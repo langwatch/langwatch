@@ -1,4 +1,16 @@
 import {
+  PeriodSelector,
+  usePeriodSelector,
+  useFilterParams,
+  FilterToggle,
+} from "@langwatch/analytics-browser-kit";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import {
   Alert,
   Button,
   Card,
@@ -11,19 +23,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-  useFilterParams,
-  FilterToggle,
-} from "@langwatch/analytics-browser-kit";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
 import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";

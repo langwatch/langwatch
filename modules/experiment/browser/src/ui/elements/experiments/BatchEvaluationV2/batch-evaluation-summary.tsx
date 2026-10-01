@@ -1,6 +1,14 @@
-import { Box, Button, HStack, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import {
+  Box,
+  Button,
+  HStack,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";

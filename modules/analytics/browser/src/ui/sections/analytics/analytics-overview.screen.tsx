@@ -10,7 +10,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
 

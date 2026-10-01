@@ -1,12 +1,12 @@
+import { Pagination as ChakraPagination } from "@chakra-ui/react";
 import {
   Button,
-  Pagination as ChakraPagination,
   Grid,
   HStack,
   NativeSelect,
   Skeleton,
   Text,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**

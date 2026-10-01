@@ -1,5 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";

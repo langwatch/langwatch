@@ -1,4 +1,3 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { classifyPromptText } from "@langwatch/coding-agent-contract";
 import {
@@ -6,6 +5,7 @@ import {
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   Fragment,
   memo,

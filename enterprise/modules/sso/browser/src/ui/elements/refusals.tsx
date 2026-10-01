@@ -1,3 +1,4 @@
+import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How single sign-on setup reports a failure, in one place. Every word comes
@@ -5,8 +6,7 @@
  * wire message for a handled error IS the code, so rendering it would show an
  * administrator `sso_activation_break_glass_missing`.
  */
-import { Alert, Text } from "@chakra-ui/react";
-import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
+import { Alert, Text } from "@langwatch/design-system/primitives";
 
 /**
  * A refusal from a change, ON THE PAGE, beside the control that caused it.

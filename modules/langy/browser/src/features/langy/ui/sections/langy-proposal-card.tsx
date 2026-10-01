@@ -1,6 +1,6 @@
-import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { isInternalHref } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-browser-kit";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";

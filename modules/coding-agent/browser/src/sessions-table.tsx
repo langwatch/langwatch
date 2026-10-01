@@ -1,6 +1,6 @@
-import { Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Pagination } from "@langwatch/design-system/pagination";
+import { Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";

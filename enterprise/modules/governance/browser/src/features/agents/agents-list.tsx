@@ -1,4 +1,4 @@
-import { HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import { HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import type { GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 import { LayoutGrid, List as ListIcon } from "lucide-react";

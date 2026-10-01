@@ -1,5 +1,5 @@
-import { Alert, Button, HStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Alert, Button, HStack } from "@langwatch/design-system/primitives";
 
 interface OverSeatsCalloutProps {
   currentMembers: number;

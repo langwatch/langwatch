@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 

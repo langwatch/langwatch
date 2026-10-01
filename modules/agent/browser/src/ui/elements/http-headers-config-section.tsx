@@ -1,5 +1,5 @@
-import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { HttpHeader } from "@langwatch/agent-contract";
+import { Button, HStack, Input, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus, X } from "lucide-react";
 

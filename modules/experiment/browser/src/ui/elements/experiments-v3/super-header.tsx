@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import type { ReactNode } from "react";
 

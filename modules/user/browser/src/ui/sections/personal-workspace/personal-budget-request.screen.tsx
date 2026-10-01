@@ -1,5 +1,15 @@
-import { Alert, Box, Button, HStack, Link, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Link,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";

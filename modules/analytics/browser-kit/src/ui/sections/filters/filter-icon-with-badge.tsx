@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { LuFilter } from "react-icons/lu";
 
 import { useFilterParams } from "../use-filter-params.ts";

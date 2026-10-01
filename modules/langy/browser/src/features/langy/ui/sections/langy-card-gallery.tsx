@@ -1,4 +1,4 @@
-import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { useLangyStore, LangyCard } from "@langwatch/langy-browser-kit";
 /**
  * Developer-mode card gallery — every card Langy can produce, on demand.

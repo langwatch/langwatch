@@ -1,6 +1,14 @@
-import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";

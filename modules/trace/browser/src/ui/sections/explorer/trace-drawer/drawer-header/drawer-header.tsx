@@ -1,3 +1,6 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import {
   Box,
   Button,
@@ -8,10 +11,7 @@ import {
   Portal,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";

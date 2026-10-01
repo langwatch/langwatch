@@ -3,7 +3,6 @@
  * then the project's custom views, which reorder by drag and rename or delete in edit mode.
  */
 
-import { Badge, Box, Button, HStack, IconButton, Input, Text } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -23,6 +22,15 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Check, MoreVertical, User, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";

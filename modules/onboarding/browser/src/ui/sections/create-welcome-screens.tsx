@@ -1,6 +1,7 @@
-import { Alert, Checkbox, Field, Icon, Input, Text, VStack } from "@chakra-ui/react";
+import { Checkbox } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
+import { Alert, Field, Icon, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { Suspense, useMemo } from "react";

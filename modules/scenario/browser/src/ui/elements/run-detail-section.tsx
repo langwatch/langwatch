@@ -2,7 +2,7 @@
  * Accordion section for the run detail drawer body.
  */
 
-import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Accordion, Badge, Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { LuChevronDown } from "react-icons/lu";
 

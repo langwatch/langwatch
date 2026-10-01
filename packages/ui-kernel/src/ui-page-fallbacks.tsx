@@ -2,8 +2,17 @@
  * What a routed page shows instead of itself.
  */
 
-import { Box, Button, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
+import {
+  Box,
+  Button,
+  Center,
+  Heading,
+  HStack,
+  Spinner,
+  Stack,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 
 import { UiErrorActions } from "./ui-error-actions.tsx";

@@ -1,3 +1,8 @@
+import type { UiWorkflowSelectorForEvaluatorDrawerProps } from "@langwatch/browser-host/drawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   Box,
   Button,
@@ -8,12 +13,7 @@ import {
   Textarea,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import type { UiWorkflowSelectorForEvaluatorDrawerProps } from "@langwatch/browser-host/drawer";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   getRandomWorkflowIcon,

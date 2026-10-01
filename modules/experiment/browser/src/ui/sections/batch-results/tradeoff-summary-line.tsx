@@ -2,7 +2,7 @@
  * The trade-off chart's conclusion, rendered above the chart rather than below it
  * (#5103).
  */
-import { HStack, Icon, Text } from "@chakra-ui/react";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 import { LuInfo, LuScissors } from "react-icons/lu";
 

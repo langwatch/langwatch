@@ -4,7 +4,7 @@
  * path renders the automations tab, so that tab is the one highlighted.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,

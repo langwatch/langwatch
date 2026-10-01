@@ -5,7 +5,7 @@
  * organizations can both call theirs `okta` and nothing routes on this
  * string. Edited in place — a whole screen for one word is furniture.
  */
-import { HStack, IconButton, Input, Text } from "@chakra-ui/react";
+import { HStack, IconButton, Input, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Pencil, X } from "lucide-react";
 import { useState } from "react";

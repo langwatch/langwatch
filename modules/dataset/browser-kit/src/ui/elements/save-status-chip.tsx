@@ -4,7 +4,7 @@
  * save must never look successful, so error is its own state, not a silent idle.
  */
 
-import { HStack, Spinner, Text } from "@chakra-ui/react";
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, X } from "lucide-react";
 

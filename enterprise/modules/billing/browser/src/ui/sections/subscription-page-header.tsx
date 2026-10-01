@@ -1,6 +1,6 @@
-import { createListCollection, HStack, Spacer } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { createListCollection, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { ArrowRight } from "lucide-react";

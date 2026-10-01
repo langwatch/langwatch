@@ -1,4 +1,4 @@
-import { VisuallyHidden } from "@chakra-ui/react";
+import { VisuallyHidden } from "@langwatch/design-system/primitives";
 
 import "../../model/ambient.d.ts";
 

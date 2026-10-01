@@ -1,5 +1,5 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 

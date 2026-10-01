@@ -4,7 +4,7 @@
  * `behavior/use-filter-toggle.ts`). The platform module stays: `TryItOut` renders it too.
  */
 
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { X } from "react-feather";
 

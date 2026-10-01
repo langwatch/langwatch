@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
 import { formatAbsoluteTime } from "@langwatch/trace-browser-kit";

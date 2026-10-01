@@ -1,4 +1,4 @@
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 
 /** The banner a checkout returns to, with the proration note after a plan change. */
 export function SubscriptionSuccessNotice({ showUpgradeCredit }: { showUpgradeCredit: boolean }) {

@@ -5,9 +5,18 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
-import { Box, Button, Checkbox, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Checkbox } from "@chakra-ui/react";
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";

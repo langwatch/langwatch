@@ -4,8 +4,8 @@
  * Spec: specs/features/onboarding/model-provider-step.feature
  */
 
-import { Box, Button, HStack, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Box, Button, HStack, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 

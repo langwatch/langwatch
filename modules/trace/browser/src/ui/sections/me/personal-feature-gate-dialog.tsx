@@ -1,4 +1,4 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { Dialog } from "../dialog.tsx";
 import type { PersonalFeatureKey } from "./use-personal-feature-gate.ts";

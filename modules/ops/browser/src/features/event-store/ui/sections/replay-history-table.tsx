@@ -1,4 +1,4 @@
-import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
+import { Badge, Card, HStack, Status, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
 import { ArrowRight } from "lucide-react";
 

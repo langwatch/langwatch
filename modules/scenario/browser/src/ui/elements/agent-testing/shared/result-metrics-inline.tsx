@@ -1,8 +1,8 @@
+import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 /**
  * What a run cost, beside a result: "6.3s · $0.0042".
  */
-import { Text } from "@chakra-ui/react";
-import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import { Text } from "@langwatch/design-system/primitives";
 
 export type ResultMetricsInlineProps = {
   durationInMs?: number | null;

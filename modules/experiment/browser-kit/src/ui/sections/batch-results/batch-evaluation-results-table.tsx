@@ -1,7 +1,3 @@
-/**
- * BatchEvaluationResultsTable - Main table component for batch evaluation results
- */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   PopoverArrow,
@@ -10,6 +6,10 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+/**
+ * BatchEvaluationResultsTable - Main table component for batch evaluation results
+ */
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";

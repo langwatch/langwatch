@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { isAppPath, toRelativeSameOriginHref } from "@langwatch/langy-contract";
 import { type CapabilityIconName, type CapabilitySurface } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";

@@ -1,4 +1,12 @@
-import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";

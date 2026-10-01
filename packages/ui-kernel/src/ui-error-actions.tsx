@@ -2,7 +2,7 @@
  * The footer of an error toast: read the docs, copy the id to hand to support.
  */
 
-import { chakra, HStack, Link } from "@chakra-ui/react";
+import { chakra, HStack, Link } from "@langwatch/design-system/primitives";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 

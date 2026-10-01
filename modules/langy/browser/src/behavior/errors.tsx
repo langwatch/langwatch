@@ -2,7 +2,7 @@
  * The failure surfaces this package renders INTO a page.
  */
 
-import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import type { ReactNode } from "react";
 export { readHandledError } from "@langwatch/error-presentation/read-handled-error";

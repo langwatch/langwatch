@@ -3,7 +3,7 @@
  * actually succeeds.
  */
 
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";

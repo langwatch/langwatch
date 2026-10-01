@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../model/scenario-run-status-config.ts";

@@ -1,4 +1,3 @@
-import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import {
   AgentLabel,
   EmptySection,
@@ -10,6 +9,7 @@ import {
 } from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { chakra, HStack, Spinner, Table, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { ContributorName } from "./contributor-name.tsx";

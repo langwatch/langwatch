@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { vscodeThemeName } from "@langwatch/workflow-browser-kit";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";

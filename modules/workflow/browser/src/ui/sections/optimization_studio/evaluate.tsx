@@ -1,3 +1,4 @@
+import { toaster } from "@langwatch/browser-host/toaster";
 import {
   Button,
   createListCollection,
@@ -7,8 +8,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { toaster } from "@langwatch/browser-host/toaster";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

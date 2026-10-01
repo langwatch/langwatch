@@ -1,4 +1,4 @@
-import { Circle, HStack, Icon, RadioCard, Text } from "@chakra-ui/react";
+import { Circle, HStack, Icon, RadioCard, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 type IconListItem<T> = {

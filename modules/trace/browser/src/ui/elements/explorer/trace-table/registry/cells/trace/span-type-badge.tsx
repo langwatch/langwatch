@@ -1,4 +1,4 @@
-import { Text, type TextProps } from "@chakra-ui/react";
+import { Text, type TextProps } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 const PROMINENT_SPAN_TYPES = new Set(["llm", "agent", "workflow"]);

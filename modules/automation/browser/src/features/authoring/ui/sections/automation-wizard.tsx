@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { stepIsComplete, stepSummary } from "../../model/wizard-steps.ts";
 import { StepRail } from "../blocks/step-rail.tsx";

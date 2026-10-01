@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 
 /** One label above a field, drawn as the Agent Testing dialogs draw theirs. */
 export function FieldLabel({ children }: { children: React.ReactNode }) {

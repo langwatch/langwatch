@@ -1,6 +1,6 @@
 // The "Grant role" button; a reader who may not manage sees it greyed out and why.
 
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus } from "lucide-react";
 

@@ -1,4 +1,4 @@
-import { Button, HStack, Input, SegmentGroup, Text, Textarea, VStack } from "@chakra-ui/react";
+import { SegmentGroup } from "@chakra-ui/react";
 /**
  * "Edit API key": the same ceiling as create, on a key that already
  * exists. Selections are clamped TWICE — a stored or pre-existing level
@@ -14,6 +14,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useState } from "react";
 
 import {

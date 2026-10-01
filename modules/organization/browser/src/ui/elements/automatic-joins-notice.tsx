@@ -1,4 +1,4 @@
-import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { readableDate } from "../../model/display-formatters.ts";
 import type { AutomaticJoin } from "../../model/pending-join-request.ts";

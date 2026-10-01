@@ -1,7 +1,16 @@
-import { Badge, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {

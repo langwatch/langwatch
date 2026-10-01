@@ -5,7 +5,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { chakra, VStack } from "@chakra-ui/react";
+import { chakra, VStack } from "@langwatch/design-system/primitives";
 import { getRoutePath } from "@langwatch/workflow-contract";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";

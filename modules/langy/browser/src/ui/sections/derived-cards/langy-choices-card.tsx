@@ -2,7 +2,7 @@
  * The choices card — the one sanctioned UI for the decision that belongs to the user
  * (ADR-060 §6).
  */
-import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   LangyChoiceSelection,
   LangyChoicesLockState,

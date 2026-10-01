@@ -1,6 +1,6 @@
 /** Permission restriction notice: shown in place of restricted content. */
 
-import { Alert, Box, Text } from "@chakra-ui/react";
+import { Alert, Box, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import type { ComponentProps } from "react";
 

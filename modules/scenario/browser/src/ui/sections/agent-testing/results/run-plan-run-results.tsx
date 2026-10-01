@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { type BatchRun, ScenarioRunContent, targetKeyOfRun } from "@langwatch/suite-browser-kit";
 

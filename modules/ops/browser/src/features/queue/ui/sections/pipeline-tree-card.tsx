@@ -1,4 +1,4 @@
-import { Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { PipelineNode } from "@langwatch/ops-contract";
 import { useMemo, useState } from "react";
 

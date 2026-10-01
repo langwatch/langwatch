@@ -1,4 +1,10 @@
 import {
+  GrantScopeTier,
+  grantScopeTierSchema,
+  teamUserRoleSchema,
+} from "@langwatch/authz-contract";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import {
   Badge,
   Box,
   Button,
@@ -7,13 +13,7 @@ import {
   Input,
   Spacer,
   Text,
-} from "@chakra-ui/react";
-import {
-  GrantScopeTier,
-  grantScopeTierSchema,
-  teamUserRoleSchema,
-} from "@langwatch/authz-contract";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";

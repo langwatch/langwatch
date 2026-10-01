@@ -1,5 +1,5 @@
-import { Text } from "@chakra-ui/react";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
 import type { ReactNode } from "react";

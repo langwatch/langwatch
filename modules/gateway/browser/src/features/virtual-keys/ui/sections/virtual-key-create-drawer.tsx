@@ -1,3 +1,5 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Button,
   Field,
@@ -8,9 +10,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEffect, useMemo, useState } from "react";
 

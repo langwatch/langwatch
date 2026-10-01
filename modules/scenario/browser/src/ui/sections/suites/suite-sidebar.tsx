@@ -2,6 +2,12 @@
  * Suite sidebar with search, all runs link, suite list, and external sets section.
  */
 
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "@langwatch/design-system/pass-rate-indicator";
 import {
   Box,
   Button,
@@ -13,13 +19,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
-import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
-import {
-  getPassRateGradientColor,
-  PassRateCircle,
-} from "@langwatch/design-system/pass-rate-indicator";
+} from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";

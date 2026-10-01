@@ -1,4 +1,4 @@
-import { Heading, Text, VStack } from "@chakra-ui/react";
+import { Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";

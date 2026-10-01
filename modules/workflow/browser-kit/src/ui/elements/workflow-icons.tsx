@@ -1,6 +1,6 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { EqualsIcon, LLMIcon, WeaviateIcon } from "@langwatch/design-system/icons";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
 import { Bot, Database } from "lucide-react";
 import {

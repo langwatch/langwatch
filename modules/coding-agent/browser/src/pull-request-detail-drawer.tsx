@@ -1,4 +1,3 @@
-import { Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import {
   ModelsSection,
   MISSING_VALUE,
@@ -8,6 +7,15 @@ import {
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { GitHubIcon } from "@langwatch/design-system/icons";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import type React from "react";

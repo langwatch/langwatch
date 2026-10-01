@@ -4,9 +4,9 @@
  * Errors route through the host's failure notice for code-keyed presentation.
  */
 
-import { Button, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { evaluatorApi } from "../../behavior/evaluator-api.ts";

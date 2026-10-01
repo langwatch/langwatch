@@ -1,3 +1,5 @@
+import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
+import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Directory page's status band: which sources are connected, when the last
@@ -5,9 +7,15 @@
  * it does not manage. Lent to organization's Directory through `withCapabilities`.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Alert, Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
-import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
-import { Link } from "@langwatch/browser-host/link";
+import {
+  Alert,
+  Card,
+  HStack,
+  SimpleGrid,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";

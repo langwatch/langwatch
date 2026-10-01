@@ -1,11 +1,11 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * Settings, Checkup: is this install wired, what is broken and how to fix it,
  * and exactly what it sends. The same rows print from `langwatch doctor`.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
-import { Alert, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Cloud } from "lucide-react";
 
 import { useCheckupScreen } from "../../behavior/use-checkup-screen.ts";

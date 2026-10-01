@@ -2,9 +2,9 @@
  * Who changed this evaluator, and when. THE ONE OVERLAY OF THIS FAMILY THAT TRAVELLED.
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import {
   ArrowUp,

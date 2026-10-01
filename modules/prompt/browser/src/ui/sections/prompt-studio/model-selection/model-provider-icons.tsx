@@ -4,7 +4,6 @@
  * is the contract's, so an added provider fails typecheck, not a blank cell.
  */
 
-import { Box } from "@chakra-ui/react";
 import {
   AnthropicIcon,
   AWSIcon,
@@ -12,6 +11,7 @@ import {
   IconGlyph,
   OpenAIIcon,
 } from "@langwatch/design-system/icons";
+import { Box } from "@langwatch/design-system/primitives";
 import type { modelProviders } from "@langwatch/model-provider-contract";
 import { useId, type ReactNode } from "react";
 

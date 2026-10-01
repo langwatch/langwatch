@@ -1,5 +1,5 @@
-import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import type { HttpAuth, HttpAuthType } from "@langwatch/agent-contract";
+import { Field, Input, NativeSelect, VStack } from "@langwatch/design-system/primitives";
 
 export type AuthConfigSectionProps = {
   value: HttpAuth | undefined;

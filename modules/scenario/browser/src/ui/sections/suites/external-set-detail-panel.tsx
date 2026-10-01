@@ -2,9 +2,9 @@
  * Read-only detail panel for external SDK/CI scenario sets.
  */
 
-import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Box, Button, EmptyState, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";

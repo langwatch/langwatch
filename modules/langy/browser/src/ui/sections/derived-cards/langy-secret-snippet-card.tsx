@@ -3,7 +3,7 @@
  * through `secrets.revealOnce` on its first render in this tab and is masked on every later one.
  * Spec: specs/langy/langy-secret-snippet.feature
  */
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { KeyRound } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 

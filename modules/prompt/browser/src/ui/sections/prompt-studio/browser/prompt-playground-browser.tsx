@@ -1,5 +1,5 @@
-import { HStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { HStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LuColumns2 } from "react-icons/lu";
 

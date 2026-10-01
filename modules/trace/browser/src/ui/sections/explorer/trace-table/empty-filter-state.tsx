@@ -1,4 +1,12 @@
-import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  HStack,
+  Stack,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { type TimeRange, useExplorerStore } from "@langwatch/trace-browser-kit";
 import type React from "react";

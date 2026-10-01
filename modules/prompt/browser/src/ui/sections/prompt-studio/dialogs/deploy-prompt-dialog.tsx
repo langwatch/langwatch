@@ -1,14 +1,4 @@
 import {
-  Box,
-  Button,
-  createListCollection,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   DialogBody,
   DialogCloseTrigger,
   DialogContent,
@@ -17,6 +7,16 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import {
+  Box,
+  Button,
+  createListCollection,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Trash2, UnplugIcon, Info } from "lucide-react";

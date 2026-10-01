@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { RunMetricsSummary } from "@langwatch/suite-browser-kit";
 

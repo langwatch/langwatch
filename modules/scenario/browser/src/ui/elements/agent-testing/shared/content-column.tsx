@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { Box, type BoxProps, VStack } from "@chakra-ui/react";
+import { Box, type BoxProps, VStack } from "@langwatch/design-system/primitives";
 
 /** How wide the column is allowed to grow beside a rail. */
 export const CONTENT_COLUMN_MAX_WIDTH = "1100px";

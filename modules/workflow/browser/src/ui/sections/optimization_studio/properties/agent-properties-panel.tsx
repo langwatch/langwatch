@@ -1,3 +1,10 @@
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "@langwatch/agent-contract/code-config";
+import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
 import {
   Badge,
   Box,
@@ -9,14 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "@langwatch/agent-contract/code-config";
-import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
+} from "@langwatch/design-system/primitives";
 import { type FieldMapping, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import { useRegisterDrawerFooter, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {

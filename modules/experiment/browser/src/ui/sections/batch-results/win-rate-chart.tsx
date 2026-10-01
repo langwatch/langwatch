@@ -18,7 +18,7 @@
  * visual break — same width, same header treatment, same chartHeight.
  */
 
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { type BatchComparisonColumn, disambiguateNames } from "@langwatch/experiment-browser-kit";
 import {
   Bar,

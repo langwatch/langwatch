@@ -4,7 +4,14 @@
  * forbids repointing it, so this one travels with the add-or-edit drawer.
  */
 
-import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  type BoxProps,
+  Field,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import type { SlugValidation } from "../../model/dataset-slug-validation.ts";
 import { CopyValueButton } from "../elements/copy-value-button.tsx";

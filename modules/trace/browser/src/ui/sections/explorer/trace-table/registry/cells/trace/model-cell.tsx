@@ -1,4 +1,12 @@
-import { Badge, chakra, HoverCard, Icon, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  chakra,
+  HoverCard,
+  Icon,
+  Portal,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { CircleHelp } from "lucide-react";
 import type React from "react";

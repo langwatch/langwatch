@@ -4,10 +4,10 @@
  * every project grouped by organization and team, as the graph arrives.
  */
 
-import { Button, HStack, Text } from "@chakra-ui/react";
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 

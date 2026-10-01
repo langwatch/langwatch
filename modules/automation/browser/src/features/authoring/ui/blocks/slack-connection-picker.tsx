@@ -1,5 +1,13 @@
-import { Box, Field, HStack, type ListCollection, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Box,
+  Field,
+  HStack,
+  type ListCollection,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import {
   findSlackConnection,

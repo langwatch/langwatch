@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 
 /**
  * How wide the shared left rail reads. Scenarios uses this for the suites rail,

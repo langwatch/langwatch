@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 
 import type { SubscriberHealthRow } from "../../model/subscriber-health.ts";
 

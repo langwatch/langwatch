@@ -1,7 +1,7 @@
 /**
  * MediaPart — renders a single AG-UI media content part inline.
  */
-import { Box, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
 import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import type { MediaPartData } from "@langwatch/trace-contract";

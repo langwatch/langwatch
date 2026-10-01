@@ -1,8 +1,17 @@
 // The role cards (main's RoleCards): a predefined tier names what it adds to the one
 // below; a custom role shows what it grants, where it is in force and who holds it.
 
-import { Badge, Box, Button, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { format } from "@langwatch/time";
 import { Pencil, Trash2 } from "lucide-react";

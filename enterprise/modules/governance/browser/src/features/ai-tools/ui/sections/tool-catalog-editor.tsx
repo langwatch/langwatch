@@ -1,15 +1,4 @@
 import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   closestCenter,
   DndContext,
   type DragEndEvent,
@@ -25,6 +14,17 @@ import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type {
   AiToolEntry,
   AiToolStarterTileChoice,

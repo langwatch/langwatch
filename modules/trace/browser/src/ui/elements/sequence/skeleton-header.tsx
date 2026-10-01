@@ -1,4 +1,4 @@
-import { Box, Flex, Skeleton } from "@chakra-ui/react";
+import { Box, Flex, Skeleton } from "@langwatch/design-system/primitives";
 
 /**
  * Header bar shared by SequenceSkeleton and TopologySkeleton — keeps the

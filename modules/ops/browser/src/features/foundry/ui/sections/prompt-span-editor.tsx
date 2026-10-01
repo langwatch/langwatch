@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Input, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, Input, Text } from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";

@@ -1,3 +1,4 @@
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -10,8 +11,7 @@ import {
   Spinner,
   Table,
   Text,
-} from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";

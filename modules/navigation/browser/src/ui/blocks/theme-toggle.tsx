@@ -1,5 +1,5 @@
-import { Box, chakra, HStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { Box, chakra, HStack } from "@langwatch/design-system/primitives";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";

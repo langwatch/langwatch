@@ -1,4 +1,4 @@
-import { HStack, Skeleton, Text } from "@chakra-ui/react";
+import { HStack, Skeleton, Text } from "@langwatch/design-system/primitives";
 
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { EventBadge } from "../../shared-chips.tsx";

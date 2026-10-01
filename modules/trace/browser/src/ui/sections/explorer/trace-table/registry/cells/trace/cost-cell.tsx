@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatCost } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";

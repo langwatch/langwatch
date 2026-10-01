@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@langwatch/design-system/dialog";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
   Badge,
   Box,
   Button,
@@ -14,19 +26,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";

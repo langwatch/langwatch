@@ -1,5 +1,5 @@
-import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";

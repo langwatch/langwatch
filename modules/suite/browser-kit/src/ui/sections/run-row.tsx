@@ -4,9 +4,9 @@
  * ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
  */
 
-import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";

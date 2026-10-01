@@ -2,7 +2,7 @@
  * Trace-sample card (`langwatch.trace.search`).
  */
 
-import { Button, Text } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { traceContextChip, LangyContextTarget } from "@langwatch/langy-browser-kit";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { useExplorerLinkLensId } from "@langwatch/trace-browser-kit";

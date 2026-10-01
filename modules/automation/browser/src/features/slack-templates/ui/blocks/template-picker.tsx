@@ -1,5 +1,5 @@
-import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automation-contract";
+import { Box, Flex, Stack, Text } from "@langwatch/design-system/primitives";
 import { useId, useState } from "react";
 
 import { buildLayoutRows, type LayoutRow } from "../elements/layout-rows.ts";

@@ -1,5 +1,12 @@
-import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import {
+  EmptyState,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import React, { useEffect, useRef, useState } from "react";
 
 import {

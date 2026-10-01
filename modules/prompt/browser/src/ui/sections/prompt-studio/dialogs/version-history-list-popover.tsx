@@ -1,5 +1,8 @@
+import { Avatar } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Menu } from "@langwatch/design-system/menu";
+import { Popover } from "@langwatch/design-system/popover";
 import {
-  Avatar,
   Box,
   Button,
   type ButtonProps,
@@ -10,10 +13,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Menu } from "@langwatch/design-system/menu";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, type Instant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";

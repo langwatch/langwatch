@@ -1,4 +1,13 @@
-import { Box, chakra, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { memo, type RefObject, useCallback, useMemo } from "react";

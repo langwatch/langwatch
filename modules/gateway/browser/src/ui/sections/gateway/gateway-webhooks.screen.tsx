@@ -1,9 +1,19 @@
-import { Alert, Badge, Box, Button, Spacer, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   History,
   MoreVertical,

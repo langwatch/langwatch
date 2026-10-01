@@ -1,5 +1,5 @@
-import { VStack } from "@chakra-ui/react";
 import { useFilterToggle } from "@langwatch/analytics-browser-kit";
+import { VStack } from "@langwatch/design-system/primitives";
 import React from "react";
 
 import { QueryStringFieldsFilters } from "./fields-filters.tsx";

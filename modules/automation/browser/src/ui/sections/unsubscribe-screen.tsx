@@ -4,9 +4,9 @@
  * entire project. Spec: specs/automations/unsubscribe-landing.feature
  */
 
-import { Button, Center, Spinner } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Button, Center, Spinner } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { automationApi } from "../../behavior/automation-api.ts";

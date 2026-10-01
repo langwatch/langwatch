@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { Icon, Skeleton, VStack } from "@chakra-ui/react";
+import { Icon, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Folder, FolderCode, FolderPlus } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";

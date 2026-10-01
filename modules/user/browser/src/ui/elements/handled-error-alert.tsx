@@ -3,7 +3,7 @@
  * Displays error title and description (awaiting code-keyed presentation registry).
  */
 
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error.ts";

@@ -1,5 +1,5 @@
-import { Button, HStack, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Button, HStack, VStack } from "@langwatch/design-system/primitives";
 
 interface OnboardingNavigationProps<T extends number = number> {
   /** The surface these clicks happened on, named by whoever mounted the flow. */

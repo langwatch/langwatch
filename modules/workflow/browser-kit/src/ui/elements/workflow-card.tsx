@@ -1,6 +1,6 @@
-import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, chakra, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
 

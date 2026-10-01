@@ -4,18 +4,7 @@
  * (`inMemoryDataset` + `onUpdateDataset`, caller owns the data).
  */
 
-import {
-  Box,
-  Button,
-  Checkbox,
-  Heading,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Checkbox } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
@@ -38,6 +27,17 @@ import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { getImageUrl } from "@langwatch/design-system/external-image";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";

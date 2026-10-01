@@ -1,4 +1,4 @@
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import React from "react";
 
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";

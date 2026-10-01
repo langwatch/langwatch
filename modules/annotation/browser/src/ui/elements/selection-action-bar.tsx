@@ -3,7 +3,7 @@
  * UX: dev/docs/best_practices/selection-action-bar.md.
  */
 
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 

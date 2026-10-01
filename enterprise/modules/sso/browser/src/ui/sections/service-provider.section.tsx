@@ -6,7 +6,7 @@
  * and needs these values to do it. A form that only asked questions would
  * send them away to guess, and what they would guess is ours.
  */
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoConnectionType } from "@langwatch/identity-contract";
 
 import {

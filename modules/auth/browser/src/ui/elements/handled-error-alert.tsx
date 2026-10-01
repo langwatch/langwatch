@@ -1,6 +1,6 @@
 /** Inline error alert; says failure using host's explanation or generic fallback. */
 
-import { Alert, List, Text } from "@chakra-ui/react";
+import { Alert, List, Text } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 import { explainErrorCode } from "../../model/error-presentation.ts";

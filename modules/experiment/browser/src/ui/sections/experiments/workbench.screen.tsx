@@ -1,7 +1,7 @@
-import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import {
   type ProposalHandlers,
   useRegisterLangyActions,

@@ -1,4 +1,4 @@
-import { Box, chakra, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type ChatMessage,
   isRecord,

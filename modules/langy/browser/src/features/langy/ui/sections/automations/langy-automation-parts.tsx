@@ -3,7 +3,7 @@
  * the state as the list's dot and word, and the delivery as its action name over a muted
  * destination.
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import type { LangyAutomationDestination } from "../../../model/logic/langy-automation-summary.ts";

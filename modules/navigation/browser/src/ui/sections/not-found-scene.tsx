@@ -3,8 +3,16 @@
  * with its canvas renderer.
  */
 
-import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useColorMode, useColorModeValue } from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { ArrowLeft, Home, Settings } from "lucide-react";
 import { type Dispatch, type SetStateAction, useMemo, useRef, useState } from "react";

@@ -1,5 +1,5 @@
-import { Button } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Button } from "@langwatch/design-system/primitives";
 import { HandledErrorState } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { SearchX } from "lucide-react";

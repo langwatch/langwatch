@@ -4,7 +4,15 @@
  * Spec: specs/integrations/github-connection.feature.
  */
 
-import { Badge, Button, Card, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 

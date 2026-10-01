@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Portal, Textarea } from "@chakra-ui/react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { Box, Button, HStack, Portal, Textarea } from "@langwatch/design-system/primitives";
 import {
   type CSSProperties,
   type KeyboardEvent,

@@ -1,8 +1,17 @@
 /** What one member can reach, and the one save that changes it. */
 
-import { Badge, Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

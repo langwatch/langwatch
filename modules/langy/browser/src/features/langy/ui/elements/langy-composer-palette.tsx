@@ -6,7 +6,7 @@ import {
   Portal,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import {
   absorbContextTarget,
   type LangyContextChip,

@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import type { GroupTarget, useGroupActions } from "../../behavior/use-group-actions.ts";

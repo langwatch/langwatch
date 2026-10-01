@@ -1,4 +1,4 @@
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { Chip } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";

@@ -1,4 +1,4 @@
-import { Center, Spinner, VStack } from "@chakra-ui/react";
+import { Center, Spinner, VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";

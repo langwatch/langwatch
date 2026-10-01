@@ -1,4 +1,4 @@
-import { Button, Icon, Text } from "@chakra-ui/react";
+import { Button, Icon, Text } from "@langwatch/design-system/primitives";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import { LuCheck, LuCopy } from "react-icons/lu";
 

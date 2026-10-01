@@ -1,7 +1,16 @@
-import { Box, Circle, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Circle,
+  HStack,
+  IconButton,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";

@@ -1,6 +1,6 @@
 // Parses CSV/JSON/JSONL to rows via native input for keyboard accessibility, not papaparse.
 
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
 

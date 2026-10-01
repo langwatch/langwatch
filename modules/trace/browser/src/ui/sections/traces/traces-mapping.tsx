@@ -1,4 +1,3 @@
-import { Field, Grid, GridItem, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   type DatasetRecordEntry,
@@ -6,6 +5,7 @@ import {
   SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
 } from "@langwatch/dataset-contract";
+import { Field, Grid, GridItem, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant } from "@langwatch/time";
 import type { Trace } from "@langwatch/trace-contract";

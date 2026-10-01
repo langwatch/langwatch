@@ -1,12 +1,19 @@
 // Create/edit datasets with validation for required name and no duplicate column names.
 
-import { Button, Field, HStack, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import {
   type DatasetColumns,
   type DatasetColumnType,
   datasetColumnTypeSchema,
 } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 

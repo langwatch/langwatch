@@ -1,4 +1,4 @@
-import type { Tokens } from "@chakra-ui/react";
+import type { Tokens } from "@langwatch/design-system/primitives";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 import {
   Activity,

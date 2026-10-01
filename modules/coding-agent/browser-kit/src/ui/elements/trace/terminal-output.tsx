@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import { memo, useCallback, useMemo, useState } from "react";
 

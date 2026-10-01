@@ -1,10 +1,19 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Deleting a workflow, and everything that hangs off it: linked evaluators
  * and agents are ARCHIVED, and the online evaluations those evaluators back
  * are DELETED.
  */
-import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Alert,
+  Button,
+  HStack,
+  Input,
+  List,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
 

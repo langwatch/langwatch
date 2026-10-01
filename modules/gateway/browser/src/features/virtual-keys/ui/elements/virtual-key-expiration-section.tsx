@@ -1,5 +1,12 @@
-import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import {

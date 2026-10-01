@@ -1,6 +1,6 @@
 /** Top bar: org/product scope (left), account controls (right). Impersonation banner from host. */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Settings as SettingsIcon } from "lucide-react";
 
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";

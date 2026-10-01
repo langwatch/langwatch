@@ -1,12 +1,12 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import { formatMoney } from "@langwatch/design-system/format-money";
 /**
  * Read-only, virtualized results table for a batch evaluation run: inputs,
  * outputs, cost/duration, score/passed/label/details; auto-pins to the
  * bottom while streaming, click-to-expand cells, error/skipped tinting.
  */
-import { Box, Button, HStack } from "@chakra-ui/react";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
-import { formatMoney } from "@langwatch/design-system/format-money";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import { cellPictureUrl } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";

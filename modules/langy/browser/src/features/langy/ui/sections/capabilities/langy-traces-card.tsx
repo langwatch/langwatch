@@ -1,8 +1,8 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
 /**
  * Traces capability card (`langwatch.trace.search` / `langwatch.trace.get`).
  */
-import { Button, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy-contract";

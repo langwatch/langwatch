@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
 import type { DragEvent } from "react";
 

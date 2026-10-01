@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { differenceInMinutes, differenceInSeconds, toEpochMs } from "@langwatch/time";
 
 import { api, type RouterOutputs } from "../../../../behavior/automation-api.ts";

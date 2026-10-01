@@ -1,6 +1,6 @@
-import { Button, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { GitHubIcon as GitHub } from "@langwatch/design-system/icons";
+import { Button, Text, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 import { Discord } from "./icons/discord.tsx";

@@ -1,5 +1,6 @@
-import { HStack, Stat, Text } from "@chakra-ui/react";
+import { Stat } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 

@@ -4,8 +4,8 @@
  * Spec: specs/navigation/navigation-modes.feature
  */
 
-import { Box, Button, HStack, Portal } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
 import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 

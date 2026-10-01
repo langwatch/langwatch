@@ -1,7 +1,7 @@
-import { HStack, type StackProps } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { ExternalImage } from "@langwatch/design-system/external-image";
+import { HStack, type StackProps } from "@langwatch/design-system/primitives";
 import { slugify } from "@langwatch/design-system/slugify";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
 import {

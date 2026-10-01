@@ -1,5 +1,5 @@
-import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

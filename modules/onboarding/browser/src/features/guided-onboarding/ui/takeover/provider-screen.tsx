@@ -1,9 +1,9 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Connect an AI provider on the way into the product: one row of marks, one
  * focused connect panel, and a quiet "Skip Guided Tour" link that asks once.
  */
-import { Box, chakra, Flex, HStack, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, chakra, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { guidedProvidersFor } from "@langwatch/onboarding-browser-kit";
 import { useEffect, useMemo, useState } from "react";

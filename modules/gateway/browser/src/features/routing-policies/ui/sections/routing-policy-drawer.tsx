@@ -1,4 +1,12 @@
 import {
+  ProviderScopeChips,
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+} from "@langwatch/authz-browser-kit";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
   Box,
   Button,
   Field,
@@ -9,15 +17,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import {
-  ProviderScopeChips,
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "@langwatch/authz-browser-kit";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+} from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";

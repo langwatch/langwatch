@@ -1,4 +1,4 @@
-import { Box, chakra, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { ChevronRight, GitCompare, ScanSearch, ShieldCheck } from "lucide-react";
 import { type ComponentType, useMemo } from "react";
 // Lucide dropped its brand glyphs, so the octocat comes from react-feather —

@@ -1,4 +1,4 @@
-import { Status } from "@chakra-ui/react";
+import { Status } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 
 import { formatDurationMs } from "../../../../model/ops-formatters.ts";

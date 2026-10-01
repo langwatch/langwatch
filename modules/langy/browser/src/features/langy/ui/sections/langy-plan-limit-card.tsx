@@ -1,5 +1,5 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useLangyStore, LangyCard } from "@langwatch/langy-browser-kit";
 import { ArrowUpRight, Crown } from "lucide-react";
 

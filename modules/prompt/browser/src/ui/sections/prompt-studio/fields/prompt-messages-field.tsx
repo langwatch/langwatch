@@ -1,4 +1,11 @@
-import { Box, Field, HStack, Spacer, type StackProps, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  HStack,
+  Spacer,
+  type StackProps,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   type AvailableSource,
   PromptTextAreaWithVariables,

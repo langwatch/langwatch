@@ -1,8 +1,15 @@
 /**
  * Tool-call activity for an assistant turn. Everything here is a CARD.
  */
-import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
 import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";

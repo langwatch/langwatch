@@ -1,13 +1,13 @@
 // Per-category read/write picker. Shows LOCKED rows (not hidden) so unavailable permissions
 // don't confuse users to ask support.
 
-import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   type AccessLevel,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronsUpDown, Lock } from "lucide-react";
 

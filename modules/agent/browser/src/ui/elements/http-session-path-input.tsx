@@ -1,4 +1,4 @@
-import { chakra, Field, HStack, Input } from "@chakra-ui/react";
+import { chakra, Field, HStack, Input } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle } from "lucide-react";
 

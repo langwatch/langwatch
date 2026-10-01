@@ -1,5 +1,13 @@
-import { Box, Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuArrowRight, LuRocket } from "react-icons/lu";
 

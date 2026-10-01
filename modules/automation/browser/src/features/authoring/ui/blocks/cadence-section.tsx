@@ -1,4 +1,3 @@
-import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import {
   CADENCE_CHOICE_LABELS,
   GRAPH_ALERT_TIME_PERIODS,
@@ -6,6 +5,14 @@ import {
   type GraphAlertTimePeriod,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import {
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { describeCron, isValidCron } from "../../model/report-schedule.ts";

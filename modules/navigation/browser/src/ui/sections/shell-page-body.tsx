@@ -12,7 +12,7 @@ import {
   type StackProps,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 

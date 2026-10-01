@@ -1,7 +1,7 @@
-import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import type { UiAgentActionsMenuProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useState } from "react";

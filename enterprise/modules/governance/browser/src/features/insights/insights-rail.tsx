@@ -1,4 +1,4 @@
-import { Badge, chakra, Separator, Text, VStack } from "@chakra-ui/react";
+import { Badge, chakra, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { Archive, Bell, Clock, Inbox, Mail } from "lucide-react";
 
 /**

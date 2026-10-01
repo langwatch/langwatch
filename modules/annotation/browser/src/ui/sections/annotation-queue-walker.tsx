@@ -4,7 +4,7 @@
  * Behaviour is main's my-queue page; see modules/annotation/specs.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { sessionTraceIds, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useMemo, useState } from "react";
 

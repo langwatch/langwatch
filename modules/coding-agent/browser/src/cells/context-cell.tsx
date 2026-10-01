@@ -1,6 +1,6 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { MissingValue } from "@langwatch/coding-agent-browser-kit";
 import { formatTokens } from "@langwatch/design-system/display-formatters";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 

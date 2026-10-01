@@ -1,3 +1,4 @@
+import { Drawer } from "@langwatch/design-system/drawer";
 /**
  * User management drawer component
  * Manages ephemeral state for planning upgrades - does NOT save to DB
@@ -15,8 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";

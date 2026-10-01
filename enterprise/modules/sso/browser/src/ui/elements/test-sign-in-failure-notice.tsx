@@ -5,7 +5,7 @@
  * connection refuses them, and a toast disappears while they are reading,
  * cannot be pasted into a ticket, and sits away from what it is about.
  */
-import { Alert, Box, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { TestSignInFailure } from "../../model/test-sign-in-failure.ts";
 

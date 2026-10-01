@@ -1,4 +1,4 @@
-import { Button, VStack } from "@chakra-ui/react";
+import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { ArrowLeft } from "lucide-react";
 

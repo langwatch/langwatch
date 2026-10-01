@@ -1,4 +1,4 @@
-import { Box, IconButton } from "@chakra-ui/react";
+import { Box, IconButton } from "@langwatch/design-system/primitives";
 import { codeToHtml, codeToHtmlDark } from "@langwatch/design-system/shiki";
 import { toaster } from "@langwatch/design-system/toaster";
 import { CopyIcon } from "lucide-react";

@@ -1,5 +1,5 @@
-import { Skeleton, VStack } from "@chakra-ui/react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type Cell, flexRender, type RowData } from "@tanstack/react-table";
 
 import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";

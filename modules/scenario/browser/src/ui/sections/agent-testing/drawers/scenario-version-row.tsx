@@ -4,8 +4,16 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 
 import type { VersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";

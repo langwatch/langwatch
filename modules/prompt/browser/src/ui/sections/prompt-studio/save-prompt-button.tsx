@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 

@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { CheckCircle, ChevronRight } from "lucide-react";
 

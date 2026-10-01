@@ -3,7 +3,7 @@
  * rail. The shell owns the chrome and each screen sets its own Header and Container.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { type PropsWithChildren, useEffect } from "react";
 
 export default function AiGatewayLayout({

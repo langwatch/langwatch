@@ -1,4 +1,3 @@
-import { Button, Field, HStack, IconButton, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { WireOf } from "@langwatch/api/web";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
@@ -13,6 +12,15 @@ import {
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Button,
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  NativeSelect,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-browser-kit";

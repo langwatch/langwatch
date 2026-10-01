@@ -3,8 +3,8 @@
  * platform/app (one caller); Design System Dialog replaces ui/dialog.
  */
 
-import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Alert, Button, Text, VStack } from "@langwatch/design-system/primitives";
 
 interface RegenerateApiKeyDialogProps {
   open: boolean;

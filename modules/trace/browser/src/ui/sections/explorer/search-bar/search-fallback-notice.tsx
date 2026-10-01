@@ -1,5 +1,5 @@
-import { Button, HStack, IconButton, Text } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Button, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { type SearchNotice, useFilterStore } from "@langwatch/trace-browser-kit";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";

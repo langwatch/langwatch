@@ -1,4 +1,4 @@
-import { Box, Card, HStack, Text } from "@chakra-ui/react";
+import { Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
 import { Skull } from "lucide-react";
 
 /**

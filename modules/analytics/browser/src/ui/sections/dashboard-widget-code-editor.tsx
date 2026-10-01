@@ -4,8 +4,8 @@
  * Query SQL is edited in the kit's `LwqlEditor`.
  */
 
-import { Box } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box } from "@langwatch/design-system/primitives";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useMemo, useState } from "react";

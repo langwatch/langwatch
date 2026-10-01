@@ -1,5 +1,5 @@
-import { chakra, HStack, Icon, Input, Stack, Text } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { chakra, HStack, Icon, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   type LensColumnOption,

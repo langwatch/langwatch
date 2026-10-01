@@ -1,4 +1,4 @@
-import { HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 const SKELETON_SECTIONS: { titleWidth: string; rows: string[] }[] = [

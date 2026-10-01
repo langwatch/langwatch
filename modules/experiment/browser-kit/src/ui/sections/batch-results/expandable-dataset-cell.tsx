@@ -2,7 +2,7 @@
  * ExpandableDatasetCell - A cell that can expand to show full content.
  */
 
-import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useRef, useState } from "react";

@@ -1,4 +1,4 @@
-import { Box, Code, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, Code, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { useState } from "react";
 

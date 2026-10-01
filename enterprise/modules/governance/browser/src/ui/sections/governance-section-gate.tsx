@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Skeleton, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import type { ComponentType } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";

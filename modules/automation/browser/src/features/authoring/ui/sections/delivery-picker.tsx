@@ -1,5 +1,5 @@
-import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { TriggerAction } from "@langwatch/automation-contract";
+import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Settings2 } from "lucide-react";
 

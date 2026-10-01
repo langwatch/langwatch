@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Keyboard } from "lucide-react";
 import type { ReactNode } from "react";
 

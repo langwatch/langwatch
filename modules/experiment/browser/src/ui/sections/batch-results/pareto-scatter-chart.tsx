@@ -3,7 +3,7 @@
  * Point size carries the third metric so uncertainty error bars remain legible;
  * `computeParetoDominance` supplies the accompanying outright-loss verdict.
  */
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,

@@ -1,6 +1,14 @@
-import { Alert, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { useEffect } from "react";
 

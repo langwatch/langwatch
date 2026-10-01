@@ -2,7 +2,7 @@
  * Criteria summary chip for the run detail drawer header.
  */
 
-import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, CircleDashed, X } from "lucide-react";
 
 import { SimulationChip } from "./simulation-chip.tsx";

@@ -1,4 +1,4 @@
-import { SimpleGrid } from "@chakra-ui/react";
+import { SimpleGrid } from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
 import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";

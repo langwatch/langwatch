@@ -1,12 +1,21 @@
 // CLI device-flow approval (RFC 8628): lookup code, review scopes/perms, approve. Exchange
 // unchanged; three fetch calls delegated to host. CreateProjectDrawer is recorded gap.
 
-import { Box, Button, HStack, Icon, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
 import {
   CLI_KEY_MANAGEMENT_PERMISSIONS,
   cliKeyManagementPermissions,
   type CliKeyManagementPermission,
 } from "@langwatch/api-key-contract";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Spinner,
+  Stack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -1,6 +1,15 @@
-import { Box, Button, Circle, HStack, Icon, IconButton, Spacer, Text } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Icon,
+  IconButton,
+  Spacer,
+  Text,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AgentTypeEnum } from "@langwatch/experiment-contract";
 import {

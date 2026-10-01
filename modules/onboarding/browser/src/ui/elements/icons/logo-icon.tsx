@@ -3,7 +3,7 @@
  * `LogoIcon` other modules carry (auth, navigation, workflow); shared in
  * design-system eventually.
  */
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 
 const LOGO_PLATE_PATH =
   "M0 12.383v28.652c0 .357.19.688.5.866l16.595 9.58a.993.993 0 001 0l19.184-11.072a1 1 0 00.5-.866V10.887a.998.998 0 00-.5-.866l-6.111-3.526a.999.999 0 00-.999 0l-2.874 1.659V4.837a.998.998 0 00-.5-.866L20.684.442a1.003 1.003 0 00-1 0l-5.903 3.409a1 1 0 00-.5.866v7.44l-.36.208v-.493a1 1 0 00-.5-.866L7.405 8.107a1.005 1.005 0 00-1 0l-5.904 3.41a.998.998 0 00-.501.866z";

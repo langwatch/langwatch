@@ -40,6 +40,9 @@
       "path": "../../enterprise/modules/scim/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../handled-error/tsconfig.build.json"
     },
     {

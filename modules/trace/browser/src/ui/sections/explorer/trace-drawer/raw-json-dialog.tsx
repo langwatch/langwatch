@@ -1,5 +1,14 @@
-import { Box, Button, HStack, Icon, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { useEffect, useMemo, useState } from "react";

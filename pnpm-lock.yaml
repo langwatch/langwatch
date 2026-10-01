@@ -3674,6 +3674,9 @@ importers:
 
   enterprise/modules/managed-provider/browser:
     dependencies:
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../../packages/design-system
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9875,6 +9878,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -13957,6 +13963,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../contract
@@ -16870,6 +16879,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../design-system
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../error-presentation
@@ -17682,6 +17694,9 @@ importers:
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../modules/entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error

@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
 import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
 

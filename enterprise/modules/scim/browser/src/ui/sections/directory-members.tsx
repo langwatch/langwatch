@@ -1,11 +1,11 @@
+import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The people the directory actually put here, named: the status band counts
  * them and a count is the one answer nobody can check. Two `organization:manage`
  * reads joined here: the roster for names, provenance for who the directory made.
  */
-import { Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Heading, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { HandledErrorAlert } from "@langwatch/error-views";
 

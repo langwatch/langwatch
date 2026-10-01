@@ -1,9 +1,9 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
-import { Alert, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Alert, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";

@@ -1,4 +1,4 @@
-import { Button, Icon, Text, VStack, Checkbox } from "@chakra-ui/react";
+import { Checkbox } from "@chakra-ui/react";
 import {
   PopoverArrow,
   PopoverBody,
@@ -6,6 +6,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import { Button, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { LuSettings2 } from "react-icons/lu";
 

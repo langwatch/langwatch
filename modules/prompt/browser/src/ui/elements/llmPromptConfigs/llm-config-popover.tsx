@@ -1,6 +1,6 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { allModelOptions } from "@langwatch/model-provider-browser-kit";
 import {
   getParameterConfigWithModelOverrides,

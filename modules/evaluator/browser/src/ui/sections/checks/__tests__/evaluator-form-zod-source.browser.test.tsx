@@ -4,16 +4,8 @@
  * `AVAILABLE_EVALUATORS` (now Zod, not ts-to-zod); captures a screenshot.
  */
 
-import {
-  Badge,
-  Box,
-  ChakraProvider,
-  defaultSystem,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Badge, Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AVAILABLE_EVALUATORS, evaluatorsSchema } from "@langwatch/evaluator-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

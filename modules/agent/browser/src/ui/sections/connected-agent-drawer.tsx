@@ -14,7 +14,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import type { ReactNode } from "react";

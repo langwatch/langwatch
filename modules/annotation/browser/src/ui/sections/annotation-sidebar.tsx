@@ -3,9 +3,9 @@
  * Local copy (see platform/app/src/components/AnnotationsLayout).
  */
 
-import { Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationQueuePendingCount } from "@langwatch/annotation-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox, MoreVertical, Pencil, Plus, SquarePen, Users } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useState } from "react";

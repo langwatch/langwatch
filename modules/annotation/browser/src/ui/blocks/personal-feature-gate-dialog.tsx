@@ -1,7 +1,7 @@
 /** The confirmation dialog shown before enabling personal-workspace advanced features. */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 type PersonalFeatureGateDialogState = {
   open: boolean;
   onConfirm: () => void;

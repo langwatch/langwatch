@@ -1,16 +1,3 @@
-// Bulk upload drawer with per-file column-type confirms, using lucide icons and formatFileSize.
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Icon,
-  Input,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -32,6 +19,19 @@ import { CSS } from "@dnd-kit/utilities";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Drawer } from "@langwatch/design-system/drawer";
+// Bulk upload drawer with per-file column-type confirms, using lucide icons and formatFileSize.
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Icon,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   AlertTriangle,
   CheckCircle,

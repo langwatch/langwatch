@@ -3,7 +3,7 @@
  * the reader picks. The access token and project id are already in the env block above
  * it, so this body carries no credentials of its own.
  */
-import { Box, Grid, VStack } from "@chakra-ui/react";
+import { Box, Grid, VStack } from "@langwatch/design-system/primitives";
 import {
   DocsLinks,
   FrameworkGrid,

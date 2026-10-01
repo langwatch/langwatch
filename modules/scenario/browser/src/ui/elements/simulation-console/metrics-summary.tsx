@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioResults } from "@langwatch/scenario-contract";
 
 import { CONSOLE_COLORS } from "../../../model/simulation-console/constants.ts";

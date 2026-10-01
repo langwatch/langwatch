@@ -4,6 +4,8 @@
  * log of recent runs.
  */
 
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Badge,
@@ -15,9 +17,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,

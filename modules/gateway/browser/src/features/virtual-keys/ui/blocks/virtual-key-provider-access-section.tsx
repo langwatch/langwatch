@@ -1,6 +1,6 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { useMemo } from "react";
 

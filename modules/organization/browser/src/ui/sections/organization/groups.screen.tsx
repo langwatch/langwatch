@@ -4,6 +4,9 @@
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
 
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Alert,
   Badge,
@@ -18,10 +21,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 

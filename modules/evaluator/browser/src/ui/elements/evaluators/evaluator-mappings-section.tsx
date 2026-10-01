@@ -1,7 +1,7 @@
-import { Box, Text } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
 import { createLogger } from "@langwatch/observability/browser";
 import {

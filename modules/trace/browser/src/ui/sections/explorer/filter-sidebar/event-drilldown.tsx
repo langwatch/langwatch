@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { type EventMetricValues, type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {
   EVENT_METRICS_PREFIX,

@@ -1,5 +1,13 @@
-import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo, useRef } from "react";

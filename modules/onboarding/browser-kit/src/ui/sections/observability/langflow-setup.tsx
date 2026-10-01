@@ -1,4 +1,4 @@
-import { Accordion, Separator, Text, VStack } from "@chakra-ui/react";
+import { Accordion, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 

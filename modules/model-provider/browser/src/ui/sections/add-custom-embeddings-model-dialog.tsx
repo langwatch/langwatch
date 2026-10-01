@@ -1,4 +1,3 @@
-import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -8,6 +7,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { customModelEntrySchema } from "@langwatch/model-provider-contract";
 import { useCallback, useRef, useState } from "react";

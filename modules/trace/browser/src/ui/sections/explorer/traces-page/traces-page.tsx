@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, useBreakpointValue, VStack } from "@langwatch/design-system/primitives";
 import {
   useFilterStore,
   SELECT_ALL_MATCHING_CAP,

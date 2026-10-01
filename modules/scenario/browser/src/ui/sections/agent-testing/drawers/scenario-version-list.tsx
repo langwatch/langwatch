@@ -4,7 +4,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useVersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";

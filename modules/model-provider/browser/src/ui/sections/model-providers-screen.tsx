@@ -4,7 +4,6 @@
  * rows arrive pre-masked and only the editor drawer accepts a key.
  */
 
-import { Box, Button, Card, HStack, Skeleton, Spacer, Table, Text, VStack } from "@chakra-ui/react";
 import {
   ProviderScopeChips,
   ScopeFilter,
@@ -17,6 +16,17 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Skeleton,
+  Spacer,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";

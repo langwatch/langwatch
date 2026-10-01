@@ -1,4 +1,4 @@
-import { Text, Textarea, VStack } from "@chakra-ui/react";
+import { Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 
 /** A signed license, shown exactly once: it is not stored and cannot be read back. */
 export function SignedLicenseOnce({ licenseKey }: { licenseKey: string }) {

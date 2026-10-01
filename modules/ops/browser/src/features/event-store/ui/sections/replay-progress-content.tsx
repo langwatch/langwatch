@@ -1,3 +1,5 @@
+import { Stat } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import {
   Badge,
   Box,
@@ -8,12 +10,10 @@ import {
   Progress,
   SimpleGrid,
   Spinner,
-  Stat,
   Status,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+} from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { ArrowLeft } from "lucide-react";

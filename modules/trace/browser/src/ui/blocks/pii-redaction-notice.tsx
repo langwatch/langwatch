@@ -1,5 +1,5 @@
-import { Alert, Link } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Alert, Link } from "@langwatch/design-system/primitives";
 import { hasRedactionMarker } from "@langwatch/redaction";
 import type React from "react";
 

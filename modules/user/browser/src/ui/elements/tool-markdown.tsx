@@ -3,7 +3,7 @@
  * Lightweight subset for feature-web packages (no platform dependencies).
  */
 
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

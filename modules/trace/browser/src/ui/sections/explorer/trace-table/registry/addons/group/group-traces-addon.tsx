@@ -1,5 +1,5 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   formatCost,
   formatDuration,

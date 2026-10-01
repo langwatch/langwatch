@@ -2,8 +2,15 @@
  * The dataset picker the "Add to Dataset" drawer opens with.
  */
 
-import { Button, createListCollection, Field, HStack, Spinner, Text } from "@chakra-ui/react";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { type ReactNode, useState } from "react";
 import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";

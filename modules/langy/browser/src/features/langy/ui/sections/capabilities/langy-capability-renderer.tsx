@@ -2,7 +2,7 @@
  * Capability-card dispatcher.
  */
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import {
   asJsonDocument,
   type CliToolResult,

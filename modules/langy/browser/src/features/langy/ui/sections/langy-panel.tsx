@@ -1,9 +1,17 @@
-import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  chakra,
+  HStack,
+  IconButton,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";

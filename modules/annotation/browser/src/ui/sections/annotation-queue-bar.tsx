@@ -4,8 +4,8 @@
  * on the item waits while the step in hand is the one the reviewer has left.
  */
 
-import { Box, Button, HStack, Spacer, Spinner, Text } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Box, Button, HStack, Spacer, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

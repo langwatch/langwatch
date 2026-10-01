@@ -1,6 +1,6 @@
-import { Button, CodeBlock, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, CodeBlock, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Copy as LuCopy } from "lucide-react";
 import { useState } from "react";

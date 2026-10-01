@@ -4,8 +4,8 @@
  * (warning) rather than red (danger) since it's reversible.
  */
 
-import { Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 /** What the dialog says when the caller does not name the thing being archived. */
 const defaultTitle = "Archive run plan?";

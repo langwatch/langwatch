@@ -1,6 +1,6 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UiAgentTypeSelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, Cable, Code, Globe, Mic, Workflow } from "lucide-react";
 
 import { useAgentTypeSelection } from "../../behavior/use-agent-type-selection.ts";

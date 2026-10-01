@@ -1,4 +1,11 @@
-import { Button, HStack, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Entry, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";

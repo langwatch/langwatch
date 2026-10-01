@@ -1,7 +1,6 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Box, Button, HStack, Text, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles } from "lucide-react";

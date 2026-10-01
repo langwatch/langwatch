@@ -1,4 +1,4 @@
-import { Badge, Text } from "@chakra-ui/react";
+import { Badge, Text } from "@langwatch/design-system/primitives";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 

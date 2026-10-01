@@ -3,8 +3,7 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Box, Circle, Flex, HStack, Icon } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, Circle, Flex, HStack, Icon, keyframes } from "@langwatch/design-system/primitives";
 import { BUBBLE_TONES, getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 
 /** One dot rises and fades, the next follows it. */

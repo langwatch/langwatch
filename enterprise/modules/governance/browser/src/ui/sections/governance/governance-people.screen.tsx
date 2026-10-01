@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -11,10 +14,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import {
   Archive,

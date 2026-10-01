@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
+import { Box, Button, Flex, Icon, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";

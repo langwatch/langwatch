@@ -1,4 +1,4 @@
-import { Button, Icon } from "@chakra-ui/react";
+import { Button, Icon } from "@langwatch/design-system/primitives";
 import { forwardRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCheck, LuCopy, LuLanguages, LuLightbulb, LuPlay } from "react-icons/lu";

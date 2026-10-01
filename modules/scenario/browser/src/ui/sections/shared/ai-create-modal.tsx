@@ -8,7 +8,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { LangyMark, LangyMarkGradientDefs, CARD } from "@langwatch/langy-browser-kit";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";

@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, Input, Text } from "@chakra-ui/react";
+import { Box, Input, Text } from "@langwatch/design-system/primitives";
 import { MAX_RUN_NOTE_LENGTH } from "@langwatch/scenario-contract";
 
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/dialog-fields.tsx";

@@ -1,4 +1,12 @@
-import { Badge, Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Input,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";

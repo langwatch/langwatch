@@ -1,5 +1,5 @@
-import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";

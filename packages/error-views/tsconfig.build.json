@@ -21,6 +21,9 @@
   ],
   "references": [
     {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
       "path": "../error-presentation/tsconfig.build.json"
     }
   ]

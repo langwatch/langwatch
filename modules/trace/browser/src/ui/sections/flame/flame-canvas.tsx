@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import type { MouseEvent, PointerEvent, RefObject } from "react";

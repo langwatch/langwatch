@@ -1,4 +1,13 @@
-import { Badge, Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Bot, Check, Terminal } from "lucide-react";
 import { type ReactNode, useState } from "react";
 

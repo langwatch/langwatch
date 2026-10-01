@@ -1,3 +1,7 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -11,11 +15,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";

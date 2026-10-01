@@ -1,4 +1,12 @@
-import { Box, Button, chakra, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { RotateCcw, XCircle } from "lucide-react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";

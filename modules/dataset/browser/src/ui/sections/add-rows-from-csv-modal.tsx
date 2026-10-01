@@ -1,12 +1,19 @@
 // Appends CSV/JSON/JSONL rows; requires all dataset columns mapped or unmapped columns get blanks.
 
-import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Box,
+  Button,
+  HStack,
+  NativeSelect,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

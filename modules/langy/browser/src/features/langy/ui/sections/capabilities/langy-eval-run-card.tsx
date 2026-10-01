@@ -2,7 +2,7 @@
  * Evaluation-run capability card (`platform_run_experiment`, `platform_run_plan`,
  * `platform_experiment_results`, `platform_experiment_status`).
  */
-import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
 
 import { useCapabilityData } from "../../../behavior/use-capability-data.ts";

@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Markdown } from "@langwatch/browser-host/markdown";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type {
   LangyChoiceSelection,

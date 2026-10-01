@@ -1,4 +1,4 @@
-import { Box, Card, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Card, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 import {

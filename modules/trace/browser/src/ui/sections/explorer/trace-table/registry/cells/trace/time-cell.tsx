@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { formatISOTimestamp } from "@langwatch/trace-browser-kit";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";

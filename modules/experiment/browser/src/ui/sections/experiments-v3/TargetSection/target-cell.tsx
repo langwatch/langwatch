@@ -1,6 +1,14 @@
-import { Box, Button, HStack, Portal, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import {
+  Box,
+  Button,
+  HStack,
+  Portal,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { describeCellFailure } from "@langwatch/experiment-browser-kit";

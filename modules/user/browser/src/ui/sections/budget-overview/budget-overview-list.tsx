@@ -1,4 +1,4 @@
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";

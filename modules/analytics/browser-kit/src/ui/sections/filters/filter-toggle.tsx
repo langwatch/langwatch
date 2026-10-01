@@ -1,6 +1,6 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
 import type { FilterField } from "@langwatch/analytics-filters";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import qs from "qs";
 import { X } from "react-feather";

@@ -1,6 +1,6 @@
-import type { ButtonProps } from "@chakra-ui/react";
-import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import type { ButtonProps } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";

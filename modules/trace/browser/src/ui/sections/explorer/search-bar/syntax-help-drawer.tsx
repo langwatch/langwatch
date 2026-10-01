@@ -10,7 +10,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { useFilterStore, useUIStore } from "@langwatch/trace-browser-kit";

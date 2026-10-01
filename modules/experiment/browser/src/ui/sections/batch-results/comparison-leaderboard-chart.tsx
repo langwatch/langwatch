@@ -1,7 +1,7 @@
 /**
  * ComparisonLeaderboardChart - compact Bradley-Terry ranking card (#5103).
  */
-import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import {
   type BatchComparisonColumn,
   type BatchResultRow,

@@ -1,8 +1,8 @@
-import { Box, Image, Text, VStack } from "@chakra-ui/react";
 import type {
   UiConversationAudioPlayback,
   UiRenderMediaPart,
 } from "@langwatch/browser-host/declarations";
+import { Box, Image, Text, VStack } from "@langwatch/design-system/primitives";
 import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";

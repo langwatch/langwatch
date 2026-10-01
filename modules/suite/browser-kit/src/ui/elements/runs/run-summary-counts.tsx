@@ -4,7 +4,7 @@
  * Only shows non-zero counts as colored badges with labels.
  */
 
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, Ban, Check, Clock, Loader, X } from "lucide-react";

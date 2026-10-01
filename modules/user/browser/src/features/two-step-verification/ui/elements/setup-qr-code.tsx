@@ -3,7 +3,7 @@
  * both themes: a code that follows the theme's foreground goes light-on-white
  * in dark mode, and scanners want dark modules on a light ground anyway.
  */
-import { QrCode } from "@chakra-ui/react";
+import { QrCode } from "@langwatch/design-system/primitives";
 
 export function SetupQrCode({ value }: { value: string }) {
   return (

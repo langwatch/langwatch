@@ -4,7 +4,16 @@
  * Adapted from BatchEvaluationV2EvaluationSummary with cleaner styling.
  */
 
-import { Box, Button, HStack, Progress, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Progress,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import numeral from "numeral";

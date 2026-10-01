@@ -1,3 +1,11 @@
+import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit";
+import {
+  ASSISTANT_KINDS,
+  ASSISTANT_OPTIONS,
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "@langwatch/coding-agent-browser-kit";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
   Box,
@@ -10,15 +18,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit";
-import {
-  ASSISTANT_KINDS,
-  ASSISTANT_OPTIONS,
-  ASSISTANT_PRESETS,
-  type AssistantKind,
-} from "@langwatch/coding-agent-browser-kit";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Bot, Wrench } from "lucide-react";

@@ -1,6 +1,6 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { MissingValue } from "@langwatch/coding-agent-browser-kit";
 import { formatCost } from "@langwatch/design-system/display-formatters";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { SessionListRow } from "../session-list-row.ts";

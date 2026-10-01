@@ -3,7 +3,8 @@
  * Uses React.lazy to defer the emoji picker and avoid collapsing the library.
  */
 
-import { type BoxProps, PopoverContent } from "@chakra-ui/react";
+import { PopoverContent } from "@chakra-ui/react";
+import { type BoxProps } from "@langwatch/design-system/primitives";
 import { WorkflowConfigPopover } from "@langwatch/workflow-browser-kit";
 import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
 import { lazy, Suspense } from "react";

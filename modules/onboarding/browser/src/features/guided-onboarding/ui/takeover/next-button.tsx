@@ -2,7 +2,7 @@
  * The takeover's Next: left-aligned under the words, hidden until the screen
  * says so, and then fading in over half a second.
  */
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 
 export function NextButton({ show, onClick }: { show: boolean; onClick: () => void }) {

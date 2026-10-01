@@ -1,5 +1,6 @@
-import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
+import { Popover as ChakraPopover } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import type { ModelOption } from "@langwatch/topic-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";

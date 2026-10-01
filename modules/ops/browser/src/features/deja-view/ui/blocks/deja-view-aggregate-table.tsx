@@ -1,4 +1,4 @@
-import { Badge, Card, Table, Text } from "@chakra-ui/react";
+import { Badge, Card, Table, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 
 import { formatTimestamp } from "../../model/deja-view-fragment.ts";

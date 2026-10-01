@@ -4,7 +4,7 @@
  * then a plain rule, since a trace that 404s is worse than a beat's wait.
  */
 
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 import { LuListTree } from "react-icons/lu";
 

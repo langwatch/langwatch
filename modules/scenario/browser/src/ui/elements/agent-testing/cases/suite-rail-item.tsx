@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { Box, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 

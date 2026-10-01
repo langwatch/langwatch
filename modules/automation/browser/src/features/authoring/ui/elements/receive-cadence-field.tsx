@@ -1,5 +1,5 @@
-import { Field, HStack, NativeSelect, Stack, Text } from "@chakra-ui/react";
 import { NOTIFICATION_CADENCES, type NotificationCadence } from "@langwatch/automation-contract";
+import { Field, HStack, NativeSelect, Stack, Text } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { useState } from "react";
 

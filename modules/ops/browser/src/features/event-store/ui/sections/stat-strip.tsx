@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { LATENCY_SAMPLE_SIZE, type DashboardData } from "@langwatch/ops-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";

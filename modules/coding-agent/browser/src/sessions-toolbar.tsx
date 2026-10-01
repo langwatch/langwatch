@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";

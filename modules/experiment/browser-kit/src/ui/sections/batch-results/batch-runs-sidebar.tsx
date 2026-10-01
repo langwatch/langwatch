@@ -1,3 +1,4 @@
+import { Checkbox } from "@chakra-ui/react";
 /**
  * BatchRunsSidebar - Sidebar component showing list of evaluation runs
  */
@@ -5,14 +6,13 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   chakra,
   HStack,
   Skeleton,
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import { GitCompare, X } from "lucide-react";

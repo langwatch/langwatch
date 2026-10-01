@@ -1,4 +1,4 @@
-import { Box, Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";

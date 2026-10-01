@@ -7,7 +7,7 @@ import {
   Input,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import {
   DYNAMIC_PREFIXES,

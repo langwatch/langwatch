@@ -1,10 +1,10 @@
-import { Text, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams, SavedTriggerRow } from "@langwatch/automation-contract";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
   mappingStateSchema,
 } from "@langwatch/dataset-contract";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 

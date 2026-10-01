@@ -1,5 +1,5 @@
-import { Button, Icon, type SystemStyleObject, Text } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, Icon, type SystemStyleObject, Text } from "@langwatch/design-system/primitives";
 import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
 

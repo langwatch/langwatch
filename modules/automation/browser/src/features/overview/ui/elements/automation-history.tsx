@@ -1,5 +1,5 @@
-import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { TriggerKind } from "@langwatch/automation-contract";
+import { Badge, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type Instant,
   Temporal,

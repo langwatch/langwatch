@@ -1,9 +1,10 @@
+import { Checkbox } from "@chakra-ui/react";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 /** Dataset preview grid on shared cells with evaluations workbench/editor.
  * Data caller-owned; edits/selection/row-pick propagate up.
  */
-import { Box, Checkbox, HStack, Text } from "@chakra-ui/react";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import {
   type ColumnDef,
   createColumnHelper,

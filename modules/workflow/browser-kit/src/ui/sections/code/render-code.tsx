@@ -1,5 +1,5 @@
-import { Box, IconButton } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { Box, IconButton } from "@langwatch/design-system/primitives";
 import { codeToHtml, codeToHtmlDark } from "@langwatch/design-system/shiki";
 import { CopyIcon } from "lucide-react";
 import type React from "react";

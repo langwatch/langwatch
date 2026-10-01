@@ -1,3 +1,4 @@
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -9,8 +10,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";

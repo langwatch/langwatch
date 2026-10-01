@@ -2,7 +2,7 @@
  * "What are the most valuable things we can set up for you today?": a
  * multi-pick card grid whose order carries meaning — the first pick is next.
  */
-import { Box, chakra, Flex, Grid, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Grid, Text } from "@langwatch/design-system/primitives";
 import {
   GUIDED_PATH_DESCRIPTIONS,
   GUIDED_PATH_TITLES,

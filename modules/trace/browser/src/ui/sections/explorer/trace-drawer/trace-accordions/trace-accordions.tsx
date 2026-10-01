@@ -1,4 +1,4 @@
-import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { memo } from "react";
 

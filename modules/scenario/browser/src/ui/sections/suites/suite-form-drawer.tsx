@@ -2,6 +2,12 @@
  * Drawer for creating and editing suite configurations.
  */
 
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import {
+  applyHandledErrorToForm,
+  describeError,
+  showErrorToast,
+} from "@langwatch/browser-host/errors";
 import {
   Box,
   Button,
@@ -12,13 +18,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
-import {
-  applyHandledErrorToForm,
-  describeError,
-  showErrorToast,
-} from "@langwatch/browser-host/errors";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";

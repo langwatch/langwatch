@@ -2,8 +2,8 @@
  * SingleRunTable - Table component for displaying a single evaluation run
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
   flexRender,

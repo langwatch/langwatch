@@ -1,5 +1,5 @@
-import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyContextChip, LangySkillChip } from "@langwatch/langy-browser-kit";
 import { ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";

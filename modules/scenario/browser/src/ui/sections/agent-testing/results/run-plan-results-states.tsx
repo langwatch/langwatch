@@ -5,8 +5,15 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, EmptyState, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { Period, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import {
+  Box,
+  EmptyState,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";

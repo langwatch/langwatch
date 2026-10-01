@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";

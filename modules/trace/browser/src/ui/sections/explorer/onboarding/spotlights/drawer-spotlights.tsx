@@ -1,7 +1,7 @@
 /**
  * DrawerSpotlights — condition-gated, show-once spotlights inside the trace drawer.
  */
-import { Portal } from "@chakra-ui/react";
+import { Portal } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

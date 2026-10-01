@@ -1,5 +1,5 @@
-import { Alert, Button } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Alert, Button } from "@langwatch/design-system/primitives";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { useEffect, useState } from "react";

@@ -1,5 +1,14 @@
-import { Box, Button, HStack, Input, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 import { Info, Plus, X } from "lucide-react";

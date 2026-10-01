@@ -1,4 +1,4 @@
-import { Button, Grid, GridItem, HStack, Input, VStack } from "@chakra-ui/react";
+import { Button, Grid, GridItem, HStack, Input, VStack } from "@langwatch/design-system/primitives";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";

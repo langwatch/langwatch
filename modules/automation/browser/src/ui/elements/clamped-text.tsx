@@ -1,7 +1,7 @@
 // Text clamped to cell with tooltip on hover; unlike HoverableBigText (expand-to-dialog), this
 // just clamps and offers the full string in a tooltip when it doesn't fit.
 
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEffect, useRef, useState } from "react";
 

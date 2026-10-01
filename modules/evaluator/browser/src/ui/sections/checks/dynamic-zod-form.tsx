@@ -1,3 +1,5 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Box,
   Button,
@@ -8,9 +10,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+} from "@langwatch/design-system/primitives";
 import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";

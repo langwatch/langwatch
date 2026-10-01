@@ -1,6 +1,6 @@
-import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
+import { createListCollection, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo } from "react";
 

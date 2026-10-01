@@ -1,5 +1,11 @@
-import { Box, Button, type ButtonProps, Center, Spinner } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  type ButtonProps,
+  Center,
+  Spinner,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";

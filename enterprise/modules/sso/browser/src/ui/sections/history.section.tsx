@@ -6,7 +6,7 @@
  * edit would not be one. Every word comes from the server, so no reader ever
  * meets an internal event name.
  */
-import { Badge, Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant, toDate, Temporal } from "@langwatch/time";
 
 import { ssoApi } from "../../behavior/sso-api.ts";

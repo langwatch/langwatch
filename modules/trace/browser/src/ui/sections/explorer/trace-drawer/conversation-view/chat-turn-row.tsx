@@ -1,4 +1,13 @@
-import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   type BubbleTone,
   formatCost,

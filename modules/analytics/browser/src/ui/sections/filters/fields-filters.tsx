@@ -1,18 +1,4 @@
 import {
-  Box,
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Input,
-  Skeleton,
-  Spacer,
-  Tag,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
-import {
   availableFilters,
   type FilterDefinition,
   type FilterField,
@@ -28,6 +14,20 @@ import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  Field,
+  Heading,
+  HStack,
+  Input,
+  Skeleton,
+  Spacer,
+  Tag,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { keepPreviousData } from "@tanstack/react-query";

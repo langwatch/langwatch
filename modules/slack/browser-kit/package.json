@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
     "@langwatch/slack-contract": "workspace:*"
   },
   "devDependencies": {

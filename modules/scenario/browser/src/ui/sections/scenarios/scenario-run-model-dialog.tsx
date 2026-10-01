@@ -1,4 +1,4 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 import { SimulationModelSelect } from "./simulation-model-select.tsx";

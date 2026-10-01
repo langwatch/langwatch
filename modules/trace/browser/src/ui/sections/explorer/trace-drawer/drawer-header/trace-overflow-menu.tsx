@@ -1,6 +1,6 @@
-import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { MoreVertical } from "lucide-react";
 import { useCallback, useMemo } from "react";

@@ -1,5 +1,12 @@
-import { Button, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Button,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { type Control, type UseFormRegister, useFieldArray } from "react-hook-form";
 

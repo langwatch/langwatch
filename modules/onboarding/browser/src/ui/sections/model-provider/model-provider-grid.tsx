@@ -4,7 +4,7 @@
  * name, so assistive technology hears the recommendation sighted readers see.
  */
 
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { SelectableIconCard } from "@langwatch/onboarding-browser-kit";
 import type React from "react";

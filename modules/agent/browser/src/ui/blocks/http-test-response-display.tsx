@@ -1,5 +1,5 @@
-import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { Alert, Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertCircle, Clock } from "lucide-react";
 
 import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";

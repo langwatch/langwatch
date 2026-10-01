@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Button, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

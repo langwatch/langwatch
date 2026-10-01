@@ -1,4 +1,4 @@
-import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
+import { Center, EmptyState, Icon, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /**

@@ -1,4 +1,12 @@
-import { Box, chakra, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { AArrowDown, AArrowUp, Check } from "lucide-react";
 import type React from "react";
 

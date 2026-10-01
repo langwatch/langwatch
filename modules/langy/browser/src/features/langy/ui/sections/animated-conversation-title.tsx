@@ -1,4 +1,4 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";

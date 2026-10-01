@@ -1,5 +1,5 @@
-import { Alert } from "@chakra-ui/react";
 import { describeError } from "@langwatch/browser-host/errors";
+import { Alert } from "@langwatch/design-system/primitives";
 
 /** A failure inline, worded by the error registry. Renders nothing when there is none. */
 export function SlackErrorAlert({

@@ -3,7 +3,7 @@
  * Drawer mounted separately (portal-based). Moved from platform/app; DashboardLayout deleted.
  */
 
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { useEffect, type ReactNode } from "react";
 
 import {

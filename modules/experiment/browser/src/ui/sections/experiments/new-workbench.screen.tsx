@@ -1,7 +1,7 @@
-import { Box, Center } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { Box, Center } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 import { useEffect, useRef } from "react";
 

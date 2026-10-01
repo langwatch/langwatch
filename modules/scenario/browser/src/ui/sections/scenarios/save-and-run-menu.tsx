@@ -1,5 +1,13 @@
-import { Box, Button, HStack, Input, Portal, Text, chakra } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Portal,
+  Text,
+  chakra,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";

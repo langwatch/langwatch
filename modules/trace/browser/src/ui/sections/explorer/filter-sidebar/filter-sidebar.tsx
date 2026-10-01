@@ -1,4 +1,3 @@
-import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -17,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   useFilterStore,

@@ -4,6 +4,8 @@
  * Impersonation is deliberately absent. Spec: specs/identity/directory-administration.feature
  */
 
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
   Box,
@@ -14,9 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Ban, Trash2, Undo2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 

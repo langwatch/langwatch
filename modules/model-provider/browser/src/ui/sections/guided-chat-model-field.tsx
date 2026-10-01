@@ -1,4 +1,4 @@
-import { chakra, Flex, Text, VStack } from "@chakra-ui/react";
+import { chakra, Flex, Text, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 import type { ComponentProps } from "react";
 

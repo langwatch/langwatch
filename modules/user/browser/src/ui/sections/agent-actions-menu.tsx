@@ -2,8 +2,8 @@
  * Actions menu for the personal usage header (hand to agent, copy prompt, read guide).
  */
 
-import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 
 import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";

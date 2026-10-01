@@ -1,11 +1,11 @@
-/**
- * The workbench's saved versions, as a list.
- */
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+/**
+ * The workbench's saved versions, as a list.
+ */
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs, type TimeInput } from "@langwatch/time";
 import { useState } from "react";
 

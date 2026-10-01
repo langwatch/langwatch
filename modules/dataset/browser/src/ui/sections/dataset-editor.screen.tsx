@@ -1,7 +1,7 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
-import { Alert, Button, Spinner, Text } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { datasetContextChip, useRegisterLangyPageContext } from "@langwatch/langy-browser-kit";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";

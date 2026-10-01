@@ -1,11 +1,11 @@
+import { CopyButton } from "@langwatch/design-system/copy-button";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The address the provider identifies itself by, and a way to take it. The
  * scheme is chrome rather than information (every issuer here is https), so it
  * is dropped from the display; the whole address is on the hover and the copy.
  */
-import { HStack, Text, VStack } from "@chakra-ui/react";
-import { CopyButton } from "@langwatch/design-system/copy-button";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 export function IssuerRow({ issuer }: { issuer: string }) {
   return (

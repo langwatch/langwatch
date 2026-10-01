@@ -1,4 +1,4 @@
-import { keyframes } from "@emotion/react";
+import { keyframes } from "@langwatch/design-system/primitives";
 
 // The brand's shimmer geometry, verbatim from the marketing site: a 200%-wide
 // background swept from `200% 50%` to `-200% 50%`. Declared with emotion's

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, VStack } from "@langwatch/design-system/primitives";
 import { RefreshCw } from "react-feather";
 
 import { HandledErrorAlert } from "./handled-error-alert.tsx";

@@ -1,6 +1,6 @@
-import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { CodePreview } from "@langwatch/onboarding-browser-kit";
 import type { Snippet, Target } from "@langwatch/prompt-browser-kit";

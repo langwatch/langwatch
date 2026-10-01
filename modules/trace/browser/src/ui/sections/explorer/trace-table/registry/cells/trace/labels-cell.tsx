@@ -1,4 +1,4 @@
-import { Badge, HStack, Text } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 
 import { getColorPaletteForString } from "../../../../../../../model/rotating-colors.ts";

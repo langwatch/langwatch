@@ -1,4 +1,4 @@
-import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatDuration } from "@langwatch/trace-browser-kit";
 import { ChevronRight, RotateCcw } from "lucide-react";

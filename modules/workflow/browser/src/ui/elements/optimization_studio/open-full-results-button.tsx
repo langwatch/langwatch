@@ -1,5 +1,5 @@
-import { Button } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ExternalLink } from "react-feather";
 

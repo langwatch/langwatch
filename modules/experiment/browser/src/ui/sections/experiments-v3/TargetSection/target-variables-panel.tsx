@@ -1,6 +1,6 @@
 // Target input variables and their sources (datasets and chained target outputs).
 
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { getUsedFields } from "@langwatch/experiment-contract/mapping-validation";
 import {
   VariablesSection,

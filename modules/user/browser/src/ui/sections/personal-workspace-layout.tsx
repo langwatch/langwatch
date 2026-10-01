@@ -2,7 +2,7 @@
  * Frame for /me/* pages (container only; chrome belongs to route tree).
  */
 
-import { Box, Container } from "@chakra-ui/react";
+import { Box, Container } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren } from "react";
 
 export function PersonalWorkspaceLayout({ children }: PropsWithChildren) {

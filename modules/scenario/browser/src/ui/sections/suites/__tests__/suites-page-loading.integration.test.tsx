@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * Integration tests for single loading indicator on suites page (Issue #1904).
  * @vitest-environment jsdom
  * @see specs/features/suites/single-loading-indicator.feature
  */
-import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";
+import { Spinner } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 

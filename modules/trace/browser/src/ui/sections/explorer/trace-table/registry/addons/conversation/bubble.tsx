@@ -1,4 +1,4 @@
-import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@langwatch/design-system/primitives";
 import { BUBBLE_TONES, type BubbleTone, useConversationExpand } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";

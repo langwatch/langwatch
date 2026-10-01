@@ -1,5 +1,5 @@
-import { Box, HStack, Table, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import type { PausedSchedule } from "../../model/paused-schedule.ts";

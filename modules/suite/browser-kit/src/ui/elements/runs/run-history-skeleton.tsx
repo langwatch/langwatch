@@ -4,7 +4,7 @@
  * when data lands — same approach as the Traces V2 table's skeleton rows.
  */
 
-import { Box, Grid, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
 
 function SkeletonHeaderRow() {
   return (

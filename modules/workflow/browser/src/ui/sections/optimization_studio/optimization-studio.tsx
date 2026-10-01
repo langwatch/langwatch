@@ -1,15 +1,24 @@
-import { Box, Button, Center, Flex, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 
 import "@xyflow/react/dist/style.css";
-import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 import {
   useColorMode,
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";

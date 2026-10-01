@@ -3,9 +3,9 @@
  * host's diagnostics as markers. The Monaco import stays lazy since Monaco is large.
  */
 
-import { Box } from "@chakra-ui/react";
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box } from "@langwatch/design-system/primitives";
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useId, useState } from "react";

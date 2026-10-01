@@ -1,5 +1,5 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 
 import type { DiscardTarget } from "../../behavior/use-discard-guard.ts";
 

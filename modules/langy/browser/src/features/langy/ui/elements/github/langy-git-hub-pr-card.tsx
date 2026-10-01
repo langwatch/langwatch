@@ -1,9 +1,9 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * In-chat pull-request card.
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { GitMerge, GitPullRequest, GitPullRequestClosed, type LucideIcon } from "lucide-react";
 
 import type {

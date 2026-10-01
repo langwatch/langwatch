@@ -1,4 +1,4 @@
-import { Alert, Text } from "@chakra-ui/react";
+import { Alert, Text } from "@langwatch/design-system/primitives";
 import type { Custom } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";

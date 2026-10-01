@@ -1,10 +1,18 @@
-import { Box, Button, Flex, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { MessagesSquare } from "lucide-react";
 import { useState } from "react";

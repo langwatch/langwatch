@@ -1,3 +1,6 @@
+import { Link } from "@langwatch/browser-host/link";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { FullLogo } from "@langwatch/design-system/full-logo";
 import {
   Alert,
   Box,
@@ -8,10 +11,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { FullLogo } from "@langwatch/design-system/full-logo";
+} from "@langwatch/design-system/primitives";
 import { Link2Off } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 

@@ -4,9 +4,9 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 
-import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, HStack, Input, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Crosshair, FileText, Info, Lock, Repeat } from "lucide-react";
 

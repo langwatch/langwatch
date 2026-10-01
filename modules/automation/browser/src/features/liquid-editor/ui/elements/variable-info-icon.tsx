@@ -1,5 +1,13 @@
-import { Box, chakra, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import type { VariableInfo } from "@langwatch/automation-contract";
+import {
+  Box,
+  chakra,
+  HoverCard,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Info } from "lucide-react";
 
 /** Uses an interactive hover card so long variable lists remain scrollable. */

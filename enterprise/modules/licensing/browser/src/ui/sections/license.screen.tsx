@@ -1,8 +1,8 @@
 // Organization license page for self-hosted operators; licenses are issued in
 // the backoffice. No chrome — the settings frame is applied by the host.
 
-import { Link, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Link, Text, VStack } from "@langwatch/design-system/primitives";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ArrowUpRight } from "lucide-react";
 

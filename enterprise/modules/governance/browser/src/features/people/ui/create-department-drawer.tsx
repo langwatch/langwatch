@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, Field, HStack, Input, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";

@@ -1,7 +1,7 @@
 /** Frame for /ops/event-sourcing/* pages; title bar, section rail and content column. */
 
-import { Badge, HStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, HStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,

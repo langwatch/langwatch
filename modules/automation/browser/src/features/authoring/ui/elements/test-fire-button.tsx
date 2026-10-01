@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Send } from "lucide-react";
 
 /** Controlled test-fire affordance; the caption says it is a real send using example data. */

@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  *
  * @see specs/suites/simulation-card-color-mode.feature
  */
-import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { SimulationCard } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";

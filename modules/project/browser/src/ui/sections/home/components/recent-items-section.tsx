@@ -1,5 +1,13 @@
-import { Box, Link as ChakraLink, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import {
+  Box,
+  Link as ChakraLink,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";

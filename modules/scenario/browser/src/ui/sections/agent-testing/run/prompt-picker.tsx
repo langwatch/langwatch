@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, FileText, Folder } from "lucide-react";
 
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";

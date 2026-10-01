@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Badge, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Badge, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { ToolCardFigure, ToolCardMark } from "./tool-card-figure";

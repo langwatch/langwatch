@@ -2,7 +2,7 @@
  * The declarative capability card — one component that draws every result the catalog
  * describes, from the body widget its descriptor names.
  */
-import { Box, Grid, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, Text, VStack } from "@langwatch/design-system/primitives";
 import { type LangyTurnMetric } from "@langwatch/langy-browser-kit";
 import {
   type CliResultDigest,

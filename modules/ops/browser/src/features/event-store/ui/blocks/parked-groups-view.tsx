@@ -1,4 +1,4 @@
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { ParkedGroupInfo } from "@langwatch/ops-contract";
 
 import { formatCount, formatTimeAgo } from "../../../../model/ops-formatters.ts";

@@ -1,6 +1,6 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Archive, Plus, Tag } from "lucide-react";
 
 import { SmallButton } from "./agent-testing/shared/small-button.tsx";

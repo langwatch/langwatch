@@ -1,5 +1,5 @@
-import { Input, Textarea } from "@chakra-ui/react";
 import type { AnnotationScoreDataType as AnnotationScoreDataTypeName } from "@langwatch/annotation-contract";
+import { Input, Textarea } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 

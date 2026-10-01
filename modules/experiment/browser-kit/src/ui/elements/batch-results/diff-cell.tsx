@@ -3,7 +3,7 @@
  *
  * Shows stacked values with colored indicators to correlate with each run.
  */
-import { Box, Circle, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Circle, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 export type DiffValue = {
   runId: string;

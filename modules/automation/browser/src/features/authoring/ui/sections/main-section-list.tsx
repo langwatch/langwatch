@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { AutomationSeveritySection } from "../blocks/severity-section.tsx";

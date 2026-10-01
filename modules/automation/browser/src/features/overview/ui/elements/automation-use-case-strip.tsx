@@ -1,5 +1,5 @@
-import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { TriggerAction } from "@langwatch/automation-contract";
+import { SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle, Database, DollarSign, Edit3, Flag, TrendingDown } from "lucide-react";
 
 export type AutomationUseCaseKind = "alert" | "automation";

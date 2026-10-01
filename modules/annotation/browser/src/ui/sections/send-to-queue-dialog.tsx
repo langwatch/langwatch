@@ -1,7 +1,7 @@
 /** Sends selected traces to reviewers or queues. */
 
-import { VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";

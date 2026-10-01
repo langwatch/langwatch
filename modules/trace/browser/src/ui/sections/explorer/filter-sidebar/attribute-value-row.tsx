@@ -1,4 +1,4 @@
-import { CheckboxCard, Box, HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { type FacetValueState, hashColor, paletteFromColor } from "@langwatch/trace-browser-kit";
 import { memo } from "react";
 

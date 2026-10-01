@@ -1,8 +1,8 @@
 // MCP config syntax-highlighted. Family-local copy (onboarding needs it). Uses
 // design-system/shiki not trace-web re-export (one fewer web-to-web import).
 
-import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, ClientOnly, CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import type React from "react";
 

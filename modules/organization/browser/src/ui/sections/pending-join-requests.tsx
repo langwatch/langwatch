@@ -1,10 +1,18 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * Colleagues waiting at the door, where an administrator looks every day. Draws nothing for
  * anybody who cannot approve, and nothing while nobody waits.
  * Spec: specs/identity/domain-auto-join.feature
  */
-import { Box, Button, Card, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import {
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { ArrowRight, UserPlus } from "lucide-react";
 
 import { useJoinRequests } from "../../behavior/use-join-requests.ts";

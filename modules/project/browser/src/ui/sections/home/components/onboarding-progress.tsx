@@ -1,5 +1,5 @@
-import { Box, Grid, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Box, Grid, HStack, Progress, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 import type { IconType } from "react-icons";
 import {

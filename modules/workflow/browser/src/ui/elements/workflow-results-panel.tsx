@@ -8,7 +8,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { useState, type ReactNode } from "react";
 import { X } from "react-feather";
 import { LuSquareCheckBig } from "react-icons/lu";

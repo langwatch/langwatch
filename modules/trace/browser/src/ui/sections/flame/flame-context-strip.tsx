@@ -1,4 +1,4 @@
-import { Flex, HStack, Text } from "@chakra-ui/react";
+import { Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { formatDuration } from "@langwatch/trace-browser-kit";
 
 import { formatPercent } from "../../../behavior/flame/tree.ts";

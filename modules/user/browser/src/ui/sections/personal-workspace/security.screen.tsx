@@ -4,8 +4,8 @@
  * password.
  */
 
-import { Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { TwoStepVerificationSection } from "../../../features/two-step-verification/ui/sections/two-step-verification-section.tsx";
 import { EmailAndLinkedAccountsSection } from "../email-and-linked-accounts-section.tsx";

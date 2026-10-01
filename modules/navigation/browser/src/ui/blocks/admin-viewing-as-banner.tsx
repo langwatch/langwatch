@@ -1,4 +1,12 @@
-import { Alert, Box, Button, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Eye, LogOut, X } from "lucide-react";
 import { useState } from "react";

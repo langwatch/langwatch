@@ -1,7 +1,7 @@
 // Roles screen; three-state plan gate; grant asked twice for future reuse.
 
-import { Alert, Skeleton, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Skeleton, VStack } from "@langwatch/design-system/primitives";
 
 import { AUTHZ_MANAGE_PERMISSION, useAuthzHost } from "../../model/authz-host.ts";
 import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";

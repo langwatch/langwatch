@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { formatDuration } from "@langwatch/trace-browser-kit";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";

@@ -4,7 +4,7 @@
  * inline alert, and the whole-form slot a rejected submit fills.
  */
 
-import { Alert, Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import type { ReactNode } from "react";
 

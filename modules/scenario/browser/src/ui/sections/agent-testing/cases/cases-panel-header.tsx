@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import { HStack, Icon, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

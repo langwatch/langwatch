@@ -1,4 +1,4 @@
-import { Button, VStack } from "@chakra-ui/react";
+import { Button, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 import { TalkToItPanel } from "../../behavior/lent-talk-to-it-panel.tsx";

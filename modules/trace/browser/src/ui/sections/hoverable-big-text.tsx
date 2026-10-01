@@ -1,4 +1,4 @@
-import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";

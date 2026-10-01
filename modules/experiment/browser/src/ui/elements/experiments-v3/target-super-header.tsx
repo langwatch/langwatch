@@ -1,5 +1,5 @@
-import { Button, Skeleton, Text } from "@chakra-ui/react";
 import { LLMIcon } from "@langwatch/design-system/icons";
+import { Button, Skeleton, Text } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import React from "react";
 

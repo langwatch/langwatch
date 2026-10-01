@@ -2,9 +2,9 @@
  * ComparisonLeaderboardDrawer - full Bradley-Terry leaderboard view (#5103).
  */
 
-import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-browser-kit";
 import { useMemo, useState } from "react";
 

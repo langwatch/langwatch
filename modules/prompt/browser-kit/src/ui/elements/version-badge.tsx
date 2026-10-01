@@ -1,4 +1,5 @@
-import { Badge, chakra, Text, Tooltip } from "@chakra-ui/react";
+import { Tooltip } from "@chakra-ui/react";
+import { Badge, chakra, Text } from "@langwatch/design-system/primitives";
 
 type VersionBadgeProps = {
   version: number;

@@ -1,6 +1,6 @@
-import { Button, Heading, HStack } from "@chakra-ui/react";
 import type { UiEvaluatorCategorySelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import { Button, Heading, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";

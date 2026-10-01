@@ -1,4 +1,4 @@
-import { Card, HStack, Icon, List, Text, VStack } from "@chakra-ui/react";
+import { Card, HStack, Icon, List, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, CircleDot, MessageSquare, TriangleAlert, Users } from "lucide-react";
 
 import type { ScenarioFormController } from "../../elements/scenario-form.tsx";

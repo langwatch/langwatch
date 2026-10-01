@@ -1,4 +1,4 @@
-import { Center, Spinner } from "@chakra-ui/react";
+import { Center, Spinner } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";

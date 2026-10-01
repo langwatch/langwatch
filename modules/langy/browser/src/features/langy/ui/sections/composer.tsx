@@ -1,6 +1,6 @@
-import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, chakra, HStack, Spinner, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   useLangyContextTargetStore,

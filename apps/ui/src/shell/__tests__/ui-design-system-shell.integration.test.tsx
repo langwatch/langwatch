@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see packages/design-system/specs/design-system-boundary.feature
  */
-import { useChakraContext } from "@chakra-ui/react";
+import { useChakraContext } from "@langwatch/design-system/primitives";
 import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";

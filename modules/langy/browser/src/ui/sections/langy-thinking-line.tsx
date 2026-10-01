@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { AnimatePresence, motion } from "motion/react";

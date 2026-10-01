@@ -1,4 +1,4 @@
-import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   AvailableSource,
   FieldMapping,

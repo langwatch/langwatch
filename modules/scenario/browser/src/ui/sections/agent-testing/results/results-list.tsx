@@ -1,9 +1,16 @@
-import { Box, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import {
+  Box,
+  EmptyState,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { FlaskConical, Plus } from "lucide-react";
 

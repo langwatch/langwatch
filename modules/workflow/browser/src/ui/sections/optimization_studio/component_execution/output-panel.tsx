@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";

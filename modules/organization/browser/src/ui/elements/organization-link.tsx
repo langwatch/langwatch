@@ -1,6 +1,6 @@
 /** Link with anchor + host navigate (no router import for feature-web package). */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useOrganizationHost } from "../../model/organization-host.ts";

@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Spinner, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Spinner, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";

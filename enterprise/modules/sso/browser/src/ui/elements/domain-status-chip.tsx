@@ -3,7 +3,7 @@
  * One domain's standing, in a word. A settled domain carries a tick as well
  * as its colour: green alone is a channel some readers do not have.
  */
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 
 import type { DomainChip } from "../../model/domain-proof-chip.ts";

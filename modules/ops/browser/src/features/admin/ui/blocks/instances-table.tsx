@@ -1,4 +1,4 @@
-import { Badge, Table, Text, VStack } from "@chakra-ui/react";
+import { Badge, Table, Text, VStack } from "@langwatch/design-system/primitives";
 
 import {
   ACTIVITY_COLORS,

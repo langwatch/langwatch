@@ -1,6 +1,6 @@
 /** Collapsible row for grouped scenario runs, with header sticky positioning. */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";

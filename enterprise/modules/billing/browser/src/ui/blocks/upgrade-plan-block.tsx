@@ -1,7 +1,15 @@
 /**
  * Upgrade Plan Block - displays upgrade CTA with features and dynamic pricing
  */
-import { Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Card,
+  Flex,
+  HStack,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 import type React from "react";
 

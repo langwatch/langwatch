@@ -1,6 +1,14 @@
-import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";

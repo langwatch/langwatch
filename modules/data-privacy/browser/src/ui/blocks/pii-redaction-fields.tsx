@@ -1,5 +1,6 @@
-import { Box, Button, HStack, RadioGroup, Text, VStack } from "@chakra-ui/react";
+import { RadioGroup } from "@chakra-ui/react";
 import type { PiiLevel } from "@langwatch/data-privacy-contract";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus } from "lucide-react";
 

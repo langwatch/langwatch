@@ -1,6 +1,6 @@
-import { Box, Button, HStack } from "@chakra-ui/react";
 import type { VoiceTransport } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { canTalkTo, talkTooltipFor } from "../../model/voice-talk.ts";

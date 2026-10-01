@@ -1,4 +1,4 @@
-import { HStack, Spacer, Text } from "@chakra-ui/react";
+import { HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";

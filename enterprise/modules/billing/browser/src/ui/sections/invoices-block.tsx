@@ -1,10 +1,18 @@
+import { Link } from "@langwatch/browser-host/link";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
  * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
  * status chip, and PDF download link.
  */
-import { Alert, Card, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import {
+  Alert,
+  Card,
+  HStack,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type StatusChipTone, StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Download, ExternalLink, Receipt } from "lucide-react";

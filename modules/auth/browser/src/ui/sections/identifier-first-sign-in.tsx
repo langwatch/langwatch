@@ -1,5 +1,5 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 

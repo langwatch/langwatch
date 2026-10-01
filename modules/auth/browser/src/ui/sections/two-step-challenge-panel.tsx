@@ -1,4 +1,4 @@
-import { Box, Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import { useState } from "react";
 

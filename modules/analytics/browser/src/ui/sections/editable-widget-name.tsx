@@ -16,7 +16,7 @@
  * than permanent on-card text.
  */
 
-import { chakra, Box, Input, Text } from "@chakra-ui/react";
+import { chakra, Box, Input, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

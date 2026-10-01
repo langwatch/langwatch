@@ -1,5 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
 import type { AutosaveState } from "@langwatch/dataset-browser-kit";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";

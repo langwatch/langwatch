@@ -3,7 +3,7 @@
  * whether it runs and when it next acts. A list draws one row each; a result that is not an
  * automation (a test fire) keeps the declarative card. Spec: specs/langy/langy-automations.feature.
  */
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { NamedSlackConnection } from "@langwatch/slack-browser-kit";
 
 import type { CapabilityTone } from "../../../../../model/langy-capability-registry.ts";

@@ -1,4 +1,4 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import type { ExportFormat, ExportMode } from "@langwatch/trace-browser-kit";
 import { Download } from "lucide-react";

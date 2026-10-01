@@ -1,3 +1,4 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Inventory page's test harness: the mounted screen and everything the
@@ -43,8 +44,7 @@
  *   - specs/ai-governance/dashboard/inventory-environments.feature
  *   - specs/ai-governance/dashboard/governance-ui-controls.feature
  */
-import { Button } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { Button } from "@langwatch/design-system/primitives";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

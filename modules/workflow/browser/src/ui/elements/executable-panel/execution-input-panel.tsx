@@ -1,5 +1,12 @@
-import { Button, Field, Heading, HStack, Textarea, VStack } from "@chakra-ui/react";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Button,
+  Field,
+  Heading,
+  HStack,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
 import { type FieldErrors, useForm } from "react-hook-form";

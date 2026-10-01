@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
 

@@ -1,6 +1,6 @@
 // A permission as the engine spells it, split at the colon; the sentence lives on hover.
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { permissionSentence, resourceCopy, splitPermission } from "../../model/role-permissions.ts";

@@ -1,5 +1,14 @@
-import { Accordion, Badge, Box, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Accordion,
+  Badge,
+  Box,
+  Field,
+  HStack,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { Control, UseFormRegister } from "react-hook-form";

@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 /** The placeholder character for a value a row does not have. */

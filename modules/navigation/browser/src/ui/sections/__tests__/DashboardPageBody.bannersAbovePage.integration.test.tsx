@@ -3,7 +3,8 @@
  * Plan-limit banners: positioned layers outside box. Message-limit readable.
  */
 
-import { ChakraProvider, defaultSystem, Box } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

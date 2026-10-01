@@ -3,7 +3,6 @@
  * with URL state managed via ?rule=new or ?rule=<tier>:<id>:<personal>.
  */
 
-import { Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   ScopeChipPicker,
   ScopeFilter,
@@ -18,6 +17,7 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";

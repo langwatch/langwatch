@@ -4,9 +4,17 @@
  * `triggers:view`. The settings frame is applied by whoever serves the address.
  */
 
-import { Badge, Button, Card, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Button,
+  Card,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { MailX, Trash2 } from "lucide-react";
 
 import { notificationApi } from "../../behavior/notification-api.ts";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Circle, Text } from "@chakra-ui/react";
+import { Circle, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { TileIcon } from "../../ai-tools/ui/elements/tile-icon.tsx";

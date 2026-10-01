@@ -1,5 +1,12 @@
-import { HStack, IconButton, Input, InputGroup, type InputProps, Text } from "@chakra-ui/react";
+import { InputGroup } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import {
+  HStack,
+  IconButton,
+  Input,
+  type InputProps,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";

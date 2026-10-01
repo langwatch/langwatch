@@ -2,11 +2,19 @@
  * Unified run history panel for both single-suite and cross-suite views.
  */
 
-import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import {
+  Box,
+  Button,
+  EmptyState,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";

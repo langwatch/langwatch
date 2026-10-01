@@ -1,3 +1,4 @@
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -8,8 +9,7 @@ import {
   Separator,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { format, Temporal, toEpochMs } from "@langwatch/time";

@@ -1,7 +1,7 @@
 /**
  * The live turn's answer, with blocks previewing as they stream (ADR-060 §7).
  */
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import {
   feedLangyDerivedCardPreview,
   type LangyDerivedCardPreview,

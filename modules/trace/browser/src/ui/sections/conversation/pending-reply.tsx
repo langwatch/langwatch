@@ -1,7 +1,6 @@
 // Waiting state shows avatar and bubble in answer's final place with
 // shimmer, so arrival feels intentional not accidental.
-import { Box, Circle, Flex, Icon } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, Circle, Flex, Icon, keyframes } from "@langwatch/design-system/primitives";
 import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 import type { ConversationRoleMode } from "@langwatch/trace-contract/conversation";
 

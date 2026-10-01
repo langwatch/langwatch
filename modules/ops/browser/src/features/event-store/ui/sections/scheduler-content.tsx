@@ -1,4 +1,12 @@
-import { Badge, Center, EmptyState, HStack, Spinner, Table, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Center,
+  EmptyState,
+  HStack,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { CalendarClock } from "lucide-react";

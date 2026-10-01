@@ -1,4 +1,4 @@
-import { Button, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@langwatch/design-system/primitives";
 import { CopyIcon } from "lucide-react";
 
 import { toaster } from "./toaster.ts";

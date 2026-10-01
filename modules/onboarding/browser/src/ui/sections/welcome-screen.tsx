@@ -1,6 +1,6 @@
-import { Box, HStack, VStack } from "@chakra-ui/react";
 import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 import { guidedPathLanding } from "@langwatch/onboarding-contract";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";

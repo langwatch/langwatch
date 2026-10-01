@@ -1,9 +1,9 @@
 /** Main entry point combining the sidebar and table (V3-style, replaces BatchEvaluationV2). */
 
-import { Alert, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Alert, Box, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
 import {
   describeCellFailure,

@@ -1,3 +1,5 @@
+import { Link } from "@langwatch/browser-host/link";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Box,
   Button,
@@ -7,9 +9,7 @@ import {
   Input,
   Skeleton,
   Text,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle, Search } from "lucide-react";

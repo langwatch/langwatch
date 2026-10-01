@@ -1,4 +1,4 @@
-import { HStack, Icon, Text } from "@chakra-ui/react";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
 import type { IconType } from "react-icons";
 import { LuBot, LuCode, LuSettings, LuUser, LuWrench } from "react-icons/lu";

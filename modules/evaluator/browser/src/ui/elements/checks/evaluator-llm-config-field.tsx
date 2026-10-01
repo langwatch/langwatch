@@ -1,5 +1,5 @@
-import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import { toInternalKey } from "@langwatch/prompt-browser-kit";
 import type { LLMConfig } from "@langwatch/workflow-contract";

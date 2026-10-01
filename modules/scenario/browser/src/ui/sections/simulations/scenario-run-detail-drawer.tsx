@@ -1,10 +1,19 @@
-import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import {
   type UiScenarioRunDetailDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import {
+  Accordion,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 import { Chip, ConversationExpandContext } from "@langwatch/trace-browser-kit";

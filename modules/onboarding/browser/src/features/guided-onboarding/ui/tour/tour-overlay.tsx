@@ -3,7 +3,7 @@
  * Langy's cursor travelling to it, and the caption. Presentational only —
  * nothing here knows about steps advancing; `tour-layer.tsx` is the engine.
  */
-import { Box, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 

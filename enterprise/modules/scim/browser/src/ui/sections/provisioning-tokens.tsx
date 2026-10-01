@@ -1,3 +1,4 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The provisioning tokens an organization holds, and the two acts on them.
@@ -20,8 +21,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+} from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";

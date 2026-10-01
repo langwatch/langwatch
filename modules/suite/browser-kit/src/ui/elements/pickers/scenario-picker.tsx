@@ -4,8 +4,16 @@
  * and select-all/clear.
  */
 
-import { Badge, Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle, Plus, X } from "lucide-react";

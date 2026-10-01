@@ -2,7 +2,7 @@
  * The note an activity card wears when the turn ended while the call was still open —
  * Stop was pressed, or the turn died.
  */
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 export const LANGY_INTERRUPTED_NOTE = "Interrupted before it finished";
 

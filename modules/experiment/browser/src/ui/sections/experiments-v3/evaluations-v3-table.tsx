@@ -1,4 +1,3 @@
-import { Box } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   datasetTableCss,
@@ -6,6 +5,7 @@ import {
   VirtualizedTableBody,
 } from "@langwatch/dataset-browser-kit";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { Box } from "@langwatch/design-system/primitives";
 import { isRowEmpty, isCellInExecution, toComparisonConfig } from "@langwatch/experiment-contract";
 import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

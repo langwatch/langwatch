@@ -1,5 +1,14 @@
-import { Badge, Box, Button, HStack, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  SimpleGrid,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { TimeInput } from "@langwatch/time";
 import { Copy, Download } from "lucide-react";
 import { useEffect, useState } from "react";

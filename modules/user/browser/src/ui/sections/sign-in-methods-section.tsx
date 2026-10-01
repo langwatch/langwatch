@@ -2,7 +2,16 @@
  * Per-user sign-in methods (email/password or linked SSO providers).
  */
 
-import { Box, Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { KeyRound, X } from "lucide-react";
 import { useState } from "react";
 

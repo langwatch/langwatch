@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 
 /** Address pill for credential step; shows address, provides way back to change it. */
 export function EmailPill({

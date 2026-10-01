@@ -1,4 +1,4 @@
-import { HStack, NativeSelect } from "@chakra-ui/react";
+import { HStack, NativeSelect } from "@langwatch/design-system/primitives";
 import type { OpsBlobSort } from "@langwatch/ops-contract";
 
 /**

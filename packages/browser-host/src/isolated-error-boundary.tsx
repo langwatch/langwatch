@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";

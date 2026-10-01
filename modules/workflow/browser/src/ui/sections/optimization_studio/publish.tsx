@@ -1,3 +1,7 @@
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Alert,
   Box,
@@ -9,11 +13,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";

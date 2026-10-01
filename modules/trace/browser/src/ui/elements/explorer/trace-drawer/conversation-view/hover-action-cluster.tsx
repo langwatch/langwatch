@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { forwardRef } from "react";

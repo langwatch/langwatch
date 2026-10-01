@@ -3,8 +3,8 @@
  * with timestamp and pass rate, followed by cards or rows.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { useMemo } from "react";
 

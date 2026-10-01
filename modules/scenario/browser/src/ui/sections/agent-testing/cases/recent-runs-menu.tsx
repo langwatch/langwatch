@@ -4,10 +4,10 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { Box, type ButtonProps, HStack, Icon, Text } from "@chakra-ui/react";
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, type ButtonProps, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";

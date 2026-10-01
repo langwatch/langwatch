@@ -4,8 +4,8 @@
  * the drawer writes through, so a suggestion is edited in exactly one place.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { UserAvatar } from "@langwatch/user-browser-kit";
 import { useState, type MouseEvent } from "react";

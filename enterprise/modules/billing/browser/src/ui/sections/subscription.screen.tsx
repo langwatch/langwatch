@@ -3,10 +3,10 @@
  * picks. Waits for deployment answer before rendering.
  */
 
-import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Server } from "lucide-react";
 
 import { useBillingHost } from "../../model/billing-host.ts";

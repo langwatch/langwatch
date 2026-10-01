@@ -2,7 +2,8 @@
 // drawerStore's collapsed state.
 // @vitest-environment jsdom
 
-import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";

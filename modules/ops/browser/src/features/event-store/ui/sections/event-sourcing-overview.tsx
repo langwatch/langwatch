@@ -1,5 +1,14 @@
-import { Box, Button, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Box,
+  Button,
+  Card,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
 

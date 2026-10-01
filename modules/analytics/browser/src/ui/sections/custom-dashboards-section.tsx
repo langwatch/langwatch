@@ -1,6 +1,6 @@
-import { Box, Button, Input, Spinner } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, Input, Spinner } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

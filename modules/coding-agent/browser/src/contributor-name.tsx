@@ -1,4 +1,4 @@
-import { Table } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { Link } from "./activity-link.tsx";

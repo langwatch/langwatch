@@ -1,5 +1,5 @@
-import { Button, Field, HStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { Button, Field, HStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 

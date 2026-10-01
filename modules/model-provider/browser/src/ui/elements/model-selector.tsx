@@ -1,3 +1,6 @@
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Box,
   Button,
@@ -7,10 +10,7 @@ import {
   Input,
   Skeleton,
   Text,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";

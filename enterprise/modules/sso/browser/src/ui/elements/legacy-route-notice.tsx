@@ -10,7 +10,7 @@
  * back. Moving the old route onto a connection is something LangWatch does,
  * so this says the setup exists and stops offering a rival to it.
  */
-import { Alert, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { providerDisplayName } from "../../model/provider-display-name.ts";
 

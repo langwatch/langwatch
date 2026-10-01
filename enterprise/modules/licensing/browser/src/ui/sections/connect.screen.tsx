@@ -3,10 +3,10 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { Alert, Button, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { CloudOff, KeyRound } from "lucide-react";
 
 import { connectApi } from "../../behavior/connect-api.ts";

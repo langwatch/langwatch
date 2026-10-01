@@ -1,3 +1,5 @@
+import { Link } from "@langwatch/browser-host/link";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Box,
@@ -10,9 +12,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";

@@ -1,4 +1,3 @@
-import { HStack } from "@chakra-ui/react";
 /**
  * One run plan: its runs in a rail on the left, the results of the selected
  * run filling the rest of the page.
@@ -6,6 +5,7 @@ import { HStack } from "@chakra-ui/react";
  * @see specs/suites/run-notes.feature
  */
 import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { HStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";

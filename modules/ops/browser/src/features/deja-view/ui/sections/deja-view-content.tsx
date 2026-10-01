@@ -1,4 +1,12 @@
-import { Box, Center, EmptyState, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Center,
+  EmptyState,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Eye, Info } from "lucide-react";
 import type { ReactNode } from "react";
 

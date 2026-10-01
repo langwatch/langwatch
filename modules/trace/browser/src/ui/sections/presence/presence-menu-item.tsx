@@ -3,7 +3,8 @@
  * States its own disabled treatment when presence is off at the organization or project.
  */
 
-import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";
+import { Menu } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Eye, EyeOff } from "lucide-react";
 

@@ -1,5 +1,5 @@
-import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowRight, FlaskConical, RefreshCw } from "lucide-react";
 
 const capabilities = [

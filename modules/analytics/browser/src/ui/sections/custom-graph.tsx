@@ -1,3 +1,11 @@
+import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
+import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
+import {
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+  type CustomGraphInput,
+} from "@langwatch/dashboard-contract";
+import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import {
   Badge,
   Box,
@@ -8,15 +16,7 @@ import {
   type SystemStyleObject,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
-import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import {
-  resolveGraphTimeScale,
-  withGroupedPipeline,
-  type CustomGraphInput,
-} from "@langwatch/dashboard-contract";
-import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
+} from "@langwatch/design-system/primitives";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { nowInstant } from "@langwatch/time";
 import numeral from "numeral";

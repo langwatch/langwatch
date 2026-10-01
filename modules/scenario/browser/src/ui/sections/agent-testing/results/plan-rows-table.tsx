@@ -4,9 +4,9 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
 import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";

@@ -1,10 +1,10 @@
-import { Badge, HStack } from "@chakra-ui/react";
 import {
   PopoverAnchor,
   PopoverBody,
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
+import { Badge, HStack } from "@langwatch/design-system/primitives";
 import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

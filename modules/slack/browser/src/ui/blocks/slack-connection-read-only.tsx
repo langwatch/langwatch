@@ -1,5 +1,5 @@
-import { Field, Text, VStack } from "@chakra-ui/react";
 import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
+import { Field, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   maskedSecret,
   SLACK_CONNECTION_KINDS,

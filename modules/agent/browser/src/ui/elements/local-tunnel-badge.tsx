@@ -1,4 +1,4 @@
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function LocalTunnelBadge() {

@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { safeProse } from "@langwatch/error-presentation/read-handled-error";
 import type { AiActionError } from "@langwatch/trace-contract";
 import type React from "react";

@@ -4,7 +4,7 @@
  * left-click to the host's navigate — the sixth copy of this policy.
  */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";

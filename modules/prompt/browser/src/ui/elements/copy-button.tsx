@@ -4,7 +4,7 @@
  * back through `onCopied` / `onRefused` and the host decides the words a reader sees.
  */
 
-import { Button, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@langwatch/design-system/primitives";
 import { CopyIcon } from "lucide-react";
 
 interface CopyButtonProps extends Omit<ButtonProps, "value" | "label" | "onClick"> {

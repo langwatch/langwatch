@@ -1,4 +1,4 @@
-import { Box, Combobox, HStack, Portal } from "@chakra-ui/react";
+import { Box, Combobox, HStack, Portal } from "@langwatch/design-system/primitives";
 import { Check, Plus, Search } from "lucide-react";
 
 import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";

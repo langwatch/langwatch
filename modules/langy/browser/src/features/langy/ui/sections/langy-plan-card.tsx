@@ -1,8 +1,15 @@
 /**
  * The plan checklist — what a multi-step turn said it would do, and where it is.
  */
-import { Box, chakra, HStack, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  Text,
+  VisuallyHidden,
+  VStack,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { useReducedMotion, LangyCard } from "@langwatch/langy-browser-kit";
 import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";

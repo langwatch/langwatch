@@ -1,5 +1,5 @@
-import { Alert } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Alert } from "@langwatch/design-system/primitives";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 import { describeError } from "../../../../model/describe-error.ts";

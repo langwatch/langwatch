@@ -1,7 +1,7 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   isSessionMarked,
   readableDate,

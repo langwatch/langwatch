@@ -1,4 +1,4 @@
-import { Button, Center, EmptyState, Flex, Spinner } from "@chakra-ui/react";
+import { Button, Center, EmptyState, Flex, Spinner } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { Database } from "lucide-react";
 

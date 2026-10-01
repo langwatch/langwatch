@@ -1,14 +1,3 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
@@ -21,6 +10,17 @@ import type {
   InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { createLogger } from "@langwatch/observability/browser";
 import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";

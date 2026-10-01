@@ -1,4 +1,4 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { ShareLinkView } from "../../../model/share/share-link-status.ts";
 import { ShareLinkRow } from "./share-link-row.tsx";

@@ -1,5 +1,15 @@
-import { Badge, Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Input,
+  Spacer,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";

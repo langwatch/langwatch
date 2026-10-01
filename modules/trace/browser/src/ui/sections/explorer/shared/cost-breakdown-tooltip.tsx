@@ -1,4 +1,4 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { formatCost } from "@langwatch/trace-browser-kit";
 
 import { TooltipRow } from "../../../elements/explorer/shared/tooltip-row.tsx";

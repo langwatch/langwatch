@@ -1,4 +1,4 @@
-import { Skeleton } from "@chakra-ui/react";
+import { Skeleton } from "@langwatch/design-system/primitives";
 import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
 

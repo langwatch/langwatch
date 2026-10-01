@@ -1,4 +1,3 @@
-import { Badge, Box, Button, HStack, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import {
   RUNAWAY_PAUSE_EXPLANATION,
@@ -9,6 +8,16 @@ import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  SimpleGrid,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";

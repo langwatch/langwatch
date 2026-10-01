@@ -4,8 +4,8 @@
  * belong to the composing application); this page is a child of that layout route.
  */
 
-import { Box, HStack, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 
 import { PromptPlaygroundChatProvider } from "../../../model/prompt-chat-sync-context.tsx";
 import { PromptPlaygroundMainContent } from "./playground-main-content.tsx";

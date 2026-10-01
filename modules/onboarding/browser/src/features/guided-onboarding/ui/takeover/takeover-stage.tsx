@@ -3,7 +3,7 @@
  * the content block centred so it drifts up as the words land. Phases fade
  * through it over 450ms.
  */
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import { OnboardingMeshBackground } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 

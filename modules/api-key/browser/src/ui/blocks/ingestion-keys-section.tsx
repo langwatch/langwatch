@@ -1,8 +1,18 @@
-import { Badge, Box, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { MoreVertical, Radio } from "lucide-react";

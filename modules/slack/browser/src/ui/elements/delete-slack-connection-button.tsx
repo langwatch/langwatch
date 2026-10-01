@@ -1,5 +1,5 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { type SlackConnection, unusedDeleteConfirmation } from "@langwatch/slack-browser-kit";
 import { useState } from "react";
 

@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { useProjectBySlugOrLatest, ActiveProjectProvider } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";

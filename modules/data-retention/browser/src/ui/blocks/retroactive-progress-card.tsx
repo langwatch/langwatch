@@ -1,5 +1,13 @@
-import { Button, Card, Heading, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import type { RetentionCategory } from "@langwatch/data-retention-contract";
+import {
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Progress,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 

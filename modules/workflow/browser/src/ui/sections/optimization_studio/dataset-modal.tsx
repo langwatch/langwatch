@@ -1,15 +1,15 @@
-/**
- * Dataset dialog for the workflow entry-point node: same experience as the rest of the
- * platform: the shared dataset picker for choosing, the shared TanStack editor for
- * editing.
- */
-import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
+/**
+ * Dataset dialog for the workflow entry-point node: same experience as the rest of the
+ * platform: the shared dataset picker for choosing, the shared TanStack editor for
+ * editing.
+ */
+import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import {
   datasetColumnsToFields,

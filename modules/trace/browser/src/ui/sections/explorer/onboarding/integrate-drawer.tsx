@@ -1,5 +1,5 @@
-import { Box, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Box, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,

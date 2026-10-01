@@ -1,9 +1,9 @@
-import { Box, VStack } from "@chakra-ui/react";
 import {
   readAnnotationScoreOptions,
   type AnnotationFormState,
   describeAnnotationAnchor,
 } from "@langwatch/annotation-contract";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 
 import {

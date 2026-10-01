@@ -3,7 +3,7 @@
  * traces already exist.
  */
 
-import { HStack, Icon, Spinner, Text } from "@chakra-ui/react";
+import { HStack, Icon, Spinner, Text } from "@langwatch/design-system/primitives";
 import { CheckCircle2 } from "lucide-react";
 
 import { useFirstTraceWatch } from "../../behavior/use-first-trace-watch.ts";

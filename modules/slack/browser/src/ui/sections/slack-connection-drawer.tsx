@@ -1,7 +1,7 @@
-import { Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   findSlackConnection,
   type SlackConnection,

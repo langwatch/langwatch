@@ -1,4 +1,4 @@
-import { Box, HStack, type SystemStyleObject, Text } from "@chakra-ui/react";
+import { Box, HStack, type SystemStyleObject, Text } from "@langwatch/design-system/primitives";
 import type { LangyContextTargetProps } from "@langwatch/langy-browser-kit";
 import type React from "react";
 

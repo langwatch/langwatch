@@ -4,7 +4,7 @@
  * previews; the full SimulationChat is used in detail views.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { Settings } from "react-feather";
 import { z } from "zod";

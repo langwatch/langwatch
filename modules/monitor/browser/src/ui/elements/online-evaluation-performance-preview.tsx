@@ -3,7 +3,7 @@
  * type from evaluation-contract, not a duplicate.
  */
 
-import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 
 type PerformanceRow = {

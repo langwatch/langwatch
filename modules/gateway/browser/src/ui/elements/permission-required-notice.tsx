@@ -1,6 +1,6 @@
 /** One region the viewer does not hold permission for. Copy hardcoded pending registry. */
 
-import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 
 const TITLE = "You do not have access to this";

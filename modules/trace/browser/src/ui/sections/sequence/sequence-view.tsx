@@ -1,6 +1,6 @@
-import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import { type RefObject, useCallback, useMemo, useRef, useState } from "react";

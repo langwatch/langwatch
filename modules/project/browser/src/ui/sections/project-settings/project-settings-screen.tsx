@@ -1,5 +1,7 @@
 /** Organization and project settings; personal workspaces cannot be the org's project (ADR-038). */
 
+import { Dialog } from "@langwatch/design-system/dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
@@ -12,9 +14,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";

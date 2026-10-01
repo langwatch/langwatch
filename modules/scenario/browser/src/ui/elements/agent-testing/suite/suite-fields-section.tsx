@@ -5,16 +5,6 @@
  */
 
 import {
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   closestCenter,
   DndContext,
   type DragEndEvent,
@@ -30,6 +20,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Box,
+  chakra,
+  HStack,
+  IconButton,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SUITE_FIELD_TYPES, type SuiteFieldType } from "@langwatch/scenario-contract";
 import { GripVertical, X } from "lucide-react";
 

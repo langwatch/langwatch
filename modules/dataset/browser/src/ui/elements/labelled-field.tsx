@@ -2,7 +2,7 @@
  * dataset-needed props and layout.
  */
 
-import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Box, Field, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren, ReactNode } from "react";
 
 export function LabelledField({

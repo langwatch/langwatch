@@ -1,10 +1,10 @@
-import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { monitorApiUpdateInputSchema } from "@langwatch/monitor-contract";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";

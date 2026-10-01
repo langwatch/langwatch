@@ -1,6 +1,6 @@
-import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { HStack, Icon, Link, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { Lock } from "react-feather";

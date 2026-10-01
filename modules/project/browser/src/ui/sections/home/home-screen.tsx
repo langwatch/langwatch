@@ -1,4 +1,13 @@
-import { Box, Container, chakra, Grid, HStack, Skeleton, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Container,
+  chakra,
+  Grid,
+  HStack,
+  Skeleton,
+  Spacer,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 import { LuCalendarClock } from "react-icons/lu";
 

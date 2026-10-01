@@ -1,4 +1,4 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 
 /** The box's outline, painted solid behind the lines as its faces. */
 export const LOGO_PLATE_PATH =

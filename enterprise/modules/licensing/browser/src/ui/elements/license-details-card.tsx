@@ -1,4 +1,4 @@
-import { Alert, Button, HStack, Link, Text } from "@chakra-ui/react";
+import { Alert, Button, HStack, Link, Text } from "@langwatch/design-system/primitives";
 import {
   OverviewCard,
   OverviewDetail,

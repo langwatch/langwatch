@@ -4,8 +4,8 @@
  * reaches a project-scoped connection. Specs: specs/automations/slack-connections.feature.
  */
 
-import { Skeleton, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 
 import { useGithubHost } from "../../model/github-host.ts";

@@ -1,4 +1,4 @@
-import { Button, Combobox, Text } from "@chakra-ui/react";
+import { Button, Combobox, Text } from "@langwatch/design-system/primitives";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 

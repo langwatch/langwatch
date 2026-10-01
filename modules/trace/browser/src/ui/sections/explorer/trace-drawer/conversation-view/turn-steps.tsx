@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { formatCost, formatDuration, formatTokens } from "@langwatch/trace-browser-kit";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";

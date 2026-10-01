@@ -1,6 +1,6 @@
 /** Mobile shell: compact bar with logo, product selector, menu. Menu opens overlay. */
 
-import { Box, HStack, IconButton, Spacer, Text, chakra } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Spacer, Text, chakra } from "@langwatch/design-system/primitives";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 

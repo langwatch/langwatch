@@ -4,8 +4,8 @@
  * footer with count and select-all/clear buttons.
  */
 
-import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SuiteTarget, SuiteTargetType } from "@langwatch/suite-contract";

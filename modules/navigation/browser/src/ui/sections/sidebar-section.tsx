@@ -1,4 +1,4 @@
-import { Box, HStack, VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 

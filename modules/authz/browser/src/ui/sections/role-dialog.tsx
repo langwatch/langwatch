@@ -1,10 +1,19 @@
 // Writing a role with the answer beside it: what it should reach on the left, what
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
-import { Box, Button, Field, Grid, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
 import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Box,
+  Button,
+  Field,
+  Grid,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 import { type FieldErrors, type UseFormRegister, useForm, useWatch } from "react-hook-form";
 

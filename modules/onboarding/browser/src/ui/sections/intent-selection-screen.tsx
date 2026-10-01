@@ -1,5 +1,5 @@
-import { Box, HStack, Icon, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Box, HStack, Icon, RadioCard, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   accentChipBg,
   accentChipBorder,

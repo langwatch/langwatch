@@ -1,4 +1,4 @@
-import { CheckboxCard, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {

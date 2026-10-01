@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
-import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { SuggestionPanel } from "@langwatch/trace-browser-kit";
 import { useId, useRef } from "react";
 

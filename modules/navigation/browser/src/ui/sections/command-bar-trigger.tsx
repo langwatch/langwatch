@@ -1,4 +1,5 @@
-import { Button, Kbd, Text } from "@chakra-ui/react";
+import { Kbd } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 import { useCommandBar } from "../../behavior/command-bar-context.ts";

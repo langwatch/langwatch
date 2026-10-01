@@ -1,5 +1,6 @@
-import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
+import { Popover as ChakraPopover } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type LlmConfigOutputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { ChevronDown } from "lucide-react";

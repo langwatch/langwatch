@@ -1,4 +1,4 @@
-import { CheckboxCard, Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import {
   type FacetItem,
   type FacetValueState,

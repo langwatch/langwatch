@@ -4,9 +4,9 @@
  * family doesn't own — written via `host.openOverlay`.
  */
 
-import { Grid, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Grid, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 

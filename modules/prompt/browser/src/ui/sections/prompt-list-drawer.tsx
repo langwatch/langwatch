@@ -4,10 +4,19 @@
  * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
 
-import { Box, Button, Collapsible, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { UiPromptListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Box,
+  Button,
+  Collapsible,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import groupBy from "lodash-es/groupBy";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";

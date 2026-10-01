@@ -1,4 +1,4 @@
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import { OnboardingMeshBackground } from "@langwatch/onboarding-browser-kit";
 
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";

@@ -1,5 +1,5 @@
-import { Field, HStack, Input, Text } from "@chakra-ui/react";
 import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "@langwatch/automation-contract";
+import { Field, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 const MIN_SECONDS = Math.floor(MIN_TRACE_DEBOUNCE_MS / 1000);

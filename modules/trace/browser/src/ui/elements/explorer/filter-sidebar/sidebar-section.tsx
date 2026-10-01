@@ -1,4 +1,13 @@
-import { Box, Button, Collapsible, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Collapsible,
+  chakra,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   ChevronDown,
   ChevronUp,

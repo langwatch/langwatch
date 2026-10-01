@@ -1,3 +1,6 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -9,10 +12,7 @@ import {
   RadioCard,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   FACET_PERSPECTIVES,

@@ -1,5 +1,5 @@
 /** Quiet loading state for inspecting existing data rather than taking an action. */
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { motion } from "motion/react";
 

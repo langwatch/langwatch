@@ -1,4 +1,3 @@
-import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import {
   DEFAULT_WEBHOOK_CONTENT_TYPE,
   type SavedTriggerRow,
@@ -9,6 +8,16 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import {
   findWebhookUrlProblemMessage,

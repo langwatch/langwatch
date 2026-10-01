@@ -3,8 +3,8 @@
  * Narrowed local copy (see platform/app/src/components/MenuLink).
  */
 
-import { HStack, Spacer, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export function SidebarMenuLink({

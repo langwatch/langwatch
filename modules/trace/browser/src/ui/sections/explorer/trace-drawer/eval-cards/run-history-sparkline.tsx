@@ -1,4 +1,4 @@
-import { Circle, HStack, Text } from "@chakra-ui/react";
+import { Circle, HStack, Text } from "@langwatch/design-system/primitives";
 
 import type { EvalRunHistoryEntry } from "./utils.ts";
 

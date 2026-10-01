@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";

@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 
 /** One chip: the cut it selects, what it is called, and how many rows it holds. */
 export interface FilterChipItem {

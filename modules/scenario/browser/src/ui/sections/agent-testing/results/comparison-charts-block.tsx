@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Grid } from "@chakra-ui/react";
+import { Grid } from "@langwatch/design-system/primitives";
 import {
   type BatchRun,
   formatCost,

@@ -3,7 +3,7 @@
  * bottom of the scrolling card. Every analytics screen renders inside it.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { SavedViewsBar } from "./saved-views-bar.tsx";

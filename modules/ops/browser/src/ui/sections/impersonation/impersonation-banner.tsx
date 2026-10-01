@@ -1,4 +1,4 @@
-import { chakra, HStack, Text } from "@chakra-ui/react";
+import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export interface ImpersonationBannerProps {

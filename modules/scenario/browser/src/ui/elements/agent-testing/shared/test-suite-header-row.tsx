@@ -2,7 +2,7 @@
  * The row that opens a group of scenarios inside a table: the test suite and how many
  * scenarios it holds.
  */
-import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";
 
 import {

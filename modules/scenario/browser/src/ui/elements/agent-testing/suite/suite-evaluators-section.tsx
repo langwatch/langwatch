@@ -5,8 +5,7 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { Circle, chakra, Icon, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Circle, chakra, Icon, Text, VStack, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   SCENARIO_MISSING_MAPPING_TOOLTIP,

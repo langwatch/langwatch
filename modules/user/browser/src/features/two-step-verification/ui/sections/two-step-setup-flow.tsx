@@ -2,7 +2,7 @@
  * The whole setup, start to finish, with no chrome of its own: confirm who
  * you are (only where there is a password to confirm), scan, save the codes.
  */
-import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useTwoStepSetup } from "../../behavior/use-two-step-setup.ts";

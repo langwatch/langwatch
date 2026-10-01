@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 import { formatPassRate, passRateColor } from "./pass-rate-color.ts";
 

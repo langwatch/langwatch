@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 
 import { useResendBackoff } from "../../behavior/use-resend-backoff.ts";
 import { AddressBadges } from "../elements/address-badges.tsx";

@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer } from "@chakra-ui/react";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 

@@ -1,4 +1,4 @@
-import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /** One titled band of the checkup page: a hairline above, one line of description, an action. */

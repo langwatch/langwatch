@@ -1,6 +1,6 @@
-import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Card, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
   ArrowUp,

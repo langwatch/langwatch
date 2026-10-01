@@ -1,5 +1,5 @@
-import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, CodeBlock, Flex, Spinner } from "@langwatch/design-system/primitives";
 import {
   useLangyContextTarget,
   traceChipDisplayName,

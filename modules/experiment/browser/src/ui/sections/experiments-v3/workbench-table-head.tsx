@@ -1,5 +1,5 @@
 /** The workbench table's column widths and header cells, resize handles included. */
-import { Link } from "@chakra-ui/react";
+import { Link } from "@langwatch/design-system/primitives";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";

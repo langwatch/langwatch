@@ -1,4 +1,4 @@
-import { HStack, VStack } from "@chakra-ui/react";
+import { HStack, VStack } from "@langwatch/design-system/primitives";
 import { Chip, type ChipProps } from "@langwatch/trace-browser-kit";
 import type { ReactElement, ReactNode } from "react";
 

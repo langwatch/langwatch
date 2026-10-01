@@ -1,4 +1,10 @@
 import {
+  isAutomationPauseReason,
+  parseAutomationFiltersWire,
+  RUNAWAY_PAUSE_EXPLANATION,
+} from "@langwatch/automation-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
+import {
   Badge,
   Button,
   Code,
@@ -8,13 +14,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  isAutomationPauseReason,
-  parseAutomationFiltersWire,
-  RUNAWAY_PAUSE_EXPLANATION,
-} from "@langwatch/automation-contract";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { Calendar, TrendingUp } from "react-feather";

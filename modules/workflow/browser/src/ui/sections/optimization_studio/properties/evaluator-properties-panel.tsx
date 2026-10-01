@@ -1,5 +1,5 @@
-import { Button, HStack, Spacer, Spinner } from "@chakra-ui/react";
 import type { UiEvaluatorEditorValues } from "@langwatch/browser-host/declarations";
+import { Button, HStack, Spacer, Spinner } from "@langwatch/design-system/primitives";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,

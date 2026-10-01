@@ -1,15 +1,3 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Input,
-  NativeSelect,
-  RadioCard,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import {
   getComplexProps,
@@ -21,6 +9,18 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Input,
+  NativeSelect,
+  RadioCard,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";

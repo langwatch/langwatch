@@ -1,8 +1,8 @@
-import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,
 } from "@langwatch/design-system/json-value-text";
+import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";

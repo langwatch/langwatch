@@ -1,10 +1,18 @@
-/**
- * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
- */
-import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { RowHeightMode } from "@langwatch/dataset-browser-kit";
 import { Popover } from "@langwatch/design-system/popover";
+/**
+ * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
+ */
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";

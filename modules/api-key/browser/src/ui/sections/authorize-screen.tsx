@@ -1,8 +1,8 @@
 // /authorize: copy the project API key on a standalone branded card; the host lends the
 // switcher. Signed out, it sends the reader to sign in and back, as main's DashboardLayout did.
 
-import { HStack, Text, VStack } from "@chakra-ui/react";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { useAuthorizeHost } from "../../model/authorize-host.ts";

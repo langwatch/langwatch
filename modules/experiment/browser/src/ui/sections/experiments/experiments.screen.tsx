@@ -1,14 +1,3 @@
-import {
-  Badge,
-  Box,
-  HStack,
-  Skeleton,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
@@ -20,6 +9,17 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Box,
+  HStack,
+  Skeleton,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { LangyContextTarget, experimentContextChip } from "@langwatch/langy-browser-kit";

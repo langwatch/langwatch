@@ -1,5 +1,5 @@
-import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { EmptyState, SIDEBAR_PANEL_WIDTH, useReducedMotion } from "@langwatch/langy-browser-kit";
 import type { GuidedKickoffInput } from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";

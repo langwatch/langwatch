@@ -1,3 +1,6 @@
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -11,10 +14,7 @@ import {
   Text,
   VStack,
   Wrap,
-} from "@chakra-ui/react";
-import { Link as RoutedLink } from "@langwatch/browser-host/link";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
 import { MoreVertical, Pencil, UserCheck } from "lucide-react";

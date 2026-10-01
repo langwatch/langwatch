@@ -1,7 +1,7 @@
 /** The question asked before a sitting ends with nothing handed over to a dataset. */
 
-import { Button } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button } from "@langwatch/design-system/primitives";
 
 /** What the reviewer is asked before the session ends with no dataset. */
 export const END_SESSION_QUESTION =

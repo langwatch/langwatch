@@ -1,6 +1,6 @@
 /** Renders scenario runs as grid or list with virtualization above a threshold. */
 
-import { Grid, VStack } from "@chakra-ui/react";
+import { Grid, VStack } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";

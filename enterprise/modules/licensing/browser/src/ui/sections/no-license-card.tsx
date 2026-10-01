@@ -1,5 +1,14 @@
-import { Box, Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";

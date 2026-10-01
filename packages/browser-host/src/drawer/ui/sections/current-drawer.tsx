@@ -4,8 +4,8 @@
  * `true`, never the address's drawer name. Restriction is one `restriction` prop.
  */
 
-import { Center, Spinner } from "@chakra-ui/react";
 import { DrawerOffsetProvider } from "@langwatch/design-system/drawer";
+import { Center, Spinner } from "@langwatch/design-system/primitives";
 import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";

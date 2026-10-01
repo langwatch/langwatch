@@ -2,8 +2,8 @@
  * Scenario Mappings Section
  */
 
-import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type AvailableSource,
   type FieldMapping,

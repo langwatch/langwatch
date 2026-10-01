@@ -1,4 +1,3 @@
-import { Field, Tabs, Text, VStack } from "@chakra-ui/react";
 import type {
   AgentInputBinding as FieldMapping,
   Field as Variable,
@@ -7,6 +6,7 @@ import type {
   HttpMethod,
 } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { Field, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";

@@ -4,7 +4,6 @@
  * specs/rbac/roles-and-access-ui.feature
  */
 
-import { Button, Card, HStack, Spacer, VStack } from "@chakra-ui/react";
 import {
   GrantRoleButton,
   GrantsTable,
@@ -12,6 +11,7 @@ import {
   RevokeGrantDialog,
 } from "@langwatch/authz-browser-kit";
 import type { GrantScopeType, GrantStatus } from "@langwatch/authz-contract";
+import { Button, Card, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useGrantList } from "../../behavior/use-grant-list.ts";

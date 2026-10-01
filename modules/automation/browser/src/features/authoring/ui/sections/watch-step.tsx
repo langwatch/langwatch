@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertType } from "@langwatch/automation-contract";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock, TrendingUp, Zap } from "lucide-react";
 
 import { SourceCard } from "../elements/source-card.tsx";

@@ -1,5 +1,14 @@
-import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Alert,
+  Button,
+  HStack,
+  Input,
+  List,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

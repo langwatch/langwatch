@@ -6,7 +6,7 @@
  * reason this is a grid and not a dropdown — and where no mark exists we draw
  * letters rather than invent a logo.
  */
-import { Box, Text, chakra } from "@chakra-ui/react";
+import { Box, Text, chakra } from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 import type { IconType } from "react-icons";
 import { FaMicrosoft } from "react-icons/fa6";

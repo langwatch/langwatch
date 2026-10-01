@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { Table } from "@langwatch/design-system/primitives";
 import "@testing-library/jest-dom/vitest";
 import { Temporal } from "@langwatch/time";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

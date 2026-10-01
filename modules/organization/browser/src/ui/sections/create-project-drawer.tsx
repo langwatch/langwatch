@@ -1,8 +1,8 @@
 /** Create-project drawer: inline error (no toast), hard nav after create. */
 
-import { Heading } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Heading } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { api } from "../../behavior/organization-api.ts";

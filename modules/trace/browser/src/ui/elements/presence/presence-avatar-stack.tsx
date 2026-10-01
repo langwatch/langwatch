@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { PresenceSession } from "@langwatch/presence-contract";
 
 import { PresenceAvatar } from "./presence-avatar.tsx";

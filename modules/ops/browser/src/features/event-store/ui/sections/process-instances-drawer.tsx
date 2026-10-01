@@ -1,5 +1,15 @@
-import { Badge, Box, Button, HStack, Input, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";

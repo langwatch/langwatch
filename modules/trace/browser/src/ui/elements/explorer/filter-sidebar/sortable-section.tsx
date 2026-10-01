@@ -1,6 +1,6 @@
-import { Box } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Box } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useMemo } from "react";
 

@@ -2,6 +2,10 @@
  * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
 
+import type { WireOf } from "@langwatch/api/web";
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Badge,
@@ -14,11 +18,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { WireOf } from "@langwatch/api/web";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */

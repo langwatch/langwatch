@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { HStack, IconButton } from "@chakra-ui/react";
+import { HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LayoutGrid, Table2 } from "lucide-react";
 

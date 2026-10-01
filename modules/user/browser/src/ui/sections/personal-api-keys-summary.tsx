@@ -4,8 +4,8 @@
  * already carries the scopes and confirmations that go with them.
  */
 
-import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { useEffect } from "react";
 

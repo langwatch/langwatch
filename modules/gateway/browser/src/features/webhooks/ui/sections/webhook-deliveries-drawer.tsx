@@ -1,5 +1,14 @@
-import { Badge, Box, Button, HStack, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type TimeInput } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
 

@@ -4,19 +4,19 @@
  * scope — the mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
 
+import { SegmentGroup } from "@chakra-ui/react";
+import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
+import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   createListCollection,
   HStack,
   Input,
-  SegmentGroup,
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import type { Instant } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";

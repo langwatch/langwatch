@@ -3,7 +3,7 @@
  *
  * Shows target name with icon and summary statistics (similar to V3 TargetHeader).
  */
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { memo } from "react";
 import {

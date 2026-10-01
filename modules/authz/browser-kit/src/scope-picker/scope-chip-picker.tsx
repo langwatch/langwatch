@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
   Wrap,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";

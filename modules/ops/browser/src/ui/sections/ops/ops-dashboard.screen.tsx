@@ -1,5 +1,5 @@
-import { Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 
 import { api } from "../../../behavior/ops-api.ts";

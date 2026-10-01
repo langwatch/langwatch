@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 import { Dialog } from "../dialog.tsx";

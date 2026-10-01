@@ -5,9 +5,9 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { Box, Input, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Input, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

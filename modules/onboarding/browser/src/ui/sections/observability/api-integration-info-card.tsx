@@ -1,5 +1,5 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { CLOUD_ENDPOINT, useActiveProject } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 

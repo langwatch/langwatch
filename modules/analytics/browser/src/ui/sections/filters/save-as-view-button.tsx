@@ -4,8 +4,8 @@
  * are active and ClickHouse is enabled.
  */
 
-import { Button, HStack, Input, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Check, ChevronDown, User, Users } from "lucide-react";
 import type React from "react";

@@ -3,8 +3,8 @@
  * (security-critical second lock); wire and frame changed per port architecture.
  */
 
-import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 

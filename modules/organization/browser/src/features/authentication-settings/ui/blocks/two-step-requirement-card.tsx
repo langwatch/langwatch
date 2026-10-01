@@ -1,10 +1,10 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * Whether every member must prove a second factor. The server enforces it; the
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Box, HStack, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Alert, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";

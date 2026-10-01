@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 /**
  * `defaultModelOverride`: "Inherit" on the wire is key absence. The Langy pill sync helper is
  * missing on purpose (importing `@langwatch/langy-browser` back would cycle), so an open panel
@@ -8,6 +7,7 @@ import type { WireOf } from "@langwatch/api/web";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   INHERIT_SENTINEL,

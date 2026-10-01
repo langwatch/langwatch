@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type React from "react";
 

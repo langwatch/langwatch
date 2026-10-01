@@ -4,7 +4,7 @@
  * one reads the same way.
  */
 
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 
 export function FromCodeBadge() {
   return (

@@ -10,7 +10,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Plus } from "lucide-react";
 

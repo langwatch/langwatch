@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { compileAttributePattern } from "@langwatch/data-privacy-contract";
+import { Box, Button, HStack, Icon, Input, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { useCallback, useMemo, useRef, useState } from "react";

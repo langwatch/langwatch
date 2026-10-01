@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Box, Grid, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Grid, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 
 /** How wide the results column reads beside the conversation. */

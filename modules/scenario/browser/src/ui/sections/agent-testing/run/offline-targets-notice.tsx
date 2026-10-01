@@ -3,7 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { offlineTargetMessage, offlineTargetsOf } from "./offline-targets.ts";

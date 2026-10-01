@@ -4,9 +4,9 @@
  * gate, since this app never renders on a server.
  */
 
-import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
+import { Box, Card as ChakraCard } from "@langwatch/design-system/primitives";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 

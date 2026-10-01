@@ -1,4 +1,4 @@
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import type { PageCursor } from "@langwatch/trace-browser-kit";
 import { motion } from "motion/react";
 import type React from "react";

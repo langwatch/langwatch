@@ -1,7 +1,7 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 import { describeError } from "@langwatch/browser-host/errors";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { useState } from "react";
 

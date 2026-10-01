@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 
 import { readableDate } from "../../model/display-formatters.ts";
 import type { PendingJoinRequest } from "../../model/pending-join-request.ts";

@@ -1,4 +1,4 @@
-import { Box, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";

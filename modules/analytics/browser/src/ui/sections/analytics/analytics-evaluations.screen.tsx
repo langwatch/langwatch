@@ -1,4 +1,13 @@
-import { Alert, Box, Card, GridItem, Heading, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Card,
+  GridItem,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";

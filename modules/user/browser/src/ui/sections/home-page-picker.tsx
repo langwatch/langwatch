@@ -1,4 +1,5 @@
-import { Box, HStack, RadioGroup, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { RadioGroup } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";

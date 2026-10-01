@@ -3,7 +3,7 @@
  * for compatibility.
  */
 
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
 import { useMonitorHost } from "../../model/monitor-host.ts";

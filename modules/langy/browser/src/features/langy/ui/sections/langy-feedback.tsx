@@ -1,4 +1,4 @@
-import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { chakra, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useLangyStore, useReducedMotion, ACCENT, CARD } from "@langwatch/langy-browser-kit";
 import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";

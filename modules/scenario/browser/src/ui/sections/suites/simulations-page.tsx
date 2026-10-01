@@ -2,12 +2,12 @@
  * Unified simulations page — the primary view for all simulation runs.
  */
 
-import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
 import { type Period, PeriodSelector, usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, EmptyState, HStack, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
 import {

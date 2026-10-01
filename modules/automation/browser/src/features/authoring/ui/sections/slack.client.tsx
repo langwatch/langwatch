@@ -1,4 +1,12 @@
 import {
+  type SlackActionParams,
+  type SlackPreview,
+  slackDeliveryMethodOf,
+  type SavedTriggerRow,
+  defaultsForSourceKind,
+  filterVariablesForCadence,
+} from "@langwatch/automation-contract";
+import {
   Box,
   Button,
   Combobox,
@@ -10,15 +18,7 @@ import {
   useFilter,
   useListCollection,
   VStack,
-} from "@chakra-ui/react";
-import {
-  type SlackActionParams,
-  type SlackPreview,
-  slackDeliveryMethodOf,
-  type SavedTriggerRow,
-  defaultsForSourceKind,
-  filterVariablesForCadence,
-} from "@langwatch/automation-contract";
+} from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";

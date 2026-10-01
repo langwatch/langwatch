@@ -4,6 +4,7 @@
  * standalone, and its last result — whichever run produced one most recently.
  */
 
+import { LwqlEditor, type LwqlParameter } from "@langwatch/analytics-browser-kit";
 import {
   chakra,
   Accordion,
@@ -16,8 +17,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { LwqlEditor, type LwqlParameter } from "@langwatch/analytics-browser-kit";
+} from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 

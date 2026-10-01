@@ -4,7 +4,7 @@
  * Spec: specs/ui/in-app-links.feature
  */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useOptionalUiCapabilities } from "./capabilities.ts";

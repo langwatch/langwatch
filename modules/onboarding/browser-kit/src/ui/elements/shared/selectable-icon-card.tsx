@@ -1,5 +1,5 @@
-import { chakra, Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { chakra, Box, type IconProps, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 

@@ -1,5 +1,5 @@
-import { Card, Heading, HStack, IconButton } from "@chakra-ui/react";
 import { analyticsMetrics } from "@langwatch/analytics-browser-kit";
+import { Card, Heading, HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
 

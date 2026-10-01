@@ -5,7 +5,8 @@
  * @see specs/identity/mfa-and-session-shape.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import type { OrganizationMemberFactor } from "@langwatch/identity-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

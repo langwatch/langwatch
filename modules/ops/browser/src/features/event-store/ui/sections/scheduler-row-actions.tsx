@@ -1,4 +1,5 @@
-import { Field, IconButton, Input, Menu, Portal, Text } from "@chakra-ui/react";
+import { Menu } from "@chakra-ui/react";
+import { Field, IconButton, Input, Portal, Text } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 

@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Box } from "@langwatch/design-system/primitives";
 import {
   useLangyStore,
   LANGY_DOCKED_OFFSET,

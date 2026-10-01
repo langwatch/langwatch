@@ -1,5 +1,15 @@
-import { Alert, Box, Button, Code, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Alert,
+  Box,
+  Button,
+  Code,
+  HStack,
+  Link,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
 

@@ -1,4 +1,12 @@
-import { Badge, Collapsible, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Collapsible,
+  HStack,
+  Icon,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type FacetValueState, formatCount } from "@langwatch/trace-browser-kit";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";

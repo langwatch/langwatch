@@ -1,5 +1,13 @@
-import { Card, Grid, GridItem, Heading, HStack, IconButton, Tabs } from "@chakra-ui/react";
 import { analyticsMetrics } from "@langwatch/analytics-browser-kit";
+import {
+  Card,
+  Grid,
+  GridItem,
+  Heading,
+  HStack,
+  IconButton,
+  Tabs,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
 

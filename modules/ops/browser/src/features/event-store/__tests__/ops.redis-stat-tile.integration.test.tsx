@@ -1,8 +1,9 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Real RedisStatTile rendering (Memory, Processor, Connections as one tile).
  */
-import { ChakraProvider, defaultSystem, HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

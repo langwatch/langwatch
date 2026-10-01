@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Check, Code, Globe, Mic, Plug, Workflow } from "lucide-react";

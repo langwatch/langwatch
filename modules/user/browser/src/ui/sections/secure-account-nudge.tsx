@@ -1,10 +1,10 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Offering to make an account harder to take over, once, after a password
  * sign-in: a step rather than a banner, "Not now" beside the offer, and never
  * a gate. Which halves to show is the server's answer. specs/identity/passkeys.feature
  */
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Fingerprint, ShieldCheck } from "lucide-react";
 
 import { useSecureAccountNudge } from "../../behavior/use-secure-account-nudge.ts";

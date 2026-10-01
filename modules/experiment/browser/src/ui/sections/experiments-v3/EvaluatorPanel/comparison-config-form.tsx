@@ -1,6 +1,14 @@
-import { Box, Button, Field, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { ALL_DEFAULT_JUDGE_PROMPTS, pickDefaultJudgePrompt } from "@langwatch/evaluator-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";

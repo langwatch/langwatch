@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 

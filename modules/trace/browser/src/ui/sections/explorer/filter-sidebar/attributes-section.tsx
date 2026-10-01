@@ -1,5 +1,5 @@
-import { Button, Input, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type AttributeKey,
   type FacetValueState,

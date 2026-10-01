@@ -1,4 +1,3 @@
-import { Box, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type {
   UiEvaluatorEditorDrawerProps,
   UiEvaluatorGateConfig,
@@ -14,6 +13,15 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Box,
+  Field,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import {
   AVAILABLE_EVALUATORS,

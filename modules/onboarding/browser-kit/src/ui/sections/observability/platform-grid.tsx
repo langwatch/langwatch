@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { PlatformKey } from "../../../model/observability/types.ts";

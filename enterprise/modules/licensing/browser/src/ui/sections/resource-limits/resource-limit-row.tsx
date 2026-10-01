@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 
 import { formatLimitOrUnlimited } from "../../../model/license-status.ts";

@@ -4,7 +4,7 @@
  * the frame's own layout (and its iframe) stays untouched.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriangleAlert } from "lucide-react";
 

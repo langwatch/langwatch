@@ -1,6 +1,6 @@
-import { Box, Grid, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { formatCost } from "@langwatch/design-system/display-formatters";
+import { Box, Grid, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { useMemo } from "react";

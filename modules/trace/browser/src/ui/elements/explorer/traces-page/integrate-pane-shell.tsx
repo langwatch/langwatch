@@ -3,7 +3,7 @@
  * hero container that floats its content to the middle when there's room and falls back
  * to the top when there isn't.
  */
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export const IntegratePaneShell: React.FC<{

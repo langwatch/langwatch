@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { isImageAttachmentRef } from "@langwatch/dataset-contract";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";

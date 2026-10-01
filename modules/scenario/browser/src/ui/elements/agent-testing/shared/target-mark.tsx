@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { Bot, Code, Globe, type LucideIcon, MessageSquare, Target, Workflow } from "lucide-react";
 
 import type { TargetKind } from "../../../../model/target-kind.ts";

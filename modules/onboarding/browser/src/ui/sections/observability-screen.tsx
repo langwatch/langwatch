@@ -1,4 +1,4 @@
-import { Box, Grid, VStack } from "@chakra-ui/react";
+import { Box, Grid, VStack } from "@langwatch/design-system/primitives";
 import {
   type FrameworkKey,
   type PlatformKey,

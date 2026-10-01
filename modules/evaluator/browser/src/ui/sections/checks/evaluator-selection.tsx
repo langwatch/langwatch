@@ -1,3 +1,7 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   Alert,
   Badge,
@@ -10,11 +14,7 @@ import {
   Tag,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
-import { Link } from "@langwatch/browser-host/link";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
+} from "@langwatch/design-system/primitives";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {

@@ -3,7 +3,14 @@
  * left, a Group-by selector on the right.
  */
 
-import { Button, HStack, IconButton, NativeSelect, Spinner, Text } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  NativeSelect,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Download, LayoutGrid, List, X } from "lucide-react";
 
 import type { ViewMode } from "../../behavior/use-run-history-store.ts";

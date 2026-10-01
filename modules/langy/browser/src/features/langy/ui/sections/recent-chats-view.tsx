@@ -1,3 +1,4 @@
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
   Button,
@@ -8,8 +9,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 /**

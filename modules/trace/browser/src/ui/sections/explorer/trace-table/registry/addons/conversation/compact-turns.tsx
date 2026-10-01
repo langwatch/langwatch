@@ -1,5 +1,13 @@
-import { Badge, Box, Button, Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Icon,
+  Text,
+} from "@langwatch/design-system/primitives";
 import {
   formatCost,
   formatDuration,

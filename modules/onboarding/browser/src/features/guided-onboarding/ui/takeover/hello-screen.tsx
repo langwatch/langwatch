@@ -2,7 +2,7 @@
  * Langy's hello: the greeting types out, the caret rests, and Next follows
  * once the words have had a beat to themselves.
  */
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 

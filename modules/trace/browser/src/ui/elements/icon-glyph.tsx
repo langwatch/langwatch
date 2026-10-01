@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 // biome-ignore lint/style/useImportType: React needed at runtime for non-jsdom JSX
 import React from "react";
 

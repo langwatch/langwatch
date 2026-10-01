@@ -4,8 +4,8 @@
  * `setFlowCallbacks` side channel: `onChange` is just a prop here.
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../../model/analytics-filter-params.ts";

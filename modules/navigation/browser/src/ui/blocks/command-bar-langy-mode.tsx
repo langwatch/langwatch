@@ -1,4 +1,4 @@
-import { Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { CornerDownLeft } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 

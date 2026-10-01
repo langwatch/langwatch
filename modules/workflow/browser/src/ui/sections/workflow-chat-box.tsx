@@ -4,8 +4,17 @@
  * TRAVEL: ~900 lines of SSE transport stayed with the studio.
  */
 
-import { Box, Button, Flex, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { getEntryInputs } from "@langwatch/workflow-contract";

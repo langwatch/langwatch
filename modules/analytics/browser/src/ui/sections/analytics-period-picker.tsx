@@ -4,9 +4,19 @@
  * `model/analytics-period.ts` and bound in `behavior/use-analytics-period.ts`.
  */
 
-import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
-import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import type { PopoverRootProps } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import type { ButtonProps } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { format, nowInstant, type Instant } from "@langwatch/time";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";

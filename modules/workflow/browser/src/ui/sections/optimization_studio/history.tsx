@@ -1,3 +1,5 @@
+import { toaster } from "@langwatch/browser-host/toaster";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   type BoxProps,
@@ -8,9 +10,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
 import { UserAvatar } from "@langwatch/user-browser-kit";

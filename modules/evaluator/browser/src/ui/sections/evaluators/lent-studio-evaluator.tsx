@@ -1,11 +1,11 @@
 /** Evaluator's editor and settings form, lent to the studio (ARCHITECTURE.md §3.4, rule 7). */
 
-import { VStack } from "@chakra-ui/react";
 import type {
   UiEvaluatorEditorValues,
   UiEvaluatorSettingsFormProps,
   UiStudioEvaluatorEditorProps,
 } from "@langwatch/browser-host/declarations";
+import { VStack } from "@langwatch/design-system/primitives";
 import { evaluatorSettingsSchemaFor } from "@langwatch/evaluator-contract";
 import { useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";

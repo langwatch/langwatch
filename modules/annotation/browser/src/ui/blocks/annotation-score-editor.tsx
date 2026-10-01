@@ -1,3 +1,4 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Box,
   Button,
@@ -9,8 +10,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
+} from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Plus, X } from "lucide-react";
 import type { ReactNode } from "react";

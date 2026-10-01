@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from "@chakra-ui/react";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
 /**
  * Cell/row styling shared by every dataset table surface, applied via

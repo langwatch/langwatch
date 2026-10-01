@@ -1,5 +1,5 @@
-import { Box, Center, Flex, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, Center, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 

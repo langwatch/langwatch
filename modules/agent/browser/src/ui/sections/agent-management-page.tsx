@@ -7,7 +7,6 @@ export type {
   AgentManagementFeedback,
   AgentManagementLifecycle,
 } from "../../behavior/use-agent-management.ts";
-import { Grid, Skeleton, VStack } from "@chakra-ui/react";
 import type {
   AgentCopy,
   AgentWithFields as StoredAgentWithFields,
@@ -16,6 +15,7 @@ import type {
 import type { WireOf } from "@langwatch/api/web";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Grid, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode } from "react";
 

@@ -1,7 +1,7 @@
 /**
  * TableSkeleton - Loading skeleton for batch evaluation tables
  */
-import { Box, Card, Skeleton } from "@chakra-ui/react";
+import { Box, Card, Skeleton } from "@langwatch/design-system/primitives";
 
 type TableSkeletonProps = {
   /** Number of rows to show in skeleton */

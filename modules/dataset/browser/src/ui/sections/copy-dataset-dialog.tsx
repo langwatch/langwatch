@@ -1,7 +1,7 @@
 // Replicates datasets across projects using host.copyTargets() for authz instead of server imports.
 
-import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, createListCollection, Field, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
 

@@ -1,4 +1,4 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 
 export const Table = chakra("table");
 export const Thead = chakra("thead");

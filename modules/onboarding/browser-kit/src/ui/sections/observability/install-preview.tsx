@@ -1,12 +1,12 @@
+import { createShikiAdapter } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   ClientOnly,
   CodeBlock,
-  createShikiAdapter,
   IconButton,
   Tabs,
   useTabs,
-} from "@chakra-ui/react";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+} from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useMemo } from "react";
 import { createHighlighter } from "shiki";

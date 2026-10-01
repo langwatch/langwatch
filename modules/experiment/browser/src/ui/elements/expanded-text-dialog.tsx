@@ -1,9 +1,9 @@
+import { Markdown } from "@langwatch/browser-host/markdown";
 /**
  * A long cell value in full, formatted as JSON or markdown or left raw. Copied
  * from workflow's thin, non-fetching dialog (ARCHITECTURE.md §3.4, rule 5).
  */
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { Markdown } from "@langwatch/browser-host/markdown";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { useState } from "react";

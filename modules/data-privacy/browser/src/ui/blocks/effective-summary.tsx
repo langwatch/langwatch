@@ -1,9 +1,9 @@
-import { Heading, Table, Text, VStack } from "@chakra-ui/react";
 import {
   CONTENT_CATEGORIES,
   type DataPrivacySnapshot,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { Heading, Table, Text, VStack } from "@langwatch/design-system/primitives";
 
 import {
   CATEGORY_LABELS,

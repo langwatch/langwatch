@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, VStack } from "@chakra-ui/react";
+import { Box, chakra, VStack } from "@langwatch/design-system/primitives";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { useEffect, useRef } from "react";
 

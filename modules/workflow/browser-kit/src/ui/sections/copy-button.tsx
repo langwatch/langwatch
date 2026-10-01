@@ -1,5 +1,5 @@
-import { Button, type ButtonProps } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { Button, type ButtonProps } from "@langwatch/design-system/primitives";
 import { CopyIcon } from "lucide-react";
 
 interface CopyButtonProps extends Omit<ButtonProps, "value" | "label" | "onClick"> {

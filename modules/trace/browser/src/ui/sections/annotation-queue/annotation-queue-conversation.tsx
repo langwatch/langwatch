@@ -3,10 +3,10 @@
  * rule 7): the item's thread, or its trace as the only turn when it has none.
  */
 
-import { CodeBlock } from "@chakra-ui/react";
 import type { UiAnnotationQueueConversationProps } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useCallback, useMemo } from "react";
 

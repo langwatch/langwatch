@@ -1,3 +1,7 @@
+import { Stat } from "@chakra-ui/react";
+import { neutralizeRows } from "@langwatch/csv";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -7,14 +11,10 @@ import {
   HStack,
   Spacer,
   Spinner,
-  Stat,
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { neutralizeRows } from "@langwatch/csv";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import {
   formatBudgetUsd,

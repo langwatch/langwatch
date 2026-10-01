@@ -1,4 +1,4 @@
-import { Box, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { Box, HStack, type StackProps, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 

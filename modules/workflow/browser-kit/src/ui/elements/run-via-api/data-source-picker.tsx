@@ -3,7 +3,7 @@
  * inline data rows, or a platform dataset id. Drives which body the snippet
  * shows. Rendered under the dialog header as a secondary segmented control.
  */
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 import type { RunSnippetDataSource } from "../../../model/run-via-api/run-snippets.ts";

@@ -1,3 +1,4 @@
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import {
   Alert,
   Box,
@@ -10,8 +11,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/browser-host/errors";
+} from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";

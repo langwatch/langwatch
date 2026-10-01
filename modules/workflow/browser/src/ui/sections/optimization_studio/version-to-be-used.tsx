@@ -1,5 +1,12 @@
-import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { AISparklesLoader, allModelOptions } from "@langwatch/model-provider-browser-kit";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";

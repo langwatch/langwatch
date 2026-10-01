@@ -4,7 +4,14 @@
  * vertical branch travels). `FormErrorDisplay`'s message walk comes with it.
  */
 
-import { Box, Field, HStack, type SystemStyleObject, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  HStack,
+  type SystemStyleObject,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 import { isValidElement, type PropsWithChildren, type ReactNode } from "react";

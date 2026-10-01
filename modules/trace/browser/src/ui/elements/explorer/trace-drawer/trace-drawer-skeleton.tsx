@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Icon, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LuX } from "react-icons/lu";
 

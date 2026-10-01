@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { accentChipBg, accentChipBorder } from "@langwatch/onboarding-browser-kit";
 import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import { motion } from "motion/react";

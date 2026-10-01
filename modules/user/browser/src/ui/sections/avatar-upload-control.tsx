@@ -1,5 +1,5 @@
-import { chakra, Box, Button, Center, HStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { chakra, Box, Button, Center, HStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Info, Pencil } from "lucide-react";

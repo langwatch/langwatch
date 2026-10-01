@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import React from "react";
 
 import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";

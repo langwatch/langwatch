@@ -1,15 +1,15 @@
+import { Menu } from "@chakra-ui/react";
 import {
   Box,
   Button,
   Field,
   HStack,
   Input,
-  Menu,
   Spacer,
   type StackProps,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInsideDrawer } from "@langwatch/workflow-browser-kit";
 import type {

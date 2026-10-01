@@ -1,4 +1,4 @@
-import { useChakraContext } from "@chakra-ui/react";
+import { useChakraContext } from "@langwatch/design-system/primitives";
 import { createUiOuterProvider } from "@langwatch/ui-kernel/outer-providers";
 import type { ReactNode } from "react";
 import { act } from "react";

@@ -1,9 +1,9 @@
-import { Button } from "@chakra-ui/react";
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
 } from "@langwatch/analytics-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Clock, Edit, LayoutDashboard, MoreVertical, Trash2 } from "lucide-react";
 

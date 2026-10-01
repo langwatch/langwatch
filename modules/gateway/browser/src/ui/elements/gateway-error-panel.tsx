@@ -1,4 +1,4 @@
-import { Box, Button, EmptyState, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, EmptyState, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 export type GatewayErrorPanelProps = {

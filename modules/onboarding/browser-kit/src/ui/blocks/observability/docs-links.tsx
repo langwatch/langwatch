@@ -1,5 +1,5 @@
-import { HStack, Icon, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { BookOpen, ExternalLink } from "react-feather";
 

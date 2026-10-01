@@ -1,6 +1,6 @@
 /** Link using anchor tag with navigate handler; works without importing router. */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";

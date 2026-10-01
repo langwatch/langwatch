@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createListCollection } from "@chakra-ui/react";
+import { createListCollection } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo } from "react";
 

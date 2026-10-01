@@ -1,12 +1,12 @@
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * An organization's own single sign-on setup: one read, and the steps that
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Heading, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,

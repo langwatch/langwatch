@@ -6,7 +6,7 @@
  * whose published record has vanished still routes the people already here,
  * so it is never shown as simply "Proved".
  */
-import { Button, HStack, Input, Table, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoIssuedDnsRecord } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 

@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
-import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Alert, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";

@@ -1,4 +1,5 @@
-import { Button, HStack, Menu, Text } from "@chakra-ui/react";
+import { Menu } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
 import { getTypeLabel, VariableTypeIcon } from "./variable-type-icon.tsx";

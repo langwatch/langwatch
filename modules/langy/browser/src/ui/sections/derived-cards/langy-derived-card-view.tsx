@@ -1,10 +1,10 @@
+import { Link } from "@langwatch/browser-host/link";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 /**
  * The derived-block dispatcher — one stamped `langy-card` part in, the card it
  * validates as out (ADR-060 §3).
  */
-import { Box, Grid, Table, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { Box, Grid, Table, Text } from "@langwatch/design-system/primitives";
 import type {
   LangyCardHint,
   LangyChoiceSelection,

@@ -1,5 +1,5 @@
-import { Badge } from "@chakra-ui/react";
 import { readableDate } from "@langwatch/coding-agent-browser-kit";
+import { Badge } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { IconType } from "react-icons";
 import {

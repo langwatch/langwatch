@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";

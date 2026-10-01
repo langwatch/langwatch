@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { CLOUD_ENDPOINT, CodePreview, InlineCopyButton } from "@langwatch/onboarding-browser-kit";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";

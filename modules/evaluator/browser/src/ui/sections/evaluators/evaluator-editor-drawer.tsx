@@ -1,5 +1,5 @@
-import { Button, HStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Button, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { LuArrowLeft } from "react-icons/lu";
 

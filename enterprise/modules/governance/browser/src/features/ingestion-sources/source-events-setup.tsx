@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Box, Code, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { Box, Code, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox, Info } from "lucide-react";
 
 import { GovernanceEmptyState } from "../../ui/elements/governance-empty-state.tsx";

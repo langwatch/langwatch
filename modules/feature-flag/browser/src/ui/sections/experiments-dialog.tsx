@@ -1,5 +1,6 @@
-import { Badge, HStack, Stack, Switch, Text, VStack } from "@chakra-ui/react";
+import { Switch } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Badge, HStack, Stack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   ExperimentCatalogueEntry,
   ExperimentTenantPolicy,

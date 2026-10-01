@@ -1,4 +1,4 @@
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import type { Control, FieldValues } from "react-hook-form";
 import { useFormState } from "react-hook-form";
 

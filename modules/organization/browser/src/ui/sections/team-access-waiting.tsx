@@ -1,11 +1,11 @@
+import { Link } from "@langwatch/browser-host/link";
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Signed in to an organization but on none of its teams: nothing to open yet.
  * Shown in place of the dashboard body; the administrator adding them to a
  * team is what ends the wait.
  */
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Clock3 } from "lucide-react";
 
 import { useOrganizationHost } from "../../model/organization-host.ts";

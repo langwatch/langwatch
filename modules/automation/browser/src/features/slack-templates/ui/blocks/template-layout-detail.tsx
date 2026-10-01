@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 
 import { GATED_NOTE, type LayoutRow } from "../elements/layout-rows.ts";
 

@@ -1,6 +1,15 @@
-import { Box, Button, Flex, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { UiFoundryDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Play, RotateCcw } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";

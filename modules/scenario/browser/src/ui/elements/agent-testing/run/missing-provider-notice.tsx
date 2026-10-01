@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 
 export function MissingProviderNotice() {
   return (

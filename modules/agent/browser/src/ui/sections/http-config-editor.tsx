@@ -1,6 +1,6 @@
-import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";

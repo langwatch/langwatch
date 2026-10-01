@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import {
   INHERIT_SENTINEL,
   modelSelectorOptions,

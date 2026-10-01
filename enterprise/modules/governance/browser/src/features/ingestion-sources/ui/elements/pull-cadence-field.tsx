@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
 import type { GovernanceSourceType } from "@langwatch/enterprise-governance-contract";

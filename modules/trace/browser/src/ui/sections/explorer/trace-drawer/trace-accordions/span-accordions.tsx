@@ -1,4 +1,12 @@
-import { Box, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Icon,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";

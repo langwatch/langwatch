@@ -1,4 +1,5 @@
-import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
+import { Drawer as ChakraDrawer } from "@chakra-ui/react";
+import { Portal } from "@langwatch/design-system/primitives";
 import {
   LANGY_DOCK_GAP,
   LANGY_DODGE_STAGGER_MS,

@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import {
   PopoverAnchor,
@@ -8,6 +7,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Zap } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";

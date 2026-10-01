@@ -4,7 +4,7 @@
  * for a lightweight conversation preview without the CopilotKit runtime.
  */
 
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { Square } from "lucide-react";
 

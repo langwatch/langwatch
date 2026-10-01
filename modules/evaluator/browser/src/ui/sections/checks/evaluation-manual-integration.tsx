@@ -1,8 +1,8 @@
-import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
+import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import { RenderCode } from "@langwatch/workflow-browser-kit";

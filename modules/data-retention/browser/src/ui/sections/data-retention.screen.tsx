@@ -4,18 +4,6 @@
  */
 
 import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   isScopeInFilter,
   resolveScopeFilter,
   ScopeChipPicker,
@@ -32,6 +20,18 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 

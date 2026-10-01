@@ -3,7 +3,7 @@
  * card.
  * @see specs/langy/langy-followup-suggestions.feature
  */
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 
 import type { FollowUpChip } from "../../../model/capabilities/follow-up-chips.ts";

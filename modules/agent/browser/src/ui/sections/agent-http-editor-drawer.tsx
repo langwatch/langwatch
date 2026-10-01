@@ -1,6 +1,14 @@
-import { Box, Button, Field, HStack, Input, Spinner, VStack } from "@chakra-ui/react";
 import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spinner,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 

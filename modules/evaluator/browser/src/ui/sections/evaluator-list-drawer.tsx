@@ -1,4 +1,3 @@
-import { Button, HStack, Spinner, VStack } from "@chakra-ui/react";
 /**
  * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns evaluators. KNOWN GAP: "New
@@ -9,6 +8,7 @@ import type { UiEvaluatorListDrawerProps } from "@langwatch/browser-host/drawer"
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,

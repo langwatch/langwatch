@@ -2,7 +2,7 @@
  * Scenario capability card (`platform_*_scenario(s)`, `platform_*_suite(s)`,
  * `platform_*_simulation_run(s)` reads).
  */
-import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
 
 import { isSerializedDocumentLine } from "../../../../../model/langy-capability-registry.ts";

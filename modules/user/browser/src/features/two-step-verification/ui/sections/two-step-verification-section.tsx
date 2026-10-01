@@ -3,7 +3,17 @@
  * behind whichever way in was used. Absent entirely where the deployment offers none.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Badge, Box, Button, Card, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Smartphone } from "lucide-react";
 import { useState } from "react";
 

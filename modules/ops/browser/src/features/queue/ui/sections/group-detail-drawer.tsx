@@ -1,6 +1,6 @@
-import { CodeBlock } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useState } from "react";
 

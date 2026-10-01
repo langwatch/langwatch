@@ -1,4 +1,4 @@
-import { Field, Textarea, VStack } from "@chakra-ui/react";
+import { Field, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";

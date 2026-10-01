@@ -2,7 +2,7 @@
  * ParameterField Component
  */
 
-import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { HStack, Input, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { Slider } from "@langwatch/design-system/slider";
 
 import type {

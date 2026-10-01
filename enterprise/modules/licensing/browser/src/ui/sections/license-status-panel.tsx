@@ -4,7 +4,7 @@
  * sharing a name between component and payload type invited confusion.
  */
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { licensingApi } from "../../behavior/licensing-api.ts";

@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 import { contentToText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import { RedactedInline } from "../../../../../redacted-field.tsx";

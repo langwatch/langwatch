@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { HStack, VStack } from "@chakra-ui/react";
+import { HStack, VStack } from "@langwatch/design-system/primitives";
 
 import { TestCasesDialogs } from "./test-cases-dialogs.tsx";
 import { TestCasesPanel } from "./test-cases-panel.tsx";

@@ -1,5 +1,5 @@
-import { HStack, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { getGetPromptSnippets, type PromptSnippetVariable } from "@langwatch/prompt-browser-kit";
 import type React from "react";
 import { useMemo } from "react";

@@ -1,8 +1,7 @@
 /**
  * The in-progress half of a capability card.
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, HStack, Text, VStack, keyframes } from "@langwatch/design-system/primitives";
 import { useReducedMotion, type LangyProgressSample } from "@langwatch/langy-browser-kit";
 import type { CapabilitySurface } from "@langwatch/langy-contract";
 

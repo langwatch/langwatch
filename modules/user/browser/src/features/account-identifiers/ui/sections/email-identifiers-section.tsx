@@ -4,7 +4,7 @@
  * Spec: specs/identity/authentication-settings.feature
  */
 
-import { Box, Button, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 

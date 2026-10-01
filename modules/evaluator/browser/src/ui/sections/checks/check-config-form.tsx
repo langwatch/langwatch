@@ -1,3 +1,13 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+  type MappingState,
+  mappingStateSchema,
+} from "@langwatch/dataset-contract";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Accordion,
   Button,
@@ -9,17 +19,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-  type MappingState,
-  mappingStateSchema,
-} from "@langwatch/dataset-contract";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+} from "@langwatch/design-system/primitives";
 import { slugify } from "@langwatch/design-system/slugify";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {

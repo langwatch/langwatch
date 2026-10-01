@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import type { UiCodeEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
@@ -9,6 +8,7 @@ import {
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   type CodeEvaluatorConfig,

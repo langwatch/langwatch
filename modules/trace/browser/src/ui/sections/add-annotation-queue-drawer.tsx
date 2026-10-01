@@ -1,3 +1,6 @@
+import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -10,10 +13,7 @@ import {
   Textarea,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";

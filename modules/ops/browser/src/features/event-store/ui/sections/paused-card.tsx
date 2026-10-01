@@ -1,4 +1,4 @@
-import { Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Card, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ParkedTenant } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
 

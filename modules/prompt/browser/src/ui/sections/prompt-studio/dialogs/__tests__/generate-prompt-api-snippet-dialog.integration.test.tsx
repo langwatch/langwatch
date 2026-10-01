@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * The API dialog for a prompt: title, API key handling, and what it offers
  * with no key to show. Spec: specs/prompts/prompt-api-snippet-dialog.feature
  */
-import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

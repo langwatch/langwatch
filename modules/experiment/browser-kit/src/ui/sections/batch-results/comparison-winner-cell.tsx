@@ -3,7 +3,7 @@
  * column-target's cell (#5100 follow-up, generalized to N candidates in #5101).
  */
 
-import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { useCallback, useRef, useState } from "react";
 

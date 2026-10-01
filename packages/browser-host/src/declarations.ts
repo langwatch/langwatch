@@ -4,12 +4,12 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
-import type { SystemStyleObject } from "@chakra-ui/react";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { UiTokenIdentity } from "@langwatch/kernel/contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";

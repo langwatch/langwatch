@@ -1,8 +1,8 @@
-import { Button, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { findSeriesIdentifier } from "@langwatch/automation-contract";
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { Button, Heading, HStack, IconButton, Spacer } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo, type MouseEvent } from "react";

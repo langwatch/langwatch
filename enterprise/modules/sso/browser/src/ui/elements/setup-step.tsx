@@ -5,7 +5,16 @@
  * finished step keeps its answer and loses its workspace. Which step is in
  * which state is `model/setup-progress.ts`'s decision, never this file's.
  */
-import { Badge, Box, Card, Collapsible, HStack, Heading, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Card,
+  Collapsible,
+  HStack,
+  Heading,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useState, type ReactNode } from "react";
 

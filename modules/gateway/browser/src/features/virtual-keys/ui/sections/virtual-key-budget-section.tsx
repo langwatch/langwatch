@@ -1,6 +1,15 @@
-import { Badge, Box, HStack, Input, NativeSelect, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Badge,
+  Box,
+  HStack,
+  Input,
+  NativeSelect,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 

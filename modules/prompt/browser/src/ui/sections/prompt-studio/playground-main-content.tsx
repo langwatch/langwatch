@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 
 import { useLoadSpanIntoPromptPlayground } from "../../../behavior/use-load-span-into-prompt-studio.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";

@@ -1,4 +1,3 @@
-import { Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type {
   DataPrivacyAudienceOptions,
   DataPrivacyConfig,
@@ -7,6 +6,7 @@ import type {
   ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { describeAudienceSelection } from "../../model/data-privacy-labels.ts";

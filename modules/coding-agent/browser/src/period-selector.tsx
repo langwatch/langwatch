@@ -1,7 +1,17 @@
-import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
-import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import type { PopoverRootProps } from "@chakra-ui/react";
 import { readableDate, type ReadableDate } from "@langwatch/coding-agent-browser-kit";
 import { Popover } from "@langwatch/design-system/popover";
+import type { ButtonProps } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   differenceInCalendarDays,
   format,

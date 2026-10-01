@@ -2,7 +2,7 @@
  * Plain trace-query editor without autocomplete/syntax help (pending trace-web surface).
  */
 
-import { Textarea } from "@chakra-ui/react";
+import { Textarea } from "@langwatch/design-system/primitives";
 
 export function QueryFilterInput({
   value,

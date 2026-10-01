@@ -1,3 +1,4 @@
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
   Box,
@@ -10,8 +11,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";

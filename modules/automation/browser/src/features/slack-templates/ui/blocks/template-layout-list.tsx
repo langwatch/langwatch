@@ -1,4 +1,4 @@
-import { Badge, Box, chakra, HStack, Stack, Text } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import { type KeyboardEvent, useRef } from "react";
 

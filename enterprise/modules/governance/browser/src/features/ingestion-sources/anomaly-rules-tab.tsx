@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
   Box,
@@ -12,8 +13,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";

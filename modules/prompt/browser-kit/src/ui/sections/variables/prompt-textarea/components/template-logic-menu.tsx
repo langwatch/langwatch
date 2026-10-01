@@ -1,5 +1,5 @@
-import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Link, Text, VStack } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

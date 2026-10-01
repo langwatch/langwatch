@@ -4,10 +4,10 @@
  * every dashboard showing it; a too-fine step asks to coarsen, not refuse.
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";

@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/trace-browser-kit";
 import { UserAvatar } from "@langwatch/user-browser-kit";
 

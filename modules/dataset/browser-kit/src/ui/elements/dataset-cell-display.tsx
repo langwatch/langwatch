@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { Box } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import {
   type MouseEvent as ReactMouseEvent,

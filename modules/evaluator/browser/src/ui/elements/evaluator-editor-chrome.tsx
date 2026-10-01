@@ -1,4 +1,4 @@
-import { Button, Circle, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Button, Circle, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export const REMOVE_EVALUATOR_LABEL = "Remove evaluator";

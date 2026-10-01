@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type { RefObject } from "react";
 
 import type { Variable } from "../../variables-section.tsx";

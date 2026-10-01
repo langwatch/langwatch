@@ -4,8 +4,8 @@
  * specs/rbac/roles-and-access-ui.feature
  */
 
-import { Badge, Box, Button, Spinner, Table, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Badge, Box, Button, Spinner, Table, Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 

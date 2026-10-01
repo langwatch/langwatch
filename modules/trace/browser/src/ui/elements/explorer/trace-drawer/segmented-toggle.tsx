@@ -1,4 +1,4 @@
-import { Flex, HStack } from "@chakra-ui/react";
+import { Flex, HStack } from "@langwatch/design-system/primitives";
 
 /**
  * One option in a `<SegmentedToggle>`. The string-shorthand form covers

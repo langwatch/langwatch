@@ -1,10 +1,10 @@
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 /**
  * The lit ground the governance hero stands on, bleeding past its own box
  * on purpose — the hero is where the page is lit from, not an object on it.
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
-import { Box } from "@chakra-ui/react";
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { Box } from "@langwatch/design-system/primitives";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type { ReactNode } from "react";
 

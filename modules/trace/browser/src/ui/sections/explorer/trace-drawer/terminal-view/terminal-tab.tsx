@@ -1,4 +1,3 @@
-import { Text, VStack } from "@chakra-ui/react";
 import {
   deriveSessionBanner,
   indexToolSpansBySpanId,
@@ -7,6 +6,7 @@ import {
   TerminalView,
 } from "@langwatch/coding-agent-browser-kit";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { api } from "../../../../../behavior/trace-api.ts";

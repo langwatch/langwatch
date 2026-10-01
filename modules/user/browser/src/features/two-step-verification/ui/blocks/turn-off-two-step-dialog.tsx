@@ -1,6 +1,6 @@
-/** Turning two-step verification off costs the password and a current code. */
-import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+/** Turning two-step verification off costs the password and a current code. */
+import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 export function TurnOffTwoStepDialog({

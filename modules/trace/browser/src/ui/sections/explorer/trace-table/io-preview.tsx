@@ -1,4 +1,4 @@
-import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { chakra, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import {
   collectMediaParts,

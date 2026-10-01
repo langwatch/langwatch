@@ -1,7 +1,7 @@
-import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { useUIStore } from "@langwatch/trace-browser-kit";
 import { ArrowLeft, BookOpen, RotateCcw, Wrench } from "lucide-react";

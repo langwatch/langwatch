@@ -1,5 +1,5 @@
-import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";

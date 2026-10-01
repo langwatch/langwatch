@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Chip } from "@langwatch/trace-browser-kit";
 import { LuLayers } from "react-icons/lu";
 

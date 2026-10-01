@@ -1,6 +1,15 @@
-import { Box, Button, HStack, Input, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import {

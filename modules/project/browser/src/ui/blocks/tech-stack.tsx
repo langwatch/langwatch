@@ -4,7 +4,7 @@
  * (the project-creation screen) plus this settings-page reader.
  */
 
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import {
   techStackFrameworkOptions,
   techStackLanguageOptions,

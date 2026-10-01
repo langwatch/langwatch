@@ -1,4 +1,4 @@
-import type { Alert } from "@chakra-ui/react";
+import type { Alert } from "@langwatch/design-system/primitives";
 
 import { SlugAlert } from "./slug-alert.tsx";
 

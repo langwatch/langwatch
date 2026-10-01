@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { walkAST } from "@langwatch/trace-contract";

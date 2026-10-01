@@ -1,10 +1,10 @@
+import type { DatasetTableColumnType as ColumnType } from "@langwatch/dataset-browser-kit";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 /**
  * The workbench table's column definitions: stable structure only. Headers and
  * cells read current data from the table meta, so these change almost never.
  */
-import { HStack, Text } from "@chakra-ui/react";
-import type { DatasetTableColumnType as ColumnType } from "@langwatch/dataset-browser-kit";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import type { ColumnDef, ColumnHelper } from "@tanstack/react-table";
 

@@ -1,10 +1,10 @@
-import { Button, HStack, Input, Stack } from "@chakra-ui/react";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import { Button, HStack, Input, Stack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 

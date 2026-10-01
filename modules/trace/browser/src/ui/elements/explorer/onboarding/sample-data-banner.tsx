@@ -1,4 +1,4 @@
-import { Flex, Icon, Text } from "@chakra-ui/react";
+import { Flex, Icon, Text } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 import type React from "react";
 

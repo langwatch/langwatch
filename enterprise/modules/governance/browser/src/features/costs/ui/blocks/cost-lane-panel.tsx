@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type GovernanceSeatLane,
   type GovernanceSeatPool,

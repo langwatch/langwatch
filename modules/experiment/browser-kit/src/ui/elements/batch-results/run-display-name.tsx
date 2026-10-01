@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 /** Gray middle-dot separator between the run index and its generated id. */
 const RUN_NAME_SEPARATOR = " · ";

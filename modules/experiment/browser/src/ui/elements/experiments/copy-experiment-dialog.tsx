@@ -1,6 +1,12 @@
-import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import {
+  Button,
+  createListCollection,
+  Field,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";

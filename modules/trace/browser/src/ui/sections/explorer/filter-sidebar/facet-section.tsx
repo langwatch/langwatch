@@ -1,5 +1,13 @@
-import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   type FacetItem,
   type FacetValueState,

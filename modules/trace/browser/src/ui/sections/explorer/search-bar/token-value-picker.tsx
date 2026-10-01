@@ -1,4 +1,13 @@
-import { Box, Button, chakra, HStack, Icon, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Icon,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useFilterStore, useUIStore } from "@langwatch/trace-browser-kit";
 import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";

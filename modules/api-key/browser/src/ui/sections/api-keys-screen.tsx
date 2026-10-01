@@ -3,6 +3,11 @@
  * the ingestion keys the CLI mints.
  */
 
+import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { WireOf } from "@langwatch/api/web";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -14,12 +19,7 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
-import type { WireOf } from "@langwatch/api/web";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Menu } from "@langwatch/design-system/menu";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { Clipboard, Key, MoreVertical, Plus, RotateCw } from "lucide-react";

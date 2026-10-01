@@ -2,8 +2,8 @@
  * Global "Run Evaluation" button with validation.
  */
 
-import { Button, Spinner } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Button, Spinner } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { validateWorkbench } from "@langwatch/experiment-contract/mapping-validation";
 import { LuPlay, LuSquare } from "react-icons/lu";

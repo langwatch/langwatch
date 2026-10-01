@@ -4,9 +4,9 @@
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  */
 
-import { Button } from "@chakra-ui/react";
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";

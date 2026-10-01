@@ -1,9 +1,9 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Popover } from "@langwatch/design-system/popover";
 /**
  * VersionHistoryButton - the workbench's version history, anchored to its own button.
  */
-import { Button, Text } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { Popover } from "@langwatch/design-system/popover";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { History } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";

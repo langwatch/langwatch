@@ -2,10 +2,10 @@
  * "Add to Dataset": pick a dataset, map the trace onto its columns, add the rows.
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";

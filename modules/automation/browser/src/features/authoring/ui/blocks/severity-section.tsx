@@ -1,6 +1,6 @@
-import { createListCollection } from "@chakra-ui/react";
 import { AlertType } from "@langwatch/automation-contract";
 import type { AlertType as AlertTypeValue } from "@langwatch/automation-contract";
+import { createListCollection } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 
 import type { FacetAccordionProps } from "../elements/facet-section.tsx";

@@ -1,7 +1,7 @@
 /**
  * Shared utilities for batch evaluation result tables
  */
-import type { SystemStyleObject } from "@chakra-ui/react";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
 import { getImageUrl } from "./presentation.tsx";
 

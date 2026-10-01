@@ -4,7 +4,7 @@
  * Hardcoded text because render crashes can't be named.
  */
 
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 export class WorkflowErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

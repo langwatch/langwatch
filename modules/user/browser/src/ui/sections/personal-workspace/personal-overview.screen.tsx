@@ -1,5 +1,13 @@
-import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Box,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";

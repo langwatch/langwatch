@@ -5,7 +5,7 @@
  * file. A provider tile pre-answers it, so these cards stay on screen after
  * one is picked — pre-answered must never mean hidden.
  */
-import { Box, HStack, Text, VStack, chakra } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack, chakra } from "@langwatch/design-system/primitives";
 import { FileCode2, KeyRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 

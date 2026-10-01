@@ -4,10 +4,10 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import { Box, Text } from "@chakra-ui/react";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";

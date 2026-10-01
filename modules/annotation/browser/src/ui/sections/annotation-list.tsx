@@ -1,6 +1,5 @@
 /** One table renders every annotations view. */
 
-import { Box, Button, Flex, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   annotationQueueItemStatusSchema,
   type AnnotationQueueItemStatus,
@@ -12,6 +11,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
+import { Box, Button, Flex, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucide-react";

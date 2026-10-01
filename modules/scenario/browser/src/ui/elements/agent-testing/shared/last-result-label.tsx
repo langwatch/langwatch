@@ -3,7 +3,7 @@
  * verdict's own dot replaces an icon, so a column of rows reads as coloured
  * text. Met-every-criterion-but-failed-required reads "Failed"; hover names it.
  */
-import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { formatRunStatusLabel } from "@langwatch/suite-browser-kit";
 

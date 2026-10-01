@@ -1,4 +1,4 @@
-import { Box, Field, Spacer, type StackProps, VStack } from "@chakra-ui/react";
+import { Box, Field, Spacer, type StackProps, VStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren, ReactNode } from "react";
 
 export function FullWidthFormControl({

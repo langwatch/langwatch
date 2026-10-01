@@ -1,6 +1,6 @@
-import { Field, NativeSelect } from "@chakra-ui/react";
 import type { VoiceTransport } from "@langwatch/agent-contract";
 import { Link } from "@langwatch/browser-host/link";
+import { Field, NativeSelect } from "@langwatch/design-system/primitives";
 
 import { isVoiceTransport } from "../../model/voice-form.ts";
 import { MODEL_PROVIDERS_ROUTE, transportOptionsFor } from "../../model/voice-talk.ts";

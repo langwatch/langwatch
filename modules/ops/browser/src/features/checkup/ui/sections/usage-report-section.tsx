@@ -1,6 +1,6 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { CopyButton } from "@langwatch/design-system/copy-button";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import type { UsageReportPreview } from "@langwatch/ops-contract";
 import { ExternalLink, Send } from "lucide-react";

@@ -1,5 +1,5 @@
-import { Badge, Button, Table, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";

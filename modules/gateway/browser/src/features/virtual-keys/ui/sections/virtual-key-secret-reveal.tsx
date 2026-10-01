@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty
 // blocks in this file are deliberate no-ops.
 
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Alert,
   Box,
@@ -11,8 +12,7 @@ import {
   Separator,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+} from "@langwatch/design-system/primitives";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 

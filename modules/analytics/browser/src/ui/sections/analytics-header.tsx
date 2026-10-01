@@ -1,5 +1,5 @@
-import { Box, HStack, Input, Spacer } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, Input, Spacer } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

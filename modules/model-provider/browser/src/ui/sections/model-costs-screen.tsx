@@ -4,6 +4,8 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
   Card,
@@ -14,9 +16,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { MoreVertical, Plus } from "lucide-react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";

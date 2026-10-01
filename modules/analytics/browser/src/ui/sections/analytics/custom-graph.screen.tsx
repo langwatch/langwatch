@@ -1,22 +1,4 @@
 import {
-  Accordion,
-  Box,
-  Button,
-  Card,
-  Center,
-  createListCollection,
-  Field,
-  Grid,
-  HStack,
-  Input,
-  NativeSelect,
-  Spacer,
-  Text,
-  Textarea,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
-import {
   analyticsGroups,
   analyticsMetrics,
   analyticsPipelines,
@@ -36,6 +18,24 @@ import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Accordion,
+  Box,
+  Button,
+  Card,
+  Center,
+  createListCollection,
+  Field,
+  Grid,
+  HStack,
+  Input,
+  NativeSelect,
+  Spacer,
+  Text,
+  Textarea,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";

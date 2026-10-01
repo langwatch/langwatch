@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { DetailPayload } from "../../model/pull-request-detail.ts";

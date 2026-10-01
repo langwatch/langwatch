@@ -3,9 +3,16 @@
 // handed back. The dialog only greys out roles it can tell are beyond the reader.
 // specs/rbac/roles-and-access-ui.feature
 
-import { Button, Field, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { GrantScopeType } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  Field,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { useState } from "react";
 

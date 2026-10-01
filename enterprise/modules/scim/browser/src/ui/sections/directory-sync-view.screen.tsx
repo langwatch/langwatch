@@ -1,3 +1,5 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Directory sync across every customer, in the back office (ADR-122): the
@@ -16,9 +18,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
 import { useState, type ReactNode } from "react";

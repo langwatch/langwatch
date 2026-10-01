@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /** A tab's first heading row: title over hint, and the tab's own action at its end. */

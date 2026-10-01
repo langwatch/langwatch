@@ -1,4 +1,4 @@
-import { Box, Icon } from "@chakra-ui/react";
+import { Box, Icon } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { IconType } from "react-icons";
 

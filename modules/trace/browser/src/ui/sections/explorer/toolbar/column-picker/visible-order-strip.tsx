@@ -1,4 +1,3 @@
-import { Box, HStack, Icon, IconButton, Stack, Text } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -9,6 +8,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Box, HStack, Icon, IconButton, Stack, Text } from "@langwatch/design-system/primitives";
 import type { LensColumnOption } from "@langwatch/trace-browser-kit";
 import { ArrowDown, ArrowUp, GripVertical, X } from "lucide-react";
 import type React from "react";

@@ -2,8 +2,16 @@
  * Creating a workflow, from a template or from an imported file.
  */
 
-import { Button, Field, HStack, Input, Textarea, useDisclosure, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Textarea,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { getRandomWorkflowIcon, useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";

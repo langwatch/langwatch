@@ -3,10 +3,19 @@
  * D12): three cuts of one list (specs/identity/directory-administration.feature).
  */
 
-import { Badge, Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";

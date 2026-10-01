@@ -1,3 +1,5 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -10,9 +12,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";

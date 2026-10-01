@@ -1,4 +1,13 @@
-import { Button, Center, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Center,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";

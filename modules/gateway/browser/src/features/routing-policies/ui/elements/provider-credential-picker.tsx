@@ -1,4 +1,12 @@
-import { Box, Button, HStack, NativeSelect, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  NativeSelect,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { useMemo } from "react";
 

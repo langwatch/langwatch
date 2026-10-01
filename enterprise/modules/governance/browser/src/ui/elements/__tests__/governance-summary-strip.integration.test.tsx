@@ -1,3 +1,5 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 // @vitest-environment jsdom
 /**
@@ -6,8 +8,7 @@
  *
  * Spec: specs/ai-governance/dashboard/governance-summary-strip.feature
  */
-import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Button } from "@langwatch/design-system/primitives";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { Bot } from "lucide-react";

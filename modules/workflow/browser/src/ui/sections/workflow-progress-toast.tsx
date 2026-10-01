@@ -1,4 +1,11 @@
-import { Alert, Button, HStack, Progress, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Button,
+  HStack,
+  Progress,
+  Spacer,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 

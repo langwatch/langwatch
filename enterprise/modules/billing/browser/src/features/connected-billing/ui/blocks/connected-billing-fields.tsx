@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Field, HStack, Input, NativeSelect, SimpleGrid, VStack } from "@chakra-ui/react";
+import {
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  SimpleGrid,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import type { BankTransferChoice, BillingForm } from "../../model/connected-billing-form.ts";
 

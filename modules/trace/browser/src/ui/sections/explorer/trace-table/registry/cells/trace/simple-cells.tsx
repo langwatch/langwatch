@@ -1,4 +1,4 @@
-import { Badge, Text } from "@chakra-ui/react";
+import { Badge, Text } from "@langwatch/design-system/primitives";
 import {
   useFilterStore,
   originColorPalette,

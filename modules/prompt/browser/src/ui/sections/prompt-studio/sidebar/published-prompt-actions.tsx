@@ -1,5 +1,5 @@
-import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, Text, useDisclosure } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUp, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";

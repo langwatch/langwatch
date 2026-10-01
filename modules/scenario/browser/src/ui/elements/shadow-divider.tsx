@@ -1,6 +1,6 @@
 /** 1px border line + soft downward shadow. Optionally fades in based on scroll position. */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 export function ShadowDivider({

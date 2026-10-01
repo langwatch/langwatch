@@ -3,9 +3,16 @@
  * branded card as the sign-in doors: centred on a wide screen, full bleed on a phone.
  */
 
-import { Button, Field, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import {
+  Button,
+  Field,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type ProjectFormData, TechStackSelector } from "@langwatch/onboarding-browser-kit";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";

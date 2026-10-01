@@ -1,10 +1,10 @@
-import { Box, Button, HStack, NativeSelect } from "@chakra-ui/react";
 /**
  * The filter row of the Results tab: how the list is grouped, what is cut from it, and
  * the window it all sits in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { Box, Button, HStack, NativeSelect } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { ChartColumn } from "lucide-react";
 

@@ -3,7 +3,7 @@
  * offers the setup on the spot, and swaps only the page body, so the switcher in
  * the chrome still reaches every other organization. The shell lends it the body.
  */
-import { Box, Card, Heading, Text, VStack } from "@chakra-ui/react";
+import { Box, Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";

@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

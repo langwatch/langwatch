@@ -1,4 +1,4 @@
-import { createListCollection } from "@chakra-ui/react";
+import { createListCollection } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 /**

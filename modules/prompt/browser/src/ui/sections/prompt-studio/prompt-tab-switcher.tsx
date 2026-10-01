@@ -1,4 +1,5 @@
-import { Button, Menu, Text } from "@chakra-ui/react";
+import { Menu } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode, RefObject } from "react";
 import { LuChevronDown } from "react-icons/lu";
 

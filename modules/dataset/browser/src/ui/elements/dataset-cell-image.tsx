@@ -2,7 +2,7 @@
  * closes expanded view.
  */
 
-import { Box, Image, Portal, Text } from "@chakra-ui/react";
+import { Box, Image, Portal, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
 

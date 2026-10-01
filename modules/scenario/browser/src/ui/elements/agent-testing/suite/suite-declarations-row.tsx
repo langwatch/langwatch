@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type {
   EvaluatorAttachment,
   SuiteFieldDefinition,

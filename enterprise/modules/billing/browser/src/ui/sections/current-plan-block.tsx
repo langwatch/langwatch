@@ -1,8 +1,8 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * Current Plan Block - displays the active subscription
  */
-import { Alert, Button, HStack, SimpleGrid, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Alert, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import {
   SettingList,
   SettingRow,

@@ -1,13 +1,20 @@
+import { describeError } from "@langwatch/browser-host/errors";
+import type { DatasetAttachmentSlot } from "@langwatch/dataset-browser-kit";
+import { attachmentDisplayName, isDatasetAttachmentRef } from "@langwatch/dataset-contract";
+import { getImageUrl } from "@langwatch/design-system/external-image";
 /**
  * The cell body of an `image` or a `file` column: empty, uploading, filled
  * image or filled file. The value stays a plain string a user can still type.
  * @see specs/datasets/dataset-attachment-cells.feature
  */
-import { Box, Button, HStack, IconButton, Spinner, Text } from "@chakra-ui/react";
-import { describeError } from "@langwatch/browser-host/errors";
-import type { DatasetAttachmentSlot } from "@langwatch/dataset-browser-kit";
-import { attachmentDisplayName, isDatasetAttachmentRef } from "@langwatch/dataset-contract";
-import { getImageUrl } from "@langwatch/design-system/external-image";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
 

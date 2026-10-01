@@ -4,7 +4,7 @@
  * and the router a variable's description doesn't need. `react-markdown` plus GFM.
  */
 
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

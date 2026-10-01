@@ -1,8 +1,9 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Passkey autofill request starts on first gesture to address field, not page load
  */
-import { ChakraProvider, defaultSystem, Input } from "@chakra-ui/react";
+import { Input } from "@langwatch/design-system/primitives";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

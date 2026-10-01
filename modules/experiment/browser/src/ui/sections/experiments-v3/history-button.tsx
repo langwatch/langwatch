@@ -1,9 +1,9 @@
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 /**
  * HistoryButton - Navigate to evaluation results
  */
-import { Button } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2 } from "react-feather";
 

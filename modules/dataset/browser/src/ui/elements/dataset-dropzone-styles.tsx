@@ -3,8 +3,7 @@
  * and `BulkUploadDrawer`): the dashed dotted-grid surface, the cloud
  * illustration that grows on hover/drag, and the rainbow "loading" sheen.
  */
-import { Box, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, Text, VStack, keyframes } from "@langwatch/design-system/primitives";
 import { CloudUpload } from "lucide-react";
 
 // Dotted-grid surface for the empty dropzone. Raw CSS (not a Chakra token) so

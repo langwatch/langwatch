@@ -4,7 +4,7 @@
  * reader can act on (card taxonomy: spotlight).
  * @see specs/langy/langy-guided-onboarding.feature
  */
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { LangyCard } from "@langwatch/langy-browser-kit";
 import type { GuidedPullRequest } from "@langwatch/onboarding-browser-kit";
 import { ArrowUpRight, GitBranch, GitPullRequest } from "lucide-react";

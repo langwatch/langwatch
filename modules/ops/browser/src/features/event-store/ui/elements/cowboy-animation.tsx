@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 // -- Cowboy Gunfight Frames (adapted from CLI) --

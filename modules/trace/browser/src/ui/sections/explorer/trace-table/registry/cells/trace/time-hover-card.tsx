@@ -1,4 +1,4 @@
-import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, HoverCard, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   formatAbsoluteTime,
   formatDayOfWeek,

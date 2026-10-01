@@ -1,4 +1,10 @@
 import {
+  type NotificationCadence,
+  sanitizeAutomationFilters,
+} from "@langwatch/automation-contract";
+import { Link } from "@langwatch/browser-host/link";
+import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import {
   Badge,
   Box,
   Button,
@@ -11,13 +17,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  type NotificationCadence,
-  sanitizeAutomationFilters,
-} from "@langwatch/automation-contract";
-import { Link } from "@langwatch/browser-host/link";
-import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import { Plus } from "lucide-react";

@@ -2,7 +2,7 @@
  * Analytics capability card (`get_analytics`).
  */
 
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { type LangyTurnMetric } from "@langwatch/langy-browser-kit";
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";

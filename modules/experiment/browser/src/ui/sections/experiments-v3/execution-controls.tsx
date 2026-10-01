@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { ExecutionScope } from "@langwatch/experiment-contract";
 import { LuPlay, LuSquare } from "react-icons/lu";
 

@@ -2,7 +2,7 @@
  * ComparisonCharts - Bar charts for comparing metrics across runs
  */
 
-import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type BatchComparisonColumn,
   type BatchEvaluationData,

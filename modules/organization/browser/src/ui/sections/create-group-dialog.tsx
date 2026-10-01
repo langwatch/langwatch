@@ -1,3 +1,5 @@
+import { Dialog } from "@langwatch/design-system/dialog";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Badge,
   Box,
@@ -8,9 +10,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
 import { useState } from "react";

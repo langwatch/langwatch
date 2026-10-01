@@ -1,4 +1,4 @@
-import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Circle, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";

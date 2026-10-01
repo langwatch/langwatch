@@ -1,5 +1,5 @@
 import "../../model/ambient.d.ts";
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 

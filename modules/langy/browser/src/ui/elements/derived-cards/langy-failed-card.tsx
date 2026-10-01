@@ -3,7 +3,7 @@
  * not validate, rendered as a collapsed one-line note that expands to the raw fenced
  * text.
  */
-import { Box, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import type { LangyCardFailedPart } from "@langwatch/langy-contract";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";

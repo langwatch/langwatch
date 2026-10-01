@@ -3,8 +3,8 @@
  * or select control with its description.
  */
 
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { Slider } from "@langwatch/design-system/slider";
 
 import type {

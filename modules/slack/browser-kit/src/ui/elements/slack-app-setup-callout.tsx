@@ -1,4 +1,13 @@
-import { Box, Button, Code, HStack, Link, List, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Code,
+  HStack,
+  Link,
+  List,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useCopySlackAppManifest } from "../../behavior/use-copy-slack-app-manifest.ts";

@@ -1,3 +1,12 @@
+import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
+import {
+  getComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   Box,
   Button,
@@ -9,16 +18,7 @@ import {
   Skeleton,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
-import {
-  getComplexProps,
-  setFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
-import { useRouter } from "@langwatch/browser-host/use-router";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";

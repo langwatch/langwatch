@@ -4,6 +4,10 @@
  * Spec: specs/automations/slack-connections.feature.
  */
 
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
+import { describeError } from "@langwatch/browser-host/errors";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,
   Badge,
@@ -15,11 +19,7 @@ import {
   Skeleton,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
-import { describeError } from "@langwatch/browser-host/errors";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+} from "@langwatch/design-system/primitives";
 import {
   maskedSecret,
   type SlackConnection,

@@ -1,4 +1,4 @@
-import { Field, Input } from "@chakra-ui/react";
+import { Field, Input } from "@langwatch/design-system/primitives";
 import { useEffect, useRef } from "react";
 
 const NAME_PLACEHOLDER = {

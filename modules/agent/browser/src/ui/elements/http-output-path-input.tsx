@@ -1,4 +1,4 @@
-import { Input, Text, VStack } from "@chakra-ui/react";
+import { Input, Text, VStack } from "@langwatch/design-system/primitives";
 
 export type HttpOutputPathInputProps = {
   value: string;

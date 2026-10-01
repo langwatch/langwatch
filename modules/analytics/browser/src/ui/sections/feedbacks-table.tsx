@@ -1,4 +1,4 @@
-import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, Center, Link, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";

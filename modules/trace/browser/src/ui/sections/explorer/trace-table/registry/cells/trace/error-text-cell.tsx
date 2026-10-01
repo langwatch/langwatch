@@ -1,4 +1,4 @@
-import { HStack, Icon, Text } from "@chakra-ui/react";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 import type { TraceListItem } from "../../../../types/trace.ts";

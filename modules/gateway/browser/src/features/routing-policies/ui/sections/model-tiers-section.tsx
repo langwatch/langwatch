@@ -1,5 +1,14 @@
-import { Box, Code, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Box,
+  Code,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type Control, useWatch } from "react-hook-form";
 
 import { api } from "../../../../behavior/gateway-api.ts";

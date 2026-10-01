@@ -1,7 +1,7 @@
 /** The host address controls the score editor overlay. */
 
-import { HStack, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 import { AnnotationScoreForm } from "./annotation-score-form.tsx";

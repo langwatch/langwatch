@@ -2,7 +2,7 @@
  * Scenario mappings for the prompt targets in a run plan.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import type { FieldMapping, Variable } from "@langwatch/prompt-browser-kit";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 

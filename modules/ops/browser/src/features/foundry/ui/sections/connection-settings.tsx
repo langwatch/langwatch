@@ -1,4 +1,4 @@
-import { Box, Flex, Text, VStack } from "@chakra-ui/react";
+import { Box, Flex, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 

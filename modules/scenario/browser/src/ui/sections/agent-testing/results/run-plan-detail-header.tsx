@@ -4,8 +4,8 @@
  * deliberately not here — the page title, runs rail and settings block already show them.
  */
 
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { type RunGroupSummary, RunMetricsSummary } from "@langwatch/suite-browser-kit";
 import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
 

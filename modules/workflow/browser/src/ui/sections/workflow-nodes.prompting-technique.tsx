@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { type Node, type NodeProps, NodeToolbar } from "@xyflow/react";
 import type { Ref } from "react";

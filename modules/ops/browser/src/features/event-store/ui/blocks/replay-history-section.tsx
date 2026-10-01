@@ -1,4 +1,4 @@
-import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 

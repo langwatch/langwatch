@@ -1,5 +1,12 @@
-import { Box, createListCollection, Field, HStack, Input, Text } from "@chakra-ui/react";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Box,
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {

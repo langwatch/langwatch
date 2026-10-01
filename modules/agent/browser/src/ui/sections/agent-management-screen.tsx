@@ -1,6 +1,6 @@
-import { Alert, Button, Spacer } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Button, Spacer } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";

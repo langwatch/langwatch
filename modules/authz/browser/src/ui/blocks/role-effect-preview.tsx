@@ -1,12 +1,12 @@
 // What the role will do while it is written, in sentences; the scope picker is a
 // lens, since organization-tier grants do nothing from a team (ADR-021; main's RoleEffectPreview).
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   ScopeChipPicker,
   type ScopeTriadEntry,
   type ScopeTriadType,
 } from "@langwatch/authz-browser-kit";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import {

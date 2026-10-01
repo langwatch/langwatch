@@ -1,4 +1,4 @@
-import { HStack, IconButton } from "@chakra-ui/react";
+import { HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Redo2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 

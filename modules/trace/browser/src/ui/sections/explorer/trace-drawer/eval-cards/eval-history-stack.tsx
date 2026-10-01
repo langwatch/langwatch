@@ -1,4 +1,12 @@
-import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { truncateId, readableDate } from "@langwatch/trace-browser-kit";
 import { useState } from "react";

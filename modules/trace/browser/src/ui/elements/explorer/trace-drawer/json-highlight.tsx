@@ -1,5 +1,5 @@
-import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, ClientOnly, CodeBlock } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 const KEY_LINE_REGEX = /^"([^"]+)":/;

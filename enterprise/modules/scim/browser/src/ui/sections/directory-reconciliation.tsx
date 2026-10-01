@@ -1,3 +1,4 @@
+import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Where each of this organization's directory syncs stands (ADR-122).
@@ -22,8 +23,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+} from "@langwatch/design-system/primitives";
 import { Plug } from "lucide-react";
 import { type ReactNode, useState } from "react";
 

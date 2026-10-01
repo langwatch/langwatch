@@ -1,4 +1,3 @@
-import { Table } from "@chakra-ui/react";
 import {
   AgentLabel,
   EmptySection,
@@ -8,6 +7,7 @@ import {
 } from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Table } from "@langwatch/design-system/primitives";
 import numeral from "numeral";
 import type React from "react";
 

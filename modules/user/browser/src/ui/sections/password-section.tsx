@@ -4,7 +4,7 @@
  * decides whether this deployment lets the product touch a password at all.
  */
 
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AccountIdentifier } from "@langwatch/identity-contract";
 import { KeyRound } from "lucide-react";

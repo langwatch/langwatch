@@ -1,4 +1,4 @@
-import { Heading } from "@chakra-ui/react";
+import { Heading } from "@langwatch/design-system/primitives";
 import { SERIF } from "@langwatch/langy-browser-kit";
 import { nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useState } from "react";

@@ -1,6 +1,6 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import type { UiJoinOfferProps } from "@langwatch/browser-host/declarations";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { useOrganizationHost } from "../../../../model/organization-host.ts";

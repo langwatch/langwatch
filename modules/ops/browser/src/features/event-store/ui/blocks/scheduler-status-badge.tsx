@@ -1,4 +1,4 @@
-import { Badge, HStack, Text } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 
 import { formatDurationMs } from "../../../../model/ops-formatters.ts";
 import type { SchedulerJobStatus } from "../../model/scheduler-presentation.ts";

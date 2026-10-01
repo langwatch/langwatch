@@ -1,4 +1,4 @@
-import { Box, Input, Text } from "@chakra-ui/react";
+import { Box, Input, Text } from "@langwatch/design-system/primitives";
 import type { RefObject } from "react";
 
 /** A suggestion menu's search input, or the typed query when it is read-only. */

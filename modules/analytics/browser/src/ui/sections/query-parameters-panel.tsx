@@ -10,7 +10,17 @@
  * adapter shape, rather than hand-duplicating the row markup.
  */
 
-import { Badge, Box, Button, chakra, HStack, Input, Stack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Input,
+  Stack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import { Plus, Trash2 } from "lucide-react";
 

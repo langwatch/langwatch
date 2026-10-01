@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { traceContextChip } from "@langwatch/langy-browser-kit";
 import { useFilterStore, type LensConfig, useViewStore } from "@langwatch/trace-browser-kit";
 import {

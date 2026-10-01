@@ -1,4 +1,3 @@
-import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
@@ -6,6 +5,14 @@ import {
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
+import {
+  Box,
+  Button,
+  HStack,
+  NativeSelect,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";

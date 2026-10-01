@@ -1,6 +1,14 @@
-import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { PromptScope } from "@langwatch/workflow-contract";
 import { Building, Check, ChevronDown, Users } from "lucide-react";

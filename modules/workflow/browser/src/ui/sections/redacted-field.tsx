@@ -1,4 +1,4 @@
-import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { HStack, Icon, Link, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { NextLink } from "@langwatch/workflow-browser-kit";
 import type React from "react";

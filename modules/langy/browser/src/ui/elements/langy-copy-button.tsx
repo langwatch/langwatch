@@ -2,7 +2,7 @@
  * Copy one short string, and say so. The card shows a command the developer has to run in
  * their own terminal, so the copy has to be one click and has to confirm it happened.
  */
-import { IconButton } from "@chakra-ui/react";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import { Check, Copy } from "lucide-react";
 

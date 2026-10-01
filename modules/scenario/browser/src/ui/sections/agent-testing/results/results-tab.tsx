@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Skeleton, VStack } from "@chakra-ui/react";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect } from "react";
 
 import {

@@ -1,4 +1,4 @@
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 
 /** Marks a control the plan does not carry. Never a refusal: what is in force stays in force. */
 export function EnterprisePlanBadge({

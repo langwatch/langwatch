@@ -1,15 +1,3 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Center,
-  Field,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
 /**
  * The mapping half of the "Add to Dataset" drawer: which trace field fills which
  * dataset column, and what the rows will look like once it does.
@@ -22,6 +10,18 @@ import type {
   DatasetRecordEntry,
   MappingState,
 } from "@langwatch/dataset-contract";
+import {
+  Badge,
+  Box,
+  Button,
+  Center,
+  Field,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Trace } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";

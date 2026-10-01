@@ -4,7 +4,7 @@
  * what it holds, and the thing itself. Framed like its neighbours — an
  * unframed list on a page of cards reads as something that fell out of one.
  */
-import { Card, Heading, Text, VStack } from "@chakra-ui/react";
+import { Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export function SettingsCard({

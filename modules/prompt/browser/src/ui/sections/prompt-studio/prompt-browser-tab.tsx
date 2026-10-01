@@ -1,4 +1,4 @@
-import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { Box, Circle, HStack, type StackProps, Text } from "@langwatch/design-system/primitives";
 import { VersionBadge } from "@langwatch/prompt-browser-kit";
 import { useState, type MouseEvent } from "react";
 import { LuX } from "react-icons/lu";

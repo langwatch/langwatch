@@ -1,5 +1,4 @@
-import { Box, Flex, IconButton, Input } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, Flex, IconButton, Input, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { Sparkles, X } from "lucide-react";

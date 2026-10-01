@@ -4,19 +4,7 @@
  * can't name. Specs: datasets-list-page, rbac/lite-member-restrictions.feature.
  */
 
-import {
-  Badge,
-  Button,
-  HStack,
-  Input,
-  InputGroup,
-  Skeleton,
-  Spacer,
-  Table,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { InputGroup } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import {
   type DatasetColumns,
@@ -28,6 +16,18 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Button,
+  HStack,
+  Input,
+  Skeleton,
+  Spacer,
+  Table,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   ChevronDown,
   Copy,

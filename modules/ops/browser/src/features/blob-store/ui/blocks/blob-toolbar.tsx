@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer } from "@chakra-ui/react";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import type { OpsBlobSort } from "@langwatch/ops-contract";
 
 import { BlobFilters } from "../elements/blob-filters.tsx";

@@ -4,7 +4,7 @@
  * a router), so selection arrives as `isSelected` from the layout instead.
  */
 
-import { HStack, Link as ChakraLink, Spacer, Text } from "@chakra-ui/react";
+import { HStack, Link as ChakraLink, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { MouseEvent, PropsWithChildren, ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";

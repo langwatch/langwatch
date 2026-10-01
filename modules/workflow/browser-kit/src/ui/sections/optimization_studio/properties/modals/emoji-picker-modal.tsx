@@ -1,4 +1,5 @@
-import { type BoxProps, PopoverContent } from "@chakra-ui/react";
+import { PopoverContent } from "@chakra-ui/react";
+import { type BoxProps } from "@langwatch/design-system/primitives";
 import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
 import { lazy, Suspense } from "react";
 

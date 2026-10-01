@@ -1,6 +1,14 @@
-import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { usePeriodSelector, analyticsMetrics } from "@langwatch/analytics-browser-kit";
 import type { UiCustomGraphProps } from "@langwatch/browser-host/declarations";
+import {
+  Box,
+  chakra,
+  Grid,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-browser-kit";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";

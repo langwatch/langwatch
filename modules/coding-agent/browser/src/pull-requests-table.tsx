@@ -1,4 +1,3 @@
-import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import {
   PeerComparisonCell,
   peerComparisonSentence,
@@ -9,6 +8,7 @@ import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { Pagination } from "@langwatch/design-system/pagination";
+import { Button, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";

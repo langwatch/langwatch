@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, Text } from "@chakra-ui/react";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -10,6 +9,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 
 /** Removing a tool is permanent, so it asks first and names the reversible alternative. */

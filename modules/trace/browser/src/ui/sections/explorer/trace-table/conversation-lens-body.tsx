@@ -1,5 +1,5 @@
-import { Flex, Text } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Flex, Text } from "@langwatch/design-system/primitives";
 import { useExplorerStore, type LensConfig } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,

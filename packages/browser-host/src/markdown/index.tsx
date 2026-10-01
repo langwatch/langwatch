@@ -1,4 +1,4 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";

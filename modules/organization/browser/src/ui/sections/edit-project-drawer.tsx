@@ -1,5 +1,6 @@
 /** Edit-project drawer: sends only changed fields; filters personal workspaces. */
 
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   createListCollection,
@@ -10,8 +11,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";

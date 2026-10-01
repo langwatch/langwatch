@@ -1,5 +1,5 @@
-import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import type { ConnectContractView } from "@langwatch/enterprise-licensing-contract";

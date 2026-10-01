@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Icon, Text, Textarea } from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, Textarea } from "@langwatch/design-system/primitives";
 import { useCallback, useMemo } from "react";
 import { LuRotateCcw, LuTriangleAlert } from "react-icons/lu";
 

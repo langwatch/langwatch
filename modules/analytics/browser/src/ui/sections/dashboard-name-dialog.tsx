@@ -4,9 +4,9 @@
  * and this dialog has exactly one opener.
  */
 
-import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { dashboardNameSchema } from "@langwatch/dashboard-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Input, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";

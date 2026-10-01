@@ -4,7 +4,7 @@
  * from the card that opened it, so both read/write the exact same state.
  */
 
-import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";
+import { Box, Button, Spacer, Tabs } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Plus } from "lucide-react";
 import { type ReactNode, useMemo } from "react";

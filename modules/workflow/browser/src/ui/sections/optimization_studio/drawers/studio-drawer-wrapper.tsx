@@ -1,5 +1,5 @@
-import { Box, Button, HStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ComponentIcon, DrawerFooterContext } from "@langwatch/workflow-browser-kit";

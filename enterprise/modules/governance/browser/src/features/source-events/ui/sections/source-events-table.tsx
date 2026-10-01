@@ -11,7 +11,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Fragment, type ReactNode, useState } from "react";

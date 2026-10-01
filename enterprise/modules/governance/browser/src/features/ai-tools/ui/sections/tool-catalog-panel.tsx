@@ -1,4 +1,4 @@
-import { Skeleton, Tabs, VStack } from "@chakra-ui/react";
+import { Skeleton, Tabs, VStack } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 

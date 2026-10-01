@@ -3,8 +3,17 @@
  * Cloud only; self-hosted shows capabilities and setup guide.
  */
 
-import { Badge, Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
 

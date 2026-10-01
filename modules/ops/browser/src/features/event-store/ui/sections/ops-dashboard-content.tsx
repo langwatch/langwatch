@@ -1,4 +1,4 @@
-import { Card, Text, VStack } from "@chakra-ui/react";
+import { Card, Text, VStack } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo } from "react";
 

@@ -3,8 +3,8 @@
  * toaster, so failed copies don't falsely confirm when handling credentials.
  */
 
-import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
+import { Input } from "@langwatch/design-system/primitives";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 

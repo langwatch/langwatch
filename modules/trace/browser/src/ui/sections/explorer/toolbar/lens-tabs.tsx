@@ -1,6 +1,6 @@
-import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LensConfig,

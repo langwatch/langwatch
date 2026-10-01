@@ -1,6 +1,6 @@
-import { Button, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LocalPromptConfig,

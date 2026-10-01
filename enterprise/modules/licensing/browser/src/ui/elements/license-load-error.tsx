@@ -1,4 +1,4 @@
-import { Alert, Button } from "@chakra-ui/react";
+import { Alert, Button } from "@langwatch/design-system/primitives";
 
 /**
  * Shown when the license status could not be fetched. Distinct from having no

@@ -1,4 +1,4 @@
-import { Button, chakra, HStack, Input, Stack, Text } from "@chakra-ui/react";
+import { Button, chakra, HStack, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   EVAL_COLUMN_FIELDS,

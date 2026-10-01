@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { NowProvider } from "@langwatch/suite-browser-kit";
 
 import { toRunPlanSuites } from "../../../behavior/agent-testing/results/run-plans.ts";

@@ -1,4 +1,3 @@
-import { Button, Text } from "@chakra-ui/react";
 import {
   DialogBody,
   DialogContent,
@@ -8,6 +7,7 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { isCodexModel, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { useEffect } from "react";
 

@@ -3,7 +3,7 @@
  * Keeps anchor affordances; left-click routes through host.
  */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";

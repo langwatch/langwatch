@@ -1,6 +1,15 @@
-import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@chakra-ui/react";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Alert,
+  HStack,
+  Skeleton,
+  Spacer,
+  Table,
+  Tabs,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import React, { useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";

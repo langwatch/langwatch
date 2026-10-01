@@ -3,6 +3,9 @@
  * list shows both: every project the team owns, and everybody bound to the team DIRECTLY.
  */
 
+import { Link } from "@langwatch/browser-host/link";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -16,10 +19,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

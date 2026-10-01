@@ -1,6 +1,6 @@
 /** Toggle and banner for governance sample data panels. */
 
-import { Button, Flex, Icon, Text } from "@chakra-ui/react";
+import { Button, Flex, Icon, Text } from "@langwatch/design-system/primitives";
 import { Compass, Sparkles, Tent } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";

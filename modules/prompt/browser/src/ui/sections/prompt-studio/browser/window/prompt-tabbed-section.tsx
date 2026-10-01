@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type LayoutMode, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";

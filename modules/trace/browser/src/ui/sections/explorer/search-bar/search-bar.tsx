@@ -1,3 +1,5 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { Kbd } from "@langwatch/design-system/kbd";
 import {
   Box,
   chakra,
@@ -8,9 +10,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
-import { Kbd } from "@langwatch/design-system/kbd";
+} from "@langwatch/design-system/primitives";
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";

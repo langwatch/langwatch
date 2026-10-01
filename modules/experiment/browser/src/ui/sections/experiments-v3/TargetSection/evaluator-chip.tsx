@@ -1,6 +1,15 @@
-import { Box, Button, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Icon,
+  Spinner,
+  Text,
+  VStack,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EVALUATION_STATUS_COLORS, getStatusLabel } from "@langwatch/evaluator-browser-kit";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";

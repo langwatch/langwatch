@@ -4,7 +4,15 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Accordion,
+  Box,
+  Grid,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 

@@ -1,6 +1,14 @@
-import { Alert, Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 

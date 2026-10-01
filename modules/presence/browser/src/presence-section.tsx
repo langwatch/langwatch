@@ -1,4 +1,4 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useEffect, useRef } from "react";
 

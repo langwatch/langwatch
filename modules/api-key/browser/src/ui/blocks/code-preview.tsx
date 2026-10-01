@@ -2,8 +2,8 @@
 // theirs). Uses shared shiki highlighter; copyText bypasses CodeBlock copy (security property).
 // Spec: token-created-uniform.integration.test.tsx
 
-import { ClientOnly, CodeBlock, HStack, IconButton } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { ClientOnly, CodeBlock, HStack, IconButton } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Eye, EyeOff } from "lucide-react";

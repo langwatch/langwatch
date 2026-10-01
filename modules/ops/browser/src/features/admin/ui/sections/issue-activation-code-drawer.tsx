@@ -1,6 +1,14 @@
-import { Button, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { addDays, nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useState } from "react";
 

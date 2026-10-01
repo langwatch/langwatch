@@ -1,4 +1,4 @@
-import { Box, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Link, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";

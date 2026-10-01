@@ -1,5 +1,5 @@
-import { useDisclosure, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useState } from "react";
 

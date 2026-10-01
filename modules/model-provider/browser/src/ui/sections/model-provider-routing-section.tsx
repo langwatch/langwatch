@@ -1,4 +1,4 @@
-import { Box, Field, Input, Text } from "@chakra-ui/react";
+import { Box, Field, Input, Text } from "@langwatch/design-system/primitives";
 import {
   ROUTING_HANDLE_MAX_LENGTH,
   sanitizeRoutingHandleInput,

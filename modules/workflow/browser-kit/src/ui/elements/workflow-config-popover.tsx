@@ -1,5 +1,6 @@
-import { Button, HStack, PopoverTrigger, Spacer, Text, VStack } from "@chakra-ui/react";
+import { PopoverTrigger } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useState } from "react";
 import { X } from "react-feather";
 

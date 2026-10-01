@@ -1,4 +1,12 @@
-import { Badge, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant, toDate } from "@langwatch/time";
 import { useState } from "react";
 

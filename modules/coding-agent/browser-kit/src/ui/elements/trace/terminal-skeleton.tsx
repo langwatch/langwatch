@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "../../../model/trace/terminal-palette.ts";
 

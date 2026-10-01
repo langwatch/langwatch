@@ -1,4 +1,12 @@
-import { Box, chakra, HStack, Spacer, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  Spacer,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, ChevronDown, HelpCircle } from "lucide-react";
 import type { ReactNode } from "react";

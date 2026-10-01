@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@langwatch/design-system/dialog";
+import {
   Badge,
   Box,
   Button,
@@ -11,16 +20,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+} from "@langwatch/design-system/primitives";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 import { Boxes } from "lucide-react";
 import type { ReactNode } from "react";

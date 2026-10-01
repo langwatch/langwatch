@@ -3,8 +3,8 @@
  * shape the widget card's range picker uses.
  */
 
-import { Button } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button } from "@langwatch/design-system/primitives";
 import { RefreshCw } from "lucide-react";
 
 import {

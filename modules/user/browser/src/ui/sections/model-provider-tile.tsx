@@ -1,4 +1,13 @@
-import { Box, Button, Code, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Code,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 

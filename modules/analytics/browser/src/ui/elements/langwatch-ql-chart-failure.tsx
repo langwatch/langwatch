@@ -5,11 +5,11 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { Badge, Box, Stack, Text, VStack } from "@chakra-ui/react";
 import type {
   VegaValidationError,
   VegaValidationErrorCode,
 } from "@langwatch/analytics-contract/visualization";
+import { Badge, Box, Stack, Text, VStack } from "@langwatch/design-system/primitives";
 
 interface FailureCopy {
   /** What happened, in the member's terms. */

@@ -2,7 +2,7 @@
  * LeaderboardVerdictPanel — the answer, stated in one sentence, above the evidence for
  * it.
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";

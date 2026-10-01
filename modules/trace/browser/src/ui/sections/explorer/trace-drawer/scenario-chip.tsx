@@ -1,5 +1,5 @@
-import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Circle, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser-kit";
 import { LuCheck, LuX } from "react-icons/lu";
 

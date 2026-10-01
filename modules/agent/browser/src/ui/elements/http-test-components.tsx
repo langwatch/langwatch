@@ -1,4 +1,4 @@
-import { Box, Button, Collapsible, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, Collapsible, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";

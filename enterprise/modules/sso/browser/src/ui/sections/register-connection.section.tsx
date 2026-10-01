@@ -18,7 +18,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";

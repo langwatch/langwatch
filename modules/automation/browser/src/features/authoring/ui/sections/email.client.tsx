@@ -1,4 +1,3 @@
-import { Alert, Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   EMAIL_RX,
   type EmailActionParams,
@@ -7,6 +6,17 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 

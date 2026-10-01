@@ -1,9 +1,19 @@
-import { Badge, Box, Button, Code, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import {
+  Badge,
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { HelpCircle, Plus } from "lucide-react";

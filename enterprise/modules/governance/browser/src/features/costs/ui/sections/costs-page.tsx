@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 import { useSampleMode } from "../../../../ui/elements/governance-sample-mode.ts";

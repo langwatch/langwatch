@@ -1,4 +1,10 @@
 import {
+  type HttpTestErrorExplanation,
+  type HttpTestResult,
+  messagesToJson,
+  type TestMessage,
+} from "@langwatch/agent-contract/http-test";
+import {
   Alert,
   Box,
   Button,
@@ -10,13 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  type HttpTestErrorExplanation,
-  type HttpTestResult,
-  messagesToJson,
-  type TestMessage,
-} from "@langwatch/agent-contract/http-test";
+} from "@langwatch/design-system/primitives";
 import { AlertCircle, Play } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 

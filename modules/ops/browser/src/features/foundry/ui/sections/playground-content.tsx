@@ -1,4 +1,4 @@
-import { Box, Flex, Grid, GridItem, Tabs, Text } from "@chakra-ui/react";
+import { Box, Flex, Grid, GridItem, Tabs, Text } from "@langwatch/design-system/primitives";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { ConnectionSettings } from "./connection-settings.tsx";

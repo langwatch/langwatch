@@ -10,7 +10,7 @@
  * offset size, and that is only known after the browser lays the box out.
  */
 
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEffect, useRef, useState } from "react";
 

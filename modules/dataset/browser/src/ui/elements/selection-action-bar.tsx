@@ -2,7 +2,7 @@
  * byte-for-byte match.
  */
 
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 

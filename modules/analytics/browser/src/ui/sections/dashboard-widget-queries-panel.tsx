@@ -4,7 +4,7 @@
  * `lastRuns`/`onRun` come from the card's shared executor, so Run here or in the chart agree.
  */
 
-import { Accordion, VStack } from "@chakra-ui/react";
+import { Accordion, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";

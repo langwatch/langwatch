@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Input, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   DialogBody,
@@ -10,6 +9,16 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+  Wrap,
+} from "@langwatch/design-system/primitives";
 import type {
   CustomModelEntry,
   MultimodalInput,

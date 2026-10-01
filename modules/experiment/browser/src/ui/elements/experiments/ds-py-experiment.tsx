@@ -1,3 +1,7 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import {
   Alert,
   Box,
@@ -15,11 +19,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { formatMoney } from "@langwatch/design-system/format-money";
+} from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { getRunDisplayName } from "@langwatch/experiment-browser-kit";

@@ -1,5 +1,5 @@
-import { createListCollection, HStack, Text } from "@chakra-ui/react";
 import type { DataPrivacyAudienceOptions } from "@langwatch/data-privacy-contract";
+import { createListCollection, HStack, Text } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Eye, Shield, User, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";

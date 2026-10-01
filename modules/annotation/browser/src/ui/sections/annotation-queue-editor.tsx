@@ -1,19 +1,19 @@
 /** Edits a queue through the annotation feature API. */
 
+import { Popover } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   type ButtonProps,
   Field,
   HStack,
   Input,
-  Popover,
   Spacer,
   Tag,
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

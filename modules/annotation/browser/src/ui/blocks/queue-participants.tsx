@@ -3,17 +3,17 @@
  * Family-local copy (see platform/app/src/components/traces/AddParticipants).
  */
 
+import { CloseButton } from "@chakra-ui/react";
 import {
   Badge,
   Box,
   Button,
-  CloseButton,
   createListCollection,
   HStack,
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Plus, Users } from "lucide-react";
 

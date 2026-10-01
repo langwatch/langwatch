@@ -1,5 +1,5 @@
-import { Box, Grid, GridItem, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Grid, GridItem, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { accentChipBg, useActiveProject } from "@langwatch/onboarding-browser-kit";
 import {
   Activity,

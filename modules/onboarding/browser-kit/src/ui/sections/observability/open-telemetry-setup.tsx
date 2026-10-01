@@ -1,5 +1,5 @@
-import { Separator, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 

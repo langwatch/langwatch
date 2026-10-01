@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   asMarkdownBody,
   type ChatMessage,

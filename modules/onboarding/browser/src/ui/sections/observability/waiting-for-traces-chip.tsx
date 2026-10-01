@@ -1,6 +1,6 @@
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { useActiveProject } from "@langwatch/onboarding-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";

@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { useDensityStore } from "../../../behavior/density.store.ts";

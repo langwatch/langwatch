@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/trace-browser-kit";
 import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Crosshair, Lightbulb } from "lucide-react";

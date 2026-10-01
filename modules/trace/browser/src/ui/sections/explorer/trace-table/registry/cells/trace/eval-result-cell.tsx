@@ -1,4 +1,4 @@
-import { Circle, HStack, Text } from "@chakra-ui/react";
+import { Circle, HStack, Text } from "@langwatch/design-system/primitives";
 import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-browser-kit";
 import type React from "react";
 

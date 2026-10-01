@@ -1,9 +1,18 @@
 // What a role can do and who holds one (main's RolesPanel): the predefined ladder
 // first, then the organization's own roles; counts and holders fold out of the assignments.
 
-import { Alert, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import {
+  Alert,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";

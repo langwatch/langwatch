@@ -4,7 +4,7 @@
  * Renders a rounded pill with optional remove button.
  */
 
-import { chakra, HStack, Text } from "@chakra-ui/react";
+import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 
 const StyledButton = chakra("button");

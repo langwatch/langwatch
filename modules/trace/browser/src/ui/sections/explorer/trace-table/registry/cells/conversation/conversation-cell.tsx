@@ -1,4 +1,4 @@
-import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Circle, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { useFilterStore, useViewStore, truncateId } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";

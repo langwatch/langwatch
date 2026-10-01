@@ -1,3 +1,4 @@
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import {
   Alert,
   Box,
@@ -9,8 +10,7 @@ import {
   Textarea,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";

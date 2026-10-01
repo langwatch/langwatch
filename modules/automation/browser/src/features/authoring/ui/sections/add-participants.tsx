@@ -4,16 +4,16 @@
  * with this move.
  */
 
+import { CloseButton } from "@chakra-ui/react";
 import {
   Badge,
   Box,
-  CloseButton,
   createListCollection,
   HStack,
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Users } from "react-feather";
 

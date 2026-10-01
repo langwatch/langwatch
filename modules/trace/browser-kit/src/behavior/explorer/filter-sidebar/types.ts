@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from "@chakra-ui/react";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
 export type FacetValueState = "neutral" | "include" | "exclude";
 

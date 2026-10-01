@@ -1,6 +1,6 @@
 /** Icon-rail product column (moved from platform/app; uses NavigationLink). */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
 

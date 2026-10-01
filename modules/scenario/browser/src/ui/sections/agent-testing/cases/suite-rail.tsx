@@ -1,10 +1,10 @@
-import { VStack } from "@chakra-ui/react";
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
 import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { VStack } from "@langwatch/design-system/primitives";
 import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { useCallback, useState } from "react";

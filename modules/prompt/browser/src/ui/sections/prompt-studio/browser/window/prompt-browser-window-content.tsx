@@ -1,4 +1,4 @@
-import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type LayoutMode, LayoutModeContext } from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import cloneDeep from "lodash-es/cloneDeep";

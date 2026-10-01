@@ -1,5 +1,5 @@
-import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Box, Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
 import { WorkflowCardDisplay, WorkflowCardLink } from "@langwatch/workflow-browser-kit";

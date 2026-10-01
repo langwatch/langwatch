@@ -1,3 +1,7 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Link } from "@langwatch/browser-host/link";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import {
   Alert,
   Box,
@@ -11,11 +15,7 @@ import {
   type StackProps,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Link } from "@langwatch/browser-host/link";
-import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+} from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { getRunDisplayName } from "@langwatch/experiment-browser-kit";

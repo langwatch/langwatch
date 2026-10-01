@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Direction, SnakeGame } from "../../model/castle-snake.ts";

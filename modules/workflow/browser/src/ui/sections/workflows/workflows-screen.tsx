@@ -4,9 +4,9 @@
  * `@langwatch/langy-browser` is ungoverned.
  */
 
-import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@chakra-ui/react";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";

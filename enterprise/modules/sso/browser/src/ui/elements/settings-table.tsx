@@ -5,7 +5,7 @@
  * it are meant to read as one screen, and two things that must match stop
  * matching the moment each draws its own frame.
  */
-import { Box, Table } from "@chakra-ui/react";
+import { Box, Table } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export function SettingsTable({ children, testId }: { children: ReactNode; testId?: string }) {

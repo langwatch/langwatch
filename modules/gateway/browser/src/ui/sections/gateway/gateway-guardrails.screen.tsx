@@ -1,3 +1,7 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
@@ -11,11 +15,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,

@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { extractLiquidVariables } from "@langwatch/prompt-contract";
 import {
   type ChangeEvent,

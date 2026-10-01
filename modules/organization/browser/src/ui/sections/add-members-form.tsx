@@ -1,3 +1,6 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import {
   Box,
   Button,
@@ -9,10 +12,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";

@@ -4,7 +4,7 @@
  * import another — renders `ClampedText`, `HoverableBigText` refused promotion.
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle, Filter } from "react-feather";
 

@@ -1,5 +1,5 @@
-import { Alert, Heading, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Alert, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
 

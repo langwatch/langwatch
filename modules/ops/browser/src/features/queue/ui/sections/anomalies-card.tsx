@@ -1,4 +1,13 @@
-import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
 

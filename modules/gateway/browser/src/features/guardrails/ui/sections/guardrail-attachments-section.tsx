@@ -1,5 +1,14 @@
-import { Badge, Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Separator,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";

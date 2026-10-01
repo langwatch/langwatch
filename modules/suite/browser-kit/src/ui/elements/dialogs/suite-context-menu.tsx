@@ -3,7 +3,7 @@
  * Shows Edit, Duplicate, and Archive actions.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef } from "react";
 
 export type SuiteContextMenuProps = {

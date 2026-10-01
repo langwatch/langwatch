@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LangyCard } from "@langwatch/langy-browser-kit";
 import { AlertCircle, BookOpen, ExternalLink, ScrollText } from "lucide-react";
 

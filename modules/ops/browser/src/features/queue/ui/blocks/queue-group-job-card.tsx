@@ -1,4 +1,12 @@
-import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { useState } from "react";
 

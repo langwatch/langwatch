@@ -1,4 +1,13 @@
-import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Button,
+  HStack,
+  Input,
+  List,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";

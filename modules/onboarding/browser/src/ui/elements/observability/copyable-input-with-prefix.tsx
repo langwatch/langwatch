@@ -1,4 +1,4 @@
-import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";

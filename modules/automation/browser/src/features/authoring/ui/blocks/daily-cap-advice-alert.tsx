@@ -1,5 +1,5 @@
-import { Alert, Box, Button } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Alert, Box, Button } from "@langwatch/design-system/primitives";
 
 import type { DailyCapAdvice } from "../../model/daily-cap-advice.ts";
 

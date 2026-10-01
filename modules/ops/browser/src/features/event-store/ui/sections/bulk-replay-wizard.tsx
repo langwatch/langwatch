@@ -1,3 +1,5 @@
+import { Stat } from "@chakra-ui/react";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Badge,
   Box,
@@ -7,13 +9,11 @@ import {
   HStack,
   Input,
   Spinner,
-  Stat,
   Table,
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
+} from "@langwatch/design-system/primitives";
 import { nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useMemo, useRef, useState } from "react";
 

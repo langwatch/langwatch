@@ -1,6 +1,16 @@
-import { Badge, Box, Button, HStack, Input, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Tabs,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";

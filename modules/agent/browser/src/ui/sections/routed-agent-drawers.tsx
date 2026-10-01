@@ -1,4 +1,3 @@
-import { Button, VStack } from "@chakra-ui/react";
 /**
  * The drawers the address bar opens, each wired to what it reads so it needs no caller
  * (main's #3193; ARCHITECTURE.md: drawers are URL-routed singletons that navigate).
@@ -8,6 +7,7 @@ import type {
   UiWorkflowSelectorDrawerProps,
 } from "@langwatch/browser-host/drawer";
 import { CopyButton } from "@langwatch/design-system/copy-button";
+import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import {
   EmojiPickerModal,

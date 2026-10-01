@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { useDraft } from "./automation-selectors.ts";
 import { useAutomationStore } from "./automation-store.ts";

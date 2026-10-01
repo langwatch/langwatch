@@ -1,4 +1,4 @@
-import { HStack, Progress, Text } from "@chakra-ui/react";
+import { HStack, Progress, Text } from "@langwatch/design-system/primitives";
 
 export function EvaluationProgressBar({
   evaluationState,

@@ -1,5 +1,14 @@
-import { Box, Button, chakra, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  chakra,
+  Heading,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { LangyMark, useLangyStore } from "@langwatch/langy-browser-kit";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {

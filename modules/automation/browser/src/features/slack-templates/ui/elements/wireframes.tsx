@@ -1,4 +1,4 @@
-import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 
 type WireKind =
   | "header"

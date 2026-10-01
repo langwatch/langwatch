@@ -4,7 +4,7 @@
  * that rendered a bogus model string.
  * @see specs/model-providers/no-models-empty-state.feature
  */
-import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 
 import { modelProviderIcons } from "./model-provider-icons.tsx";

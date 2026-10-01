@@ -1,4 +1,4 @@
-import { Box, chakra } from "@chakra-ui/react";
+import { Box, chakra } from "@langwatch/design-system/primitives";
 
 const ChakraButton = chakra("button");
 

@@ -4,10 +4,10 @@
  * platform/app drawers; analytics uses real links, not overlays.
  */
 
-import { HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Activity, Plus, Shield } from "lucide-react";
 import { useState } from "react";
 

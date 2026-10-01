@@ -1,7 +1,15 @@
-import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
 import { BackLink } from "@langwatch/design-system/back-link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Box,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { Wallet } from "lucide-react";

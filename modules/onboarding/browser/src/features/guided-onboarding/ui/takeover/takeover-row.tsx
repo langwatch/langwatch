@@ -3,7 +3,7 @@
  * out to its right, left-aligned, the whole block centred on the screen so
  * the text drifts up as more of it lands.
  */
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export function TakeoverRow({

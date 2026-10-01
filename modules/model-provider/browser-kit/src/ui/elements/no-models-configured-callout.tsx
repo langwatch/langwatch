@@ -3,7 +3,7 @@
  * but errored every AI call at runtime — this is the honest "not configured yet" affordance.
  * See specs/model-providers/no-models-empty-state.feature.
  */
-import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 
 import { modelProviderIcons } from "../../provider-icons.ts";

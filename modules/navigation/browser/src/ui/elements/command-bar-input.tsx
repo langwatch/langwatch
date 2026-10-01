@@ -1,4 +1,4 @@
-import { Box, HStack, Input, Spinner } from "@chakra-ui/react";
+import { Box, HStack, Input, Spinner } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 import { MIN_SEARCH_QUERY_LENGTH } from "../../model/command-bar-constants.ts";

@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 

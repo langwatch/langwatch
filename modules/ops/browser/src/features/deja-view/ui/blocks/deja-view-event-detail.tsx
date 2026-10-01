@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { formatTimestamp, hashEventTypeColor } from "../../model/deja-view-fragment.ts";

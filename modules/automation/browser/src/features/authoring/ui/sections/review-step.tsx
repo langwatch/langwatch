@@ -1,5 +1,5 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { CADENCE_CHOICE_LABELS } from "@langwatch/automation-contract";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useDailyCapAdvice } from "../../behavior/use-daily-cap-advice.ts";
 import { watchSummary, watchSummaryLine } from "../../model/watch-summary.ts";

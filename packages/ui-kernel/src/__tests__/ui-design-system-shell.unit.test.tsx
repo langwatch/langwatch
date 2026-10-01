@@ -1,5 +1,5 @@
-import { useChakraContext } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { useChakraContext } from "@langwatch/design-system/primitives";
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

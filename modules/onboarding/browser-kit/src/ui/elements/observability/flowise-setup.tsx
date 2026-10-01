@@ -1,4 +1,4 @@
-import { Card, Separator, Text, VStack } from "@chakra-ui/react";
+import { Card, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 /**

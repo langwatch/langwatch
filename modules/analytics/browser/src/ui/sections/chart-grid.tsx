@@ -5,7 +5,7 @@
  */
 
 import "react-grid-layout/css/styles.css";
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { type ReactNode, useCallback } from "react";
 import { GridLayout, type Layout, type LayoutItem, useContainerWidth } from "react-grid-layout";
 

@@ -1,7 +1,7 @@
-import { Box, IconButton } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Box, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { motion } from "motion/react";

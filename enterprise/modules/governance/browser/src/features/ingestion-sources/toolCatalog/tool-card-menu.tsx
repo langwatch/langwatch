@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical, Pencil, Power, Trash2 } from "lucide-react";
 
 import type { ToolCard } from "./tool-cards";

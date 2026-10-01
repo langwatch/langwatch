@@ -1,4 +1,4 @@
-import { HStack, Image, Text } from "@chakra-ui/react";
+import { HStack, Image, Text } from "@langwatch/design-system/primitives";
 
 import { assistantKindOfAgent } from "../../model/assistant-identity.ts";
 import { ASSISTANT_PRESETS } from "../../model/assistant-presets.ts";

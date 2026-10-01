@@ -3,9 +3,9 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
 

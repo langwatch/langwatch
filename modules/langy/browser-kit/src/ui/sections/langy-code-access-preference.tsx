@@ -2,7 +2,7 @@
  * The remembered answer to "how should Langy reach my code" (ADR-129), letting the reader take
  * it back. Hangs off the Integrations screen's GitHub card, which reads and clears the choice.
  */
-import { Button, Card, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, Card, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { GitHub } from "react-feather";
 
 export function LangyCodeAccessPreference({

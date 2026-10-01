@@ -1,7 +1,15 @@
-import { Button, Field, HStack, Input, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { ScopeChipPicker } from "@langwatch/authz-browser-kit";
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  RadioCard,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   maskedSecret,
   narrowingConfirmation,

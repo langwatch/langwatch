@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * Real-Chromium paint-order test for the Langy home's lit block: jsdom paints
  * nothing, so only a browser can say which layer ends up on top of a card.
  * Spec: specs/home/langy-home.feature
  */
-import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

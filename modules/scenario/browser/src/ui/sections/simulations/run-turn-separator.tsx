@@ -3,7 +3,7 @@
  * conversation view: a hairline with "TURN N" centered.
  */
 
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 import { LuListTree } from "react-icons/lu";
 

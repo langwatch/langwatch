@@ -1,4 +1,4 @@
-import { Field, Input, Text, VStack } from "@chakra-ui/react";
+import { Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 
 import type { CallDirection } from "../../model/voice-form.ts";

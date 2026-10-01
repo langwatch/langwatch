@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { HStack, IconButton, Text } from "@chakra-ui/react";
+import { HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Pencil } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

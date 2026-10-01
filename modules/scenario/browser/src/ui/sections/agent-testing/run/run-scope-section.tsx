@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-browser-kit";
 import { Folder } from "lucide-react";
 

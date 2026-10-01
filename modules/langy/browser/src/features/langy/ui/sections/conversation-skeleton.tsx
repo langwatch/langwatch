@@ -1,4 +1,4 @@
-import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/langy-browser-kit";
 
 /**

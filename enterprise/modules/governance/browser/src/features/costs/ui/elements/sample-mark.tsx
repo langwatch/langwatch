@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 import { createContext, type ReactNode, useContext } from "react";
 
 /**

@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import { formatBytes } from "@langwatch/trace-browser-kit";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";

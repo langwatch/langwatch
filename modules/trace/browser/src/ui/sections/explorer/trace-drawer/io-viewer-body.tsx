@@ -1,5 +1,5 @@
-import { Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Text } from "@langwatch/design-system/primitives";
 import {
   type ChatLayout,
   type ContentBlock,

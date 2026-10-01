@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { DisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 import type { ChatMessage, ContentBlock } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";

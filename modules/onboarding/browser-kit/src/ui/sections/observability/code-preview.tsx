@@ -1,12 +1,12 @@
+import { createShikiAdapter } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   ClientOnly,
   CodeBlock,
-  createShikiAdapter,
   HStack,
   Icon,
   IconButton,
-} from "@chakra-ui/react";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";

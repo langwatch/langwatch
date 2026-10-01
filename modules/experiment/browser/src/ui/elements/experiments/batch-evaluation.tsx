@@ -1,3 +1,6 @@
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { downloadCsv } from "@langwatch/csv/download";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import {
   Box,
   Button,
@@ -11,10 +14,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { downloadCsv } from "@langwatch/csv/download";
-import { formatMoney } from "@langwatch/design-system/format-money";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import { toEpochMs } from "@langwatch/time";

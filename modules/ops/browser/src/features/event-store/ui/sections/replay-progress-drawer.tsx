@@ -1,3 +1,5 @@
+import { Stat } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
   Box,
@@ -5,12 +7,10 @@ import {
   HStack,
   Progress,
   Separator,
-  Stat,
   Status,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 

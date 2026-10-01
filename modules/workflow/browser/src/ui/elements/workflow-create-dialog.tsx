@@ -1,5 +1,5 @@
-import { Button, Grid, Heading, HStack, Separator } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Grid, Heading, HStack, Separator } from "@langwatch/design-system/primitives";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   Fragment,

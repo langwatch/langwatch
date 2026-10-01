@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceCostSummary } from "@langwatch/enterprise-governance-contract";
 
 import { formatLaneUsd } from "../../model/cost-lane-format.ts";

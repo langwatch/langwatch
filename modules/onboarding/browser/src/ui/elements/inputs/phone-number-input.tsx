@@ -1,4 +1,4 @@
-import { Box, Group, Input, NativeSelect } from "@chakra-ui/react";
+import { Box, Group, Input, NativeSelect } from "@langwatch/design-system/primitives";
 import {
   AsYouType,
   type CountryCode,

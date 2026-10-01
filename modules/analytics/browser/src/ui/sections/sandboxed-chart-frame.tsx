@@ -4,7 +4,6 @@
  * code with an opaque origin, no cookies, no parent DOM, only a MessagePort.
  */
 
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
@@ -13,6 +12,7 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {

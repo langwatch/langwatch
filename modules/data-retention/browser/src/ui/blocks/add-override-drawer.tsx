@@ -1,4 +1,12 @@
 import {
+  ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+  INDEFINITE_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
+  RETENTION_WEEK_DAYS,
+  type ScopeAssignment,
+} from "@langwatch/data-retention-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
+import {
   Badge,
   Button,
   createListCollection,
@@ -7,15 +15,7 @@ import {
   Input,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
-  INDEFINITE_RETENTION_DAYS,
-  MAX_RETENTION_DAYS,
-  RETENTION_WEEK_DAYS,
-  type ScopeAssignment,
-} from "@langwatch/data-retention-contract";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { useEffect, useMemo, useState } from "react";

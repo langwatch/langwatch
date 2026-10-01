@@ -1,4 +1,4 @@
-import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Cable, X } from "lucide-react";
 import type React from "react";

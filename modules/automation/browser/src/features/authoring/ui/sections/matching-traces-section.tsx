@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
 

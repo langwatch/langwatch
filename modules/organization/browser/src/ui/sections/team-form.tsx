@@ -1,3 +1,5 @@
+import { Link } from "@langwatch/browser-host/link";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import {
   Box,
   Button,
@@ -12,9 +14,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";

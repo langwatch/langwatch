@@ -1,5 +1,5 @@
-import { Table } from "@chakra-ui/react";
 import { AgentLabel, MISSING_VALUE } from "@langwatch/coding-agent-browser-kit";
+import { Table } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";

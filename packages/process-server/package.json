@@ -31,6 +31,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

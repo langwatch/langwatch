@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon, Text } from "@langwatch/design-system/primitives";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
 import type { ContentBlock, ConversationTurn } from "@langwatch/trace-contract/transcript";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";

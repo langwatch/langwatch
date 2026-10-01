@@ -1,4 +1,4 @@
-import { Skeleton, Text } from "@chakra-ui/react";
+import { Skeleton, Text } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 import React from "react";
 

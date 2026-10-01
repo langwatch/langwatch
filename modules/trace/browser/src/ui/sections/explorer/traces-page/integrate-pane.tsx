@@ -1,9 +1,9 @@
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 /**
  * IntegratePane — the default view for no-traces projects.
  * Spec: specs/traces-v2/integrate-pane.feature
  */
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,

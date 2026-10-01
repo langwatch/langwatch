@@ -3,9 +3,9 @@
  * from Langy with per-caller text (one shape, many voices).
  */
 
-import { Button, type ButtonProps, HStack } from "@chakra-ui/react";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Button, type ButtonProps, HStack } from "@langwatch/design-system/primitives";
 import type { ComponentType, PropsWithChildren, ReactNode } from "react";
 
 /** Structural, so a lucide glyph and any other icon library both satisfy it. */

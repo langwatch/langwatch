@@ -1,10 +1,18 @@
-import { Box, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
+import {
+  Box,
+  Grid,
+  GridItem,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import type { Trace } from "@langwatch/trace-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";

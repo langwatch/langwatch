@@ -1,4 +1,3 @@
-import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import type { UiPromptEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
@@ -7,6 +6,15 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Box,
+  Button,
+  Circle,
+  Heading,
+  HStack,
+  Spinner,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {

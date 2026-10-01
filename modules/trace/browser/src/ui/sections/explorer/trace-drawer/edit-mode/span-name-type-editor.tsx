@@ -1,4 +1,4 @@
-import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { HStack, Input, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { type SpanTypes, spanTypesSchema } from "@langwatch/trace-contract";
 import { useCallback, useMemo } from "react";
 

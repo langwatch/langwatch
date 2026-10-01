@@ -1,4 +1,4 @@
-import { Button, type ButtonProps, Text } from "@chakra-ui/react";
+import { Button, type ButtonProps, Text } from "@langwatch/design-system/primitives";
 import { Braces } from "lucide-react";
 import { forwardRef } from "react";
 

@@ -3,9 +3,9 @@
  * (hosted plan / self-hosted license / open-source). No chrome.
  */
 
-import { Alert, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";

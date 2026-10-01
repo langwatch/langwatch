@@ -1,4 +1,4 @@
-import { HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/automation-api.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";

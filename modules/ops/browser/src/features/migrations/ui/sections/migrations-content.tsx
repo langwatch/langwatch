@@ -1,3 +1,5 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -11,9 +13,7 @@ import {
   Stack,
   Table,
   Text,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { ListTable } from "@langwatch/design-system/list-table";
+} from "@langwatch/design-system/primitives";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 

@@ -1,5 +1,13 @@
-import { Button, Field, HStack, Input, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Suspense, useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";

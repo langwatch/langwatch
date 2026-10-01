@@ -1,6 +1,6 @@
-import { Box, Card } from "@chakra-ui/react";
 import type { LangWatchQLGranularityStep, FilterField } from "@langwatch/analytics-contract";
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { Box, Card } from "@langwatch/design-system/primitives";
 
 import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";

@@ -1,6 +1,6 @@
 /** Compact metrics pill for run/group row headers with pass rate, duration, and cost. */
 
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronRight, Clock, Zap } from "lucide-react";
 import { useCallback, useRef, useState } from "react";

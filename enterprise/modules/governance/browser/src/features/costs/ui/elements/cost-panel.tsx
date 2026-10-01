@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode } from "react";
 
 import { SampleMark } from "./sample-mark.tsx";

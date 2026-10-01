@@ -1,5 +1,5 @@
-import { Button, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Button, Text } from "@langwatch/design-system/primitives";
 
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { AuthCard } from "../elements/auth-card.tsx";

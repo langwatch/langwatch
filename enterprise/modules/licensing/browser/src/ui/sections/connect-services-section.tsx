@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";

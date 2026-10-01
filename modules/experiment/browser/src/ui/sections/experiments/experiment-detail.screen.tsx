@@ -1,8 +1,8 @@
-import { Alert, Box } from "@chakra-ui/react";
 import { isNotFoundError as isNotFound } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";

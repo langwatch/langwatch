@@ -1,5 +1,5 @@
-import { Badge, Box, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, Box, Spacer, VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";

@@ -1,4 +1,4 @@
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 
 export function replayStateColor(state: string): "green" | "red" | "orange" | "blue" | "gray" {
   switch (state) {

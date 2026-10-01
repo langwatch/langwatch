@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LangyTurnMetric } from "@langwatch/langy-browser-kit";
 
 import { NumberTicker } from "./number-ticker.tsx";

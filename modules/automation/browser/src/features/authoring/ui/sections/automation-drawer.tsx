@@ -1,4 +1,3 @@
-import { Box, Button, Heading, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
@@ -24,6 +23,16 @@ import {
 } from "@langwatch/automation-contract";
 import type { UiAutomationDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { nowInstant } from "@langwatch/time";

@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ComparisonAggregate } from "@langwatch/experiment-contract";
 import { labelNamesVariant } from "@langwatch/experiment-contract";

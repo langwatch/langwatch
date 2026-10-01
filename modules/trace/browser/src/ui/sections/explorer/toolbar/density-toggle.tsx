@@ -1,5 +1,5 @@
-import { Group, HStack, IconButton, Text } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { Group, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";

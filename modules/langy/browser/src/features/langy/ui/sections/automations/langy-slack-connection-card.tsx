@@ -3,7 +3,7 @@
  * connections, one choice answering Langy with its name and id, or slack's `slackConnection`
  * drawer by name when there are none. Langy never creates or sees a connection's secret.
  */
-import { Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type SlackConnection,
   slackConnectionKindLabel,

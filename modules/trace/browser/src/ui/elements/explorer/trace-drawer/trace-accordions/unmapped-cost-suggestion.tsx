@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { LuExternalLink, LuLightbulb } from "react-icons/lu";
 
 import { exactModelMatchRegex } from "../../../../../model/model-cost-regex.ts";
