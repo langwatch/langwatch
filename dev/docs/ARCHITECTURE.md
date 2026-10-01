@@ -2289,7 +2289,7 @@ chain. New code uses the left column only.
 | `@langwatch/process`                                                                     | `@langwatch/process-server` + kernel's boot AND declaration halves |
 | `@langwatch/browser`                                                                     | `@langwatch/ui-kernel` (boot half)                                 |
 | `createProcessApp(role)`                                                                 | none — apps compose directly (see note below)                      |
-| `openStores(config)`                                                                     | `createProcessMembers({ config })`                                 |
+| `openStores(config)`                                                                     | `openProcessStores({ config })`                                    |
 | `defineProcessModule` / `defineBrowserModule`                                            | `defineServerModule` / `defineWebModule`                           |
 | `traceProcessModule` / `processModules`                                                  | `traceServer` / `serverModules`                                    |
 | `TraceModule` + `.withApi(...)`                                                          | `TraceApp` + `.withApp(...)`                                       |

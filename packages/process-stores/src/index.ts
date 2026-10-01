@@ -25,7 +25,6 @@ export {
   type UploadFacts,
 } from "./members.ts";
 export {
-  createProcessMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   type MemberSource,

@@ -62,7 +62,7 @@ export interface MemberSource<Members> {
   read<Name extends keyof Members & string>(name: Name): Members[Name];
   /** Closes every client this source opened, in reverse construction order. */
   close(): Promise<void>;
-  /** The same close, so `await using members = createProcessMembers(...)` works. */
+  /** The same close, so `await using members = buildProcessStores(...).members` works. */
   [Symbol.asyncDispose](): Promise<void>;
 }
 
@@ -175,7 +175,7 @@ type MemberBuilders = {
   readonly [Member in MemberName]: () => BuiltMember<ProcessMembers[Member]>;
 };
 
-type CreateProcessMembersOptions = {
+type BuildProcessStoresOptions = {
   readonly config: ProcessConfig;
   /**
    * Members this caller built itself. One passed is used as it stands and is
@@ -184,17 +184,13 @@ type CreateProcessMembersOptions = {
   readonly members?: { readonly [Name in MemberName]?: ProcessMembers[Name] };
 };
 
-export function createProcessMembers(options: CreateProcessMembersOptions): ProcessMemberSource {
-  return createProcessStores(options).members;
-}
-
 /** The opened members, plus the operator-read mint only the process root may hold (§7). */
 export type ProcessStores = Readonly<{
   members: ProcessMemberSource;
   operatorReads: OperatorReadMint;
 }>;
 
-export function createProcessStores(options: CreateProcessMembersOptions): ProcessStores {
+export function buildProcessStores(options: BuildProcessStoresOptions): ProcessStores {
   const { config } = options;
   const supplied = options.members ?? {};
   refuseUndefinedMembers(supplied);

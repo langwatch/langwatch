@@ -3,7 +3,7 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 import { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
 import type { ClickHousePrivateRoute, ObjectStorageConfig, ProcessConfig } from "./config.ts";
-import { createProcessStores, type ProcessStores } from "./create-members.ts";
+import { buildProcessStores, type ProcessStores } from "./create-members.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -145,7 +145,7 @@ export function openProcessStores(options: {
           secrets.into(storesOwner.secrets.encryption, (credentials) =>
             secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
               withStorageSecrets(secrets, (storage) =>
-                createProcessStores({
+                buildProcessStores({
                   config: processConfigOf({
                     name,
                     config,

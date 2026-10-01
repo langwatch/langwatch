@@ -6,7 +6,7 @@ import { createApp } from "@langwatch/kernel";
  */
 import { describe, expect, it } from "vitest";
 
-import { createProcessMembers, MemberSuppliedUndefinedError } from "../src/create-members.ts";
+import { buildProcessStores, MemberSuppliedUndefinedError } from "../src/create-members.ts";
 import type { ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all. */
@@ -42,8 +42,8 @@ describe("given a process stated with createProcess", () => {
 
   describe("when the caller hands a member in as undefined", () => {
     it("refuses by name rather than building the real client", () => {
-      expect(() =>
-        createProcessMembers({ config: config(), members: { clock: undefined } }),
+      expect(
+        () => buildProcessStores({ config: config(), members: { clock: undefined } }).members,
       ).toThrow(MemberSuppliedUndefinedError);
     });
   });
