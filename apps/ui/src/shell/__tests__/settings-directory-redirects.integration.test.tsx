@@ -35,6 +35,7 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
 const stubbedShellLayouts = {
   auth: async () => ({ default: () => <Outlet /> }),
   chrome: async () => ({ default: () => <Outlet /> }),
+  "full-screen": async () => ({ default: () => <Outlet /> }),
 };
 
 const realRoutes = createUiRouteObjects({

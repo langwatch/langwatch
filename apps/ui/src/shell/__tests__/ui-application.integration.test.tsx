@@ -84,6 +84,7 @@ function applicationOf({
       shellLayouts: {
         auth: async () => ({ default: () => <Outlet /> }),
         chrome: async () => ({ default: () => <Outlet /> }),
+        "full-screen": async () => ({ default: () => <Outlet /> }),
       },
       loaders,
       errorFallback: () => <div data-testid="page-error" />,

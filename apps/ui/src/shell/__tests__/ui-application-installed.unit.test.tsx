@@ -54,6 +54,7 @@ function applicationFromPackageEntry() {
       shellLayouts: {
         auth: async () => ({ default: () => null }),
         chrome: async () => ({ default: () => null }),
+        "full-screen": async () => ({ default: () => null }),
       },
       loaders: hostRegistryWithoutGovernance(),
       errorFallback: () => null,
