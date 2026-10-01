@@ -1,12 +1,10 @@
 import type { IncomingMessage } from "node:http";
 
-import { McpClientAddress } from "../app/hosted-mcp.members.ts";
-
 /**
  * Reads forwarding headers in priority order (cf-connecting-ip first as edge-authored).
  * Returns 'unknown' if no address found, so rate limiter fails safe.
  */
-export class HeaderMcpClientAddressService extends McpClientAddress {
+export class HeaderMcpClientAddressService {
   private static readonly HEADERS = [
     "cf-connecting-ip",
     "true-client-ip",
@@ -14,9 +12,7 @@ export class HeaderMcpClientAddressService extends McpClientAddress {
     "x-forwarded-for",
   ] as const;
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   static create(): HeaderMcpClientAddressService {
     return new HeaderMcpClientAddressService();

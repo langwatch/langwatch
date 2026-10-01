@@ -14,6 +14,7 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
 import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
@@ -109,7 +110,7 @@ import {
   type SimulationRunRestResponse,
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
-  type SimulationService,
+  type SimulationService as SimulationServiceContract,
   type SimulationSetData,
   ScenarioSimulationsUnavailableError,
   withActor,
@@ -160,6 +161,11 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
+import {
+  ClickHouseScenarioSession,
+  type ScenarioReadOnlyClickHouse,
+} from "../repositories/clickhouse/clickhouse.scenario-session.store.ts";
+import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
@@ -183,19 +189,24 @@ import { ScenarioService } from "../services/scenario.service.ts";
 import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
 import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
+import { SimulationService } from "../services/simulation.service.ts";
 import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
 import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 import { VoicePublicUrlService } from "../services/voice-public-url.service.ts";
 import { VoiceSessionService } from "../services/voice-session.service.ts";
-import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
+
+const SCENARIO_KSUID_RESOURCE = "scenario";
+
+/** The folder id's resource (`KSUID_RESOURCES.SCENARIO_TEST_SUITE`); `suite_` is persisted. */
+const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
   scenarios: ScenarioService;
-  simulations: SimulationService;
+  simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
   prefetcher: ScenarioExecutionPrefetcherService;
   /** Closes a run that can no longer finish on its own. */
@@ -231,7 +242,7 @@ export interface ScenarioAppDependencies {
  * services (agent testing, executor, buffer, reads) and four small ports.
  */
 export interface ScenarioAppInfrastructure {
-  simulations: SimulationService;
+  simulations: SimulationServiceContract;
   scenarioTabs: ScenarioTabRegistry;
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;
@@ -271,19 +282,7 @@ export const scenarioAppDependencyTokens = {
   apiKeys: ApiKeyApi,
 };
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-export type ScenarioReadOnlyClickHouse = Readonly<{
-  query<Row>(input: {
-    tenantId: string;
-    tenantIds?: readonly string[];
-    sql: string;
-    params?: Record<string, unknown>;
-  }): Promise<{ rows: Row[] }>;
-}>;
+export type { ScenarioReadOnlyClickHouse };
 
 /** The process's Redis as scenario reaches it: fan-out publishes and a duplicable subscriber. */
 export type ScenarioRedis = ScenarioEventBroadcastPublisher &
@@ -372,15 +371,23 @@ export class ScenarioApp implements ScenarioApi {
       setup.resources.own("scenario voice public URL", () => voice.close());
     }
     const simulationCommands = SimulationCommandDispatcherService.create();
-    const composed = buildScenarioComposition({
-      encryption: setup.members.encryption,
-      clickhouse: setup.members.clickhouse,
-      execution: simulationCommands,
-    });
-    const { ids, testSuiteIds, clock, secretCipher } = composed;
+    const ids = { next: () => generate(SCENARIO_KSUID_RESOURCE).toString() };
+    const testSuiteIds = { next: () => generate(SCENARIO_TEST_SUITE_KSUID_RESOURCE).toString() };
+    const clock = { now: nowInstant };
+    const secretCipher = setup.members.encryption;
     // A process that composes its own whole simulation service still wins;
     // otherwise the module builds the reads its own ClickHouse member derives.
-    const simulations = setup.members.simulations ?? composed.simulations;
+    const { clickhouse } = setup.members;
+    const simulations =
+      setup.members.simulations ??
+      (clickhouse
+        ? SimulationService.create(
+            SimulationClickHouseRepository.create(
+              ClickHouseScenarioSession.resolverOver(clickhouse),
+            ),
+            simulationCommands,
+          )
+        : undefined);
     const scenarios = ScenarioService.create({
       repository: setup.repositories.scenarios,
       simulations,

@@ -5,23 +5,14 @@ export {
 } from "./data-privacy.server.ts";
 export { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
 /**
- * The lineage a rule is placed and named against, and the analysis capability
- * the redaction calls out to. Both read stores this feature does not own, so
- * the process that owns them supplies them.
+ * The lineage a rule is placed and named against. It reads stores this feature
+ * does not own, so the process that owns them supplies it.
  */
 export type {
   DataPrivacyDirectoryReader,
   DataPrivacyOrganizationDirectory,
   DataPrivacyProjectLineage,
 } from "./app/data-privacy.app.ts";
-export {
-  type DataPrivacyProject,
-  type DataPrivacyResolution,
-  type PiiAnalysisMetrics,
-  type PiiAnalysisOutcome,
-  type PIICheckOptions,
-  type PiiAnalysis,
-} from "./app/data-privacy.members.ts";
 export type { DataPrivacyDirectoryDatabase } from "./repositories/prisma/prisma.data-privacy-directory.repository.ts";
 export {
   PiiAnalysisMetricsOtelService,

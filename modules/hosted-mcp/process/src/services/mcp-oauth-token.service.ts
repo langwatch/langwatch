@@ -9,10 +9,18 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { McpApiKeyCipher } from "../app/hosted-mcp.members.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
 
 const logger = createLogger("langwatch:mcp");
+
+/**
+ * Reversible encryption for the API key an OAuth session was minted from. The key is stored,
+ * not hashed, because the MCP session has to present it again on every tool call.
+ */
+export interface McpApiKeyCipher {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
 
 const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
 const OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE = "mcptoken";

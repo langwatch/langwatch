@@ -11,13 +11,12 @@ import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oa
 import { RedisMcpSessionRepository } from "../repositories/redis/redis.mcp-session.repository.ts";
 import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
-import { GovernanceMcpSessionToolsService } from "../services/governance-mcp-session-tools.service.ts";
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { McpAuthorizationService } from "../services/mcp-authorization.service.ts";
 import { McpEndpointService, type McpHandler } from "../services/mcp-endpoint.service.ts";
+import type { McpApiKeyCipher } from "../services/mcp-oauth-token.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
-import type { HostedMcpDependencies } from "./hosted-mcp.members.ts";
 
 /**
  * Shapes restated rather than imported: a module depends on contracts.
@@ -33,6 +32,21 @@ export type HostedMcpInfrastructure = Readonly<{
     decrypt(ciphertext: string): string;
   }>;
   publicBaseUrl: string | undefined;
+}>;
+
+/** Everything the hosted MCP endpoint needs from the process that mounts it. */
+export type HostedMcpDependencies = Readonly<{
+  /** The process's Redis connection, or nothing when it has none (ADR-093). */
+  redis: Redis | Cluster | null;
+  projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
+  /** Required, not optional: an unwired re-check is a token that never expires. */
+  grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
+  cipher: McpApiKeyCipher;
+  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  /** Absent installs no extra tools. */
+  sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
+  /** The public origin the MCP client is told to come back to. */
+  baseHost: string;
 }>;
 
 type HostedMcpDependenciesMap = Readonly<{
@@ -102,9 +116,7 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
         cipher: members.encryption,
         address: HeaderMcpClientAddressService.create(),
         baseHost: members.publicBaseUrl,
-        sessionTools: GovernanceMcpSessionToolsService.create({
-          governance: dependencies.governance,
-        }),
+        sessionTools: dependencies.governance,
       },
       approvals,
     );

@@ -20,14 +20,13 @@ import {
 } from "vitest";
 
 import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
-import {
-  HeaderMcpClientAddressService,
-  McpApiKeyCipher,
-  McpProjectLookup,
-  McpSessionGrant,
-  type McpHandler,
-} from "../../index.ts";
+import { HeaderMcpClientAddressService, type McpHandler } from "../../index.ts";
+import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
+import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "../../services/project-mcp-project-lookup.service.ts";
 
 function stringField(body: unknown, key: string): string {
   const value: unknown =
@@ -63,7 +62,10 @@ const mockRedis = {
  * takes each of them as a parameter now, so a test states what it gave the
  * handler instead of intercepting what the handler reached for.
  */
-class FakeProjectLookup extends McpProjectLookup {
+class FakeProjectLookup implements Pick<
+  ProjectMcpProjectLookupService,
+  "resolveLiveProjectByApiKey"
+> {
   async resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
     const project: { id: string; teamId: string } | null = await mockPrisma.project.findUnique({
       where: { apiKey, archivedAt: null },
@@ -73,7 +75,7 @@ class FakeProjectLookup extends McpProjectLookup {
 }
 
 /** The grant behind an OAuth bearer, answered by whatever a test set. */
-class FakeSessionGrant extends McpSessionGrant {
+class FakeSessionGrant implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   granted = true;
   readonly asked: { userId: string; projectId: string }[] = [];
   stillGranted(input: { userId: string; projectId: string }): Promise<boolean> {
@@ -85,7 +87,7 @@ class FakeSessionGrant extends McpSessionGrant {
 const sessionGrant = new FakeSessionGrant();
 
 /** Identity "encryption", so a test can read the value it expected to be stored. */
-class ReversibleTestCipher extends McpApiKeyCipher {
+class ReversibleTestCipher implements McpApiKeyCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }

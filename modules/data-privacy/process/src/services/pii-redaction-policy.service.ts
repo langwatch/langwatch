@@ -15,12 +15,22 @@ import {
 } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import {
-  type DataPrivacyResolution,
-  type PIICheckOptions,
-  type PiiAnalysis,
-} from "../app/data-privacy.members.ts";
 import { NAME_AND_PLACE_ENTITIES, presidioEntitiesFor } from "../rules/pii-analysis.rules.ts";
+import type { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
+import type { PiiAnalysisService } from "./pii-analysis.service.ts";
+
+/** The options one analysis-service call is made with. */
+export type PIICheckOptions = {
+  piiRedactionLevel: PIIRedactionLevel;
+  enforced?: boolean;
+  mainMethod?: "google_dlp" | "presidio";
+  /** Analyzer entity names (uppercase) overriding the level defaults; the custom level uses it. */
+  entities?: readonly string[];
+  /** Do-not-redact exception patterns (raw sources). Only google_dlp reads them. */
+  exceptPatterns?: readonly string[];
+  /** The tenant the batch belongs to, when the path has one. */
+  projectId?: string;
+};
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.
@@ -57,7 +67,7 @@ export type RedactionOptions =
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
-  transport: PiiAnalysis;
+  transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close">;
   /** Asked, never assumed: evaluation answers whether this deployment reaches langevals. */
   isLangevalsConfigured: () => Promise<boolean>;
   isProduction: boolean;
@@ -69,7 +79,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * lazily defaulted to the process-wide service, so callers that never pass a
    * tenant (and most tests) don't need to provide it.
    */
-  dataPrivacy: DataPrivacyResolution;
+  dataPrivacy: Pick<DataPrivacyResolutionService, "getResolvedForProject">;
   featureFlags?: FeatureFlagApi;
 }
 
@@ -83,7 +93,7 @@ const runGoogleDlpBatch = ({
   exceptPatterns,
   spareNamesAndPlaces,
 }: {
-  transport: PiiAnalysis;
+  transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close">;
   texts: string[];
   piiRedactionLevel: PIIRedactionLevel;
   exceptPatterns?: readonly string[];
@@ -107,7 +117,7 @@ const batchClearPII = async ({
   options,
   spareNamesAndPlaces,
 }: {
-  transport: PiiAnalysis;
+  transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close">;
   texts: string[];
   options: PIICheckOptions;
   spareNamesAndPlaces: readonly boolean[];

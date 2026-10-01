@@ -1,17 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { registerRoutePolicy } from "@langwatch/api/rest";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  McpApiKeyCipher,
-  McpClientAddress,
-  McpProjectLookup,
-  McpSessionGrant,
-  McpSessionToolRegistrar,
-} from "../app/hosted-mcp.members.ts";
 import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
@@ -23,13 +17,16 @@ import {
   isMcpRoute,
   PROTECTED_RESOURCE_METADATA_PATH,
 } from "../rules/mcp-routes.rules.ts";
+import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
+import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
-import { McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
+import { type McpApiKeyCipher, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
 import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
+import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -52,11 +49,11 @@ export type McpEndpointCollaborators = Readonly<{
   relay: McpSessionRelayChannel;
   oauthTokenRecords: McpOAuthTokenRepository;
   oauthClients: McpOAuthClientRepository;
-  projects: McpProjectLookup;
-  grants: McpSessionGrant;
+  projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
+  grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   cipher: McpApiKeyCipher;
-  address: McpClientAddress;
-  sessionTools?: McpSessionToolRegistrar | undefined;
+  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
   /** The public origin the MCP client is told to come back to. */
   baseHost: string;
 }>;

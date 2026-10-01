@@ -6,18 +6,17 @@
 import { createHash } from "node:crypto";
 import { createServer, type Server, type IncomingMessage } from "node:http";
 
-import { Redis } from "ioredis";
+import { type Cluster, Redis } from "ioredis";
 
 import { HostedMcpApp } from "../../../app/hosted-mcp.app.ts";
-import type { McpLiveProjectLookup } from "../../../app/hosted-mcp.members.ts";
-import {
-  McpApiKeyCipher,
-  McpClientAddress,
-  McpProjectLookup,
-  McpSessionGrant,
-  type HostedMcpRedis,
-  type McpHandler,
-} from "../../../index.ts";
+import type { McpHandler } from "../../../index.ts";
+import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
+import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
+import type { McpApiKeyCipher } from "../../../services/mcp-oauth-token.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "../../../services/project-mcp-project-lookup.service.ts";
 
 export const SSE_SESSION_PREFIX = "mcp:sse:session:";
 export const SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
@@ -63,17 +62,18 @@ function resolveMatchingWaiters(waiters: SseWaiter[], parsed: JsonRpcMessage): v
  * The Redis these suites talk to. Opened by the suite, so the suite closes it.
  * Native Redis is the local default; CI hands the URL in.
  */
-export function connectTestRedis(): HostedMcpRedis {
+export function connectTestRedis(): Redis | Cluster {
   const url =
     process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379";
   return new Redis(url, { maxRetriesPerRequest: null });
 }
 
 /** The project every key in `apiKeys` belongs to, keyed by the key itself. */
-class HarnessProjectLookup extends McpProjectLookup {
-  constructor(private readonly apiKeys: readonly string[]) {
-    super();
-  }
+class HarnessProjectLookup implements Pick<
+  ProjectMcpProjectLookupService,
+  "resolveLiveProjectByApiKey"
+> {
+  constructor(private readonly apiKeys: readonly string[]) {}
   resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
     return Promise.resolve(
       this.apiKeys.includes(apiKey)
@@ -84,14 +84,14 @@ class HarnessProjectLookup extends McpProjectLookup {
 }
 
 /** Every grant holds: these suites are about transport, not about revocation. */
-class HarnessSessionGrant extends McpSessionGrant {
+class HarnessSessionGrant implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(true);
   }
 }
 
 /** Identity "encryption", so a suite can read the value it expected to be stored. */
-class HarnessCipher extends McpApiKeyCipher {
+class HarnessCipher implements McpApiKeyCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }
@@ -101,7 +101,7 @@ class HarnessCipher extends McpApiKeyCipher {
 }
 
 /** Every replica answers on loopback, so every caller is the same address. */
-class HarnessClientAddress extends McpClientAddress {
+class HarnessClientAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
   clientIp(request: IncomingMessage): string {
     return request.socket.remoteAddress ?? "127.0.0.1";
   }
@@ -126,7 +126,7 @@ export async function clearRecordedSessions({
   redis,
   apiKey,
 }: {
-  redis: HostedMcpRedis;
+  redis: Redis | Cluster;
   apiKey: string;
 }): Promise<void> {
   for (const [setPrefix, sessionPrefix] of [
@@ -169,7 +169,7 @@ export async function startReplicaPair({
   redis,
   apiKeys,
 }: {
-  redis: HostedMcpRedis;
+  redis: Redis | Cluster;
   apiKeys: string[];
 }): Promise<ReplicaPair> {
   for (const apiKey of apiKeys) {

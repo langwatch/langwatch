@@ -1,6 +1,6 @@
+import type { Cluster, Redis } from "ioredis";
 import { z } from "zod";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import {
   McpOAuthClientRepository,
   type RegisteredOAuthClient,
@@ -22,14 +22,14 @@ const storedClientSchema = z.object({
 
 /** Registrations in Redis. With no Redis nothing registers and every client reads unregistered. */
 export class RedisMcpOAuthClientRepository extends McpOAuthClientRepository {
-  readonly #redis: HostedMcpRedis | null;
+  readonly #redis: Redis | Cluster | null;
 
-  private constructor({ redis }: { redis: HostedMcpRedis | null }) {
+  private constructor({ redis }: { redis: Redis | Cluster | null }) {
     super();
     this.#redis = redis;
   }
 
-  static create({ redis }: { redis: HostedMcpRedis | null }): RedisMcpOAuthClientRepository {
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpOAuthClientRepository {
     return new RedisMcpOAuthClientRepository({ redis });
   }
 

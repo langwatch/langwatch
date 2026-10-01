@@ -5,29 +5,31 @@ import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
 import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
   HeaderMcpClientAddressService,
   hostedMcpRoutePolicies,
   HOSTED_MCP_FAMILY,
-  McpApiKeyCipher,
-  McpProjectLookup,
-  McpSessionGrant,
 } from "../../index.ts";
+import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
+import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "../../services/project-mcp-project-lookup.service.ts";
 
-class NoProjects extends McpProjectLookup {
+class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
   resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {
     return Promise.resolve({ kind: "unknown" });
   }
 }
 
-class NoGrants extends McpSessionGrant {
+class NoGrants implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(false);
   }
 }
 
-class PlainCipher extends McpApiKeyCipher {
+class PlainCipher implements McpApiKeyCipher {
   encrypt(value: string): string {
     return value;
   }

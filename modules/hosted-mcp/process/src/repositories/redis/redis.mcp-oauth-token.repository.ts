@@ -4,8 +4,8 @@ import {
   type McpAuthorizationCodeRecord,
   type McpOAuthTokenRecord,
 } from "@langwatch/hosted-mcp-contract";
+import type { Cluster, Redis } from "ioredis";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import {
   McpOAuthTokenRepository,
   type McpAuthorizationCodeConsumption,
@@ -19,16 +19,16 @@ const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
 
 /** Redis persistence for encrypted OAuth bearers and one-time codes. */
 export class RedisMcpOAuthTokenRepository extends McpOAuthTokenRepository {
-  readonly #redis: HostedMcpRedis | null;
+  readonly #redis: Redis | Cluster | null;
   readonly #clients: RedisMcpOAuthClientRepository;
 
-  private constructor({ redis }: { redis: HostedMcpRedis | null }) {
+  private constructor({ redis }: { redis: Redis | Cluster | null }) {
     super();
     this.#redis = redis;
     this.#clients = RedisMcpOAuthClientRepository.create({ redis });
   }
 
-  static create({ redis }: { redis: HostedMcpRedis | null }): RedisMcpOAuthTokenRepository {
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpOAuthTokenRepository {
     return new RedisMcpOAuthTokenRepository({ redis });
   }
 

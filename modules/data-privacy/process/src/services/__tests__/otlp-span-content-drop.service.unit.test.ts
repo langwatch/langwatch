@@ -10,14 +10,14 @@ import {
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DataPrivacyResolution } from "../../app/data-privacy.members.ts";
+import type { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service.ts";
 
 /** A resolver built from one function, so a test states only what it answers. */
 function resolverOf(
   resolve: (input: { projectId: string }) => Promise<ResolvedDataPrivacy> | ResolvedDataPrivacy,
-): DataPrivacyResolution {
-  return new (class implements DataPrivacyResolution {
+): Pick<DataPrivacyResolutionService, "getResolvedForProject"> {
+  return new (class implements Pick<DataPrivacyResolutionService, "getResolvedForProject"> {
     async getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
       return resolve(input);
     }

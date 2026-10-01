@@ -2,12 +2,13 @@ import { type EvaluationApi, LangevalsPiiDetectionError } from "@langwatch/evalu
 import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PiiAnalysisMetrics, PiiClearing } from "../app/data-privacy.members.ts";
 import {
   PII_ANALYSIS_TEXT_BUDGET,
   presidioEntitiesFor,
   redactSparingNamesAndPlaces,
+  type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
+import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
 
 type PiiDetection = Pick<EvaluationApi, "detectPii">;
 
@@ -15,7 +16,10 @@ type PiiDetection = Pick<EvaluationApi, "detectPii">;
 export class PresidioRedactionService {
   static create(input: {
     evaluation: PiiDetection;
-    metrics: PiiAnalysisMetrics;
+    metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >;
     timeoutMs: number;
   }): PresidioRedactionService {
     return new PresidioRedactionService(input.evaluation, input.metrics, input.timeoutMs);
@@ -25,7 +29,10 @@ export class PresidioRedactionService {
 
   private constructor(
     private readonly evaluation: PiiDetection,
-    private readonly metrics: PiiAnalysisMetrics,
+    private readonly metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >,
     private readonly timeoutMs: number,
   ) {}
 

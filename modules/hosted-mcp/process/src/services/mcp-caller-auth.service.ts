@@ -3,16 +3,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  McpClientAddress,
-  McpLiveProjectLookup,
-  McpProjectLookup,
-  McpSessionGrant,
-} from "../app/hosted-mcp.members.ts";
 import { extractBearerToken } from "../rules/mcp-routes.rules.ts";
+import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
+import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
 import type { McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "./project-mcp-project-lookup.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -40,9 +40,9 @@ export type McpAuthentication =
 
 type McpCallerAuthCollaborators = Readonly<{
   oauthTokens: McpOAuthTokenService;
-  projects: McpProjectLookup;
-  grants: McpSessionGrant;
-  address: McpClientAddress;
+  projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
+  grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
+  address: Pick<HeaderMcpClientAddressService, "clientIp">;
   http: McpHttpService;
 }>;
 

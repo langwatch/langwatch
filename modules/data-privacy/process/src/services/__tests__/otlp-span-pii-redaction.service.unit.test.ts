@@ -9,18 +9,19 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  DataPrivacyResolution,
-  PiiAnalysis,
-  PiiClearing,
-} from "../../app/data-privacy.members.ts";
+import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";
+import type { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
+import type { PiiAnalysisService } from "../pii-analysis.service.ts";
 
 /**
  * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  */
 
-class FakePiiAnalysis implements PiiAnalysis {
+class FakePiiAnalysis implements Pick<
+  PiiAnalysisService,
+  "clearGoogleDlp" | "clearPresidio" | "close"
+> {
   readonly presidioCalls: {
     texts: string[];
     level: string;
@@ -76,8 +77,10 @@ function resolvedPolicy(over: Partial<ResolvedDataPrivacy> = {}): ResolvedDataPr
   };
 }
 
-function dataPrivacyReturning(policy: ResolvedDataPrivacy | Error): DataPrivacyResolution {
-  return new (class implements DataPrivacyResolution {
+function dataPrivacyReturning(
+  policy: ResolvedDataPrivacy | Error,
+): Pick<DataPrivacyResolutionService, "getResolvedForProject"> {
+  return new (class implements Pick<DataPrivacyResolutionService, "getResolvedForProject"> {
     async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
       if (policy instanceof Error) throw policy;
       return policy;
@@ -107,7 +110,7 @@ function spanWith(attributes: { key: string; value: { stringValue: string } }[])
 }
 
 function serviceWith(options: {
-  transport: PiiAnalysis;
+  transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close">;
   policy?: ResolvedDataPrivacy | Error;
   isLangevalsConfigured?: boolean;
   isProduction?: boolean;

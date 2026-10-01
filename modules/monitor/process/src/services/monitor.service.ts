@@ -1,3 +1,4 @@
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
@@ -24,12 +25,11 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 
-import type { MonitorEvaluator } from "../app/monitor.app.ts";
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
-  evaluators: MonitorEvaluator;
+  evaluators: Pick<EvaluatorApi, "getById">;
   generateId: () => string;
 };
 

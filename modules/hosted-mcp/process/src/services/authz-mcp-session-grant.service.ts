@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 
-import { McpSessionGrant } from "../app/hosted-mcp.members.ts";
 import { MCP_AUTHORIZE_PERMISSION } from "./mcp-authorization.service.ts";
 
 /**
@@ -8,11 +7,10 @@ import { MCP_AUTHORIZE_PERMISSION } from "./mcp-authorization.service.ts";
  * approval step demanded, re-checked against the same permission it was
  * minted under.
  */
-export class AuthzMcpSessionGrantService extends McpSessionGrant {
+export class AuthzMcpSessionGrantService {
   readonly #authorization: AuthzApi;
 
   private constructor(authorization: AuthzApi) {
-    super();
     this.#authorization = authorization;
   }
 

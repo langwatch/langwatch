@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { PiiAnalysisMetrics } from "../../app/data-privacy.members.ts";
 import { HttpGoogleDlpChannel } from "../../channels/http/http.google-dlp.channel.ts";
 import { MemoryGoogleDlpChannel } from "../../channels/memory/memory.google-dlp.channel.ts";
 import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
+import type { PiiAnalysisMetricsOtelService } from "../pii-analysis-metrics-otel.service.ts";
 
-class RecordingMetrics implements PiiAnalysisMetrics {
+class RecordingMetrics implements Pick<
+  PiiAnalysisMetricsOtelService,
+  "analysisCalled" | "analysisObserved" | "analysisFinished"
+> {
   readonly calls: string[] = [];
   analysisCalled(method: string): void {
     this.calls.push(method);

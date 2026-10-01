@@ -1,3 +1,4 @@
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { getConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
@@ -6,12 +7,12 @@ import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js
 import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import type { McpApiKeyCipher, McpSessionToolRegistrar } from "../app/hosted-mcp.members.ts";
 import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type {
   McpSessionRepository,
   McpSessionTransport,
 } from "../repositories/mcp-session.repository.ts";
+import type { McpApiKeyCipher } from "./mcp-oauth-token.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -46,7 +47,7 @@ type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
   relay: McpSessionRelayChannel;
   cipher: McpApiKeyCipher;
-  sessionTools: McpSessionToolRegistrar | undefined;
+  sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 
 /**
@@ -93,7 +94,7 @@ export class McpSessionService {
     userId: string | undefined;
   }): Promise<void> {
     const server = createMcpServer();
-    this.#collaborators.sessionTools?.register({
+    this.#collaborators.sessionTools?.registerMcpTools({
       server,
       apiKey: input.apiKey,
       callerUserId: input.userId,

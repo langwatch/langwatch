@@ -1,20 +1,24 @@
 import { compilePiiExceptPatterns } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PiiAnalysisMetrics, PiiClearing } from "../app/data-privacy.members.ts";
 import type { GoogleDlpChannel } from "../channels/google-dlp.channel.ts";
 import {
   googleDlpInfoTypesFor,
   maskGoogleDlpFindings,
   PII_ANALYSIS_TEXT_BUDGET,
+  type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
+import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
 
 /** One text through Google DLP: main's `clearGoogleDlp`, over this module's DLP channel. */
 export class GoogleDlpRedactionService {
   static create(input: {
     dlp: GoogleDlpChannel;
     disabled: boolean;
-    metrics: PiiAnalysisMetrics;
+    metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >;
   }): GoogleDlpRedactionService {
     return new GoogleDlpRedactionService(input.dlp, input.disabled, input.metrics);
   }
@@ -22,7 +26,10 @@ export class GoogleDlpRedactionService {
   private constructor(
     private readonly dlp: GoogleDlpChannel,
     private readonly disabled: boolean,
-    private readonly metrics: PiiAnalysisMetrics,
+    private readonly metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >,
   ) {}
 
   async clear(input: {

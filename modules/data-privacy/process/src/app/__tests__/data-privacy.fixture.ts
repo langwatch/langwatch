@@ -7,11 +7,14 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
+import type { DataPrivacyResolutionService } from "../../services/data-privacy-resolution.service.ts";
 import { DataPrivacyApp } from "../data-privacy.app.ts";
-import type { DataPrivacyResolution } from "../data-privacy.members.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
-export class DataPrivacyResolutionFake implements DataPrivacyResolution {
+export class DataPrivacyResolutionFake implements Pick<
+  DataPrivacyResolutionService,
+  "getResolvedForProject"
+> {
   constructor(private readonly resolved: ResolvedDataPrivacy) {}
 
   async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
