@@ -112,10 +112,13 @@ class CapabilityBillingHost extends BillingHostApi {
  * is what `mounts.load` resolves.
  */
 export default function BillingHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, navigation, route } = useUiCapabilities();
+  const { session, feedback, navigation, route } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const deployment = useUiDeployment();
-  const organizations = billingApi.organization.getScopeGraph.useQuery({});
+  const organizations = billingApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
 
   const org = useMemo<BillingHostOrganization | undefined>(() => {
     const found = (organizations.data ?? []).find((candidate) => candidate.id === organizationId);

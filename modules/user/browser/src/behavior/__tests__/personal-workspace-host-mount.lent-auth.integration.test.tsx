@@ -6,7 +6,9 @@
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiSession,
   type UiActiveScope,
+  type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclaringModule } from "@langwatch/browser-host/declarations";
@@ -27,6 +29,24 @@ import {
   type TwoStepSetup,
 } from "../../model/personal-workspace-host.ts";
 import PersonalWorkspaceHostMount from "../personal-workspace-host-mount.tsx";
+
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
 
 class TestScope extends UiScope {
   activeScope(): UiActiveScope {
@@ -79,10 +99,10 @@ const AUTH: UiDeclaringModule = {
 
 function mountedHost(modules: readonly UiDeclaringModule[]): PersonalWorkspaceHostApi {
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
+    ...createUiCapabilitiesFromHost(
+      { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+      new SignedInSession(),
+    ),
     scope: new TestScope(),
     declarations: uiDeclarations(modules),
   };

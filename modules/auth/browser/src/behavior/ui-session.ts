@@ -253,7 +253,7 @@ export function useBrowserUiSession({
     organizationId: organizationId ?? null,
     // A flag read that leaves out a scope it should have named cannot match
     // the rule that names it, so nothing is asked until the scope has settled.
-    enabled: scope.status !== "loading",
+    enabled: !!userId && scope.status !== "loading",
   });
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);

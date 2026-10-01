@@ -122,7 +122,10 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
     return lent ? lazy(lent.capability.load) : void 0;
   }, [declarations]);
 
-  const organizations = api.organization.getAll.useQuery({ isDemo: false });
+  const organizations = api.organization.getAll.useQuery(
+    { isDemo: false },
+    { enabled: !!session.currentUser() },
+  );
   const orgs = organizations.data ?? NO_ORGANIZATIONS;
 
   const organization = useMemo(

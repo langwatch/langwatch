@@ -227,7 +227,10 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const graph = automationApi.organization.getScopeGraph.useQuery({});
+  const graph = automationApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const organizations = graph.data ?? NO_ORGANIZATIONS;
 
   const host = useMemo(

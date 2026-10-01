@@ -4,7 +4,14 @@
  * time on the host teams.
  * Spec: specs/features/onboarding/manual-setup-api-key.feature
  */
+import {
+  UiCapabilityContextProvider,
+  UiSession,
+  type UiActor,
+} from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const graph = [
@@ -44,12 +51,40 @@ vi.mock("../onboarding-api.ts", () => ({
 
 import { useOnboardingOrganizationGraph } from "../onboarding-organization-graph.ts";
 
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
+
+const capabilities = createUiCapabilitiesFromHost(
+  { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+  new SignedInSession(),
+);
+
+function SignedIn({ children }: { children: ReactNode }) {
+  return createElement(UiCapabilityContextProvider, { value: capabilities }, children);
+}
+
 describe("useOnboardingOrganizationGraph", () => {
   describe("when the graph lists two projects", () => {
     /** @scenario "The organization graph carries no project key and keeps each creation time" */
     it("offers no key lookup, and keeps creation times", () => {
-      const { result } = renderHook(() =>
-        useOnboardingOrganizationGraph({ organizationId: "org_1", projectId: void 0 }),
+      const { result } = renderHook(
+        () => useOnboardingOrganizationGraph({ organizationId: "org_1", projectId: void 0 }),
+        { wrapper: SignedIn },
       );
 
       expect(result.current).not.toHaveProperty("projectApiKey");

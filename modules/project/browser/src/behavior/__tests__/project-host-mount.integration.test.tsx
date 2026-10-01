@@ -6,7 +6,9 @@
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiSession,
   type UiActiveScope,
+  type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
@@ -69,6 +71,24 @@ vi.mock("../project-api.ts", () => ({
 import { useProjectHost } from "../../model/project-host.ts";
 import ProjectHostMount from "../project-host-mount.tsx";
 
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
+
 class TestScope extends UiScope {
   constructor(private readonly reading: UiActiveScope) {
     super();
@@ -81,10 +101,10 @@ class TestScope extends UiScope {
 
 function harness(scope: UiActiveScope) {
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
+    ...createUiCapabilitiesFromHost(
+      { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+      new SignedInSession(),
+    ),
     scope: new TestScope(scope),
   };
 
