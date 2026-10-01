@@ -93,10 +93,9 @@ export interface UserApi {
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference>;
   setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void>;
-  isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
-  /** Whether the account behind an id is a platform operator, by its own address. */
+  /** Whether the account behind an id holds the platform-operator grant. */
   isOperator(input: { userId: string }): Promise<boolean>;
-  /** The account an address belongs to, ignoring case, or nothing when nobody holds it. */
+  /** The account an address belongs to, ignoring case; the exact address wins over case-twins. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
@@ -144,6 +143,7 @@ export interface UserApi {
   }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
+  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
   deactivate(input: UserIdInput): Promise<UserProfile>;
   reactivate(input: UserIdInput): Promise<UserProfile>;
   /** Retires an account and ends every credential family that outlives it. */

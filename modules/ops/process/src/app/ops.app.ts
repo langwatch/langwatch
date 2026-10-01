@@ -86,6 +86,7 @@ import {
   type OpsMigrationOverview,
   type OpsMigrationTargetedRunResult,
   type OpsOperator,
+  type OpsPlatformOperator,
   OpsConfirmationRequiredError,
   OpsImpersonatedOperatorRefusedError,
   OpsOperatorRequiredError,
@@ -260,6 +261,7 @@ import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
 import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
+import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
 import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
@@ -274,6 +276,11 @@ import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts"
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
+import {
+  PlatformOperatorsService,
+  type PlatformOperatorSeedOutcome,
+  type PlatformOperatorSeedSettings,
+} from "../services/platform-operators.service.ts";
 import type { ProjectionReplayRequestSender } from "../services/replay.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import { StorageStatsCollectionService } from "../services/storage-stats-collection.service.ts";
@@ -287,6 +294,14 @@ import {
   type OpsProcessMembers,
   sharedStorageStatsInstance,
 } from "./ops-composition.build.ts";
+/** The back-office methods that only read; every other one needs `ops:manage`. */
+const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
+  "getList",
+  "getOne",
+  "getMany",
+  "getManyReference",
+]);
+
 /**
  * Who an operator request is attributed to: the impersonator where there is
  * one, so a back-office read is recorded against the human who made it rather
@@ -623,6 +638,8 @@ export interface OpsAppInfrastructure {
   isProduction: boolean;
   /** Whether ops's cloud-ops capability is on: Cloud admin answers nowhere else (§3.5). */
   cloudOps: boolean;
+  /** What the one-time platform-operator seed reads; absent, the seed grants nobody. */
+  operatorSeed?: PlatformOperatorSeedSettings;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -649,6 +666,9 @@ type OpsRuntimeDependencies = Readonly<{
   storageStats: StorageStatsCollectionService | undefined;
   /** The orphaned-organization rate; absent where a composition built none. */
   signUpHealth: SignUpHealthService | undefined;
+  /** The Operators page, the recovery task and the seed; absent where a composition built none. */
+  platformOperators: PlatformOperatorsService | undefined;
+  operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
@@ -724,7 +744,6 @@ export class OpsApp implements OpsApi {
     "eventing",
     "logger",
     "nodeEnvironment",
-    "adminEmails",
     "isSaas",
     "serviceVersion",
     "publicBaseUrl",
@@ -813,6 +832,11 @@ export class OpsApp implements OpsApi {
       logger: members.logger,
     });
 
+    const { adminEmails } = setup.config;
+    for (const warning of PlatformOperatorsService.bootWarnings({ adminEmails })) {
+      members.logger.warn(warning);
+    }
+
     const app = OpsApp.fromInfrastructure({
       infrastructure,
       dependencies,
@@ -823,6 +847,11 @@ export class OpsApp implements OpsApi {
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
         identity: dependencies.identity,
+      }),
+      platformOperators: PlatformOperatorsService.create({
+        authz: dependencies.authz,
+        users: dependencies.users,
+        organizations: dependencies.organizations,
       }),
     });
     return app;
@@ -841,6 +870,7 @@ export class OpsApp implements OpsApi {
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
     signUpHealth?: SignUpHealthService;
+    platformOperators?: PlatformOperatorsService;
   }): OpsApp {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -878,6 +908,8 @@ export class OpsApp implements OpsApi {
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
       signUpHealth: setup.signUpHealth,
+      platformOperators: setup.platformOperators,
+      operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
@@ -891,10 +923,8 @@ export class OpsApp implements OpsApi {
     this.#dependencies = dependencies;
   }
 
-  /**
-   * Whether this identity is on the deployment's operator allow-list, keyed on email address.
-   */
-  isAdmin(identity: AdminIdentity): boolean {
+  /** Whether this identity holds `ops:view` at the platform tier: the platform-operator grant. */
+  isAdmin(identity: AdminIdentity): Promise<boolean> {
     return this.#dependencies.ops.isAdmin(identity);
   }
 
@@ -1146,7 +1176,7 @@ export class OpsApp implements OpsApi {
   async startAdminImpersonation(
     input: StartAdminImpersonationInput,
   ): Promise<AdminImpersonationStarted> {
-    const staff = this.#admitHiddenStaff(input.actor);
+    const staff = await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.startImpersonation({
@@ -1163,7 +1193,7 @@ export class OpsApp implements OpsApi {
   async stopAdminImpersonation(
     input: StopAdminImpersonationInput,
   ): Promise<AdminImpersonationStopped> {
-    this.#admitHiddenStaff(input.actor);
+    await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.stopImpersonation({ sessionId: session.id });
@@ -1171,8 +1201,11 @@ export class OpsApp implements OpsApi {
     return { message: "Impersonation ended" } as const;
   }
 
-  runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult> {
-    const staff = this.#admitHiddenStaff(input.actor);
+  async runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult> {
+    const staff = await this.#admitHiddenStaff({
+      operator: input.actor,
+      permission: ADMIN_READ_METHODS.has(input.method) ? "ops:view" : "ops:manage",
+    });
     const resource = adminResourceNameSchema.safeParse(
       ADMIN_RESOURCE_NAMES[input.resource] ?? input.resource,
     );
@@ -1355,26 +1388,35 @@ export class OpsApp implements OpsApi {
    * global menu polls it on every page load, so a non-operator gets
    * `{ kind: "none" }` and not a console full of errors (lw#3584).
    */
-  operatorScope(operator: OpsOperator | null): OpsScope {
-    return this.#operatorOf(operator) ? { kind: "platform" } : { kind: "none" };
+  async operatorScope(operator: OpsOperator | null): Promise<OpsScope> {
+    return (await this.#operatorOf({ operator, permission: "ops:view" }))
+      ? { kind: "platform" }
+      : { kind: "none" };
   }
 
   /**
-   * The one gate every operator procedure passes: platform-tier, resolving the
-   * allow-list with no id from the request — there is no scope to check at.
+   * The one gate every operator procedure passes: the platform-operator grant,
+   * asked of authz at the platform tier — there is no scope id in the request.
    * Silent-damage writes pass a second gate too (destructive-operator checks).
    */
-  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): void {
-    if (!this.#operatorOf(operator)) throw new OpsOperatorRequiredError(permission);
+  async admitOperator(
+    operator: OpsOperator | null,
+    permission: OpsOperatorPermission,
+  ): Promise<void> {
+    if (!(await this.#operatorOf({ operator, permission }))) {
+      throw new OpsOperatorRequiredError(permission);
+    }
   }
 
   /**
-   * The staff gate on the support inbox. The same allow-list, named for what
+   * The staff gate on the support inbox. The same grant, named for what
    * it decides there: a bug report carries no tenant, so staff is the only
    * question that could be asked about it.
    */
-  admitStaff(operator: OpsOperator | null): OpsOperator {
-    if (!this.#operatorOf(operator)) throw new OpsOperatorRequiredError("ops:view");
+  async admitStaff(operator: OpsOperator | null): Promise<OpsOperator> {
+    if (!(await this.#operatorOf({ operator, permission: "ops:view" }))) {
+      throw new OpsOperatorRequiredError("ops:view");
+    }
 
     return actingIdentityOf(operator);
   }
@@ -1383,8 +1425,8 @@ export class OpsApp implements OpsApi {
    * The staff list refused as not-found, so a probe learns nothing about the
    * surface, and only where the cloud-ops capability is on.
    */
-  admitCloudAdmin(operator: OpsOperator | null): OpsOperator {
-    const staff = this.#admitHiddenStaff(operator);
+  async admitCloudAdmin(operator: OpsOperator | null): Promise<OpsOperator> {
+    const staff = await this.#admitHiddenStaff({ operator, permission: "ops:view" });
     this.#refuseWithoutCloudOps();
 
     return staff;
@@ -1394,26 +1436,45 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.cloudOps;
   }
 
-  #admitHiddenStaff(operator: OpsOperator | null): OpsOperator {
-    if (!this.#operatorOf(operator)) throw new AdminSurfaceHiddenError();
+  async #admitHiddenStaff({
+    operator,
+    permission,
+  }: {
+    operator: OpsOperator | null;
+    permission: OpsOperatorPermission;
+  }): Promise<OpsOperator> {
+    if (!(await this.#operatorOf({ operator, permission }))) {
+      throw new AdminSurfaceHiddenError();
+    }
 
     return actingIdentityOf(operator);
   }
 
   /**
-   * The acting operator, or nothing where the caller is not on the list. An
+   * The acting operator, or nothing where the caller does not hold the grant. An
    * impersonating operator is read as the operator: somebody debugging a
-   * customer account is still staff, and the list matches the ADDRESS.
+   * customer account is still staff, and the grant is asked of the impersonator.
    */
-  #operatorOf(operator: OpsOperator | null): OpsOperator | null {
+  async #operatorOf({
+    operator,
+    permission,
+  }: {
+    operator: OpsOperator | null;
+    permission: OpsOperatorPermission;
+  }): Promise<OpsOperator | null> {
     if (!operator) return null;
 
-    return this.isAdmin(actingIdentityOf(operator)) ? operator : null;
+    const held = await this.#dependencies.ops.holds({
+      identity: operator.impersonator ?? operator,
+      permission,
+    });
+
+    return held ? operator : null;
   }
 
-  /** An install admin is an operator on the same list; a caller with no person never is. */
-  #isInstallAdmin(operator: OpsOperator | null): boolean {
-    return this.#operatorOf(operator) !== null;
+  /** An install admin holds the platform grant; a caller with no person never does. */
+  async #isInstallAdmin(operator: OpsOperator | null): Promise<boolean> {
+    return (await this.#operatorOf({ operator, permission: "ops:view" })) !== null;
   }
 
   /** The checkup's details: an install admin's, or a manager's of the organization asked about. */
@@ -1424,7 +1485,7 @@ export class OpsApp implements OpsApi {
     organizationId: string;
     operator: OpsOperator | null;
   }): Promise<boolean> {
-    if (this.#isInstallAdmin(operator)) return true;
+    if (await this.#isInstallAdmin(operator)) return true;
     if (!operator) return false;
     return this.#dependencies.authz.hasPermission({
       userId: operator.id,
@@ -1894,6 +1955,75 @@ export class OpsApp implements OpsApi {
       installAdmin: false,
       requestedBy: "checkup",
     });
+  }
+
+  // -- platform operators (ARCHITECTURE.md, "Platform operators are a grant") ----
+
+  async listPlatformOperators(): Promise<OpsPlatformOperator[]> {
+    return this.#platformOperators().list();
+  }
+
+  async grantPlatformOperator(input: {
+    email: string;
+    operator: OpsOperator | null;
+  }): Promise<OpsPlatformOperator> {
+    return this.#platformOperators().grant(input);
+  }
+
+  async revokePlatformOperator(input: {
+    grantId: string;
+    operator: OpsOperator | null;
+  }): Promise<void> {
+    await this.#platformOperators().revoke(input);
+  }
+
+  /** The `grant-platform-operator` task's one call, as the system. */
+  grantPlatformOperatorAsSystem(input: { email: string }): Promise<OpsPlatformOperator> {
+    return this.#platformOperators().grantAsSystem(input);
+  }
+
+  /** One attempt of `ops_platform_operator_seed`: decides and records; waiting records nothing. */
+  seedPlatformOperators(): Promise<PlatformOperatorSeedOutcome> {
+    const { operatorSeed } = this.#dependencies;
+    if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
+    return this.#platformOperators().seedOnce(operatorSeed);
+  }
+
+  /** The grants `ops_platform_operator_seed`'s recorded decision asks for, as the system. */
+  grantSeededPlatformOperators(decision: {
+    via: "admin-emails" | "sole-organization-admin" | "none";
+    userIds: string[];
+  }): Promise<void> {
+    return this.#platformOperators().grantSeeded(decision);
+  }
+
+  /** Binds `ops_platform_operator_seed`'s record command once the pipeline registers. */
+  connectPlatformOperatorSeedCommands(commands: {
+    recordPlatformOperatorSeed: {
+      send(input: {
+        tenantId: string;
+        occurredAt: number;
+        via: "admin-emails" | "sole-organization-admin" | "none";
+        userIds: string[];
+      }): Promise<unknown>;
+    };
+  }): void {
+    this.#dependencies.platformOperators?.connectSeedRecorder({
+      record: async ({ via, userIds }) => {
+        await commands.recordPlatformOperatorSeed.send({
+          tenantId: PLATFORM_OPERATOR_SEED_TENANT_ID,
+          occurredAt: nowInstant().epochMilliseconds,
+          via,
+          userIds: [...userIds],
+        });
+      },
+    });
+  }
+
+  #platformOperators(): PlatformOperatorsService {
+    const { platformOperators } = this.#dependencies;
+    if (!platformOperators) throw new OpsCapabilityUnavailableError("platform operators");
+    return platformOperators;
   }
 
   /** The daily report's one send for `ops_usage_report`; never throws for a refusal. */

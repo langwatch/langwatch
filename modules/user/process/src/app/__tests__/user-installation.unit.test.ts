@@ -25,11 +25,7 @@ import { hash } from "bcrypt";
 import { describe, expect, it, vi } from "vitest";
 
 import { userServer } from "../../user.server.ts";
-import {
-  createUserTestAuth,
-  createUserTestOps,
-  createUserTestOrganizations,
-} from "./user.fixture.ts";
+import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
 /**
  * The narrow slice of a generated Prisma client the organization directory
@@ -74,7 +70,6 @@ function process(
       governance: createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
-      ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });

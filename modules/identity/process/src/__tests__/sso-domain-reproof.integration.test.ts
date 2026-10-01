@@ -163,7 +163,7 @@ beforeEach(() => {
       registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
-      platformOperators: new StubPlatformOperators([OLIVE.id]),
+      authorization: new StubPlatformOperators([OLIVE.id]),
       licensing: licensingFixture(),
     }),
     ledger,

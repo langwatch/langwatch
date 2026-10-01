@@ -1,5 +1,6 @@
 import { type OrganizationRole } from "@langwatch/authorization";
 import {
+  bindingScopeCanGrantPermission,
   builtinRolePermissions,
   roleKeyForTeamRole,
   type AuthzAccessBinding,
@@ -190,7 +191,10 @@ export class AuthzGrantReaderService {
     if (binding.role === "CUSTOM" && binding.customRole) {
       return Array.isArray(binding.customRole.permissions)
         ? binding.customRole.permissions.filter(
-            (permission): permission is string => typeof permission === "string",
+            (permission): permission is string =>
+              typeof permission === "string" &&
+              // A legacy `ops:*` entry confers nothing (the platform fence), so it is not shown.
+              bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }),
           )
         : [];
     }

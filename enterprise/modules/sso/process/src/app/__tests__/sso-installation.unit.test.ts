@@ -9,9 +9,8 @@ import { describe, expect, it } from "vitest";
 import {
   createSsoTestApp,
   createSsoTestConfig,
-  createSsoTestUsers,
+  createSsoTestAuthorization,
   RecordingSsoConnectionLedger,
-  SSO_TEST_STAFF_EMAIL,
 } from "./sso.fixture.ts";
 
 const STAFF_ID = "user_olive";
@@ -23,7 +22,7 @@ describe("given a process that installed single sign-on", () => {
       const connections = RecordingSsoConnectionLedger.create();
       const app = await createSsoTestApp({
         connections,
-        dependencies: { users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }) },
+        dependencies: { authorization: createSsoTestAuthorization([STAFF_ID]) },
       });
 
       await expect(

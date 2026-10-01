@@ -13,7 +13,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { licensingFixture } from "../../__tests__/support/in-memory-connections.ts";
+import {
+  licensingFixture,
+  StubPlatformOperators,
+} from "../../__tests__/support/in-memory-connections.ts";
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
 import { migrationFinalizedEventSchema } from "../../eventing/sso-connection-state.projection.ts";
 import {
@@ -66,6 +69,7 @@ function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): 
     eventSourcing: testEventSourcing(),
     directoryMove,
     licensing: licensingFixture(),
+    authorization: new StubPlatformOperators(),
   });
 }
 

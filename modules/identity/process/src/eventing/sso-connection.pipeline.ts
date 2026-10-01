@@ -426,7 +426,6 @@ export function composeSsoConnectionGraph(options: {
     | "ssoRegistrationSlots"
     | "ssoBreakGlass"
     | "ssoStranding"
-    | "ssoPlatformOperators"
     | "joinRequestAudience"
   >;
   eventSourcing: EventSourcing;
@@ -436,6 +435,8 @@ export function composeSsoConnectionGraph(options: {
   engineProvider?: SsoEngineProviderProjection;
   /** What the installation's licence may decide, for the licence ceremony. */
   licensing: SsoConnectionGuardsDeps["licensing"];
+  /** The platform-operator grant the operator-only acts are asked against. */
+  authorization: SsoConnectionGuardsDeps["authorization"];
 }): SsoConnectionGraph {
   const { repositories, eventSourcing } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
@@ -450,7 +451,7 @@ export function composeSsoConnectionGraph(options: {
       bindings: SsoBreakGlassRecoveryService.create({ bindings: repositories.ssoBreakGlass }),
     }),
     stranding: repositories.ssoStranding,
-    platformOperators: repositories.ssoPlatformOperators,
+    authorization: options.authorization,
     licensing: options.licensing,
   });
   const connections = SsoConnectionService.create(

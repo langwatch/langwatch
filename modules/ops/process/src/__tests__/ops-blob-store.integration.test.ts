@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import {
@@ -73,7 +74,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         user: { findUnique: async () => null },
         session: { update: async () => ({}) },
       }),
-      adminEmails: [],
+      authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,

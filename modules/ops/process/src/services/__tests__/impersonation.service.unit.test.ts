@@ -8,6 +8,7 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
@@ -78,6 +79,10 @@ const target = (overrides: Partial<ImpersonationTarget> = {}): ImpersonationTarg
   ...overrides,
 });
 
+const PLATFORM_OPERATOR_ID = "user_platform_operator";
+
+const platformGrants = platformOperatorAuthz({ holders: { [PLATFORM_OPERATOR_ID]: ["ops:view"] } });
+
 const serviceFor = (repository: InMemoryImpersonationRepository) => {
   const audit = new RecordingAuditSink();
   return {
@@ -85,7 +90,8 @@ const serviceFor = (repository: InMemoryImpersonationRepository) => {
     service: ImpersonationService.create({
       repository,
       access: AdminAccessService.create({
-        adminEmails: ["root@langwatch.ai"],
+        authz: platformGrants,
+        users: { findByEmail: async () => null },
       }),
       audit,
       now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
@@ -139,7 +145,7 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(CannotImpersonateDeactivatedUserError);
     await expect(
       serviceFor(
-        new InMemoryImpersonationRepository(target({ email: "Root@Langwatch.ai" })),
+        new InMemoryImpersonationRepository(target({ id: PLATFORM_OPERATOR_ID })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
   });

@@ -53,6 +53,17 @@ describe("ops server configuration", () => {
     });
   });
 
+  describe("given a deployment still sets ADMIN_EMAILS for the one-time operator seed", () => {
+    /** @scenario "A still-set ADMIN_EMAILS seeds its verified users once" */
+    it("reads the comma-separated addresses, trimmed, blanks dropped", () => {
+      expect(read({}).adminEmails).toEqual([]);
+      expect(read({ ADMIN_EMAILS: " ana@acme.com, ,bo@acme.com " }).adminEmails).toEqual([
+        "ana@acme.com",
+        "bo@acme.com",
+      ]);
+    });
+  });
+
   describe("given the browser is told what ops answers", () => {
     /** @scenario "The browser learns Cloud admin from what the ops process answered" */
     it("projects the running answer and never the switch or a key", async () => {

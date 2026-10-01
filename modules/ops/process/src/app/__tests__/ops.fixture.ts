@@ -18,6 +18,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import { AdminAccessService } from "../../services/admin-access.service.ts";
 import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   OpsApp,
@@ -89,12 +90,19 @@ export function createOpsTestInfrastructure(
   capability: Partial<OpsCapability> = {},
 ): OpsAppInfrastructure {
   return {
-    createCapability: () =>
-      createApiFixture<OpsCapability>({
+    createCapability: (dependencies) => {
+      const access = AdminAccessService.create({
+        authz: dependencies.authz,
+        users: dependencies.users,
+      });
+
+      return createApiFixture<OpsCapability>({
         snapshots: null,
-        isAdmin: (identity: { email?: string | null }) => identity.email === OPS_STAFF_ADDRESS,
+        isAdmin: (identity) => access.isAdmin(identity),
+        holds: (input) => access.holds(input),
         ...capability,
-      }),
+      });
+    },
     eventingIntrospection: new EmptyOpsIntrospection(),
     pipelines: { listRegistrations: () => ({ projections: [], eventSubscribers: [] }) },
     eventLogWindow: {
@@ -128,7 +136,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
-      authz: options.authz ?? createApiFixture<AuthzApi>(),
+      authz: options.authz ?? platformOperatorAuthz(),
       retention: createApiFixture<DataRetentionApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog:

@@ -18,7 +18,6 @@ import {
 import type { FeatureSetup } from "@langwatch/kernel";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OpsApi, type AdminIdentity } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   EnsuredPersonalWorkspace,
@@ -105,6 +104,10 @@ import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
+import {
+  UserLifecycleNoticeService,
+  type UserLifecycleSenders,
+} from "../services/user-lifecycle-notice.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
 import { buildUserInfrastructure } from "./user-composition.build.ts";
@@ -146,7 +149,6 @@ interface UserAppDependencies {
     GovernanceRestApi,
     "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap"
   >;
-  ops: OpsApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
 }
@@ -178,7 +180,6 @@ export class UserApp implements UserApi {
     governance: typeof GovernanceRestApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
-    ops: typeof OpsApi;
     projects: typeof ProjectApi;
     storedObjects: typeof StoredObjectApi;
   } = {
@@ -189,7 +190,6 @@ export class UserApp implements UserApi {
     governance: GovernanceRestApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
-    ops: OpsApi,
     projects: ProjectApi,
     storedObjects: StoredObjectApi,
   };
@@ -249,6 +249,7 @@ export class UserApp implements UserApi {
     facts: UserFacts;
   }): UserApp {
     const now = members.now;
+    const lifecycle = UserLifecycleNoticeService.create();
 
     return new UserApp({
       users: UserService.create({
@@ -258,7 +259,11 @@ export class UserApp implements UserApi {
         avatarStorage: members.avatarStorage,
         credentialIssuer: CREDENTIAL_ISSUER,
         ...(now ? { now } : {}),
+        platformOperators: dependencies.authz,
+        lifecycle,
+        cliCredentials: members.cliCredentials,
       }),
+      lifecycle,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords: members.passwords,
@@ -270,6 +275,7 @@ export class UserApp implements UserApi {
   }
 
   readonly #users: UserService;
+  readonly #lifecycle: UserLifecycleNoticeService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -278,18 +284,21 @@ export class UserApp implements UserApi {
 
   private constructor({
     users,
+    lifecycle,
     credentials,
     dependencies,
     members,
     facts,
   }: {
     users: UserService;
+    lifecycle: UserLifecycleNoticeService;
     credentials: UserCredentialService;
     dependencies: UserAppDependencies;
     members: UserInfrastructure;
     facts: UserFacts;
   }) {
     this.#users = users;
+    this.#lifecycle = lifecycle;
     this.#credentials = credentials;
     this.#account = UserAccountService.create(dependencies);
     this.#peers = dependencies;
@@ -371,19 +380,13 @@ export class UserApp implements UserApi {
     return this.#users.setLangyCodeAccessPreference(input);
   }
 
-  /**
-   * Whether an identity is a platform operator. Synchronous, and it takes the
-   * identity rather than an id, because that is what the operator list is.
-   */
-  isAdmin(identity: AdminIdentity): boolean {
-    return this.#account.isAdmin(identity);
-  }
-
-  /** The same lookup from an id, resolving the address through this directory. */
-  async isOperator({ userId }: { userId: string }): Promise<boolean> {
-    const profile = await this.#users.findById({ id: userId });
-
-    return this.#account.isAdmin({ email: profile?.email ?? null });
+  /** Whether the account behind an id holds the platform-operator grant. */
+  isOperator({ userId }: { userId: string }): Promise<boolean> {
+    return this.#peers.authz.can({
+      principal: { type: "user", id: userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
   }
 
   // -- credentials -----------------------------------------------------------
@@ -702,7 +705,12 @@ export class UserApp implements UserApi {
 
   // -- the account's lifecycle -----------------------------------------------
 
-  /** Retires an account. The effects that follow it are the process's. */
+  /** user_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: UserLifecycleSenders): void {
+    this.#lifecycle.connect(senders);
+  }
+
+  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
   deactivate(input: UserIdInput): Promise<UserProfile> {
     return this.#users.deactivate(input);
   }
@@ -712,11 +720,7 @@ export class UserApp implements UserApi {
     return this.#users.reactivate(input);
   }
 
-  /**
-   * Retirement is three writes, not one: the durable flag, then the two credential
-   * families that would otherwise outlive it. Stopping at the flag would leave a live
-   * session and a live CLI token belonging to somebody the product says is gone.
-   */
+  /** Self-service or an operator's call; `deactivate` ends every credential family. */
   async deactivateAccount({
     userId,
     caller,
@@ -729,8 +733,6 @@ export class UserApp implements UserApi {
     }
 
     await this.#users.deactivate({ id: userId });
-    await this.#account.revokeAllBrowserSessions({ userId });
-    await this.#members.cliCredentials.revokeForUser({ userId });
   }
 
   /** Restoring is an operator's call alone. */
@@ -831,17 +833,9 @@ export class UserApp implements UserApi {
       organizationId,
       personalTeamId: workspace.team.id,
     });
-    const canManageProject = await this.#peers.authz.hasPermission({
-      userId,
-      permission: "project:manage",
-      projectId: workspace.project.id,
-    });
 
     return {
-      workspace: {
-        ...workspace,
-        project: { ...workspace.project, apiKey: canManageProject ? workspace.project.apiKey : "" },
-      },
+      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" } },
       routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
     };
   }

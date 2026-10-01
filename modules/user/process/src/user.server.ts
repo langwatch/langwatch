@@ -4,6 +4,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import type { MePersonalCredential } from "@langwatch/user-contract";
 
 import { UserApp } from "./app/user.app.ts";
+import { userLifecycleEventing } from "./eventing/user-lifecycle.pipeline.ts";
 import { userRepositories } from "./repositories/user-repositories.registry.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
 import { mePersonalCredential, meRest } from "./transport/me.rest.ts";
@@ -14,6 +15,7 @@ export const userServer = defineServerModule("user")
   .withRepositories(userRepositories)
   .withApp(UserApp)
   .withTransports(meRest, userAvatarRest, userTrpcTransport)
+  .withEventing(userLifecycleEventing)
   .withTasks(({ members }) => [createGdprUserDataEraseRunner({ database: members.prisma })])
   // The credential whole rather than in pieces: a personal-usage answer is
   // refused for a key that is not the asking member's own, and the door's

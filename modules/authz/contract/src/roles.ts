@@ -9,6 +9,7 @@ import {
 } from "@langwatch/authorization";
 
 import type { GrantScopeTier, TeamUserRole } from "./authz.ts";
+import { bindingScopeCanGrantPermission } from "./scope.ts";
 
 export type BuiltinRoleKey =
   | "admin"
@@ -17,7 +18,11 @@ export type BuiltinRoleKey =
   | "lite-member"
   | "demo-viewer"
   | "org-admin"
-  | "org-member";
+  | "org-member"
+  | "platform-operator";
+
+/** The one role the PLATFORM tier accepts, granted to users only (ADR-092). */
+export const PLATFORM_OPERATOR_ROLE_ID = "platform-operator" as const satisfies BuiltinRoleKey;
 
 const VIEWER: readonly AuthzPermission[] = [
   "project:view",
@@ -182,6 +187,9 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
 
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];
 
+/** What the platform-operator role carries; no other grant confers these. */
+export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = ["ops:view", "ops:manage"];
+
 const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   viewer: new Set(VIEWER),
   member: new Set([...VIEWER, ...MEMBER_ADDITIONS]),
@@ -190,6 +198,7 @@ const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   "demo-viewer": new Set(DEMO_VIEWER),
   "org-admin": new Set(ORG_ADMIN),
   "org-member": new Set(ORG_MEMBER),
+  "platform-operator": new Set(PLATFORM_OPERATOR_PERMISSIONS),
 };
 
 export function builtinRolePermissions(role: BuiltinRoleKey): ReadonlySet<string> {
@@ -229,6 +238,21 @@ export function roleKeyForTeamRole(role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM
 
 /** What a binding confers, read the way the engine's matcher reads it. */
 export function permissionsConferred({
+  role,
+  scopeType,
+  customPermissions,
+}: {
+  role: TeamUserRole;
+  scopeType: GrantScopeTier;
+  customPermissions: readonly string[];
+}): readonly string[] {
+  return listedPermissions({ role, scopeType, customPermissions }).filter((permission) =>
+    // The platform fence: no binding confers `ops:*`, whatever its role lists.
+    bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }),
+  );
+}
+
+function listedPermissions({
   role,
   scopeType,
   customPermissions,

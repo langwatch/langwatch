@@ -22,7 +22,7 @@ export const ssoSelfServeContextSchema = z.object({
   optedIn: z.boolean(),
   /** Self-hosted only: the installation holds exactly one organization. */
   singleOrganization: z.boolean(),
-  /** Whether the person asking is a platform operator (ADMIN_EMAILS); asked only
+  /** Whether the person asking is a platform operator (the platform grant); asked only
    *  where it changes the answer. */
   actorIsPlatformOperator: z.boolean(),
 });

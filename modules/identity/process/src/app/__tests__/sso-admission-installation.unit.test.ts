@@ -24,7 +24,6 @@ const bootIdentity = () =>
   createApp({ role: "api", secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      adminEmails: [],
       publicBaseUrl: undefined,
       isSaas: false,
       rateLimiter: { check: async () => ({ allowed: true }) },

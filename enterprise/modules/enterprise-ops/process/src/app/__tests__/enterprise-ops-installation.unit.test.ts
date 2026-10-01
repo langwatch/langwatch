@@ -31,7 +31,7 @@ function boot({
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       ops: createApiFixture<OpsApi>({
-        admitCloudAdmin: (operator) => {
+        admitCloudAdmin: async (operator) => {
           if (!cloudOps || !operator || operator.email !== staff.email)
             throw new AdminSurfaceHiddenError();
           return operator;
@@ -86,9 +86,9 @@ describe("enterprise ops installation", () => {
 
       try {
         const app = runtime.service(EnterpriseOpsApi);
-        expect(() =>
+        await expect(
           app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
-        ).toThrow(AdminSurfaceHiddenError);
+        ).rejects.toMatchObject({ code: "not_found" });
         expect(audited).toEqual([]);
       } finally {
         await runtime.stop();
@@ -105,7 +105,7 @@ describe("enterprise ops installation", () => {
       try {
         const app = runtime.service(EnterpriseOpsApi);
         await expect(
-          (async () => app.getSelfHostedInstance({ id: "inst_1", operator: customerAdmin }))(),
+          app.getSelfHostedInstance({ id: "inst_1", operator: customerAdmin }),
         ).rejects.toMatchObject({ code: "not_found" });
         expect(audited).toEqual([]);
       } finally {

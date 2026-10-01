@@ -4,6 +4,7 @@ import type { AuthzRepositories } from "../authz.repositories.ts";
 import { PrismaAuthzAdmissionRepository } from "./prisma.authz-admission.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
+import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
 
 /**
  * The live tier: binding facts and engine cutover state, both read from
@@ -20,6 +21,7 @@ export class PostgresAuthzRepositories {
       bindings: PrismaAuthzManagedGrantRepository.create({ database }),
       cutover: PrismaAuthzCutoverRepository.create({ database }),
       admissions: PrismaAuthzAdmissionRepository.create({ database }),
+      userStandings: PrismaAuthzUserStandingRepository.create({ database }),
     };
   }
 }

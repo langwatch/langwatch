@@ -30,7 +30,6 @@ import type { SsoConnectionRoutingRepository } from "./sso-connection-routing.re
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
 import type { SsoDomainOwnershipRepository } from "./sso-domain-ownership.repository.ts";
@@ -91,8 +90,6 @@ export interface IdentityRepositories {
   readonly joinRequestAudience: JoinRequestAudienceRepository;
   /** What a join-request mail says beyond names: intent, domain habit, personal teams. */
   readonly joinRequestNotificationContext: JoinRequestNotificationContextRepository;
-  /** Who counts as a LangWatch platform operator, by the deployment's `ADMIN_EMAILS`. */
-  readonly ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** Which domains a connection owns, re-projected by the ownership backfill. */
   readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
   /** The cross-organization reads the operator identity lookup takes (D05). */

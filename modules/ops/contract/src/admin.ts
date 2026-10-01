@@ -3,6 +3,7 @@ import { z } from "zod";
 export const OPS_FEATURE_ID = "ops" as const;
 
 export const adminIdentitySchema = z.object({
+  id: z.string().optional(),
   email: z.string().nullable().optional(),
 });
 

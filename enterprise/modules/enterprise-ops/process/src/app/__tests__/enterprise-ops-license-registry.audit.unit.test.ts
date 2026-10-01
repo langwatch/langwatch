@@ -27,7 +27,7 @@ const OPS_STAFF_ADDRESS = "olive@langwatch.test";
 
 /** OpsApi's Cloud admin gate over a one-address staff list. */
 const ops = createApiFixture<OpsApi>({
-  admitCloudAdmin: (operator) => {
+  admitCloudAdmin: async (operator) => {
     if (!operator || operator.email !== OPS_STAFF_ADDRESS) throw new AdminSurfaceHiddenError();
     return operator;
   },

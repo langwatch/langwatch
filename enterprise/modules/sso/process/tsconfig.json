@@ -23,6 +23,9 @@
       "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../licensing/contract/tsconfig.build.json"
     },
     {
@@ -42,9 +45,6 @@
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/api-fixture/tsconfig.build.json"

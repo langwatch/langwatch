@@ -35,14 +35,13 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
 import { sha256Hex } from "../rules/pkce.rules.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
-import { licensingFixture } from "./support/in-memory-connections.ts";
+import { licensingFixture, StubPlatformOperators } from "./support/in-memory-connections.ts";
 
 /**
  * The self-serve domain ceremony (ADR-123, D05 tier 3). Integration because
@@ -133,12 +132,6 @@ class LocalBreakGlass implements SsoBreakGlassBindingRepository {
 
   async reserveActivationRecovery(): Promise<boolean> {
     return true;
-  }
-}
-
-class LocalPlatformOperators implements SsoPlatformOperatorRepository {
-  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    return actorId === OPS_ID;
   }
 }
 
@@ -284,7 +277,7 @@ function compose(licensing: ReturnType<typeof licensingFixture>): void {
       registrationSlots: connections,
       breakGlass: new LocalBreakGlass(),
       stranding: new LocalStranding(),
-      platformOperators: new LocalPlatformOperators(),
+      authorization: new StubPlatformOperators([OPS_ID]),
       licensing,
     }),
     ledger,

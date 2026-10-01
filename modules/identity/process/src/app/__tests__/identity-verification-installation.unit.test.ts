@@ -24,7 +24,6 @@ describe("identity verification installation", () => {
     })
       .withModules([withMemoryRepositories(identityServer)])
       .withMembers({
-        adminEmails: [],
         publicBaseUrl: undefined,
         isSaas: false,
         rateLimiter: { check: async () => ({ allowed: true }) },

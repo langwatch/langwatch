@@ -26,6 +26,7 @@ const CONFIG: OpsServerConfig = {
   collectClickHouseBackupMetrics: true,
   productAnalytics: { key: undefined, host: undefined },
   cloudOps: false,
+  adminEmails: [],
 };
 
 const PROJECT: Project = {

@@ -101,9 +101,6 @@ export type OpsProcessMembers = Readonly<{
   logger: Logger;
   /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
   nodeEnvironment: string | undefined;
-  /** Who reaches the back office — the deployment's own list, named raw
-   *  because it is a fact about the installation, not a store. */
-  adminEmails: readonly string[];
   /** The process's own facts the checkup and the usage report name. */
   isSaas: boolean;
   serviceVersion: string;
@@ -276,7 +273,7 @@ export function buildOpsInfrastructure(input: {
   return {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
-        adminEmails: members.adminEmails,
+        authz: dependencies.authz,
         // Without it every queue read answers the empty NullQueueRepository shape.
         redis: members.redis,
         // Where an organization's connection decides its sign-in, editing
@@ -354,6 +351,8 @@ export function buildOpsInfrastructure(input: {
     },
     isProduction: members.nodeEnvironment === "production",
     cloudOps: input.cloudOps,
+    // Cloud never bootstraps: staff are seeded at cutover with the recovery task.
+    operatorSeed: { adminEmails: config.adminEmails, cloud: members.isSaas || input.cloudOps },
   };
 }
 
@@ -367,7 +366,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
   };
 }
 
-export interface OpsOperationsOptions extends AdminAccessServiceOptions {
+export interface OpsOperationsOptions {
+  authz: AdminAccessServiceOptions["authz"];
   database: AdminDatabase & SchedulerAuditDatabase;
   audit: AdminAuditSink;
   /** The shared audit log every operator act is recorded on. */
@@ -402,7 +402,8 @@ export class OpsOperations {
 
   build(): OpsCapability {
     const access =
-      this.options.access ?? AdminAccessService.create({ adminEmails: this.options.adminEmails });
+      this.options.access ??
+      AdminAccessService.create({ authz: this.options.authz, users: this.options.users });
     const queues = this.options.redis
       ? QueueService.create({
           repo: QueueRedisRepository.create({

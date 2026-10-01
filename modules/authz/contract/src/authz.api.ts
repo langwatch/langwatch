@@ -15,6 +15,7 @@ import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
+import type * as Platform from "./authz-platform-operators.commands.ts";
 import type { RoleBindingRest } from "./authz-rest.schemas.ts";
 import type {
   AuthzAdmissionScope,
@@ -142,7 +143,7 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
-  /** The caller's session version (ADR-164): 0 until first bumped; throws when unreadable. */
+  /** The caller's session version (ADR-170): 0 until first bumped; throws when unreadable. */
   getSessionVersion(input: { userId: string }): Promise<number>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;
   offboard(args: Commands.AuthzOffboardInput): Promise<Commands.AuthzOffboardOutput>;
@@ -201,6 +202,14 @@ export interface AuthzApi {
   /** Changes only the role, under the same ceiling as a create. */
   changeGrantRole(args: Grants.AuthzChangeGrantRoleInput): Promise<Grants.Grant>;
   revokeGrant(args: Grants.AuthzRevokeGrantByIdInput): Promise<Grants.GrantRevoked>;
+  /** Grants platform-operator to a user: by an ops:manage holder, never to yourself. */
+  grantPlatformOperator(
+    args: Platform.AuthzGrantPlatformOperatorInput,
+  ): Promise<Platform.PlatformOperator>;
+  /** Revokes one platform-operator grant; never the last, unless user erasure asks as `system`. */
+  revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
+  /** Every live platform operator, oldest first. */
+  listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(
     args: Grants.AuthzFindPermissionsBeyondCallerInput,

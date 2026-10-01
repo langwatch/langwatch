@@ -72,7 +72,7 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(true),
     stranding: new StubStranding(),
-    platformOperators: new StubPlatformOperators(),
+    authorization: new StubPlatformOperators(),
     licensing: licensingFixture(),
   });
 });
@@ -242,7 +242,7 @@ describe("given a domain no published proof ever proved", () => {
           registrationSlots: connections,
           breakGlass: new StubBreakGlassBindings(true),
           stranding: new StubStranding(),
-          platformOperators: new StubPlatformOperators(),
+          authorization: new StubPlatformOperators(),
           licensing: licensingFixture(),
         });
         seed({ method });

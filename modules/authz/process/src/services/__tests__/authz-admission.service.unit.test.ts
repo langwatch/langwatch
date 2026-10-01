@@ -28,7 +28,6 @@ function openAdmission(memory: AuthzMemoryStore): void {
     grantId: GRANT_ID,
     occurredAtMs: 1_700_000_000_000,
     disabled: false,
-    deactivated: false,
   });
 }
 

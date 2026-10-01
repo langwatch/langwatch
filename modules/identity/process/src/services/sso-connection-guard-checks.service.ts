@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   DomainClaimLicenseAuthority,
   LicensingApi,
@@ -47,7 +48,6 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
 import { isTerminalSsoConnection } from "../rules/sso-domain-ownership.rules.ts";
 
@@ -158,7 +158,8 @@ export interface SsoConnectionGuardsDeps {
   registrationSlots: SsoConnectionRegistrationRepository;
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
-  platformOperators: SsoPlatformOperatorRepository;
+  /** Asked at the platform: a caller-supplied "I am an operator" would authorize itself. */
+  authorization: Pick<AuthzApi, "can">;
   /** What the installation's licence may decide (D05 tier 2), asked per ceremony. */
   licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 }
@@ -172,7 +173,7 @@ export class SsoConnectionGuardChecksService {
   private readonly registrationSlots: SsoConnectionRegistrationRepository;
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
-  private readonly platformOperators: SsoPlatformOperatorRepository;
+  private readonly authorization: Pick<AuthzApi, "can">;
   private readonly licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 
   private constructor(deps: SsoConnectionGuardsDeps) {
@@ -180,7 +181,7 @@ export class SsoConnectionGuardChecksService {
     this.registrationSlots = deps.registrationSlots;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
-    this.platformOperators = deps.platformOperators;
+    this.authorization = deps.authorization;
     this.licensing = deps.licensing;
   }
 
@@ -350,8 +351,10 @@ export class SsoConnectionGuardChecksService {
       );
     }
 
-    const isOperator = await this.platformOperators.isPlatformOperator({
-      actorId: actor.id,
+    const isOperator = await this.authorization.can({
+      principal: { type: "user", id: actor.id },
+      permission: "ops:manage",
+      scope: { type: "platform" },
     });
     if (isOperator) {
       return;

@@ -82,7 +82,7 @@ export interface SsoSelfServeOptIn {
   isOptedIn(input: { organizationId: string }): Promise<boolean>;
 }
 
-/** Who counts as a platform operator (ADMIN_EMAILS). */
+/** Who counts as a platform operator (holds the platform grant). */
 export interface SsoPlatformOperators {
   isPlatformOperator(input: { actorId: string }): Promise<boolean>;
 }

@@ -374,3 +374,31 @@ export class UserCapabilityUnavailableError extends HandledError {
     this.name = "UserCapabilityUnavailableError";
   }
 }
+
+/** Deactivating the last active platform operator would leave the installation with none. */
+export class UserLastPlatformOperatorError extends HandledError {
+  declare readonly code: "user_last_platform_operator";
+
+  constructor(userId: string) {
+    super(
+      "user_last_platform_operator",
+      "The last active platform operator cannot be deactivated; make someone else an operator first",
+      { httpStatus: 409, fault: "customer", meta: { userId } },
+    );
+    this.name = "UserLastPlatformOperatorError";
+  }
+}
+
+/** More than one account holds this address in different case, and none holds it exactly. */
+export class UserEmailAmbiguousError extends HandledError {
+  declare readonly code: "user_email_ambiguous";
+
+  constructor() {
+    super(
+      "user_email_ambiguous",
+      "More than one account holds this address in different case; change one of their addresses first",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "UserEmailAmbiguousError";
+  }
+}

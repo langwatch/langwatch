@@ -11,17 +11,15 @@ import type {
   SsoConnectionHistoryApi,
   SsoSetupApi,
 } from "@langwatch/identity-contract";
-import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
   createSsoTestIdentity,
-  createSsoTestUsers,
+  createSsoTestAuthorization,
   RecordingSsoConnectionLedger,
   RecordingSsoSetupCommands,
-  SSO_TEST_STAFF_EMAIL,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoConnectionTrpcTransport } from "../sso-connection.trpc.ts";
 
@@ -32,7 +30,7 @@ type TestContext = { actor: { id: string; impersonatorId?: string } };
 
 /**
  * The domain error a procedure threw, out from under tRPC's wrapper: a thrown
- * `AdminSurfaceHiddenError` arrives as a `TRPCError` carrying it as `cause`,
+ * The hidden-surface error arrives as a `TRPCError` carrying it as `cause`,
  * which is where `createTrpcErrorFormatter` looks for it in the real app.
  */
 function domainErrorOf(error: unknown): unknown {
@@ -91,10 +89,7 @@ async function harness() {
         setup: createApiFixture<SsoSetupApi>({ getMigrationProgress }),
         commands,
       }),
-      users: createSsoTestUsers({
-        [STAFF_ID]: SSO_TEST_STAFF_EMAIL,
-        [CUSTOMER_ID]: "ana@acme.com",
-      }),
+      authorization: createSsoTestAuthorization([STAFF_ID]),
       auditLog: { record, listEntityHistory: async () => [], hasRecordedSince: async () => false },
     },
   });
@@ -156,7 +151,7 @@ describe("the back-office single sign-on surface", () => {
     context = await harness();
   });
 
-  describe("given somebody outside the staff list", () => {
+  describe("given somebody without the platform-operator grant", () => {
     it("answers a denial that says nothing about the surface", async () => {
       const caller = context.callerFor({ id: CUSTOMER_ID });
 
@@ -166,12 +161,9 @@ describe("the back-office single sign-on surface", () => {
         () => {
           throw new Error("attestDomain resolved: the back office gate let the call through");
         },
-        (error: unknown) => domainErrorOf(error) as AdminSurfaceHiddenError,
+        (error: unknown) => domainErrorOf(error),
       );
-      expect(denial).toBeInstanceOf(AdminSurfaceHiddenError);
-      expect(denial.code).toBe("not_found");
-      expect(denial.message).toBe("Not found");
-      expect(denial.message).not.toMatch(/sso|backoffice|admin|connection/i);
+      expect(denial).toMatchObject({ code: "not_found", message: "Not found" });
 
       // And nothing was commanded, nor recorded.
       expect(context.connections.attestDomain).not.toHaveBeenCalled();
@@ -204,7 +196,7 @@ describe("the back-office single sign-on surface", () => {
         const refusal = await attempt().then(() => {
           throw new Error("the back office gate let a call through");
         }, domainErrorOf);
-        expect(refusal).toBeInstanceOf(AdminSurfaceHiddenError);
+        expect(refusal).toMatchObject({ code: "not_found" });
       }
       expect(context.connections.claimDomain).not.toHaveBeenCalled();
       expect(context.connections.requestTeardown).not.toHaveBeenCalled();

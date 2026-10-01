@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 import type { OpsOperatorPermission } from "./ops.responses.ts";
 
@@ -156,7 +156,7 @@ export class OpsUnknownFeatureFlagError extends HandledError {
 }
 
 /**
- * The whole platform tier is decided by the operator allow-list, not by an
+ * The whole platform tier is decided by the platform-operator grant, not by an
  * RBAC grain an id in the input could be checked at — so this refusal is the
  * module's own, not a scope decision the door could have made.
  */
@@ -190,5 +190,15 @@ export class BugReportRateLimitedError extends HandledError {
       httpStatus: 429,
       fault: "customer",
     });
+  }
+}
+
+/** The Operators page and the recovery task grant existing, active accounts only. */
+export class PlatformOperatorUserNotFoundError extends NotFoundError {
+  declare readonly code: "platform_operator_user_not_found";
+
+  constructor(email: string) {
+    super("platform_operator_user_not_found", { resource: "Active user", id: email });
+    this.name = "PlatformOperatorUserNotFoundError";
   }
 }

@@ -1,0 +1,83 @@
+/**
+ * @vitest-environment node
+ * Every operator gate asks authz for the platform-operator grant: ops:view for reads,
+ * ops:manage for writes, the impersonator's own grant when impersonating.
+ * Spec: modules/ops/specs/admin.feature
+ */
+import type { OpsOperator } from "@langwatch/ops-contract";
+import { describe, expect, it } from "vitest";
+
+import { createOpsTestApp, platformOperatorAuthz } from "./ops.fixture.ts";
+
+const VIEWER: OpsOperator = { id: "user_viewer", email: "viewer@langwatch.ai" };
+const MANAGER: OpsOperator = { id: "user_manager", email: "manager@langwatch.ai" };
+const OUTSIDER: OpsOperator = { id: "user_outsider", email: "outsider@acme.com" };
+const IMPERSONATING_MANAGER: OpsOperator = {
+  id: "user_customer",
+  email: "customer@acme.com",
+  impersonator: { id: MANAGER.id, email: MANAGER.email },
+};
+
+const { app } = createOpsTestApp({
+  authz: platformOperatorAuthz({
+    holders: {
+      [VIEWER.id]: ["ops:view"],
+      [MANAGER.id]: ["ops:view", "ops:manage"],
+    },
+  }),
+});
+
+describe("given the platform-operator grant answers through authz", () => {
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("admits a read for a holder of ops:view and refuses a non-holder", async () => {
+    await expect(app.admitOperator(VIEWER, "ops:view")).resolves.toBeUndefined();
+    await expect(app.admitOperator(OUTSIDER, "ops:view")).rejects.toMatchObject({
+      code: "permission_denied",
+    });
+    await expect(app.admitOperator(null, "ops:view")).rejects.toMatchObject({
+      code: "permission_denied",
+    });
+  });
+
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("admits a write only for a holder of ops:manage", async () => {
+    await expect(app.admitOperator(MANAGER, "ops:manage")).resolves.toBeUndefined();
+    await expect(app.admitOperator(VIEWER, "ops:manage")).rejects.toMatchObject({
+      code: "permission_denied",
+    });
+  });
+
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("reads an impersonating operator by the impersonator's own grant", async () => {
+    await expect(app.admitOperator(IMPERSONATING_MANAGER, "ops:manage")).resolves.toBeUndefined();
+    expect(await app.operatorScope(IMPERSONATING_MANAGER)).toEqual({ kind: "platform" });
+  });
+
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("answers the operator scope as an answer, never a refusal", async () => {
+    expect(await app.operatorScope(VIEWER)).toEqual({ kind: "platform" });
+    expect(await app.operatorScope(OUTSIDER)).toEqual({ kind: "none" });
+    expect(await app.operatorScope(null)).toEqual({ kind: "none" });
+  });
+
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("admits staff on ops:view and refuses a non-holder", async () => {
+    expect((await app.admitStaff(VIEWER)).id).toBe(VIEWER.id);
+    await expect(app.admitStaff(OUTSIDER)).rejects.toMatchObject({ code: "permission_denied" });
+  });
+
+  /** @scenario "Operator gates ask the platform-operator grant" */
+  it("hides the admin door from a non-holder as not found, and demands manage for writes", async () => {
+    const run = (actor: OpsOperator, method: "getList" | "update") =>
+      app.runAdminOperation({
+        actor,
+        req: { headers: {} },
+        resource: "user",
+        method,
+        params: {},
+      });
+
+    await expect(run(OUTSIDER, "getList")).rejects.toMatchObject({ code: "not_found" });
+    await expect(run(VIEWER, "update")).rejects.toMatchObject({ code: "not_found" });
+  });
+});

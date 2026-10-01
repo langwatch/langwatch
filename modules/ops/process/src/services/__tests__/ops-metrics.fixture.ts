@@ -48,8 +48,8 @@ export class OpsMetricsTestAdapter {
     throw new Error("This operations capability is not used by metrics collector tests");
   }
 
-  isAdmin(): boolean {
-    return false;
+  isAdmin(): Promise<boolean> {
+    return Promise.resolve(false);
   }
 
   startImpersonation(): never {

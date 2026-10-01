@@ -17,7 +17,13 @@ export type AuthzMemoryAdmissionRow = {
   grantId: string;
   occurredAtMs: number;
   disabled: boolean;
+};
+
+/** A user's standing as authz folded it from user's and identity's facts. */
+export type AuthzMemoryUserStandingRow = {
   deactivated: boolean;
+  erased: boolean;
+  changedAtMs: number;
 };
 
 /** What the ledger says about the grant an admission marker named. */
@@ -50,6 +56,7 @@ export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();
   readonly sessionVersions = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
+  readonly userStandings = new Map<string, AuthzMemoryUserStandingRow>();
   readonly admissions: AuthzMemoryAdmissionRow[] = [];
   readonly admissionGrants: AuthzMemoryAdmissionGrantRow[] = [];
   readonly bindings: AuthzManagedBindingRow[] = [];
@@ -70,10 +77,17 @@ export class AuthzMemoryStore {
 
   private constructor() {}
 
+  /** Deactivated or erased, as the standing table says; no row means active. */
+  isInactiveUser(userId: string): boolean {
+    const row = this.userStandings.get(userId);
+    return row !== undefined && (row.deactivated || row.erased);
+  }
+
   reset(): void {
     this.epochs.clear();
     this.sessionVersions.clear();
     this.cutovers.clear();
+    this.userStandings.clear();
     this.organizationRoles.clear();
     for (const rows of [
       this.admissions,

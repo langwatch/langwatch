@@ -20,6 +20,7 @@ import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
+import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma/prisma.authz-managed-grant.repository.ts";
 
 const ORGANIZATION_ID = "org_contract";
@@ -41,6 +42,7 @@ const backends: readonly Backend[] = [
         bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
         cutover: MemoryAuthzCutoverRepository.create({ memory }),
         admissions: MemoryAuthzAdmissionRepository.create({ memory }),
+        userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
       };
     },
   },
@@ -155,7 +157,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         grantId: "rb_admission",
         occurredAtMs: 1_700_000_000_000,
         disabled: false,
-        deactivated: false,
       });
 
       await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
@@ -176,7 +177,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         grantId: "rb_admission",
         occurredAtMs: 1,
         disabled: false,
-        deactivated: false,
       });
       repositories.store.admissionGrants.push({
         ...scope,
@@ -202,7 +202,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         grantId: "rb_admission",
         occurredAtMs: 1,
         disabled: false,
-        deactivated: false,
       };
       repositories.store.admissions.push(marker);
       repositories.store.admissionGrants.push({
@@ -235,8 +234,83 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         grantId: "rb_admission",
         occurredAtMs: 1,
         disabled: true,
-        deactivated: false,
       });
+
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: false,
+      });
+    });
+  });
+
+  describe("when user's and identity's facts reach the standing table", () => {
+    const at = (ms: number) => Temporal.Instant.fromEpochMilliseconds(ms);
+
+    /** @scenario A deactivated user is inactive to authz until reactivated */
+    it("holds a deactivated user inactive, and active again once reactivated", async () => {
+      const { userStandings } = backend.create();
+
+      await userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
+      await expect(userStandings.findInactiveUserIds({ userIds: [USER_ID] })).resolves.toEqual([
+        USER_ID,
+      ]);
+
+      await userStandings.recordReactivated({ userId: USER_ID, at: at(20) });
+      await expect(userStandings.findInactiveUserIds({ userIds: [USER_ID] })).resolves.toEqual([]);
+    });
+
+    /** @scenario A redelivered user fact changes nothing */
+    it("ignores a redelivered or older fact", async () => {
+      const { userStandings } = backend.create();
+
+      await userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
+      await userStandings.recordReactivated({ userId: USER_ID, at: at(20) });
+      await userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
+
+      await expect(userStandings.findInactiveUserIds({ userIds: [USER_ID] })).resolves.toEqual([]);
+    });
+
+    /** @scenario A deactivation and a reactivation stamped at the same instant leave the user inactive */
+    it.each([
+      ["reactivation first", ["reactivated", "deactivated"]],
+      ["deactivation first", ["deactivated", "reactivated"]],
+    ] as const)("holds the user inactive on a tie, %s", async (_order, facts) => {
+      const { userStandings } = backend.create();
+
+      for (const fact of facts) {
+        const input = { userId: USER_ID, at: at(10) };
+        await (fact === "deactivated"
+          ? userStandings.recordDeactivated(input)
+          : userStandings.recordReactivated(input));
+      }
+
+      await expect(userStandings.findInactiveUserIds({ userIds: [USER_ID] })).resolves.toEqual([
+        USER_ID,
+      ]);
+    });
+
+    /** @scenario An erased user stays inactive */
+    it("keeps an erased user inactive through a later reactivation", async () => {
+      const { userStandings } = backend.create();
+
+      await userStandings.recordErased({ userId: USER_ID, at: at(10) });
+      await userStandings.recordErased({ userId: USER_ID, at: at(10) });
+      await userStandings.recordReactivated({ userId: USER_ID, at: at(20) });
+
+      await expect(userStandings.findInactiveUserIds({ userIds: [USER_ID] })).resolves.toEqual([
+        USER_ID,
+      ]);
+    });
+
+    it("keeps an inactive user's admission marker out of the read", async () => {
+      const repositories = backend.create();
+      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
+      repositories.store.admissions.push({
+        ...scope,
+        grantId: "rb_admission",
+        occurredAtMs: 1,
+        disabled: false,
+      });
+      await repositories.userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
 
       await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
         found: false,

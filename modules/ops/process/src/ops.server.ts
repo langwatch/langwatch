@@ -3,11 +3,13 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { OpsApp } from "#app/ops.app";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
+import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
+import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
@@ -41,8 +43,10 @@ export const opsServer = defineServerModule("ops")
   .withEventing(storageStatsEventing)
   .withEventing(projectionReplayEventing)
   .withEventing(systemMigrationsEventing)
-  .withTasks(({ repositories }) => [
+  .withEventing(platformOperatorSeedEventing)
+  .withTasks(({ repositories, app }) => [
     ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
+    GrantPlatformOperatorTask.create({ operators: app }),
   ]);
 
 /** One request's presented project credential, unverified, or none at all. */

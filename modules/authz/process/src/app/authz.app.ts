@@ -22,6 +22,7 @@ import {
   type AuthzServerConfig,
   AuthzScopeNotFoundError,
   type AuthzScopeRef,
+  PLATFORM_OPERATOR_PERMISSIONS,
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -33,6 +34,7 @@ import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzGrantIdService } from "../services/authz-grant-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
+import type { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import {
   PostgresAuthzAdapter,
@@ -106,6 +108,8 @@ export class AuthzApp implements AuthzApi {
   #migration: SystemMigration | undefined;
   /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no version store. */
   #sessionVersions: AuthzSessionVersionService | undefined;
+  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no platform tier. */
+  #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(
     permissions: AuthzService,
@@ -116,6 +120,7 @@ export class AuthzApp implements AuthzApi {
       admissions?: AuthzAdmissionService;
       migration?: SystemMigration;
       sessionVersions?: AuthzSessionVersionService;
+      platformOperators?: AuthzPlatformOperatorsService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -131,6 +136,7 @@ export class AuthzApp implements AuthzApi {
     this.#admissions = options.admissions;
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
+    this.#platformOperators = options.platformOperators;
   }
 
   /**
@@ -171,6 +177,7 @@ export class AuthzApp implements AuthzApi {
       admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
       migration: built.migration,
       sessionVersions: built.sessionVersions,
+      platformOperators: built.platformOperators,
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -215,16 +222,34 @@ export class AuthzApp implements AuthzApi {
         organizationId: input.projectId ? undefined : input.organizationId,
       });
     } catch (error) {
-      if (AuthzScopeNotFoundError.is(error)) return { scope: null, permissions: [] };
+      if (AuthzScopeNotFoundError.is(error)) {
+        return { scope: null, permissions: [...(await this.platformPermissionsOf(by))] };
+      }
       throw error;
     }
+    const [scoped, platform] = await Promise.all([
+      this.effectivePermissions({ principal: { type: "user", id: by.id }, scope }),
+      this.platformPermissionsOf(by),
+    ]);
     return {
       scope: { type: scope.type, id: scope.id },
-      permissions: await this.effectivePermissions({
-        principal: { type: "user", id: by.id },
-        scope,
-      }),
+      permissions: [...scoped, ...platform],
     };
+  }
+
+  /** The session's own ops permissions: only a platform grant confers them, at any scope. */
+  private async platformPermissionsOf(by: AuthzCaller): Promise<AuthzPermission[]> {
+    const held = await Promise.all(
+      PLATFORM_OPERATOR_PERMISSIONS.map((permission) =>
+        this.#permissions.can({
+          principal: { type: "user", id: by.id },
+          permission,
+          scope: { type: "platform" },
+        }),
+      ),
+    );
+
+    return PLATFORM_OPERATOR_PERMISSIONS.filter((_, index) => held[index]);
   }
   check: AuthzApi["check"] = (a) => this.#permissions.check(a);
   checkDetailed: AuthzApi["checkDetailed"] = (a) => this.#permissions.checkDetailed(a);
@@ -285,6 +310,12 @@ export class AuthzApp implements AuthzApi {
   completeAdmission: AuthzApi["completeAdmission"] = (a) => this.admissions().completeAdmission(a);
   clearPendingAdmission: AuthzApi["clearPendingAdmission"] = (a) =>
     this.admissions().clearPendingAdmission(a);
+
+  grantPlatformOperator: AuthzApi["grantPlatformOperator"] = (a) =>
+    this.platformOperators().grant(a);
+  revokePlatformOperator: AuthzApi["revokePlatformOperator"] = (a) =>
+    this.platformOperators().revoke(a);
+  listPlatformOperators: AuthzApi["listPlatformOperators"] = () => this.platformOperators().list();
 
   getSessionVersion: AuthzApi["getSessionVersion"] = (a) => {
     if (!this.#sessionVersions) {
@@ -359,6 +390,16 @@ export class AuthzApp implements AuthzApi {
       );
     }
     return [this.#migration];
+  }
+
+  private platformOperators(): AuthzPlatformOperatorsService {
+    if (!this.#platformOperators) {
+      throw new Error(
+        "This AuthzApp was composed from already-built services, so it holds no platform " +
+          "tier: compose it through AuthzApp.create to grant, revoke or list operators.",
+      );
+    }
+    return this.#platformOperators;
   }
 
   private admissions(): AuthzAdmissionService {

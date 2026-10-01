@@ -10,6 +10,7 @@ import type {
   GovernanceRestApi,
   PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -28,11 +29,7 @@ import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { userServer } from "../../user.server.ts";
-import {
-  createUserTestAuth,
-  createUserTestOps,
-  createUserTestOrganizations,
-} from "./user.fixture.ts";
+import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -93,15 +90,17 @@ function process(
         ttl: async () => -1,
       }) satisfies RedisConnection,
     )
+    .withEventing(
+      new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
+    )
     .provide({
       auth: peers.auth ?? createUserTestAuth(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
       "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
       gateway: createApiFixture<GatewayApi>(),
       governance: peers.governance ?? createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: createUserTestOrganizations(),
-      ops: createUserTestOps(),
       project: peers.project ?? createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });

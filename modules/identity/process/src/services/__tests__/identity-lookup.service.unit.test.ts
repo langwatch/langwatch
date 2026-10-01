@@ -9,10 +9,10 @@ import type { IdentityHistoryEntry, LinkProposalRecord } from "@langwatch/identi
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { StubPlatformOperators } from "../../__tests__/support/in-memory-connections.ts";
 import { IdentityHistoryRepository } from "../../repositories/identity-history.repository.ts";
 import { MemoryIdentityLookupRepository } from "../../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
-import type { SsoPlatformOperatorRepository } from "../../repositories/sso-connection.repository.ts";
 import {
   IdentityLookupService,
   type IdentityLookupServiceDeps,
@@ -62,13 +62,6 @@ class FakeAuditLog implements AuditLogApi {
   }
 }
 
-class FakeOperators implements SsoPlatformOperatorRepository {
-  constructor(private readonly operatorIds: Set<string>) {}
-  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    return this.operatorIds.has(actorId);
-  }
-}
-
 /** Fixed window, in memory - no Redis needed to prove the throttle shape. */
 function fakeRateLimiter(max: number): RateLimiter {
   const counts = new Map<string, number>();
@@ -114,7 +107,7 @@ function serviceFor({
       listBrowserSessions: async () => [],
     }),
     invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-    platformOperators: new FakeOperators(operatorIds),
+    authorization: new StubPlatformOperators([...operatorIds]),
     auditLog,
     rateLimiter: fakeRateLimiter(budget),
   });

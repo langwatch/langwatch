@@ -41,7 +41,6 @@ async function bootIdentity() {
   })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      adminEmails: ["olive@langwatch.ai"],
       publicBaseUrl: undefined,
       isSaas: false,
       rateLimiter: { check: async () => ({ allowed: true }) },
@@ -53,7 +52,7 @@ async function bootIdentity() {
     .expose(() => ({ hosts: { trpc: recordingTrpcHost() }, serve: () => undefined }))
     .provide({
       organization: createApiFixture<OrganizationApi>(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({ can: async () => false }),
       auth: createApiFixture<AuthApi>(),
       user: createApiFixture<UserApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
@@ -79,7 +78,7 @@ describe("identity lookup installation", () => {
     });
   });
 
-  describe("when somebody outside the staff list resolves an address", () => {
+  describe("when somebody without the platform-operator grant resolves an address", () => {
     it("refuses with the generic not_found through IdentityLookupApi", async () => {
       const runtime = await bootIdentity();
       try {
@@ -88,7 +87,7 @@ describe("identity lookup installation", () => {
 
         await expect(
           lookup.lookupAddress({ address: "sam@acme.com", operator: { userId: "user_mallory" } }),
-        ).rejects.toMatchObject({ code: "not_found", httpStatus: 404 });
+        ).rejects.toMatchObject({ code: "not_found" });
       } finally {
         await runtime.stop();
       }

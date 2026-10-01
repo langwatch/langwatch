@@ -1,6 +1,6 @@
 /**
  * The server half of the operator dashboard and scheduler procedures.
- * Platform-tier: the deployment's own operator allow-list decides, not an
+ * Platform-tier: the platform-operator grant decides, not an
  * RBAC permission. `getScope` answers rather than refuses, so the menu can poll it.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -13,13 +13,13 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("getScope")
     .withFacts(opsOperatorFact)
     .noPermission(OPS_PROBE)
-    .handle(({ app }, operator) => ({ scope: app.operatorScope(operator) }))
+    .handle(async ({ app }, operator) => ({ scope: await app.operatorScope(operator) }))
 
     .procedure("getDashboardSnapshot")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.findDashboardData();
     })
@@ -27,8 +27,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("getSignUpHealth")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getSignUpHealth(input);
     })
@@ -36,8 +36,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("getBadgeCounts")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.badgeCounts();
     })
@@ -45,8 +45,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("dashboardStream")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, signal }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, signal }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.streamDashboard({ signal });
     })
@@ -54,8 +54,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("listParkedGroups")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listParkedQueueGroups(input);
     })
@@ -63,8 +63,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("listQueues")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listQueues();
     })
@@ -72,8 +72,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("listScheduledJobs")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listScheduledJobs({ limit: input.limit });
     })
@@ -81,8 +81,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("listPausedSchedules")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listPausedSchedules({ limit: input.limit });
     })
@@ -90,8 +90,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("listSchedulerActions")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listSchedulerActions({ limit: input.limit });
     })
@@ -99,8 +99,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("setScheduleActive")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.setScheduleActive({
         scheduleId: input.scheduleId,
@@ -112,8 +112,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("clearScheduleSlot")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.clearStuckScheduleSlot({
         scheduleId: input.scheduleId,
@@ -124,8 +124,8 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("runScheduleNow")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.runScheduleNow({
         scheduleId: input.scheduleId,

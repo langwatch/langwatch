@@ -14,7 +14,7 @@ import { opsTrpcTestMembers } from "../../transport/__tests__/ops.trpc.harness.t
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import { createOpsTestApp, OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 /**
  * Every stub is typed from the runner itself. A stub typed
@@ -47,7 +47,7 @@ const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
 const IMPERSONATING: OpsOperator = {
   id: "user_customer",
   email: "ana@acme.com",
-  impersonator: { email: OPS_STAFF_ADDRESS },
+  impersonator: { id: "user_alex", email: OPS_STAFF_ADDRESS },
 };
 
 /**
@@ -58,7 +58,10 @@ const IMPERSONATING: OpsOperator = {
 const demandedPermissions = new Map<string, string>();
 
 function callerFor(operator: OpsOperator) {
-  const { app } = createOpsTestApp({ members: { createSystemMigrations: () => service } });
+  const { app } = createOpsTestApp({
+    members: { createSystemMigrations: () => service },
+    authz: platformOperatorAuthz({ holders: { user_alex: ["ops:view", "ops:manage"] } }),
+  });
   const admitOperator = app.admitOperator.bind(app);
   let current = "";
 

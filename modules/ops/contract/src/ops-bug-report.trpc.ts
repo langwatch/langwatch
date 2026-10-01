@@ -1,7 +1,7 @@
 /**
  * Every `bugReports.*` procedure: `getAll` pages reports filed against the
  * product, `getById` opens one. Not an RBAC permission - a report carries
- * no tenant, so the LangWatch staff list decides instead.
+ * no tenant, so the platform-operator grant decides instead.
  */
 import { defineTrpcContract } from "@langwatch/kernel/contract";
 

@@ -29,7 +29,6 @@ import { IdentityHistoryRepository } from "../repositories/identity-history.repo
 import { MemoryIdentityHistoryRepository } from "../repositories/memory/memory.identity-history.repository.ts";
 import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
-import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
@@ -40,6 +39,7 @@ import {
 import { IdentityService } from "../services/identity.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
+import { StubPlatformOperators } from "./support/in-memory-connections.ts";
 import { fact, headsWith, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
@@ -88,13 +88,6 @@ class FakeAuditLog implements AuditLogApi {
   }
 }
 
-class FakeOperators implements SsoPlatformOperatorRepository {
-  constructor(private readonly operatorIds: Set<string>) {}
-  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    return this.operatorIds.has(actorId);
-  }
-}
-
 function noopRateLimiter(): RateLimiter {
   return { check: async () => ({ allowed: true }) };
 }
@@ -129,7 +122,7 @@ beforeEach(() => {
       listBrowserSessions: async () => [],
     }),
     invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-    platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+    authorization: new StubPlatformOperators([OLIVE.userId]),
     auditLog,
     rateLimiter: noopRateLimiter(),
   });
@@ -280,7 +273,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
       router: { route: async () => CONNECTED_ROUTE },
       identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
-      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -437,7 +430,7 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
           },
         }),
       }),
-      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -608,7 +601,7 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
         listBrowserSessions: async () => [],
       }),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       now: () => 1_000,
@@ -677,7 +670,7 @@ describe("identity lookup, detaching a sign-in method", () => {
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });

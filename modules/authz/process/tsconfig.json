@@ -36,6 +36,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -58,6 +61,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

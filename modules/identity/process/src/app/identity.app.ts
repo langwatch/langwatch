@@ -179,7 +179,6 @@ type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption",
   Readonly<{
     /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
     isSaas: boolean;
-    adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
      *  is told LangWatch is called. A process fact, not one of the fourteen. */
     publicBaseUrl: string | undefined;
@@ -425,7 +424,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     "encryption",
     "rateLimiter",
     "isSaas",
-    "adminEmails",
     "publicBaseUrl",
   ] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
@@ -455,7 +453,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       repositories: setup.repositories,
       eventing: setup.members.eventing,
       identityEventing,
-      adminEmails: setup.members.adminEmails,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -526,6 +523,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         baseUrl: setup.members.publicBaseUrl ?? "",
       }),
       licensing: setup.dependencies.licensing,
+      authorization: setup.dependencies.permissions,
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
@@ -779,7 +777,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
           proposals: setup.repositories.identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        platformOperators: setup.repositories.ssoPlatformOperators,
+        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,

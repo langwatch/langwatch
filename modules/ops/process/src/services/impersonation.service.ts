@@ -69,7 +69,7 @@ export class ImpersonationService {
       throw new CannotImpersonateDeactivatedUserError(target.id);
     }
 
-    if (this.access.isAdmin(target)) {
+    if (await this.access.isAdmin(target)) {
       throw new CannotImpersonateAdminError(target.id);
     }
 

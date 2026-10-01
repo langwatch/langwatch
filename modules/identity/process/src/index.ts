@@ -131,7 +131,6 @@ export type {
 // two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
 // instance's sign-in method policy.
 export { type IdentityEventing, type IdentityPipelineCommand } from "./app/identity.members.ts";
-export { type PlatformOperator } from "./app/identity.members.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,

@@ -3,6 +3,7 @@
  * @see specs/identity/sso-idp-termination.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
@@ -12,7 +13,6 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../../repositories/sso-connection.repository.ts";
 import { SsoConnectionGuardChecksService } from "../sso-connection-guard-checks.service.ts";
 
@@ -30,7 +30,7 @@ function checksOver(connections: SsoConnectionState[]) {
     registrationSlots: createApiFixture<SsoConnectionRegistrationRepository>(),
     breakGlass: createApiFixture<SsoBreakGlassBindingRepository>(),
     stranding: createApiFixture<SsoConnectionStrandingRepository>(),
-    platformOperators: createApiFixture<SsoPlatformOperatorRepository>(),
+    authorization: createApiFixture<AuthzApi>(),
     licensing: createApiFixture<LicensingApi>(),
   });
 }

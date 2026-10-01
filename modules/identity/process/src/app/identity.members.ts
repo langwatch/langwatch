@@ -4,7 +4,6 @@ import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
-import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
@@ -228,15 +227,6 @@ export interface JoinRequestNotificationMail {
 }
 
 /**
- * Who this deployment counts as a LangWatch platform operator, by address. The answer is
- * `ADMIN_EMAILS`, and the ops feature owns both the variable and the comparison.
- */
-export interface PlatformOperator {
-  /** Whether this address is on the deployment's operator list. */
-  isPlatformOperatorEmail(input: { email: string | null }): boolean;
-}
-
-/**
  * What the process supplies this feature beyond its twelve repository rows:
  * eventing, operators, join-request mail, latch knobs, write-side heads
  * (Q3(b) — each needs `EventSourcing`, so stays process-side).
@@ -247,8 +237,6 @@ export type IdentityInfrastructure = Readonly<{
    * producer-only stand-in where the process composed no queue.
    */
   eventing: IdentityEventing;
-  /** The deployment's operator list, for the SSO connection guards. `ADMIN_EMAILS`, not `ops:*`. */
-  operators: PlatformOperator;
   /** Overridden only by tests that need the latch to expire or evict inside one run. */
   latch: Readonly<{ ttlMs: number; maxUsers: number; now: () => number }>;
   /**
@@ -262,8 +250,6 @@ export type IdentityInfrastructure = Readonly<{
   secrets: IdentitySecretCarryRepository;
   /** Who a join-request notification reaches. Read only when `mail` is present. */
   joinRequestAudience: JoinRequestAudienceRepository;
-  /** Who counts as a LangWatch platform operator, for the SSO connection guards (D05 tier 1). */
-  ssoPlatformOperators: SsoPlatformOperatorRepository;
   /**
    * One connection's own log, read. Null where the process composed no event
    * stack — the history refuses by name rather than reading as empty, which

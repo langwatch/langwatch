@@ -53,7 +53,7 @@ beforeEach(() => {
       registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
-      platformOperators: new StubPlatformOperators(),
+      authorization: new StubPlatformOperators(),
       licensing: licensingFixture(),
     }),
     ledger,

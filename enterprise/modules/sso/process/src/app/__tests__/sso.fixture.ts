@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { type SsoConfig } from "@langwatch/enterprise-sso-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -15,16 +16,11 @@ import {
   type SsoSetupCommandsApi,
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { OpsApi } from "@langwatch/ops-contract";
 import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwatch/secrets";
-import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
 import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
-
-/** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
-export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
 
 export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
   return {
@@ -74,30 +70,14 @@ export function createSsoTestLicensing(): LicensingApi {
   });
 }
 
-export function createSsoTestOperators(staffEmail = SSO_TEST_STAFF_EMAIL): OpsApi {
-  return createApiFixture<OpsApi>({
-    isAdmin: (identity) => identity.email === staffEmail,
-  });
-}
-
-function testProfile(id: string, email: string | null): UserProfile {
-  return {
-    id,
-    name: null,
-    email,
-    emailVerified: true,
-    image: null,
-    pendingSsoSetup: false,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    lastLoginAt: null,
-    deactivatedAt: null,
-  };
-}
-
-export function createSsoTestUsers(profiles: Record<string, string | null> = {}): UserApi {
-  return createApiFixture<UserApi>({
-    findById: async ({ id }) => (id in profiles ? testProfile(id, profiles[id] ?? null) : null),
+/** Authz as the back office asks it: yes at the platform for the users named, no for the rest. */
+export function createSsoTestAuthorization(operators: readonly string[] = []): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    can: async ({ principal, permission, scope }) =>
+      scope.type === "platform" &&
+      permission.startsWith("ops:") &&
+      principal.type === "user" &&
+      operators.includes(principal.id),
   });
 }
 
@@ -323,8 +303,7 @@ export function createSsoTestApp(
     connections?: RecordingSsoConnectionLedger;
     dependencies?: Partial<{
       licensing: LicensingApi;
-      operators: OpsApi;
-      users: UserApi;
+      authorization: AuthzApi;
       auditLog: AuditLogApi;
       identity: IdentityApi;
       featureFlags: FeatureFlagApi;
@@ -336,8 +315,7 @@ export function createSsoTestApp(
     config: input.config ?? createSsoTestConfig(),
     dependencies: {
       licensing: input.dependencies?.licensing ?? createSsoTestLicensing(),
-      operators: input.dependencies?.operators ?? createSsoTestOperators(),
-      users: input.dependencies?.users ?? createSsoTestUsers(),
+      authorization: input.dependencies?.authorization ?? createSsoTestAuthorization(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
       featureFlags: input.dependencies?.featureFlags ?? createSsoTestFeatureFlags(),

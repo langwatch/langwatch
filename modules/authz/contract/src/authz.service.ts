@@ -34,6 +34,7 @@ import type {
   AuthzCanBatchPermissionsByIdsOutput,
   AuthzCheckByIdsInput,
   AuthzCheckByIdsOutput,
+  AuthzCanInput,
   AuthzCheckDetailedOutput,
   AuthzCheckInput,
   AuthzCustomRole,
@@ -92,7 +93,7 @@ export abstract class AuthzService {
 
   abstract checkDetailed(args: AuthzCheckInput): Promise<AuthzCheckDetailedOutput>;
 
-  abstract can(args: AuthzCheckInput): Promise<boolean>;
+  abstract can(args: AuthzCanInput): Promise<boolean>;
 
   /** The only public operation that returns an authorization witness. */
   abstract authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {

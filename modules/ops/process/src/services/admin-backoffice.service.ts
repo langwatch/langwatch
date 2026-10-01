@@ -1,4 +1,5 @@
 import type { AuthApi } from "@langwatch/auth-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
   adminOperationInputSchema,
@@ -15,6 +16,8 @@ import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
+/** User writes that would skip the user module's facts and last-operator rule. */
+const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
 export interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
@@ -77,6 +80,11 @@ export class AdminBackofficeService {
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
     const parsed = adminOperationInputSchema.parse(input);
+    if (parsed.resource === "user" && USER_METHODS_REFUSED.has(parsed.method)) {
+      throw new ValidationError("The admin API does not bulk-update or delete users", {
+        meta: { fieldErrors: { method: ["Deactivate users one at a time instead."] } },
+      });
+    }
     if (
       parsed.resource === "user" &&
       parsed.method === "update" &&

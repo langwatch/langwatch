@@ -94,3 +94,25 @@ describe("AdminBackofficeService user update", () => {
     expect(await updateUser(data)).toMatchSnapshot();
   });
 });
+
+describe("AdminBackofficeService user writes past the user module", () => {
+  /** @scenario "The Back office refuses user writes the user module does not serve" */
+  it.each<[AdminOperationInput["method"], AdminOperationInput["params"]]>([
+    ["updateMany", { ids: ["user-1"], data: { deactivatedAt: null } }],
+    ["delete", { id: "user-1" }],
+    ["deleteMany", { ids: ["user-1"] }],
+  ])("refuses %s with validation_error and writes nothing", async (method, params) => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      auth: createApiFixture<AuthApi>({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await expect(
+      service.execute({ resource: "user", method, params, actorId: "olive", req: { headers: {} } }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([]);
+  });
+});

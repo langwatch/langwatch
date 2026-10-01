@@ -94,8 +94,8 @@ state and the existing SSE response fields.
 
 ## Environment and configuration
 
-Packages read no environment. Application composition supplies the configured
-admin email allow-list through `AdminAccess`.
+Packages read no environment. Application composition supplies authz, which `AdminAccess`
+asks for the platform-operator grant.
 
 ## Errors
 

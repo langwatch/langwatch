@@ -35,6 +35,7 @@ import {
   type AuthzCanBatchByIdsOutput,
   type AuthzCanBatchPermissionsByIdsInput,
   type AuthzCanBatchPermissionsByIdsOutput,
+  type AuthzCanInput,
   type AuthzCheckByIdsInput,
   type AuthzCheckByIdsOutput,
   type AuthzDecision,
@@ -76,6 +77,7 @@ import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
+import type { AuthzPlatformOperatorsService } from "./authz-platform-operators.service.ts";
 import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
 
 const decisions = createLogger("langwatch:authz:decisions");
@@ -118,6 +120,8 @@ export type AuthzServiceOptions = {
   isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
   findEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
+  /** Answers `can` at the platform; omitted = every platform question is refused. */
+  platformOperators?: Pick<AuthzPlatformOperatorsService, "can">;
 };
 
 const rolePermissionListSchema = z.array(z.string());
@@ -220,8 +224,12 @@ export class AuthzService extends AuthzServiceContract {
     return { decision, grants };
   }
 
-  async can(args: CheckArgs): Promise<boolean> {
-    const decision = await this.check(args);
+  async can(args: AuthzCanInput): Promise<boolean> {
+    const { scope } = args;
+    if (scope.type === "platform") {
+      return (await this.options.platformOperators?.can(args)) ?? false;
+    }
+    const decision = await this.check({ ...args, scope });
 
     return decision.allowed;
   }

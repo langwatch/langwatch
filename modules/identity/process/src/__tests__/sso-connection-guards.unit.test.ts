@@ -106,7 +106,7 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass,
     stranding,
-    platformOperators: new StubPlatformOperators([OPS.id]),
+    authorization: new StubPlatformOperators([OPS.id]),
     licensing: licensingFixture(),
   });
 });
@@ -703,7 +703,7 @@ describe("sso connection guards", () => {
         registrationSlots: connections,
         breakGlass,
         stranding,
-        platformOperators: new StubPlatformOperators([OPS.id]),
+        authorization: new StubPlatformOperators([OPS.id]),
         licensing: licensingFixture({
           authorizesDomainClaims: true,
           hostsSingleOrganization: false,

@@ -34,7 +34,9 @@ function harness(
   const effectivePermissions = vi.fn(
     overrides.effectivePermissions ?? (async () => ["project:view" as const]),
   );
-  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions } });
+  // Nobody here holds the platform grant, so the answer carries no ops permissions.
+  const can = vi.fn(async () => false);
+  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions, can } });
 
   const procedures: Record<string, Procedure> = {};
   const accesses: string[] = [];

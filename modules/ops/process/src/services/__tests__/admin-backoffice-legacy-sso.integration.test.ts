@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
@@ -40,7 +41,7 @@ function backoffice(connectionDecides = true) {
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
     auditLog: createApiFixture<AuditLogApi>(),
-    adminEmails: ["olive@example.com"],
+    authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),
     auth: createApiFixture<AuthApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },

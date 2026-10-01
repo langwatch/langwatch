@@ -31,6 +31,9 @@
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
       "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
@@ -53,9 +56,6 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../ops/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
