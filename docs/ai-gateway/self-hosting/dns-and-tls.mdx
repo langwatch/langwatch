@@ -15,29 +15,33 @@ Give the gateway its own hostname, separate from the app. LLM clients and coding
 <Steps>
 <Step title="Set the ingress values">
 
-The gateway Ingress is off by default. These values turn it on:
+The gateway is published from the app Ingress settings. Set `ingress.gateway.host` next to the app hosts:
 
 ```yaml
-gateway:
-  ingress:
-    enabled: true
-    className: nginx
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
     host: gateway.acme.com
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true
-      path: /health
     tls:
-      enabled: true
       secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
 ```
 
-Replace `host`. The control plane derives the public URL CLI users get from it.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
-With `className: nginx` the chart adds the ingress-nginx annotations from `ingress.controllerAnnotations.nginx`. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys you set in `annotations` override them.
+With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 
 </Step>
 <Step title="Issue the certificate">
@@ -107,18 +111,16 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | Path | Match | Routes |
 |---|---|---|
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
-| `/health` | `Exact`, only with `ingress.healthPath.enabled: true` | The public status endpoint for uptime monitors |
+| `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the default ingress; `ingress.path: /` publishes every route, including the probes and `/metrics`.
+`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
-To terminate TLS on a cloud load balancer instead of the ingress, disable the ingress and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
+To terminate TLS on a cloud load balancer instead of the ingress, leave `ingress.gateway.host` empty and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
 
 ```yaml
 gateway:
-  ingress:
-    enabled: false
   publicUrl: https://gateway.acme.com   # no ingress host to derive it from
   service:
     type: LoadBalancer
@@ -153,19 +155,23 @@ A Service of type `LoadBalancer` publishes every route, including `/metrics`, th
 
 ## Other ingress controllers
 
-Set `ingress.className` and put the controller's equivalents of the nginx settings in `ingress.annotations`. The ingress-nginx annotations are added only when `className` is `nginx`. Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
+Set `ingress.className` for your controller. The ingress-nginx annotations are added only when `className` is `nginx`. Put the controller's equivalents in `ingress.gateway.annotations` so they apply to the gateway host only.
+
+Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
 
 AWS ALB example:
 
 ```yaml
-gateway:
-  ingress:
-    className: alb
+ingress:
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
+  gateway:
+    host: gateway.acme.com
     annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
       alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
 ```
 
@@ -186,9 +192,9 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `curl` reports an unknown certificate | cert-manager has not issued `gateway-tls` yet | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
-| Streamed responses arrive all at once | Buffering is on at the proxy | Set `className: nginx` so the chart adds `proxy-buffering: "off"`, or set the equivalent on your controller |
+| Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
-| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Enable the gateway Ingress with `gateway.ingress.host`, or set `gateway.publicUrl` |
+| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
 | A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).

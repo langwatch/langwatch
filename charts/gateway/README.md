@@ -71,10 +71,6 @@ self-hosting. The values you most often override:
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
 | `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
 | `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
-| `ingress.enabled`             | Render an Ingress (default `false`)                                  |
-| `ingress.className`           | IngressClass; empty uses the cluster default                         |
-| `ingress.host`                | Customer-facing hostname for the gateway, required when enabled      |
-| `ingress.tls.secretName`      | TLS Secret managed by cert-manager (or BYO)                          |
 | `replicaCount`                | Static replicas if `autoscaling.enabled: false`                      |
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
 | `resources`                   | Pod CPU/memory requests + limits                                     |
@@ -116,8 +112,8 @@ Response shape and tuning are documented in
 ## Status-page endpoint
 
 `GET /health` (also `HEAD`) is the public status-page surface, exposed
-through the ingress as an Exact path when `ingress.healthPath.enabled`
-(default `true`) and the Ingress is enabled; point an uptime monitor at `https://<ingress.host>/health`.
+as an Exact path by the langwatch chart's gateway Ingress (`ingress.gateway.host`);
+point an uptime monitor at `https://<gateway host>/health`.
 It reports the gateway process plus the control-plane connectivity
 verdict that a background probe refreshes every 15 s over the signed
 internal channel: HTTP 200 healthy, 503 once the control plane has been
@@ -127,25 +123,17 @@ out anywhere. Distinct from the k8s probes above, which stay in-cluster.
 
 ## Streaming / SSE
 
-The Ingress is off by default (`ingress.enabled: false`). When you enable
-it with `ingress.className: nginx`, the chart adds the annotations under
-`ingress.controllerAnnotations.nginx`: proxy buffering off, one-hour
-read/send timeouts so SSE chunks reach clients promptly, and a 32m body
-size to match `security.maxRequestBodyBytes`. Keys in `ingress.annotations`
-win over them. Any other class gets only `ingress.annotations`:
+This chart renders no Ingress. Under the langwatch chart, set
+`ingress.gateway.host` on the app Ingress: it renders a second Ingress for
+the gateway host with the app Ingress `className` and `annotations`, and with
+`className: nginx` adds proxy buffering off, one-hour read/send timeouts so
+SSE chunks reach clients promptly, and a 32m body size to match
+`security.maxRequestBodyBytes`. Leftover `ingress.*` values in this chart fail
+the render rather than being dropped.
 
-```yaml
-ingress:
-  enabled: true
-  className: nginx
-  host: gateway.acme.com
-```
-
-For `alb` or another controller, set the equivalent streaming knobs in
-`ingress.annotations` (ALB needs
-`load-balancer-attributes: idle_timeout.timeout_seconds=3600`). For
-Envoy Gateway and other Gateway API implementations, leave the Ingress off
-and follow
+For Envoy Gateway, other Gateway API implementations, or this chart
+installed on its own, route `/v1` and `/health` to the Service yourself and
+follow
 [Routing and ingress controllers](https://docs.langwatch.ai/self-hosting/deployment/routing).
 
 ## Scaling

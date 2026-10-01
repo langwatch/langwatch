@@ -1649,6 +1649,23 @@ ingress:
   ## @param ingress.tls [array] TLS configuration for HTTPS.
   tls: []
 
+  # AI Gateway host on the same Ingress settings. When `host` is set, the chart
+  # renders a second Ingress, `<release>-gateway-ingress`, with this
+  # ingress's className, labels and annotations, routing /v1 (Prefix) and
+  # /health (Exact) on that host to the `<release>-gateway` Service. It is a
+  # separate object because controllers such as ingress-nginx apply
+  # annotations per Ingress, and the gateway needs streaming settings the app
+  # does not. With className nginx the chart adds proxy buffering off,
+  # 3600s read/send timeouts and a 32m body size to it.
+  gateway:
+    ## @param ingress.gateway.host [string, default: ""] Hostname for the AI Gateway, e.g. gateway.your-corp.com. Empty renders no gateway Ingress. Requires ingress.enabled.
+    host: ""
+    tls:
+      ## @param ingress.gateway.tls.secretName [string, default: ""] TLS Secret for the gateway host. Empty serves the host without a tls entry.
+      secretName: ""
+    ## @param ingress.gateway.annotations [object] Annotations for the gateway Ingress only, applied over ingress.annotations and the nginx defaults.
+    annotations: {}
+
 # =============================================================================
 # System Dependencies Configuration
 # =============================================================================
@@ -2212,21 +2229,11 @@ gateway:
   ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
   internalUrl: ""
 
-  # The gateway needs its OWN externally-reachable endpoint, separate from
+  # The gateway needs its OWN externally-reachable hostname, separate from
   # the main app: LLM clients hit the gateway, the browser hits the app.
-  # Like the app ingress, the gateway Ingress is off by default. Enable it
-  # below, or route to the `<release>-gateway` Service (port 80) with your
-  # own Gateway API HTTPRoute or load balancer and set gateway.publicUrl.
+  # Publish it with ingress.gateway.host on the app Ingress, or route to the
+  # `<release>-gateway` Service (port 80) yourself and set gateway.publicUrl.
   # Routes, timeouts and body size: docs/self-hosting/deployment/routing.
-  ## @param gateway.ingress.enabled [default: false] Render an Ingress for the AI Gateway (paths /v1 and /health).
-  ## @param gateway.ingress.className [string, default: ""] IngressClass for the gateway Ingress. Empty uses the cluster default IngressClass. When it is nginx, the subchart adds the ingress-nginx streaming, timeout and body-size annotations.
-  ## @param gateway.ingress.host [string, default: ""] Gateway hostname, e.g. gateway.your-corp.com. Required when gateway.ingress.enabled is true, and refused when it is not.
-  ## @param gateway.ingress.annotations [object] Annotations applied to the gateway Ingress as written. Keys here win over the subchart's per-controller defaults.
-  ingress:
-    enabled: false
-    className: ""
-    host: ""
-    annotations: {}
 
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common

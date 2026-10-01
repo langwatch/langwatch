@@ -218,6 +218,12 @@ ingress:
     - secretName: langwatch-tls
       hosts:
         - langwatch.example.com
+  # AI Gateway host. Renders a second Ingress with the settings above, plus
+  # the nginx streaming settings the gateway needs.
+  gateway:
+    host: gateway.langwatch.example.com
+    tls:
+      secretName: langwatch-gateway-tls
 
 # Prometheus monitoring
 prometheus:
@@ -430,7 +436,7 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `gateway.ingress.enabled: true`, `gateway.ingress.host` and `gateway.ingress.className`, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
@@ -493,7 +499,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-If both installs enable an Ingress, give each its own `ingress.hosts` and `gateway.ingress.host`. Overlapping host and path rules conflict in the ingress controller.
+If both installs enable an Ingress, give each its own `ingress.hosts` and `ingress.gateway.host`. Overlapping host and path rules conflict in the ingress controller.
 
 ### Custom StorageClass
 

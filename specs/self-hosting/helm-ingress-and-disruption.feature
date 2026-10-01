@@ -1,17 +1,17 @@
 Feature: Helm install routing and disruption budgets
 
-  A plain Helm install creates no Ingress for the app or the AI Gateway, so a
-  cluster that runs Envoy Gateway, Traefik or another controller never gets
-  objects tied to ingress-nginx. An operator who wants the chart Ingress turns
-  it on and picks the class. The chart's PodDisruptionBudgets never block a
-  node drain, so cluster upgrades and admission policies that reject such
-  budgets both keep working.
+  A plain Helm install creates no Ingress, so a cluster that runs Envoy
+  Gateway, Traefik or another controller never gets objects tied to
+  ingress-nginx. The AI Gateway has no Ingress of its own: an operator
+  publishes it from the app Ingress settings with ingress.gateway.host. The
+  chart's PodDisruptionBudgets never block a node drain, so cluster upgrades
+  and admission policies that reject such budgets both keep working.
 
   # Bindings: charts/gateway/tests/ingress-and-pdb.sh (the `helm` job in
   # .github/workflows/go-services.yaml) and
   # charts/langwatch/tests/gateway-ingress-and-pdbs.sh.
 
-  Rule: The gateway Ingress is opt-in
+  Rule: The gateway is published from the app Ingress settings
 
     @unit
     Scenario: a default install creates no gateway Ingress
@@ -22,27 +22,37 @@ Feature: Helm install routing and disruption budgets
       And the control plane is given no gateway public URL
 
     @unit
-    Scenario: an enabled gateway Ingress uses the class the operator picked
-      Given the gateway Ingress is enabled with host "gateway.acme.com" and class "envoy"
+    Scenario: the gateway host follows the app Ingress settings
+      Given the app Ingress is enabled with class "envoy" and a cert-manager annotation
+      And ingress.gateway.host is "gateway.acme.com" with TLS secret "gateway-tls"
       When the chart renders
-      Then the gateway Ingress has ingressClassName "envoy"
+      Then a second Ingress routes /v1 and /health on that host to the gateway Service
+      And it has ingressClassName "envoy", the app annotations and the TLS secret
       And it carries no ingress-nginx annotation
-      And the control plane is given "https://gateway.acme.com" as the gateway public URL when TLS is on
-      And with no class set, the Ingress leaves ingressClassName unset for the cluster default
+      And the control plane is given "https://gateway.acme.com" as the gateway public URL
+      And without ingress.gateway.host no gateway Ingress renders
 
     @unit
-    Scenario: ingress-nginx annotations apply only to an nginx gateway Ingress
-      Given the gateway Ingress is enabled with class "nginx"
+    Scenario: ingress-nginx streaming settings apply only to an nginx gateway host
+      Given the app Ingress uses class "nginx"
+      And ingress.gateway.host is set
       When the chart renders
-      Then the Ingress turns off proxy buffering and sets a 32m body size
-      And an annotation the operator sets wins over the nginx default
+      Then the gateway Ingress turns off proxy buffering, sets a 3600s read timeout and a 32m body size
+      And ingress.gateway.annotations win over those defaults
+      And the app Ingress keeps only its own annotations
 
     @unit
     Scenario: a gateway host without an enabled Ingress is refused
-      Given a values file that sets the gateway Ingress host but does not enable it
+      Given ingress.gateway.host is set and ingress.enabled is not
       When the chart renders
       Then the render fails naming ingress.enabled
-      And enabling the Ingress without a host fails naming ingress.host
+
+    @unit
+    Scenario: retired gateway ingress values are refused
+      Given a values file that still sets gateway.ingress.enabled true or gateway.ingress.host
+      When the chart renders
+      Then the render fails naming ingress.gateway.host
+      And gateway.ingress.enabled false on its own still renders
 
   Rule: Disruption budgets never block a node drain
 

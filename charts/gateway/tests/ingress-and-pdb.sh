@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Renders the gateway chart and asserts two things about what a plain install
-# creates on the cluster:
+# Renders the gateway chart and asserts two things about what it creates on
+# the cluster:
 #
-#   - the Ingress is opt-in. A default render has none, an enabled one carries
-#     the class the operator picked (or none, for the cluster default), and the
-#     ingress-nginx annotations appear only when that class is nginx.
+#   - no Ingress. The langwatch chart publishes the gateway from its app
+#     Ingress (ingress.gateway.host), so the retired ingress values here are
+#     refused with a pointer to that key instead of being dropped.
 #   - the PodDisruptionBudget never blocks a node drain. None renders over a
 #     single pod, and a budget that leaves no pod evictable is refused.
 #
@@ -70,80 +70,22 @@ test_default_render_has_no_ingress() {
   fi
 }
 
-# @scenario "an enabled gateway Ingress uses the class the operator picked"
-test_enabled_ingress_uses_the_chosen_class() {
-  local doc
-  render envoy --set ingress.enabled=true --set ingress.host=gateway.acme.com \
-    --set ingress.className=envoy
-  doc=$(doc_of envoy ingress.yaml)
-  if [ -z "$doc" ]; then
-    fail "chosen class" "no Ingress rendered: $(cat "$tmp/envoy.err")"
-    return
-  fi
-  if printf '%s\n' "$doc" | grep -q 'ingressClassName: envoy$'; then
-    ok "chosen class" "ingressClassName: envoy"
+# @scenario "retired gateway ingress values are refused"
+test_retired_ingress_values_are_refused() {
+  local entry
+  for entry in "ingress.enabled=true" "ingress.host=gateway.acme.com" "ingress.className=nginx"; do
+    render "retired-${entry%%=*}" --set "$entry"
+    if grep -q 'ingress.gateway.host' "$tmp/retired-${entry%%=*}.err"; then
+      ok "retired $entry" "render refused, naming ingress.gateway.host"
+    else
+      fail "retired $entry" "the retired value rendered or failed without naming the new key: $(cat "$tmp/retired-${entry%%=*}.err")"
+    fi
+  done
+  render disabled-only --set ingress.enabled=false
+  if [ -s "$tmp/disabled-only.err" ]; then
+    fail "ingress.enabled=false" "an explicit off switch was refused: $(cat "$tmp/disabled-only.err")"
   else
-    fail "chosen class" "ingressClassName is not envoy: $(printf '%s\n' "$doc" | grep ingressClassName || echo '<absent>')"
-  fi
-  if printf '%s\n' "$doc" | grep -q 'nginx.ingress.kubernetes.io'; then
-    fail "chosen class annotations" "an envoy Ingress carries ingress-nginx annotations"
-  else
-    ok "chosen class annotations" "no ingress-nginx annotations on an envoy Ingress"
-  fi
-  if printf '%s\n' "$doc" | grep -q 'host: "gateway.acme.com"'; then
-    ok "chosen class host" "rule host is gateway.acme.com"
-  else
-    fail "chosen class host" "rule host is not gateway.acme.com"
-  fi
-
-  render noclass --set ingress.enabled=true --set ingress.host=gateway.acme.com
-  doc=$(doc_of noclass ingress.yaml)
-  if [ -z "$doc" ]; then
-    fail "default class" "no Ingress rendered: $(cat "$tmp/noclass.err")"
-  elif printf '%s\n' "$doc" | grep -q 'ingressClassName'; then
-    fail "default class" "an empty className still rendered ingressClassName"
-  else
-    ok "default class" "empty className leaves the cluster default IngressClass"
-  fi
-}
-
-# @scenario "ingress-nginx annotations apply only to an nginx gateway Ingress"
-test_nginx_annotations_follow_the_nginx_class() {
-  local doc
-  render nginx --set ingress.enabled=true --set ingress.host=gateway.acme.com \
-    --set ingress.className=nginx \
-    --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout=7200'
-  doc=$(doc_of nginx ingress.yaml)
-  if printf '%s\n' "$doc" | grep -q 'nginx.ingress.kubernetes.io/proxy-buffering: "off"'; then
-    ok "nginx streaming" "proxy-buffering off on an nginx Ingress"
-  else
-    fail "nginx streaming" "nginx Ingress is missing proxy-buffering off"
-  fi
-  if printf '%s\n' "$doc" | grep -q 'nginx.ingress.kubernetes.io/proxy-body-size: 32m'; then
-    ok "nginx body size" "proxy-body-size matches the 32 MiB request cap"
-  else
-    fail "nginx body size" "nginx Ingress is missing proxy-body-size 32m"
-  fi
-  if printf '%s\n' "$doc" | grep -q 'nginx.ingress.kubernetes.io/proxy-read-timeout: "7200"'; then
-    ok "nginx override" "an operator annotation wins over the nginx default"
-  else
-    fail "nginx override" "ingress.annotations did not override the nginx default read timeout"
-  fi
-}
-
-# @scenario "a gateway host without an enabled Ingress is refused"
-test_host_without_enabled_is_refused() {
-  render hostonly --set ingress.host=gateway.acme.com
-  if grep -q 'ingress.enabled is not true' "$tmp/hostonly.err"; then
-    ok "host only" "render refused, naming ingress.enabled"
-  else
-    fail "host only" "a host without enabled rendered: $(cat "$tmp/hostonly.err")"
-  fi
-  render nohost --set ingress.enabled=true
-  if grep -q 'ingress.host is empty' "$tmp/nohost.err"; then
-    ok "enabled without host" "render refused, naming ingress.host"
-  else
-    fail "enabled without host" "enabled without a host rendered: $(cat "$tmp/nohost.err")"
+    ok "ingress.enabled=false" "an explicit off switch still renders"
   fi
 }
 
@@ -197,9 +139,7 @@ test_pdb_never_blocks_a_drain() {
 }
 
 test_default_render_has_no_ingress
-test_enabled_ingress_uses_the_chosen_class
-test_nginx_annotations_follow_the_nginx_class
-test_host_without_enabled_is_refused
+test_retired_ingress_values_are_refused
 test_pdb_never_blocks_a_drain
 
 if [ "$failures" -gt 0 ]; then

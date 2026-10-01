@@ -279,15 +279,15 @@ spec:
             # cursor) at login. Without it the CLI falls back to
             # http://localhost:5563, which a developer laptop can't reach
             # against a remote cluster. Prefer the explicit gateway.publicUrl
-            # knob; otherwise derive it from the gateway ingress host when
-            # that ingress is enabled.
+            # knob; otherwise derive it from ingress.gateway.host when the
+            # app Ingress publishes the gateway.
             {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
             {{- if not $gwPublic }}
-            {{- $gwIngress := .Values.gateway.ingress | default dict }}
-            {{- $gwHost := $gwIngress.host | default "" }}
-            {{- if and $gwIngress.enabled $gwHost }}
+            {{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+            {{- $gwHost := $gwRoute.host | default "" }}
+            {{- if and .Values.ingress.enabled $gwHost }}
             {{- $scheme := "http" }}
-            {{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+            {{- if ($gwRoute.tls | default dict).secretName }}{{- $scheme = "https" }}{{- end }}
             {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
             {{- end }}
             {{- end }}

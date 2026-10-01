@@ -212,26 +212,26 @@ docker compose up -d
 
 ## Breaking Changes
 
-### LangWatch AI Gateway Ingress is off by default (Helm)
+### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
 
-The gateway sub-chart used to create an Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now creates none until `gateway.ingress.enabled` is `true`, the same as the app Ingress.
+The gateway sub-chart used to create its own Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now renders no Ingress. The `gateway.ingress.*` values are gone.
 
-If you published the gateway through that Ingress, set these values before you upgrade:
+To keep publishing the gateway through an Ingress, set its host on the app Ingress. The chart renders a second Ingress, `<release>-gateway-ingress`, with the app Ingress `className`, `labels` and `annotations`:
 
 ```yaml
-gateway:
-  ingress:
-    enabled: true
-    className: nginx
+ingress:
+  enabled: true
+  className: nginx
+  # ...your existing app hosts, tls and annotations
+  gateway:
     host: gateway.acme.com
     tls:
-      enabled: true
       secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod   # only if you used it
 ```
 
-With `className: nginx` the chart still adds the streaming and timeout annotations, and now sets a 32 MB body limit. A values file that sets `gateway.ingress.host` without `enabled: true` fails to render, so the Ingress cannot disappear on upgrade without an error. If you route to the gateway another way, remove `gateway.ingress.host` and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+
+A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
 

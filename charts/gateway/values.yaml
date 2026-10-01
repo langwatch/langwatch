@@ -57,53 +57,11 @@ service:
     enabled: false
     port: 80
 
-# Off by default, like the umbrella chart's app ingress: a plain install
-# creates no Ingress. Enable it to publish the gateway through an Ingress
-# controller, or leave it off and route to the gateway Service yourself
-# (Gateway API HTTPRoute, a LoadBalancer Service, a mesh). The routes,
-# timeouts and body size any controller needs are in
+# This chart renders no Ingress. Under the langwatch chart, publish the
+# gateway with ingress.gateway.host on the app Ingress. Installed on its own,
+# route to the Service above (Gateway API HTTPRoute, a LoadBalancer Service,
+# your own Ingress). Paths, timeouts and body size:
 # docs/self-hosting/deployment/routing.
-ingress:
-  enabled: false
-  # IngressClass to use. Empty leaves spec.ingressClassName unset, so the
-  # cluster's default IngressClass picks it up.
-  className: ""
-  # Hostname LLM clients use for the gateway, separate from the app host.
-  # Required when enabled.
-  host: ""
-  path: /v1
-  pathType: Prefix
-  # Public status-page surface. An Exact match publishes this one path and
-  # nothing else, so /healthz, /readyz, /metrics and /internal stay
-  # in-cluster. Methods are bounded by the gateway route, which serves GET
-  # and HEAD and answers 405 otherwise, not by the ingress.
-  # The endpoint is unauthenticated by design: it reports the gateway
-  # process plus the control-plane connectivity verdict cached by a
-  # background probe, returns no tenant data, makes no upstream call per
-  # poll, and can never go red from a model-provider outage. Point the
-  # status-page HTTP monitor at https://<ingress.host>/health.
-  healthPath:
-    enabled: true
-    path: /health
-  tls:
-    enabled: false
-    secretName: gateway-tls
-  # Applied as written, whatever the controller. Put cert-manager issuers,
-  # controller timeouts and the like here. Keys here win over
-  # controllerAnnotations.
-  annotations: {}
-  # Added only when ingress.className equals the key, so a cluster on another
-  # controller never receives them. The nginx set keeps streamed (SSE)
-  # responses unbuffered, lets a stream run for an hour, and raises
-  # ingress-nginx's 1m body default to security.maxRequestBodyBytes (32 MiB).
-  # Add an entry for your own IngressClass name to get the same behaviour.
-  controllerAnnotations:
-    nginx:
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-body-size: "32m"
 
 # Control-plane connection (LangWatch app). Left empty, this resolves to the
 # app Service of the install the gateway is part of, `<release>-app:5560` —

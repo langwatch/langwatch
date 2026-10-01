@@ -77,17 +77,16 @@ dev's Personal Workspace at https://<your-host>/me .
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ .Release.Name }}-gateway
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
-{{- $gwIngress := .Values.gateway.ingress | default dict }}
-{{- if $gwIngress.enabled }}
-  • AI Gateway public route: Ingress for {{ $gwIngress.host }}{{ with $gwIngress.className }} (class {{ . }}){{ end }}, paths /v1 and /health.
+{{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
+{{- if and .Values.ingress.enabled $gwHost }}
+  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1 and /health.
 {{- else if .Values.gateway.publicUrl }}
   • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
     rendered; your own route must send /v1 and /health to Service
     {{ .Release.Name }}-gateway port 80).
 {{- else }}
-  • The AI Gateway has no public route: gateway.ingress is off by default.
-    LLM clients and the CLI need one. Either set gateway.ingress.enabled=true
-    with gateway.ingress.host and gateway.ingress.className, or route
+  • The AI Gateway has no public route. LLM clients and the CLI need one.
+    Either set ingress.gateway.host on the app Ingress, or route
     /v1 and /health on your gateway hostname to Service
     {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
     balancer) and set gateway.publicUrl. Routes, timeouts and body size:

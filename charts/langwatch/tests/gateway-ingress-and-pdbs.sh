@@ -3,9 +3,9 @@
 # Renders the umbrella chart and asserts what a plain install creates for
 # routing and disruption budgets:
 #
-#   - no Ingress at all, app or gateway, until an operator enables one, and
-#     an enabled gateway Ingress uses the class the operator picked and hands
-#     the control plane its public URL.
+#   - no Ingress at all until an operator enables one. The gateway is
+#     published from the app Ingress settings with ingress.gateway.host, as a
+#     second Ingress object, and the retired gateway.ingress values are refused.
 #   - no PodDisruptionBudget that blocks a node drain: none over a single pod,
 #     and a budget that leaves no pod evictable is refused at render time.
 #
@@ -64,6 +64,17 @@ doc_of() {
   ' "$tmp/$name.yaml"
 }
 
+# One rendered document, picked by its metadata.name.
+doc_named() {
+  local name="$1" want="$2"
+  awk -v want="  name: $want" '
+    /^---/ { if (hit) exit; buf=""; next }
+    { buf = buf $0 "\n" }
+    $0 == want { hit=1 }
+    END { if (hit) printf "%s", buf }
+  ' "$tmp/$name.yaml"
+}
+
 # @scenario "a default install creates no gateway Ingress"
 test_default_install_has_no_ingress() {
   render default
@@ -88,41 +99,117 @@ test_default_install_has_no_ingress() {
   fi
 }
 
-# @scenario "an enabled gateway Ingress uses the class the operator picked"
-test_enabled_gateway_ingress_under_the_umbrella() {
+# Common flags: the app Ingress on, with a gateway host.
+APP_INGRESS=(--set ingress.enabled=true --set 'ingress.hosts[0].host=langwatch.acme.com'
+  --set 'ingress.hosts[0].http.paths[0].path=/' --set 'ingress.hosts[0].http.paths[0].pathType=Prefix'
+  --set ingress.gateway.host=gateway.acme.com)
+
+# @scenario "the gateway host follows the app Ingress settings"
+test_gateway_host_on_the_app_ingress() {
   local doc url
-  render envoy --set gateway.ingress.enabled=true --set gateway.ingress.host=gateway.acme.com \
-    --set gateway.ingress.className=envoy --set gateway.ingress.tls.enabled=true
-  doc=$(doc_of envoy langwatch/charts/gateway/templates/ingress.yaml)
+  render envoy "${APP_INGRESS[@]}" --set ingress.className=envoy \
+    --set-string 'ingress.annotations.cert-manager\.io/cluster-issuer=letsencrypt-prod' \
+    --set ingress.gateway.tls.secretName=gateway-tls
+  doc=$(doc_named envoy lw-gateway-ingress)
   if [ -z "$doc" ]; then
-    fail "umbrella gateway ingress" "no gateway Ingress rendered: $(cat "$tmp/envoy.err")"
+    fail "gateway ingress" "no lw-gateway-ingress rendered: $(cat "$tmp/envoy.err")"
     return
   fi
   if printf '%s\n' "$doc" | grep -q 'ingressClassName: envoy$'; then
-    ok "umbrella gateway class" "ingressClassName: envoy"
+    ok "gateway class" "ingressClassName: envoy, from ingress.className"
   else
-    fail "umbrella gateway class" "ingressClassName is not envoy"
+    fail "gateway class" "the gateway Ingress did not take ingress.className"
   fi
-  if printf '%s\n' "$doc" | grep -q 'name: lw-gateway$'; then
-    ok "umbrella gateway backend" "backend is the lw-gateway Service"
+  if printf '%s\n' "$doc" | grep -q 'cert-manager.io/cluster-issuer: letsencrypt-prod'; then
+    ok "gateway annotations" "carries the app Ingress annotations"
   else
-    fail "umbrella gateway backend" "backend is not the lw-gateway Service"
+    fail "gateway annotations" "the app Ingress annotations did not reach the gateway Ingress"
+  fi
+  if printf '%s\n' "$doc" | grep -q 'nginx.ingress.kubernetes.io'; then
+    fail "gateway no nginx" "an envoy gateway Ingress carries ingress-nginx annotations"
+  else
+    ok "gateway no nginx" "no ingress-nginx annotations on an envoy class"
+  fi
+  if printf '%s\n' "$doc" | grep -q 'name: lw-gateway$' && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
+      && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
+    ok "gateway backend" "/v1 and /health route to the lw-gateway Service"
+  else
+    fail "gateway backend" "the gateway paths do not route to lw-gateway"
+  fi
+  if printf '%s\n' "$doc" | grep -q 'secretName: gateway-tls$'; then
+    ok "gateway tls" "tls uses ingress.gateway.tls.secretName"
+  else
+    fail "gateway tls" "the gateway tls secret is missing"
   fi
   url=$(app_env envoy LW_GATEWAY_PUBLIC_URL)
   if [ "$url" = "https://gateway.acme.com" ]; then
-    ok "umbrella public url" "LW_GATEWAY_PUBLIC_URL derived from the gateway Ingress host"
+    ok "gateway public url" "LW_GATEWAY_PUBLIC_URL derived from ingress.gateway.host"
   else
-    fail "umbrella public url" "LW_GATEWAY_PUBLIC_URL is '${url:-<unset>}', want https://gateway.acme.com"
+    fail "gateway public url" "LW_GATEWAY_PUBLIC_URL is '${url:-<unset>}', want https://gateway.acme.com"
+  fi
+
+  render nogw "${APP_INGRESS[@]/ingress.gateway.host=gateway.acme.com/ingress.gateway.host=}"
+  if grep -q 'lw-gateway-ingress' "$tmp/nogw.yaml"; then
+    fail "no gateway host" "a gateway Ingress rendered with no ingress.gateway.host"
+  else
+    ok "no gateway host" "no gateway Ingress without ingress.gateway.host"
+  fi
+}
+
+# @scenario "ingress-nginx streaming settings apply only to an nginx gateway host"
+test_nginx_settings_on_the_gateway_host() {
+  local doc app
+  render nginx "${APP_INGRESS[@]}" --set ingress.className=nginx \
+    --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout=120' \
+    --set-string 'ingress.gateway.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout=7200'
+  doc=$(doc_named nginx lw-gateway-ingress)
+  app=$(doc_named nginx lw-ingress)
+  if printf '%s\n' "$doc" | grep -q 'proxy-buffering: "off"' && printf '%s\n' "$doc" | grep -q 'proxy-body-size: 32m' \
+      && printf '%s\n' "$doc" | grep -q 'proxy-read-timeout: "3600"'; then
+    ok "nginx gateway" "buffering off, 32m body, 3600s read timeout on the gateway Ingress"
+  else
+    fail "nginx gateway" "the gateway Ingress is missing the nginx streaming settings"
+  fi
+  if printf '%s\n' "$doc" | grep -q 'proxy-send-timeout: "7200"'; then
+    ok "nginx gateway override" "ingress.gateway.annotations wins"
+  else
+    fail "nginx gateway override" "ingress.gateway.annotations did not override the nginx default"
+  fi
+  if printf '%s\n' "$app" | grep -q 'proxy-buffering'; then
+    fail "nginx app untouched" "the app Ingress picked up the gateway streaming settings"
+  elif printf '%s\n' "$app" | grep -q 'proxy-read-timeout: "120"'; then
+    ok "nginx app untouched" "the app Ingress keeps its own annotations"
+  else
+    fail "nginx app untouched" "the app Ingress lost its annotations"
   fi
 }
 
 # @scenario "a gateway host without an enabled Ingress is refused"
-test_gateway_host_without_enabled_is_refused() {
-  render hostonly --set gateway.ingress.host=gateway.acme.com
+test_gateway_host_without_ingress_is_refused() {
+  render hostonly --set ingress.gateway.host=gateway.acme.com
   if grep -q 'ingress.enabled is not true' "$tmp/hostonly.err"; then
-    ok "umbrella host only" "render refused, naming ingress.enabled"
+    ok "gateway host only" "render refused, naming ingress.enabled"
   else
-    fail "umbrella host only" "gateway.ingress.host without enabled rendered"
+    fail "gateway host only" "ingress.gateway.host without ingress.enabled rendered"
+  fi
+}
+
+# @scenario "retired gateway ingress values are refused"
+test_retired_gateway_ingress_values_are_refused() {
+  local entry
+  for entry in "gateway.ingress.enabled=true" "gateway.ingress.host=gateway.acme.com"; do
+    render "retired-${entry%%=*}" --set "$entry"
+    if grep -q 'ingress.gateway.host' "$tmp/retired-${entry%%=*}.err"; then
+      ok "retired $entry" "render refused, naming ingress.gateway.host"
+    else
+      fail "retired $entry" "rendered or failed without naming the new key: $(cat "$tmp/retired-${entry%%=*}.err")"
+    fi
+  done
+  render retired-off --set gateway.ingress.enabled=false
+  if [ -s "$tmp/retired-off.err" ]; then
+    fail "gateway.ingress.enabled=false" "an explicit off switch was refused: $(cat "$tmp/retired-off.err")"
+  else
+    ok "gateway.ingress.enabled=false" "an explicit off switch still renders"
   fi
 }
 
@@ -192,8 +279,10 @@ test_blocking_pass_through_pdb_is_refused() {
 }
 
 test_default_install_has_no_ingress
-test_enabled_gateway_ingress_under_the_umbrella
-test_gateway_host_without_enabled_is_refused
+test_gateway_host_on_the_app_ingress
+test_nginx_settings_on_the_gateway_host
+test_gateway_host_without_ingress_is_refused
+test_retired_gateway_ingress_values_are_refused
 test_gateway_pdb_under_the_umbrella
 test_pass_through_pdb_over_one_pod_is_skipped
 test_blocking_pass_through_pdb_is_refused

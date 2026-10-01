@@ -1,3 +1,15 @@
+{{- /*
+  This chart renders no Ingress. The langwatch chart publishes the gateway
+  from its own app Ingress (ingress.gateway.host), so a leftover ingress block
+  here would otherwise be dropped without a word and the public route with it.
+  `ingress.enabled: false` on its own asks for nothing and is accepted.
+*/ -}}
+{{- with .Values.ingress }}
+{{- $rest := omit . "enabled" }}
+{{- if or .enabled $rest }}
+{{- fail "gateway ingress values (gateway.ingress.* in the langwatch chart) are no longer supported: the gateway chart renders no Ingress. In the langwatch chart set ingress.gateway.host (and ingress.gateway.tls.secretName) to publish the gateway on the app Ingress, with the same className and annotations. Installed on its own, route to this chart's Service yourself. Remove the gateway ingress block. See https://docs.langwatch.ai/self-hosting/deployment/routing" }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

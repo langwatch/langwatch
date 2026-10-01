@@ -17,7 +17,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |
 
-None of these endpoints requires a key. With the chart's ClusterIP Service and its Ingress enabled, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 
@@ -97,15 +97,7 @@ The verdict flips to 503 after 60 seconds without a successful probe, and a new 
 
 The probe failure itself is logged on the gateway pod as `statusprobe_control_plane_unreachable`, with the underlying error.
 
-```yaml
-gateway:
-  ingress:
-    healthPath:
-      enabled: true    # default
-      path: /health
-```
-
-Set `enabled: false` to keep the endpoint in-cluster.
+The chart Ingress for `ingress.gateway.host` publishes `/health` as an `Exact` path next to `/v1`. To keep the endpoint in-cluster, route the gateway with your own route and leave `/health` out.
 
 ## Graceful shutdown
 
