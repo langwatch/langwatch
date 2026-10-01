@@ -11,12 +11,8 @@ import { z } from "zod";
 
 import { createErrorHandler, EndpointWithdrawnError } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
-import {
-  createRestRuntime,
-  type RestAuditRow,
-  type RestIdentity,
-  type RestRuntimeMembers,
-} from "../runtime.ts";
+import { createRestRuntime, type RestRuntimeMembers } from "../runtime.ts";
+import type { RestAuditRow, RestIdentity } from "../../hosting/api-door.ts";
 
 const VERSION = "2026-09-10";
 
@@ -53,7 +49,7 @@ const keys = defineRestRouter(KeyApi)
   .withCredential("organization")
 
   .post("/", "createApiKey")
-  .withCredential("instance-admin")
+  .withCredential("instance_admin")
   .withAudit("api-key.created")
   .withInput(z.object({ name: z.string() }))
   .withPermission("organization:manage")
@@ -103,7 +99,7 @@ function recordingSink(): { rows: RestAuditRow[]; record(row: RestAuditRow): voi
 function mounted(ports: Partial<RestRuntimeMembers> = {}): Hono {
   const runtime = createRestRuntime({
     identity: organizationDoor,
-    doors: { "instance-admin": instanceAdminDoor },
+    doors: { instance_admin: instanceAdminDoor },
     ...ports,
   });
 
@@ -160,7 +156,7 @@ describe("given a route that raises a credential kind of its own", () => {
           credential: "organization",
           onError: createErrorHandler(),
         }),
-      ).toThrow(/answers behind the "instance-admin" door/);
+      ).toThrow(/answers behind the "instance_admin" door/);
     });
   });
 });
@@ -211,7 +207,7 @@ describe("given a route that declares the trail it leaves", () => {
     it("refuses the mount naming the action", () => {
       const runtime = createRestRuntime({
         identity: organizationDoor,
-        doors: { "instance-admin": instanceAdminDoor },
+        doors: { instance_admin: instanceAdminDoor },
       });
 
       expect(() =>

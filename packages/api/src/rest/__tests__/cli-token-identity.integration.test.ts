@@ -11,7 +11,7 @@ import { CliTokenIdentity, type CliTokenPresented } from "../cli-token-identity.
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import type { RestAuditRow } from "../runtime.ts";
+import type { RestAuditRow } from "../../hosting/api-door.ts";
 
 const NOW = Date.parse("2026-09-25T12:00:00Z");
 
@@ -23,7 +23,7 @@ const declaration = defineRestRouter(Api)
   .withNamespace("cli-token")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
-  .withCredential("cliToken", {
+  .withCredential("cli_token", {
     session: z.object({
       tokenKey: z.string(),
       cliApiKeyId: z.string().optional(),
@@ -53,9 +53,9 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -82,7 +82,7 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
     },
   });
   host.mount(declaration.router(), () => ({ whoAmI: (input: WhoAmI) => input }), {
-    facts: [bindRestCredential("cliToken", () => door)],
+    facts: [bindRestCredential("cli_token", () => door)],
   });
 
   return host;
@@ -179,9 +179,9 @@ describe("the CLI token door", () => {
         identities: {
           project: closed,
           organization: closed,
-          apiKey: closed,
-          scimToken: closed,
-          "instance-admin": closed,
+          api_key: closed,
+          scim_token: closed,
+          instance_admin: closed,
           browser: closed,
         },
         bearers: () => closed,

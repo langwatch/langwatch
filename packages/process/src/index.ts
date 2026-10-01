@@ -1,4 +1,5 @@
 export type { BootedRuntime } from "./application.ts";
+export { composeApiApplication } from "./transport/api-surface.ts";
 export { MissingTransportPeerError, transportPeersOf } from "./transport-peers.ts";
 export {
   DuplicateTransportNamespaceError,

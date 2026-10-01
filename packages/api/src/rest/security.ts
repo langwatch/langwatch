@@ -1,15 +1,13 @@
 /**
- * The process security kernel a REST door composes: per-process ports, the route-policy
- * registry and its every-route-declared-a-policy check, the credential-refusal fingerprint,
- * the shared-secret comparison, the audit emission, and the custom-role permission vocabulary.
+ * The process security kernel a REST door composes: per-process ports, the
+ * every-route-declared-a-policy check over the route registry, the credential-refusal
+ * fingerprint, the audit emission, and the custom-role permission vocabulary.
  */
-import { timingSafeEqual } from "node:crypto";
-
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 
-import type { AccessPolicy, CredentialClass } from "../access-policy.ts";
 import type { Credential } from "../access/access.ts";
+import { allRegisteredRoutes, type RegisteredRoute } from "../route-registry.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 
 // Everything a REST door needs from the process it runs in. Authentication (API keys,
@@ -112,67 +110,6 @@ export function familyFromBasePath(basePath: string): string {
       .replace(/\/+$/, "")
       .replace(/\//g, "-") || "api"
   );
-}
-
-// The process-wide route-policy registry, populated as each family mounts. The
-// router-introspection guard cross-checks the composed router against it, so any mounted
-// route lacking a declared policy — even one that bypassed the runtime — fails CI.
-
-export interface RegisteredRoute {
-  readonly method: string;
-  readonly path: string;
-  readonly policy: AccessPolicy;
-  readonly family: string;
-  /**
-   * Which credential an API consumer sends here. Derived by the runtime from the mount and
-   * the route, so a route cannot claim a credential class nothing enforces. Read by the
-   * OpenAPI generator to stamp each operation's `security`.
-   */
-  readonly credentialClass: CredentialClass;
-  /**
-   * The credential KIND the route answers behind: the door it names, or its
-   * family's own. The address inventory is keyed on this, so a conversion that
-   * changes which door serves a path is a failing diff.
-   */
-  readonly credential: Credential;
-  /**
-   * The `/api/v1` path this same route also answers at. One logical route with
-   * two addresses, so an authorization audit and the document's drift guard
-   * count it once and still recognise the canonical published URL.
-   */
-  readonly canonicalPath?: string;
-  /**
-   * True when this mount answers 410 Gone for a withdrawn endpoint. No handler
-   * stands behind it, so the route-coverage gate accounts for it by shape.
-   */
-  readonly withdrawn?: boolean;
-  /**
-   * True for the catch-alls that 404 an unknown version namespace. Real routes
-   * in the table, and undocumentable for the same reason a tombstone is.
-   */
-  readonly isNamespaceGuard?: boolean;
-}
-
-const registry = new Map<string, RegisteredRoute>();
-
-function registryKey(method: string, path: string): string {
-  return `${method.toUpperCase()} ${path}`;
-}
-
-/** Record (or overwrite, idempotently) the policy for a (method, path). */
-export function registerRoutePolicy(route: RegisteredRoute): void {
-  registry.set(registryKey(route.method, route.path), {
-    ...route,
-    method: route.method.toUpperCase(),
-  });
-}
-
-export function getRoutePolicy(method: string, path: string): RegisteredRoute | undefined {
-  return registry.get(registryKey(method, path));
-}
-
-export function allRegisteredRoutes(): RegisteredRoute[] {
-  return [...registry.values()];
 }
 
 /** One mounted address, as the checked-in inventory records it. */
@@ -324,36 +261,6 @@ export function collectAuthDiagnostics(request: {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The one comparison behind every internal route's shared secret.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Fails CLOSED, because `header === secret` read `undefined === undefined` as
- * true and let anyone trigger destructive jobs.
- */
-export function isInternalSecretValid({
-  authorizationHeader,
-  expected,
-}: {
-  authorizationHeader: string | undefined;
-  expected: string | undefined;
-}): boolean {
-  if (!expected) return false;
-
-  const presented = authorizationHeader?.startsWith("Bearer ")
-    ? authorizationHeader.slice("Bearer ".length)
-    : authorizationHeader;
-
-  if (!presented) return false;
-
-  const presentedBytes = Buffer.from(presented);
-  const expectedBytes = Buffer.from(expected);
-  if (presentedBytes.length !== expectedBytes.length) return false;
-
-  return timingSafeEqual(presentedBytes, expectedBytes);
-}
-
 // Audit emission for management API writes, as a port. The write has already committed by
 // the time this runs, so a logging failure must not fail the response — the port returns
 // `void` rather than a promise on purpose, and the process that supplies it owns the swallow.
@@ -422,45 +329,4 @@ export interface AppRestRbacVocabulary {
    * project scope.
    */
   isOrganizationExclusive(resource: string): boolean;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Whether a request came from this deployment's own pages.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** The request headers the guard reads, whatever framework carries them. */
-export type OriginBearingRequest = Readonly<{
-  req: Readonly<{ header(name: string): string | undefined }>;
-}>;
-
-/**
- * A browser attaches this deployment's cookie to cross-site requests too, so "the cookie is valid"
- * and "our own page sent this" differ; only the second keeps a forged form off an endpoint.
- */
-export class BrowserOriginGuard {
-  /**
-   * `Sec-Fetch-Site` is the primary signal — set by every modern browser from the real request
-   * initiator and unaffected by reverse proxies. `cross-site` is exactly the forgery vector;
-   * `same-origin`, `same-site` and `none` (a direct navigation) are all legitimate.
-   */
-  static isFromOwnOrigin(request: OriginBearingRequest): boolean {
-    const secFetchSite = request.req.header("sec-fetch-site");
-    if (secFetchSite) return secFetchSite !== "cross-site";
-
-    const origin = request.req.header("origin");
-    // Fail CLOSED: with neither `Sec-Fetch-Site` nor `Origin` there is no
-    // positive same-site signal. A real request from the browser application
-    // always carries one of the two, so this rejects only forged and
-    // pathological contexts, never a legitimate browser call.
-    if (!origin) return false;
-
-    const host = request.req.header("x-forwarded-host") ?? request.req.header("host") ?? "";
-
-    try {
-      return new URL(origin).host === host;
-    } catch {
-      // A malformed Origin is not this deployment's own page.
-      return false;
-    }
-  }
 }

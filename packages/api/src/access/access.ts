@@ -82,12 +82,12 @@ export type Credential =
   | "browser"
   | "project"
   | "organization"
-  | "apiKey"
-  | "scimToken"
-  | "internalSecret"
-  | "instance-admin"
-  | "sessionKey"
-  | "cliToken"
+  | "api_key"
+  | "scim_token"
+  | "internal_secret"
+  | "instance_admin"
+  | "session_key"
+  | "cli_token"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -317,22 +317,22 @@ export async function decide({
 export function securityRequirement(credential: Credential): readonly Record<string, never[]>[] {
   switch (credential) {
     case "project":
-    case "apiKey":
-    case "sessionKey":
+    case "api_key":
+    case "session_key":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];
-    case "scimToken":
+    case "scim_token":
       return [{ scim_bearer: [] }];
-    case "cliToken":
+    case "cli_token":
       return [{ cli_access_token: [] }];
     // A deployment secret is held by an operator's own monitor rather than by
     // us, so it has a scheme for the same reason the SCIM token does.
-    case "internalSecret":
+    case "internal_secret":
       return [{ internal_secret: [] }];
     // The self-hosted operator's own key. It creates the first organization,
     // before any organization key exists to be presented instead.
-    case "instance-admin":
+    case "instance_admin":
       return [{ instance_admin_key: [] }];
     case "public":
       return [];
@@ -674,4 +674,29 @@ function declaredPermissionOf(declaration: AccessDeclaration): string {
     case "no-permission":
       return "";
   }
+}
+
+/**
+ * A credential minted while an operator acts as the user would outlive the session it came
+ * from, so an endpoint declared as minting one is refused for such an actor. With no resolved
+ * scope the refusal names the endpoint as the resource.
+ */
+export function refuseImpersonatedMint({
+  permission,
+  actor,
+  scope,
+  address,
+}: {
+  permission: AuthzPermission;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  address: string;
+}): void {
+  if (actor?.type !== "user" || !actor.impersonatorId) return;
+
+  throw new PermissionDeniedError({
+    permission,
+    scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: address },
+    denialReason: "no-binding",
+  });
 }

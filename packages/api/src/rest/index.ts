@@ -49,11 +49,7 @@ export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts
 
 export {
   createRestRuntime,
-  type RestAuditRow,
-  type RestAuditSink,
-  type RestCaller,
   type RestDeprecationLog,
-  type RestIdentity,
   type RestMountOptions,
   type RestRuntime,
   type RestRuntimeMembers,
@@ -138,6 +134,8 @@ export {
 // principal a second permission question is asked with, the scope a handler
 // reads back, and who is behind a personal-workspace key.
 export {
+  type AppRestOrganizationVariables,
+  type AppRestProjectVariables,
   browserCallerOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
@@ -146,37 +144,24 @@ export {
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   organizationOf,
+  type OrganizationScopedContext,
+  PersonalProjectKeyRequiredError,
+  PersonalUsageKeyMismatchError,
+  PersonalUsageServiceKeyUnsupportedError,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectOf,
+  type ProjectScopedContext,
   recordBrowserCaller,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
   recordScimCredential,
-  scimCredentialOfRequest,
-  SessionReader,
-  type SessionCaller,
-  type SessionVerification,
-  PersonalProjectKeyRequiredError,
-  PersonalUsageKeyMismatchError,
-  PersonalUsageServiceKeyUnsupportedError,
-  projectOf,
   resolvePersonalCaller,
-  type AppRestOrganizationVariables,
-  type AppRestProjectVariables,
-  type OrganizationScopedContext,
-  type ProjectScopedContext,
   type RestBrowserCaller,
-  type RestCredentialPrincipal,
   type RestErrorHandler,
-  type RestKeyCredentialPrincipal,
-  type RestOrganizationCredentialPrincipal,
-  type RestProjectCredentialPrincipal,
-  type RestProjectIdentity,
-  type RestResolvedInternalCredential,
-  type RestResolvedOrganizationCredential,
-  type RestResolvedProjectCredential,
   type RestResolvedScimCredential,
+  scimCredentialOfRequest,
 } from "./credential.ts";
 
 // The response half: the context keys, the handler context, the status-carrying
@@ -283,28 +268,21 @@ export { resolver } from "hono-openapi";
 // cross-check that every mounted route declared a policy, the refusal
 // fingerprint, the shared-secret comparison and the management audit.
 export {
-  allRegisteredRoutes,
-  assertEveryRouteDeclared,
-  BrowserOriginGuard,
-  type OriginBearingRequest,
-  collectAuthDiagnostics,
-  emitManagementAudit,
-  familyFromBasePath,
-  getRoutePolicy,
-  isInternalSecretValid,
-  managementActor,
-  registerRoutePolicy,
-  restAddressInventory,
-  undeclaredRoutes,
   type ApiErrorEnvelope,
   type AppRestManagementAudit,
   type AppRestRbacVocabulary,
   type AppRestSecurityMembers,
+  assertEveryRouteDeclared,
   type AuthDiagnostics,
+  collectAuthDiagnostics,
+  emitManagementAudit,
+  familyFromBasePath,
+  managementActor,
   type MountedRouteTable,
-  type RegisteredRoute,
   type RestAddress,
+  restAddressInventory,
   type RestApiServiceMembers,
+  undeclaredRoutes,
 } from "./security.ts";
 
 import type { Hono } from "hono";
@@ -322,14 +300,9 @@ export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-ses
 export { bindRestCredential, type RestCredentialBinding } from "./request.ts";
 
 export { BearerIdentity } from "./bearer-identity.ts";
-export {
-  SessionKeyIdentity,
-  type SessionKeyHolder,
-  type SessionKeyPresented,
-} from "./session-key-identity.ts";
+export { SessionKeyIdentity } from "./session-key-identity.ts";
 export {
   CliTokenIdentity,
-  type CliTokenActor,
   type CliTokenHolder,
   type CliTokenPresented,
 } from "./cli-token-identity.ts";

@@ -3,18 +3,15 @@
  * Spec: specs/ui/browser-query-caching.feature.
  */
 
+import type { Authorize } from "@langwatch/api/access";
+import { SessionReader, type TrpcSessionVersions } from "@langwatch/api/hosting";
+import { composeTrpcRouters, defineTrpcRouter, TrpcHost } from "@langwatch/api/trpc";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
-import type { Authorize } from "../../access/access.ts";
-import { SessionReader } from "../../rest/credential.ts";
-import { composeTrpcRouters } from "../../trpc/compose.ts";
-import { TrpcHost } from "../../trpc/host.ts";
-import { defineTrpcRouter } from "../../trpc/runtime.ts";
-import type { TrpcSessionVersions } from "../../trpc/session-version.ts";
-import { composeApiApplication } from "../api-application.ts";
+import { inertApiDoor } from "../../__tests__/support/api-door.ts";
+import { composeApiApplication } from "../api-surface.ts";
 
 interface ProfileApi {
   own(input: { userId: string }): { name: string };
@@ -63,13 +60,14 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_ada", "Ada"],
       ["user_bo", "Bo"],
     ]);
-    const authz = createApiDouble<Authorize & TrpcSessionVersions>({
+    const authz: Authorize & TrpcSessionVersions = {
+      ...inertApiDoor().authz,
       getSessionVersion: async () => {
         reads += 1;
         return 7;
       },
       checkScopeLineage: async () => ({ kind: "consistent" }),
-    });
+    };
     reads = 0;
     trpc = TrpcHost.create({
       sessions: SessionReader.create({

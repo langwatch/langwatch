@@ -1,6 +1,7 @@
 // The base policy classes a process composes its responses from. Named values,
 // never inline data: a deployment chains onto a default, it never assembles one.
 
+export { BrowserOriginGuard, type OriginBearingRequest } from "./browser-origin.ts";
 export {
   ClientAddress,
   type AddressedRequest,

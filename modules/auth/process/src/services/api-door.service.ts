@@ -1,14 +1,16 @@
 import type { Entitlements } from "@langwatch/api/access";
-import type { ApiDoor } from "@langwatch/api/hosting";
+import type {
+  ApiDoor,
+  RestAuditSink,
+  RestCaller,
+  RestIdentity,
+  TrpcAuditSink,
+} from "@langwatch/api/hosting";
 import {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
-  type RestAuditSink,
-  type RestCaller,
-  type RestIdentity,
 } from "@langwatch/api/rest";
-import type { TrpcAuditSink } from "@langwatch/api/trpc";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import {
@@ -71,7 +73,7 @@ export class ApiDoorService {
       identities: {
         project: this.#projectDoor(),
         organization: this.#organizationDoor(),
-        apiKey: this.#keyDoor(),
+        api_key: this.#keyDoor(),
       },
       entitlements: this.#planEntitlements(),
       audit: { rest: this.#restAudit(), trpc: this.#trpcAudit() },

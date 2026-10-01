@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { BrowserSessionIdentity } from "../browser-session.ts";
-import { SessionReader } from "../credential.ts";
+import { SessionReader } from "../../hosting/session-reader.ts";
 
 const PUBLIC_BASE_URL = "https://app.example";
 const INTERNAL_URL = "http://127.0.0.1:6560/api/export/scenario-runs/download";

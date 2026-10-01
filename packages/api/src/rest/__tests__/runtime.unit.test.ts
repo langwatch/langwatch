@@ -1118,3 +1118,73 @@ describe("a create declared replayable under a caller's key", () => {
     ).toThrow(/supplied no idempotency port to keep its receipts/);
   });
 });
+
+describe("a route declared as minting a credential", () => {
+  const KeysApi = moduleApi<{ createKey(): Promise<void> }>("api-key");
+
+  function mounted({ impersonatorId, handle }: { impersonatorId?: string; handle: () => void }) {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: { type: "user", id: "user-1", ...(impersonatorId ? { impersonatorId } : {}) },
+          scope: { tier: "organization", id: "org-1" },
+        }),
+      },
+    });
+    const declaration = defineRestRouter(KeysApi)
+      .withNamespace("keys")
+      .withVersion("2026-08-07")
+      .withCredential("organization")
+      .post("/", "createKey")
+      .withPermission("organization:view")
+      .mintsCredential("organization:view")
+      .withOutput(z.object({ ran: z.boolean() }))
+      .handle(() => {
+        handle();
+
+        return { ran: true };
+      })
+      .build()
+      .router();
+
+    return runtime.mount(declaration, {
+      app: () => ({ createKey: async () => {} }),
+      credential: "organization",
+      onError: createErrorHandler(),
+    });
+  }
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses an impersonating actor before the handler runs", async () => {
+    let ran = false;
+    const app = mounted({ impersonatorId: "staff-1", handle: () => (ran = true) });
+    const response = await app.request("/api/keys/2026-08-07/", { method: "POST" });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "permission_denied" });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("lets the user acting as themselves through", async () => {
+    let ran = false;
+    const app = mounted({ handle: () => (ran = true) });
+    const response = await app.request("/api/keys/2026-08-07/", { method: "POST" });
+
+    expect(response.status).toBe(200);
+    expect(ran).toBe(true);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses the declaration on a route that answers with no caller", () => {
+    expect(() =>
+      defineRestRouter(KeysApi)
+        .withNamespace("keys")
+        .withVersion("2026-08-07")
+        .post("/", "createKey")
+        .withAccess(publicRoute({ reason: "no caller" }))
+        .mintsCredential("organization:view")
+        .handle(() => {}),
+    ).toThrow(/mints a credential, so it cannot answer with no caller/);
+  });
+});

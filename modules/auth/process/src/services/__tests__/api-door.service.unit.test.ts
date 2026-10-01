@@ -7,10 +7,10 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
-import type { RestIdentity } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = {
   id: "project-1",
@@ -121,7 +121,7 @@ describe("the key doors' actor", () => {
     });
 
     it("is that person on the key door", async () => {
-      expect(await actorThrough(identities.apiKey, headers)).toEqual({
+      expect(await actorThrough(identities.api_key, headers)).toEqual({
         type: "user",
         id: "user-1",
       });
@@ -136,7 +136,7 @@ describe("the key doors' actor", () => {
     });
 
     it("is no one on the key door", async () => {
-      expect(await actorThrough(identities.apiKey, headers)).toBeNull();
+      expect(await actorThrough(identities.api_key, headers)).toBeNull();
     });
   });
 
@@ -169,7 +169,7 @@ describe("the key doors' actor", () => {
     });
 
     it("is the person on the key door", async () => {
-      expect(await actorThrough(identities.apiKey, headers)).toEqual({
+      expect(await actorThrough(identities.api_key, headers)).toEqual({
         type: "user",
         id: "user-3",
       });

@@ -3,7 +3,6 @@
  * call, plus the one budget-resolution read the spend graph makes. Replaces
  * the abstract `GatewayService` — an interface plus its token, not a class.
  */
-import type { RestIdentity } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import type { z } from "zod";
@@ -79,6 +78,7 @@ import type {
   VirtualKeyApiApplicableBudgetsInput,
   VirtualKeyBudgetInput,
 } from "./virtual-key.schemas.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 /** The REST credential a project door presented, as this module is told about it. */
 export type GatewayRequestCredential = z.infer<typeof gatewayRequestCredentialSchema>;
@@ -759,6 +759,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
    */
   authorizeVirtualKeyCreate(input: {
     actor: GatewayCaller;
+    /** A session's impersonator: no key is minted while one acts as a member. */
+    impersonatorId?: string | undefined;
     organizationId: string;
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId?: string | null;
@@ -781,6 +783,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
   /** One permission on one of the key's existing scopes, over the same read. */
   authorizeVirtualKeyOperation(input: {
     actor: GatewayCaller;
+    /** A session's impersonator: a rotation is refused while one acts as a member. */
+    impersonatorId?: string | undefined;
     organizationId: string;
     id: string;
     permission: string;

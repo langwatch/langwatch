@@ -4,7 +4,6 @@ import {
   createRestRuntime,
   defineRestMiddleware,
   projectRestFacts,
-  type RestCaller,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -24,6 +23,7 @@ import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
 import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
+import type { RestCaller } from "@langwatch/api/hosting";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.

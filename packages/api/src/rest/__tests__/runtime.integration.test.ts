@@ -28,7 +28,7 @@ import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
-import { getRoutePolicy } from "../security.ts";
+import { getRoutePolicy } from "../../route-registry.ts";
 
 /**
  * The runtime's loggers are created at module scope, so spying on `createLogger` calls never
@@ -1205,7 +1205,7 @@ const platformHealth = defineRestRouter(PlatformHealthApi)
   .withNamespace("platform-health")
   .withVersion(VERSION)
   .withAddressing("v1-only")
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .get("/", "getPlatformHealth")
   .withAccess(anyAuthenticated({ reason: MONITORED }))
   .responds({ 200: healthReport, 503: healthReport })
@@ -1285,7 +1285,7 @@ describe("a family behind a deployment's own secret", () => {
       }),
     ).toEqual([{ internal_secret: [] }]);
 
-    expect(securityRequirement("internalSecret")).toEqual([{ internal_secret: [] }]);
+    expect(securityRequirement("internal_secret")).toEqual([{ internal_secret: [] }]);
   });
 
   /** @scenario "A family behind a deployment secret names no tenant" */
@@ -1380,7 +1380,7 @@ describe("a route that declares the several answers it may give", () => {
       .withNamespace("platform-health-undeclared")
       .withVersion(VERSION)
       .withAddressing("v1-only")
-      .withCredential("internalSecret")
+      .withCredential("internal_secret")
       .get("/", "getUndeclaredPlatformHealth")
       .withPermission("activityMonitor:view")
       .responds({ 200: healthReport, 503: healthReport })
@@ -1411,7 +1411,7 @@ const scimUsers = defineRestRouter(RoleApi)
   .withNamespace("scim")
   .withVersion(VERSION)
   .withAddressing("v1-in-path")
-  .withCredential("scimToken")
+  .withCredential("scim_token")
   .get("/Users", "listScimUsers")
   .withPermission("organization:manage")
   .withOutput(z.object({ tier: z.literal("organization"), organizationId: z.string() }))
@@ -1462,7 +1462,7 @@ describe("a family behind one directory connection's SCIM token", () => {
       }),
     ).toEqual([{ scim_bearer: [] }]);
 
-    expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
+    expect(securityRequirement("scim_token")).toEqual([{ scim_bearer: [] }]);
   });
 });
 
@@ -2146,7 +2146,7 @@ const scimV2 = defineRestRouter(DirectoryApi)
   .withNamespace("scim")
   .withVersion(VERSION)
   .withAddressing("v1-in-path", { generation: "v2" })
-  .withCredential("scimToken")
+  .withCredential("scim_token")
   .get("/Users", "listScimUsers")
   .withPermission("organization:manage")
   .withOutput(z.object({ Resources: z.string().array() }))
@@ -2584,7 +2584,7 @@ const instanceSetupHanded: { actor: unknown }[] = [];
 const instanceSetup = defineRestRouter(InstanceApi)
   .withNamespace("instance")
   .withVersion(VERSION)
-  .withCredential("instance-admin")
+  .withCredential("instance_admin")
   .withAddressing("v1-only")
   .post("/organizations", "createFirstOrganization")
   .withInput(z.object({ name: z.string() }))
@@ -2652,7 +2652,7 @@ describe("a family behind the instance administrator's own key", () => {
       }),
     ).toEqual([{ instance_admin_key: [] }]);
 
-    expect(securityRequirement("instance-admin")).toEqual([{ instance_admin_key: [] }]);
+    expect(securityRequirement("instance_admin")).toEqual([{ instance_admin_key: [] }]);
   });
 
   /** @scenario "A family behind the instance administrator's own key names no tenant" */

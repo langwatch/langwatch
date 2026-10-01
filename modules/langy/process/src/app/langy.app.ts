@@ -1,7 +1,7 @@
 import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { BearerIdentity, type RestIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
+import { BearerIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
 import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -163,6 +163,7 @@ import type { LangyService } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import type { LangyConversationCommands, LocalControlRuntime } from "./langy.members.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a

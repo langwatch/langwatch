@@ -3,8 +3,8 @@
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
-import { type AuthzPermission } from "@langwatch/authorization";
+import type { RestDeclaredResult } from "@langwatch/api/rest";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -253,6 +253,7 @@ import {
   GatewayEndUserCapsAdapter,
 } from "./gateway-composition.build.ts";
 import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -2246,6 +2247,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
    */
   async authorizeVirtualKeyCreate(input: {
     actor: GatewayActor;
+    impersonatorId?: string | undefined;
     organizationId: string;
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId: string | null | undefined;
@@ -2253,6 +2255,11 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     callerProjectId?: string | undefined;
   }): Promise<void> {
     const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
+    refuseImpersonatedMint({
+      impersonatorId: input.impersonatorId,
+      permission: "virtualKeys:create",
+      organizationId,
+    });
     if (input.callerProjectId === undefined) {
       await this.authorizeVirtualKeyScopeSelection({
         actor,
@@ -2343,10 +2350,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
    */
   async authorizeVirtualKeyOperation(input: {
     actor: GatewayActor;
+    impersonatorId?: string | undefined;
     organizationId: string;
     id: string;
     permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
+    if (input.permission === "virtualKeys:rotate") {
+      refuseImpersonatedMint({
+        impersonatorId: input.impersonatorId,
+        permission: input.permission,
+        organizationId: input.organizationId,
+      });
+    }
     const existing = await this.#dependencies.getExistingVirtualKey({
       organizationId: input.organizationId,
       id: input.id,
@@ -2423,4 +2438,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       actorUserId: authorized.actorUserId,
     };
   }
+}
+
+/** An operator acting as a member holds no grant to issue credentials as them (F05). */
+function refuseImpersonatedMint(input: {
+  impersonatorId: string | undefined;
+  permission: AuthzPermission;
+  organizationId: string;
+}): void {
+  if (!input.impersonatorId) return;
+  throw new PermissionDeniedError({
+    permission: input.permission,
+    scope: { type: "organization", id: input.organizationId },
+    denialReason: "no-binding",
+  });
 }

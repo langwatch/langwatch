@@ -1,5 +1,4 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -19,6 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
+import { SessionReader } from "@langwatch/api/hosting";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";

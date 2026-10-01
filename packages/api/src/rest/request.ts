@@ -40,7 +40,7 @@ import {
   type Declined,
   type ServiceContext,
 } from "./response.ts";
-import type { RestIdentity } from "./runtime.ts";
+import type { RestIdentity } from "../hosting/api-door.ts";
 
 // Validation: install the hook so failures reach the route's onError (ADR-045).
 

@@ -6,7 +6,7 @@
 import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 
 import { ProjectMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 export class SessionKeyIdentity implements RestIdentity {
   readonly #instanceTokenHeader: string;

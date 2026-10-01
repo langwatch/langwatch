@@ -18,6 +18,7 @@ export {
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
   ApiVersionConflictError,
+  BatchingNotSupportedError,
   createErrorHandler,
   EnterprisePlanRequiredError,
   formatError,
@@ -72,6 +73,7 @@ export {
   type HandlerCredential,
   handlerManagedAuth,
   internalSecret,
+  isInternalSecretValid,
   isApiKeyReachable,
   policyPermissions,
   publicEndpoint,
@@ -80,4 +82,11 @@ export {
   requiresOnTeam,
 } from "./access-policy.ts";
 
-export { isInternalSecretValid } from "./rest/security.ts";
+// Every mounted route and the policy it declared, recorded as each surface mounts.
+export {
+  allRegisteredRoutes,
+  getRoutePolicy,
+  registerRoutePolicy,
+  type RegisteredRoute,
+} from "./route-registry.ts";
+

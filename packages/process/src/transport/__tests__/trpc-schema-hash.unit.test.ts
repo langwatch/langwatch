@@ -3,17 +3,14 @@
  * Spec: specs/ui/browser-query-caching.feature.
  */
 
+import { SessionReader } from "@langwatch/api/hosting";
+import { composeTrpcRouters, defineTrpcRouter, TrpcHost } from "@langwatch/api/trpc";
 import { defineTrpcContract, moduleApi, schemaHashesOf } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createApiDouble } from "../../__tests__/api-double.ts";
-import type { Authorize } from "../../access/access.ts";
-import { SessionReader } from "../../rest/credential.ts";
-import { composeTrpcRouters } from "../../trpc/compose.ts";
-import { TrpcHost } from "../../trpc/host.ts";
-import { defineTrpcRouter } from "../../trpc/runtime.ts";
-import { composeApiApplication } from "../api-application.ts";
+import { inertApiDoor } from "../../__tests__/support/api-door.ts";
+import { composeApiApplication } from "../api-surface.ts";
 
 interface ProfileApi {
   motto(): { motto: string };
@@ -49,9 +46,10 @@ describe("given a tRPC surface mounting a contract", () => {
   beforeEach(() => {
     const trpc = TrpcHost.create({
       sessions: SessionReader.create({ verify: async () => ({ userId: "user_ada" }) }),
-      authz: createApiDouble<Authorize>({
+      authz: {
+        ...inertApiDoor().authz,
         checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
+      },
     });
     const application: ProfileApi = {
       motto: () => ({ motto: "trust until told" }),

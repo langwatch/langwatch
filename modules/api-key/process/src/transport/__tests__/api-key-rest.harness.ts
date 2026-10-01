@@ -9,9 +9,8 @@ import {
   createRestRuntime,
   ForbiddenError,
   HttpError,
-  UnauthorizedError,
-  type RestAuditRow,
   type RestErrorHandler,
+  UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
@@ -19,6 +18,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
+import type { RestAuditRow } from "@langwatch/api/hosting";
 
 export const ORGANIZATION_ID = "organization-1";
 export const CALLER_USER_ID = "user-caller";

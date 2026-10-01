@@ -21,7 +21,7 @@ const ProvisioningApi = moduleApi<ProvisioningApi>()("organization");
 const provisioning = defineRestRouter(ProvisioningApi)
   .withNamespace("organizations")
   .withVersion("2025-01-01")
-  .withCredential("instance-admin")
+  .withCredential("instance_admin")
   .withAddressing("literal")
   .post("/api/organizations", "provision")
   .withInput(z.object({ name: z.string().min(1) }))

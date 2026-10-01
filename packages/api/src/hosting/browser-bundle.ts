@@ -7,8 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { SecurityHeaders } from "../policy/security-headers.ts";
-import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import type { HttpFailureAnswer, HttpHandler } from "./http-mux.ts";
+import type { SessionCaller, SessionReader } from "./session-reader.ts";
 
 const MIME_TYPES: Readonly<Record<string, string>> = {
   ".css": "text/css",

@@ -181,11 +181,11 @@ defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")
 defineRestRouter(api).withNamespace("admin").withVersion("2026-09-08")
   .withCredential("public");
 defineRestRouter(api).withNamespace("scim").withVersion("2026-09-08")
-  .withCredential("scimToken")
+  .withCredential("scim_token")
   .get("/Users", "listScimUsers").withPermission("organization:manage").withOutput(tier)
   .handle(({ scope }) => ({ tier: scope.tier }));
 defineRestRouter(api).withNamespace("platform-health").withVersion("2026-09-08")
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .get("/", "getPlatformHealth").withPermission("project:view").withOutput(tier)
   .handle(({ scope }) => ({ tier: scope.tier }));
 `,

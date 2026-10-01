@@ -8,7 +8,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import type { RestIdentity } from "../runtime.ts";
+import type { RestIdentity } from "../../hosting/api-door.ts";
 
 const Api = moduleApi<{ read(): { ok: boolean } }>()("langy");
 function family(namespace: string, path: string) {
@@ -16,7 +16,7 @@ function family(namespace: string, path: string) {
     .withNamespace(namespace)
     .withVersion(MANAGEMENT_API_VERSION)
     .withAddressing("literal", { v1Twin: false })
-    .withCredential("internalSecret")
+    .withCredential("internal_secret")
     .get(path, namespace)
     .withAccess(anyAuthenticated({ reason: "module-owned internal credential" }))
     .withOutput(z.object({ ok: z.boolean() }))
@@ -30,9 +30,9 @@ function host(browser?: RestIdentity) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: browser ?? closed,
     },
     bearers: () => closed,
@@ -51,7 +51,7 @@ describe("module credential bindings", () => {
     ] as const) {
       server.mount(family(namespace, `/internal/${namespace}`).router(), app, {
         facts: [
-          bindRestCredential("internalSecret", () =>
+          bindRestCredential("internal_secret", () =>
             BearerIdentity.create({ name: namespace, token }),
           ),
         ],
@@ -81,7 +81,7 @@ describe("module credential bindings", () => {
   });
 
   it("refuses duplicate credential bindings before serving", () => {
-    const binding = bindRestCredential("internalSecret", () =>
+    const binding = bindRestCredential("internal_secret", () =>
       BearerIdentity.create({ name: "test", token: "secret" }),
     );
 
@@ -89,7 +89,7 @@ describe("module credential bindings", () => {
       host().mount(family("duplicate", "/internal/duplicate").router(), app, {
         facts: [binding, binding],
       }),
-    ).toThrow("binds internalSecret more than once");
+    ).toThrow("binds internal_secret more than once");
   });
 });
 

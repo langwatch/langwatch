@@ -17,7 +17,7 @@
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than four.
  */
-import { recordScimCredential, type RestIdentity } from "@langwatch/api/rest";
+import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
@@ -112,6 +112,7 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 type ScimSetup = FeatureSetup<
   typeof ScimModule.dependencies,

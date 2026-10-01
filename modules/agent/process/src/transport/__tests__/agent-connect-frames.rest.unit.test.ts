@@ -4,12 +4,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
  * `POST /api/v1/agents/connect/frames`: refused before the transport (ADR-128).
  * @see specs/agents/connected-agents.feature
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestCaller,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
@@ -17,6 +12,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import type { RestCaller } from "@langwatch/api/hosting";
 
 const renderRefusal: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

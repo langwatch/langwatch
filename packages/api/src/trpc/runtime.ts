@@ -51,6 +51,7 @@ import {
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
+  refuseImpersonatedMint,
   sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenial,
@@ -113,8 +114,11 @@ export class TrpcRootDefinition {
 // actor and the scope a governed handler is trusted with.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** An authenticated tRPC actor, normalized with a stable identifier for every kind. */
-export type TrpcHandlerActor = Actor & Readonly<{ id: string }>;
+/**
+ * An authenticated tRPC actor, normalized with a stable identifier for every kind.
+ * `impersonatorId` is the session's real principal when a user actor is impersonated.
+ */
+export type TrpcHandlerActor = Actor & Readonly<{ id: string; impersonatorId?: string }>;
 
 export type ApiHandlerAdapter<TContext, App> = <Input>(input: {
   readonly ctx: TContext;
@@ -347,6 +351,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   access: TrpcAccess;
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
   entitlement?: EntitlementGate;
+  /** Present exactly when the procedure mints a credential: the permission its refusal names. */
+  mintsCredential?: AuthzPermission;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
@@ -437,6 +443,14 @@ export interface TrpcRouterAccess<
     entitlement: ApiEntitlement,
     options?: EntitlementOptions,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * The procedure mints a credential (a key, token or secret). The runtime refuses it with
+   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * after access and before the handler.
+   */
+  mintsCredential(
+    permission: AuthzPermission,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
@@ -490,6 +504,7 @@ export interface TrpcRouterImplementation<
 type Implementation = Readonly<{
   access: TrpcAccess;
   entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -518,6 +533,9 @@ function mountRouter<Api, Contract extends TrpcContract>(
         member,
         access: implementation.access,
         ...(implementation.entitlement ? { entitlement: implementation.entitlement } : {}),
+        ...(implementation.mintsCredential
+          ? { mintsCredential: implementation.mintsCredential }
+          : {}),
         facts: implementation.facts,
         handle: implementation.handle,
         app,
@@ -532,6 +550,12 @@ function mountRouter<Api, Contract extends TrpcContract>(
 }
 
 type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
+
+/** What a selected procedure has declared beside its facts, before its access. */
+type ProcedureMarks = Readonly<{
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
+}>;
 
 type EntitlementQuestion = {
   contract: TrpcContract;
@@ -575,18 +599,14 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
   /** One selected procedure, with the facts it has named so far. */
-  const selected = (name: string, facts: readonly TrpcFact[], entitlement?: EntitlementGate) => {
+  const selected = (name: string, facts: readonly TrpcFact[], marks: ProcedureMarks = {}) => {
+    const { entitlement } = marks;
     const implement = (access: TrpcAccess) => ({
       handle: (handle: (args: never, ...values: never[]) => unknown) =>
         routerBuilder(
           api,
           contract,
-          new Map(implementations).set(name, {
-            access,
-            facts,
-            handle,
-            ...(entitlement ? { entitlement } : {}),
-          }),
+          new Map(implementations).set(name, { access, facts, handle, ...marks }),
         ),
     });
 
@@ -594,17 +614,25 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       withFacts: (...added: readonly TrpcFact[]) => {
         assertFactsDistinct({ contract, name, facts: [...facts, ...added] });
 
-        return selected(name, [...facts, ...added], entitlement);
+        return selected(name, [...facts, ...added], marks);
       },
       withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
 
-        return selected(name, facts, { entitlement: named, ...options });
+        return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
+      mintsCredential: (permission: AuthzPermission) =>
+        selected(name, facts, { ...marks, mintsCredential: permission }),
       withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
         implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
       withAccess: (access: PublicRouteAccess) => {
         assertNoTenantQuestion({ contract, name, entitlement });
+
+        if (marks.mintsCredential) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} mints a credential, so it cannot run with no caller`,
+          );
+        }
 
         assertAnonymousProcedure({ contract, name });
 
@@ -945,6 +973,7 @@ export function createTrpcRuntime<
           app: request.app,
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
+          ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
         }),
       );
 
@@ -1111,6 +1140,7 @@ function access<TContext extends object>({
   declaration,
   procedure,
   entitlement,
+  mintsCredential,
   app,
   facts,
 }: {
@@ -1118,6 +1148,7 @@ function access<TContext extends object>({
   declaration: TrpcAccess;
   procedure: string;
   entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1130,7 +1161,15 @@ function access<TContext extends object>({
 
   return declareAccessMiddleware(
     declaration,
-    check({ members, declaration, procedure, app, facts, ...(entitlement ? { entitlement } : {}) }),
+    check({
+      members,
+      declaration,
+      procedure,
+      app,
+      facts,
+      ...(entitlement ? { entitlement } : {}),
+      ...(mintsCredential ? { mintsCredential } : {}),
+    }),
   );
 }
 
@@ -1141,6 +1180,7 @@ function check<TContext extends object>({
   declaration,
   procedure,
   entitlement,
+  mintsCredential,
   app,
   facts,
 }: {
@@ -1148,6 +1188,7 @@ function check<TContext extends object>({
   declaration: TrpcAccess;
   procedure: string;
   entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1180,6 +1221,15 @@ function check<TContext extends object>({
 
     if (!decision.actor) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+    }
+
+    if (mintsCredential) {
+      refuseImpersonatedMint({
+        permission: mintsCredential,
+        actor: decision.actor,
+        scope: decision.scope,
+        address: `tRPC ${procedure}`,
+      });
     }
 
     // After access, never before it: a caller who may not do this at all is

@@ -1080,3 +1080,95 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     );
   });
 });
+
+describe("a procedure declared as minting a credential", () => {
+  interface KeysApi {
+    createKey(input: { organizationId: string }): Promise<{ ran: boolean }>;
+  }
+
+  const KeysApi = moduleApi<KeysApi>()("api-key");
+
+  const keysContract = defineTrpcContract("keys")
+    .mutation("createKey")
+    .withInput(z.object({ organizationId: z.string() }))
+    .withOutput(z.object({ ran: z.boolean() }))
+    .build();
+
+  type KeysContext = { actor: { id: string; impersonatorId?: string } };
+
+  const keysRoot = TrpcRootDefinition.forContext<KeysContext>().create({});
+
+  function caller({ actor, handle }: { actor: KeysContext["actor"]; handle: () => void }) {
+    const runtime = createTrpcRuntime({
+      root: keysRoot,
+      procedure: keysRoot.procedure,
+      members: {
+        identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
+        authorization: {
+          forRequest: () => ({
+            getDecision: async () => ({ permitted: true, organizationRole: null }),
+            getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+            checkScopeLineage: async () => ({ kind: "consistent" }),
+          }),
+        },
+        denials: {
+          membershipDisabled: () => new Error("membership disabled"),
+          liteMemberRestricted: () => new Error("lite member"),
+        },
+        audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+        errors: {
+          report: () => {},
+          asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+          translate: () => undefined,
+        },
+      },
+    });
+    const declaration = defineTrpcRouter(KeysApi, keysContract)
+      .procedure("createKey")
+      .mintsCredential("organization:view")
+      .withPermission("organization:view")
+      .handle(() => {
+        handle();
+
+        return { ran: true };
+      })
+      .build();
+
+    return runtime
+      .mount(declaration, () => ({ createKey: async () => ({ ran: true }) }))
+      .createCaller({ actor });
+  }
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses an impersonating actor before the handler runs", async () => {
+    let ran = false;
+    const call = caller({
+      actor: { id: "user-1", impersonatorId: "staff-1" },
+      handle: () => (ran = true),
+    }).createKey({ organizationId: "org-1" });
+
+    await expect(call).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("lets the user acting as themselves through", async () => {
+    let ran = false;
+    const answer = await caller({ actor: { id: "user-1" }, handle: () => (ran = true) }).createKey({
+      organizationId: "org-1",
+    });
+
+    expect(answer).toEqual({ ran: true });
+    expect(ran).toBe(true);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses the declaration on a procedure that runs with no caller", () => {
+    expect(() =>
+      defineTrpcRouter(KeysApi, keysContract)
+        .procedure("createKey")
+        .mintsCredential("organization:view")
+        .withAccess(publicRoute({ reason: "no caller" })),
+    ).toThrow(/mints a credential, so it cannot run with no caller/);
+  });
+});

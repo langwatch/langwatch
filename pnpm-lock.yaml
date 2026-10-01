@@ -16660,6 +16660,12 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../secrets
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.18.0(typescript@7.0.2)
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.1
       zod:
         specifier: 'catalog:'
         version: 4.6.5

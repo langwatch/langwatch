@@ -26,7 +26,6 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
@@ -47,8 +46,10 @@ import {
   type TrpcRouterDeclaration,
   type TrpcRuntimeMembers,
 } from "./runtime.ts";
-import { SESSION_VERSION_HEADER, type TrpcSessionVersions } from "./session-version.ts";
+import { SESSION_VERSION_HEADER } from "./session-version.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
+import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
+import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 
 /** The signed-in person, as the procedures that render one read it. */
 export type TrpcSessionUser = Readonly<{
@@ -90,18 +91,6 @@ export type TrpcRequestContext = {
 
 /** Whatever this root made of one declared namespace. */
 export type TrpcNamespace = unknown;
-
-/** One mutation on the deployment's trail, as this transport leaves it. */
-export type TrpcAuditSink = Readonly<{
-  record(entry: {
-    userId: string;
-    organizationId?: string;
-    projectId?: string;
-    action: string;
-    args?: unknown;
-    error?: Error;
-  }): Promise<void> | void;
-}>;
 
 /** This transport's own refusal copy: the two answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {

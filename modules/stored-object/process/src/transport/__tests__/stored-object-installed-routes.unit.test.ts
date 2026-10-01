@@ -1,5 +1,5 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { Logger } from "@langwatch/observability";
@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { storedObjectProcessModule } from "../../stored-object.module.ts";
 import { storedObjectFileRest } from "../stored-object-file.rest.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = "project_1";
 const OBJECT_ID = "so_absent";
@@ -71,9 +72,9 @@ function restHost(): RestHost {
     identities: {
       project: projectDoor,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

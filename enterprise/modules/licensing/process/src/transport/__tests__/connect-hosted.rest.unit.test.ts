@@ -1,8 +1,4 @@
-import {
-  createCanonicalFamilyErrorHandler,
-  createRestRuntime,
-  type RestIdentity,
-} from "@langwatch/api/rest";
+import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   ConnectServiceNotEntitledError,
   type LicensingApi,
@@ -19,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { connectHostedRest } from "../connect-hosted.rest.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 const gatewayDoor: RestIdentity = {
   authenticate: () => {
@@ -34,7 +31,7 @@ const gatewayDoor: RestIdentity = {
 function mount(app: Partial<LicensingApi>) {
   const hono = createRestRuntime({
     identity: gatewayDoor,
-    doors: { internalSecret: gatewayDoor },
+    doors: { internal_secret: gatewayDoor },
   }).mount(connectHostedRest.router(), {
     app: () => createApiFixture<LicensingApi>(app),
     onError: createCanonicalFamilyErrorHandler({

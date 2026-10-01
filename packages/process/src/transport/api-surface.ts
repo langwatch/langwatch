@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 import {
+  BatchingNotSupportedError,
   type RateLimiter,
   type RawHttpHost,
   SurfaceBlankSecretError,
@@ -10,35 +11,36 @@ import {
   type WebSocketHost,
 } from "@langwatch/api";
 import {
-  answerApiFailure,
-  apiRootPaths,
-  composeApiApplication,
-  HttpMux,
+  type ApiDoor,
   BrowserBundle,
   FramedDocument,
-  openApiDoor,
-  type ApiDoor,
+  type HttpFailureAnswer,
+  HttpMux,
+  mountApiDiscovery,
   type NodeHandler,
+  openApiDoor,
+  type RestCaller,
+  type RestIdentity,
+  SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
 import { ClientAddress, SecurityHeaders, type StorageEndpoints } from "@langwatch/api/policy";
 import {
-  BrowserSessionIdentity,
   bindRestMiddleware,
+  BrowserSessionIdentity,
+  canonicalErrorAnswer,
   defineRestMiddleware,
   IdempotencyLedger,
+  type IdempotentRunner,
   projectCredentialOfRequest,
   projectRestFacts,
   RestHost,
-  SessionReader,
-  type RestCaller,
-  type IdempotentRunner,
-  type RestIdentity,
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
 import {
   bindTrpcFact,
   defineTrpcFact,
+  SseLane,
   TrpcHost,
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
@@ -46,6 +48,8 @@ import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { Logger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { Hono } from "hono";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -137,8 +141,8 @@ class ApiSurface {
       identities: {
         ...this.door.identities,
         browser: this.#browserDoor(),
-        scimToken: unboundDirectoryDoor(),
-        "instance-admin": this.composition.instanceAdmin,
+        scim_token: unboundDirectoryDoor(),
+        instance_admin: this.composition.instanceAdmin,
       },
       bearers: (namespace) =>
         this.composition.internalBearers.get(namespace) ??
@@ -401,3 +405,121 @@ const shareViewerFact = defineTrpcFact(
   "shareViewer",
   z.object({ userId: z.string().nullable(), userAgent: z.string().nullable() }),
 );
+
+/**
+ * The API's whole surface: the tRPC lanes, every REST family, then the 404 — mount order is
+ * match order, and only here is every declaration known to have mounted (ARCHITECTURE.md §4).
+ */
+export function composeApiApplication(
+  hosts: {
+    rest?: RestHost | undefined;
+    trpc?: TrpcHost | undefined;
+  },
+  policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
+): Hono {
+  const root = new Hono();
+
+  root.use("*", async (context, next) => {
+    await next();
+
+    const policy =
+      context.req.path === TrpcHost.path || context.req.path.startsWith(`${TrpcHost.path}/`)
+        ? policies.trpc
+        : policies.rest;
+
+    for (const [name, value] of Object.entries(policy?.headers ?? {})) context.header(name, value);
+  });
+
+  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
+
+  if (hosts.rest) {
+    mountApiDiscovery({ root, restApp: hosts.rest.app });
+    root.route("/", hosts.rest.app);
+  }
+
+  // An address under this prefix that nothing serves is the API's own 404,
+  // never a page the browser application would try to route.
+  root.all("*", (context) => context.json({ error: "not_found" }, 404));
+
+  return root;
+}
+
+/**
+ * The literal paths the application serves outside `/api`, one per resource: a process routes
+ * each here exactly, or the browser application answers them with its shell and a 200.
+ */
+function apiRootPaths(application: Hono): string[] {
+  const paths = application.routes
+    .map(({ path }) => (path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path))
+    .filter((path) => path.startsWith("/") && path !== "/" && !/[*:]/.test(path))
+    .filter((path) => path !== "/api" && !path.startsWith("/api/"));
+
+  return [...new Set(paths)];
+}
+
+/**
+ * How the API answers a failure that escaped its middleware or preceded it:
+ * the SAME serializer the families answer through, so a client cannot tell
+ * which layer failed — and never receives HTML for a pre-routing crash.
+ */
+const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(failure);
+
+/**
+ * Both tRPC lanes over ONE composed router: the request lane at `/api/trpc`,
+ * and the subscription lane at `/api/sse`, so a procedure is reachable live
+ * exactly when it is reachable at all.
+ */
+function trpcLanes(trpc: TrpcHost): Hono {
+  const app = new Hono();
+  app.onError((failure) => answerApiFailure(failure));
+
+  app.all(`${TrpcHost.path}/*`, async (context) => {
+    const request = context.req.raw;
+    let resolved: Promise<TrpcRequestContext> | undefined;
+    const createContext = () => {
+      const address = ClientAddress.resolvedFor(request);
+      resolved ??= trpc.context({ request, ...(address ? { address } : {}) });
+      return resolved;
+    };
+
+    const { pathname, searchParams } = new URL(request.url);
+    const path = pathname.slice(TrpcHost.path.length + 1);
+    if (searchParams.has("batch") || /,|%2c/i.test(path)) {
+      throw new BatchingNotSupportedError();
+    }
+
+    // The session version and, on a query, the schema hash ride every answer.
+    const versionHeaders = {
+      ...(await trpc.sessionVersionHeaders({ context: createContext })),
+      ...trpc.schemaHashHeaders({ path }),
+    };
+    const response = await fetchRequestHandler({
+      endpoint: TrpcHost.path,
+      req: request,
+      router: trpc.router,
+      createContext,
+      allowBatching: false,
+    });
+    for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+
+    return response;
+  });
+
+  const sse = SseLane.create({
+    members: {
+      procedureTypeAt: (path) => trpc.procedureTypeAt(path),
+      createCaller: async ({ request, signal }) =>
+        trpc.router.createCaller(
+          // On the context AND in the caller's options: a subscription
+          // procedure reads whichever its own transport gives it, and only
+          // the context reaches one resolved through a v10-shaped caller.
+          { ...(await trpc.context({ request, signal })), signal },
+          signal ? { signal } : {},
+        ),
+    },
+  });
+
+  app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
+
+  return app;
+}

@@ -1,4 +1,4 @@
-import { canonicalErrorResponse, createRestRuntime, type RestCaller } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
   type LangyApi,
@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalRest } from "../langy-local.rest.ts";
+import type { RestCaller } from "@langwatch/api/hosting";
 
 const PROJECT_ID = "project-123";
 const USER_ID = "user-1";

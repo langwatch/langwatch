@@ -19,9 +19,10 @@ import {
   ProjectMissingCredentialsError,
 } from "../../errors.ts";
 import { BrowserSessionIdentity } from "../browser-session.ts";
-import { SessionReader } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
-import { createRestRuntime, type RestCaller } from "../runtime.ts";
+import { createRestRuntime } from "../runtime.ts";
+import { SessionReader } from "../../hosting/session-reader.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
 
 const VERSION = "2026-09-08";
 const KEY = "Bearer the-key";

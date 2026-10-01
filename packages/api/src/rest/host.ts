@@ -19,12 +19,7 @@ import type { RestDoorCredential, RestTransportDeclaration } from "./declaration
 import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
-import {
-  createRestRuntime,
-  type RestAuditSink,
-  type RestDeprecationLog,
-  type RestIdentity,
-} from "./runtime.ts";
+import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
 
 const restErrorLogger = createLogger("langwatch:api:rest");
 
@@ -33,10 +28,11 @@ const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
 import { SessionKeyIdentity } from "./session-key-identity.ts";
+import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
 export type RestIdentities = Readonly<
-  Record<Exclude<RestDoorCredential, "internalSecret" | "sessionKey" | "cliToken">, RestIdentity>
+  Record<Exclude<RestDoorCredential, "internal_secret" | "session_key" | "cli_token">, RestIdentity>
 >;
 
 /**
@@ -146,9 +142,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): Record<RestDoorCredential, RestIdentity> {
     return {
       ...this.options.identities,
-      internalSecret: this.options.bearers(declaration.namespace),
-      sessionKey: SessionKeyIdentity.unbound(declaration.namespace),
-      cliToken: CliTokenIdentity.unbound(declaration.namespace),
+      internal_secret: this.options.bearers(declaration.namespace),
+      session_key: SessionKeyIdentity.unbound(declaration.namespace),
+      cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
   }
 }

@@ -111,9 +111,9 @@ export type { ApiHandlerArguments } from "../handler-arguments.ts";
 // same composed router.
 export {
   TrpcHost,
-  type TrpcAuditSink,
   type TrpcNamespace,
   type TrpcRequestContext,
   type TrpcSession,
   type TrpcSessionUser,
 } from "./host.ts";
+export { SseLane } from "./sse.ts";

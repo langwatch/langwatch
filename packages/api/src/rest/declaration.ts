@@ -161,12 +161,12 @@ export type RestDoorCredential = Extract<
   Credential,
   | "project"
   | "organization"
-  | "apiKey"
-  | "scimToken"
-  | "internalSecret"
-  | "instance-admin"
-  | "sessionKey"
-  | "cliToken"
+  | "api_key"
+  | "scim_token"
+  | "internal_secret"
+  | "instance_admin"
+  | "session_key"
+  | "cli_token"
   | "browser"
 >;
 
@@ -178,13 +178,13 @@ export type RestDoorCredential = Extract<
 export const DOOR_SCOPE_TIER = {
   project: "project",
   organization: "organization",
-  apiKey: "organization",
-  scimToken: "organization",
+  api_key: "organization",
+  scim_token: "organization",
   browser: null,
-  internalSecret: null,
-  "instance-admin": null,
-  sessionKey: "project",
-  cliToken: "organization",
+  internal_secret: null,
+  instance_admin: null,
+  session_key: "project",
+  cli_token: "organization",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -205,7 +205,7 @@ type ScopedHandlerArguments<
   Omit<ApiHandlerArguments<Input, App>, "scope" | "actor"> & {
     readonly actor: Door extends "browser"
       ? Extract<Actor, { type: "user" }>
-      : Door extends "cliToken"
+      : Door extends "cli_token"
         ? CliTokenActor
         : Actor | null;
     readonly scope: DoorScope<Door>;
@@ -460,6 +460,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly cache?: RestCachePolicy;
   /** Present exactly when the route asks the tenant to hold an entitlement. */
   readonly entitlement?: EntitlementGate;
+  /** Present exactly when the route mints a credential: the permission its refusal names. */
+  readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -517,6 +519,7 @@ type RouteState = Readonly<{
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
   entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -822,6 +825,24 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...this.state,
         entitlement: { entitlement, ...options },
       },
+    });
+  }
+
+  /**
+   * The route mints a credential (a key, token or secret). The runtime refuses it with
+   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * after access and before the handler.
+   */
+  mintsCredential(permission: AuthzPermission): RouteBuilder<Api, S> {
+    if (this.state.mintsCredential)
+      throw new Error("REST route already declared mintsCredential()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, mintsCredential: permission },
     });
   }
 
@@ -1300,6 +1321,7 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
     ...(state.cache ? { cache: state.cache } : {}),
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
+    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
@@ -1681,6 +1703,10 @@ function assertPublicRouteConstraints({
       `REST ${operation} answers without a credential, so there is no tenancy a caller's ` +
         "idempotency key is unique within",
     );
+  }
+
+  if (state.mintsCredential) {
+    throw new Error(`REST ${operation} mints a credential, so it cannot answer with no caller`);
   }
 }
 

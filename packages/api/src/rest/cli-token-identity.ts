@@ -6,7 +6,7 @@
 import type { CliTokenActor } from "@langwatch/authorization";
 
 import { OrganizationMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 /** What the caller presented: the whole `Authorization` header, whose format the owner reads. */
 export type CliTokenPresented = Readonly<{ authorization: string }>;

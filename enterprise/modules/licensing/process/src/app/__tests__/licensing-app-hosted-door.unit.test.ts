@@ -1,4 +1,4 @@
-import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -14,6 +14,7 @@ import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { licensingProcessModule } from "../../licensing.module.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 const SIGNED = "signed-with-the-gateway-secret";
 
@@ -70,9 +71,9 @@ async function hostedFamily() {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

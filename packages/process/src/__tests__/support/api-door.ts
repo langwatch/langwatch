@@ -1,6 +1,5 @@
 import { type TransportPeers } from "@langwatch/api";
-import { bindApiDoor, type ApiDoor } from "@langwatch/api/hosting";
-import type { RestIdentity } from "@langwatch/api/rest";
+import { type ApiDoor, bindApiDoor, type RestIdentity } from "@langwatch/api/hosting";
 
 import { transportPeersOf } from "../../transport-peers.ts";
 
@@ -17,7 +16,7 @@ export function inertApiDoor(parts: Partial<ApiDoor> = {}): ApiDoor {
       checkScopeLineage: refuse,
       getSessionVersion: refuse,
     },
-    identities: { project: nobody, organization: nobody, apiKey: nobody },
+    identities: { project: nobody, organization: nobody, api_key: nobody },
     entitlements: { holds: refuse },
     audit: { rest: { record: () => {} }, trpc: { record: () => {} } },
     ...parts,

@@ -4,13 +4,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { RestIdentity } from "../../rest/runtime.ts";
 import {
   type ApiDoor,
   bindApiDoor,
   DuplicateApiDoorError,
   MissingApiDoorError,
   openApiDoor,
+  type RestIdentity,
 } from "../api-door.ts";
 
 const refuse = () => Promise.reject(new Error("this door decides nothing"));
@@ -25,7 +25,7 @@ function door(): ApiDoor {
       checkScopeLineage: refuse,
       getSessionVersion: refuse,
     },
-    identities: { project: nobody, organization: nobody, apiKey: nobody },
+    identities: { project: nobody, organization: nobody, api_key: nobody },
     entitlements: { holds: refuse },
     audit: { rest: { record: () => {} }, trpc: { record: () => {} } },
   };

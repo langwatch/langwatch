@@ -4,12 +4,7 @@
  * process mounts the declaration on.
  * Spec: specs/coding-agent/pull-request-linkage.feature
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  getRoutePolicy,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { CodingAgentApi, CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -17,6 +12,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { codingAgentV1Rest, codingAgentV1RestCaller } from "../coding-agent-v1.rest.ts";
+import { getRoutePolicy } from "@langwatch/api";
 
 const ROLLUP: CodingAgentPullRequestUsage = {
   pullRequest: {
