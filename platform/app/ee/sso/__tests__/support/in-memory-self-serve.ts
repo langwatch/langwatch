@@ -62,9 +62,9 @@ export class StubTestSignIns implements SsoTestSignInLookup {
   }): Promise<SsoTestSignIn | null> {
     const held = this.held.get(`${organizationId}:${connectionId}`);
     if (!held) return null;
-    const matches =
+    const isMatch =
       issuer === null || held.issuer === null || held.issuer === issuer;
-    return matches ? held.signIn : null;
+    return isMatch ? held.signIn : null;
   }
 }
 
