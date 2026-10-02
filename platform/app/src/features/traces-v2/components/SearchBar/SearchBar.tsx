@@ -17,7 +17,6 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -26,6 +25,7 @@ import {
 } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { useInstantEvalAccess } from "../../hooks/useInstantEvalAccess";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
@@ -297,15 +297,17 @@ export const SearchBar: React.FC = () => {
   // the estimate goes out; if the server refuses it, the user gets the model
   // popover and the phrase search fallback, so a slow flag read never hides a
   // feature the project actually has.
-  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } =
-    useFeatureFlag("release_instant_evals", {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project?.id && !!organization?.id,
-    });
-  const isInstantEvalAvailable =
-    instantEvalsReleased || instantEvalsFlagLoading;
-  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
+  // The organization's own switch is read beside the flag: either one makes
+  // the judgement available, and the access read also says what the popover
+  // offers a refused reader (the switch, or a word with us).
+  const instantEvalAccess = useInstantEvalAccess({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
+  const instantEval = useInstantEvalRoute({
+    isInstantEvalAvailable: instantEvalAccess.isAvailable,
+    optInOffer: instantEvalAccess.optInOffer,
+  });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the
   // bar (a Langy action) reaches this same route rather than one of its own.
@@ -315,7 +317,7 @@ export const SearchBar: React.FC = () => {
   );
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
-    isInstantEvalAvailable,
+    isInstantEvalAvailable: instantEvalAccess.isAvailable,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,
@@ -568,6 +570,8 @@ export const SearchBar: React.FC = () => {
           <InstantEvalRefusalPopover
             refusal={instantEval.refusal}
             onClose={instantEval.dismissRefusal}
+            onEnable={instantEval.enableInstantEvals}
+            isEnabling={instantEval.isEnabling}
           >
             <Box
               position="absolute"

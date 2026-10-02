@@ -48,6 +48,8 @@ export const organizationFactory = Factory.define<
   licenseLastValidatedAt: null,
   selfHostedCustomer: false,
   connectServicesDisabled: [],
+  instantEvalsEnabledAt: null,
+  instantEvalsEnabledByUserId: null,
   connectLastSyncAt: null,
   connectLastSyncError: null,
   presenceEnabled: false,

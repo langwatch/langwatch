@@ -7702,7 +7702,7 @@ A dropped parameter is reported in three places:
 | `prompt_cache_key` | dropped | dropped | dropped |  |
 | `prompt_cache_retention` | dropped | dropped | dropped |  |
 | `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
-| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
+| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); the Converse lane (customer VPC endpoints, OpenAI models) enforces json_schema for Anthropic models and OpenAI GPT-5 and later, not gpt-oss; gemini: json_object and json_schema both enforced |
 | `safety_identifier` | dropped | dropped | dropped |  |
 | `seed` | dropped | dropped | dropped |  |
 | `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |
@@ -39213,8 +39213,8 @@ In `-o json`, `run` still waits for the run and prints one document holding the 
 ---
 title: Instant Evals limits, cost and billing
 sidebarTitle: Limits and cost
-keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend
-description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend, data processing, sub-processor
+description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
 ---
 
 ## Limits
@@ -39279,6 +39279,16 @@ If you cancel a run, you pay for the rows it judged before it stopped, and a run
 
 LangWatch stores the trace, the question and the answer for each verdict, and none of the judged text; read the text again with `sample`. Verdicts are kept until you delete the project, so a question asked about last quarter still has its answer next year.
 
+## Where the judged text goes
+
+When a run starts, LangWatch sends the judge the text of each row: the inputs, outputs and metadata of the traces in that row, your questions and the name of the model. On the hosted service, and through Connect, LangWatch adds no account or organization identifier and none of your keys. If your traces hold personal data or your project id, the judge reads them too.
+
+The judge is run by a third-party provider under a data processing agreement. It processes the text on LangWatch's instructions, answers the questions, and does not use it to train its models. The provider is listed as a sub-processor in the [privacy policy](https://langwatch.ai/legal/privacy-policy) and the [trust center](https://langwatch.ai/trust-center).
+
+LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar; a member without those rights reads the same explanation there and is asked to turn to an organization admin. On an enterprise plan, ask us and we switch it on.
+
+A self-hosted install sends the text through [Connect](/self-hosting/connect) to LangWatch, which passes it on as above.
+
 ---
 
 # FILE: ./features/instant-evals/overview.mdx
@@ -39295,6 +39305,8 @@ description: Ask up to ten questions of every conversation, trace or LLM call in
 An Instant Eval is a question in plain words, judged against every row in a time window of your history. For example, "the customer sounds frustrated" over the last 30 days of conversations comes back as a yes or no per conversation, with the probability behind it, and the count across all of them.
 
 Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and 1,000 rows take about nine seconds.
+
+The judge is run by a third-party provider, so the judged text leaves LangWatch for the length of the run. [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes) says exactly what is sent, and under what agreement.
 
 ## Your first run
 
@@ -61303,7 +61315,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 
 | What is on | What this install sends to LangWatch |
 |---|---|
-| Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
+| Instant Evals | The judged text and the questions asked about it. LangWatch passes them to the judge. See [where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes). |
 | Managed models | The prompts and completions of calls that name a `langwatch/` model. No other call reaches the LangWatch slot. |
 | License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 

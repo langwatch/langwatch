@@ -82,14 +82,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedBedrockVPCEStream(
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
-	streamInput := &bedrockruntime.ConverseStreamInput{
-		ModelId:                      input.ModelId,
-		Messages:                     input.Messages,
-		System:                       input.System,
-		InferenceConfig:              input.InferenceConfig,
-		ToolConfig:                   input.ToolConfig,
-		AdditionalModelRequestFields: input.AdditionalModelRequestFields,
-	}
+	streamInput := converseStreamInput(input)
 
 	client := newBedrockRuntimeClient(cred, endpoint)
 	out, err := client.ConverseStream(ctx, streamInput)
