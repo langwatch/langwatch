@@ -716,7 +716,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Self-hosting compliance](https://langwatch.ai/docs/self-hosting/compliance.md): What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
 - [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
-- [Dataset Storage Migration](https://langwatch.ai/docs/self-hosting/upgrade-dataset-storage.md): Upgrade guide for Helm deployments: datasets move to object storage, with a one-time automatic migration
+- [Dataset Storage Migration](https://langwatch.ai/docs/self-hosting/upgrade-dataset-storage.md): Upgrade guide for Helm deployments: datasets move to object storage, with a one-time migration you run once
 
 ## Ops Console
 

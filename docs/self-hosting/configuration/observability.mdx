@@ -32,8 +32,10 @@ prometheus:
 
 | Component | Port | Endpoint | Metrics |
 |-----------|------|----------|---------|
-| App | 5560 | `/metrics` | HTTP request latency, error rates, active connections |
-| Workers | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
+| App | 5560 | `/metrics` | Trace ingestion, ClickHouse query latency, event loop lag |
+| Workers | 2999 | `/metrics` | Queue backlog, job processing time, job success/failure rates |
+
+Both scrape jobs keep only pods annotated `prometheus.io/scrape: "true"`. The chart adds that annotation to the app pods when `app.telemetry.metrics.enabled` is `true`, and never to the workers pods. Without it the chart-managed Prometheus does not reach the workers' `/metrics`. Both `/metrics` endpoints answer 500 until `app.telemetry.metrics.enabled` is on with an API key, and then require that key as a bearer token.
 
 ### Access Prometheus
 
@@ -60,13 +62,14 @@ prometheus:
       password: "password"
 ```
 
-You'll need to configure your external Prometheus to scrape the LangWatch pods. Pods are annotated with:
+You'll need to configure your external Prometheus to scrape the LangWatch pods, sending the metrics API key as a bearer token. With `app.telemetry.metrics.enabled: true`, the app pods are annotated with:
 
 ```yaml
 prometheus.io/scrape: "true"
-prometheus.io/port: "5560"    # or 2999 for workers
-prometheus.io/path: "/metrics"
+prometheus.io/port: "5560"
 ```
+
+The workers pods carry no scrape annotations. Scrape them on port `2999`, path `/metrics`, or add annotations through `workers.pod.annotations`.
 
 ## Grafana
 
@@ -75,27 +78,25 @@ Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
 ### Key Dashboards
 
 Set up dashboards for:
-- **Trace throughput**: traces ingested per minute
-- **Worker queue depth**: BullMQ queue backlog (indicates processing bottleneck)
+- **Span throughput**: spans ingested per minute
+- **Worker queue backlog**: groups waiting to be processed and the age of the oldest pending job (indicates processing bottleneck)
 - **ClickHouse query latency**: p50/p95/p99 query times
-- **Error rates**: HTTP 5xx responses from App and Workers
 - **Resource utilization**: CPU and memory per component
 
 ### Example Queries
 
 ```promql
-# Trace ingestion rate (per minute)
-rate(langwatch_traces_ingested_total[5m]) * 60
+# Span ingestion rate (per minute), by outcome
+sum by (outcome) (rate(trace_ingestion_spans_total[5m])) * 60
 
-# Worker queue depth
-langwatch_worker_queue_depth
+# Worker queue backlog
+sum by (queue_name) (gq_pending_groups)
 
-# HTTP error rate
-rate(http_requests_total{status=~"5.."}[5m])
-  / rate(http_requests_total[5m])
+# Age of the oldest pending job, in seconds
+max by (queue_name) (gq_oldest_pending_age_milliseconds) / 1000
 
 # ClickHouse query p95 latency
-histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_bucket[5m])))
 ```
 
 ## Health & Readiness Checks
@@ -109,33 +110,35 @@ histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
 
 ### Kubernetes Probes
 
-The Helm chart configures probes automatically. Default configuration:
+The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows time for migrations)
+# Startup probe (allows up to 40 minutes for migrations)
 startupProbe:
   httpGet:
     path: /api/health
-    port: 5560
-  periodSeconds: 5
-  failureThreshold: 30    # Up to 150s for startup
-
-# Liveness probe (restarts unhealthy pods)
-livenessProbe:
-  httpGet:
-    path: /api/health
-    port: 5560
-  periodSeconds: 10
-  failureThreshold: 5
+    port: http
+  periodSeconds: 15
+  failureThreshold: 160
 
 # Readiness probe (removes from service if unhealthy)
 readinessProbe:
   httpGet:
     path: /api/health
-    port: 5560
-  periodSeconds: 5
-  failureThreshold: 3
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# Liveness probe (restarts unhealthy pods)
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 30
+  timeoutSeconds: 5
 ```
+
+The workers use the same startup budget and a liveness probe every 30 seconds, both on `/healthz` at port 2999. They have no readiness probe.
 
 ### Manual Health Check
 
@@ -155,8 +158,8 @@ Set up alerts for these critical conditions:
 
 | Alert | Condition | Severity |
 |-------|-----------|----------|
-| Worker queue backlog | Queue depth > 10,000 for 5 min | Warning |
-| Worker queue backlog (critical) | Queue depth > 100,000 for 5 min | Critical |
+| Worker queue backlog | Oldest pending job older than 5 min | Warning |
+| Worker queue backlog (critical) | Oldest pending job older than 30 min | Critical |
 | ClickHouse memory | Memory usage > 80% of limit | Warning |
 | ClickHouse disk | Hot storage > 85% full | Critical |
 | PostgreSQL connections | Active connections > 80% of max | Warning |
@@ -170,13 +173,13 @@ groups:
   - name: langwatch
     rules:
       - alert: WorkerQueueBacklog
-        expr: langwatch_worker_queue_depth > 10000
+        expr: max by (queue_name) (gq_oldest_pending_age_milliseconds) > 300000
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Worker queue backlog is high"
-          description: "Queue depth is {{ $value }}. Workers may need scaling."
+          description: "Oldest pending job is {{ $value }} ms old. Workers may need scaling."
 ```
 
 ## Prometheus Configuration Reference

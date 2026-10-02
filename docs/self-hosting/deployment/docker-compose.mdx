@@ -15,14 +15,16 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd platform/app
+cd langwatch
 
-# Copy the example environment file
+# Copy the example environment file, then replace its placeholder secrets (see Configuration)
 cp platform/app/.env.example platform/app/.env
 
 # Start all services
-docker compose up
+docker compose -f infra/compose.yml --project-directory . up
 ```
+
+The compose file lives at `infra/compose.yml` and reads `platform/app/.env` relative to the repository root, so run every `docker compose` command from the repository root with `-f infra/compose.yml --project-directory .`. The commands below use that form.
 
 LangWatch is available at **http://localhost:5560**.
 
@@ -37,11 +39,11 @@ Docker Compose starts the following services:
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
-| `workers` | `langwatch/langwatch:latest` |, | Background job processing |
+| `workers` | `langwatch/langwatch:latest` | - | Background job processing |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
-| `redis` | `redis:alpine` |, | Job queue, caching |
+| `redis` | `redis:alpine` | - | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
 ## Configuration
@@ -49,10 +51,12 @@ Docker Compose starts the following services:
 Edit `platform/app/.env` to customize your deployment. Key variables:
 
 ```bash
-# Required: generate a secret for each
-API_TOKEN_JWT_SECRET=your-jwt-secret
-CREDENTIALS_SECRET=your-encryption-key
+# Required: replace the placeholders that .env.example ships
+# Signs sessions. Generate with: openssl rand -base64 32
 NEXTAUTH_SECRET=your-session-secret
+# Encrypts stored credentials and peppers API key hashes.
+# Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
+CREDENTIALS_SECRET=your-64-hex-character-key
 
 # Optional: an Enterprise license, either an activation code
 # (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
@@ -60,44 +64,44 @@ NEXTAUTH_SECRET=your-session-secret
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
 ### Start in the background
 
 ```bash
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### View logs
 
 ```bash
 # All services
-docker compose logs -f
+docker compose -f infra/compose.yml --project-directory . logs -f
 
 # Specific service
-docker compose logs -f app
+docker compose -f infra/compose.yml --project-directory . logs -f app
 ```
 
 ### Stop services
 
 ```bash
-docker compose down
+docker compose -f infra/compose.yml --project-directory . down
 ```
 
 ### Update to latest version
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . pull
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### Reset data
 
 ```bash
-docker compose down -v  # Removes volumes (all data)
-docker compose up
+docker compose -f infra/compose.yml --project-directory . down -v  # Removes volumes (all data)
+docker compose -f infra/compose.yml --project-directory . up
 ```
 
 ## Customization

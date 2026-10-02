@@ -19,7 +19,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 | **Workers** | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
 
 **What it does:**
-- Serves the LangWatch web UI (Next.js)
+- Serves the LangWatch web UI
 - Exposes REST and OTel APIs for trace ingestion from SDKs
 - Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
@@ -28,19 +28,19 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 
 ### langwatch/langwatch_nlp
 
-Python service for natural language processing tasks.
+Go service (`nlpgo`) that runs workflows. The image keeps a Python interpreter only for code blocks.
 
 | | |
 |---|---|
 | **Port** | 5561 |
-| **Base** | Python |
+| **Base** | `gcr.io/distroless/python3-debian12` |
 | **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
 
 **What it does:**
-- Runs workflows
-- Executes topic clustering algorithms
+- Runs Optimization Studio workflows
 - Handles custom evaluator execution
-- Processes NLP tasks (embeddings, text analysis)
+- Runs Python code blocks in a sandboxed process
+- Proxies LLM calls from the playground and prompts
 
 ### langwatch/langevals
 
@@ -68,6 +68,9 @@ LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run mod
 The Helm chart also deploys:
 
 - `langwatch/clickhouse-serverless`, Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
+- `langwatch/ai-gateway`, the AI Gateway (`gateway.image.repository`, on by default)
+- `langwatch/langyagent`, the Langy assistant (`langyagent.image.repository`, on by default)
+- `postgres`, `redis` and the Prometheus server image, when the chart runs those services
 
 ## Service Communication
 
@@ -84,7 +87,6 @@ graph LR
     NLP -->|LLM calls| LLMs
     App -->|queries| CH
     App -->|control plane| PG["PostgreSQL<br/>:5432"]
-    CronJobs["CronJobs"] -->|HTTP trigger| App
 ```
 
 ## Image Tags
@@ -129,7 +131,29 @@ images:
   langevals:
     repository: registry.example.com/langwatch/langevals
     tag: "3.20.1" # x-release-please-version
+```
 
-imagePullSecrets:
-  - name: registry-credentials
+Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository` and `cronjobs.image.repository`.
+
+The chart has no chart-wide `imagePullSecrets` value. If your registry needs credentials, attach the pull secret to the ServiceAccount the pods run as. The NLP, LangEvals, gateway, Langy, PostgreSQL and Redis pods use the namespace `default` ServiceAccount. The app and workers use it too, unless `global.serviceAccount.create` or `global.serviceAccount.name` gives them their own, in which case patch that one as well:
+
+```bash
+kubectl -n langwatch patch serviceaccount default \
+  -p '{"imagePullSecrets": [{"name": "registry-credentials"}]}'
+```
+
+Three workloads run under their own ServiceAccount and take the pull secret as a value instead:
+
+```yaml
+clickhouse:
+  imagePullSecrets:
+    - name: registry-credentials
+lwql:
+  imagePullSecrets:
+    - name: registry-credentials
+app:
+  storedObjects:
+    localFilesystem:
+      serializeUpgradesPullSecrets:
+        - name: registry-credentials
 ```

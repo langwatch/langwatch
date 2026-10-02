@@ -22,10 +22,12 @@ These are the default resource requests and limits from the Helm chart (`values.
 
 | Component | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
 |-----------|-------------|-----------|----------------|--------------|---------|
-| LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch App | 250m | 1000m | 2Gi | 4Gi | 10Gi stored objects, shared with the workers |
 | LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
 | LangWatch NLP | 250m | 1000m | 256Mi | 1Gi | --- |
 | LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
+| AI Gateway (2 to 10 replicas, autoscaled) | 200m | 1000m | 256Mi | 512Mi | --- |
+| Langy | 500m | 2000m | 1Gi | 4Gi | --- |
 | PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
 | ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
 | Redis | 250m | 500m | 256Mi | 512Mi | 10Gi |
@@ -47,29 +49,29 @@ For development, demos and small teams.
 - LangWatch Workers: 1 replica, 250m/1 CPU, 768Mi/2Gi memory
 - LangWatch NLP: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
 - LangEvals: 1 replica, 100m/500m CPU, 768Mi/4Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 1 CPU, 2Gi memory, 5Gi storage
 - PostgreSQL: 100m/500m CPU, 256Mi/512Mi memory, 2Gi storage
 - Redis: 50m/250m CPU, 64Mi/256Mi memory, 1Gi storage
-- Prometheus: 50m/250m CPU, 128Mi/512Mi memory
-- Total: ~2.6 CPU, ~6.7 Gi RAM requests
+- Prometheus: 50m/250m CPU, 128Mi/512Mi memory, 7d retention, 2Gi storage
+- Total: ~2.8 CPU, ~6.9 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-dev.yaml \
   --set autogen.enabled=true
 ```
 
-`examples/values-local.yaml` is the same sizing without Prometheus (~2.6 CPU, ~6.6 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
+`examples/values-local.yaml` is the same sizing without Prometheus (~2.75 CPU, ~6.8 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
 
 ### Minimal (`size-minimal.yaml`)
 
-The smallest configuration the platform still boots in. Trims the app, NLP, PostgreSQL and Redis further and drops ClickHouse to 1Gi.
+The smallest configuration the platform still boots in. Trims the app, NLP, PostgreSQL and Redis further, drops ClickHouse to 1Gi and turns off Prometheus.
 
-- Total: ~2.4 CPU, ~4.9 Gi RAM requests
+- Total: ~2.6 CPU, ~5.2 Gi RAM requests
 
-LangEvals is the one thing this overlay does not shrink much. A single worker holding every local model needs roughly 2.6 Gi resident, so its limit stays at 4Gi. The limit is a ceiling rather than a reservation, so it costs nothing until an evaluator actually loads a model.
+LangEvals is the one thing this overlay does not shrink much. A single worker holding every local model needs roughly 2.6 Gi resident, so its limit stays at 4Gi. The limit is a ceiling rather than a reservation, so the node only spends that memory once an evaluator loads a model.
 
 ### Production (`size-prod.yaml`)
 
@@ -79,15 +81,15 @@ For production with single-node ClickHouse.
 - LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
 - LangWatch NLP: 1 replica, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
 - Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.7 CPU, ~22.8 Gi RAM requests
+- Total: ~8.9 CPU, ~23 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml
@@ -101,21 +103,25 @@ For production with replicated ClickHouse.
 - LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
 - LangWatch NLP: 2 replicas, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
 - Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.7 CPU, ~84.5 Gi RAM requests
+- Total: ~22.9 CPU, ~84.8 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
   -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-data \
+  --set clickhouse.objectStorage.region=us-east-1
 ```
+
+Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
 ## Scaling Guidelines
 
