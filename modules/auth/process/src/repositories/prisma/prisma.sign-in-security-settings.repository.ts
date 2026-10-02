@@ -1,3 +1,4 @@
+import type { SignInSecuritySettings } from "@langwatch/auth-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -14,14 +15,7 @@ const ruleSelect = {
   sessionMaxLifetimeMinutes: true,
 } as const;
 
-type RuleRow = {
-  lockoutAfterFailedAttempts: number;
-  lockoutMinutes: number;
-  sessionIdleTimeoutMinutes: number;
-  sessionMaxLifetimeMinutes: number;
-};
-
-const ruleOf = (row: RuleRow): OrganizationSignInSecurityRule => ({
+const ruleOf = (row: SignInSecuritySettings): OrganizationSignInSecurityRule => ({
   lockout: {
     afterFailedAttempts: row.lockoutAfterFailedAttempts,
     lockMinutes: row.lockoutMinutes,

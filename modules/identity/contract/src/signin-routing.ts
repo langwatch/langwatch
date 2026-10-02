@@ -52,15 +52,6 @@ export type SignInRoutingReasonCode = (typeof SIGNIN_ROUTING_REASON_CODES)[numbe
 export const SIGNIN_METHOD_KINDS = ["password", "passkey", "federated"] as const;
 export type SignInMethodKind = (typeof SIGNIN_METHOD_KINDS)[number];
 
-export interface SignInMethod {
-  /** What the sign-in surface dials: `password`, or the provider id. */
-  id: string;
-  kind: SignInMethodKind;
-  /** The connection this method belongs to; null for instance-level methods
-   *  and for the legacy env provider until D04 gives it a connection. */
-  connectionId: string | null;
-}
-
 export function isLocalSignInMethod(method: SignInMethod): boolean {
   return method.kind !== "federated";
 }
@@ -132,23 +123,16 @@ export const SIGNIN_ROUTING_OUTCOMES = [
 ] as const;
 export type SignInRoutingOutcome = (typeof SIGNIN_ROUTING_OUTCOMES)[number];
 
-export interface RoutingDecision {
-  outcome: SignInRoutingOutcome;
-  /** Present only on `redirect_to_connection`. */
-  connectionId?: string;
-  /** What the surface offers. On a redirect, the one method it redirects to. */
-  methodSet: readonly SignInMethod[];
-  reasonCode: SignInRoutingReasonCode;
-  /** True when an ACTIVE organization connection fell back to local methods. */
-  domainManaged?: true;
-}
-
 /** One offered method, as a transport states it. @see SignInMethod */
 export const signInMethodSchema = z.object({
+  /** What the sign-in surface dials: `password`, or the provider id. */
   id: z.string(),
   kind: z.enum(SIGNIN_METHOD_KINDS),
+  /** The connection this method belongs to; null for instance-level methods
+   *  and for the legacy env provider until D04 gives it a connection. */
   connectionId: z.string().nullable(),
 });
+export type SignInMethod = z.infer<typeof signInMethodSchema>;
 
 /**
  * The decision the front door answers with. The object IS the contract: a
@@ -156,11 +140,15 @@ export const signInMethodSchema = z.object({
  */
 export const routingDecisionSchema = z.object({
   outcome: z.enum(SIGNIN_ROUTING_OUTCOMES),
+  /** Present only on `redirect_to_connection`. */
   connectionId: z.string().optional(),
+  /** What the surface offers. On a redirect, the one method it redirects to. */
   methodSet: z.array(signInMethodSchema).readonly(),
   reasonCode: z.enum(SIGNIN_ROUTING_REASON_CODES),
+  /** True when an ACTIVE organization connection fell back to local methods. */
   domainManaged: z.literal(true).optional(),
 });
+export type RoutingDecision = z.infer<typeof routingDecisionSchema>;
 
 /**
  * What the identified account holds, as the account lookup answers it. Kinds,

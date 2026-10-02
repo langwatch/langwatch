@@ -4,6 +4,7 @@
  * organization is in scope, and where a failure's words come from. Never the
  * router, never browser-host directly (ARCHITECTURE.md §10.1).
  */
+import type { SignInStartRefusal } from "@langwatch/auth-contract";
 import { createContext, useContext } from "react";
 
 import type { SsoQueryReading } from "./test-sign-in-callback.ts";
@@ -31,12 +32,7 @@ export type SsoRouteReading = {
  * left. Not a handled payload of ours: it comes from the identity provider,
  * or from the engine talking to it.
  */
-export type SsoTestSignInRefusal = {
-  readonly code?: string | undefined;
-  readonly message?: string | undefined;
-  readonly statusText?: string | undefined;
-  readonly status?: number | undefined;
-};
+export type SsoTestSignInRefusal = Readonly<SignInStartRefusal>;
 
 export type SsoTestSignInResult = { readonly error?: SsoTestSignInRefusal | null };
 

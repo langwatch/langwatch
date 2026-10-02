@@ -11,6 +11,7 @@ import {
   PlatformPermissionNotAssignableError,
   PLATFORM_OPERATOR_ROLE_ID,
   PLATFORM_TENANT_ID,
+  type AuthzLedgerResourceTerms,
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
@@ -90,20 +91,6 @@ export type LedgerResourcePrincipal =
   | { type: "anyone"; id: null }
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
-
-/**
- * A resource fact's own terms, minus the `projectId` the verb takes
- * separately (it is also the compat head's tenancy, so the writer needs it
- * in its own right rather than buried in the terms).
- */
-export type LedgerResourceTerms = {
-  token: string;
-  permission: string;
-  kind: "trace" | "thread";
-  expiresAtMs?: number;
-  maxViews?: number;
-  createdByUserId?: string;
-};
 
 /**
  * The one principal a write names, in the ledger's exactly-one shape. Call sites carry three
@@ -428,7 +415,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     grantId: string;
     /** Where the shared resource lives — the compat head's tenancy column. */
     projectId: string;
-    resource: LedgerResourceTerms;
+    /** The fact's own terms; `projectId` travels separately as the compat head's tenancy. */
+    resource: AuthzLedgerResourceTerms;
     principal: LedgerResourcePrincipal;
     /** The shared resource's id, and nothing else — the RESOURCE scope. */
     scopeId: string;

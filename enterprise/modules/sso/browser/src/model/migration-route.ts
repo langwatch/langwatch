@@ -28,13 +28,7 @@ export type SsoMigrationScimStatus = SsoSetupMigration["scim"]["status"];
 
 export type SsoMigrationMemberMove = SsoSetupMigration["members"]["stragglers"][number]["move"];
 
-export interface MigrationStragglerView {
-  userId: string;
-  name: string | null;
-  email: string | null;
-  lastLegacyAuthenticationAtMs: number | null;
-  move: SsoMigrationMemberMove;
-}
+export type MigrationStragglerView = SsoSetupMigration["members"]["stragglers"][number];
 
 export interface MigrationMembersView {
   activeCount: number;

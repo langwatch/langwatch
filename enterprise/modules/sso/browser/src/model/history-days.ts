@@ -6,14 +6,10 @@
  * including now: "Today" and "Yesterday" depend on when the reading happens,
  * so the caller passes the clock.
  */
+import type { SsoConnectionHistoryEntry } from "@langwatch/enterprise-sso-contract";
 import { format, isSameCalendarDay, toZonedDateTime } from "@langwatch/time";
 
-export interface HistoryDayEntry {
-  eventId: string;
-  occurredAtMs: number;
-  summary: string;
-  carriedOver: boolean;
-}
+export type HistoryDayEntry = SsoConnectionHistoryEntry;
 
 export interface HistoryDay {
   /** Stable across renders: the local calendar day, not the label. */
