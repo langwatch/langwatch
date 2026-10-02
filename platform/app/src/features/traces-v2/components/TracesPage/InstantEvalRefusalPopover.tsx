@@ -139,7 +139,9 @@ const SELF_HOSTED_REFUSAL_COPY: Record<
     dismiss: "Not now",
   },
   not_connected: {
-    title: "This install can't reach LangWatch",
+    // Not "can't reach": an operator who switched Connect off on purpose gets
+    // this one too, and nothing about the network failed for them.
+    title: "This install isn't connected to LangWatch",
     body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
     more: READ_MORE_SELF_HOSTED,
     dismiss: "Not now",

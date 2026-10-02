@@ -17,7 +17,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     signed a license that names Instant Evals, which is the same agreement, and an organization
     admin can still switch hosted judging off in Settings, Connect;
   - a self-hosted install that is not released is told why in its own terms: its license does
-    not include Instant Evals, an admin switched them off, it cannot reach LangWatch, or it
+    not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
     judges with its own key and its operator decides;
   - the operator's release flag stays as it was, and the flag, the license or the switch makes a
     project judgeable.
@@ -74,7 +74,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the popover asks what to offer
       Then an install whose license does not include Instant Evals, or that holds no license, is told its license does not include them
       And an install whose admin switched hosted judging off is told where to switch it back on
-      And an install with Connect switched off, or that holds no credential to present, is told it cannot reach LangWatch
+      And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
       And an install that judges with its own key, or with judging turned off, is told to ask whoever runs it
 
     @integration
@@ -83,7 +83,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the popover opens
       Then a license without Instant Evals offers to contact us to add them
       And a switched-off organization names Settings, Connect, and offers no "Contact us"
-      And an install that cannot reach LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
+      And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
       And an install that judges with its own key offers no "Contact us"
 
     @integration

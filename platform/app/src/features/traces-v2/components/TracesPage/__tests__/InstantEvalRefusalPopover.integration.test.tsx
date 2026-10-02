@@ -399,12 +399,12 @@ describe("given an eval chip refused on a self-hosted install", () => {
     });
   });
 
-  describe("when the install can't reach LangWatch", () => {
+  describe("when the install isn't connected to LangWatch", () => {
     /** @scenario "Each self-hosted refusal says what to do about it" */
     it("names both addresses and links Read more, with no Contact us", () => {
       renderRefusal("not_connected");
       expect(
-        screen.getByText("This install can't reach LangWatch"),
+        screen.getByText("This install isn't connected to LangWatch"),
       ).toBeInTheDocument();
       expect(
         screen.getByText(/connect\.langwatch\.ai and gateway\.langwatch\.ai/),
