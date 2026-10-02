@@ -529,9 +529,9 @@ const VariableRow = ({
               />
             </Box>
           ) : (
-            // The value typed in the Prompt Playground. It opens two lines tall
-            // (first line centred on the row) and grows with the text up to a
-            // limit, then scrolls, so a long value never pushes rows off the panel.
+            // The value typed in the Prompt Playground. It opens one row tall
+            // (centred with the type, name and "=") and grows with the text up
+            // to a limit, then scrolls, so a long value never pushes rows off.
             <Textarea
               value={defaultValue ?? ""}
               onChange={(e) => onDefaultValueChange?.(e.target.value)}
@@ -546,7 +546,8 @@ const VariableRow = ({
               borderColor="border"
               autoresize
               resize="none"
-              rows={2}
+              rows={1}
+              minHeight={ROW_HEIGHT}
               maxHeight="240px"
               data-testid={`variable-value-input-${variable.identifier}`}
             />
