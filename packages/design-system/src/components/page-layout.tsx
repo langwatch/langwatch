@@ -67,10 +67,12 @@ function Header({ children, withBorder = true, ...props }: PropsWithChildren<Hea
   );
 }
 
-// Page titles always render at the standard Heading size. Forbidding size and
-// fontSize here keeps every page heading consistent: use <PageLayout.Heading> at
-// its default size, never a hand-tuned one. See dev/docs/best_practices/react.md.
-type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
+// Page titles render at the standard Heading size; account pages (Me, Settings
+// profile and security) pass size="lg". fontSize stays forbidden so no page
+// hand-tunes its title. See dev/docs/best_practices/react.md.
+interface HeadingProps extends Omit<ChakraHeadingProps, "size" | "fontSize"> {
+  size?: "lg";
+}
 
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   return (

@@ -49,7 +49,7 @@ export function PersonalConfigureScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Settings</PageLayout.Heading>
+        <PageLayout.Heading size="lg">Settings</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">

@@ -89,7 +89,7 @@ export function PersonalOverviewScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Your AI tools</PageLayout.Heading>
+        <PageLayout.Heading size="lg">Your AI tools</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">

@@ -35,6 +35,6 @@ stores) → `ui/elements|blocks|sections` (ARCHITECTURE.md §3.4).
 
 ## Page headings
 
-- **Page titles use `<PageLayout.Heading>` at its default size.** Never set a custom `size`/`fontSize` on a page title, and never hand-roll one with `<Text fontSize="lg">`. Consistent page titles are part of the design system, not a per-page decision. `PageLayout.Heading` omits `size`/`fontSize` from its props at the type level, so the typechecker rejects an override.
+- **Page titles use `<PageLayout.Heading>` at its default size**, except account pages (every `/me` page, Settings > Profile and Settings > Security), which pass `size="lg"` (ruled 2026-10-02, Alex). Never set any other `size`, never a `fontSize`, and never hand-roll a title with `<Text fontSize="lg">`. `PageLayout.Heading` accepts only `size="lg"` and omits `fontSize` at the type level, so the typechecker rejects any other override.
 - A reusable component that renders its own title (for example the dataset editor) uses the Chakra `<Heading>` component at its default size, not a sized `<Text>`.
 - `size` on a raw Chakra `<Heading>` is fine for _sub_-headings: drawer and dialog titles, card and section labels. The rule above is specifically about top-level page titles, not every heading on the page.

@@ -105,7 +105,7 @@ export function PersonalBudgetRequestScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Request budget increase</PageLayout.Heading>
+        <PageLayout.Heading size="lg">Request budget increase</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full" maxWidth="640px">

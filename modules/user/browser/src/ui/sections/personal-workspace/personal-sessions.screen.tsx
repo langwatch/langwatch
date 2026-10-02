@@ -19,7 +19,7 @@ export function PersonalSessionsScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Sessions</PageLayout.Heading>
+        <PageLayout.Heading size="lg">Sessions</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">
