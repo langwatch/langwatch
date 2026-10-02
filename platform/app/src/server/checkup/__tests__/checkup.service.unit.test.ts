@@ -440,6 +440,32 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when the deployment sets LANGWATCH_CONNECT_DISABLED and the reach checks are asked for", () => {
+    /** @scenario "Connect switched off by the deployment probes no LangWatch host" */
+    it("opens no connection and names the variable", async () => {
+      const reach = vi.fn(async () => undefined);
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          reach,
+          connect: async () => ({
+            ...CONNECTED,
+            deployment: "off",
+            licensed: false,
+            entitledServices: null,
+            lastSyncAt: null,
+          }),
+        }),
+      ).explicit({ checks: ["reach_connect_host", "reach_gateway_host"] });
+
+      expect(reach).not.toHaveBeenCalled();
+      for (const id of ["reach_connect_host", "reach_gateway_host"] as const) {
+        const verdict = rowOf(rows, id);
+        expect(verdict.outcome).toBe("unchecked");
+        expect(verdict.detail).toContain("LANGWATCH_CONNECT_DISABLED");
+      }
+    });
+  });
+
   describe("when the model provider test budget is used up", () => {
     /** @scenario "The model provider test respects the organization's egress budget" */
     it("leaves the row not checked and names when to try again", async () => {

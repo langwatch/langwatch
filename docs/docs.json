@@ -983,6 +983,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/first-run",
               "self-hosting/licensing",
               "self-hosting/connect",
               "self-hosting/data-and-telemetry",
@@ -1012,7 +1013,8 @@
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
               "self-hosting/deployment/kubernetes-local",
-              "self-hosting/deployment/argocd"
+              "self-hosting/deployment/argocd",
+              "self-hosting/deployment/routing"
             ]
           },
           {
@@ -1717,12 +1719,12 @@
   },
   "redirects": [
     {
-      "source": "/features/instant-evals/shorthand",
-      "destination": "/features/instant-evals/targets"
+      "source": "/ci/cache/busted/1790926888",
+      "destination": "/introduction"
     },
     {
-      "source": "/ci/cache/busted/1789807595",
-      "destination": "/introduction"
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
     },
     {
       "source": "/integration/tools/integrations/claude-code",

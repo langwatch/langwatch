@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const SELF_HOSTED: SsoSelfServeContext = {
   deployment: "self-hosted",
   licensed: true,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: false,
   singleOrganization: true,
   actorIsPlatformOperator: false,
@@ -16,7 +16,7 @@ const SELF_HOSTED: SsoSelfServeContext = {
 const HOSTED: SsoSelfServeContext = {
   deployment: "hosted",
   licensed: false,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: true,
   singleOrganization: false,
   actorIsPlatformOperator: false,

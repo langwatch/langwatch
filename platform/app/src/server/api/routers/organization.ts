@@ -1,3 +1,4 @@
+import { activateConfiguredLicenseForInstall } from "@ee/licensing/activation/configuredActivation";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { SsoTestArrivalCannotCreateOrganizationError } from "@langwatch/identity";
 import { TRPCError } from "@trpc/server";
@@ -133,6 +134,11 @@ export const organizationRouter = createTRPCRouter({
         primaryIntent: input.primaryIntent,
         userDisplayName: ctx.session.user.name,
       });
+
+      // An activation code in LANGWATCH_LICENSE_KEY waits at boot for an
+      // organization to store its license on; this is where the first one
+      // appears. A no-op when the install already holds a license.
+      await activateConfiguredLicenseForInstall();
 
       return {
         success: true,

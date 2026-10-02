@@ -231,12 +231,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_INTERNAL_SECRET
+                  key: {{ include "langwatch.gatewayInternalSecretKey" . }}
             - name: LW_GATEWAY_JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_JWT_SECRET
+                  key: {{ include "langwatch.gatewayJwtSecretKey" . }}
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
@@ -279,16 +279,15 @@ spec:
             # cursor) at login. Without it the CLI falls back to
             # http://localhost:5563, which a developer laptop can't reach
             # against a remote cluster. Prefer the explicit gateway.publicUrl
-            # knob; otherwise derive it from an operator-set gateway ingress
-            # host (the SaaS default host is skipped so a self-host install
-            # never silently points at gateway.langwatch.ai).
+            # knob; otherwise derive it from ingress.gateway.host when the
+            # app Ingress publishes the gateway.
             {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
             {{- if not $gwPublic }}
-            {{- $gwIngress := .Values.gateway.ingress | default dict }}
-            {{- $gwHost := $gwIngress.host | default "" }}
-            {{- if and $gwIngress.enabled $gwHost (ne $gwHost "gateway.langwatch.ai") }}
+            {{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+            {{- $gwHost := $gwRoute.host | default "" }}
+            {{- if and .Values.ingress.enabled $gwHost }}
             {{- $scheme := "http" }}
-            {{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+            {{- if ($gwRoute.tls | default dict).secretName }}{{- $scheme = "https" }}{{- end }}
             {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
             {{- end }}
             {{- end }}
@@ -355,10 +354,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- with .Values.app.extraEnvFrom}}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.app.extraEnvFrom) | nindent 10 }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:

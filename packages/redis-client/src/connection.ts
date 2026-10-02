@@ -45,6 +45,70 @@ const SHARED_OPTIONS = {
   maxRetriesPerRequest: null,
 } as const;
 
+/** Redis commands whose arguments carry a password. */
+const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
+
+/**
+ * The password among a command's arguments: the last argument of
+ * `AUTH [username] password`, and the one after the username in
+ * `HELLO protover AUTH username password`. A username is not a secret, and
+ * masking a common one such as `default` would blank unrelated text.
+ */
+function credentialValues(name: string, args: unknown): string[] {
+  if (!Array.isArray(args)) return [];
+  let password: unknown;
+  if (name === "auth") {
+    password = args[args.length - 1];
+  } else {
+    const at = args.findIndex(
+      (a) => typeof a === "string" && a.toLowerCase() === "auth",
+    );
+    password = at < 0 ? undefined : args[at + 2];
+  }
+  return typeof password === "string" && password.length > 0 ? [password] : [];
+}
+
+/**
+ * A server that does not know the command echoes its first arguments, cut at
+ * about 128 bytes and with CR/LF replaced, so an exact match on the password
+ * can miss a truncated or rewritten copy. The whole echoed list goes.
+ */
+const ECHOED_ARGUMENTS = /(with args beginning with:)[^\n]*/g;
+
+/** Replaces the password, and any echoed argument list, in a text. */
+function maskValues(text: unknown, values: string[]): unknown {
+  if (typeof text !== "string") return text;
+  const masked = values.reduce(
+    (out, value) => out.split(value).join("[redacted]"),
+    text,
+  );
+  return masked.replace(ECHOED_ARGUMENTS, "$1 [redacted]");
+}
+
+/**
+ * ioredis attaches the failed command to a reply error as
+ * `command: { name, args }`, so a rejected AUTH carries the password in
+ * `args`, and a server that renamed AUTH echoes it in the message too. The
+ * same object rejects every queued command and can end up in a crash log, so
+ * the values are replaced on the error itself.
+ */
+function redactCommandCredentials(error: unknown): void {
+  if (!error || typeof error !== "object") return;
+  const command = (error as { command?: unknown }).command;
+  if (!command || typeof command !== "object") return;
+  const { name, args } = command as { name?: unknown; args?: unknown };
+  if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
+    return;
+  }
+  const values = credentialValues(name.toLowerCase(), args);
+  const target = error as { message?: unknown; stack?: unknown };
+  target.message = maskValues(target.message, values);
+  target.stack = maskValues(target.stack, values);
+  (command as { args: unknown }).args = Array.isArray(args)
+    ? args.map(() => "[redacted]")
+    : "[redacted]";
+}
+
 export class RedisConnectionService {
   private readonly logger: RedisLogger | undefined;
   private readonly config: RedisConfigService;
@@ -88,6 +152,10 @@ export class RedisConnectionService {
         dnsLookup: (address, callback) => callback(null, address),
         scaleReads: "all",
       });
+      // A node's error reaches the cluster as "node error", on the same object.
+      connection.on("node error", (error: unknown) =>
+        redactCommandCredentials(error),
+      );
       this.attachLifecycleLogging({
         connection,
         context: { mode: "cluster", endpoints: config.endpoints.length },
@@ -153,14 +221,28 @@ export class RedisConnectionService {
     context: object;
   }): void {
     const logger = this.logger;
+
+    // Registered first, so it runs before any listener a caller adds later,
+    // and synchronously, before the rejected command promises that share the
+    // same error object are handled.
+    connection.on("error", (error: unknown) => {
+      redactCommandCredentials(error);
+      if (logger) {
+        logger.error({ ...context, error }, "error");
+      } else if (connection.listenerCount("error") === 1) {
+        // Keeps ioredis's own report for a connection nobody else listens on;
+        // registering a listener at all is what turns that report off.
+        console.error(
+          "[ioredis] Unhandled error event:",
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    });
     if (!logger) return;
 
     connection.on("connect", () => logger.info(context, "connected"));
     connection.on("ready", () =>
       logger.info(context, "ready to accept commands"),
-    );
-    connection.on("error", (error: Error) =>
-      logger.error({ ...context, error }, "error"),
     );
     connection.on("close", () => logger.info(context, "connection closed"));
     connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
