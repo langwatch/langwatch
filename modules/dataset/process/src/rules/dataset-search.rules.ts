@@ -1,3 +1,5 @@
+import { DatasetTooLargeToSearchError } from "@langwatch/dataset-contract";
+
 /** Row search by cell content value (not columns). Predicate shared to keep
  * same rows across storage layouts (s3_jsonl vs postgres).
  */
@@ -93,3 +95,19 @@ const safeStringifyValue = (value: unknown): string => {
   }
   return "";
 };
+
+/** Refuses a search scan once it has read more rows or bytes than one search may. */
+export function refuseSearchScan(rowsRead: number, bytesRead: number): void {
+  if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+    throw new DatasetTooLargeToSearchError({
+      rowCount: rowsRead,
+      maxRows: DATASET_SEARCH_MAX_ROWS,
+    });
+  }
+  if (bytesRead > DATASET_SEARCH_MAX_BYTES) {
+    throw new DatasetTooLargeToSearchError({
+      sizeBytes: bytesRead,
+      maxBytes: DATASET_SEARCH_MAX_BYTES,
+    });
+  }
+}

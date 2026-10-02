@@ -35,12 +35,16 @@ import {
   DATASET_SEARCH_MAX_ROWS,
   matchesDatasetSearch,
   measureRowsBytes,
+  refuseSearchScan,
 } from "../rules/dataset-search.rules.ts";
+import { DatasetChunkReadService } from "../services/dataset-chunk-read.service.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentService implements DatasetContent {
   private readonly chunks: DatasetChunkService;
+
+  private readonly reads = DatasetChunkReadService.create();
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
@@ -248,7 +252,7 @@ export class DatasetContentService implements DatasetContent {
     projectId: string;
     recordIds: readonly string[];
   }): Promise<Record<string, unknown>[]> {
-    return this.chunks.findEntries({
+    return this.reads.findEntries({
       dataset: input.dataset,
       projectId: input.projectId,
       ids: input.recordIds,
@@ -436,21 +440,6 @@ function isSearchOffset(value: unknown): value is {
     typeof offset.startRow === "number" &&
     typeof offset.endRow === "number"
   );
-}
-
-function refuseSearchScan(rowsRead: number, bytesRead: number): void {
-  if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
-    throw new DatasetTooLargeToSearchError({
-      rowCount: rowsRead,
-      maxRows: DATASET_SEARCH_MAX_ROWS,
-    });
-  }
-  if (bytesRead > DATASET_SEARCH_MAX_BYTES) {
-    throw new DatasetTooLargeToSearchError({
-      sizeBytes: bytesRead,
-      maxBytes: DATASET_SEARCH_MAX_BYTES,
-    });
-  }
 }
 
 function isChunkOffset(value: unknown): value is Omit<ChunkOffset, "byteSize"> & {
