@@ -34,6 +34,10 @@ import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
+import type {
+  GithubWebhookDelivery,
+  GithubWebhookReceipt,
+} from "../rules/github-webhook.rules.ts";
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
@@ -221,7 +225,7 @@ export class GithubModule implements GithubApiContract {
     signingKeyFallback: sessionSecret,
   } as const;
 
-  readonly #service: GithubApiContract;
+  readonly #service: GithubFeatureService;
   readonly #branchMaintenance: GithubBranchMaintenance;
   readonly #projects: ProjectApiContract;
   readonly #permissions: AuthzApi;
@@ -230,7 +234,7 @@ export class GithubModule implements GithubApiContract {
   readonly #codingAgents: CodingAgentApi;
 
   private constructor(parts: {
-    service: GithubApiContract;
+    service: GithubFeatureService;
     branchMaintenance: GithubBranchMaintenance;
     projects: ProjectApiContract;
     permissions: AuthzApi;
@@ -499,6 +503,9 @@ export class GithubModule implements GithubApiContract {
   }
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
     return this.#service.parsePullRequestEvent(payload);
+  }
+  receiveWebhook(delivery: GithubWebhookDelivery): Promise<GithubWebhookReceipt> {
+    return this.#service.receiveWebhook(delivery);
   }
   applyWebhookPayload(input: {
     payload: GithubWebhookEnvelope;

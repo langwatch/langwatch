@@ -22,6 +22,11 @@ import type {
   installSuccessHtml,
 } from "../rules/github-install-response.rules.ts";
 import type { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
+import {
+  readGithubWebhook,
+  type GithubWebhookDelivery,
+  type GithubWebhookReceipt,
+} from "../rules/github-webhook.rules.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
 import type { GithubHost } from "./github-host.service.ts";
 import type { GithubInstallState } from "./github-install-state.service.ts";
@@ -245,6 +250,25 @@ export class GithubFeatureService implements GithubApi {
 
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
     return this.pullRequestEvents.parse(payload);
+  }
+
+  /** The webhook door: verified against the shared secret before anything is applied. */
+  async receiveWebhook(delivery: GithubWebhookDelivery): Promise<GithubWebhookReceipt> {
+    const read = readGithubWebhook({
+      rawBody: delivery.rawBody,
+      signature: delivery.signature,
+      secret: this.config.webhookSecret,
+    });
+
+    if ("refused" in read) return read;
+
+    await this.applyWebhookPayload({
+      payload: read.envelope,
+      eventType: delivery.eventType,
+      deliveryId: delivery.deliveryId,
+    });
+
+    return { received: true };
   }
 
   async applyWebhookPayload(input: {

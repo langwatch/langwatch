@@ -3,7 +3,7 @@
  * the HMAC-verified webhook and the two `github-langy` aliases.
  * @see specs/integrations/github-connection.feature
  */
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -16,7 +16,6 @@ import {
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
   githubInstallStartQuerySchema,
-  githubWebhookEnvelopeSchema,
   type GithubApi,
   type GithubConnectionAuditEntry,
   type GithubInstallStatePayload,
@@ -26,6 +25,12 @@ import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
+
+import type {
+  GithubWebhookDelivery,
+  GithubWebhookReceipt,
+  GithubWebhookRefusal,
+} from "../rules/github-webhook.rules.ts";
 
 /**
  * What the installation flow reaches. The GitHub capability is this module's;
@@ -51,6 +56,8 @@ export interface GithubInstallApi {
    * no-op: linkage then arrives on the branch recheck instead.
    */
   backfillPullRequestMappings(input: { organizationId: string }): Promise<void>;
+  /** The webhook door: verifies the HMAC before anything is parsed or applied. */
+  receiveWebhook(delivery: GithubWebhookDelivery): Promise<GithubWebhookReceipt>;
 }
 
 export const GithubInstallApi = moduleApi<GithubInstallApi>()("github");
@@ -598,19 +605,13 @@ async function recordInstallAudit({
 // idempotent, and acknowledged whatever happens.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function verifyWebhookSignature(
-  rawBody: string,
-  header: string | undefined,
-  secret: string,
-): boolean {
-  if (!secret || !header) return false;
-
-  const expected = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
-  const a = Buffer.from(header);
-  const b = Buffer.from(expected);
-
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+/** Each refusal in main's status and sentence. */
+const WEBHOOK_REFUSALS: Record<GithubWebhookRefusal, [GithubAnswer["status"], string]> = {
+  not_configured: [404, "Webhook not configured"],
+  invalid_signature: [401, "Invalid signature"],
+  invalid_json: [400, "Invalid JSON"],
+  invalid_envelope: [400, "Invalid JSON object"],
+};
 
 async function receiveWebhook({
   app,
@@ -621,32 +622,16 @@ async function receiveWebhook({
   request: Request;
   raw: string;
 }): Promise<GithubAnswer> {
-  const service = app.github();
-  const secret = service.getAppConfig().webhookSecret;
-
-  if (!secret) return jsonAnswer({ error: "Webhook not configured" }, 404);
-
-  const signature = request.headers.get("x-hub-signature-256") ?? undefined;
-  const signed = verifyWebhookSignature(raw, signature, secret);
-
-  if (!signed) return jsonAnswer({ error: "Invalid signature" }, 401);
-
-  let payload: unknown;
-
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    return jsonAnswer({ error: "Invalid JSON" }, 400);
-  }
-
-  const envelope = githubWebhookEnvelopeSchema.safeParse(payload);
-  if (!envelope.success) return jsonAnswer({ error: "Invalid JSON object" }, 400);
-
-  await service.applyWebhookPayload({
-    payload: envelope.data,
+  const receipt = await app.receiveWebhook({
+    rawBody: raw,
+    signature: request.headers.get("x-hub-signature-256") ?? undefined,
     eventType: request.headers.get("x-github-event") ?? undefined,
     deliveryId: request.headers.get("x-github-delivery") ?? undefined,
   });
 
-  return jsonAnswer({ received: true }, 200);
+  if ("received" in receipt) return jsonAnswer({ received: true }, 200);
+
+  const [status, error] = WEBHOOK_REFUSALS[receipt.refused];
+
+  return jsonAnswer({ error }, status);
 }

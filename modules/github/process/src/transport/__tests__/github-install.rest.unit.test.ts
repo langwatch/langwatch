@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
 import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
+import { readGithubWebhook } from "../../rules/github-webhook.rules.ts";
 
 const SIGNING_KEY = "x".repeat(64);
 const WEBHOOK_SECRET = "whsecret";
@@ -140,6 +141,14 @@ function mount(
       audits.push({ action: entry.action });
     },
     backfillPullRequestMappings: async () => {},
+    receiveWebhook: async ({ rawBody, signature, eventType, deliveryId }) => {
+      const read = readGithubWebhook({ rawBody, signature, secret: WEBHOOK_SECRET });
+      if ("refused" in read) return read;
+
+      await service.applyWebhookPayload?.({ payload: read.envelope, eventType, deliveryId });
+
+      return { received: true };
+    },
   };
 
   const runtime = createRestRuntime({
