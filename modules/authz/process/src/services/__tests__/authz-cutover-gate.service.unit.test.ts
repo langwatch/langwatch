@@ -42,8 +42,7 @@ describe("AuthzCutoverGateService", () => {
     });
   });
 
-  /** @scenario "A cut-over organization is decided by the engine" */
-  /** @scenario "An organization that has not cut over is unchanged" */
+  /** @scenario "Only a finalized migration counts as cut over" */
   it.each([
     ["migrated", false],
     ["finalized", true],

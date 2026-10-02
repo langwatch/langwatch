@@ -232,3 +232,9 @@ Feature: Permission resolution
     Given a decision refusing the caller
     When the declared check runs
     Then the request is refused and never marked as checked
+
+  Scenario: A declared check and an imperative check decide through the same service
+    Given an organization admin
+    When one permission is decided for them by a declared check and by an imperative check
+    Then both are permitted by the one authorization service
+    And the declared decision names the caller's organization role
