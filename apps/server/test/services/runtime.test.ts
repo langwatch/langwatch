@@ -231,6 +231,18 @@ describe("services/runtime", () => {
     });
   });
 
+  describe("when the user's shell carries a provider key", () => {
+    it("hands the ai-gateway the same env as the other app-tier services", async () => {
+      const ctx = fakeCtx();
+      ctx.userEnv = { OPENAI_API_KEY: "sk-user" };
+      await runtime.startAll(ctx);
+      const gatewayEnv = gatewayStub.fn.mock.calls.at(-1)![2];
+      const appEnv = langwatchStub.fn.mock.calls.at(-1)![2];
+      expect(gatewayEnv).toEqual(appEnv);
+      expect(gatewayEnv).toMatchObject({ OPENAI_API_KEY: "sk-user" });
+    });
+  });
+
   describe("when one app-tier service never becomes healthy", () => {
     it("stops the siblings that did start instead of leaking them", async () => {
       // Promise.all rejects on the first failure and DISCARDS the resolved

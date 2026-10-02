@@ -65,6 +65,23 @@ Feature: Service orchestration after pre-deps are installed
     And "curl http://localhost:5560/api/health" returns 200 within 60 seconds
     And `runtime.startAll` returns one ServiceHandle per service
 
+  Scenario: Workers report healthy only once their health door answers
+    Given the "langwatch" service is healthy
+    When the CLI starts "workers"
+    Then "workers" is not reported healthy until its "/healthz" answers on the worker metrics port
+    And when "/healthz" never answers, the workers are stopped and `runtime.startAll` fails
+
+  Scenario: Workers do not migrate a second time
+    Given phase 2 already migrated postgres and clickhouse
+    And "langwatch" already provisioned LangWatchQL
+    When the CLI starts "workers"
+    Then the workers skip Prisma migrations, ClickHouse migrations and LangWatchQL provisioning
+
+  Scenario: The ai-gateway sees the same environment as the other app-tier services
+    Given the user's shell carries "OPENAI_API_KEY"
+    When the CLI calls `runtime.startAll(ctx)`
+    Then "ai-gateway" receives the same environment as "langwatch"
+
   Scenario: Migrations run automatically on first start
     Given postgres has no "langwatch_db" schema yet
     And clickhouse has no "langwatch" database yet

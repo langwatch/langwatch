@@ -1,16 +1,25 @@
+import { nowInstant } from "@langwatch/time";
+
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
+import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { locateWorkerDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
-// LangWatch worker process. Health inferred from process liveness.
+/**
+ * The LangWatch worker process. Healthy once its health door answers, which
+ * opens after its prepare step and composition. The launcher already migrated
+ * and the api already provisioned, so the worker skips both.
+ */
 export async function startLangwatchWorkers(
   ctx: RuntimeContext,
   bus: EventBus,
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "workers" });
+  const start = nowInstant().epochMilliseconds;
+  const healthPort = envFromFile.WORKER_METRICS_PORT ?? "2999";
 
   const workerDir = locateWorkerDir();
   if (!workerDir) throw new Error("langwatch worker dir not found");
@@ -33,18 +42,30 @@ export async function startLangwatchWorkers(
         // PORT isn't used by workers but we set it for symmetry with the
         // app — some shared bootstrap code reads it for log tagging.
         PORT: String(ctx.ports.langwatch),
+        WORKER_METRICS_PORT: healthPort,
+        SKIP_PRISMA_MIGRATE: "true",
+        SKIP_CLICKHOUSE_MIGRATE: "true",
+        SKIP_LWQL_PROVISION: "true",
       },
     },
     paths: sp,
     bus,
   });
 
-  // Mark healthy synchronously after spawn — workers print their own
-  // "topic clustering worker ready" / "ingestion puller worker ready" log
-  // lines as they boot, which the user sees streamed via the log-tee. The app already
-  // gates startup behind the API server's /api/health probe, so by the
-  // time we get here Redis + ClickHouse are reachable.
-  bus.emit({ type: "healthy", service: "workers", durationMs: 0 });
+  const ready = await pollUntilHealthy({
+    check: httpGetCheck(`http://127.0.0.1:${healthPort}/healthz`),
+    timeoutMs: 120_000,
+    intervalMs: 1000,
+  });
+  if (!ready.ok) {
+    await handle.stop();
+    throw new Error(`workers did not become healthy: ${ready.reason}`);
+  }
+  bus.emit({
+    type: "healthy",
+    service: "workers",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
 
   return handle;
 }
