@@ -37,8 +37,16 @@ const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
  * knows. `joinRequests.setJoining` is the case: what an administrator needs
  * to read months later is what the setting WAS as well as what it became, and
  * the previous value is not in the input.
+ *
+ * `tracesV2.instantEval.enable` is the other: its input names a project, but
+ * the switch is the organization's consent, so its row must name the
+ * organization the handler resolves from that project.
  */
-const SELF_AUDITED_PATHS = new Set(["joinRequests.setJoining"]);
+export const INSTANT_EVALS_ENABLE_AUDIT_ACTION = "tracesV2.instantEval.enable";
+const SELF_AUDITED_PATHS = new Set([
+  "joinRequests.setJoining",
+  INSTANT_EVALS_ENABLE_AUDIT_ACTION,
+]);
 
 export function isAuditLogExempt(path: string): boolean {
   if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;

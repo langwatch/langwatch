@@ -137,6 +137,9 @@ describe("tracesV2.instantEval opt-in procedures", () => {
 
   afterAll(async () => {
     const orgIds = [ORG_ID, OTHER_ORG_ID];
+    await prisma.auditLog.deleteMany({
+      where: { userId: { in: [ADMIN_ID, MEMBER_ID] } },
+    });
     await prisma.grant.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -201,6 +204,31 @@ describe("tracesV2.instantEval opt-in procedures", () => {
         projectId: PROJECT_ID,
       });
       expect(after.released).toBe(true);
+    });
+
+    it("leaves one audit row that names the organization it switched on", async () => {
+      const rows = await prisma.auditLog.findMany({
+        where: {
+          userId: ADMIN_ID,
+          action: "tracesV2.instantEval.enable",
+        },
+        select: {
+          organizationId: true,
+          projectId: true,
+          targetKind: true,
+          targetId: true,
+          error: true,
+        },
+      });
+      expect(rows).toEqual([
+        {
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          targetKind: "organization",
+          targetId: ORG_ID,
+          error: null,
+        },
+      ]);
     });
   });
 });

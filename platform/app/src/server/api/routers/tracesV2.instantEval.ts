@@ -15,7 +15,9 @@
  * @see ../../../../../specs/traces-v2/instant-eval-search.feature
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
+import { INSTANT_EVALS_ENABLE_AUDIT_ACTION } from "~/server/api/auditLogExemptions";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import {
@@ -184,16 +186,44 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
     .input(projectScopeSchema)
     .permission("organization:manage", { via: "projectId" })
     .mutation(async ({ input, ctx }) => {
-      const organizationId = await organizationOfProject({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
-      return await switchInstantEvalsOn({
-        prisma: ctx.prisma,
-        organizationId,
-        userId: ctx.session.user.id,
-        user: ctx.session.user,
-      });
+      let organizationId: string | undefined;
+      const impersonatorId = ctx.session.user.impersonator?.id;
+      // Audited here rather than by the generic middleware, which records
+      // only the ids the input names: the input names the project, and this
+      // switch is the organization's consent, so its row must name the
+      // organization. Refused-on-permission calls never reach this handler;
+      // the permission check records those itself.
+      const record = (error?: Error) =>
+        auditLog({
+          userId: ctx.session.user.id,
+          actorUserId: impersonatorId ?? null,
+          organizationId,
+          projectId: input.projectId,
+          action: INSTANT_EVALS_ENABLE_AUDIT_ACTION,
+          args: { projectId: input.projectId },
+          error,
+          req: ctx.req,
+          targetKind: "organization",
+          targetId: organizationId,
+          metadata: impersonatorId ? { impersonatorId } : undefined,
+        });
+      try {
+        organizationId = await organizationOfProject({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+        });
+        const result = await switchInstantEvalsOn({
+          prisma: ctx.prisma,
+          organizationId,
+          userId: ctx.session.user.id,
+          user: ctx.session.user,
+        });
+        await record();
+        return result;
+      } catch (error) {
+        await record(error instanceof Error ? error : undefined);
+        throw error;
+      }
     }),
 
   estimate: protectedProcedure
