@@ -71,7 +71,12 @@ describe("secret app installation", () => {
       .withModules([withMemoryRepositories(secretProcessModule)])
       .provide({ project: team.projects, authz: team.permissions });
 
-    await expect(keyless.boot()).rejects.toThrow(/encryption/i);
+    await expect(
+      Promise.resolve().then(() =>
+        // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no encryption
+        keyless.boot(),
+      ),
+    ).rejects.toThrow(/encryption/i);
   });
 
   /** @scenario "The first read returns the secret and the second refuses" */

@@ -1,4 +1,4 @@
-import { isHandledByMissingModelHandler } from "@langwatch/browser-host/model-error";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 /**
  * @vitest-environment jsdom
  * The interceptor that turns a failed call's serialised refusal into the toast.
@@ -48,7 +48,7 @@ describe("the model error interceptor", () => {
       const reported = interceptor()(error);
 
       expect(reported).toBe(true);
-      expect(isHandledByMissingModelHandler(error)).toBe(true);
+      expect(isHandledByGlobalHandler(error)).toBe(true);
       expect(await screen.findByText(/Model not configured for AI search/i)).toBeInTheDocument();
     });
   });
@@ -58,7 +58,7 @@ describe("the model error interceptor", () => {
       const error = failedCall({ limitType: "members", current: 3, max: 3 });
 
       expect(interceptor()(error)).toBe(false);
-      expect(isHandledByMissingModelHandler(error)).toBe(false);
+      expect(isHandledByGlobalHandler(error)).toBe(false);
     });
   });
 });

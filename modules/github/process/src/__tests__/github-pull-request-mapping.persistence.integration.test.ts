@@ -4,7 +4,6 @@
 import { generateKeyPairSync } from "crypto";
 
 import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
-import { GithubModule, PostgresGithubRepositories } from "@langwatch/github-process";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -19,6 +18,8 @@ import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GithubModule } from "../app/github.app.ts";
+import { PostgresGithubRepositories } from "../repositories/prisma/prisma.github.repositories.ts";
 import {
   TestOrganizationService,
   TestProjectService,
