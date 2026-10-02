@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -69,33 +70,9 @@ function GuardrailsPage() {
     { projectId },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
-  const monitorsQuery = api.monitors.getAllForProject.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
   const utils = api.useUtils();
-
-  // executionMode AS_GUARDRAIL lives on Monitor (not Evaluator). A
-  // guardrail-eligible binding is a Monitor with executionMode set and
-  // a non-null evaluatorId — that FK is what GatewayGuardrail.evaluatorId
-  // points at.
-  const guardrailEvaluators = useMemo(
-    () =>
-      (monitorsQuery.data ?? [])
-        .filter(
-          (m) =>
-            m.enabled &&
-            m.executionMode === "AS_GUARDRAIL" &&
-            typeof m.evaluatorId === "string" &&
-            m.evaluatorId.length > 0,
-        )
-        .map((m) => ({
-          id: m.evaluatorId as string,
-          name: m.name as string,
-          slug: m.slug as string,
-        })),
-    [monitorsQuery.data],
-  );
+  const host = useGatewayHost();
+  const guardrailEvaluators = useGuardrailEvaluators({ projectId });
   const evaluatorById = useMemo(() => {
     const map = new Map<string, GuardrailEvaluator>();
     for (const e of guardrailEvaluators) {
@@ -112,8 +89,11 @@ function GuardrailsPage() {
     },
   });
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<GuardrailRow | null>(null);
+  const openGuardrail = (row?: GuardrailRow) =>
+    host.openDrawer({
+      drawer: "gatewayGuardrail",
+      ...(row ? { params: { guardrailId: row.id } } : {}),
+    });
   const [archiving, setArchiving] = useState<GuardrailRow | null>(null);
 
   const confirmArchive = async () => {
@@ -171,7 +151,7 @@ function GuardrailsPage() {
         {canManage && (
           <PageLayout.HeaderButton
             data-testid="gateway-guardrail-new"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => openGuardrail()}
             disabled={guardrailEvaluators.length === 0}
           >
             <Plus size={14} /> New guardrail
@@ -196,24 +176,13 @@ function GuardrailsPage() {
               rows={activeRows}
               evaluatorById={evaluatorById}
               canManage={canManage}
-              onEdit={setEditing}
+              onEdit={openGuardrail}
               onArchive={setArchiving}
             />
           )}
         </VStack>
       </PageLayout.Container>
 
-      <GuardrailDrawer
-        open={createOpen || editing !== null}
-        mode={editing ? "edit" : "create"}
-        existing={editing}
-        projectId={projectId}
-        guardrailEvaluators={guardrailEvaluators}
-        onClose={() => {
-          setCreateOpen(false);
-          setEditing(null);
-        }}
-      />
       <ConfirmDialog
         open={archiving !== null}
         onOpenChange={(open) => {
@@ -346,23 +315,26 @@ function GuardrailsTable({
   );
 }
 
-function GuardrailDrawer({
-  open,
-  mode,
-  existing,
-  projectId,
-  guardrailEvaluators,
+/** The guardrail editor, opened by address; `drawer.guardrailId` names the one to edit. */
+export function GuardrailDrawer({
+  guardrailId,
   onClose,
 }: {
-  open: boolean;
-  mode: "create" | "edit";
-  existing: GuardrailRow | null;
-  projectId: string;
-  guardrailEvaluators: { id: string; name: string; slug: string }[];
+  guardrailId?: string;
   onClose: () => void;
 }) {
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const listQuery = api.gatewayGuardrails.list.useQuery(
+    { projectId },
+    { enabled: !!projectId && !!guardrailId, refetchOnWindowFocus: false },
+  );
+  const existing = listQuery.data?.find((r) => r.id === guardrailId) ?? null;
+  const mode = guardrailId ? "edit" : "create";
+  const guardrailEvaluators = useGuardrailEvaluators({ projectId });
+  const defaultEvaluatorId = guardrailEvaluators[0]?.id ?? "";
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [evaluatorId, setEvaluatorId] = useState("");
@@ -370,7 +342,6 @@ function GuardrailDrawer({
   const [failureMode, setFailureMode] = useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
 
   useEffect(() => {
-    if (!open) return;
     if (mode === "edit" && existing) {
       setName(existing.name);
       setDescription(existing.description ?? "");
@@ -380,12 +351,12 @@ function GuardrailDrawer({
     } else if (mode === "create") {
       setName("");
       setDescription("");
-      setEvaluatorId(guardrailEvaluators[0]?.id ?? "");
+      setEvaluatorId(defaultEvaluatorId);
       setDirection("PRE");
       setFailureMode("FAIL_CLOSED");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, mode, existing?.id]);
+  }, [mode, existing?.id, defaultEvaluatorId]);
 
   const createMutation = api.gatewayGuardrails.create.useMutation({
     onSuccess: async () => {
@@ -438,7 +409,7 @@ function GuardrailDrawer({
 
   return (
     <Drawer.Root
-      open={open}
+      open
       onOpenChange={({ open: next }) => {
         if (!next) onClose();
       }}
@@ -552,3 +523,31 @@ function GuardrailDrawer({
 }
 
 export default GuardrailsPage;
+
+/**
+ * executionMode AS_GUARDRAIL lives on Monitor (not Evaluator). A guardrail-eligible binding is
+ * an enabled Monitor with a non-null evaluatorId: the FK GatewayGuardrail.evaluatorId points at.
+ */
+function useGuardrailEvaluators({ projectId }: { projectId: string }) {
+  const monitorsQuery = api.monitors.getAllForProject.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  );
+  return useMemo(
+    () =>
+      (monitorsQuery.data ?? [])
+        .filter(
+          (m) =>
+            m.enabled &&
+            m.executionMode === "AS_GUARDRAIL" &&
+            typeof m.evaluatorId === "string" &&
+            m.evaluatorId.length > 0,
+        )
+        .map((m) => ({
+          id: m.evaluatorId as string,
+          name: m.name as string,
+          slug: m.slug as string,
+        })),
+    [monitorsQuery.data],
+  );
+}

@@ -84,7 +84,7 @@ export type GatewayPlan = {
 
 /** The port interface a screen is handed. */
 /** A drawer a screen can open via the host. */
-export type GatewayDrawer = "routingPolicy";
+export type GatewayDrawer = "routingPolicy" | "gatewayGuardrail";
 
 export abstract class GatewayHostApi {
   /** The organization and project this page is about. */

@@ -12,7 +12,7 @@ const drawers = installedDrawerLoaders([gatewayWeb]);
 
 describe("the gateway browser declaration", () => {
   it("declares the drawer names the product's addresses already carry", () => {
-    expect(Object.keys(drawers).toSorted()).toEqual(["routingPolicy"]);
+    expect(Object.keys(drawers).toSorted()).toEqual(["gatewayGuardrail", "routingPolicy"]);
   });
 
   it.each(Object.keys(drawers))("loads a component for %s", async (drawer) => {

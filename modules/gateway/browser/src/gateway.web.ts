@@ -60,4 +60,10 @@ export const gatewayWeb = defineBrowserModule("gateway")
           .RoutingPolicyDrawer,
       }),
     },
+    gatewayGuardrail: {
+      load: async () => ({
+        default: (await import("./ui/sections/gateway/gateway-guardrails.screen.tsx"))
+          .GuardrailDrawer,
+      }),
+    },
   });
