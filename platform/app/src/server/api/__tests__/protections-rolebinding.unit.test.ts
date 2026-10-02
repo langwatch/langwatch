@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   type Audience,
   type Disposition,
@@ -81,12 +82,55 @@ function mockPolicy(policy: ResolvedDataPrivacy) {
   } as unknown as ReturnType<typeof getDataPrivacyPolicyService>);
 }
 
+type ScopedGrant = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+  roleKey: string;
+};
+
+type GrantScopeWhere = {
+  OR?: Array<{ scopeType: string; scopeId: string }>;
+  scopeType?: string;
+  scopeId?: string;
+};
+
+/**
+ * Seed the ledger with the user's grants and answer `grant.findMany` by the
+ * scopes the query actually asks for, so a query that forgets a tier misses
+ * the grants held there.
+ */
+function seedGrants(grants: ScopedGrant[]) {
+  mockPrisma.grant.findMany.mockImplementation(
+    async ({ where }: { where: GrantScopeWhere }) => {
+      const scopes = where.OR ?? [
+        { scopeType: where.scopeType, scopeId: where.scopeId },
+      ];
+      return grants
+        .filter((grant) =>
+          scopes.some(
+            (scope) =>
+              scope.scopeType === grant.scopeType &&
+              scope.scopeId === grant.scopeId,
+          ),
+        )
+        .map((grant) => ({
+          roleKey: grant.roleKey,
+          scopeType: grant.scopeType,
+          principalType: "USER",
+          principalId: "user-rolebinding-only",
+        }));
+    },
+  );
+}
+
 const ADMINS: Audience = { admins: true };
+const MEMBERS: Audience = { members: true };
 const NO_ONE: Audience = {};
 
 describe("getUserProtectionsForProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(probeProjectPermission).mockResolvedValue(true);
     mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
       teamId: "team-1",
       ownerUserId: null,
@@ -104,13 +148,7 @@ describe("getUserProtectionsForProject", () => {
 
   describe("when the user has a team grant", () => {
     beforeEach(() => {
-      mockPrisma.grant.findMany.mockResolvedValue([
-        {
-          roleKey: "member",
-          principalType: "USER",
-          principalId: "user-rolebinding-only",
-        },
-      ]);
+      seedGrants([{ scopeType: "TEAM", scopeId: "team-1", roleKey: "member" }]);
     });
 
     it("grants visibility for captured content (platform default)", async () => {
@@ -119,17 +157,25 @@ describe("getUserProtectionsForProject", () => {
       expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("queries live grants with the project's team scope", async () => {
+    it("queries live grants on the project's organization, team and project", async () => {
       await protections();
       expect(mockPrisma.grant.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
-          scopeType: "TEAM",
-          scopeId: "team-1",
+          OR: [
+            { scopeType: "ORGANIZATION", scopeId: "org-1" },
+            { scopeType: "TEAM", scopeId: "team-1" },
+            { scopeType: "PROJECT", scopeId: "project-1" },
+          ],
           revokedAt: null,
           principalType: { in: ["USER", "GROUP"] },
         },
-        select: { roleKey: true, principalType: true, principalId: true },
+        select: {
+          roleKey: true,
+          scopeType: true,
+          principalType: true,
+          principalId: true,
+        },
       });
     });
 
@@ -148,13 +194,7 @@ describe("getUserProtectionsForProject", () => {
 
   describe("when the user has an admin team grant", () => {
     beforeEach(() => {
-      mockPrisma.grant.findMany.mockResolvedValue([
-        {
-          roleKey: "admin",
-          principalType: "USER",
-          principalId: "user-rolebinding-only",
-        },
-      ]);
+      seedGrants([{ scopeType: "TEAM", scopeId: "team-1", roleKey: "admin" }]);
     });
 
     it("shows input restricted to admins", async () => {
@@ -181,11 +221,87 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when the user has no team grant", () => {
+  describe("when the user is an organization admin with no team grant", () => {
     beforeEach(() => {
-      mockPrisma.grant.findMany.mockResolvedValue([]);
+      seedGrants([
+        { scopeType: "ORGANIZATION", scopeId: "org-1", roleKey: "admin" },
+      ]);
     });
 
+    /** @scenario "An organization admin with no team role sees captured content" */
+    it("shows captured content under the platform default", async () => {
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    /** @scenario "An organization admin with no team role is in the Admins audience" */
+    it("shows input restricted to admins", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: ADMINS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(true);
+    });
+  });
+
+  describe("when the user holds a member role on the project only", () => {
+    beforeEach(() => {
+      seedGrants([
+        { scopeType: "PROJECT", scopeId: "project-1", roleKey: "member" },
+      ]);
+    });
+
+    /** @scenario "A project-level role counts as project membership" */
+    it("shows captured content under the platform default", async () => {
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    /** @scenario "A project-level role counts as project membership" */
+    it("is in the Members audience", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: MEMBERS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(true);
+    });
+  });
+
+  describe("when a team viewer also holds the organization member grant every member has", () => {
+    beforeEach(() => {
+      seedGrants([
+        { scopeType: "ORGANIZATION", scopeId: "org-1", roleKey: "member" },
+        { scopeType: "TEAM", scopeId: "team-1", roleKey: "viewer" },
+      ]);
+    });
+
+    /** @scenario "Belonging to the organization does not put a viewer in the Members audience" */
+    it("hides input restricted to members", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: MEMBERS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(false);
+    });
+  });
+
+  describe("when the permission engine denies the user trace access", () => {
+    beforeEach(() => {
+      seedGrants([]);
+      vi.mocked(probeProjectPermission).mockImplementation(
+        async (_ctx, _projectId, permission) => permission !== "traces:view",
+      );
+    });
+
+    /** @scenario "Someone the permission engine denies trace access is not a member" */
     it("denies captured content for a non-member", async () => {
       const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
@@ -202,6 +318,21 @@ describe("getUserProtectionsForProject", () => {
       expect(mockPrisma.roleBinding.findMany).not.toHaveBeenCalled();
     });
 
+    it("does not restore access from an old team membership", async () => {
+      mockPrisma.teamUser.findMany.mockResolvedValue([
+        { userId: "user-rolebinding-only", teamId: "team-1", role: "MEMBER" },
+      ]);
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when the user can read traces but holds no role grant", () => {
+    beforeEach(() => {
+      seedGrants([]);
+    });
+
     it("denies admin-only content without an admin grant", async () => {
       mockPolicy(
         policyRestricting({
@@ -212,7 +343,7 @@ describe("getUserProtectionsForProject", () => {
       expect(result.canSeeCapturedInput).toBe(false);
     });
 
-    it("does not infer admin access from an organization role", async () => {
+    it("does not infer admin access from the legacy organization role", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         userId: "user-rolebinding-only",
         organizationId: "org-1",
@@ -225,15 +356,6 @@ describe("getUserProtectionsForProject", () => {
       );
       const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
-    });
-
-    it("does not restore access from an old team membership", async () => {
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "user-rolebinding-only", teamId: "team-1", role: "MEMBER" },
-      ]);
-      const result = await protections();
-      expect(result.canSeeCapturedInput).toBe(false);
-      expect(result.canSeeCapturedOutput).toBe(false);
     });
   });
 });
