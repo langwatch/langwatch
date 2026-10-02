@@ -1,4 +1,3 @@
-export type { CodingAgentRepositories } from "./repositories/coding-agent.repositories.ts";
 export type {
   CodingAgentBillingPolicy,
   CodingAgentClock,

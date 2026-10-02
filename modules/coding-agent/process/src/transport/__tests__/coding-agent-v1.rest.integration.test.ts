@@ -1,18 +1,17 @@
+import { getRoutePolicy } from "@langwatch/api";
 /**
  * @vitest-environment node
  * The organization-keyed pull-request usage door, driven through the runtime a
  * process mounts the declaration on.
  * Spec: specs/coding-agent/pull-request-linkage.feature
  */
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import type { CodingAgentApi, CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { codingAgentV1Rest, codingAgentV1RestCaller } from "../coding-agent-v1.rest.ts";
-import { getRoutePolicy } from "@langwatch/api";
 
 const ROLLUP: CodingAgentPullRequestUsage = {
   pullRequest: {
@@ -219,7 +218,7 @@ function mount(overrides: Overrides) {
         recordPullRequestUsageRead,
       }),
     ...(overrides.credential ? { credential: overrides.credential } : {}),
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [
       // The same fact the module's own server declaration binds: the key, the
       // member it acts as, and the one stable actor string the read is
@@ -239,20 +238,3 @@ function mount(overrides: Overrides) {
   };
 }
 
-/** A handled refusal must reach the caller at its own status with its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  const handled = error as {
-    status?: number;
-    httpStatus?: number;
-    code?: string;
-    message?: string;
-  };
-  const status = handled.status ?? handled.httpStatus;
-
-  return typeof status === "number"
-    ? c.json(
-        { code: handled.code ?? "error", message: handled.message ?? "" },
-        status as ContentfulStatusCode,
-      )
-    : c.json({ error: String(error) }, 500);
-};

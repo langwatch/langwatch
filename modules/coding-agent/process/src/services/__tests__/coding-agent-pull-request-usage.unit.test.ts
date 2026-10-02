@@ -22,7 +22,7 @@ import {
   pullRequest,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { MAX_USAGE_CONTEXTS } from "../../eventing/coding-agent-session-state.projection.ts";
-import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-pull-request-read.service.ts";
+import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-personal-pull-request-read.service.ts";
 import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 
 function serviceWith(input: {
