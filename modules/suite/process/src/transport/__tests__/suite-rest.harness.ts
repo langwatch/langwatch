@@ -3,9 +3,9 @@ import {
   principalOfCredential,
   bindRestHeader,
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
   type RestMountOptions,
 } from "@langwatch/api/rest";
 /**
@@ -16,7 +16,6 @@ import {
 import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
@@ -409,22 +408,10 @@ export function memoryAgentApi(world: SuiteWorld): AgentApi {
 
 export type SuiteFamilies = ReturnType<typeof mountSuiteFamilies>;
 
-/** A handled refusal at its own status, carrying its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ message: error.message, ...error.serialize() }, error.httpStatus as 400);
-  }
-
-  return c.json({ code: "internal_server_error", message: String(error) }, 500);
-};
-
-/** The code a refusal names, whichever body shape a family publishes. */
+/** The code a refusal names in the canonical envelope. */
 export async function errorCodeOf(response: Response): Promise<string | undefined> {
-  const body = (await response.json()) as { code?: string; error?: string | { code?: string } };
-  if (typeof body.code === "string") return body.code;
-  if (typeof body.error === "string") return body.error;
-
-  return body.error?.code;
+  const body: { code?: string } = await response.json();
+  return body.code;
 }
 
 /** The key row the door binds: only an API key principal has one. */
@@ -487,10 +474,10 @@ export function mountSuiteFamilies(
       }),
     },
   });
-  const mount = (onError: RestErrorHandler): RestMountOptions<SuiteApi> => ({
+  const mount = (): RestMountOptions<SuiteApi> => ({
     app: () => app,
     credential: "project",
-    onError,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: TEST_PROJECT.slug,
@@ -516,9 +503,9 @@ export function mountSuiteFamilies(
 
   // The three families register absolute paths, so the first one's app serves
   // as the root the other two are routed into.
-  const hono = runtime.mount(createRunPlansRest().router(), mount(renderHandled));
-  hono.route("/", runtime.mount(createTestSuitesRest().router(), mount(renderHandled)));
-  hono.route("/", runtime.mount(createSuitesAliasRest().router(), mount(renderHandled)));
+  const hono = runtime.mount(createRunPlansRest().router(), mount());
+  hono.route("/", runtime.mount(createTestSuitesRest().router(), mount()));
+  hono.route("/", runtime.mount(createSuitesAliasRest().router(), mount()));
 
   const send = (
     method: string,

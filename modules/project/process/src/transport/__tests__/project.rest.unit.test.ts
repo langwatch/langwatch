@@ -249,7 +249,7 @@ describe("the projects REST family", () => {
 
       const conflict = await clash.send("/api/projects", { method: "POST", body });
       expect(conflict.status).toBe(409);
-      await expect(conflict.json()).resolves.toMatchObject({ error: "Conflict" });
+      await expect(conflict.json()).resolves.toMatchObject({ code: "conflict" });
     });
 
     it("refuses a caller without project:create", async () => {

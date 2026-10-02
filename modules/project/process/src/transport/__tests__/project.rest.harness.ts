@@ -5,15 +5,12 @@
  */
 import {
   createRestRuntime,
+  canonicalErrorResponse,
   ForbiddenError,
-  HttpError,
   UnauthorizedError,
   bindRestMiddleware,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 import { LocalFeatureApis } from "@langwatch/process";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { projectRest, projectRestCredential, ProjectManagementApi } from "../project.rest.ts";
 import { TestProjectManagementApi } from "./support/test-project-management-api.ts";
@@ -31,21 +28,6 @@ const EVERY_PERMISSION = [
   "project:delete",
   "project:manage",
 ] as const;
-
-/** The flat `{ error, message }` body this family has always published. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (error instanceof HttpError) {
-    return c.json({ error: error.error, message: error.message }, error.status);
-  }
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
 
 /** What a test may narrow about the credential the door is reached with. */
 export type ProjectRestAccess = {
@@ -116,7 +98,7 @@ export function mountProjectRestApplication(
 
   const hono = runtime.mount(projectRest.router(), {
     app: () => apis.reference(ProjectManagementApi),
-    onError: renderRefusal,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestCredential, () => ({
         apiKeyId: API_KEY_ID,

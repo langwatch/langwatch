@@ -406,11 +406,10 @@ describe("given a configuration over one scenario and one agent", () => {
       });
 
       expect(response.status).toBe(422);
-      const body = (await response.clone().json()) as {
-        reasons?: { code: string; meta?: { field?: string } }[];
-      };
+      const body: { meta?: { reasons?: { code: string; meta?: { field?: string } }[] } } =
+        await response.clone().json();
       await expect(errorCodeOf(response)).resolves.toBe("validation_error");
-      expect(body.reasons ?? []).toContainEqual(
+      expect(body.meta?.reasons ?? []).toContainEqual(
         expect.objectContaining({
           code: "schema_failure",
           meta: expect.objectContaining({ field: "config.simulatorModel" }),
