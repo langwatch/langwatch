@@ -23,6 +23,10 @@ import {
 } from "@langwatch/design-system/primitives";
 import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
 import { Select } from "@langwatch/design-system/select";
+import {
+  camelCaseToTitleCase,
+  uppercaseFirstLetterLowerCaseRest,
+} from "@langwatch/design-system/string-casing";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { chakraComponents, Select as MultiSelect, type SingleValue } from "chakra-react-select";
@@ -80,10 +84,6 @@ import {
   type PipelineFields,
   type SharedFiltersInput,
 } from "../../../model/analytics-vocabulary.ts";
-import {
-  camelCaseToTitleCase,
-  uppercaseFirstLetterLowerCaseRest,
-} from "../../../model/string-casing.ts";
 import { CodeSnippet } from "../../../ui/elements/code-snippet.tsx";
 import { AnalyticsPeriodPicker } from "../../../ui/sections/analytics-period-picker.tsx";
 import {

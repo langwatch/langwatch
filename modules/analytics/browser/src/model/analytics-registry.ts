@@ -7,6 +7,7 @@ import {
   analyticsChartTimeseriesSchema,
 } from "@langwatch/analytics-contract";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import { z } from "zod";
 
 import {
@@ -20,7 +21,6 @@ import {
   percentileAggregationTypes,
   sharedFiltersInputSchema,
 } from "./analytics-vocabulary.ts";
-import { formatMoney } from "./format-money.ts";
 
 type GroupOf<Name extends string> = Name extends `${infer Group}.${string}` ? Group : never;
 type KeyOf<Name extends string, Group extends string> = Name extends `${Group}.${infer Key}`

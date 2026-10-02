@@ -1,29 +1,10 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, useDisclosure, VStack } from "@langwatch/design-system/primitives";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { Box, Tabs, useDisclosure, VStack } from "@langwatch/design-system/primitives";
+import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import { uppercaseFirstLetter } from "../../../../model/string-casing.ts";
 import type { Snippet, Target } from "../../api-snippet/openapi-snippet.types.ts";
 import { CodePreview } from "../../onboarding/observability/code-preview.tsx";
-
-/**
- * A language tab for the segmented language picker. When `tabs` is provided,
- * the dialog renders a SegmentedControl (caller owns snippet generation) in
- * the order given (Python, then TypeScript, then Shell).
- */
-export interface ApiSnippetTab {
-  /** Stable value, e.g. "python". */
-  value: string;
-  /** Human-readable label shown in the segmented control. */
-  label: string;
-  /** The snippet body to render for this language. */
-  content: string;
-  /** Prism language id used to highlight the snippet. */
-  language: string;
-}
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{
@@ -39,12 +20,6 @@ interface GenerateApiSnippetProps {
   title?: string;
   description?: React.ReactNode;
   children?: React.ReactNode;
-  /**
-   * Optional language tabs. When provided, the dialog renders a segmented
-   * picker and shows the selected tab's snippet, bypassing the `snippets` /
-   * `targets` dropdown. Omitting `tabs` keeps the dropdown behavior.
-   */
-  tabs?: ApiSnippetTab[];
   /**
    * Optional extra controls rendered under the header (for example a data-source
    * picker, or a route to create an API key when the snippet has none).
@@ -77,7 +52,6 @@ export function GenerateApiSnippetDialog({
   title,
   description,
   children,
-  tabs,
   controls,
   sensitiveValue,
   copyDisabled = false,
@@ -98,11 +72,8 @@ export function GenerateApiSnippetDialog({
   const onOpen = () => setOpen(true);
   const onClose = () => setOpen(false);
   const [selectedTarget, setSelectedTarget] = useState<Target>(targets[0] ?? "python_python3");
-  const [selectedTab, setSelectedTab] = useState<string>(tabs?.[0]?.value ?? "python");
 
-  // Derived instead of synced via effect: an effect calling setState on every
-  // `snippets` identity change caused infinite re-render loops (React #185)
-  // when callers built `snippets` in their render body.
+  // Derived, never synced by an effect: callers rebuild `snippets` each render (React #185).
   const selectedSnippet = useMemo<Snippet | undefined>(
     () => snippets.find((snippet) => snippet.target === selectedTarget) ?? snippets[0],
     [snippets, selectedTarget],
@@ -113,90 +84,73 @@ export function GenerateApiSnippetDialog({
     onOpen();
   };
 
-  const useTabs = !!tabs && tabs.length > 0;
-  const activeTab = useTabs
-    ? (tabs.find((tab) => tab.value === selectedTab) ?? tabs[0])
-    : undefined;
-
-  const code = useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "");
-  const language = useTabs
-    ? (activeTab?.language ?? "bash")
-    : SnippetTargetToLanguageMap[selectedTarget];
-  const codeFilename = fileNameForLanguage(language);
-
-  if (!useTabs && !selectedSnippet) {
+  if (!selectedSnippet) {
     return null;
   }
+
+  const code = selectedSnippet.content;
+  const language = SnippetTargetToLanguageMap[selectedSnippet.target];
 
   return (
     <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
       <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="lg">
         <Dialog.Content
-          // Match the site's dialog surface. The shared Dialog wrapper keeps
-          // the backdrop transparent and blurred; `bg.panel` made this one
-          // modal look like a different application floating above it.
           bg="bg"
           borderWidth="1px"
           borderColor="border"
           borderRadius="lg"
           boxShadow="lg"
           width={{ base: "calc(100vw - 24px)", md: "calc(100vw - 48px)" }}
-          maxWidth="960px"
+          maxWidth="880px"
           maxHeight="calc(100dvh - 48px)"
           overflow="hidden"
         >
           <Dialog.CloseTrigger />
-          {/* One spacing scale throughout. The header carries the title alone
-              and leaves the close button its own corner, so the language picker
-              sits on the row below rather than being pushed out of line by it. */}
-          <Dialog.Header paddingX={5} paddingTop={5} paddingBottom={2} paddingRight={12}>
+          <Dialog.Header paddingX={6} paddingTop={6} paddingBottom={3} paddingRight={12}>
             <VStack alignItems="flex-start" gap={1} width="100%">
               <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
-              {description ? <Dialog.Description>{description}</Dialog.Description> : null}
+              {description ? (
+                <Dialog.Description fontSize="sm" color="fg.muted">
+                  {description}
+                </Dialog.Description>
+              ) : null}
             </VStack>
           </Dialog.Header>
-          <Dialog.Body paddingX={5} paddingTop={1} paddingBottom={5} overflowY="auto" minHeight={0}>
-            <VStack alignItems="stretch" gap={3} width="100%">
-              <HStack alignItems="center" gap={3} width="100%">
-                {useTabs ? (
-                  <SegmentedControl
-                    size="sm"
-                    value={selectedTab}
-                    onValueChange={({ value }) => {
-                      if (value) setSelectedTab(value);
-                    }}
-                    items={tabs!.map((tab) => ({
-                      value: tab.value,
-                      label: tab.label,
-                    }))}
-                  />
-                ) : (
-                  <LanguageMenu
-                    selectedTarget={selectedTarget}
-                    setSelectedTarget={setSelectedTarget}
-                    targets={targets}
-                  />
-                )}
-              </HStack>
-              {controls ? (
-                <HStack alignItems="center" gap={3} width="100%">
-                  {controls}
-                </HStack>
-              ) : null}
-              <CodePreview
-                code={code}
-                filename={codeFilename}
-                codeLanguage={language}
-                languageIconUrl={languageIconFor(language)}
-                sensitiveValue={sensitiveValue}
-                enableVisibilityToggle={!!sensitiveValue}
-                // Always the unmasked snippet: the copy button would otherwise
-                // hand over the masked key, which fails only once it is pasted.
-                copyText={code}
-                disableActions={copyDisabled}
-                maxHeight="min(460px, 58dvh)"
-              />
+          <Dialog.Body paddingX={6} paddingTop={1} paddingBottom={6} overflowY="auto" minHeight={0}>
+            <VStack alignItems="stretch" gap={4} width="100%">
+              {controls}
+              <Box>
+                <Tabs.Root
+                  value={selectedSnippet.target}
+                  onValueChange={({ value }) => {
+                    const next = targets.find((target) => target === value);
+                    if (next) setSelectedTarget(next);
+                  }}
+                  variant="line"
+                  size="sm"
+                >
+                  <Tabs.List aria-label="Snippet language">
+                    {targets.map((target) => (
+                      <Tabs.Trigger key={target} value={target}>
+                        {formatTarget(target)}
+                      </Tabs.Trigger>
+                    ))}
+                  </Tabs.List>
+                </Tabs.Root>
+                <CodePreview
+                  code={code}
+                  filename={fileNameForLanguage(language)}
+                  codeLanguage={language}
+                  languageIconUrl={languageIconFor(language)}
+                  sensitiveValue={sensitiveValue}
+                  enableVisibilityToggle={!!sensitiveValue}
+                  // Always the unmasked snippet: a masked key fails only once pasted.
+                  copyText={code}
+                  disableActions={copyDisabled}
+                  maxHeight="min(460px, 58dvh)"
+                />
+              </Box>
             </VStack>
           </Dialog.Body>
         </Dialog.Content>
@@ -221,37 +175,6 @@ GenerateApiSnippetDialog.Trigger = function Trigger({
 } as React.FC<{ children: React.ReactElement }>;
 
 GenerateApiSnippetDialog.Trigger.displayName = "GenerateApiSnippetDialog.Trigger";
-
-const LanguageMenu = React.memo(function LanguageMenu({
-  selectedTarget,
-  setSelectedTarget,
-  targets,
-}: {
-  selectedTarget: Target;
-  setSelectedTarget: (target: Target) => void;
-  targets: Target[];
-}) {
-  const { open, onOpen, onClose } = useDisclosure();
-
-  return (
-    <Menu.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())}>
-      <Menu.Trigger asChild>
-        <Button aria-label="Select language" size="sm" variant="outline">
-          {formatTarget(selectedTarget)}
-          <ChevronDownIcon />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content>
-        {targets.map((target) => (
-          <Menu.Item key={target} value={target} onClick={() => setSelectedTarget(target)}>
-            {formatTarget(target)}
-            {selectedTarget === target && <CheckIcon />}
-          </Menu.Item>
-        ))}
-      </Menu.Content>
-    </Menu.Root>
-  );
-});
 
 /**
  * What each target is called in the picker. The target id names the transport

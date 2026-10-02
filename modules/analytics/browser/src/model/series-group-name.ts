@@ -1,4 +1,4 @@
-import { uppercaseFirstLetter } from "./string-casing.ts";
+import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 
 /**
  * Display naming for the group-by bucket of a chart series. Once a chain
