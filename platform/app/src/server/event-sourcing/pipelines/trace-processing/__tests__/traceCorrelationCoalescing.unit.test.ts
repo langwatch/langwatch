@@ -17,11 +17,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../../domain/types";
 import { processCommandBatch } from "../../../services/commands/commandDispatcher";
-import type { JobRegistryEntry } from "../../../services/queues/queueManager";
-import { QueueManager } from "../../../services/queues/queueManager";
 import { RecordLogContributionCommand } from "../commands/recordLogContributionCommand";
 import { RecordMetricCorrelationCommand } from "../commands/recordMetricCorrelationCommand";
-import { createTraceProcessingPipeline } from "../pipeline";
 import {
   LOG_CONTRIBUTED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
@@ -30,11 +27,12 @@ import {
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
 } from "../schemas/constants";
 import {
-  buildTraceDeps,
   FIXTURE_TENANT_ID,
   FIXTURE_TRACE_ID,
   logContributionPayload,
   metricCorrelationPayload,
+  traceCommandRegistration,
+  wireTraceCommands,
 } from "./support/traceProcessingFixtures";
 
 vi.mock("../../../utils/killSwitch", () => ({
@@ -44,12 +42,6 @@ vi.mock("../../../utils/killSwitch", () => ({
 import { isComponentDisabled } from "../../../utils/killSwitch";
 
 const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
-
-function registrationOf(commandName: string) {
-  return createTraceProcessingPipeline(buildTraceDeps()).commands.find(
-    (candidate) => candidate.name === commandName,
-  );
-}
 
 function logBatchParamsFor({
   payloads,
@@ -104,13 +96,15 @@ describe("trace correlation append coalescing", () => {
     describe("when the correlation commands are registered", () => {
       it("bounds a log contribution batch at the trace correlation bound", () => {
         expect(
-          registrationOf("recordLogContribution")?.options?.coalesceMaxBatch,
+          traceCommandRegistration("recordLogContribution")?.options
+            ?.coalesceMaxBatch,
         ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
       });
 
       it("bounds a metric correlation batch at the same bound", () => {
         expect(
-          registrationOf("recordMetricCorrelation")?.options?.coalesceMaxBatch,
+          traceCommandRegistration("recordMetricCorrelation")?.options
+            ?.coalesceMaxBatch,
         ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
       });
 
@@ -129,7 +123,7 @@ describe("trace correlation append coalescing", () => {
           ["recordLogContribution", RecordLogContributionCommand],
           ["recordMetricCorrelation", RecordMetricCorrelationCommand],
         ] as const) {
-          const registration = registrationOf(name);
+          const registration = traceCommandRegistration(name);
           expect(registration).toBeDefined();
           expect(
             registration?.options?.getGroupKey ??
@@ -146,46 +140,12 @@ describe("trace correlation append coalescing", () => {
     // assert the batch processor is actually installed — that is what makes
     // this suite fail if the fix silently regresses to a no-op.
     describe("when the real registrations are wired into the queue manager", () => {
-      // The pipeline's own registration objects, wired by the real
-      // QueueManager. Narrowed to the commands asserted on because
-      // initializeCommandQueues constructs every handler it is given, and
-      // RecordSpanCommand's zero-arg constructor reaches for prisma.
       function registryFor() {
-        const globalJobRegistry = new Map<string, JobRegistryEntry>();
-        const manager = new QueueManager({
-          aggregateType: "trace",
-          pipelineName: "trace_processing",
-          globalQueue: {
-            send: vi.fn().mockResolvedValue(void 0),
-            sendBatch: vi.fn().mockResolvedValue(void 0),
-            close: vi.fn().mockResolvedValue(void 0),
-            waitUntilReady: vi.fn().mockResolvedValue(void 0),
-          } as never,
-          globalJobRegistry,
-        });
-        const wired = new Set([
+        return wireTraceCommands([
           "recordLogContribution",
           "recordMetricCorrelation",
           "addAnnotation",
         ]);
-        const registrations = createTraceProcessingPipeline(
-          buildTraceDeps(),
-        ).commands.filter((candidate) => wired.has(candidate.name));
-        if (registrations.length !== wired.size) {
-          // A precondition, not an expectation: if a command were renamed the
-          // filter would quietly wire fewer than it names, and every assertion
-          // below would read as a pass on a registry that was never populated.
-          throw new Error(
-            `expected ${wired.size} registrations, resolved ${registrations.length}`,
-          );
-        }
-
-        manager.initializeCommandQueues(
-          registrations as never,
-          vi.fn(),
-          "trace_processing",
-        );
-        return globalJobRegistry;
       }
 
       it("installs a batch processor for both correlation commands", () => {

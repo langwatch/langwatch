@@ -7,11 +7,11 @@
  * Asserted through the real QueueManager: an option that never reaches the
  * registry looks exactly like one that does.
  */
-import { describe, expect, it, vi } from "vitest";
-import type { JobRegistryEntry } from "../../../services/queues/queueManager";
-import { QueueManager } from "../../../services/queues/queueManager";
-import { createTraceProcessingPipeline } from "../pipeline";
-import { buildTraceDeps } from "./support/traceProcessingFixtures";
+import { describe, expect, it } from "vitest";
+import {
+  traceCommandRegistration,
+  wireTraceCommands,
+} from "./support/traceProcessingFixtures";
 
 const ANNOTATION_COMMANDS = [
   "addAnnotation",
@@ -19,37 +19,10 @@ const ANNOTATION_COMMANDS = [
   "bulkSyncAnnotations",
 ] as const;
 
-function registrationOf(name: string) {
-  const entry = createTraceProcessingPipeline(buildTraceDeps()).commands.find(
-    (candidate) => candidate.name === name,
-  );
-  if (!entry) throw new Error(`no command registered as "${name}"`);
-  return entry;
-}
-
-function registry() {
-  const globalJobRegistry = new Map<string, JobRegistryEntry>();
-  const manager = new QueueManager({
-    aggregateType: "trace",
-    pipelineName: "trace_processing",
-    globalQueue: {
-      send: vi.fn().mockResolvedValue(void 0),
-      sendBatch: vi.fn().mockResolvedValue(void 0),
-      close: vi.fn().mockResolvedValue(void 0),
-      waitUntilReady: vi.fn().mockResolvedValue(void 0),
-    } as never,
-    globalJobRegistry,
-  });
-  manager.initializeCommandQueues(
-    ANNOTATION_COMMANDS.map(registrationOf) as never,
-    vi.fn(),
-    "trace_processing",
-  );
-  return globalJobRegistry;
-}
-
 function groupKeyOf(name: string, payload: Record<string, unknown>) {
-  const entry = registry().get(`trace_processing:command:${name}`);
+  const entry = wireTraceCommands(ANNOTATION_COMMANDS).get(
+    `trace_processing:command:${name}`,
+  );
   if (!entry) throw new Error(`no job registered for "${name}"`);
   return entry.groupKeyFn(payload);
 }
@@ -57,7 +30,9 @@ function groupKeyOf(name: string, payload: Record<string, unknown>) {
 describe("given the trace-processing pipeline", () => {
   describe("when the annotation commands are registered", () => {
     it.each(ANNOTATION_COMMANDS)("%s serializes on the trace", (name) => {
-      expect(registrationOf(name).options?.serializeByAggregate).toBe(true);
+      expect(traceCommandRegistration(name).options?.serializeByAggregate).toBe(
+        true,
+      );
     });
   });
 
