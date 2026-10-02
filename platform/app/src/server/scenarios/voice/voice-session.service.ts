@@ -405,9 +405,30 @@ async function fetchProviderRecord(
 }
 
 /**
+ * One in-flight agent create per conversation on this pod (#8027).
+ *
+ * The finish path's existence check and its create are not atomic: two
+ * concurrent retries of the same hang-up — a browser retry racing a slow
+ * first request, a double click — both see no run and no agent, and both
+ * reach `createVoiceAgent`, leaving an orphan Agent row. The claim is keyed
+ * on the conversation, so whichever finish enters first performs the create
+ * and every overlapping finish awaits and reuses that same row, whatever
+ * the request ordering. Self-cleaning: the entry is removed when the create
+ * settles, so a failed create is retried by the caller's next finish rather
+ * than cached forever.
+ *
+ * Per-pod by design. Across pods the Agent table's (projectId, identityKey)
+ * unique constraint and the winner re-read in `AgentService.createVoiceAgent`
+ * already collapse duplicates; this closes the in-process window at the
+ * service seam, where the ports contract makes no dedupe promise.
+ */
+const inFlightAgentCreates = new Map<string, Promise<{ id: string }>>();
+
+/**
  * Resolve the agent row the run is written under: reuse the one the token
  * carries, else create it from the form values. A create needs a name; without
  * one the panel collects it and retries (throws {@link VoiceNameRequiredError}).
+ * Creates are single-flight per conversation (see {@link inFlightAgentCreates}).
  */
 async function resolveAgentRow(
   ports: VoiceSessionPorts,
@@ -416,12 +437,16 @@ async function resolveAgentRow(
     projectId,
     transport,
     name,
+    conversationId,
     existingAgentId,
   }: {
     token: VoiceSessionTokenPayload;
     projectId: string;
     transport: VoiceTransport;
     name?: string;
+    /** The claim key for the create: overlapping finishes of the same
+     *  conversation share one `createVoiceAgent` call (#8027). */
+    conversationId: string;
     /** The agent id a half-written run already attached: reused on a re-drive
      *  so a retried drawer finish does not create a second agent (#7973). */
     existingAgentId?: string;
@@ -441,12 +466,24 @@ async function resolveAgentRow(
     };
   }
   if (!trimmedName) throw new VoiceNameRequiredError();
-  const created = await ports.createVoiceAgent({
-    projectId,
-    name: trimmedName,
-    transport,
-    agentId: token.agentExternalId,
-  });
+  const claimKey = `${projectId}:${conversationId}`;
+  let create = inFlightAgentCreates.get(claimKey);
+  if (!create) {
+    create = (async () => {
+      try {
+        return await ports.createVoiceAgent({
+          projectId,
+          name: trimmedName,
+          transport,
+          agentId: token.agentExternalId,
+        });
+      } finally {
+        inFlightAgentCreates.delete(claimKey);
+      }
+    })();
+    inFlightAgentCreates.set(claimKey, create);
+  }
+  const created = await create;
   return { agentRowId: created.id, agentDisplayName: trimmedName };
 }
 
@@ -631,6 +668,7 @@ async function ingestFinishedCall(
     projectId: input.projectId,
     transport,
     name: input.name,
+    conversationId,
     existingAgentId,
   });
 
