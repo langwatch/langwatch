@@ -94,16 +94,24 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
 
   Rule: A sync that changes nothing leaves the workers running
 
-    # ArgoCD and Flux map the upgrade hooks to PreSync and PostSync, which run
-    # on every sync. Without this rule each re-sync of an unchanged release
-    # stopped the workers for the length of both steps.
+    # Argo CD maps the upgrade hooks to PreSync and PostSync, which run on
+    # every sync. Without this rule each re-sync of an unchanged release
+    # stopped the workers for the length of both steps. Flux runs a helm
+    # upgrade only when the release changed.
 
     @e2e
     Scenario: A sync that re-applies the running release leaves the workers up
       Given the workers Deployment carries the fingerprint of the release it runs
+      And both Deployments have finished rolling out
       When a sync applies a release with the same fingerprint
       Then the pre-upgrade step leaves the workers running
       And the post-upgrade step leaves them running when both Deployments have settled
+
+    @e2e
+    Scenario: A matching fingerprint with an unfinished rollout still drains
+      Given the last sync applied this release but the app or the workers did not finish rolling out
+      When a sync applies the same release again
+      Then the pre-upgrade step still scales the workers to zero
 
     @e2e
     Scenario: A changed release still stands the workers down

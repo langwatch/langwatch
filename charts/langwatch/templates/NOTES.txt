@@ -220,10 +220,10 @@ backend for you:
         the pre-upgrade Job fails, the upgrade stops and the workers stay
         at 0: read the Job logs, then run the upgrade again to bring them
         back.
-      • A sync that re-applies the running release (an ArgoCD or Flux
-        re-sync runs these Jobs as PreSync and PostSync every time)
-        leaves the workers up: the Jobs skip when the release fingerprint
-        on {{ .Release.Name }}-workers is unchanged and both Deployments
+      • A sync that re-applies the running release (Argo CD runs these
+        Jobs as PreSync and PostSync on every sync) leaves the workers
+        up: the Jobs skip when the release fingerprint on
+        {{ .Release.Name }}-workers is unchanged and both Deployments
         have finished rolling out.
       • Both Jobs run on `helm rollback` too. They cannot cover a
         rollback to a chart version from before they existed, because

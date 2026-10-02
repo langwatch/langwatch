@@ -666,6 +666,7 @@ exit 0
 FAKE
   chmod +x "$workdir/kubectl"
   : > "$workdir/calls"
+  rm -f "$workdir/app-asks"
   PATH="$workdir:$PATH" FAKE_DIR="$workdir" sh "$workdir/hook.sh" >/dev/null 2>&1
 }
 
@@ -700,7 +701,8 @@ test_unchanged_release_leaves_the_workers_up() {
   fi
 
   workdir=$(mktemp -d)
-  FAKE_LIVE_FINGERPRINT="$fingerprint" run_hook_script "$(hook_script "$pre")" "$workdir"
+  FAKE_LIVE_FINGERPRINT="$fingerprint" FAKE_APP_STATE='5|5|1|1|1|1|' FAKE_WORKERS_STATE='3|3|1|1|1|1|' \
+    run_hook_script "$(hook_script "$pre")" "$workdir"
   if grep -q 'patch' "$workdir/calls"; then
     fail "unchanged sync" "the drain Job scaled the workers although the release did not change"
     rm -rf "$workdir"
@@ -742,7 +744,6 @@ test_changed_release_still_stands_the_workers_down() {
   done
 
   # The app is still rolling when the restore Job starts.
-  rm -f "$workdir/app-asks"
   FAKE_APP_STATE='6|5|1|0|1|1|' FAKE_WORKERS_STATE='3|3|1|1|1|1|' \
     run_hook_script "$(hook_script "$post")" "$workdir"
   if ! grep -q '"replicas":0' "$workdir/calls" || ! grep -q '"replicas":1' "$workdir/calls"; then
@@ -754,9 +755,38 @@ test_changed_release_still_stands_the_workers_down() {
   echo "ok   [changed release] a new fingerprint or a rolling app still orders the rollout"
 }
 
+# The fingerprint matches, but the last sync left a rollout unfinished: the app
+# or the workers. A matching fingerprint says the release was applied, not that
+# it rolled out, so the drain must still run.
+#
+# @scenario "A matching fingerprint with an unfinished rollout still drains"
+test_matching_fingerprint_with_unfinished_rollout_still_drains() {
+  local pre fingerprint workdir which app_state workers_state
+  pre=$(hook_block "" | hook_doc_named "$PRE_JOB")
+  fingerprint=$(fingerprint_of "$pre")
+  workdir=$(mktemp -d)
+  for which in app workers; do
+    if [ "$which" = "app" ]; then
+      app_state='6|5|1|0|1|1|'; workers_state='3|3|1|1|1|1|'
+    else
+      app_state='5|5|1|1|1|1|'; workers_state='3|3|1|1|1|0|'
+    fi
+    FAKE_LIVE_FINGERPRINT="$fingerprint" FAKE_APP_STATE="$app_state" FAKE_WORKERS_STATE="$workers_state" \
+      run_hook_script "$(hook_script "$pre")" "$workdir"
+    if ! grep -q '"replicas":0' "$workdir/calls"; then
+      fail "unfinished rollout" "a matching fingerprint with an unfinished ${which} rollout skipped the drain"
+      rm -rf "$workdir"
+      return
+    fi
+  done
+  rm -rf "$workdir"
+  echo "ok   [unfinished rollout] a matching fingerprint with an unfinished app or workers rollout still drains"
+}
+
 test_default_install_renders_the_hook
 test_hook_scales_workers_to_zero_and_waits
 test_unchanged_release_leaves_the_workers_up
+test_matching_fingerprint_with_unfinished_rollout_still_drains
 test_changed_release_still_stands_the_workers_down
 test_wait_outlasts_the_grace_period
 test_workers_come_back_after_the_app_rollout

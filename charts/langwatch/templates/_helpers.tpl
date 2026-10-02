@@ -1535,9 +1535,10 @@ containers:
   The release's stored-objects upgrade fingerprint: a digest of the chart
   version and every value. The workers Deployment carries it as an annotation,
   and the pre-upgrade hook compares the live annotation with the release about
-  to be applied. Equal means the sync renders what is already running (ArgoCD
+  to be applied. Equal means the sync renders what is already running (Argo CD
   maps these hooks to PreSync and PostSync and runs them on every sync), so no
-  pod rolls and there is nothing to order.
+  pod rolls. The hook also requires both rollouts to be finished before it
+  skips, since an equal fingerprint does not prove the last rollout completed.
 
   Values, not the rendered Deployments: a Deployment cannot hash a manifest
   that carries the hash. Any value change counts as a change, which keeps the

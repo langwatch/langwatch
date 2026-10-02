@@ -16,6 +16,7 @@ const STORAGE_KEY = "langwatch.signin.soleConnectionDialedAt";
 
 export const SOLE_CONNECTION_REDIAL_WINDOW_MS = 2 * 60 * 1000;
 
+/** Whether this tab may dial the sole connection automatically right now. */
 export function soleConnectionAutoDialAllowed(now = Date.now()): boolean {
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -28,6 +29,7 @@ export function soleConnectionAutoDialAllowed(now = Date.now()): boolean {
   }
 }
 
+/** Records that this tab just dialed the sole connection automatically. */
 export function rememberSoleConnectionAutoDial(now = Date.now()): void {
   try {
     window.sessionStorage.setItem(STORAGE_KEY, String(now));

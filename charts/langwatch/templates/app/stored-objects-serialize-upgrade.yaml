@@ -36,11 +36,15 @@
   pod(s) <release>-app-<old>". Standing the workers down until the app rollout
   completes is what makes the workers follow the NEW app pod.
 
-  A sync that changes nothing leaves the workers running. ArgoCD and Flux run
-  these hooks on every sync, including one that re-applies the release already
-  in the cluster. The drain Job compares the fingerprint of the release about
-  to be applied (`langwatch.storedObjects.upgradeFingerprint`) with the one the
-  live workers Deployment carries, and skips when they match. The restore Job
+  A sync that changes nothing leaves the workers running. Argo CD maps these
+  hooks to PreSync and PostSync and runs them on every sync, including one that
+  re-applies the release already in the cluster (Flux runs a helm upgrade, and
+  so the hooks, only when the release changed). The drain Job compares the
+  fingerprint of the release about to be applied
+  (`langwatch.storedObjects.upgradeFingerprint`) with the one the live workers
+  Deployment carries, and skips only when they match AND both Deployments have
+  finished rolling out: a matching fingerprint says the last sync applied this
+  release, not that its rollout completed. The restore Job
   skips when both Deployments have already finished rolling out, since then
   no new pod is waiting to be scheduled and nothing needs ordering.
 
@@ -205,10 +209,13 @@ spec:
               ns={{ .Release.Namespace | quote }}
               deploy={{ $workersDeployment | quote }}
               selector={{ $workersSelector | quote }}
+              app={{ $appDeployment | quote }}
               timeout={{ $workersWait }}
               fingerprint={{ include "langwatch.storedObjects.upgradeFingerprint" . | quote }}
 
               {{ include "langwatch.storedObjects.upgradeHookShellHelpers" . | nindent 14 | trim }}
+
+              {{ include "langwatch.storedObjects.upgradeHookAppRolloutHelper" . | nindent 14 | trim }}
 
               if ! deployment_exists; then
                 printf 'serialize-upgrade[pre]: no Deployment %s in namespace %s, nothing to stand down\n' "$deploy" "$ns"
@@ -216,8 +223,11 @@ spec:
               fi
 
               live_fingerprint=$(kubectl -n "$ns" get deployment "$deploy" -o jsonpath='{.metadata.annotations.langwatch\.ai/stored-objects-upgrade-fingerprint}' 2>/dev/null || true)
-              if [ -n "$live_fingerprint" ] && [ "$live_fingerprint" = "$fingerprint" ]; then
-                printf 'serialize-upgrade[pre]: the release matches what %s already runs, no pod rolls, leaving the workers up\n' "$deploy"
+              # A matching fingerprint only says the last sync applied this
+              # release, not that its rollout finished, so both Deployments
+              # also have to be settled before the drain is skipped.
+              if [ -n "$live_fingerprint" ] && [ "$live_fingerprint" = "$fingerprint" ] && rollout_done "$app" && rollout_done "$deploy"; then
+                printf 'serialize-upgrade[pre]: the release matches what %s already runs and both rollouts are finished, leaving the workers up\n' "$deploy"
                 exit 0
               fi
 
