@@ -4,7 +4,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { notificationProcessModule } from "../../notification.module.ts";
-import { createNotificationTestApp } from "./notification.fixture.ts";
+import { createNotificationTestApp, testEventing } from "./notification.fixture.ts";
 
 function process(
   role: "api" | "worker",
@@ -14,6 +14,7 @@ function process(
     .withModules([withMemoryRepositories(notificationProcessModule)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
+    .withEventing(testEventing())
     .withConfig({
       notification: {
         defaultFrom: undefined,

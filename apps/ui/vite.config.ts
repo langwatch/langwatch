@@ -18,6 +18,7 @@ import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 
@@ -253,6 +254,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       havenHmrGate(),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
+      pushServiceWorker(),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages

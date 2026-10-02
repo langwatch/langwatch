@@ -1790,6 +1790,18 @@ Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outb
 producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
 and the outbound proxy are egress's.
 
+Langy's notifications go through Web Push from the server; the tab is never the sender (Rogerio,
+2026-10-02). Web Push is a destination kind, so notification owns it: the browsers a person
+subscribed (`WebPushSubscription`), the installation's VAPID key pair (`WebPushVapidKey`,
+generated on first use and stored encrypted; cloud and self-hosted take the same path, with no env
+var), and the sending, as `send` intents on the `notification_web_push` outbox. Langy reacts to its own
+events (a long turn completing, a card waiting, the `notify` tool) and calls
+`NotificationApi.requestWebPushDelivery` for the conversation's owner when their `langy`
+preference is on, keyed by the event so a redelivery sends nothing new. The service worker skips
+a push a visible tab already shows. The open tab notifies only on a device with no working push
+subscription (no push support, or subscribing failed), never on one that holds a subscription,
+even when a send fails. The panel's reads follow the turn through read hints, not a poll.
+
 Group membership history is organization's fact, not authz's (Alex, 2026-09-30). Organization
 records a member added to a group, a member removed and a group deleted as events on its own
 pipeline, and the history columns on `GroupMembership` and `Group` (`removedAt`, `deletedAt` and

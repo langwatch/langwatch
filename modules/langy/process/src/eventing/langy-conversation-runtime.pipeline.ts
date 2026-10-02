@@ -38,6 +38,11 @@ import {
   createLocalConnectTurnSubscriber,
   type LocalConnectTurnPresence,
 } from "./langy-local-connect-turn.subscriber.ts";
+import {
+  createLangyWebPushSubscriber,
+  langyWebPushReaders,
+  type LangyWebPushSubscriberDeps,
+} from "./langy-web-push.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
 export interface RedisLangyConversationRuntimeRepository {
@@ -82,6 +87,8 @@ export interface EventingLangyConversationAdapterOptions {
   localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
   /** Onboarding's answer for a project, and the sink its failed turns are tracked to. */
   guidedOnboarding: { reader: GuidedOnboardingReader; analytics: GuidedOnboardingAnalytics };
+  /** Who a notification goes to and whether they want it, and notification's Web Push. */
+  webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
 }
 
 /**
@@ -189,6 +196,14 @@ export class EventingLangyConversationAdapter {
       turns: options.localConnectTurn.turns,
     });
 
+    const webPushSubscriber = createLangyWebPushSubscriber({
+      ...langyWebPushReaders({
+        conversations: conversationStore,
+        turns: options.langyConversationTurnProjectionStore,
+      }),
+      ...options.webPush,
+    });
+
     return LangyConversationPipelineService.create({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
@@ -202,6 +217,7 @@ export class EventingLangyConversationAdapter {
         admissionLifecycleSubscriber,
         guidedOnboardingTurnFailedSubscriber,
         localConnectTurnSubscriber,
+        webPushSubscriber,
       ],
     }).build();
   }

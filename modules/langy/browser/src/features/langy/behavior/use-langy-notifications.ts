@@ -1,7 +1,7 @@
 /**
- * Langy's browser notifications: the person's choice (on the account), the browser's
- * permission, and the notifier that sends one for a long turn, a waiting card or a `notify`
- * call, only while the person is away. Spec: specs/langy/langy-notifications.feature
+ * Langy's notifications in the browser: the choice, the permission, this browser's push, and
+ * the tab's notifier, the fallback for a browser that cannot hold a push subscription.
+ * Spec: specs/langy/langy-notifications.feature
  */
 import {
   isPageAway,
@@ -10,6 +10,8 @@ import {
   type BrowserNotificationPermission,
 } from "@langwatch/browser-host/browser-notifications";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useWebPushDeviceState } from "@langwatch/browser-host/web-push";
+import { LANGY_NOTIFICATION_TOPIC } from "@langwatch/langy-contract";
 import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
@@ -19,7 +21,9 @@ import {
   langyNotificationTag,
   readNotifyCall,
   type LangyNotificationEvent,
+  type LangyPushDeviceState,
 } from "../../../model/langy-notifications.ts";
+import { useLangyPushDevice } from "./use-langy-web-push.ts";
 
 export type LangyNotificationChoice = "enabled" | "declined" | null;
 
@@ -31,17 +35,20 @@ export type LangyNotificationPreferenceState = {
   permission: BrowserNotificationPermission;
   /** Notifications will actually be shown: turned on, and the browser allows them. */
   active: boolean;
+  /** This browser's push standing; the tab notifies only when it is `unavailable`. */
+  pushDevice: LangyPushDeviceState;
   isSaving: boolean;
   /**
-   * Asks the browser, then turns Langy notifications on when it allows them.
-   * Answers the browser's permission so a caller can say what happened.
+   * Asks the browser, then turns Langy notifications on when it allows them and subscribes
+   * this browser to Web Push. Answers the browser's permission so a caller can say what
+   * happened.
    */
   enable: () => Promise<BrowserNotificationPermission>;
-  /** Records "no" without asking the browser anything. */
+  /** Records "no" and unsubscribes this browser, without asking the browser anything. */
   decline: () => Promise<void>;
 };
 
-const TOPIC = "langy" as const;
+const TOPIC = LANGY_NOTIFICATION_TOPIC;
 
 export function useLangyNotificationPreference(): LangyNotificationPreferenceState {
   const { permission, request } = useBrowserNotificationPermission();
@@ -56,24 +63,30 @@ export function useLangyNotificationPreference(): LangyNotificationPreferenceSta
       showErrorToast({ error, fallbackTitle: "Could not save the notification choice" }),
   });
 
+  const device = useLangyPushDevice();
+  const pushState = useWebPushDeviceState();
+
   const choice = preference.data?.choice ?? null;
   const enable = useCallback(async () => {
     // Asked first, inside the click, since browsers only prompt from one.
     const answer = await request();
     if (answer === "granted") {
       await save.mutateAsync({ topic: TOPIC, choice: "enabled" });
+      await device.subscribe();
     }
     return answer;
-  }, [request, save]);
+  }, [request, save, device]);
   const decline = useCallback(async () => {
     await save.mutateAsync({ topic: TOPIC, choice: "declined" });
-  }, [save]);
+    await device.unsubscribe();
+  }, [save, device]);
 
   return {
     choice,
     isLoading: preference.isLoading,
     permission,
     active: choice === "enabled" && permission === "granted",
+    pushDevice: pushState,
     isSaving: save.isPending,
     enable,
     decline,

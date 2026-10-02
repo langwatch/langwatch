@@ -9,6 +9,7 @@ import {
   LANGY_LONG_TURN_MS,
   LANGY_NOTIFY_TITLE_MAX,
   langyNotificationFor,
+  langyTabNotifies,
   offerNotificationsCallId,
   readNotifyCall,
 } from "../langy-notifications.ts";
@@ -18,7 +19,7 @@ const ALLOWED = { enabled: true, permission: "granted" as const };
 describe("langyNotificationFor", () => {
   describe("given Langy notifications are enabled and the browser allows them", () => {
     describe("when the tab is hidden", () => {
-      /** @scenario "A long turn that finishes while I am away notifies me" */
+      /** @scenario "A long turn that finishes while I am away notifies me from the tab without push" */
       it("notifies that a turn of more than a minute finished", () => {
         expect(
           langyNotificationFor({
@@ -132,5 +133,27 @@ describe("the notification tool parts", () => {
     expect(offerNotificationsCallId([answered])).toBe("offer-1");
     expect(isNotificationToolPart(answered)).toBe(true);
     expect(isNotificationToolPart({ type: "tool-say" })).toBe(false);
+  });
+});
+
+describe("langyTabNotifies", () => {
+  /** @scenario "A device with a live push subscription leaves notifying to the server" */
+  it("keeps the tab quiet where this browser holds a push subscription", () => {
+    expect(langyTabNotifies({ choice: "enabled", pushDevice: "subscribed" })).toBe(false);
+  });
+
+  /** @scenario "A browser not yet checked for push leaves notifying to the server" */
+  it("keeps the tab quiet before this browser's push standing is known", () => {
+    expect(langyTabNotifies({ choice: "enabled", pushDevice: "unknown" })).toBe(false);
+  });
+
+  it("notifies from the tab only where this browser cannot hold a push subscription", () => {
+    expect(langyTabNotifies({ choice: "enabled", pushDevice: "unavailable" })).toBe(true);
+  });
+
+  it("never notifies for a person who did not turn notifications on", () => {
+    expect(langyTabNotifies({ choice: "declined", pushDevice: "unavailable" })).toBe(false);
+    expect(langyTabNotifies({ choice: null, pushDevice: "unavailable" })).toBe(false);
+    expect(langyTabNotifies({ choice: "declined", pushDevice: "unsubscribed" })).toBe(false);
   });
 });

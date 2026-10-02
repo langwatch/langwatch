@@ -1,11 +1,10 @@
 /**
  * @vitest-environment jsdom
- *
- * The notifications offer card and the Notifications section of Langy's menu,
- * over a stubbed browser Notification API and a mocked account preference.
+ * The offer card and the menu's Notifications item, over stubbed Notification and Web Push.
  * @see specs/langy/langy-notifications.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as webPushModule from "@langwatch/browser-host/web-push";
 import { Menu } from "@langwatch/design-system/menu";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,12 +14,51 @@ const stored = vi.hoisted(() => ({
   loading: false,
 }));
 const save = vi.hoisted(() => vi.fn());
+const push = vi.hoisted(() => ({
+  subscribed: [] as unknown[],
+  forgotten: [] as unknown[],
+  browserEndpoint: null as string | null,
+}));
+
+vi.mock("@langwatch/browser-host/web-push", async (importOriginal) => {
+  const actual = await importOriginal<typeof webPushModule>();
+  return {
+    ...actual,
+    checkWebPushSupport: () => true,
+    ensureWebPushSubscription: async (publicKey: string) => {
+      push.browserEndpoint = `https://fcm.googleapis.com/fcm/send/${publicKey}`;
+      return { endpoint: push.browserEndpoint, keys: { p256dh: "p256dh", auth: "auth" } };
+    },
+    removeWebPushSubscription: async () => {
+      const endpoint = push.browserEndpoint;
+      push.browserEndpoint = null;
+      return endpoint;
+    },
+  };
+});
 
 vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({
       user: { getNotificationPreference: { setData: vi.fn() } },
+      notification: { webPushPublicKey: { fetch: async () => ({ publicKey: "vapid-key" }) } },
     }),
+    notification: {
+      subscribeWebPush: {
+        useMutation: () => ({
+          mutateAsync: async (input: unknown) => {
+            push.subscribed.push(input);
+          },
+        }),
+      },
+      unsubscribeWebPush: {
+        useMutation: () => ({
+          mutateAsync: async (input: unknown) => {
+            push.forgotten.push(input);
+          },
+        }),
+      },
+    },
     user: {
       getNotificationPreference: {
         useQuery: () => ({
@@ -103,6 +141,9 @@ beforeEach(() => {
   stored.choice = null;
   stored.loading = false;
   save.mockClear();
+  push.subscribed = [];
+  push.forgotten = [];
+  push.browserEndpoint = null;
 });
 
 afterEach(() => {
@@ -143,6 +184,23 @@ describe("the notifications offer card", () => {
           </ChakraProvider>,
         );
         expect(await screen.findByText(LANGY_NOTIFICATIONS_ENABLED_LINE)).toBeDefined();
+      });
+
+      /** @scenario "Enabling subscribes this browser" */
+      it("subscribes this browser with the installation's key and stores it on the server", async () => {
+        installNotification({ permission: "default", answer: "granted" });
+        renderCard();
+
+        fireEvent.click(screen.getByRole("button", { name: LANGY_NOTIFICATIONS_ENABLE_LABEL }));
+
+        await waitFor(() =>
+          expect(push.subscribed).toEqual([
+            expect.objectContaining({
+              endpoint: "https://fcm.googleapis.com/fcm/send/vapid-key",
+              keys: { p256dh: "p256dh", auth: "auth" },
+            }),
+          ]),
+        );
       });
     });
 
@@ -224,6 +282,26 @@ describe("the Notifications section of Langy's menu", () => {
         </ChakraProvider>,
       );
       expect(await screen.findByTestId("langy-notifications-on")).toBeDefined();
+    });
+  });
+
+  describe("given Langy notifications are on and this browser is subscribed", () => {
+    /** @scenario "Turning notifications off unsubscribes this browser" */
+    it("removes this browser's subscription and stores declined", async () => {
+      stored.choice = "enabled";
+      push.browserEndpoint = "https://fcm.googleapis.com/fcm/send/laptop";
+      installNotification({ permission: "granted" });
+      renderMenu();
+
+      fireEvent.click(await screen.findByText("Notifications", { selector: "p" }));
+
+      await waitFor(() =>
+        expect(push.forgotten).toEqual([
+          { endpoint: "https://fcm.googleapis.com/fcm/send/laptop" },
+        ]),
+      );
+      expect(save).toHaveBeenCalledWith({ topic: "langy", choice: "declined" });
+      expect(push.browserEndpoint).toBeNull();
     });
   });
 

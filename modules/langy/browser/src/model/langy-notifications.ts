@@ -4,21 +4,27 @@
  * Spec: specs/langy/langy-notifications.feature
  */
 import type { BrowserNotificationPermission } from "@langwatch/browser-host/browser-notifications";
+import {
+  clipNotificationLine,
+  LANGY_NOTIFY_BODY_MAX,
+  LANGY_NOTIFY_TITLE_MAX,
+  langyNotificationContent,
+  type LangyNotificationContent,
+  type LangyNotificationEvent,
+} from "@langwatch/langy-contract";
+
+export {
+  clipNotificationLine,
+  LANGY_LONG_TURN_MS,
+  LANGY_NOTIFY_BODY_MAX,
+  LANGY_NOTIFY_TITLE_MAX,
+  langyNotificationTag,
+  type LangyNotificationContent,
+  type LangyNotificationEvent,
+} from "@langwatch/langy-contract";
 
 export const LANGY_NOTIFY_TOOL_NAME = "notify";
 export const LANGY_OFFER_NOTIFICATIONS_TOOL_NAME = "offer_notifications";
-
-/** A turn at least this long, finishing while the person is away, is worth telling them about. */
-export const LANGY_LONG_TURN_MS = 60_000;
-
-/** The worker's caps, repeated here so a malformed call cannot fill the notification centre. */
-export const LANGY_NOTIFY_TITLE_MAX = 80;
-export const LANGY_NOTIFY_BODY_MAX = 240;
-
-/** One conversation's notifications share a tag, so a newer one replaces the older. */
-export function langyNotificationTag(conversationId: string): string {
-  return `langy:${conversationId}`;
-}
 
 interface ToolPartLike {
   type?: string;
@@ -63,12 +69,6 @@ export function offerNotificationsCallId(parts: readonly unknown[]): string | nu
   return null;
 }
 
-/** Cuts a line to `max` characters, ending on an ellipsis when it was cut. */
-export function clipNotificationLine(text: string, max: number): string {
-  const folded = text.trim().replace(/\s+/g, " ");
-  return folded.length <= max ? folded : `${folded.slice(0, max - 1).trimEnd()}…`;
-}
-
 export type LangyNotifyCall = { callId: string; title: string; body: string };
 
 /**
@@ -91,18 +91,9 @@ export function readNotifyCall(part: unknown): LangyNotifyCall | null {
   };
 }
 
-/** Something that happened in a conversation, before the rule decides whether it is sent. */
-export type LangyNotificationEvent =
-  | { kind: "turn_finished"; durationMs: number }
-  | { kind: "decision_needed" }
-  | { kind: "tool"; title: string; body: string };
-
-export type LangyNotificationContent = { title: string; body: string };
-
 /**
- * Whether an event becomes a notification, and its words. Nothing is sent
- * unless the person turned Langy notifications on, the browser allows them,
- * and the person is away from the tab; a finished turn also has to have run long.
+ * The open tab's notification for an event, only when it is on, allowed and the person is away.
+ * The words and the long-turn rule are langy-contract's, shared with the server's Web Push.
  */
 export function langyNotificationFor({
   event,
@@ -118,20 +109,23 @@ export function langyNotificationFor({
   conversationTitle?: string | null;
 }): LangyNotificationContent | null {
   if (!enabled || permission !== "granted" || !away) return null;
-  const about = conversationTitle?.trim() ? conversationTitle.trim() : null;
-  switch (event.kind) {
-    case "turn_finished":
-      if (event.durationMs < LANGY_LONG_TURN_MS) return null;
-      return {
-        title: "Langy finished",
-        body: about ? `Done with "${about}".` : "Your answer is ready.",
-      };
-    case "decision_needed":
-      return {
-        title: "Langy needs a decision",
-        body: about ? `Waiting on you in "${about}".` : "Langy is waiting on your answer.",
-      };
-    case "tool":
-      return { title: event.title, body: event.body };
-  }
+  const outcome = langyNotificationContent({ event, conversationTitle });
+  return outcome.kind === "notify" ? { title: outcome.title, body: outcome.body } : null;
+}
+
+/** This browser's push standing, as browser-host's Web Push reports it. */
+export type LangyPushDeviceState = "unknown" | "subscribed" | "unsubscribed" | "unavailable";
+
+/**
+ * Whether the open tab notifies at all: notifications on, and this browser `unavailable` for
+ * push. Subscribed or not yet checked leaves it to the server, even when a send fails.
+ */
+export function langyTabNotifies({
+  choice,
+  pushDevice,
+}: {
+  choice: "enabled" | "declined" | null;
+  pushDevice: LangyPushDeviceState;
+}): boolean {
+  return choice === "enabled" && pushDevice === "unavailable";
 }

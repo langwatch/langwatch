@@ -60,6 +60,21 @@ An ingress that does not pass WebSocket upgrades still works: the CLI falls back
 
 The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
 
+## Push notifications
+
+Langy's browser notifications are Web Push messages. The LangWatch app and workers send them over HTTPS (`:443`) straight to the push service of each subscribed browser. The agent pod is not involved, and there is nothing to configure: the install generates its own VAPID key pair on first use and stores it encrypted in the database.
+
+| Browser | Push service host |
+|---|---|
+| Chrome, Edge on Android, Opera, Samsung Internet and other Chromium browsers | `fcm.googleapis.com` |
+| Firefox | `updates.push.services.mozilla.com` |
+| Safari on macOS and iOS | `web.push.apple.com` (Apple documents `*.push.apple.com`) |
+| Edge on Windows and macOS | `*.notify.windows.com` |
+
+The app refuses a subscription whose endpoint is on any other host. Allow the hosts for the browsers your team uses. When the app cannot reach a push service, the send is retried with backoff for about ten minutes, and then dropped.
+
+A browser that cannot subscribe at all, because it has no Push API or subscribing failed, gets its notifications from the open LangWatch tab instead. A browser that did subscribe never falls back to the tab, so blocking these hosts after people subscribed means their notifications stop.
+
 ## Enable outbound egress
 
 The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:

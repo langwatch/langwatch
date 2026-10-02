@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { langyTabNotifies } from "../../../../model/langy-notifications.ts";
 import {
   langyDecisionKeysReady,
   useLangyNotificationPreference,
@@ -10,9 +11,8 @@ import type { useLangyLocalWaits } from "./use-langy-local-waits.ts";
 type LocalWaits = ReturnType<typeof useLangyLocalWaits>;
 
 /**
- * Browser notifications for the open conversation (specs/langy/langy-notifications.feature): a
- * long turn that finishes, a card that waits on the person, or Langy's own `notify` call, sent
- * only while the person is away from the tab and asked for them.
+ * The open tab's fallback notifications for the open conversation, only while the person is
+ * away and this browser cannot hold a push subscription. Spec: langy-notifications.feature
  */
 export function useLangyPanelNotifications({
   conversationId,
@@ -50,7 +50,7 @@ export function useLangyPanelNotifications({
     messages,
     decisionKeys,
     decisionKeysReady: langyDecisionKeysReady(waits),
-    enabled: preference.choice === "enabled",
+    enabled: langyTabNotifies(preference),
     permission: preference.permission,
   });
 }

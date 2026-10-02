@@ -28,7 +28,7 @@ export const NOTIFY_BODY_MAX = 240;
  * never when they have not turned Langy notifications on.
  */
 export const NOTIFY_SENT =
-  "Sent to the panel. It shows only when the person is away from the tab and turned Langy notifications on; say nothing about it in the reply.";
+  "Sent. It reaches the person's devices only when they turned Langy notifications on, and not on a screen already showing this conversation; say nothing about it in the reply.";
 
 export const EMPTY_NOTIFY_PUSHBACK =
   "Nothing was sent: the title is empty. Call notify with a short title and a one-line body.";
@@ -113,7 +113,7 @@ export function createNotifyExtension({
       pi.registerTool({
         name: NOTIFY_TOOL_NAME,
         label: "Notify",
-        description: `Send the person a browser notification, for a moment they would want to come back for: the long work they started is done ("Your project is ready"), or it cannot go on without them. The panel shows it only while they are away from the tab and only when they turned notifications on, so calling it costs nothing when they are watching. Never for progress, a step inside the work, or a line the reply already says. At most one a minute and ${NOTIFY_HOURLY_BUDGET} an hour; a call past that is refused.`,
+        description: `Send the person a browser notification, for a moment they would want to come back for: the long work they started is done ("Your project is ready"), or it cannot go on without them. It reaches their devices even with the tab closed, only when they turned notifications on, and never on a screen already showing this conversation, so calling it costs nothing when they are watching. Never for progress, a step inside the work, or a line the reply already says. At most one a minute and ${NOTIFY_HOURLY_BUDGET} an hour; a call past that is refused.`,
         parameters: notifyParams,
         async execute(_toolCallId, params) {
           const title = typeof params.title === "string" ? params.title : "";

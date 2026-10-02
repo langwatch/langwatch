@@ -6718,3 +6718,37 @@ model SelfHostedInstanceReport {
   @@index([instanceId, receivedAt])
   @@index([receivedAt])
 }
+
+/// One browser a person subscribed to Web Push, owned by notification. A
+/// person holds one row per device; the endpoint names the browser, so a
+/// browser that subscribes again replaces its own row.
+model WebPushSubscription {
+  id            String    @id @default(nanoid())
+  /// The person the pushes are for. A plain column: the row leaves with the
+  /// person through notification's own subscriber on the user lifecycle.
+  userId        String
+  /// The push service URL the browser handed out. Unique per browser.
+  endpoint      String    @unique
+  /// The browser's P-256 public key and auth secret, base64url, as the
+  /// browser reports them. Payloads are encrypted to these.
+  p256dh        String
+  auth          String
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  /// When the push service last accepted a push for this browser.
+  lastSuccessAt DateTime?
+
+  @@index([userId])
+}
+
+/// This installation's VAPID key pair, generated on first use so Web Push works
+/// without configuration. Fixed id, so the table holds one row: a second
+/// insert loses the race on the primary key and reads the winner's pair.
+model WebPushVapidKey {
+  id                  String   @id @default("self")
+  /// The uncompressed P-256 public key, base64url. The browser subscribes with it.
+  publicKey           String
+  /// The private key, base64url, encrypted with the process encryption key.
+  privateKeyEncrypted String
+  createdAt           DateTime @default(now())
+}

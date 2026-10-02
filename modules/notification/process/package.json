@@ -21,8 +21,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
@@ -31,14 +34,18 @@
     "@langwatch/process": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@sendgrid/mail": "catalog:",
     "nodemailer": "catalog:",
-    "undici": "catalog:"
+    "undici": "catalog:",
+    "web-push": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/nodemailer": "catalog:",
+    "@types/web-push": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

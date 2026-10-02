@@ -2255,4 +2255,20 @@ export interface LwqlPrismaRows {
     readonly unknownFields: "Int";
     readonly payload: "Json";
   };
+  readonly WebPushSubscription: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly endpoint: "String";
+    readonly p256dh: "String";
+    readonly auth: "String";
+    readonly userAgent: "String?";
+    readonly createdAt: "DateTime";
+    readonly lastSuccessAt: "DateTime?";
+  };
+  readonly WebPushVapidKey: {
+    readonly id: "String";
+    readonly publicKey: "String";
+    readonly privateKeyEncrypted: "String";
+    readonly createdAt: "DateTime";
+  };
 }
