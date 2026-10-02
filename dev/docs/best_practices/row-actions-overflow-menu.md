@@ -90,6 +90,3 @@ footer.
 - `@langwatch/model-provider-browser`'s
   `ui/sections/model-providers-screen.tsx` (provider row, with a
   permission tooltip on the trigger)
-- `@langwatch/enterprise-governance-browser`'s
-  `features/ai-tools/ui/sections/tool-catalog-editor.tsx` (AI tool catalog
-  tile row: Edit / Enable-Disable / Delete-archive)
