@@ -1,15 +1,14 @@
 import {
   bindRestMiddleware,
   createRestRuntime,
+  canonicalErrorResponse,
   projectRestFacts,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 /**
  * The `/api/monitors` family over the REAL monitor application: memory
  * repositories, recording ports, and the process ports a mount supplies.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { type MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
@@ -24,22 +23,11 @@ import { createMonitorsRest } from "../monitor.rest.ts";
 /** The project every request in these suites is authenticated for. */
 export const TEST_PROJECT = { id: "project-1", slug: "project-one" } as const;
 
-/** A handled refusal at its own status, carrying its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ ...error.serialize(), message: error.message }, error.httpStatus as 400);
-  }
-
-  return c.json({ code: "internal_error", message: String(error) }, 500);
-};
-
-/** The code a refusal names, whichever body shape the family published. */
+/** The code a refusal names in the canonical envelope. */
 export async function errorCodeOf(response: Response): Promise<string | undefined> {
-  const body = (await response.json()) as { code?: string; error?: string | { code?: string } };
-  if (typeof body.code === "string") return body.code;
-  if (typeof body.error === "string") return body.error;
+  const body: { code?: string } = await response.json();
 
-  return body.error?.code;
+  return body.code;
 }
 
 /** The family, one application, one repository the test may seed. */
@@ -69,7 +57,7 @@ export function mountMonitorRest(
   const hono = runtime.mount(createMonitorsRest().router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: TEST_PROJECT.slug,
