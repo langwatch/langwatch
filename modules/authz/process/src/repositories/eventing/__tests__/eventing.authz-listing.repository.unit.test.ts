@@ -121,6 +121,34 @@ describe("EventingAuthzListingRepository", () => {
     });
 
     /** @scenario "Dormant facts never appear as bindings in a listing" */
+    it("leaves out a custom grant whose role key names no custom role", async () => {
+      const { repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-bare-custom",
+            principalType: "USER",
+            principalId: "alice",
+            roleKey: "custom:",
+          }),
+          grantRow({
+            id: "g-member",
+            principalType: "USER",
+            principalId: "alice",
+            roleKey: "member",
+          }),
+        ],
+        users: [{ id: "alice", name: "Alice", email: "a@x.io", image: null }],
+      });
+
+      const rows = await repository.findUserBindings({
+        organizationId: ORG,
+        userId: "alice",
+      });
+
+      expect(rows.map((row) => row.id)).toEqual(["g-member"]);
+    });
+
+    /** @scenario "Dormant facts never appear as bindings in a listing" */
     it("asks the query itself to exclude resource, platform and dormant rows", async () => {
       const { prisma, repository } = prismaWith({});
 

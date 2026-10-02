@@ -581,7 +581,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     if (row.roleKey === "viewer") {
       return { role: "VIEWER", customRoleId: null };
     }
-    if (row.roleKey?.startsWith("custom:")) {
+    if (row.roleKey?.startsWith("custom:") && row.roleKey.length > "custom:".length) {
       return {
         role: this.tryTeamUserRoleFrom(row.legacyRole) ?? "CUSTOM",
         customRoleId: row.roleKey.slice("custom:".length),
