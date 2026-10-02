@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack, keyframes } from "@langwatch/design-system/p
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import type { ReactNode } from "react";
 
-import "../elements/langy-theme.css";
+import "@langwatch/design-system/langy-theme.css";
 import { CARD_TAXONOMY, type LangyCardIntent, SERIF, TYPE } from "../../model/asaplangy-tokens.ts";
 import { LangyPanelSurface } from "./langy-panel-surface.tsx";
 

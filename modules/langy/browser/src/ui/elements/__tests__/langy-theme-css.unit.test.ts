@@ -3,11 +3,14 @@
  * the token half is `langy-theme.unit.test.ts`. Read as text: the rules are the subject.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(join(import.meta.dirname, "../langy-theme.css"), "utf8");
+const css = readFileSync(
+  createRequire(import.meta.url).resolve("@langwatch/design-system/langy-theme.css"),
+  "utf8",
+);
 
 describe("given the panel's ambient textures in langy-theme.css", () => {
   // One rule per selector in the sheet, so anchoring on the selector and

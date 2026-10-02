@@ -2,7 +2,7 @@ import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { motion } from "motion/react";
 
-import "../elements/langy-theme.css";
+import "@langwatch/design-system/langy-theme.css";
 import { CARD } from "../../model/asaplangy-tokens.ts";
 
 const MotionBox = motion.create(Box);
