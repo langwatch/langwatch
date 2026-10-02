@@ -32,7 +32,7 @@ import { useState } from "react";
 import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useNow } from "../../../behavior/use-now.ts";
-import type { Period } from "../../elements/analytics/period-selector.tsx";
+import type { Period } from "../../../model/analytics/period.ts";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel.tsx";
 
 type SuiteDetailPanelProps = {

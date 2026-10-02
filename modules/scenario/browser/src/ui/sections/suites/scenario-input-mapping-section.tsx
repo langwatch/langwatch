@@ -12,11 +12,8 @@ import {
   resolveOutputField,
   toOutputFieldState,
 } from "../../../model/suite/output-field-state.ts";
-import {
-  type Variable,
-  VariablesSection,
-} from "../../sections/prompt/variables/variables-section.tsx";
-import { renderSourceTypeIcon } from "../workflow/workflow-icons.tsx";
+import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
+import { type Variable, VariablesSection } from "../prompt/variables/variables-section.tsx";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

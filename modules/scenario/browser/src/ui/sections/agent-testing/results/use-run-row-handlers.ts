@@ -9,7 +9,7 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { useCallback } from "react";
 
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
-import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
+import { CASE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 
 export function useRunRowHandlers({ scenarioSetId }: { scenarioSetId: string }) {
   const { openDrawer } = useDrawer();

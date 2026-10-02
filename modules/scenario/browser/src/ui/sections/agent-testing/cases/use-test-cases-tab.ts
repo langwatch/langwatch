@@ -21,15 +21,11 @@ import {
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
-import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "../../../elements/analytics/period-selector.tsx";
+import { AGENT_TYPE_SELECTOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
+import { useScenarioPeriod } from "../use-scenario-period.ts";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
-import { AGENT_TYPE_SELECTOR_DRAWER } from "./drawer-keys.ts";
 import { type CaseOpenActions, useCaseOpenActions } from "./use-case-open-actions.ts";
 import { type CaseRunActions, useCaseRunActions } from "./use-case-run-actions.ts";
 import { type SuiteNameDialogModel, useSuiteNameDialog } from "./use-suite-name-dialog.ts";

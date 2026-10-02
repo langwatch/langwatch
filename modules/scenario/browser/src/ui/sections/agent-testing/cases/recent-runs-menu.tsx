@@ -13,12 +13,12 @@ import { useState } from "react";
 
 import { useNow } from "../../../../behavior/use-now.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import type { Period } from "../../../../model/analytics/period.ts";
 import {
   formatPassRate,
   passRateColor,
 } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { MENU_ACTION_ICONS, MenuActionLabel } from "./menu-action-label.tsx";
 import { useOpenPlanRun } from "./use-open-plan-run.ts";
 import { type RecentRun, useSuiteRecentRuns } from "./use-suite-recent-runs.ts";

@@ -357,10 +357,9 @@ describe("the wide run detail drawer", () => {
     const user = userEvent.setup();
     renderWide();
 
-    expect(screen.queryByRole("button", { name: "Run again" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit scenario" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Edit scenario" })).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "Edit Scenario" }));
+    await user.click(screen.getByRole("button", { name: "Edit scenario" }));
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "case_1",

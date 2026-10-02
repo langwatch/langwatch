@@ -15,6 +15,7 @@ import { Square, Edit2, Play } from "lucide-react";
 import { useState } from "react";
 
 import { useCan } from "../../../../behavior/use-can.ts";
+import { CASE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
 import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip.tsx";
@@ -23,7 +24,6 @@ import { CutAtLimitBadge, isCutAtLimitOf } from "../../../elements/cut-at-limit-
 import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
-import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
 import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";
 import { RUN_AGAIN_LABEL } from "../results/run-plan-detail-header.tsx";
 import {

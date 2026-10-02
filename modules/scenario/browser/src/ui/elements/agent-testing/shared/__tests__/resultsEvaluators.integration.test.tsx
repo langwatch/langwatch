@@ -16,8 +16,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { summarizeEvaluations } from "../../../../../model/agent-testing/results/evaluation-summaries.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
-import { summarizeEvaluations } from "../../../../sections/agent-testing/results/evaluation-summaries.ts";
 import {
   RunPlanDetailHeader,
   type RunPlanDetailHeaderProps,

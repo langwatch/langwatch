@@ -18,12 +18,12 @@ import {
   useSuiteEditorStore,
 } from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import type { api } from "../../../../behavior/scenario-api.ts";
+import { SUITE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import {
   type AttachableEvaluator,
   newAttachment,
   opensOnAttach,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
 
 export type SuiteDraftUpdate = (change: (draft: SuiteDraft) => SuiteDraft) => void;
 

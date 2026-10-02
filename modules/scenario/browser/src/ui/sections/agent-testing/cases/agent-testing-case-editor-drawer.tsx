@@ -4,12 +4,7 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import {
-  getFlowCallbacks,
-  type UiAgentTestingCaseEditorDrawerProps,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
@@ -20,15 +15,30 @@ import { useCallback, useMemo } from "react";
 
 import { type Scenario } from "../../../../behavior/scenario-api.ts";
 import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { CaseModal } from "./case-modal.tsx";
 // The key lives in a component-free module so a static importer never pulls
 // this drawer's React and Chakra dependencies into its own chunk. The drawer
 // re-exports the key so existing importers stay unaffected.
-import { CASE_EDITOR_DRAWER } from "./drawer-keys.ts";
+import { CASE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { CaseModal } from "./case-modal.tsx";
 import { useCaseEditor } from "./use-case-editor.ts";
 
 export { CASE_EDITOR_DRAWER };
+
+/**
+ * The props scenario's case editor accepts at open time. The three URL-serializable fields
+ * survive a reload; the flow callback is registered separately via `setFlowCallbacks`.
+ */
+export type UiAgentTestingCaseEditorDrawerProps = {
+  /** The scenario being edited, or absent for a new one. */
+  scenarioId?: string;
+  /** The suite a new scenario starts in. */
+  testSuiteId?: string;
+  /** "true" opens the scenario with its version history strip open. */
+  showHistory?: string;
+  /** Called when a scenario is saved. `shouldRunAfterSave` is true for Save & Run. */
+  onSaved?: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
+};
 
 function useEditorSuites(projectId: string): TestSuiteEntry[] {
   const { data: testSuites } = useTestSuites({ projectId });

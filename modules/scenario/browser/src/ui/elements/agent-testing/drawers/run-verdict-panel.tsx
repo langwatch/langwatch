@@ -27,12 +27,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import {
   failedRequiredEvaluatorName,
   type RunEvaluation,
-} from "../../../sections/agent-testing/results/evaluation-summaries.ts";
+} from "../../../../model/agent-testing/results/evaluation-summaries.ts";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { PASS_RATE_AMBER_COLOR } from "../shared/pass-rate-color.ts";
 
 /**

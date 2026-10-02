@@ -9,11 +9,11 @@ import { useMemo } from "react";
 
 import { useSuiteRunData } from "../../../../behavior/suites/use-suite-run-data.ts";
 import { useSuites } from "../../../../behavior/suites/use-suites.ts";
+import type { Period } from "../../../../model/analytics/period.ts";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,
 } from "../../../../model/suite/run-history-transforms.ts";
-import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { type PlanIdentity, planOfSet } from "./plan-of-set.ts";
 
 /** How many runs the list holds. It is a way into a run, not a run history. */

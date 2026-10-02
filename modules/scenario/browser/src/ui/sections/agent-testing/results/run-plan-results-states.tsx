@@ -18,9 +18,9 @@ import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
 import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
+import type { Period, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import type { Period, RelativePresetKey } from "../../../elements/analytics/period-selector.tsx";
 import type { PeriodControls } from "./period-controls.ts";
 import { RUNS_SIDEBAR_WIDTH, RunEntriesSkeleton } from "./runs-sidebar.tsx";
 

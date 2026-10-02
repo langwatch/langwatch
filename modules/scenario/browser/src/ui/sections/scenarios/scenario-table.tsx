@@ -5,9 +5,9 @@ import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-tabl
 import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
 import type { Scenario } from "../../../behavior/scenario-api.ts";
 import { type ScenarioListItem } from "../../../model/scenario-list.types.ts";
-import { LangyContextTarget } from "../../sections/langy/langy-context-target.tsx";
-import { ScenarioTable as ScenarioTableView } from "../scenario-table.tsx";
-import { TagList } from "../tag-list.tsx";
+import { ScenarioTable as ScenarioTableView } from "../../elements/scenario-table.tsx";
+import { TagList } from "../../elements/tag-list.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
 
 export type ScenarioTableProps = {
   scenarios: Scenario[];

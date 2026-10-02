@@ -27,9 +27,9 @@ import {
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { useProjectSpanNames } from "../../../../behavior/use-project-span-names.ts";
+import { SUITE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
-import type { CustomizeChip } from "../shared/customize-chips.tsx";
+import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import { definitionsOf, placeServerRefusal, refusalsOf } from "./suite-editor-validation.ts";
 import { usePendingAttachmentEditor, useSuiteAttachments } from "./use-suite-attachments.ts";
 

@@ -8,9 +8,9 @@ import { Box, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
+import { runHasEvaluators } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
 import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { anyRunHasCaller } from "./caller-display.ts";
-import { runHasEvaluators } from "./evaluation-summaries.ts";
 import { RunResultRow } from "./run-result-row.tsx";
 
 /**

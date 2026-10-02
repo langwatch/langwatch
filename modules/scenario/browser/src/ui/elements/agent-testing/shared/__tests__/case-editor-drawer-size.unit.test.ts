@@ -7,7 +7,7 @@
 import { drawerSlotRecipe } from "@langwatch/design-system/system";
 import { describe, expect, it } from "vitest";
 
-import { CASE_EDITOR_DRAWER_SIZE } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
+import { CASE_EDITOR_DRAWER_SIZE } from "../../../../../model/agent-testing/cases/drawer-keys.ts";
 
 /** What Chakra's own drawer recipe gives the two steps either side of ours. */
 const CHAKRA_MD_REM = 32;

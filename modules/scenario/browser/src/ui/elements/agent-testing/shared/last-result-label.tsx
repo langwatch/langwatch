@@ -6,12 +6,12 @@
 import { Badge, Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
-import { formatRunStatusLabel } from "../../../../model/suite/format-run-status-label.ts";
 import {
   failedRequiredEvaluatorName,
   type RunEvaluation,
-} from "../../../sections/agent-testing/results/evaluation-summaries.ts";
+} from "../../../../model/agent-testing/results/evaluation-summaries.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
+import { formatRunStatusLabel } from "../../../../model/suite/format-run-status-label.ts";
 
 export type LastResultCriteria = {
   metCriteria: string[];

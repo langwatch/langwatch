@@ -7,8 +7,8 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
+import { usePeriodSelector } from "../../../../behavior/analytics/use-period-selector.ts";
 import { useLastResultSummaries } from "../../../../behavior/scenarios/use-last-result-summaries.ts";
-import { usePeriodSelector } from "../../../elements/analytics/period-selector.tsx";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";
 
 /** Why the button is off on a scenario that has never run. */

@@ -12,21 +12,17 @@ import { FlaskConical, Plus } from "lucide-react";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+/**
+ * The Results tab list: the filter row, the charts it drives, and the table.
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import {
   CONTENT_COLUMN_WIDE_MAX_WIDTH,
   ContentColumn,
 } from "../../../elements/agent-testing/shared/content-column.tsx";
 import { periodDays } from "../../../elements/agent-testing/shared/period-picker.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-/**
- * The Results tab list: the filter row, the charts it drives, and the table.
- * @see specs/features/agent-testing/results-tabs.feature
- */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "../../../elements/analytics/period-selector.tsx";
 import { FlatRowsTable, GroupedRowsTable } from "./grouped-rows-table.tsx";
 import { PlanRowsTable } from "./plan-rows-table.tsx";
 import type { ResultGrouping, ResultRow } from "./result-atoms.ts";

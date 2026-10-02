@@ -35,6 +35,7 @@ import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-s
 import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { useTargetNameMap } from "../../../behavior/use-target-name-map.ts";
+import type { Period } from "../../../model/analytics/period.ts";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -44,7 +45,6 @@ import {
   groupRunsByTarget,
   resolveOriginLabel,
 } from "../../../model/suite/run-history-transforms.ts";
-import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 import { ScenarioRunExportDialog } from "../../elements/suite/dialogs/scenario-run-export-dialog.tsx";
 import { RunHistorySkeleton } from "../../elements/suite/runs/run-history-skeleton.tsx";

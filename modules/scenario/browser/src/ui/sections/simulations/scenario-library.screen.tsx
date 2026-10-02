@@ -26,8 +26,8 @@ import {
   ScenarioLabelFilter as LabelFilterDropdown,
 } from "../../elements/scenario-library-controls.tsx";
 import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../elements/scenario-welcome.tsx";
-import { ScenarioTable } from "../../elements/scenarios/scenario-table.tsx";
 import { ScenarioCreateModal } from "../scenarios/scenario-create-modal.tsx";
+import { ScenarioTable } from "../scenarios/scenario-table.tsx";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();

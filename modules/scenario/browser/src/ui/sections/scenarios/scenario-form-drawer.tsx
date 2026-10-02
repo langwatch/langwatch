@@ -48,8 +48,8 @@ import {
   type ScenarioTestSuiteOption,
 } from "../../elements/scenario-form.tsx";
 import { ScenarioParametersDialog } from "../../elements/scenarios/scenario-parameters-dialog.tsx";
-import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section.tsx";
 import { TagList } from "../../elements/tag-list.tsx";
+import { hasScenarioInputMapping } from "../suites/scenario-input-mapping-section.tsx";
 import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";
 import { CallerVoiceGroup } from "./caller-voice-group.tsx";

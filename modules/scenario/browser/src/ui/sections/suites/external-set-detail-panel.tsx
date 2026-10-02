@@ -20,6 +20,7 @@ import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-s
 import { useSuiteRunData } from "../../../behavior/suites/use-suite-run-data.ts";
 import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
+import type { Period } from "../../../model/analytics/period.ts";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -27,7 +28,6 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "../../../model/suite/run-history-transforms.ts";
-import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 import { RunHistorySkeleton } from "../../elements/suite/runs/run-history-skeleton.tsx";
 import { ScenarioTabConnectedBadge } from "../../elements/suite/runs/scenario-tab-connected-badge.tsx";

@@ -9,7 +9,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import type { Period } from "../../../elements/analytics/period-selector.tsx";
+import type { Period } from "../../../../model/analytics/period.ts";
 import { MenuActionLabel, type MenuActionName } from "./menu-action-label.tsx";
 import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 

@@ -7,7 +7,7 @@
 import { fromDate, nowInstant, subDays, type Instant } from "@langwatch/time";
 import { useEffect } from "react";
 
-import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
+import type { Period } from "../../../model/analytics/period.ts";
 import { widenedWindowDays } from "./run-plans.ts";
 
 /**

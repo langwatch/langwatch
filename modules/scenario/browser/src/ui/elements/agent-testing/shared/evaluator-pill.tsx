@@ -9,12 +9,12 @@ import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import type {
   EvaluatorSummary,
   RunEvaluation,
-} from "../../../sections/agent-testing/results/evaluation-summaries.ts";
+} from "../../../../model/agent-testing/results/evaluation-summaries.ts";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { formatPassRate, PASS_RATE_AMBER_COLOR, passRateColor } from "./pass-rate-color";
 
 /** What a pill reads: one verdict, a rate over many, a number, or nothing. */

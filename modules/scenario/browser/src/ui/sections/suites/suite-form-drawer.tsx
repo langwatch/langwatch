@@ -41,9 +41,9 @@ import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
 import { type SuiteFormData } from "../../../model/suite/suite-form.types.ts";
 import { ScenarioPicker } from "../../elements/suite/pickers/scenario-picker.tsx";
 import { TargetPicker } from "../../elements/suite/pickers/target-picker.tsx";
-import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
+import { PromptTargetMappingSection } from "./prompt-target-mapping-section.tsx";
 
 /** Callbacks passed via flowCallbacks from the parent page. */
 export type SuiteFormDrawerProps = {

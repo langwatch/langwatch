@@ -13,11 +13,7 @@ import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-age
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "../../../elements/analytics/period-selector.tsx";
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
 import { RunsSidebar } from "./runs-sidebar.tsx";
 

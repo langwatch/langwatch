@@ -3,18 +3,14 @@ import type { Instant } from "@langwatch/time";
 import { ChartColumn } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
-import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 /**
  * The filter row of the Results tab: how the list is grouped, what is cut from it, and
  * the window it all sits in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "../../../elements/analytics/period-selector.tsx";
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
+import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 import { GroupByTabs } from "./group-by-tabs.tsx";
 import {
   EMPTY_RESULT_FILTERS,

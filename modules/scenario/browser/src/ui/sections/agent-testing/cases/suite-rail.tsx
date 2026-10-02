@@ -12,11 +12,7 @@ import type {
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "../../../elements/analytics/period-selector.tsx";
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailSections } from "./suite-rail-sections.tsx";

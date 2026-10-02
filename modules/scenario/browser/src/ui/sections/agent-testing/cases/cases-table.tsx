@@ -26,8 +26,8 @@ import {
   ROW_HOVER_BG,
   TABLE_HEADER_BG,
 } from "../../../../model/agent-testing/shared/design.ts";
+import type { Period } from "../../../../model/analytics/period.ts";
 import { RunCaseButton } from "../../../elements/agent-testing/cases/run-case-button.tsx";
-import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
 import { MenuActionLabel } from "./menu-action-label.tsx";
 import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";

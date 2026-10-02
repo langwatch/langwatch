@@ -12,6 +12,10 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
+import {
+  evaluationsOf,
+  isAwaitingEvaluations,
+} from "../../../../model/agent-testing/results/evaluation-summaries.ts";
 import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
 import {
@@ -21,7 +25,6 @@ import {
 import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
 import { callerLabel, runCallerKind } from "./caller-display.ts";
-import { evaluationsOf, isAwaitingEvaluations } from "./evaluation-summaries.ts";
 import { RUN_AGAIN_LABEL } from "./run-plan-detail-header.tsx";
 import type { RunResultsTableProps } from "./run-results-table.tsx";
 import { canRunAgain, RUN_AGAIN_FROM_CODE_REASON } from "./use-run-plan-run-dialog.ts";

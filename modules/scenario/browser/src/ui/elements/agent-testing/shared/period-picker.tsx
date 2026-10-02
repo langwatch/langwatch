@@ -10,9 +10,9 @@ import {
   matchPeriodPreset,
   type Period,
   type PeriodMode,
-  PeriodSelector,
   type RelativePresetKey,
-} from "../../analytics/period-selector.tsx";
+} from "../../../../model/analytics/period.ts";
+import { PeriodSelector } from "../../analytics/period-selector.tsx";
 import { TOOLBAR_BUTTON_PROPS } from "./toggle-button.tsx";
 
 /**

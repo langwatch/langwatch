@@ -10,6 +10,10 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Input, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
+import {
+  CASE_EDITOR_DRAWER_SIZE,
+  SUITE_EDITOR_DRAWER,
+} from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
@@ -20,11 +24,7 @@ import {
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { SuiteEvaluatorsSection } from "../../../elements/agent-testing/suite/suite-evaluators-section.tsx";
 import { SuiteFieldsSection } from "../../../elements/agent-testing/suite/suite-fields-section.tsx";
-import {
-  type SuiteEditorModel,
-  useSuiteEditor,
-} from "../../../elements/agent-testing/suite/use-suite-editor.ts";
-import { CASE_EDITOR_DRAWER_SIZE, SUITE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
+import { type SuiteEditorModel, useSuiteEditor } from "../suite/use-suite-editor.ts";
 
 export { SUITE_EDITOR_DRAWER };
 

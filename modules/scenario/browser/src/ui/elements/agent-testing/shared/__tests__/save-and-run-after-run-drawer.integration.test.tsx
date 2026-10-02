@@ -11,8 +11,8 @@ import { MemoryRouter, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Scenario } from "../../../../../behavior/scenario-api.ts";
+import { CASE_EDITOR_DRAWER } from "../../../../../model/agent-testing/cases/drawer-keys.ts";
 import { AgentTestingCaseEditor } from "../../../../sections/agent-testing/cases/agent-testing-case-editor.tsx";
-import { CASE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
 import type { RunDialogProps } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
 
 vi.mock("@langwatch/browser-host/use-router", () => ({

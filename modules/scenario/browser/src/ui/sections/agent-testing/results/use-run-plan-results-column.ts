@@ -21,7 +21,7 @@ import { api } from "../../../../behavior/scenario-api.ts";
 import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-scenario-runs.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { summarizeEvaluations } from "./evaluation-summaries.ts";
+import { summarizeEvaluations } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
 import type { PeriodControls } from "./period-controls.ts";
 import type { RunPlanDetailRun } from "./run-plan-detail-header.tsx";
 import { type RunSettings, readRunSettings, runActorName } from "./run-settings.ts";

@@ -20,8 +20,8 @@ import { useMemo } from "react";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
+import type { Period, PeriodMode } from "../../../../model/analytics/period.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
-import type { Period, PeriodMode } from "../../../elements/analytics/period-selector.tsx";
 import type { PlanRowModel } from "./plan-rows-table.tsx";
 import {
   codeTargetNames,

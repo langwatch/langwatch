@@ -7,7 +7,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
-import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
+import type { Period } from "../../../model/analytics/period.ts";
 import { useExternalSetSummaries, useSuiteSummaries } from "../../suites/use-set-summaries.ts";
 import { useSuites } from "../../suites/use-suites.ts";
 import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans.ts";

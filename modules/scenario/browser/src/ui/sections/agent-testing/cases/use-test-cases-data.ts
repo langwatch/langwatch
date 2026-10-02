@@ -25,7 +25,7 @@ import {
   type TestCase,
   type TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
-import type { Period } from "../../../elements/analytics/period-selector.tsx";
+import type { Period } from "../../../../model/analytics/period.ts";
 import type { CaseLastResult } from "./cases-table.tsx";
 
 type ScenarioRows = ScenarioOutputs["scenarios"]["getAll"];

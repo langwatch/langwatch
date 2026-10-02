@@ -16,7 +16,7 @@ import {
   orderSuitesDefaultFirst,
   type TestSuiteEntry,
 } from "../../../../../model/agent-testing/cases/test-cases.ts";
-import { computeRelativeWindow } from "../../../../elements/analytics/period-selector.tsx";
+import { computeRelativeWindow } from "../../../../../model/analytics/period.ts";
 import { SuiteNameDialog } from "../suite-name-dialog.tsx";
 import { SuiteRail } from "../suite-rail.tsx";
 import type { SuiteLastRun } from "../use-test-cases-data.ts";

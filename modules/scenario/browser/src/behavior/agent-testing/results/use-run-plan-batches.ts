@@ -8,13 +8,13 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { scenarioClient } from "@langwatch/scenario-client";
 import { useMemo } from "react";
 
+import type { Period } from "../../../model/analytics/period.ts";
 import {
   type BatchRun,
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
 } from "../../../model/suite/run-history-transforms.ts";
-import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
 import { useRunHistoryPagination } from "../../suites/use-run-history-pagination.ts";
 import { batchNote, type RunPlan } from "./run-plans.ts";
 import { runTitle } from "./run-titles.ts";

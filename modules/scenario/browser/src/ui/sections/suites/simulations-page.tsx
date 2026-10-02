@@ -15,6 +15,7 @@ import { fromDate, nowInstant, subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { usePeriodSelector } from "../../../behavior/analytics/use-period-selector.ts";
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite.ts";
@@ -32,11 +33,8 @@ import { useSuites } from "../../../behavior/suites/use-suites.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
-import {
-  type Period,
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../elements/analytics/period-selector.tsx";
+import type { Period } from "../../../model/analytics/period.ts";
+import { PeriodSelector } from "../../elements/analytics/period-selector.tsx";
 import { SuiteArchiveDialog } from "../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import { SuiteContextMenu } from "../../elements/suite/dialogs/suite-context-menu.tsx";
 import { SuiteRunConfirmationDialog } from "../../elements/suite/dialogs/suite-run-confirmation-dialog.tsx";
