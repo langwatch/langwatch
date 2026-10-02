@@ -1978,7 +1978,7 @@ invented:
   | `withConfig`                 | 1         | yes                                  |
   | `withApi`                    | 1 of 33   | `installedModuleApis`                |
   | `withCapabilities`           | 6         | `declared(name)` (`declarations.ts`) |
-  | `withFailureInterceptors`    | **0**     | built (`ui-feature-shell.tsx:162`)   |
+  | `withFailureInterceptors`    | 1         | `installedModuleFailures`            |
   | `withFlags` · `withCommands` | **0**     | **none**                             |
   | `publishSurfaces`            | 13        | **none — superseded, below**         |
 
@@ -1986,11 +1986,10 @@ invented:
   deleted. The three above it are the opposite case and stay: their consumers
   are built and waiting, and what they lack is declarers. `withSlots` has
   since gone too: slots are deleted, and a core screen renders the
-  enterprise module's lent component (§11; Alex, 2026-09-29). That
-  `withFailureInterceptors` has none is its own finding — the shell runs every
-  installed interceptor over each failed mutation so that "a failure a feature
-  answers application-wide is reported once, rather than by every screen that
-  happens to trip it", and no feature answers one.
+  enterprise module's lent component (§11; Alex, 2026-09-29). The shell runs
+  every installed failure interceptor over each failed mutation, so a failure
+  a feature answers application-wide is reported once; licensing answers
+  limit and Lite Member refusals with its upgrade modal, as main did.
 
   **`publishSurfaces` is superseded by the closed browser package** (ruled 2026-09-18). It is the
   declaration-side twin of the `./surfaces/*` exports entries §3.4 just closed:
