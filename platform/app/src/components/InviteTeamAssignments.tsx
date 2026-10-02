@@ -313,7 +313,6 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
-  if (orgRole === OrganizationUserRole.DEVELOPER) return [];
   if (orgRole === OrganizationUserRole.EXTERNAL)
     return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {
