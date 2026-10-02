@@ -71,9 +71,6 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
-      "path": "../../data-retention/process/tsconfig.build.json"
-    },
-    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
@@ -144,9 +141,6 @@
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"
-    },
-    {
-      "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"

@@ -62,20 +62,20 @@ Feature: Simulation Run Cost and Latency Metrics
     And totalCost is computed normally from all spans
 
   # ---------------------------------------------------------------------------
-  # Trace-side subscriber: ECST publisher
+  # Scenario subscriber to trace's span event
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Trace-side subscriber publishes metrics via ECST after trace stabilises
+  Scenario: Scenario's subscriber publishes metrics after the trace settles
     Given a trace with scenario.run_id "run-1" and role cost data
-    When the trace stabilises (60s after last span)
-    Then the subscriber dispatches computeRunMetrics with metrics in the payload
+    When the trace settles (60s after the last span)
+    Then scenario reads the trace summary through TraceApi and dispatches computeRunMetrics
     And the simulation pipeline receives and applies the metrics
 
   @integration
-  Scenario: Trace-side subscriber ignores non-scenario traces
+  Scenario: Scenario's subscriber ignores non-scenario traces
     Given a trace without scenario.run_id in its attributes
-    When the traceSummary fold is updated
+    When the trace settles
     Then no computeRunMetrics command is dispatched
 
   # ---------------------------------------------------------------------------

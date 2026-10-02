@@ -60,7 +60,6 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
-import { ScenarioApi } from "@langwatch/scenario-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 
@@ -443,7 +442,6 @@ export const traceDependencies = {
   monitors: MonitorApi,
   presence: PresenceApi,
   projects: ProjectApi,
-  scenarios: ScenarioApi,
   share: ShareApi,
   storedObjects: StoredObjectApi,
   topics: TopicApi,

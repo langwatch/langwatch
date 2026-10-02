@@ -41,11 +41,6 @@ import {
   isRealFirstIngest,
   projectMetadataGroupKey,
 } from "./project-metadata.subscriber.ts";
-import {
-  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
-  SIMULATION_METRICS_SYNC_DELAY_MS,
-  hasSimulationMetrics,
-} from "./simulation-metrics-sync.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
 import type { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "./trace-update-broadcast.subscriber.ts";
@@ -69,7 +64,6 @@ export interface TraceProcessingReactions {
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
-  simulationMetricsSync: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
   codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
   spanStorageBroadcast: (
@@ -134,13 +128,6 @@ export function buildTraceProcessingConsumer(
         windowMs: PROJECT_METADATA_WINDOW_MS,
       }),
       handler: (event, context) => reactions.projectMetadata(event, context),
-    })
-    .withProjectionSubscriber("simulationMetricsSync", {
-      fold: "traceSummary",
-      when: (_event, context) => hasSimulationMetrics(context.state),
-      delay: SIMULATION_METRICS_SYNC_DELAY_MS,
-      ttl: SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
-      handler: (event, context) => reactions.simulationMetricsSync(event, context),
     })
     .withProjectionSubscriber("experimentMetricsSync", {
       fold: "traceSummary",

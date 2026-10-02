@@ -9,7 +9,6 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
@@ -39,7 +38,6 @@ import {
   type ProjectMetadataSubscriberDeps,
 } from "./project-metadata.subscriber.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
-import { createSimulationMetricsSyncHandler } from "./simulation-metrics-sync.subscriber.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
@@ -70,7 +68,6 @@ export interface TraceProcessingPeers {
   modelProviders: Pick<ModelProviderApi, "listCosts">;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
-  scenarios: Pick<ScenarioApi, "computeRunMetrics">;
   topics: Pick<TopicApi, "bootstrapClustering">;
 }
 
@@ -204,9 +201,6 @@ export class TraceProcessingRuntimeAdapter {
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
         milestones: this.input.milestones,
-      }),
-      simulationMetricsSync: createSimulationMetricsSyncHandler({
-        computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),
       }),
       experimentMetricsSync: createExperimentMetricsSyncHandler({
         computeExperimentRunMetrics: (data) => peers.experiments.computeRunMetrics(data),
