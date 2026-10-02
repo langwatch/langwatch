@@ -14,7 +14,6 @@ export {
 } from "./eventing/github-branch-recheck.process.ts";
 export {
   githubProcessModule,
-  composeGithubApi,
   composeGithubBranchMaintenance,
   composeGithubBranchDemand,
   createGithubMaintenancePipeline,
