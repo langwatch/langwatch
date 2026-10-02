@@ -19,8 +19,9 @@ function licenceRows(): {
   candidates: MemoryOrganizationLicenseRepository;
   licenses: OrganizationLicenseReads;
 } {
-  const candidates = MemoryOrganizationLicenseRepository.create();
-  candidates.activate(LICENSED_ORGANIZATION_ID, VALID_LICENSE_KEY);
+  const candidates = MemoryOrganizationLicenseRepository.create(
+    new Map([[LICENSED_ORGANIZATION_ID, VALID_LICENSE_KEY]]),
+  );
   const licenses: OrganizationLicenseReads = {
     getOrganizationLicense: async (organizationId: string) => ({
       licenseKey: organizationId === LICENSED_ORGANIZATION_ID ? VALID_LICENSE_KEY : null,
@@ -75,7 +76,7 @@ describe("licensing infrastructure composed without licence mutation", () => {
 
   it("leaves an organization that carries no key out of the scan", async () => {
     const { candidates } = licenceRows();
-    candidates.deactivate(LICENSED_ORGANIZATION_ID);
+    await candidates.removeLicense(LICENSED_ORGANIZATION_ID);
 
     await expect(candidates.findOrganizationsWithLicense()).resolves.toEqual([]);
   });

@@ -9,23 +9,15 @@ import type {
 export class MemoryConnectOrganizationRepository implements ConnectOrganizationRepository {
   #rows: Map<string, ConnectOrganizationRecord>;
 
-  static create(
-    seed: readonly ConnectOrganizationRecord[] = [],
-  ): MemoryConnectOrganizationRepository {
-    return new MemoryConnectOrganizationRepository(
-      new Map(seed.map((row) => [row.organizationId, row])),
-    );
+  /** `rows` is shared, not copied: a test writes a licence onto it the way activation does. */
+  static create({
+    rows = new Map(),
+  }: { rows?: Map<string, ConnectOrganizationRecord> } = {}): MemoryConnectOrganizationRepository {
+    return new MemoryConnectOrganizationRepository(rows);
   }
 
   private constructor(rows: Map<string, ConnectOrganizationRecord>) {
     this.#rows = rows;
-  }
-
-  activate(organizationId: string, license: string): void {
-    this.#rows.set(organizationId, {
-      ...(this.#rows.get(organizationId) ?? blankRow(organizationId)),
-      license,
-    });
   }
 
   async findById(organizationId: string): Promise<ConnectOrganizationRecord | null> {
@@ -65,14 +57,4 @@ export class MemoryConnectOrganizationRepository implements ConnectOrganizationR
       error ? { ...row, lastSyncError: error } : { ...row, lastSyncAt: at, lastSyncError: null },
     );
   }
-}
-
-function blankRow(organizationId: string): ConnectOrganizationRecord {
-  return {
-    organizationId,
-    license: null,
-    servicesDisabled: [],
-    lastSyncAt: null,
-    lastSyncError: null,
-  };
 }

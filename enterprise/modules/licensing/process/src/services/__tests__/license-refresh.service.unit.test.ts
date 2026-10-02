@@ -13,6 +13,7 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connect-gateway.channel.ts";
 import { MemoryConnectLicenseChannel } from "../../channels/memory/memory.connect-license.channel.ts";
+import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
@@ -64,15 +65,19 @@ function refresher({
   host?: MemoryConnectLicenseChannel;
   permitted?: boolean;
 }) {
-  const organizations = MemoryConnectOrganizationRepository.create([
-    {
-      organizationId: ORGANIZATION,
-      license,
-      servicesDisabled: [],
-      lastSyncAt: null,
-      lastSyncError: null,
-    },
+  const rows = new Map<string, ConnectOrganizationRecord>([
+    [
+      ORGANIZATION,
+      {
+        organizationId: ORGANIZATION,
+        license,
+        servicesDisabled: [],
+        lastSyncAt: null,
+        lastSyncError: null,
+      },
+    ],
   ]);
+  const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const install = ConnectInstallService.create({
     organizations,
     identity: InstanceIdentityService.create({
@@ -106,7 +111,7 @@ function refresher({
         });
         if (!result.valid) return { success: false, error: result.error };
         stored.push(licenseKey);
-        organizations.activate(ORGANIZATION, licenseKey);
+        activate(rows, ORGANIZATION, licenseKey);
         return { success: true, planInfo: { maxMembers: result.licenseData.plan.maxMembers } };
       },
     },
@@ -274,3 +279,19 @@ describe("redeeming an activation code on the install", () => {
     expect(host.activations).toEqual([]);
   });
 });
+
+/** Writes a licence onto a Connect row the way activation does. */
+function activate(
+  rows: Map<string, ConnectOrganizationRecord>,
+  organizationId: string,
+  license: string,
+): void {
+  rows.set(organizationId, {
+    organizationId,
+    servicesDisabled: [],
+    lastSyncAt: null,
+    lastSyncError: null,
+    ...rows.get(organizationId),
+    license,
+  });
+}

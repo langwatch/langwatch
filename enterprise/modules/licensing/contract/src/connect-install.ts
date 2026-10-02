@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-import { type ConnectService, CONNECT_SERVICES } from "./connect-services.ts";
+import { CONNECT_SERVICES } from "./connect-services.ts";
 import type { LicenseError } from "./license-constants.ts";
 
 /** What an install presents on every call to LangWatch. */
@@ -28,11 +28,8 @@ export const connectSyncAnswerSchema = z.object({
   license: z.string().optional(),
 });
 
-export interface LicenseSyncAnswer {
-  /** The hosted services the registry has the license entitled to. */
-  readonly services: string[];
-  readonly license?: string;
-}
+/** The hosted services the registry has the license entitled to, and any reissued license. */
+export type LicenseSyncAnswer = z.infer<typeof connectSyncAnswerSchema>;
 
 export const connectActivationAnswerSchema = z.object({
   license: z.string().min(1),
@@ -43,13 +40,7 @@ export const connectActivationAnswerSchema = z.object({
 });
 
 /** The license an activation code minted, as it comes back. */
-export interface ActivationAnswer {
-  readonly license: string;
-  readonly planType: string;
-  readonly maxMembers: number;
-  readonly expiresAt: string;
-  readonly services: string[];
-}
+export type ActivationAnswer = z.infer<typeof connectActivationAnswerSchema>;
 
 export const connectBudgetSchema = z.object({
   id: z.string(),
@@ -113,61 +104,23 @@ export interface ConnectClassifyAnswer {
   readonly chargedUsd: number;
 }
 
-export interface ConnectBudgetView {
-  readonly id: string;
-  readonly scope: string;
-  readonly window: string;
-  readonly capUsd: number;
-  readonly spentUsd: number | null;
-  readonly remainingUsd: number | null;
-  readonly onBreach: string;
-  readonly periodStartedAt: string;
-  readonly isContract: boolean;
-}
+export type ConnectBudgetView = z.infer<typeof connectBudgetViewSchema>;
 
-export interface ConnectContractView extends ConnectBudgetView {
-  readonly commitUsd: number;
-  readonly maximumCapUsd: number;
-  readonly overageEnabled: boolean;
-  readonly termEndsAt: string | null;
-}
+export type ConnectContractView = z.infer<typeof connectContractViewSchema>;
 
-export interface ConnectUsageView {
-  readonly services: string[];
-  readonly spendAvailable: boolean;
-  readonly readAt: string;
-  readonly contract: ConnectContractView | null;
-  readonly budgets: ConnectBudgetView[];
-}
+export type ConnectUsageView = z.infer<typeof connectUsageViewSchema>;
 
 /** What a refused read came back as, for the page to render its own copy. */
-export interface ConnectRefusal {
-  readonly code: string;
-  readonly meta?: unknown;
-}
+export type ConnectRefusal = z.infer<typeof connectRefusalSchema>;
 
 /** Where the daily license sync stands (ADR-156, section 6). */
-export interface ConnectSyncView {
-  readonly lastSyncAt: string | null;
-  readonly lastError: { readonly code: string } | null;
-}
+export type ConnectSyncView = z.infer<typeof connectSyncViewSchema>;
 
 /**
  * What Settings, Connect renders. `deployment: "off"` is the escape hatch an
  * auditor asks for: this install builds no client and makes no outbound call.
  */
-export type ConnectStatus =
-  | { readonly deployment: "off" }
-  | {
-      readonly deployment: "on";
-      readonly gatewayHost: string;
-      readonly licensed: boolean;
-      readonly enabledServices: ConnectService[];
-      readonly entitledServices: string[] | null;
-      readonly usage: ConnectUsageView | null;
-      readonly refusal: ConnectRefusal | null;
-      readonly sync: ConnectSyncView;
-    };
+export type ConnectStatus = z.infer<typeof connectStatusSchema>;
 
 /** What one sync of one organization did with the answer it got back. */
 export type LicenseSyncOutcome =
@@ -214,6 +167,13 @@ export const connectUsageViewSchema = z.object({
   budgets: z.array(connectBudgetViewSchema),
 });
 
+const connectRefusalSchema = z.object({ code: z.string(), meta: z.unknown().optional() });
+
+const connectSyncViewSchema = z.object({
+  lastSyncAt: z.string().nullable(),
+  lastError: z.object({ code: z.string() }).nullable(),
+});
+
 export const connectStatusSchema = z.union([
   z.object({ deployment: z.literal("off") }),
   z.object({
@@ -223,11 +183,8 @@ export const connectStatusSchema = z.union([
     enabledServices: z.array(z.enum(CONNECT_SERVICES)),
     entitledServices: z.array(z.string()).nullable(),
     usage: connectUsageViewSchema.nullable(),
-    refusal: z.object({ code: z.string(), meta: z.unknown().optional() }).nullable(),
-    sync: z.object({
-      lastSyncAt: z.string().nullable(),
-      lastError: z.object({ code: z.string() }).nullable(),
-    }),
+    refusal: connectRefusalSchema.nullable(),
+    sync: connectSyncViewSchema,
   }),
 ]);
 

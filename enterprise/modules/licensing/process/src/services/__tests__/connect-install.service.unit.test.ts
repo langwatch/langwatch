@@ -19,6 +19,7 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import type { ConnectUpstreamSlot } from "../../app/licensing.members.ts";
 import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connect-gateway.channel.ts";
+import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
@@ -84,15 +85,19 @@ function install({
   /** Whether LANGWATCH_LICENSE_PUBLIC_KEY names the test key. */
   override?: boolean;
 }) {
-  const organizations = MemoryConnectOrganizationRepository.create([
-    {
-      organizationId: ORGANIZATION,
-      license,
-      servicesDisabled,
-      lastSyncAt: null,
-      lastSyncError: null,
-    },
+  const rows = new Map<string, ConnectOrganizationRecord>([
+    [
+      ORGANIZATION,
+      {
+        organizationId: ORGANIZATION,
+        license,
+        servicesDisabled,
+        lastSyncAt: null,
+        lastSyncError: null,
+      },
+    ],
   ]);
+  const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const service = ConnectInstallService.create({
     organizations,
     identity: InstanceIdentityService.create({
@@ -110,7 +115,7 @@ function install({
     ...(override ? { publicKey: TEST_PUBLIC_KEY } : {}),
     upstream,
   });
-  return { service, organizations, gateway, upstream };
+  return { service, organizations, rows, gateway, upstream };
 }
 
 describe("what a self-hosted install may call", () => {
@@ -142,14 +147,14 @@ describe("what a self-hosted install may call", () => {
 
   /** @scenario "A service switched off stays off when the license is reissued" */
   it("keeps a service off across a licence carrying the same entitlement", async () => {
-    const { service, organizations } = install({
+    const { service, rows } = install({
       license: licenseNaming(["instant_evals"]),
       servicesDisabled: ["instant_evals"],
     });
 
     expect(await service.findEnabledServices(ORGANIZATION)).toEqual([]);
 
-    organizations.activate(ORGANIZATION, licenseNaming(["instant_evals"]));
+    activate(rows, ORGANIZATION, licenseNaming(["instant_evals"]));
     expect(await service.findEnabledServices(ORGANIZATION)).toEqual([]);
   });
 
@@ -292,8 +297,8 @@ describe("whether the install as a whole is connected", () => {
   });
 
   it("names the organizations holding a license for the daily sync", async () => {
-    const { service, organizations } = install({ license: null });
-    organizations.activate("org-second", licenseNaming([]));
+    const { service, rows } = install({ license: null });
+    activate(rows, "org-second", licenseNaming([]));
 
     expect(await service.findLicensedOrganizationIds()).toEqual(["org-second"]);
   });
@@ -419,3 +424,19 @@ describe("the license key the usage report names", () => {
     });
   });
 });
+
+/** Writes a licence onto a Connect row the way activation does. */
+function activate(
+  rows: Map<string, ConnectOrganizationRecord>,
+  organizationId: string,
+  license: string,
+): void {
+  rows.set(organizationId, {
+    organizationId,
+    servicesDisabled: [],
+    lastSyncAt: null,
+    lastSyncError: null,
+    ...rows.get(organizationId),
+    license,
+  });
+}

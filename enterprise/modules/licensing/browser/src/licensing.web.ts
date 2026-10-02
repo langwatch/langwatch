@@ -1,12 +1,16 @@
 /**
  * What a browser installs when it installs licensing: the License settings
- * screen, and the usage-against-limit row billing and organization borrow.
- * Always installed, so nothing here gates itself by tier.
+ * screen, the usage-against-limit row billing and organization borrow, and the
+ * reader that opens the upgrade modal on any licence refusal. Always installed.
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
 
+import { reportLicenseFailure } from "./ui/sections/license-error-interceptor/index.ts";
+
 export const licensingWeb = defineBrowserModule("licensing")
+  // specs/licensing/license-failure-modal.feature
+  .withFailureInterceptors([reportLicenseFailure])
   .withHosts({
     requires: ["LicensingHostApi"],
     mounts: {

@@ -5,7 +5,6 @@
  */
 
 import { ValidationError } from "@langwatch/handled-error";
-import type { InstantEvalQuestion } from "@langwatch/instant-eval-contract";
 import { z } from "zod";
 
 const MAX_QUESTIONS_PER_CALL = 50;
@@ -50,11 +49,6 @@ export const hostedBudgetPayloadSchema = z.object({
   /** The new cap in USD, to the cent. */
   cap_usd: z.number().positive().finite(),
 });
-
-export type HostedClassifyPayload = {
-  text: string;
-  questions: readonly InstantEvalQuestion[];
-};
 
 /** The parsed body, or the framework's own field-level refusal. */
 export function parseHostedPayload<T>(schema: z.ZodType<T>, payload: unknown): T {
