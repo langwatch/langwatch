@@ -205,6 +205,19 @@ export class PromptPlaygroundNotPermittedError extends HandledError {
   }
 }
 
+/** The caller may not change this prompt, e.g. an organization prompt owned by another project. */
+export class PromptModifyNotPermittedError extends HandledError {
+  declare readonly code: "insufficient_permissions";
+
+  constructor(message = "You don't have permission to modify this prompt") {
+    super("insufficient_permissions", message, {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "PromptModifyNotPermittedError";
+  }
+}
+
 /** The read-only prompt process deliberately has no execution engine or workflow peer. */
 export class PromptPlaygroundUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

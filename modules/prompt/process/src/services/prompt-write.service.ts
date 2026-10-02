@@ -12,6 +12,7 @@ import {
   type promptingTechniqueSchema,
   parseLlmConfigVersion,
   parseRuntimeParameters,
+  PromptModifyNotPermittedError,
 } from "@langwatch/prompt-contract";
 import type { z } from "zod";
 
@@ -419,7 +420,7 @@ export class PromptWriteService {
     });
 
     if (!permission.hasPermission) {
-      throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
+      throw new PromptModifyNotPermittedError(permission.reason);
     }
   }
 
