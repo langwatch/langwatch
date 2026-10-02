@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 
-import { navigationApi } from "../../behavior/navigation-api.ts";
+import { navigationApi, type NavigationApiMap } from "../../behavior/navigation-api.ts";
 import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-state.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { isPathUnder } from "../../model/products.ts";
@@ -28,12 +28,8 @@ import { SideMenuLink } from "../blocks/side-menu-link.tsx";
  * default-empty storage means an existing reader sees Traces only, until
  * the bundle checkbox in `/me/configure` flips them on atomically.
  */
-interface PersonalWorkspaceFeatures {
-  evaluations?: boolean;
-  datasets?: boolean;
-  annotations?: boolean;
-  automations?: boolean;
-}
+type PersonalWorkspaceFeatures =
+  NavigationApiMap["personalWorkspaceFeatures"]["get"]["query"]["output"];
 
 export const PersonalSidebarLinks = function PersonalSidebarLinks({
   showExpanded,

@@ -4,32 +4,18 @@
  * Query cache.
  */
 
-import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { homeTrpc } from "@langwatch/audit-log-contract";
+import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
+import type {
+  homeTrpc,
+  RecentItem as ContractRecentItem,
+  RecentItemType,
+} from "@langwatch/audit-log-contract";
 import type { integrationsChecksTrpc } from "@langwatch/onboarding-contract";
 import type { projectTrpc } from "@langwatch/project-contract";
 
-/**
- * What kind of thing the reader touched. Restated rather than imported: a web
- * package may not name a server package, and this is the wire's vocabulary.
- */
-export type RecentItemType =
-  | "prompt"
-  | "workflow"
-  | "dataset"
-  | "evaluation"
-  | "annotation"
-  | "simulation";
-
-/** One thing the reader touched recently, as the home lists it. */
-export type RecentItem = {
-  id: string;
-  type: RecentItemType;
-  name: string;
-  href: string;
-  /** ISO 8601: the wire carries the instant as text. */
-  updatedAt: string;
-};
+/** One thing the reader touched recently, as the home lists it: `updatedAt` arrives as ISO text. */
+export type RecentItem = WireOf<ContractRecentItem>;
+export type { RecentItemType };
 
 type BorrowedProcedures = {
   organization: {
