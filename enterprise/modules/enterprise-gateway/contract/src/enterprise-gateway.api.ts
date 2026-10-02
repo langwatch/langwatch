@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { moduleApi } from "@langwatch/kernel/module-api";
 import type {
   SuggestTierTargetsInput,
   TierTargetSuggestion,
 } from "@langwatch/model-provider-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { moduleApi } from "@langwatch/module";
 
 import type {
   EnsureDefaultPersonalVirtualKeyInput,

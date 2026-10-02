@@ -4,13 +4,12 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useVersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
+import { useScenarioVersions } from "../../../../behavior/scenarios/use-scenario-versions.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { VersionEntry } from "../../../../model/agent-testing/drawers/scenario-versions.ts";
 import { ScenarioVersionRow } from "./scenario-version-row.tsx";
 
@@ -39,14 +38,10 @@ export function ScenarioVersionList({
   isCompact?: boolean;
 }) {
   const { can } = useCan();
-  const { project } = useOrganizationTeamProject();
   const [openVersion, setOpenVersion] = useState<number | null>(null);
   const restore = useVersionRestore({ scenarioId });
 
-  const versionsQuery = api.scenarios.listVersions.useQuery(
-    { projectId: project?.id ?? "", scenarioId },
-    { enabled: !!project?.id && !!scenarioId },
-  );
+  const versionsQuery = useScenarioVersions({ scenarioId });
 
   if (versionsQuery.isLoading) {
     return (

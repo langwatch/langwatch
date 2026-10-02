@@ -1,4 +1,3 @@
-import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -7,6 +6,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { Box, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";

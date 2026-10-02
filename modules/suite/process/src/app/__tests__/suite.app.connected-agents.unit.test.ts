@@ -3,8 +3,8 @@
  * @see specs/agents/connected-agents.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ConnectedTargetAgent } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createSuiteTestApp } from "./suite.fixture.ts";

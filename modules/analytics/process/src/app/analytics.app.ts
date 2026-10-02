@@ -41,10 +41,12 @@ import {
   type AnalyticsEvaluationRollupAppendBatchInput,
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationRow,
+  type LangWatchQLTimeWindow,
+  type LangWatchQLValidationResult,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -52,20 +54,23 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
-import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
-import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
-import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import {
+  ClickHouseAnalyticsEvaluationRepository,
+  type EvaluationAnalyticsClickHouseClient,
+} from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
+import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
+import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
@@ -84,7 +89,9 @@ import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-funct
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
+import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { FilterService } from "../services/filter.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
   LangWatchQLConnectionService,
@@ -105,6 +112,11 @@ import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
+import {
+  DEFAULT_LWQL_DATABASE,
+  LangWatchQLService as LangWatchQLServiceClass,
+} from "../services/langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
 import {
   convergeLwqlAccessModel,
@@ -382,7 +394,9 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
  * attention: a transport reaches this object through the operations-only feature-API
  * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
  */
-export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi {
+export class AnalyticsModule
+  implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi
+{
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -414,19 +428,18 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
     lwqlPostgresReaderPassword: Secret.load("LWQL_POSTGRES_READER_PASSWORD", { optional: true }),
   } as const;
 
-  static async create(setup: AnalyticsSetup): Promise<AnalyticsApp> {
+  static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
     const clickhouse = setup.members.clickhouse;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
-    const analytics = AnalyticsAdapter.create({
-      resolveClient,
-      // The member is a `reads("clickhouse")` claim: boot refuses this
-      // process before `create()` runs if no ClickHouse was configured, so by
-      // the time this constructs, ClickHouse is always available.
-      clickhouseEnabled: true,
-      // Data retention owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a second claim
-      // on it refuses the whole process, and two defaults expire rows.
-      defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+    // `reads = ["clickhouse"]` makes boot refuse before `create()` if none is configured.
+    // Data retention owns the default retention days; a second claim refuses the process.
+    const analytics = AnalyticsServiceClass.create({
+      repository: ClickHouseAnalyticsRepository.create({ resolveClient }),
+      evaluationRepository: ClickHouseAnalyticsEvaluationRepository.create({
+        resolveClient,
+        defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
     });
     const lwqlConfig = setup.config.langwatchQl;
     const { clickhouseAdmin: admin, databaseTarget: postgres, prisma } = setup.members;
@@ -439,7 +452,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
         })
       : { available: false as const };
     const connection: LangWatchQLConnection | null = target.available
-      ? await setup.secrets.into(AnalyticsApp.secrets.lwqlClickHousePassword, (password) =>
+      ? await setup.secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (password) =>
           typeof password === "string" && password
             ? {
                 url: target.url,
@@ -454,7 +467,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
     const lwqlProvisioning =
       admin.configured && postgres.configured && connection
         ? await setup.secrets.into(
-            AnalyticsApp.secrets.lwqlPostgresReaderPassword,
+            AnalyticsModule.secrets.lwqlPostgresReaderPassword,
             (readerPassword) =>
               lwqlProvisioningOperations({
                 admin,
@@ -466,12 +479,17 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
               }),
           )
         : LWQL_UNAVAILABLE;
-    const langWatchQL = createLangWatchQLService({ connection });
+    const langWatchQL = LangWatchQLServiceClass.create({
+      executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
+      database: connection?.database ?? DEFAULT_LWQL_DATABASE,
+    });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
-    return new AnalyticsApp(
+    return new AnalyticsModule(
       {
         analytics,
-        filterOptions: FilterOptionsAdapter.create({ resolveClient }),
+        filterOptions: FilterService.create({
+          repository: FilterOptionsClickHouseRepository.create({ resolveClient }),
+        }),
         langWatchQL,
         featureFlags: setup.dependencies.featureFlags,
         authz: setup.dependencies.authz,
@@ -504,11 +522,16 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
   #protections: WorkbenchProtectionsService;
+  #validationReport: LangWatchQLValidationReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
     this.#protections = WorkbenchProtectionsService.create(dependencies);
+    this.#validationReport = LangWatchQLValidationReportService.create({
+      langWatchQL: dependencies.langWatchQL,
+      protections: this.#protections,
+    });
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
     this.#hydration = LangWatchQLHydrationService.create({
@@ -809,6 +832,17 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** A member's statement judged for the editor's markers; never executed. */
+  diagnoseLangWatchQL(input: {
+    projectId: string;
+    userId: string;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    timeWindow?: LangWatchQLTimeWindow;
+  }): Promise<LangWatchQLValidationResult> {
+    return this.#validationReport.report(input);
   }
 
   /** The judged columns a hydration plan asks for, read off this catalogue. */

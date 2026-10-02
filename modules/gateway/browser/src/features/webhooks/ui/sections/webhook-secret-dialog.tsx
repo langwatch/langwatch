@@ -1,5 +1,5 @@
-import { Alert, Button, Code, HStack, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Alert, Button, Code, HStack, VStack } from "@langwatch/design-system/primitives";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 

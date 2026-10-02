@@ -1,10 +1,9 @@
 /**
- * The relay a process opens, composed the way LangyApp composes it.
+ * The relay a process opens, composed the way LangyModule composes it.
  * @vitest-environment node
  * @see modules/langy/specs/langy-internal-relay.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -20,6 +19,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -163,7 +163,7 @@ const bashCall = ({ id, command, output }: { id: string; command: string; output
   { type: "tool", id, name: "bash", phase: "end", input: { command }, output },
 ];
 
-describe("the relay LangyApp composes", () => {
+describe("the relay LangyModule composes", () => {
   describe("when Langy opens a resource the conversation remembered no link for", () => {
     /** @scenario "A navigate with no remembered link opens the resource's page" */
     it("navigates to the resource's own page under the project slug", async () => {

@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": ["./src/coding-agent.web.ts", "./src/pull-requests.ts", "./src/session-table.ts"],
+  "files": ["./src/coding-agent.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -24,10 +24,13 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
-      "path": "../browser-kit/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -40,9 +43,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

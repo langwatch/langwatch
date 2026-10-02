@@ -1,9 +1,9 @@
 /** Spec: packages/api/specs/transport-declaration-split.feature. */
 import { publicRoute } from "@langwatch/api/access";
-import { defineTrpcContract } from "@langwatch/api/contract";
 import { defineRestRouter, type FeatureApiWitness, type RestRawResult } from "@langwatch/api/rest";
 import type { TrpcFeatureApiWitness } from "@langwatch/api/trpc";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 type Equal<Left, Right> =

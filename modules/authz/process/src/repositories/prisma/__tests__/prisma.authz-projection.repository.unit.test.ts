@@ -147,6 +147,7 @@ describe("PrismaAuthzProjectionRepository", () => {
     /** @scenario "A role deletion drops the compatibility bindings that still name it" */
     it("removes those bindings before the compat role row", async () => {
       const { repository, prisma } = build();
+      prisma.role.findUnique.mockResolvedValueOnce({ organizationId: ORG });
 
       await repository.append({
         kind: "role.delete",
@@ -154,11 +155,12 @@ describe("PrismaAuthzProjectionRepository", () => {
         occurredAt: ROLE_OCCURRED_AT,
       });
 
+      // The tenant guard refuses a binding delete that names no organization.
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
-        where: { customRoleId: "customrole_2" },
+        where: { organizationId: ORG, customRoleId: "customrole_2" },
       });
       expect(prisma.customRole.deleteMany).toHaveBeenCalledWith({
-        where: { id: "customrole_2" },
+        where: { organizationId: ORG, id: "customrole_2" },
       });
       const [bindingsFirst] = prisma.roleBinding.deleteMany.mock.invocationCallOrder;
       const [roleAfter] = prisma.customRole.deleteMany.mock.invocationCallOrder;
@@ -335,14 +337,37 @@ describe("PrismaAuthzProjectionRepository", () => {
 
       await repository.append({
         kind: "grant.revoke",
+        organizationId: ORG,
         grantId: "grant_1",
         reason: "offboarded",
         occurredAt: Temporal.Instant.fromEpochMilliseconds(9),
-      } as GrantProjectionWrite);
+      });
 
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
         where: { organizationId: ORG, id: "grant_1" },
       });
+    });
+
+    /** @scenario "A revoke ends a grant only inside its own organization" */
+    it("ends neither the grant nor its compat binding when the revoke names another organization", async () => {
+      const { repository, prisma } = build();
+      prisma.grant.updateMany.mockResolvedValue({ count: 0 });
+
+      await repository.append({
+        kind: "grant.revoke",
+        organizationId: "org_other",
+        grantId: "grant_1",
+        reason: null,
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(9),
+      });
+
+      expect(prisma.grant.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: "grant_1", organizationId: "org_other" }),
+        }),
+      );
+      expect(prisma.roleBinding.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.shareLink.deleteMany).not.toHaveBeenCalled();
     });
 
     // A redelivered older `attached` loses the occurredAt guard on the

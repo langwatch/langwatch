@@ -1,7 +1,7 @@
 /** Two-step confirm for destructive actions (moved from platform/app, design-system
  * dialog only). Takes arbitrary child (typed-confirmation inputs). */
 
-import { Button, Text } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { Dialog } from "./ops-dialog.tsx";

@@ -1,4 +1,5 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 
 import { formatLimitOrUnlimited } from "../../../model/license-status.ts";
 
@@ -8,28 +9,12 @@ export interface ResourceLimitRowProps {
   max?: number;
 }
 
+/** Usage against a limit as a tile: the figure, and a meter when the limit is a real number. */
 export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps) {
+  const isMetered = max !== void 0 && Number.isFinite(max) && max < 1_000_000;
   return (
-    <VStack
-      align="start"
-      gap={1}
-      paddingY={4}
-      paddingX={5}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      bg="bg.subtle"
-    >
-      <Text
-        fontSize="xs"
-        color="fg.muted"
-        fontWeight="medium"
-        textTransform="uppercase"
-        letterSpacing="wide"
-      >
-        {label}
-      </Text>
-      <Text fontSize="xl" fontWeight="semibold" color="fg">
+    <StatTile label={label} meter={isMetered ? { current, max } : void 0}>
+      <StatTileFigure>
         {current.toLocaleString()}
         {max != null && (
           <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
@@ -37,7 +22,7 @@ export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps)
             / {formatLimitOrUnlimited(max)}
           </Text>
         )}
-      </Text>
-    </VStack>
+      </StatTileFigure>
+    </StatTile>
   );
 }

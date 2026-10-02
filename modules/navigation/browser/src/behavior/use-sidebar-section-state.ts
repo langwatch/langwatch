@@ -1,6 +1,6 @@
 /** Sidebar group open state, remembered per device; storage key unchanged on purpose */
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   getSidebarSectionOverride,
@@ -27,9 +27,12 @@ export const useSidebarSectionState = ({
     getSidebarSectionOverride(id),
   );
 
-  useEffect(() => {
+  const sectionKey = `${id}|${defaultExpanded}`;
+  const [sectionFrom, setSectionFrom] = useState(sectionKey);
+  if (sectionFrom !== sectionKey) {
+    setSectionFrom(sectionKey);
     setIsExpanded(readSaved({ id, defaultExpanded }));
-  }, [defaultExpanded, id]);
+  }
 
   const toggleSection = () => {
     const nextExpanded = !isExpanded;

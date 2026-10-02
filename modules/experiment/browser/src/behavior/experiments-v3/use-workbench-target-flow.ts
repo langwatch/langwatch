@@ -7,9 +7,9 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -33,6 +33,7 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 import { useOpenEvaluatorEditor } from "./use-open-evaluator-editor.ts";
 import { scrollToTargetColumn, useOpenTargetEditor } from "./use-open-target-editor.ts";
@@ -62,7 +63,7 @@ const recordPendingMapping =
 export const useWorkbenchTargetSelection = () => {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = evaluatorClient.useUtils();
   const { addTarget, removeTarget, updateTarget, setTargetMapping, removeTargetMapping } =
     useEvaluationsV3Store(
       useShallow((state) => ({
@@ -211,7 +212,7 @@ export const useWorkbenchTargetSelection = () => {
 export const useWorkbenchEvaluatorAdd = () => {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = experimentApi.useUtils();
   const { evaluators, addEvaluator } = useEvaluationsV3Store(
     useShallow((state) => ({
       evaluators: state.evaluators,

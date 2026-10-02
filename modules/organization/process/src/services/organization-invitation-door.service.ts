@@ -9,7 +9,6 @@ import {
   InviteWrongAccountError,
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
-  isOrganizationApiCustomRole,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
@@ -27,21 +26,27 @@ import { toDate } from "@langwatch/time";
 import type {
   OrganizationInvitations,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationSignals,
 } from "../app/organization.members.ts";
+import { grantCallerOf } from "../rules/grant-caller.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
+import type {
+  OrganizationGrantCeilingService,
+  OrganizationIntendedGrant,
+} from "./organization-grant-ceiling.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
   readonly joinRequests: OrganizationJoinRequests | null;
-  readonly plans: OrganizationPlanGate;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
   readonly lifecycle: Pick<OrganizationLifecycleNoticeService, "membersInvited" | "inviteAccepted">;
+  /** Authz's escalation rule: nobody invites anyone to more than the inviter holds. */
+  readonly ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   /** The sender-scoped per-hour creation counter, spent before a batch is written. */
   readonly creationThrottle: Pick<InviteCreationThrottleService, "assertCreationAllowed">;
   /** Provisions the accepting person's personal workspace for this tenant. */
@@ -81,12 +86,12 @@ export class OrganizationInvitationDoorService {
       count: input.invites.length,
     });
 
-    const namesCustomRole = input.invites.some((invite) =>
-      (invite.teams ?? []).some((team) => isOrganizationApiCustomRole(team.role)),
-    );
-    if (namesCustomRole) {
-      await this.deps.plans.assertCustomRolesAllowed({ organizationId: input.organizationId });
-    }
+    // Acceptance writes these grants as a consequence, so the inviter's ceiling is asked here.
+    await this.deps.ceiling.assertWithinCaller({
+      organizationId: input.organizationId,
+      caller: grantCallerOf(by),
+      grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
+    });
 
     const created = await this.#createOrRefuse(input);
     const withUrls = created.invites.map((record) => ({
@@ -136,13 +141,32 @@ export class OrganizationInvitationDoorService {
     return { invite: inviteOnWire(invite) };
   }
 
-  createPaymentPending(
+  /** Asks the inviter's ceiling for these invitations and writes nothing. */
+  async checkInvitesWithinCaller(
+    input: Readonly<{
+      organizationId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    await this.deps.ceiling.assertWithinCaller({
+      organizationId: input.organizationId,
+      caller: grantCallerOf(by),
+      grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
+    });
+  }
+
+  /** Payment is no barrier: the inviter's ceiling is asked here, as for any invitation. */
+  async createPaymentPending(
     input: Readonly<{
       organizationId: string;
       subscriptionId: string;
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
+    by: OrganizationCaller,
   ): Promise<void> {
+    await this.checkInvitesWithinCaller(input, by);
+
     return this.deps.invitations.createPaymentPending(input);
   }
 
@@ -235,9 +259,9 @@ export class OrganizationInvitationDoorService {
 
     return {
       success: true,
-      invite: { ...invite, ...inviteOnWire(invite) },
+      invite: { organization: { id: invite.organization.id, name: invite.organization.name } },
       project: projectSlug ? { slug: projectSlug } : null,
-    } as OrganizationInviteAccepted;
+    };
   }
 
   async #createOrRefuse(input: OrganizationApiCreateInvitationsInput) {
@@ -342,4 +366,48 @@ function inviteOnWire(invite: OrganizationInvite): OrganizationInviteCreated["in
     createdAt: toDate(invite.createdAt),
     updatedAt: toDate(invite.updatedAt),
   };
+}
+
+/** The grants accepting this invitation would write: its organization role and each team role. */
+function intendedGrants(
+  organizationId: string,
+  invite: Readonly<{
+    role: OrganizationUserRole;
+    teamIds?: string;
+    teams?: OrganizationApiCreateInvitationsInput["invites"][number]["teams"];
+  }>,
+): OrganizationIntendedGrant[] {
+  const organizationGrant: OrganizationIntendedGrant = {
+    role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
+    scopeType: "ORGANIZATION",
+    scopeId: organizationId,
+  };
+  // As invite-team-assignment.service.ts resolves: explicit teams, else legacy ids at the
+  // default team role.
+  if (!invite.teams || invite.teams.length === 0) {
+    const legacyTeamIds = (invite.teamIds ?? "")
+      .split(",")
+      .map((teamId) => teamId.trim())
+      .filter(Boolean);
+    return [
+      organizationGrant,
+      ...legacyTeamIds.map((teamId): OrganizationIntendedGrant => ({
+        role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
+        scopeType: "TEAM",
+        scopeId: teamId,
+      })),
+    ];
+  }
+  const teamGrants = invite.teams.map((team): OrganizationIntendedGrant => {
+    if (team.role === "ADMIN" || team.role === "MEMBER" || team.role === "VIEWER") {
+      return { role: team.role, scopeType: "TEAM", scopeId: team.teamId };
+    }
+    return {
+      role: "CUSTOM",
+      customRoleId: team.customRoleId ?? null,
+      scopeType: "TEAM",
+      scopeId: team.teamId,
+    };
+  });
+  return [organizationGrant, ...teamGrants];
 }

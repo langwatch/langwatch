@@ -3,8 +3,8 @@
  * Narrowed local copy (see platform/app/src/components/ui/RedactedField).
  */
 
-import { HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Icon, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";

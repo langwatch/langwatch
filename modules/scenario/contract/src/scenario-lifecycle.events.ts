@@ -13,7 +13,7 @@ export const RECORD_SCENARIO_CREATED_COMMAND_TYPE = "lw.scenario.record_created"
 
 export const SCENARIO_LIFECYCLE_EVENT_TYPES = [SCENARIO_CREATED_EVENT_TYPE] as const;
 
-/** A scenario was written, and how many the project holds counting it. */
+/** A scenario was written, how many the project holds counting it, and when. */
 export const scenarioCreatedEventDataSchema = z.object({
   scenarioId: z.string(),
   projectId: z.string(),
@@ -21,6 +21,7 @@ export const scenarioCreatedEventDataSchema = z.object({
   scenarioCount: z.number().int().nonnegative(),
   /** Where the onboarding experiment put the organization; absent before it. */
   onboardingVariant: onboardingVariantSchema.nullish(),
+  occurredAt: z.number().int().nonnegative(),
 });
 export type ScenarioCreatedEventData = z.infer<typeof scenarioCreatedEventDataSchema>;
 

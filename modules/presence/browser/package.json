@@ -21,13 +21,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@chakra-ui/react": "catalog:",
-    "@langwatch/design-system": "workspace:*",
+    "@langwatch/browser": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
-    "react": "catalog:",
-    "zustand": "catalog:"
+    "react": "catalog:"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

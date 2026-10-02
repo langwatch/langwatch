@@ -1,8 +1,8 @@
-import { HStack, Icon, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Key } from "lucide-react";
 
-import { api } from "../../../../behavior/trace-api.ts";
+import { useApiKeyName } from "../../../../behavior/reads/use-project-reads.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { apiKeySettingsHref } from "../../../../model/api-key-anchor.ts";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
@@ -26,15 +26,7 @@ export function ApiKeyAttributeValue({ apiKeyId }: { apiKeyId: string }) {
   const isReadOnly = useIsReadOnlyTrace();
   const organizationId = organization?.id ?? "";
 
-  const { data } = api.apiKey.nameById.useQuery(
-    { organizationId, apiKeyId },
-    {
-      enabled: !!organizationId && !!apiKeyId && !isReadOnly,
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      retry: false,
-    },
-  );
+  const { data } = useApiKeyName({ organizationId, apiKeyId, enabled: !isReadOnly });
 
   const name = data?.name;
 

@@ -1,8 +1,7 @@
 // Test harness for mounting the SCIM screen: a fake host that records requests
 // and answers the base URL. Internal only, not exported.
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -71,10 +70,6 @@ export class FakeScimHost extends ScimHostApi {
 export function renderWithScimHost(element: ReactElement, host: FakeScimHost = new FakeScimHost()) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <ScimHostProvider value={host}>{element}</ScimHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<ScimHostProvider value={host}>{element}</ScimHostProvider>),
   };
 }

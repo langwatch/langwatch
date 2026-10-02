@@ -3,10 +3,9 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
+import { scenarioClient } from "@langwatch/scenario-client";
 import { isCancellableStatus } from "@langwatch/scenario-contract";
 import { useCallback } from "react";
-
-import { api } from "../scenario-api.ts";
 
 export { isCancellableStatus };
 
@@ -40,8 +39,16 @@ export function useCancelScenarioRun({
   onCancelBatchSuccess?: () => void;
   onCancelBatchError?: (error: { message: string }) => void;
 } = {}) {
-  const cancelJobMutation = api.scenarios.cancelJob.useMutation({
+  const utils = scenarioClient.useUtils();
+  const invalidateRuns = () => {
+    void utils.scenarios.getRunState.invalidate();
+    void utils.scenarios.getBatchRunData.invalidate();
+    void utils.scenarios.getSuiteRunData.invalidate();
+  };
+
+  const cancelJobMutation = scenarioClient.scenarios.cancelJob.useMutation({
     onSuccess: (result) => {
+      invalidateRuns();
       if (result.cancelled) {
         onCancelJobSuccess?.();
       } else {
@@ -55,8 +62,9 @@ export function useCancelScenarioRun({
     },
   });
 
-  const cancelBatchRunMutation = api.scenarios.cancelBatchRun.useMutation({
+  const cancelBatchRunMutation = scenarioClient.scenarios.cancelBatchRun.useMutation({
     onSuccess: () => {
+      invalidateRuns();
       onCancelBatchSuccess?.();
     },
     onError: (error) => {

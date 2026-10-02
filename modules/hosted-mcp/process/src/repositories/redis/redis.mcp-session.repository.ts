@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { nowInstant } from "@langwatch/time";
+import type { Cluster, Redis } from "ioredis";
 import { z } from "zod";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import {
   McpSessionRepository,
   type McpSessionRecordLookup,
@@ -16,7 +16,10 @@ const LAYOUT: Record<McpSessionTransport, { record: string; byKey: string; ttlSe
   sse: { record: "mcp:sse:session:", byKey: "mcp:sse:sessions_by_key:", ttlSeconds: 30 * 60 },
 };
 
-const storedSessionSchema = z.object({ encryptedApiKey: z.string() });
+const storedSessionSchema = z.object({
+  encryptedApiKey: z.string(),
+  projectId: z.string().optional(),
+});
 
 /**
  * An opaque stand-in for an API key in key names. Raw keys must never appear there: key names
@@ -28,14 +31,14 @@ function hashApiKey(apiKey: string): string {
 
 /** Session records in Redis. With no Redis every write is dropped and every read is missing. */
 export class RedisMcpSessionRepository extends McpSessionRepository {
-  readonly #redis: HostedMcpRedis | null;
+  readonly #redis: Redis | Cluster | null;
 
-  private constructor({ redis }: { redis: HostedMcpRedis | null }) {
+  private constructor({ redis }: { redis: Redis | Cluster | null }) {
     super();
     this.#redis = redis;
   }
 
-  static create({ redis }: { redis: HostedMcpRedis | null }): RedisMcpSessionRepository {
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpSessionRepository {
     return new RedisMcpSessionRepository({ redis });
   }
 
@@ -48,18 +51,20 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     sessionId,
     apiKey,
     encryptedApiKey,
+    projectId,
   }: {
     transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
     encryptedApiKey: string;
+    projectId?: string;
   }): Promise<void> {
     if (!this.#redis) return;
     const layout = LAYOUT[transport];
     const setKey = `${layout.byKey}${hashApiKey(apiKey)}`;
     await this.#redis.set(
       `${layout.record}${sessionId}`,
-      JSON.stringify({ encryptedApiKey, createdAt: nowInstant().epochMilliseconds }),
+      JSON.stringify({ encryptedApiKey, projectId, createdAt: nowInstant().epochMilliseconds }),
       "EX",
       layout.ttlSeconds,
     );
@@ -93,7 +98,11 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     const data = await this.#redis.get(`${LAYOUT[transport].record}${sessionId}`);
     if (!data) return { kind: "missing" };
     const stored = storedSessionSchema.parse(JSON.parse(data));
-    return { kind: "found", encryptedApiKey: stored.encryptedApiKey };
+    return {
+      kind: "found",
+      encryptedApiKey: stored.encryptedApiKey,
+      projectId: stored.projectId,
+    };
   }
 
   async remove({

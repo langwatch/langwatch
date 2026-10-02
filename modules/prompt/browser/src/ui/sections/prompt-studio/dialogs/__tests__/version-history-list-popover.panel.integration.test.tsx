@@ -4,9 +4,9 @@
  * version is loaded, and how a version is compared with the one before it.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -71,7 +71,10 @@ const { mockUseQuery } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../behavior/prompt-api.ts", () => ({
-  promptApi: {
+  promptApi: {},
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
     prompts: {
       getAllVersionsForPrompt: {
         useQuery: mockUseQuery,
@@ -84,7 +87,7 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
 import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 const renderWithChakra = (ui: React.ReactElement) => {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithDesignSystem(ui);
 };
 
 const openPopover = async () => {

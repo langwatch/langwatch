@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { Header } from "@tanstack/react-table";
 import type React from "react";
 

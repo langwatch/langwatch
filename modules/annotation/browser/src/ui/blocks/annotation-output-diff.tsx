@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { type Change, diffWordsWithSpace } from "diff";
 import { useDeferredValue, useMemo } from "react";
 

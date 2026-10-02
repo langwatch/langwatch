@@ -4,12 +4,12 @@
  * Errors route through the host's failure notice for code-keyed presentation.
  */
 
-import { Button, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useEffect, useState } from "react";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
+import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 export function EvaluatorPushToCopiesDialog({
@@ -25,13 +25,15 @@ export function EvaluatorPushToCopiesDialog({
 }) {
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [edited, setEdited] = useState<{ copyIds: string; selected: ReadonlySet<string> } | null>(
+    null,
+  );
 
-  const copies = evaluatorApi.evaluators.getCopies.useQuery(
+  const copies = evaluatorClient.evaluators.getCopies.useQuery(
     { evaluatorId, projectId: projectId ?? "" },
     { enabled: open && !!projectId && !!evaluatorId },
   );
-  const pushToCopies = evaluatorApi.evaluators.pushToCopies.useMutation();
+  const pushToCopies = evaluatorClient.evaluators.pushToCopies.useMutation();
 
   /**
    * Selection keys off the IDS, not the query result's identity: keying
@@ -39,17 +41,16 @@ export function EvaluatorPushToCopiesDialog({
    * (refocus, push invalidation). IDs only change when replicas do.
    */
   const copyIds = (copies.data ?? []).map((copy) => copy.id).join(",");
-  useEffect(() => {
-    setSelected(new Set(copyIds === "" ? [] : copyIds.split(",")));
-  }, [copyIds]);
+  const selected: ReadonlySet<string> =
+    edited?.copyIds === copyIds
+      ? edited.selected
+      : new Set(copyIds === "" ? [] : copyIds.split(","));
 
   const toggle = (copyId: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(copyId)) next.delete(copyId);
-      else next.add(copyId);
-      return next;
-    });
+    const next = new Set(selected);
+    if (next.has(copyId)) next.delete(copyId);
+    else next.add(copyId);
+    setEdited({ copyIds, selected: next });
   };
 
   const push = async () => {
@@ -64,7 +65,7 @@ export function EvaluatorPushToCopiesDialog({
         title: "Evaluator pushed",
         description: `"${evaluatorName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated evaluator(s).`,
       });
-      setSelected(new Set());
+      setEdited({ copyIds, selected: new Set() });
       onClose();
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't push the evaluator" });

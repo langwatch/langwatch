@@ -5,7 +5,7 @@
  */
 
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { dataRetentionTrpc } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
 

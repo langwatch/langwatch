@@ -11,7 +11,7 @@ const TRANSPORT = "modules/widget/process/src/transport/widget.api.ts";
 const REST_FAMILY = "modules/widget/process/src/transport/api-rest/widget.api.ts";
 const TRPC_FAMILY = "modules/widget/process/src/transport/api-trpc/widget.api.ts";
 const SERVICE = "modules/widget/process/src/services/widget.service.ts";
-const SERVER = "modules/widget/process/src/widget.server.ts";
+const SERVER = "modules/widget/process/src/widget.module.ts";
 
 function report(code, filename = TRANSPORT) {
   return runRule(transportDeclaresRule, { code, cwd: workspace.cwd, filename });
@@ -291,6 +291,40 @@ describe("given a route whose own chain declares a producer", () => {
   });
 });
 
+describe("given a door credential that declares a session", () => {
+  it("accepts session from a router-level or a route-level withCredential", () => {
+    expect(
+      located(
+        '  .withCredential("cli_token", { session: widgetSessionSchema })',
+        '  .get("/widgets/me", "getWidget")',
+        "  .handle(async ({ app, session }) => app.getWidget(session))",
+        '  .get("/widgets/you", "getYou")',
+        "  .handle(async ({ app, session }) => app.getYou(session))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("cli_token", { session: otherSchema })',
+        "  .handle(async ({ app, session }) => app.ownWidget(session))",
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports session when the door declares none, or the route's own credential drops it", () => {
+    expect(
+      located(
+        '  .withCredential("cli_token", { session: widgetSessionSchema })',
+        '  .get("/widgets/me", "getWidget")',
+        '  .withCredential("api_key")',
+        "  .handle(async ({ app, session }) => app.getWidget(session))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("api_key", {})',
+        "  .handle(async ({ app, session }) => app.ownWidget(session))",
+      ),
+    ).toEqual([
+      ["rawContextField", "session", 9, 24],
+      ["rawContextField", "session", 6, 24],
+    ]);
+  });
+});
+
 describe("given a handler taking a producer its route did not declare", () => {
   /** @scenario "A handler taking a producer its own route did not declare is reported at the field" */
   it("reports raw without withRawBody, request on a bytes route and files without withMultipart", () => {
@@ -492,16 +526,18 @@ describe("given a handler that does more than call one operation", () => {
 
 describe("given a handler that builds its own collaborators", () => {
   /** @scenario "A handler that constructs a service or repository is refused" */
-  it.each(["new WidgetApp()", "WidgetApp.create()", "createWidgetApp()", "WidgetService.create()"])(
-    "reports %s",
-    (construction) => {
-      const code = `group.register("create", "2026-08-28", async (context, input) => ${construction});`;
+  it.each([
+    "new WidgetModule()",
+    "WidgetModule.create()",
+    "createWidgetModule()",
+    "WidgetService.create()",
+  ])("reports %s", (construction) => {
+    const code = `group.register("create", "2026-08-28", async (context, input) => ${construction});`;
 
-      expect(report(code)).toEqual([
-        expect.objectContaining({ messageId: "handlerConstructs", line: 1 }),
-      ]);
-    },
-  );
+    expect(report(code)).toEqual([
+      expect.objectContaining({ messageId: "handlerConstructs", line: 1 }),
+    ]);
+  });
 
   it("follows a named handler and an import alias", () => {
     const code = [

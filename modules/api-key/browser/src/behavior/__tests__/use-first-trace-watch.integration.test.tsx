@@ -5,8 +5,8 @@
  * Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../model/api-key-host.ts";
@@ -60,16 +60,14 @@ const ORGANIZATIONS = [
 
 function watchElement(host: FakeApiKeyHost) {
   return (
-    <ChakraProvider value={defaultSystem}>
-      <ApiKeyHostProvider value={host}>
-        <FirstTraceRedirect />
-      </ApiKeyHostProvider>
-    </ChakraProvider>
+    <ApiKeyHostProvider value={host}>
+      <FirstTraceRedirect />
+    </ApiKeyHostProvider>
   );
 }
 
 function renderWatch(host: FakeApiKeyHost) {
-  return render(watchElement(host));
+  return renderWithDesignSystem(watchElement(host));
 }
 
 beforeEach(() => {
@@ -106,16 +104,14 @@ describe("given a personal project that has never received a trace", () => {
       );
     });
 
-    /** @scenario First-trace polling only runs while the page is visible and stops at the timeout */
-    it("never overrides react-query's own visible-tab-only interval behaviour", async () => {
+    /** @scenario The first-trace watch sets no timer */
+    it("sets no refetch timer; a server read hint drives the watch", async () => {
       const host = new FakeApiKeyHost({ organizations: ORGANIZATIONS });
       state.firstMessage = false;
       renderWatch(host);
       await screen.findByText(/Waiting for your first trace/);
-      // Leaving `refetchIntervalInBackground` unset is what stops the watch
-      // polling a hidden tab. Setting it — in either direction — is the change
-      // this pins.
       expect(state.lastOptions).toBeDefined();
+      expect(state.lastOptions).not.toHaveProperty("refetchInterval");
       expect(state.lastOptions).not.toHaveProperty("refetchIntervalInBackground");
       expect(state.lastOptions!.refetchOnWindowFocus).toBe(false);
     });

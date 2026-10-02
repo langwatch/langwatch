@@ -1,4 +1,5 @@
 import {
+  AgentStoredCredentialsDestinationError,
   buildHttpNodeParameters,
   type HttpAgentTestInput,
   type HttpAuth,
@@ -7,22 +8,27 @@ import {
 } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   type WorkflowApi,
+  isSameOrigin,
   LATEST_SPEC_VERSION,
   type BaseComponent,
   type Field,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
+import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { referencedSecretValues, withSecretValues } from "../rules/agent-test-destination.rules.ts";
 import {
   buildAgentTestTrace,
   buildTraceparentHeader,
   buildTraceTestContext,
   generateTraceIds,
 } from "../rules/agent-test-tracing.rules.ts";
+import type { AgentService } from "./agent.service.ts";
 
 const logger = createLogger("langwatch:httpProxy");
 type ExecutionState = NonNullable<BaseComponent["execution_state"]>;
@@ -34,32 +40,46 @@ type ExecutionState = NonNullable<BaseComponent["execution_state"]>;
 const AGENT_TEST_TRACE_KSUID_RESOURCE = "agenttesttrace";
 const AGENT_TEST_WORKFLOW_KSUID_RESOURCE = "agenttestworkflow";
 
+type HttpAgentTestPeers = {
+  workflows: WorkflowApi;
+  traces: TraceApi;
+  agents: Pick<AgentService, "getById">;
+  secrets: Pick<SecretApi, "getValues">;
+};
+
 export class HttpAgentTestService {
   readonly #workflows: WorkflowApi;
   readonly #traces: TraceApi;
+  readonly #agents: Pick<AgentService, "getById">;
+  readonly #secrets: Pick<SecretApi, "getValues">;
 
-  static create(peers: { workflows: WorkflowApi; traces: TraceApi }): HttpAgentTestService {
+  static create(peers: HttpAgentTestPeers): HttpAgentTestService {
     return new HttpAgentTestService(peers);
   }
 
-  private constructor(peers: { workflows: WorkflowApi; traces: TraceApi }) {
+  private constructor(peers: HttpAgentTestPeers) {
     this.#workflows = peers.workflows;
     this.#traces = peers.traces;
+    this.#agents = peers.agents;
+    this.#secrets = peers.secrets;
   }
 
   async execute(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
-    const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = input;
+    const values = await this.#secrets.getValues({ projectId: input.projectId });
+    const { call: filled, secrets } = await this.#withStoredCredentials({ input, values });
+    const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = filled;
     const traceIds = agentId ? generateTraceIds() : void 0;
-    const headers = [...(call.headers ?? [])];
-    if (traceIds) {
-      headers.push({ key: "traceparent", value: buildTraceparentHeader(traceIds) });
-    }
+    const traceparent = traceIds
+      ? [{ key: "traceparent", value: buildTraceparentHeader(traceIds) }]
+      : [];
+    const headers = [...(call.headers ?? []), ...traceparent];
 
     const nodeId = "http_agent_test";
     const workflow = buildAgentTestWorkflow({
       nodeId,
       variables: templateVariables,
       parameters: buildHttpNodeParameters({ ...call, headers, bodyTemplate }),
+      secrets,
     });
     const traceId = traceIds?.traceId ?? generate(AGENT_TEST_TRACE_KSUID_RESOURCE).toString();
     const startedAt = nowInstant().epochMilliseconds;
@@ -89,7 +109,8 @@ export class HttpAgentTestService {
         spanId: traceIds?.spanId,
         testContext: buildTraceTestContext(input),
         requestBody: result.renderedBody ?? "",
-        requestHeaders: tracedRequestHeaders(headers, input.auth),
+        // As typed, before stored values filled the blanks: a trace never holds a stored credential.
+        requestHeaders: tracedRequestHeaders([...(input.headers ?? []), ...traceparent], input.auth),
         customAuthHeaderName: input.auth?.type === "api_key" ? input.auth.header : void 0,
         result,
       });
@@ -108,6 +129,36 @@ export class HttpAgentTestService {
     }
 
     return result;
+  }
+
+  /**
+   * A saved agent's stored credentials fill the test's blank ones, and only the secrets its
+   * saved config references resolve, only where the address, references resolved, is the
+   * saved one.
+   */
+  async #withStoredCredentials<T extends HttpAgentTestInput>({
+    input,
+    values,
+  }: {
+    input: T;
+    values: Record<string, string>;
+  }): Promise<{ call: T; secrets: Record<string, string> }> {
+    const unfilled: { call: T; secrets: Record<string, string> } = { call: input, secrets: {} };
+    if (!input.agentId) return unfilled;
+    const stored = await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
+    if (stored.type !== "http") return unfilled;
+
+    const saved = { ...stored.config, url: withSecretValues({ text: stored.config.url, values }) };
+    const requested = { ...input, url: withSecretValues({ text: input.url, values }) };
+    if (movesStoredSecrets({ stored: saved, incoming: requested })) {
+      throw new AgentStoredCredentialsDestinationError();
+    }
+    if (!isSameOrigin({ requested: requested.url, saved: saved.url })) return unfilled;
+
+    return {
+      call: httpSecretsKeepingStored({ stored: stored.config, incoming: input }),
+      secrets: referencedSecretValues({ referencing: stored.config, values }),
+    };
   }
 
   async #executeNode(input: {
@@ -135,7 +186,8 @@ function buildAgentTestWorkflow(input: {
   nodeId: string;
   parameters: Field[];
   variables: Record<string, unknown>;
-}): StudioWorkflow {
+  secrets: Record<string, string>;
+}): StudioWorkflow & { secrets: Record<string, string> } {
   return {
     spec_version: LATEST_SPEC_VERSION,
     workflow_id: generate(AGENT_TEST_WORKFLOW_KSUID_RESOURCE).toString(),
@@ -164,6 +216,8 @@ function buildAgentTestWorkflow(input: {
     ],
     edges: [],
     state: {},
+    // The engine resolves `{{ secrets.NAME }}` from this map when it builds the request.
+    secrets: input.secrets,
   };
 }
 

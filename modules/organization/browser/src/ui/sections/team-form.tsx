@@ -1,3 +1,5 @@
+import { Link } from "@langwatch/browser-host/link";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import {
   Box,
   Button,
@@ -12,9 +14,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -39,10 +39,10 @@ import { ProjectAvatar } from "../elements/project-avatar.tsx";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Select } from "@langwatch/design-system/select";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
-import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,
@@ -210,6 +210,7 @@ export const TeamForm = ({
     onSuccess: () => {
       setProjectToArchive(null);
       void queryClient.organization.getAll.invalidate();
+      void queryClient.organization.getScopeGraph.invalidate();
       void queryClient.team.getTeamWithMembers.invalidate();
     },
     onError: () => {

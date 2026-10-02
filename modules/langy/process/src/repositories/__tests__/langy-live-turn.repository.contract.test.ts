@@ -1,4 +1,4 @@
-import { instantiateRepositories } from "@langwatch/kernel";
+import { instantiateRepositories } from "@langwatch/process";
 /**
  * @vitest-environment node
  * The contract every langy live-turn backend answers the same way, run

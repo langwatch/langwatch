@@ -1,11 +1,19 @@
 import {
   allowedProxyHosts,
+  allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   Config,
   langwatchDefaultModel,
   type ConfigOf,
 } from "@langwatch/config";
 import { z } from "zod";
+
+import { SCENARIO_WORKER } from "./scenario-execution.constants.ts";
+import {
+  isScenarioResourceClass,
+  SCENARIO_RESOURCE_CLASSES,
+  type ScenarioResourceClass,
+} from "./scenario-resource-class.ts";
 
 const trimmedOptional = z
   .string()
@@ -27,6 +35,39 @@ const optionalNumber = z
   .optional()
   .transform((value) => (value === void 0 ? void 0 : Number(value)));
 
+const allResourceClasses = Object.keys(SCENARIO_RESOURCE_CLASSES).filter(isScenarioResourceClass);
+/** A comma list of runtime classes; unset means every class, an unknown name is refused. */
+const resourceClassSet = z
+  .string()
+  .optional()
+  .transform((value, ctx): ScenarioResourceClass[] => {
+    const names = (value ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (names.length === 0) return allResourceClasses;
+    const known = names.filter(isScenarioResourceClass);
+    if (known.length !== names.length) {
+      ctx.addIssue({ code: "custom", message: `unknown runtime class in "${value}"` });
+      return z.NEVER;
+    }
+    return known;
+  });
+/** A positive whole number of slots; unset means today's concurrency. */
+const slotBudget = z
+  .string()
+  .optional()
+  .transform((value, ctx) => {
+    if (value === void 0 || value.trim() === "") return SCENARIO_WORKER.CONCURRENCY;
+    const slots = Number(value);
+    if (Number.isInteger(slots) && slots > 0) return slots;
+    ctx.addIssue({
+      code: "custom",
+      message: `slot budget must be a positive integer, got "${value}"`,
+    });
+    return z.NEVER;
+  });
+
 /**
  * What a scenario child is started with. The ten passthrough values are main's
  * allowlist of the parent environment; the child never inherits anything else.
@@ -40,8 +81,14 @@ export const scenarioConfig = Config.define((c) => ({
   voiceTunnel: c.env("VOICE_TUNNEL", onUnlessFalse),
   /** A voice-only worker refuses to boot without a public https origin. */
   voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
+  /** The runtime classes this worker admits; a refused job retries on a worker that consumes it. */
+  consumedResourceClasses: c.env("SCENARIO_CONSUMED_RESOURCE_CLASSES", resourceClassSet),
+  /** The slots this worker's execution pool holds; a run takes its class's weight. */
+  slotBudget: c.env("SCENARIO_SLOT_BUDGET", slotBudget),
   /** The browser call's length cap in seconds; unusable values fall back to the default. */
   voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
+  /** Dev only: a loopback voice stand-in's signed URL passes the check. */
+  allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,

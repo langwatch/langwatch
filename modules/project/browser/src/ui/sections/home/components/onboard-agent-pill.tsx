@@ -28,7 +28,6 @@ export function OnboardAgentPill({
    */
   prominent?: boolean;
 } = {}) {
-  const project = useProjectHomeHost().project();
   const deployment = useProjectHomeHost().deployment();
   const canAsk = useProjectHomeHost().canAskLangy();
   // The same condition the menu itself applies, so the tiles on the pill
@@ -71,9 +70,6 @@ export function OnboardAgentPill({
       copy={{
         // No prompt of its own: trace falls back to the tracing skill's setup prompt.
         skill: "tracing",
-        // The project's own key, so the agent gets a setup it can run rather
-        // than one that stops to ask for credentials.
-        apiKey: project?.apiKey ?? undefined,
         endpoint: selfHostedEndpoint(deployment.baseHost) ?? undefined,
         label: "Copy a prompt for your coding agent",
         hint: "Paste it into Claude Code, Cursor, or whatever you use",

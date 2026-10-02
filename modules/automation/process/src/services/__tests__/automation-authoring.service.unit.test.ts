@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { Trigger } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
@@ -7,11 +6,16 @@ import type { Trigger } from "@langwatch/automation-contract";
  * application's now, so REST reaches the same answers.
  * @see specs/automations/runaway-automation-containment.feature
  */
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import {
+  createTestSlackConnections,
+  createTestSlackDestinations,
+} from "../../__tests__/testing.ts";
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
@@ -28,7 +32,6 @@ function authoring(
     projects: createApiFixture<ProjectApi>({
       findSummaryById: async () => ({ name: "Test", slug: "test" }),
     }),
-    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
   });
 
   return AutomationAuthoringService.create({
@@ -39,13 +42,16 @@ function authoring(
       actionParamsSchemaFor: () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
       persistActionParamsFor: async (_action, args) => args.incoming,
       redactActionParamsFor: (_action, params) => params,
-      findDecryptedSlackBotToken: () => null,
       decryptWebhookHeaders: () => ({}),
       decryptWebhookSigningSecrets: () => [],
     },
     slackChannels: { list: async () => ({ channels: [], error: null, gaps: [] }) },
+    slackDestinations: createTestSlackDestinations(),
+    slackConnections: createTestSlackConnections(),
     traceFilters: { assertCompiles: () => undefined },
     limits: { count: async () => ({ allowed: true, resetAt: 0 }) },
+    filterValidation: { assertWritable: async () => undefined },
+    logger: new SilentLogger(),
   });
 }
 

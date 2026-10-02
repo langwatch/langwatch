@@ -1,9 +1,3 @@
-import {
-  INITIAL_TIME_RANGE,
-  useFilterStore,
-  ACTIVE_LENS_KEY,
-  useViewStore,
-} from "@langwatch/trace-browser-kit";
 // @vitest-environment jsdom
 // Deep links navigate via same-route fragments (React Router's `navigate()`,
 // never `popstate`).
@@ -12,10 +6,13 @@ import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
 import {
   commitExplorerState,
   readExplorerState,
 } from "../../../../../behavior/explorer/commit-explorer-state.ts";
+import { INITIAL_TIME_RANGE } from "../../../../../behavior/query.slice.ts";
+import { ACTIVE_LENS_KEY } from "../../../../../behavior/view.slice.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 let pushHash: ((hash: string) => void) | null = null;

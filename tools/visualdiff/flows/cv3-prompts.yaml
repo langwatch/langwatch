@@ -20,11 +20,11 @@ flows:
           path: "/{slug}/prompts"
       - action: expect
         with:
-          text: /^vd-cv3p-{uid}$/
+          text: /^{promptHandle}$/
           timeout: "30000"
       - action: click
         with:
-          text: /^vd-cv3p-{uid}$/
+          text: /^{promptHandle}$/
       - action: expect
         with:
           testId: save-prompt-button
@@ -76,11 +76,11 @@ flows:
           path: "/{slug}/prompts"
       - action: expect
         with:
-          text: /^vd-cv3r-{uid}$/
+          text: /^{promptHandle}$/
           timeout: "30000"
       - action: click
         with:
-          text: /^vd-cv3r-{uid}$/
+          text: /^{promptHandle}$/
       - action: fill
         with:
           field: "Enter your prompt..."

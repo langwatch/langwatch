@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ApiKey,
   type ApiKeyApi,
@@ -8,6 +7,7 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -38,7 +38,6 @@ function registered({ callerUserId, allowed }: { callerUserId?: string; allowed:
   const asked: string[] = [];
   const service = GovernanceMcpToolsService.create({
     projects: createApiFixture<ProjectApi>({
-      findIdByLegacyApiKey: async () => "project_1",
       getOrganizationId: async () => "org_1",
     }),
     governance: createApiFixture<GovernanceRestApi>({
@@ -50,7 +49,7 @@ function registered({ callerUserId, allowed }: { callerUserId?: string; allowed:
     permissions: { holdsOrganizationPermission: async () => allowed },
   });
   const { server, tools } = recordingServer();
-  service.register({ server, apiKey: "sk-lw-1", callerUserId });
+  service.register({ server, projectId: "project_1", callerUserId });
   return { tools, asked };
 }
 
@@ -74,7 +73,7 @@ function ingestionKey(overrides: Partial<ApiKey>): ApiKey {
     ingestionTemplateId: null,
     createdAt: new Date(1_000),
     updatedAt: new Date(1_000),
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -134,7 +133,6 @@ async function withIngestionKeys({
   });
   const service = GovernanceMcpToolsService.create({
     projects: createApiFixture<ProjectApi>({
-      findIdByLegacyApiKey: async () => "project_1",
       getOrganizationId: async () => "org_1",
     }),
     governance: createApiFixture<GovernanceRestApi>({
@@ -144,7 +142,7 @@ async function withIngestionKeys({
     permissions: { holdsOrganizationPermission: async () => true },
   });
   const { server, tools } = recordingServer();
-  service.register({ server, apiKey: "sk-lw-1", callerUserId: "user_1" });
+  service.register({ server, projectId: "project_1", callerUserId: "user_1" });
   return { tools, created, revoked, audited, templateId: template.id };
 }
 
@@ -173,14 +171,26 @@ describe("GovernanceMcpToolsService", () => {
     });
   });
 
-  describe("when an OAuth caller lacks the permission", () => {
-    it("refuses the read naming the permission", async () => {
-      const { tools, asked } = registered({ callerUserId: "user_1", allowed: false });
-      const result = await tools.get("governance_ingestion_templates_list")!({});
+  describe("when a person's MCP session calls a template tool", () => {
+    /** @scenario A person's MCP session is refused the organization's ingestion templates */
+    it("refuses the read by code, even with the permission, and reads nothing", async () => {
+      const { tools, asked } = registered({ callerUserId: "user_1", allowed: true });
+
+      await expect(tools.get("governance_ingestion_templates_list")!({})).rejects.toMatchObject({
+        code: "api_key_scope_violation",
+      });
       expect(asked).toEqual([]);
-      expect(result.content[0]!.text).toBe(
-        "FORBIDDEN: caller lacks permission 'aiTools:view' on organization org_1",
-      );
+    });
+
+    it("refuses an OTTL rules write by code", async () => {
+      const { tools } = registered({ callerUserId: "user_1", allowed: true });
+
+      await expect(
+        tools.get("governance_ingestion_templates_update_ottl_rules")!({
+          id: "t1",
+          ottl_rules: "",
+        }),
+      ).rejects.toMatchObject({ code: "api_key_scope_violation" });
     });
   });
 

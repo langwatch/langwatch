@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
@@ -37,6 +37,7 @@ import {
   TENANTS,
   USER_ID,
 } from "./support/budget-overview.fixture.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 import { TestOrganizationService } from "./support/test-organization-service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
@@ -143,6 +144,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
     chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
     budgetDecisions = PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: organizationApiOver(prisma),
       projects: new SuiteProjectService(),
       evaluators: {} as never,
       monitors: {} as never,

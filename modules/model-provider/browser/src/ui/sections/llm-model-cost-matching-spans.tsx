@@ -4,9 +4,18 @@
  * The row links via address, not navigation, so a new tab won't lose the mid-edit form.
  */
 
-import { Badge, Box, chakra, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
-import { ProviderIcon } from "@langwatch/model-provider-browser-kit";
+import {
+  Badge,
+  Box,
+  chakra,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { ProviderIcon } from "@langwatch/design-system/provider-icons";
 import type {
   CostRuleMatchingSpansPreview,
   CostRulePreviewSampleSpan,
@@ -293,7 +302,6 @@ export function LLMModelCostMatchingSpans({
     {
       enabled: !!projectId && regexValid,
       placeholderData: keepPreviousData,
-      staleTime: 30_000,
     },
   );
 

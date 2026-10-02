@@ -2,7 +2,7 @@
  * Lovable-style tag list component for displaying and managing labels.
  */
 
-import { Button, HStack, Input } from "@chakra-ui/react";
+import { Button, HStack, Input } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import { TagPill, type TagPillTone } from "./tag-pill.tsx";

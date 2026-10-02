@@ -53,8 +53,8 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/analytics-browser-kit", () => ({
-  usePeriodSelector: () => ({
+vi.mock("../../../behavior/use-analytics-period.ts", () => ({
+  useAnalyticsPeriod: () => ({
     period: { startDate: new Date(0), endDate: new Date(1) },
   }),
 }));
@@ -146,7 +146,7 @@ describe("a dashboard grid card", () => {
     it("offers the alert bell", () => {
       renderCard({ kind: "builder" });
 
-      expect(screen.getByRole("button", { name: /Add alert/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Add automation/ })).toBeInTheDocument();
     });
 
     it("says so rather than drawing a builder graph it cannot read", () => {
@@ -178,7 +178,7 @@ describe("a dashboard grid card", () => {
     it("offers no alert bell", () => {
       renderCard({ kind: WORKBENCH_SQL_CHART_KIND });
 
-      expect(screen.queryByRole("button", { name: /Add alert/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add automation/ })).not.toBeInTheDocument();
     });
 
     it("passes the stored step through to the widget", () => {
@@ -267,7 +267,7 @@ describe("a dashboard grid card", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByRole("button", { name: /Add alert/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add automation/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -1,24 +1,11 @@
-export {
-  LangyPostgresService,
-  type LangyCredentialComposition,
-  type LangyServiceCompositionOptions,
-  LangyEventingMembers,
-  LangyTrustedMessage,
-  type LangyPostgresServiceOptions,
-} from "./services/langy-postgres.service.ts";
-export { langyServer } from "./langy.server.ts";
+export { langyProcessModule } from "./langy.module.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
-export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
-export {
-  LangySessionKeyMetricsOtelService,
-  LANGY_SESSION_KEYS_METRIC_NAME,
-} from "./services/langy-session-key-metrics-otel.service.ts";
 export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 // The seam for the two rows above: a composing worker calls this instead of naming either
 // class (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
 // The raw exports stay until every importer is rewired onto the seam.
-export { createLangySessionKeyReap } from "./langy.server.ts";
+export { createLangySessionKeyReap } from "./langy.module.ts";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service.ts";
 export type {
   LangyConversationCommands,
@@ -42,31 +29,12 @@ export type {
   UiActionOutcome,
   UiActionRedis,
 } from "./services/langy-ui-action.service.ts";
-export {
-  type LangyUiActionBackendMode,
-  type LangyUiActionCatalog,
-  type LangyUiActionDefinition,
-} from "./app/langy.members.ts";
-export {
-  type LangyBackendActor,
-  type LangyBackendRunResult,
-  type LangyBackendSaveResult,
-  type LangyBackendStateRead,
-  type LangyUiActionBackend,
-} from "./app/langy.members.ts";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to
 // the feature's private repository/service layout.
 export type { LangyToolFrame } from "./rules/langy-cli-envelope.rules.ts";
 export type { LangyConversationProcessingEvent } from "./eventing/langy-conversation-state.projection.ts";
-export {
-  computeFrameMac,
-  mintRunToken,
-  newFrameNonce,
-  signFrame,
-  verifyFrame,
-} from "./rules/langy-frame-auth.rules.ts";
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./eventing/langy-conversation-process.schemas.ts";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
@@ -77,15 +45,7 @@ export type {
   LangyWorkerChannelConfig,
   LangyWorkerHttpConfig,
 } from "./channels/http/http.langy-worker.channel.ts";
-export { LangyWorkerMetricsNullService } from "./services/langy-worker-metrics-null.service.ts";
-export { LangyBlockMetricsNullService } from "./services/langy-block-metrics-null.service.ts";
 export { UnavailableLangyWorkerChannel } from "./channels/unavailable.langy-worker.channel.ts";
-export {
-  LANGY_UI_ACTIONS_FLAG,
-  LangyBlockMetrics,
-  LangyGithubPermit,
-  LangyUiActionSurface,
-} from "./app/langy.members.ts";
 export { LangyWorkerMetrics, LangyWorker } from "./channels/langy-worker.channel.ts";
 export type {
   LangyWorkerCancelInput,
@@ -93,18 +53,12 @@ export type {
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
 } from "./channels/langy-worker.channel.ts";
-export { LangyUiActionSurfaceService } from "./services/langy-ui-action-surface.service.ts";
-export { LangyConversationPipelineService } from "./services/langy-conversation-pipeline.service.ts";
 export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
 export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,
   type RedisLangyConversationRuntimeRepository,
 } from "./eventing/langy-conversation-runtime.pipeline.ts";
-export {
-  LangyMaintenanceService,
-  type LangyMaintenancePipelineDeps,
-} from "./services/langy-maintenance.service.ts";
 // The seam for the conversation-runtime's five process-graph rows above: a composing worker
 // calls these instead of naming the classes directly (private-runtime-export drive,
 // dev/docs/plans/private-runtime-export-drive.md §3d). The raw exports stay until every
@@ -114,7 +68,7 @@ export {
   createLangyTokenBufferRedisRepository,
   createLangyTurnHandoffRedisRepository,
   createLangyTitleGenerator,
-} from "./langy.server.ts";
+} from "./langy.module.ts";
 export {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
@@ -126,7 +80,6 @@ export {
   type LangySessionKeyReapDeps,
 } from "./eventing/langy-session-key-reap.intent.ts";
 export type { LangyAnalyticsEventProjectionRecord } from "./eventing/langy-analytics-event.projection.ts";
-export { LangyAnalyticsEventStorageService } from "./services/langy-analytics-event-storage.service.ts";
 export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
 export type {
   LangyAnalyticsClickHouseClientResolver,
@@ -135,11 +88,6 @@ export type {
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyEffectMembers } from "./app/langy.members.ts";
 export type { LangyTitleGenerator } from "./app/langy.members.ts";
-export {
-  LANGY_TITLE_FEATURE_KEY,
-  LangyTitleGeneratorService,
-  type LangyTitleGeneratorDeps,
-} from "./services/langy-title-generator.service.ts";
 export type { CreateLangyEffectRepositoryOptions } from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
   createAgentTurnLivenessSubscriber,
@@ -161,16 +109,13 @@ export type { LangyGenerateTitleIntent, LangyWorkerDispatchIntent } from "./app/
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
 export type { LangyTurnAccess } from "./repositories/langy-live-turn.repository.ts";
-export { LangyTurnHandoffRedisRepository } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 export type { LangyHandoffRedis } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 export type { LangyTurnHandoff } from "./repositories/langy-live-turn.repository.ts";
-export { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.langy-token-buffer.repository.ts";
 export type {
   LangyStreamRead,
   LangyStreamRedis,
   LangyTokenBufferConnection,
 } from "./repositories/langy-token-buffer.repository.ts";
-export { LangyTurnsBoundsService } from "./services/langy-turns-bounds.service.ts";
 
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.
@@ -191,21 +136,9 @@ export type {
   LangyIdentityToken,
   LangyKeyIdentity,
 } from "./services/langy-key-identity.service.ts";
-export {
-  LangyRestCallerService,
-  type LangyRestCallerMembers,
-} from "./services/langy-rest-caller.service.ts";
 
 // The per-user daily cap on pull requests Langy may open on someone's behalf.
 export type { GithubPrLimitResult } from "./services/langy-github-pr-quota.service.ts";
-export {
-  LANGY_DISPATCH_METRIC_NAME,
-  LangyWorkerMetricsOtelService,
-} from "./services/langy-worker-metrics-otel.service.ts";
-export {
-  LANGY_BLOCKS_METRIC_NAME,
-  LangyBlockMetricsOtelService,
-} from "./services/langy-block-metrics-otel.service.ts";
 
 // ADR-129 local control: the developer's own folder, and the cards that wait
 // for the developer. One runtime per process, two transports over it, and the

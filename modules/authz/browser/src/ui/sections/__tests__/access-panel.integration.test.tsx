@@ -5,11 +5,12 @@
  * Spec: specs/rbac/roles-and-access-ui.feature
  */
 
-import { expiryFromDay } from "@langwatch/authz-browser-kit";
 import { toDate } from "@langwatch/time";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { expiryFromDay } from "../../../model/grants/grants.ts";
 
 type MutationOptions = { onSuccess?: () => void; onError?: (error: unknown) => void };
 
@@ -35,8 +36,10 @@ const { api, state } = vi.hoisted(() => {
 
   const api = {
     useUtils: () => ({
-      authz: { listGrants: { invalidate: state.invalidateGrants } },
-      roleBinding: { listForOrg: { invalidate: vi.fn() } },
+      authz: {
+        listGrants: { invalidate: state.invalidateGrants },
+        listManagedGrants: { invalidate: vi.fn() },
+      },
     }),
     authz: {
       listGrants: {

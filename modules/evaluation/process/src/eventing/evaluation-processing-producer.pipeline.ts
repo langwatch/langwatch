@@ -5,13 +5,11 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 
-import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 import type { EvaluationAnalyticsData } from "./evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import {
   EvaluationProcessingPipelineAdapter,
-  type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "./evaluation-processing-definition.pipeline.ts";
 
@@ -51,22 +49,12 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
 }
 
 /** The execution intent this process does not hold. */
-class ProducerOnlyExecutionIntent implements EvaluationExecutionIntent {
+class ProducerOnlyExecutionIntent {
   constructor(private readonly processName: string) {}
 
   execute(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "execute an evaluation"));
   }
-}
-
-/** The automation subscribers this process does not hold. */
-function producerOnlyAutomations(processName: string): EvaluationAutomationReactions {
-  return {
-    handleEvaluationTriggerMatch: () =>
-      Promise.reject(producerOnly(processName, "match an automation trigger")),
-    handleEvaluationGraphTriggerActivity: () =>
-      Promise.reject(producerOnly(processName, "sweep graph triggers")),
-  };
 }
 
 /**
@@ -98,7 +86,6 @@ export class EvaluationProcessingProducerAdapter {
       executeEvaluationCommand: ExecuteEvaluationCommand.create(
         new ProducerOnlyExecutionIntent(processName),
       ),
-      automations: producerOnlyAutomations(processName),
     });
   }
 }

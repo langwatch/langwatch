@@ -3,8 +3,8 @@
  * Spec: specs/navigation/icon-rail-navigation.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -66,17 +66,15 @@ const BASE_READINGS: StubNavigationReadings = {
 };
 
 function renderShell(readings: Partial<StubNavigationReadings> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{ ...BASE_READINGS, ...readings }}
-        actions={{ navigate: navigateMock }}
-      >
-        <NavigationShell mode="icon-rail">
-          <div data-testid="page-body" />
-        </NavigationShell>
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{ ...BASE_READINGS, ...readings }}
+      actions={{ navigate: navigateMock }}
+    >
+      <NavigationShell mode="icon-rail">
+        <div data-testid="page-body" />
+      </NavigationShell>
+    </WithStubNavigationHost>,
   );
 }
 

@@ -8,7 +8,6 @@ import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
 
 export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   governance_cost_rollup_1d: {
-    name: "governance_daily_cost_rollup",
     description:
       "Daily cost rollups per tenant, provider and model, keyed by the org's " +
       "internal_governance project; visible only to a caller whose project " +
@@ -17,12 +16,8 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)",
     timeColumn: "Day",
     dedup: { versionColumn: "EventTimestamp" },
-    columnGates: {
-      AmountNanoMinor: ["costs"],
-    },
   },
   governance_cost_rollup_restatement_index: {
-    name: "governance_cost_restatements",
     description:
       "Index of cost-rollup restatements, keyed by the org's " +
       "internal_governance project; visible only to a caller whose project " +
@@ -37,7 +32,6 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     dedup: { versionColumn: "EventTimestamp" },
   },
   governance_kpis: {
-    name: "governance_hourly_kpis",
     description:
       "Hourly spend and token KPIs per source, keyed by the org's " +
       "internal_governance project; visible only to a caller whose project " +
@@ -47,7 +41,6 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     dedup: { versionColumn: "LastEventOccurredAt" },
   },
   governance_ocsf_events: {
-    name: "governance_security_events",
     description:
       "Raw OCSF-shaped security events, keyed by the org's " +
       "internal_governance project; visible only to a caller whose project " +
@@ -55,8 +48,5 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     grain: "one row per (TenantId, EventId)",
     timeColumn: "EventTime",
     dedup: { versionColumn: "LastUpdatedAt" },
-    columnGates: {
-      RawOcsfJson: ["output"],
-    },
   },
 };

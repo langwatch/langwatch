@@ -104,9 +104,9 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
   private readonly config: CodeAgentData;
   private readonly nlpServiceUrl: string;
   /**
-   * The LangWatch platform API key, sent as workflow.api_key; nlpgo forwards
-   * it verbatim as X-Auth-Token on its platform callbacks. Never an LLM
-   * provider credential, so it must not be sourced from litellm params (#6634).
+   * The run's own key, minted for this scenario run, sent as workflow.api_key; nlpgo
+   * forwards it as X-Auth-Token on its platform callbacks. Never an LLM provider
+   * credential, so it must not be sourced from litellm params (#6634).
    */
   private readonly projectApiKey: string;
   /**

@@ -1,4 +1,4 @@
-import { Button, Center, EmptyState, HStack } from "@chakra-ui/react";
+import { Button, Center, EmptyState, HStack } from "@langwatch/design-system/primitives";
 import { LuSparkles } from "react-icons/lu";
 
 import { SetupWithAgentButton } from "../../../../behavior/lent-setup-with-agent-button.tsx";

@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Cancellation tests: service dispatches cancel_requested event; process manager

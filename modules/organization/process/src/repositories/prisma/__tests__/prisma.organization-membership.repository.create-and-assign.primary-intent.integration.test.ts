@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * createAndAssign persists the declared primary intent atomically with the
@@ -13,6 +12,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 

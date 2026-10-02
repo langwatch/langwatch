@@ -3,13 +3,14 @@
  * answers, the door it is asked behind and the handler that answers it — with
  * declaration-time asserts that refuse an incoherent route where it is written.
  */
-import type { Actor } from "@langwatch/actor";
 import type {
+  Actor,
   AuthzDeclaredScopeId,
   AuthzPermission,
+  CliTokenActor,
   ScopeTierField,
-} from "@langwatch/authz-contract";
-import type { ModuleApiToken } from "@langwatch/kernel";
+} from "@langwatch/authorization";
+import type { ModuleApiToken } from "@langwatch/module";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
@@ -18,6 +19,8 @@ import {
   SCOPE_INPUT_FIELDS,
   type ApiEntitlement,
   type Credential,
+  type EntitlementGate,
+  type EntitlementOptions,
   type RouteAccess,
 } from "../access/access.ts";
 import { PayloadTooLargeError } from "../errors.ts";
@@ -31,7 +34,6 @@ import {
   type RestAddressing,
   type RestAddressingOptions,
 } from "./addressing.ts";
-import type { CliTokenActor } from "./cli-token-identity.ts";
 import type { RestIdempotency } from "./idempotency.ts";
 import type { RestTransportDocs } from "./openapi.ts";
 import {
@@ -159,12 +161,12 @@ export type RestDoorCredential = Extract<
   Credential,
   | "project"
   | "organization"
-  | "apiKey"
-  | "scimToken"
-  | "internalSecret"
-  | "instance-admin"
-  | "sessionKey"
-  | "cliToken"
+  | "api_key"
+  | "scim_token"
+  | "internal_secret"
+  | "instance_admin"
+  | "session_key"
+  | "cli_token"
   | "browser"
 >;
 
@@ -176,35 +178,43 @@ export type RestDoorCredential = Extract<
 export const DOOR_SCOPE_TIER = {
   project: "project",
   organization: "organization",
-  apiKey: "organization",
-  scimToken: "organization",
+  api_key: "organization",
+  scim_token: "organization",
   browser: null,
-  internalSecret: null,
-  "instance-admin": null,
-  sessionKey: "project",
-  cliToken: "organization",
+  internal_secret: null,
+  instance_admin: null,
+  session_key: "project",
+  cli_token: "organization",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
 type DoorScope<Door extends RestDoorCredential> = (typeof DOOR_SCOPE_TIER)[Door] extends null
   ? null
   : Extract<AuthzDeclaredScopeId, { tier: (typeof DOOR_SCOPE_TIER)[Door] }>;
-type ScopedHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
-  ApiHandlerArguments<Input, App>,
-  "scope" | "actor"
-> & {
-  readonly actor: Door extends "browser"
-    ? Extract<Actor, { type: "user" }>
-    : Door extends "cliToken"
-      ? CliTokenActor
-      : Actor | null;
-  readonly scope: DoorScope<Door>;
-  /**
-   * The scope this route's own path named, when its permission was checked
-   * there; `null` on every route checked at the credential's own scope.
-   */
-  readonly target: AuthzDeclaredScopeId | null;
-};
+/** The schema a route declared for the session its door hands beside the actor, if any. */
+type RouteSession = z.ZodType | Missing;
+type SessionArguments<Session extends RouteSession> = Session extends z.ZodType
+  ? { readonly session: z.output<Session> }
+  : unknown;
+type ScopedHandlerArguments<
+  Input,
+  App,
+  Door extends RestDoorCredential,
+  Session extends RouteSession,
+> = SessionArguments<Session> &
+  Omit<ApiHandlerArguments<Input, App>, "scope" | "actor"> & {
+    readonly actor: Door extends "browser"
+      ? Extract<Actor, { type: "user" }>
+      : Door extends "cli_token"
+        ? CliTokenActor
+        : Actor | null;
+    readonly scope: DoorScope<Door>;
+    /**
+     * The scope this route's own path named, when its permission was checked
+     * there; `null` on every route checked at the credential's own scope.
+     */
+    readonly target: AuthzDeclaredScopeId | null;
+  };
 /** A public route resolves no credential, so it knows neither actor nor scope. */
 type PublicHandlerArguments<Input, App> = Omit<
   ApiHandlerArguments<Input, App>,
@@ -240,13 +250,14 @@ type HandlerArgumentsFor<
   Input,
   App,
   Door extends RestDoorCredential,
+  Session extends RouteSession,
 > = Access extends "public"
   ? PublicHandlerArguments<Input, App>
   : Access extends "optional"
     ? OptionalHandlerArguments<Input, App, Door>
     : Access extends "deferred"
       ? DeferredHandlerArguments<Input, App>
-      : ScopedHandlerArguments<Input, App, Door>;
+      : ScopedHandlerArguments<Input, App, Door, Session>;
 export type RouteAccessKind = "scoped" | "public" | "authenticated" | "optional" | "deferred";
 /**
  * What a stored handler is invoked with, once the declaration's own types are
@@ -259,6 +270,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  /** The door's session parsed against the route's schema; undefined when it declared none. */
+  session: unknown;
   signal: AbortSignal | undefined;
   /** Read once, only for a route that declared it; undefined everywhere else. */
   raw: string | Uint8Array | ReadableStream<Uint8Array> | null | undefined;
@@ -446,7 +459,9 @@ export type RestTransportRoute<Api> = Readonly<{
   /** Present exactly when the route's answer stands for a while. */
   readonly cache?: RestCachePolicy;
   /** Present exactly when the route asks the tenant to hold an entitlement. */
-  readonly entitlement?: ApiEntitlement;
+  readonly entitlement?: EntitlementGate;
+  /** Present exactly when the route mints a credential: the permission its refusal names. */
+  readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -463,6 +478,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly deprecated?: RestDeprecation;
   /** The door this ONE route answers behind; the family's own when absent. */
   readonly credential?: RestDoorCredential;
+  /** The schema the door's session is parsed against; present exactly when one was declared. */
+  readonly session?: z.ZodType;
   /** Present exactly when the route declared the trail it leaves. */
   readonly audit?: string;
   readonly handler: StoredHandler<Api>;
@@ -501,7 +518,8 @@ type RouteState = Readonly<{
   multipart?: RestMultipart;
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -518,6 +536,7 @@ type RouteState = Readonly<{
   bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   deprecated?: RestDeprecation;
   credential?: RestDoorCredential;
+  session?: z.ZodType;
   audit?: string;
 }>;
 
@@ -581,6 +600,9 @@ type RouteShape = Readonly<{
   /** The family's door, which a route may narrow to its own. */
   family: RestDoorCredential;
   door: RestDoorCredential;
+  /** The family's session schema, and the one this route's own door declared. */
+  familySession: RouteSession;
+  session: RouteSession;
   strict: boolean;
 }>;
 
@@ -590,7 +612,7 @@ type With<S extends RouteShape, Changes extends Partial<RouteShape>> = Readonly<
 }>;
 
 class RouteBuilder<Api, S extends RouteShape> {
-  private readonly router: RestTransportRouter<Api, S["family"], S["strict"]>;
+  private readonly router: RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]>;
   private readonly method: S["method"];
   private readonly path: S["path"];
   private readonly operation: string;
@@ -603,7 +625,7 @@ class RouteBuilder<Api, S extends RouteShape> {
     operation,
     state = {},
   }: {
-    router: RestTransportRouter<Api, S["family"], S["strict"]>;
+    router: RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]>;
     method: S["method"];
     path: S["path"];
     operation: string;
@@ -784,11 +806,14 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * What the tenant behind the request must hold beside the permission. Asked
-   * after access is decided, at the scope access resolved, so a caller who may
-   * not do this at all is refused before the plan is ever looked up.
+   * What the tenant must hold beside the permission, asked after access at the scope it
+   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
+   * `when` asks only for an input it holds for.
    */
-  withEntitlement(entitlement: ApiEntitlement): RouteBuilder<Api, S> {
+  withEntitlement(
+    entitlement: ApiEntitlement,
+    options: EntitlementOptions = {},
+  ): RouteBuilder<Api, S> {
     assertSourceUnset("entitlement", this.state.entitlement);
 
     return new RouteBuilder<Api, S>({
@@ -798,8 +823,26 @@ class RouteBuilder<Api, S extends RouteShape> {
       operation: this.operation,
       state: {
         ...this.state,
-        entitlement,
+        entitlement: { entitlement, ...options },
       },
+    });
+  }
+
+  /**
+   * The route mints a credential (a key, token or secret). The runtime refuses it with
+   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * after access and before the handler.
+   */
+  mintsCredential(permission: AuthzPermission): RouteBuilder<Api, S> {
+    if (this.state.mintsCredential)
+      throw new Error("REST route already declared mintsCredential()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, mintsCredential: permission },
     });
   }
 
@@ -1090,7 +1133,8 @@ class RouteBuilder<Api, S extends RouteShape> {
         S["access"],
         RouteInput<S["params"], S["query"], S["body"]>,
         Api,
-        S["door"]
+        S["door"],
+        S["session"]
       > &
         RawBodyArguments<S["body"]> &
         MultipartArguments<S["body"]> &
@@ -1098,7 +1142,7 @@ class RouteBuilder<Api, S extends RouteShape> {
         ResponseArguments<S["answer"]>,
       ...facts: MiddlewareFacts<S["middleware"]>
     ) => TResult & OutputResultCheck<S["answer"], TResult>,
-  ): RestTransportRouter<Api, S["family"], S["strict"]> {
+  ): RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]> {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -1111,6 +1155,8 @@ class RouteBuilder<Api, S extends RouteShape> {
       this.path,
       this.operation,
     );
+
+    const session = this.state.credential === undefined ? this.router.session : this.state.session;
 
     this.router.routes.push({
       method: this.method,
@@ -1137,6 +1183,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
       ...(this.state.deprecated ? { deprecated: this.state.deprecated } : {}),
+      ...(session ? { session } : {}),
       handler: handler as ErasedHandler,
     });
 
@@ -1208,15 +1255,16 @@ class RouteBuilder<Api, S extends RouteShape> {
 
   /**
    * The door THIS route answers behind, where it differs from the family's own:
-   * retypes the handler's actor/scope through `DOOR_SCOPE_TIER`, so the route
-   * reads the scope ITS door resolves, not the family's.
+   * retypes actor/scope through `DOOR_SCOPE_TIER`. A `session` schema types and parses
+   * the session that door hands beside the actor; the family's does not carry over.
    */
-  withCredential<NewDoor extends RestDoorCredential>(
+  withCredential<NewDoor extends RestDoorCredential, NewSession extends RouteSession = Missing>(
     credential: NewDoor,
-  ): RouteBuilder<Api, With<S, { door: NewDoor }>> {
+    options?: Readonly<{ session: NewSession }>,
+  ): RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession }>> {
     assertSourceUnset("credential", this.state.credential);
 
-    return new RouteBuilder<Api, With<S, { door: NewDoor }>>({
+    return new RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession }>>({
       router: this.router,
       method: this.method,
       path: this.path,
@@ -1224,6 +1272,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       state: {
         ...this.state,
         credential,
+        ...(options?.session ? { session: options.session } : {}),
       },
     });
   }
@@ -1272,6 +1321,7 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
     ...(state.cache ? { cache: state.cache } : {}),
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
+    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
@@ -1287,6 +1337,7 @@ type OpenRoute<
   Path extends string,
   Door extends RestDoorCredential,
   StrictJsonSchemas extends boolean,
+  Session extends RouteSession,
 > = RouteBuilder<
   Api,
   {
@@ -1301,6 +1352,8 @@ type OpenRoute<
     access: "scoped";
     family: Door;
     door: Door;
+    familySession: Session;
+    session: Session;
     strict: StrictJsonSchemas;
   }
 >;
@@ -1309,6 +1362,7 @@ class RestTransportRouter<
   Api,
   Door extends RestDoorCredential = "project",
   StrictJsonSchemas extends boolean = false,
+  Session extends RouteSession = Missing,
 > {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
@@ -1321,41 +1375,47 @@ class RestTransportRouter<
   readonly namespace: string;
   readonly version: DateVersion;
   readonly credential: Door;
+  /** Holds what `Session` types; `undefined` exactly when the family declared no session. */
+  readonly session: RouteSession;
 
   constructor({
     api,
     namespace,
     version,
     credential,
+    session,
   }: {
     api: FeatureApiWitness<Api>;
     namespace: string;
     version: DateVersion;
     credential: Door;
+    session: RouteSession;
   }) {
     this.api = api;
     this.namespace = namespace;
     this.version = version;
     this.credential = credential;
+    this.session = session;
   }
 
   /**
-   * The door this family's routes answer behind. Declared before the first
-   * route, because it decides the scope every handler is handed: a route
-   * declared under it reads `scope.tier` as the credential's own tier.
+   * The door this family's routes answer behind, declared before the first route: a
+   * handler reads `scope.tier` as the door's tier and `session` as this schema's output.
    */
-  withCredential<NewDoor extends RestDoorCredential>(
+  withCredential<NewDoor extends RestDoorCredential, NewSession extends RouteSession = Missing>(
     credential: NewDoor,
-  ): RestTransportRouter<Api, NewDoor, StrictJsonSchemas> {
+    options?: Readonly<{ session: NewSession }>,
+  ): RestTransportRouter<Api, NewDoor, StrictJsonSchemas, NewSession> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its credential before its routes`);
     }
 
-    const router = new RestTransportRouter<Api, NewDoor, StrictJsonSchemas>({
+    const router = new RestTransportRouter<Api, NewDoor, StrictJsonSchemas, NewSession>({
       api: this.api,
       namespace: this.namespace,
       version: this.version,
       credential,
+      session: options?.session,
     });
 
     router.addressing = this.addressing;
@@ -1375,7 +1435,7 @@ class RestTransportRouter<
   withAddressing(
     addressing: RestAddressing,
     options: RestAddressingOptions = {},
-  ): RestTransportRouter<Api, Door, StrictJsonSchemas> {
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
@@ -1391,7 +1451,9 @@ class RestTransportRouter<
   }
 
   /** Marks every route of the family superseded by `successor`. */
-  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api, Door, StrictJsonSchemas> {
+  withDeprecated(
+    deprecated: RestDeprecation,
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session> {
     this.deprecated = deprecated;
 
     return this;
@@ -1422,7 +1484,7 @@ class RestTransportRouter<
   get<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "get", Path, Door, StrictJsonSchemas> {
+  ): OpenRoute<Api, "get", Path, Door, StrictJsonSchemas, Session> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1436,7 +1498,7 @@ class RestTransportRouter<
   patch<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "patch", Path, Door, StrictJsonSchemas> {
+  ): OpenRoute<Api, "patch", Path, Door, StrictJsonSchemas, Session> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1450,7 +1512,7 @@ class RestTransportRouter<
   post<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "post", Path, Door, StrictJsonSchemas> {
+  ): OpenRoute<Api, "post", Path, Door, StrictJsonSchemas, Session> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1464,7 +1526,7 @@ class RestTransportRouter<
   put<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "put", Path, Door, StrictJsonSchemas> {
+  ): OpenRoute<Api, "put", Path, Door, StrictJsonSchemas, Session> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1478,7 +1540,7 @@ class RestTransportRouter<
   delete<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "delete", Path, Door, StrictJsonSchemas> {
+  ): OpenRoute<Api, "delete", Path, Door, StrictJsonSchemas, Session> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1528,6 +1590,7 @@ export function defineRestRouter<Api, StrictJsonSchemas extends boolean = false>
             namespace,
             version,
             credential: "project",
+            session: undefined,
           });
         },
       };
@@ -1631,7 +1694,7 @@ function assertPublicRouteConstraints({
   if (state.entitlement) {
     throw new Error(
       `REST ${operation} answers without a credential, so there is no tenant to ask whether it ` +
-        `holds "${state.entitlement}"`,
+        `holds "${state.entitlement.entitlement}"`,
     );
   }
 
@@ -1640,6 +1703,10 @@ function assertPublicRouteConstraints({
       `REST ${operation} answers without a credential, so there is no tenancy a caller's ` +
         "idempotency key is unique within",
     );
+  }
+
+  if (state.mintsCredential) {
+    throw new Error(`REST ${operation} mints a credential, so it cannot answer with no caller`);
   }
 }
 

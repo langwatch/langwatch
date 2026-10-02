@@ -1,11 +1,12 @@
-import { Alert, Button, Spacer } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Button, Spacer } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Plus } from "lucide-react";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { useAgents } from "../../behavior/use-agents.ts";
 import { connectedAgentsOf } from "../../behavior/use-connected-agent-detail.ts";
 import { VOICE_AGENTS_FLAG_KEY } from "../../features/voice-editor/model/voice-talk.ts";
 import {
@@ -152,7 +153,7 @@ export function AgentManagementScreen() {
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't start the test run" }),
   });
 
-  const agentsQuery = agentApi.agents.getAll.useQuery({ projectId }, { enabled: Boolean(project) });
+  const agentsQuery = useAgents({ projectId: project?.id });
 
   const items = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
   // The connected agents draw their own card (ADR-128); `items` keeps every
@@ -174,6 +175,14 @@ export function AgentManagementScreen() {
   const closeTypeSelector = useCallback(() => {
     host.setQuery({ ...reading.query, [AGENT_NEW_QUERY_KEY]: void 0 });
   }, [host, reading.query]);
+  // The editor opens once the address has dropped `new=agent`: both navigations read the
+  // address they find, so opening in the same tick would carry the chooser along.
+  const [pendingType, setPendingType] = useState<AgentType | null>(null);
+  useEffect(() => {
+    if (pendingType === null || isCreating) return;
+    host.openAgentEditor({ drawer: newAgentDrawerFor(pendingType) });
+    setPendingType(null);
+  }, [pendingType, isCreating, host]);
   const openHistory = useCallback(
     (agent: AgentWithFields) => {
       host.setQuery({ ...reading.query, [AGENT_HISTORY_QUERY_KEY]: agent.id });
@@ -276,8 +285,8 @@ export function AgentManagementScreen() {
           open
           onClose={closeTypeSelector}
           onSelect={(type: AgentType) => {
+            setPendingType(type);
             closeTypeSelector();
-            host.openAgentEditor({ drawer: newAgentDrawerFor(type) });
           }}
         />
       )}

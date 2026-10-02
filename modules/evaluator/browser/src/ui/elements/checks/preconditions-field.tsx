@@ -1,5 +1,13 @@
-import { Box, Button, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { X } from "react-feather";

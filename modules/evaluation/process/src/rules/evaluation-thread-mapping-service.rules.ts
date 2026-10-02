@@ -11,7 +11,7 @@ import {
 } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
-import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
+import type { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 
 /**
  * Callback that fetches all traces belonging to a thread.
@@ -45,7 +45,7 @@ export async function resolveThreadMappingsIntoData(params: {
   trace: Trace;
   mappings: MappingState;
   getThreadTraces: GetThreadTraces;
-  spanDigest: EvaluationSpanDigest;
+  spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread">;
   /** The judge's render budget for `formatted_traces`. */
   maxTokens: number;
 }): Promise<void> {

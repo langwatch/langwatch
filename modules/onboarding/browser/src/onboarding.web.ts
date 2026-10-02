@@ -3,19 +3,16 @@
  * the product-flavour flow and project creation.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
 
-export const onboardingWeb = defineWebModule("onboarding")
-  // Whether a guided path is active; a peer screen's own host reads this
-  // through the shell, so the simulations welcome card and similar coach
-  // marks stay quiet without importing onboarding's private state.
+export const onboardingWeb = defineBrowserModule("onboarding")
   // The tour's state for Langy's tour card, and the Home offer a screen draws in its own space.
   .withCapabilities({
-    guidedPath: onboardingGuidedPath,
     guidedTour: onboardingGuidedTour,
+    guidedPathActive: onboardingGuidedPath,
     guidedOnboardingOffer: {
       load: () => import("./features/guided-onboarding/ui/home/guided-onboarding-offer.tsx"),
     },

@@ -1,5 +1,5 @@
-import { Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Button, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import type { IconType } from "react-icons";
 import { LuCalendarClock } from "react-icons/lu";

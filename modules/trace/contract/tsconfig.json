@@ -22,7 +22,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"
@@ -34,7 +34,7 @@
       "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/otlp/tsconfig.build.json"

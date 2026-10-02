@@ -1,7 +1,7 @@
 /**
- * Whether a guided onboarding path is active, published for a peer screen —
- * the trace explorer's first-trace coach mark and the simulations welcome
- * card both stay quiet while one is being set up or its tour runs.
+ * Whether a guided onboarding path is active, published for a peer screen:
+ * the trace explorer's first-trace spotlight stays quiet while one is being
+ * set up or its tour runs.
  * @see specs/features/onboarding/guided-tour.feature
  */
 import { isGuidedPathActive } from "../model/guided-path-active.ts";

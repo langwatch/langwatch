@@ -1,7 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
-import { cachePlanFor, unbatchedCachePaths } from "@langwatch/browser-host/cache-tiers";
 import type {
   UiDeployment,
   UiFeedback,
@@ -12,29 +11,29 @@ import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/fea
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
+import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
+import { browserModules } from "@langwatch/installed-web-modules";
+import { createUi } from "@langwatch/browser";
+import { createUiApplication, type UiApplication } from "@langwatch/browser/application";
+import { UiApplicationShell } from "@langwatch/browser/application-shell";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
+import { GraphicsQualityProvider } from "@langwatch/browser/graphics-quality-provider";
+import { installedModuleApis } from "@langwatch/browser/module-apis";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
+import {
+  installedModuleHostMounts,
+  type UiModuleHostMount,
+} from "@langwatch/browser/module-hosts";
+import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
+import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
+import { readPublicAppConfig } from "@langwatch/browser/public-config";
+import { UiRuntime } from "@langwatch/browser/runtime";
+import { UiShell } from "@langwatch/browser/shell";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
-} from "@langwatch/browser-host/transport";
-import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
-import { webModules } from "@langwatch/installed-web-modules";
-import { createUi } from "@langwatch/ui-kernel";
-import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/application";
-import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
-import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
-import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-provider";
-import { installedModuleApis } from "@langwatch/ui-kernel/module-apis";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
-import {
-  installedModuleHostMounts,
-  type UiModuleHostMount,
-} from "@langwatch/ui-kernel/module-hosts";
-import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
-import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
-import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
-import { UiRuntime } from "@langwatch/ui-kernel/runtime";
-import { UiShell } from "@langwatch/ui-kernel/shell";
+} from "@langwatch/browser/transport";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
@@ -239,21 +238,17 @@ class BrowserUiShell extends UiShell {
 export async function startUi(): Promise<void> {
   const served = readPublicAppConfig(document);
   const config = parseUiFeatureConfig(served);
-  // Session and reference reads travel unbatched, and every answer's session version
-  // reaches the watch the shell invalidates the session tier from (ADR-164).
-  const cachePlan = cachePlanFor({
-    contracts: webModules.flatMap((module) => module.installation.apiContracts ?? []),
-  });
+  // Every answer's session version reaches the watch the shell invalidates reads from.
   const sessionVersions = SessionVersionWatch.create();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
-    unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+    isDevelopment: config.process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
-    .withModules(webModules)
+    .withModules(browserModules)
     .withTransport(transport)
     .withInjectedConfig(() => served)
     .render();

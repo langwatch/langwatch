@@ -2,7 +2,7 @@
  * What one member can prove, in the members table. Every member says something,
  * because a blank cell reads as "not loaded". Never names a device or a code.
  */
-import { Badge, HStack, Text } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import type { OrganizationMemberFactor } from "@langwatch/identity-contract";
 
 export function SecondFactorCell({

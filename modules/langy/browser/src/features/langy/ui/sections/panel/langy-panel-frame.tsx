@@ -1,4 +1,4 @@
-import { Box, chakra } from "@chakra-ui/react";
+import { Box, chakra } from "@langwatch/design-system/primitives";
 import { motion } from "motion/react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 

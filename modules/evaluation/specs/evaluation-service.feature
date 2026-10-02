@@ -339,9 +339,12 @@ Feature: Evaluation service boundary
     Then the parse fails with the schema's error
     And the route answers 400 rather than dispatching the generation parameters alone
 
+  # Replaces "An evaluation's organization count is read once" (Alex, 2026-09-30, option D1a):
+  # nurturing names the admin and counts evaluations from its own side, so evaluation needs no
+  # ProjectApi. See enterprise/modules/nurturing/specs/nurturing.feature.
   @unit
-  Scenario: An evaluation's organization count is read once, not once per project
-    Given an organization with three projects
-    When a settled evaluation in one of them is recorded for nurturing
-    Then the organization's evaluation count is asked for once, naming all three projects
-    And the count is one ClickHouse read across the projects, which share one route
+  Scenario: A settled evaluation is recorded with no organization lookup
+    Given an evaluation in a project settles
+    When its lifecycle fact is recorded
+    Then the fact carries the project, the evaluation, its evaluator type, score and verdict
+    And it names no admin and no organization count

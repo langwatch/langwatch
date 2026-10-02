@@ -86,3 +86,24 @@ Feature: Composing durable coding-agent session processing
     Given a process where coding_agent_processing registered no senders
     When trace hands the coding-agent API one span's facts
     Then the call is refused naming the contributeSpanFacts sender
+
+  @unit
+  Scenario: The ADR-056 edge is mounted rather than declared missing
+    Given coding-agent's session pipeline composed over its own substrate
+    When the pipeline is composed
+    Then it mounts a peer subscriber on log's received-record event and one on metric's received-point event
+    And nothing is reported at boot about a missing Coding Agent pipeline
+
+  @unit
+  Scenario: Each received log record is forwarded to coding-agent once per record
+    Given the peer subscriber coding-agent mounts on log's received-record event
+    When the same received log record is delivered twice
+    Then each delivery contributes the record to coding-agent unchanged
+    And both deliveries share one deduplication identity, apart from any other record
+
+  @unit
+  Scenario: Each received metric point is forwarded to coding-agent once per point
+    Given the peer subscriber coding-agent mounts on metric's received-point event
+    When the same received metric point is delivered twice
+    Then each delivery contributes the point to coding-agent unchanged
+    And both deliveries share one deduplication identity, apart from any other point

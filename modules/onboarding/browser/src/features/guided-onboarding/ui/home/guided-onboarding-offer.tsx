@@ -1,11 +1,11 @@
+import type { UiGuidedOnboardingOfferProps } from "@langwatch/browser-host/declarations";
 /**
  * The "Start guided onboarding" pill on a day-zero home, one path per space. Hidden while guided,
  * done, in use (`spaceInUse`, null while unknown) or touring. Clicking begins the path.
  *
  * @see specs/home/guided-onboarding-offer.feature
  */
-import { chakra, HStack } from "@chakra-ui/react";
-import type { UiGuidedOnboardingOfferProps } from "@langwatch/browser-host/declarations";
+import { chakra, HStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";

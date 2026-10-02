@@ -5,15 +5,11 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/ops-browser": ["./src/index.ts"],
       "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
     }
   },
   "files": [
-    "./src/index.ts",
-    "./src/ui/sections/impersonation/index.ts",
-    "./src/ops.ts",
-    "./src/drawers.ts"
+    "./src/ui/sections/impersonation/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -31,6 +27,12 @@
   "references": [
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
@@ -51,13 +53,13 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/client/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

@@ -1,5 +1,5 @@
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   ActivationCodePage,
@@ -47,6 +47,7 @@ import type {
   StoreLicenseInput,
 } from "./license.commands.ts";
 import type {
+  DomainClaimLicenseAuthority,
   LicenseStatus,
   PlatformLicenseAccess,
   RemoveLicenseResult,
@@ -77,8 +78,12 @@ export interface LicensingApi {
   getSsoGateStatus(): Promise<SsoGateStatus>;
   /** Whether a signed license on this deployment permits platform single sign-on. */
   isPlatformSsoLicensed(): Promise<boolean>;
+  /** Whether the licence may prove a claimed single sign-on domain, and for whom. */
+  getDomainClaimAuthority(): Promise<DomainClaimLicenseAuthority>;
   /** Validates a pasted key and stores it, answering the plan it grants. */
   uploadLicense(input: StoreLicenseInput): Promise<PlanInfo>;
+  /** Changes on every license this process stores or removes, so a gate can re-read at once. */
+  licenseRevision(): Promise<number>;
   /**
    * Redeems an activation code with LangWatch and stores the license it
    * minted, through the same validation as a pasted key.

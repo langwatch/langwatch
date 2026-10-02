@@ -1,10 +1,14 @@
 /** Sends selected traces to reviewers or queues. */
 
-import { VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
+import {
+  useAnnotationQueueList,
+  useOrganizationMembers,
+} from "../../behavior/use-annotation-reads.ts";
 import type { AnnotationSuccessNotice } from "../../model/annotation-host.ts";
 import { QueueParticipants, type QueueParticipant } from "../blocks/queue-participants.tsx";
 
@@ -114,15 +118,8 @@ export function SendToQueueDialog({
 
   // The picker reads the same query, so this shares its cache rather than
   // costing a second round trip.
-  const queues = annotationApi.annotation.getQueues.useQuery(
-    { projectId: projectId ?? "" },
-    { enabled: !!projectId },
-  );
-
-  const organization = annotationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId },
-  );
+  const queues = useAnnotationQueueList({ projectId });
+  const organization = useOrganizationMembers({ organizationId });
 
   const utils = annotationApi.useUtils();
 

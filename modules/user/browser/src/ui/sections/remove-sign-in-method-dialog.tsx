@@ -1,5 +1,5 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { SignInMethodRemovalTarget } from "../../behavior/use-sign-in-method-removal.ts";
 

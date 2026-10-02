@@ -4,7 +4,7 @@
  * The notifier over a stubbed browser Notification API and the real Langy store.
  * @see specs/langy/langy-notifications.feature
  */
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

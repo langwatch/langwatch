@@ -1,8 +1,8 @@
-import { Badge, Text } from "@chakra-ui/react";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+import { Badge, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
-import { api } from "../../../../../../../behavior/trace-api.ts";
+import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
+import { usePromptsForProject } from "../../../../../../../behavior/reads/use-project-reads.ts";
 import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
@@ -18,10 +18,7 @@ type Density = "compact" | "comfortable";
 const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({ row, density }) => {
   const promptId = row.promptId ?? null;
   const { project } = useOrganizationTeamProject();
-  const promptsQuery = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && !!promptId, staleTime: 5 * 60_000 },
-  );
+  const promptsQuery = usePromptsForProject({ projectId: project?.id, enabled: !!promptId });
 
   if (!promptId) {
     return (

@@ -148,7 +148,7 @@ function isEnterpriseRuntimeDependency(name: string): boolean {
 }
 
 function compatibleEnterpriseCompositionTarget(target: ClassifiedPackage): boolean {
-  if (target.kind === "contract") return true;
+  if (target.kind === "contract" || target.kind === "library") return true;
 
   return Boolean(target.enterprise && target.feature && target.kind === "process");
 }
@@ -228,6 +228,22 @@ function zodRuntimeViolation(
     specifier: "zod",
     message: `Feature packages cannot use the retired Zod runtime; found ${JSON.stringify(zodVersion)}.`,
     allowed: 'Declare the repository Zod 4 range and import schemas from "zod".',
+  };
+}
+
+/** A portable library declaring a runtime, transport, persistence or UI package. */
+function libraryRuntimeViolation(
+  pkg: ClassifiedPackage,
+  dependency: string,
+): ArchitectureViolation | undefined {
+  if (pkg.kind !== "library" || !isEnterpriseRuntimeDependency(dependency)) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `The portable library ${pkg.name} cannot depend on runtime, transport, persistence or UI package ${dependency}.`,
+    allowed: "Move the code that needs it into the module's process or browser package.",
   };
 }
 
@@ -373,7 +389,7 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
 const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
   if (!pkg.feature || !target.feature) return undefined;
   const isForeignFeature = pkg.feature !== target.feature;
-  const isImplementationTarget = target.kind !== "contract" && target.kind !== "browser";
+  const isImplementationTarget = !["contract", "browser", "library"].includes(target.kind);
   if (!isForeignFeature || !isImplementationTarget) return undefined;
 
   return {
@@ -421,6 +437,21 @@ const serverWebCheck: DependencyCheck = (pkg, target, dependency) => {
   };
 };
 
+/** A library depends on its own module's contract and other libraries only (ARCHITECTURE.md §2). */
+const libraryTargetCheck: DependencyCheck = (pkg, target, dependency) => {
+  if (pkg.kind !== "library" || target.kind === "library") return undefined;
+  if (target.kind === "contract" && target.feature === pkg.feature) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `The portable library ${pkg.name} cannot depend on ${target.kind} package ${target.name}.`,
+    allowed:
+      "Depend only on this module's contract, other module libraries and framework-free packages.",
+  };
+};
+
 const DEPENDENCY_TARGET_CHECKS: DependencyCheck[] = [
   applicationBoundaryCheck,
   enterpriseCompositionMismatchCheck,
@@ -432,6 +463,7 @@ const DEPENDENCY_TARGET_CHECKS: DependencyCheck[] = [
   contractImplementationCheck,
   webServerCheck,
   serverWebCheck,
+  libraryTargetCheck,
 ];
 
 /** Violations for one declared dependency of a package, given the package index by name. */
@@ -442,6 +474,7 @@ function dependencyViolations(
 ): ArchitectureViolation[] {
   const runtimeViolations = [
     enterpriseRuntimeViolation(pkg, dependency),
+    libraryRuntimeViolation(pkg, dependency),
     contractRuntimeViolation(pkg, dependency),
   ].flatMap((violation) => (violation ? [violation] : []));
   const target = byName.get(dependency);

@@ -1,28 +1,52 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Copy, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useMintPersonalToken } from "@langwatch/api-key-client";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Copy } from "lucide-react";
 
-import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
-import { usePersonalDeployment } from "../../behavior/personal-workspace-session.ts";
+import {
+  usePersonalToaster,
+  useShowErrorToast,
+} from "../../behavior/personal-workspace-feedback.ts";
+import {
+  useCurrentUser,
+  usePersonalDeployment,
+} from "../../behavior/personal-workspace-session.ts";
 
-const SECRET_MASK = "•".repeat(36);
-
-/** The API key field's display value: masked, revealed, or a placeholder. */
-function apiKeyDisplay({ apiKey, showSecret }: { apiKey: string; showSecret: boolean }): string {
-  if (!apiKey) return "—";
-  return showSecret ? apiKey : SECRET_MASK;
-}
-
-export function PersonalOtlpEndpointPanel({ apiKey }: { apiKey: string }) {
+/** The token lives in this component's memory only, for this project and user. */
+export function PersonalOtlpEndpointPanel({
+  organizationId,
+  projectId,
+}: {
+  organizationId: string;
+  projectId: string;
+}) {
   const toaster = usePersonalToaster();
+  const showErrorToast = useShowErrorToast();
+  const minting = useMintPersonalToken({
+    organizationId,
+    projectId,
+    userId: useCurrentUser()?.id,
+    name: "Personal access token",
+  });
+  const token = minting.token ?? null;
   const { appBaseUrl: baseHost } = usePersonalDeployment();
   const endpoint = baseHost ? `${baseHost}/api/otel` : "";
-  const [showSecret, setShowSecret] = useState(false);
 
   const envVars = endpoint
     ? `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${showSecret ? apiKey : SECRET_MASK}"`
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACEHOLDER}"`
     : "";
+
+  const createToken = () => {
+    minting
+      .mint()
+      .catch((error: unknown) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't create the personal access token" }),
+      );
+  };
 
   const copy = (value: string, label: string) => {
     void navigator.clipboard.writeText(value);
@@ -45,28 +69,12 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${showSecret ? apiKey : 
         </Button>
       </Row>
 
-      <Row label="API key">
-        <Text fontSize="sm" fontFamily="mono" wordBreak="break-all" flex={1}>
-          {apiKeyDisplay({ apiKey, showSecret })}
-        </Text>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => setShowSecret((v) => !v)}
-          disabled={!apiKey}
-        >
-          {showSecret ? <EyeOff size={12} /> : <Eye size={12} />}
-          {showSecret ? "Hide" : "Show"}
-        </Button>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => copy(apiKey, "API key")}
-          disabled={!apiKey}
-        >
-          <Copy size={12} /> Copy
-        </Button>
-      </Row>
+      <PersonalAccessTokenBanner
+        token={token}
+        isCreating={minting.isMinting}
+        onCreate={createToken}
+        scopeNote={minting.scopeNote}
+      />
 
       {envVars && (
         <Box
@@ -84,14 +92,8 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${showSecret ? apiKey : 
             <Button
               size="xs"
               variant="ghost"
-              onClick={() => {
-                const text = endpoint
-                  ? `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${apiKey}"`
-                  : "";
-                copy(text, "Env vars");
-              }}
-              disabled={!apiKey}
+              disabled={!token}
+              onClick={() => copy(envVars, "Env vars")}
             >
               <Copy size={12} /> Copy
             </Button>

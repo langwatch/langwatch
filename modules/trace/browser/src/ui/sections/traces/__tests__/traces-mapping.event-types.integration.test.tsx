@@ -1,11 +1,11 @@
+import type { MappingState } from "@langwatch/dataset-contract";
 /**
  * Integration tests for the "events" field mapping dropdown in TracesMapping.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { MappingState } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -76,14 +76,12 @@ function renderEventsMapping() {
     },
     expansions: [],
   };
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TracesMapping
-        traces={[traceWithoutEvents]}
-        traceMapping={traceMapping}
-        targetFields={["event_col"]}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TracesMapping
+      traces={[traceWithoutEvents]}
+      traceMapping={traceMapping}
+      targetFields={["event_col"]}
+    />,
   );
 }
 

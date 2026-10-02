@@ -12,6 +12,10 @@ let mockResolveHome: {
   data?: { destination: string; isOverride: boolean } & Record<string, unknown>;
   isError: boolean;
 } = { isError: false };
+let mockTestArrival: { data?: { testing: boolean }; isLoading: boolean } = {
+  data: { testing: false },
+  isLoading: false,
+};
 
 vi.mock("../../../../behavior/use-reachable-products.ts", () => ({
   useReachableProducts: () => ({
@@ -26,7 +30,7 @@ vi.mock("../../../../behavior/navigation-api.ts", () => ({
       resolveHome: { useQuery: () => mockResolveHome },
     },
     identity: {
-      myTestArrival: { useQuery: () => ({ data: { testing: false }, isLoading: false }) },
+      myTestArrival: { useQuery: () => mockTestArrival },
     },
   },
 }));
@@ -38,13 +42,13 @@ import LandingScreen from "../landing.screen.tsx";
 const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };
 
-function renderLanding() {
+function renderLanding({ orgless = false }: { orgless?: boolean } = {}) {
   return render(
     <WithStubNavigationHost
       readings={{
-        organization: ORGANIZATION,
-        organizations: [ORGANIZATION],
-        project: PROJECT,
+        organization: orgless ? undefined : ORGANIZATION,
+        organizations: orgless ? [] : [ORGANIZATION],
+        project: orgless ? undefined : PROJECT,
         isLoading: false,
       }}
       actions={{ replace: replaceMock }}
@@ -57,6 +61,7 @@ function renderLanding() {
 beforeEach(() => {
   localStorage.clear();
   replaceMock.mockClear();
+  mockTestArrival = { data: { testing: false }, isLoading: false };
   mockResolveHome = {
     data: {
       destination: "/demo",
@@ -126,6 +131,42 @@ describe("the root landing", () => {
       );
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a test sign-in leaves somebody with no organization", () => {
+    // With no organization the home query is disabled, so it never answers.
+    beforeEach(() => {
+      mockResolveHome = { isError: false };
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("sends them to the test sign-in result, not to onboarding", async () => {
+      mockTestArrival = { data: { testing: true }, isLoading: false };
+      renderLanding({ orgless: true });
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/auth/sso-test-complete");
+      });
+      expect(replaceMock).not.toHaveBeenCalledWith("/onboarding/welcome");
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("sends them nowhere while the server has not answered", async () => {
+      mockTestArrival = { data: undefined, isLoading: true };
+      renderLanding({ orgless: true });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("still sends somebody who is not a test arrival to onboarding", async () => {
+      renderLanding({ orgless: true });
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/onboarding/welcome");
+      });
     });
   });
 });

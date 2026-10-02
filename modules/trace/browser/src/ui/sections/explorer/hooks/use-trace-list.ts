@@ -1,5 +1,4 @@
-import type { TraceListCursor } from "@langwatch/trace-browser-kit";
-
+import type { TraceListCursor } from "../../../../behavior/query.slice.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { useNewlyArrivedTraceIds } from "./use-newly-arrived-trace-ids.ts";
 import { useTraceListAnnotations } from "./use-trace-list-annotations.ts";

@@ -1,4 +1,4 @@
-import { Card, GridItem, Heading, HStack } from "@chakra-ui/react";
+import { Card, GridItem, Heading, HStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren } from "react";
 import { BarChart2 } from "react-feather";
 

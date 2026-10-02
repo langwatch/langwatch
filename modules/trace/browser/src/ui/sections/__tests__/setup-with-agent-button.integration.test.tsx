@@ -1,11 +1,11 @@
+import { setUiFeedbackHost, type UiFeedbackSink } from "@langwatch/browser-host/toaster";
 /**
  * The set-up-with-AI control every empty state carries (spec:
  * specs/skills/empty-state-skill-setup.feature).
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { setUiFeedbackHost, type UiFeedbackSink } from "@langwatch/browser-host/toaster";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 const askLangyMock = vi.fn();
-vi.mock("@langwatch/langy-browser-kit", () => ({
+vi.mock("../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: { askLangy: (p: string) => void }) => unknown) =>
     selector({ askLangy: askLangyMock }),
 }));
@@ -84,11 +84,7 @@ const REPO_CONNECTED: SetupSurface[] = [
 ];
 
 function renderButton({ surface, apiKey }: { surface: SetupSurface; apiKey?: string }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SetupWithAgentButton surface={surface} apiKey={apiKey} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SetupWithAgentButton surface={surface} apiKey={apiKey} />);
 }
 
 beforeEach(() => {
@@ -255,20 +251,18 @@ describe("SetupWithAgentButton", () => {
         value: { writeText },
         configurable: true,
       });
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <AgentActionsMenu
-            triggerLabel="Onboard your agent"
-            langy={null}
-            copy={{
-              skill: "tracing",
-              label: "Copy a prompt for your coding agent",
-              hint: "Paste it into your coding agent",
-              copiedTitle: "Prompt copied",
-            }}
-            docs={{ href: "https://docs.langwatch.ai", label: "Read the guide", hint: "Docs" }}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <AgentActionsMenu
+          triggerLabel="Onboard your agent"
+          langy={null}
+          copy={{
+            skill: "tracing",
+            label: "Copy a prompt for your coding agent",
+            hint: "Paste it into your coding agent",
+            copiedTitle: "Prompt copied",
+          }}
+          docs={{ href: "https://docs.langwatch.ai", label: "Read the guide", hint: "Docs" }}
+        />,
       );
 
       await user.click(screen.getByRole("button", { name: /onboard your agent/i }));

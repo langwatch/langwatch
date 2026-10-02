@@ -3,16 +3,17 @@
  * the media thumbnail/indicator badges.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
-import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IOPreview } from "../io-preview.tsx";
 
 const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
 
-vi.mock("@langwatch/stored-object-browser-kit", () => ({ useStoredObjectUrl: mint }));
+vi.mock("../../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
+  useStoredObjectUrl: mint,
+}));
 
 beforeEach(() => {
   mint.mockImplementation(({ reference }: { reference: string }) => ({
@@ -38,15 +39,13 @@ function renderPreview(
   output: string | null,
   mediaRefs?: { input?: TraceMediaRef[]; output?: TraceMediaRef[] },
 ) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IOPreview
-        input={input}
-        output={output}
-        inputMediaRefs={mediaRefs?.input}
-        outputMediaRefs={mediaRefs?.output}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <IOPreview
+      input={input}
+      output={output}
+      inputMediaRefs={mediaRefs?.input}
+      outputMediaRefs={mediaRefs?.output}
+    />,
   );
 }
 
@@ -225,16 +224,14 @@ describe("IOPreview missing-side placeholders", () => {
       outputRedacted?: boolean;
     } = {},
   ) {
-    return render(
-      <ChakraProvider value={defaultSystem}>
-        <IOPreview
-          input={input}
-          output={output}
-          showMissingPlaceholders={over.showMissingPlaceholders ?? true}
-          inputRedacted={over.inputRedacted}
-          outputRedacted={over.outputRedacted}
-        />
-      </ChakraProvider>,
+    return renderWithDesignSystem(
+      <IOPreview
+        input={input}
+        output={output}
+        showMissingPlaceholders={over.showMissingPlaceholders ?? true}
+        inputRedacted={over.inputRedacted}
+        outputRedacted={over.outputRedacted}
+      />,
     );
   }
 

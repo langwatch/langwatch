@@ -1,6 +1,8 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { promptClient } from "@langwatch/prompt-client";
 import { useMemo } from "react";
+
+import { experimentApi } from "./experiment-api.ts";
 
 /**
  * Fetches agents and prompts for the current project and builds a
@@ -10,11 +12,11 @@ import { useMemo } from "react";
 export function useTargetNameMap(): Map<string, string> {
   const { project } = useOrganizationTeamProject();
 
-  const { data: agents } = api.agents.getAll.useQuery(
+  const { data: agents } = experimentApi.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
+  const { data: prompts } = promptClient.prompts.getAllPromptsForProject.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );

@@ -1,7 +1,16 @@
-import { Badge, Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {

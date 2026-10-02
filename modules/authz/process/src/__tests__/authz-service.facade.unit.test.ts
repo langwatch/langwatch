@@ -1,11 +1,9 @@
-import {
-  AuthzService as AuthzServiceContract,
-  PermissionDeniedError,
-} from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzService as AuthzServiceContract } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
@@ -22,7 +20,7 @@ function makeService({ listing = new StubAuthzListingRepository(), reader = make
       isOnEngine: async () => true,
       repository: reader,
       listing,
-      bindings: new StubAuthzBindingRepository(),
+      bindings: new StubAuthzManagedGrantRepository(),
     }),
   };
 }

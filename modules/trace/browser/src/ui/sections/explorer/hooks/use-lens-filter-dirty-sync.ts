@@ -1,5 +1,6 @@
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef } from "react";
+
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 
 /**
  * Bridge: subscribe to `filterStore.queryText` and forward changes into

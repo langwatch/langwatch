@@ -1,9 +1,9 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
-import type { GuidedPullRequest } from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";
 import { type ProfilerOnRenderCallback, type RefObject, useEffect, useMemo } from "react";
 
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import type { GuidedPullRequest } from "../../../../guided-onboarding/model/guided-conversation.ts";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
 import type { useLangyComposerModel } from "../../../behavior/panel/use-langy-composer-model.ts";
 import type { useLangyLocalWaits } from "../../../behavior/panel/use-langy-local-waits.ts";

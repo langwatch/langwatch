@@ -4,9 +4,9 @@
  * under the names the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const gatewayWeb = defineWebModule("gateway")
+export const gatewayWeb = defineBrowserModule("gateway")
   .withHosts({
     requires: ["GatewayHostApi"],
     mounts: { GatewayHostApi: { load: () => import("./behavior/gateway-host-mount.tsx") } },

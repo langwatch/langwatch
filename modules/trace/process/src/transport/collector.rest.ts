@@ -5,7 +5,7 @@
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import type { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import {
   ingestDoorRefusalBody,

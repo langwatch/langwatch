@@ -3,7 +3,7 @@
  * anyway. Uses real Redis (marker+handoff two keys one lifetime). See
  * specs/langy/langy-stop-and-resume.feature.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Redis } from "ioredis";
 import IORedis from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";

@@ -1,12 +1,20 @@
+import type { WireOf } from "@langwatch/api/web";
+import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
 /**
  * Searchable list of the project's datasets: shared by the Choose Dataset
  * drawer (evaluations workbench) and the workflow dataset node. Renders
  * search, loading and empty states, one card per dataset with counts and date.
  */
-import { Box, chakra, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { WireOf } from "@langwatch/api/web";
-import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
-import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  Box,
+  chakra,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { formatDistanceToNow } from "@langwatch/time";
 import { Database, Search } from "lucide-react";
 import { useMemo, useState } from "react";

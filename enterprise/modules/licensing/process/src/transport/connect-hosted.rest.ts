@@ -42,7 +42,7 @@ function callerOf(input: {
 export const connectHostedRest = defineRestRouter(LicensingApi)
   .withNamespace("connect-hosted")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/internal/gateway/connect/instant-evals-classify", "classifyForHostedCaller")

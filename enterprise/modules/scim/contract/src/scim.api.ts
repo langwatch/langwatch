@@ -9,7 +9,7 @@
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   DirectoryIdentityRow,
@@ -60,6 +60,9 @@ export type ScimTokenAuditEntry = Readonly<{
   args: Readonly<Record<string, unknown>>;
 }>;
 
+/** Who mints a token: the member, and the organization key the call arrived on (which bounds it). */
+export type ScimTokenCaller = Readonly<{ id: string; apiKeyId?: string | null }>;
+
 export interface ScimApi {
   // ── The organization's provisioning tokens ───────────────────────────────
 
@@ -75,16 +78,24 @@ export interface ScimApi {
   findDirectoryExternalIds(input: {
     organizationId: string;
   }): Promise<{ userId: string; externalId: string }[]>;
+  /** Whether this organization's directory holds the person as inactive: asked
+   *  by a single sign-on before it attaches an assertion to them. */
+  isDirectoryUserInactive(input: { organizationId: string; userId: string }): Promise<boolean>;
+  /** The connections whose directory sync provisioned the person. */
+  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
   /**
    * Mints a token for one directory connection. `connectionId` is the whole of
    * the token's write authority, so it is named rather than defaulted.
    */
-  generateToken(input: {
-    organizationId: string;
-    connectionId?: string | undefined;
-    description?: string | undefined;
-    secret?: string | undefined;
-  }): Promise<IssuedScimToken>;
+  generateToken(
+    input: {
+      organizationId: string;
+      connectionId?: string | undefined;
+      description?: string | undefined;
+      secret?: string | undefined;
+    },
+    by: ScimTokenCaller,
+  ): Promise<IssuedScimToken>;
   /** Retires one token. Idempotent from the caller's side. */
   revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }>;
   /**

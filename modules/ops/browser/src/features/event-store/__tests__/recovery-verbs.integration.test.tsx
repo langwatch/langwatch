@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Same recovery vocabulary across queue and outbox substrates (drifted: "Replay"
  * vs "Redrive" for same act).
  */
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

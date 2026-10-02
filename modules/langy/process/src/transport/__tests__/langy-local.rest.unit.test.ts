@@ -4,14 +4,15 @@
  * proves the owner and the conversation) and answers its result as JSON, status 200.
  * @see specs/langy/langy-local-control.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { canonicalErrorResponse, createRestRuntime, type RestCaller } from "@langwatch/api/rest";
+import type { RestCaller } from "@langwatch/api/hosting";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
   type LangyApi,
   LangyConversationNotFoundError,
   LangyLocalRecordNotFoundError,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalRest } from "../langy-local.rest.ts";

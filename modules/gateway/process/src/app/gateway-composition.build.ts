@@ -1,8 +1,10 @@
-import type { AuthzApi, AuthzPermission, ApiKeyPermissionScope } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -41,6 +43,7 @@ import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
 import {
   GatewayScopeResolutionService,
   type GatewayPlatformProviders,
@@ -48,7 +51,7 @@ import {
 import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import { GatewayService } from "../services/gateway.service.ts";
+import { GatewayService, type GatewayBudgetOrganizations } from "../services/gateway.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
 import type {
   MembershipSet,
@@ -98,6 +101,7 @@ class GatewayClickHouseSession implements GatewayClickHouseClient {
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
     unscoped?: { reason: string };
     tenantIds?: readonly string[];
+    signal?: AbortSignal;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
@@ -107,6 +111,7 @@ class GatewayClickHouseSession implements GatewayClickHouseClient {
       settings: input.clickhouse_settings as Record<string, string | number> | undefined,
       ...(input.unscoped ? { unscoped: input.unscoped } : {}),
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
+      ...(input.signal ? { signal: input.signal } : {}),
     });
 
     return { json: <T = unknown>() => Promise.resolve(rows as T[]) };
@@ -180,6 +185,8 @@ export type GatewayControlPlanePeers = Readonly<{
   authz: AuthzApi;
   /** The project directory the tenancy graph composed. */
   projects: ProjectApi;
+  /** The organization directory: existence, membership, groups and their members. */
+  organizations: OrganizationApi;
   /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
   evaluators: EvaluatorApi;
   /** The monitors a guardrail attachment names. */
@@ -243,16 +250,19 @@ function everyClickHouseServer(clickhouse: ClickHouseQueryClient): GatewayClickH
 }
 
 /**
- * Composes the gateway control plane: the whole of what {@link GatewayApp}'s
+ * Composes the gateway control plane: the whole of what {@link GatewayModule}'s
  * core surface answers from.
  */
 export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {
   const { prisma, peers } = options;
-  const { projects } = peers;
+  const { projects, organizations } = peers;
   const permissions = GatewayAuthzScopePermissions.create(peers.authz);
   const organizationDirectory = PrismaGatewayOrganizationDirectoryRepository.create(prisma);
+  const organizationFacts = GatewayOrganizationDirectoryService.create({ organizations });
   const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
     directory: PrismaVirtualKeyAuthorizationRepository.create({ database: prisma }),
+    organizations,
+    projects,
   });
   // One resolution over the one member, per tenant. `Promise.resolve` because
   // there is nothing to open: the client already exists.
@@ -262,6 +272,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   const scopeResolution = GatewayScopeResolutionService.create({
     repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
     platformProviders: peers.platformProviders,
+    projects,
   });
   const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const virtualKeys = VirtualKeyService.create({
@@ -287,6 +298,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   const budgetDecisions = PrismaGatewayAdapter.create({
     database: prisma,
     projects,
+    organizations,
     evaluators: peers.evaluators,
     monitors: peers.monitors,
     // The change feed the Go data plane long-polls and the audit trail every
@@ -321,7 +333,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     spendEvents,
     projects,
     usage,
-    // `reads("clickhouse")` is a boot claim: a process that opened no
+    // `reads = ["clickhouse"]` is a boot claim: a process that opened no
     // ClickHouse never reaches this function, so the spend source is present
     // whenever the control plane is.
     spendSourceAvailable: true,
@@ -341,8 +353,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     // The refusal the deleted composition raised, unchanged: the anchor is
     // read from both doors and a second taxonomy here would change what a
     // tRPC caller already sees.
-    assertOrganizationExists: (organizationId) =>
-      organizationDirectory.assertExists(organizationId),
+    assertOrganizationExists: (organizationId) => organizationFacts.assertExists(organizationId),
     resolveProviderLabels: (budgets) =>
       PrismaGatewayProviderLabelRepository.create(prisma).resolveProviderLabels([...budgets]),
     listGroupTargets: (organizationId) => organizationDirectory.findGroupTargets(organizationId),
@@ -350,12 +361,18 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     // The label per key a page of spend rows carries, read through this
     // feature's OWN persistence rather than by a key-table `findMany`.
     resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
-    isOrganizationMember: (input) => organizationDirectory.isMember(input),
+    isOrganizationMember: (input) => organizationFacts.isMember(input),
     // A scoped API key acts as its owning user; a legacy project key carries
     // none, so it acts as a stable machine principal for its project, which
     // keeps an audit row traceable back to the credential that wrote it.
-    actorForCredential: ({ projectId, credential }) =>
-      credential.kind === "apiKey"
+    actorForCredential: ({ projectId, credential }) => {
+      if (credential.kind === "user") {
+        return {
+          actor: { kind: "cliAccessToken", userId: credential.userId, projectId },
+          actorUserId: credential.userId,
+        } satisfies { actor: VirtualKeyActor; actorUserId: string };
+      }
+      return credential.kind === "apiKey"
         ? {
             actor: {
               kind: "apiKey",
@@ -368,7 +385,8 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         : {
             actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
             actorUserId: `svc_${projectId}`,
-          },
+          };
+    },
 
     listVisibleVirtualKeys: async ({ organizationId, userId }) => {
       const membership = await virtualKeyAuthorization.loadMembershipSet({
@@ -480,6 +498,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
       VirtualKeyDirectBudgetService.create({
         repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+        projects,
       }).loadDirectBudgetsForKeys({
         organizationId,
         virtualKeyIds: [...virtualKeyIds],
@@ -513,6 +532,13 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
       userId: actor.userId,
       organizationId: actor.organizationId,
     };
+  }
+  if (actor.kind === "cliAccessToken") {
+    const userId = "userId" in actor ? actor.userId : null;
+    const projectId = "projectId" in actor ? actor.projectId : null;
+    if (typeof userId === "string" && typeof projectId === "string") {
+      return { kind: "cliAccessToken", userId, projectId };
+    }
   }
   if (
     actor.kind === "legacyProjectKey" &&
@@ -584,6 +610,7 @@ export class PrismaGatewayAdapter {
   static create(options: {
     database: GatewayPersistence;
     projects: ProjectApi;
+    organizations: GatewayBudgetOrganizations;
     evaluators: EvaluatorApi;
     monitors: MonitorApi;
     changes: GatewayChangeEvents;
@@ -612,6 +639,7 @@ export class PrismaGatewayAdapter {
       GatewayService.create({
         repository: budgetRepository,
         projects: options.projects,
+        organizations: options.organizations,
         cacheRules,
         guardrails,
       }),

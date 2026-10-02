@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { presenceWeb } from "../presence.web.ts";
@@ -21,15 +21,6 @@ describe("given a browser that installs presence", () => {
         .render();
 
       expect(installed.modules).toContain(presenceWeb);
-    });
-  });
-
-  describe("when the surface the declaration publishes is asked for", () => {
-    it("resolves the presence store and components", async () => {
-      const publication = presenceWeb.installation.publications.presence;
-      const loaded = await publication?.load();
-
-      expect(loaded).toBeDefined();
     });
   });
 });

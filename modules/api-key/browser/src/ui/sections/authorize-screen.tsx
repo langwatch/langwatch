@@ -1,12 +1,12 @@
-// /authorize: copy the project API key on a standalone branded card; the host lends the
-// switcher. Signed out, it sends the reader to sign in and back, as main's DashboardLayout did.
+// /authorize: mint and copy a personal access token on a standalone branded card; the host lends
+// the switcher. Signed out, it sends the reader to sign in and back, as main's DashboardLayout did.
 
-import { HStack, Text, VStack } from "@chakra-ui/react";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { PersonalAccessTokenBanner } from "@langwatch/design-system/personal-access-token-banner";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
-import { CopyInput } from "../elements/copy-input.tsx";
 
 export default function Authorize() {
   const host = useAuthorizeHost();
@@ -24,7 +24,7 @@ export default function Authorize() {
     <BrandedCardPage>
       <BrandedCard
         title="Authorize"
-        intro="Copy your LangWatch API key and paste it into your command line or notebook to authorize it."
+        intro="Create a LangWatch personal access token and paste it into your command line or notebook to authorize it."
       >
         <HStack width="full" justify="space-between">
           <Text fontSize="sm" color="fg.muted">
@@ -47,5 +47,43 @@ export default function Authorize() {
 
 export function APIKeyCopyInput({ onCopied }: { onCopied?: () => void }) {
   const host = useAuthorizeHost();
-  return <CopyInput value={host.revealProjectApiKey() ?? ""} label="API key" onCopied={onCopied} />;
+  const [isRevealing, setIsRevealing] = useState(false);
+  // A failed copy (Safari after an await) keeps the token on screen to copy by hand.
+  const projectId = host.scope().projectId;
+  const [uncopied, setUncopied] = useState<{ projectId: string | undefined; token: string }>();
+  const shown = uncopied && uncopied.projectId === projectId ? uncopied.token : undefined;
+
+  const copyKey = async () => {
+    setIsRevealing(true);
+    try {
+      const text = await host.mintProjectToken();
+      if (!text) return;
+      const copied = await host.copyToClipboard({
+        text,
+        succeeded: { title: "Personal access token copied to clipboard" },
+      });
+      if (copied) onCopied?.();
+      else setUncopied({ projectId, token: text });
+    } catch (error) {
+      host.failed({ error, fallbackTitle: "Couldn't create the personal access token" });
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
+  if (shown) {
+    return (
+      <PersonalAccessTokenBanner
+        token={shown}
+        isCreating={isRevealing}
+        onCreate={() => void copyKey()}
+      />
+    );
+  }
+
+  return (
+    <Button loading={isRevealing} onClick={() => void copyKey()}>
+      Create and copy a personal access token
+    </Button>
+  );
 }

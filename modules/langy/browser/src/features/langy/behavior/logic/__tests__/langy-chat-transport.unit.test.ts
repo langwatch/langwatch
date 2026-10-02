@@ -334,6 +334,23 @@ describe("createLangyChatTransport", () => {
       ]);
     });
 
+    /** @scenario "The retry line shows on a turn that picks up after an answered card" */
+    it("marks only the first pre-output status as readiness, so a retry line before output stays real", async () => {
+      // The manager's "Thinking…" is the one placeholder. A retry line the
+      // worker sends before its first output is not one: on a turn that already
+      // shows a card, the panel hides readiness statuses, and the retry line
+      // would vanish with it.
+      onData({ type: "status", status: "Thinking…" });
+      onData({ type: "status", status: "Retrying (1 of 5)" });
+      onData({ type: "status", status: "" });
+
+      expect(onSignal.mock.calls.map(([s]) => s)).toEqual([
+        { type: "status", status: "Thinking…", readiness: true },
+        { type: "status", status: "Retrying (1 of 5)", readiness: false },
+        { type: "status", status: "", readiness: false },
+      ]);
+    });
+
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
       // First output fires the one-shot cold-start clear…
       onData({ type: "delta", text: "Looking…" });

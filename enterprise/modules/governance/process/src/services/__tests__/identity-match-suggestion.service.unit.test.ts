@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -196,6 +196,7 @@ describe("Feature: computing who a provider-named person might be", () => {
   });
 
   describe("given stored suggestions from an earlier run", () => {
+    /** @scenario "Running the suggestion job again replaces what it found last time" */
     it("replaces them with what the new inputs imply", async () => {
       const world = buildWorld();
       await world.seedPerson("m.silva");

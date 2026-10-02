@@ -30,11 +30,6 @@ export function useOrganizationTeamProject(): GatewayScopeReading {
       project: host.project(),
       team: host.team(),
       hasPermission: (permission: string) => host.hasPermission(permission),
-      // The platform hook drew a distinction the gateway screens never used
-      // differently: `hasPermission` asked about the active project and
-      // `hasAnyPermission` about anywhere in the organization, and every
-      // gateway resource is organization-scoped, so both asked the same
-      // question. One answer, under both names, so no call site changed.
       hasAnyPermission: (permission: string) => host.hasPermission(permission),
     }),
     [host],

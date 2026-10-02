@@ -1,12 +1,12 @@
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * An organization's own single sign-on setup: one read, and the steps that
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Heading, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -21,6 +21,7 @@ import { useMigrationMembers } from "../../behavior/use-migration-members.ts";
 import { useSettlingSetup } from "../../behavior/use-settling-setup.ts";
 import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.ts";
 import { liveBreakGlassGrants } from "../../model/break-glass-grants.ts";
+import { identityProviderIsEditable } from "../../model/identity-provider-edit.ts";
 import { providerDisplayName } from "../../model/provider-display-name.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import {
@@ -42,6 +43,7 @@ import {
   type ConnectionRemovalCommand,
 } from "./connection-removal.section.tsx";
 import { DomainsSection } from "./domains.section.tsx";
+import { EditIdentityProviderSection } from "./edit-identity-provider.section.tsx";
 import { GoLiveSection } from "./go-live.section.tsx";
 import { HistorySection } from "./history.section.tsx";
 import { MigrationProgressSection } from "./migration-progress.section.tsx";
@@ -423,6 +425,8 @@ function SetupJourneySteps({
   const activate = ssoApi.ssoSetup.activate.useMutation();
   // Set between an activation being accepted and the read saying ACTIVE.
   const [activationAccepted, setActivationAccepted] = useState(false);
+  const [editingIdp, setEditingIdp] = useState(false);
+  const canEditIdp = identityProviderIsEditable({ canManage, connection });
   const connectionId = connection.connectionId;
   const facts = goLiveFactsOf(view.goLive);
 
@@ -458,6 +462,8 @@ function SetupJourneySteps({
     );
   };
 
+  const licenseProves = provesWithLicense({ availability: view.availability });
+
   return (
     <SetupSteps>
       <SetupStep
@@ -480,22 +486,35 @@ function SetupJourneySteps({
               onRename={renameConnection}
             />
           </HStack>
-          {connection.issuer && <IssuerRow issuer={connection.issuer} />}
+          {connection.issuer && (
+            <IssuerRow
+              issuer={connection.issuer}
+              onEdit={canEditIdp && !editingIdp ? () => setEditingIdp(true) : null}
+            />
+          )}
+          {editingIdp && (
+            <EditIdentityProviderSection
+              organizationId={organizationId}
+              connectionId={connectionId}
+              onDone={() => setEditingIdp(false)}
+            />
+          )}
           <ServiceProviderSection
             protocol={connection.type}
             addresses={view.serviceProvider}
             connected
+            deploymentSignIn={view.serviceProvider.deploymentSignIn}
           />
         </VStack>
       </SetupStep>
 
       <SetupStep
         number={2}
-        title="Prove a domain is yours"
+        title={licenseProves ? "Add your domain" : "Prove a domain is yours"}
         state={progress.domain}
         summary={
           connection.verifiedDomains.length > 0
-            ? `${connection.verifiedDomains.join(", ")} proved`
+            ? `${connection.verifiedDomains.join(", ")} ${licenseProves ? "added" : "proved"}`
             : undefined
         }
       >
@@ -503,7 +522,7 @@ function SetupJourneySteps({
           organizationId={organizationId}
           connectionId={connectionId}
           canManage={canManage}
-          provesWithLicense={provesWithLicense({ connection, record: view.record })}
+          provesWithLicense={licenseProves}
           evidence={domainEvidenceOf(connection)}
           claims={domainClaimsOf(view.claims)}
           onChanged={onChanged}

@@ -3,8 +3,15 @@
  * stands on, wide enough for the permission list, with a way to sign out.
  */
 
-import { Box, HStack, IconButton, Skeleton, SkeletonText, VStack } from "@chakra-ui/react";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import {
+  Box,
+  HStack,
+  IconButton,
+  Skeleton,
+  SkeletonText,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LogOut } from "lucide-react";
 import type React from "react";

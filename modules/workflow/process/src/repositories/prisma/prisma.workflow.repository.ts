@@ -3,6 +3,7 @@ import {
   workflowSchema,
   workflowVersionSchema,
   type Workflow,
+  type WorkflowDsl,
   type WorkflowVersion,
   type WorkflowWithVersion,
   type WorkflowReference,
@@ -47,6 +48,8 @@ type WorkflowRow = Omit<
 };
 
 type VersionRow = Omit<WorkflowVersion, "dsl"> & { dsl?: unknown };
+
+const updateCountSchema = z.object({ count: z.number() });
 
 const workflowFieldSourceRowsSchema = z.array(
   z.object({ id: z.string(), currentVersion: z.object({ dsl: z.unknown() }).nullish() }),
@@ -304,6 +307,20 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
         data: { ...input, id: undefined },
       }),
     );
+  }
+
+  async updateVersionDslIfUnchanged(input: {
+    id: string;
+    projectId: string;
+    dsl: WorkflowDsl;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const written = await this.database.workflowVersion.updateMany({
+      where: { id: input.id, projectId: input.projectId, updatedAt: input.updatedAt },
+      data: { dsl: input.dsl },
+    });
+
+    return updateCountSchema.parse(written).count === 1;
   }
 
   async setVersionPointers(input: {

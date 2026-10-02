@@ -55,9 +55,11 @@ export const apiKeySchema = z
     lastUsedAt: z.date().nullable(),
     ingestSourceType: z.string().nullable(),
     ingestionTemplateId: z.string().nullable(),
+    /** Minted by LangWatch for itself (a run, the gateway, Langy), never by a customer. */
+    isSystemManaged: z.boolean().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
-    roleBindings: z.array(apiKeyBindingSchema),
+    grants: z.array(apiKeyBindingSchema),
   })
   .strict();
 export type ApiKey = z.infer<typeof apiKeySchema>;
@@ -67,6 +69,8 @@ const apiKeyMutationShape = {
   organizationId: z.string().min(1),
   userId: z.string().min(1).nullable().optional(),
   createdByUserId: z.string().min(1).nullable().optional(),
+  /** The organization key making the request, which bounds every binding it grants. */
+  callerApiKeyId: z.string().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
   expiresAt: z.date().nullable().optional(),
   permissionMode: z.string().default("all"),
@@ -90,6 +94,7 @@ export const updateApiKeyInputSchema = z
     id: z.string().min(1),
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1).nullable(),
+    callerApiKeyId: z.string().min(1).nullable().optional(),
     callerIsAdmin: z.boolean(),
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),

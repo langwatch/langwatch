@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { GatewayKeyReachCandidate } from "../gateway-budget.repository.ts";
+import type { GatewayKeyReachRow } from "../gateway-budget.repository.ts";
 
 /** The client slice the reach walk reads. */
-export type GatewayBudgetScopeReachDatabase = Pick<PrismaClient, "virtualKey" | "groupMembership">;
+export type GatewayBudgetScopeReachDatabase = Pick<PrismaClient, "virtualKey">;
 
 /** Gateway-owned active-key facts used by the budget reach policy. */
 export class PrismaGatewayBudgetScopeReachRepository {
@@ -15,15 +15,11 @@ export class PrismaGatewayBudgetScopeReachRepository {
     return new PrismaGatewayBudgetScopeReachRepository(database);
   }
 
-  async findAll(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
+  async findAll(organizationId: string): Promise<GatewayKeyReachRow[]> {
     const keys = await this.database.virtualKey.findMany({
       where: { organizationId, status: "ACTIVE" },
       include: { scopes: true },
     });
-    const groupIdsByPrincipal = await this.listGroupIds(
-      organizationId,
-      keys.map((key) => key.principalUserId),
-    );
 
     return keys.map((key) => ({
       organizationId: key.organizationId,
@@ -33,29 +29,6 @@ export class PrismaGatewayBudgetScopeReachRepository {
       traceProjectId: key.traceProjectId,
       virtualKeyId: key.id,
       principalUserId: key.principalUserId,
-      groupIds: key.principalUserId ? (groupIdsByPrincipal.get(key.principalUserId) ?? []) : [],
     }));
-  }
-
-  private async listGroupIds(
-    organizationId: string,
-    principalUserIds: (string | null)[],
-  ): Promise<Map<string, string[]>> {
-    const ids = [...new Set(principalUserIds.filter((id): id is string => id !== null))];
-    const groupsByPrincipal = new Map<string, string[]>();
-    if (ids.length === 0) {
-      return groupsByPrincipal;
-    }
-
-    const memberships = await this.database.groupMembership.findMany({
-      where: { userId: { in: ids }, group: { organizationId } },
-      select: { userId: true, groupId: true },
-    });
-    for (const membership of memberships) {
-      const groupIds = groupsByPrincipal.get(membership.userId) ?? [];
-      groupIds.push(membership.groupId);
-      groupsByPrincipal.set(membership.userId, groupIds);
-    }
-    return groupsByPrincipal;
   }
 }

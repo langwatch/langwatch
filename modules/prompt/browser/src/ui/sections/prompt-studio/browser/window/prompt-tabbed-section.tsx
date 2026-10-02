@@ -1,8 +1,6 @@
-import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type LayoutMode, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
@@ -10,7 +8,10 @@ import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { type LayoutMode } from "../../../../../model/layout-mode.ts";
 import { usePromptHost } from "../../../../../model/prompt-host.ts";
+import { renderSourceTypeIcon } from "../../../../elements/workflow/workflow-icons.tsx";
+import { type Variable, VariablesSection } from "../../../variables/variables-section.tsx";
 import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable.tsx";
 import {
   PromptPlaygroundChat,

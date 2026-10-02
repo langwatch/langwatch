@@ -27,10 +27,7 @@ import { z } from "zod";
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import {
-  createEvaluationProcessingPipeline,
-  type EvaluationAutomationReactions,
-} from "../eventing/evaluation-processing-definition.pipeline.ts";
+import { createEvaluationProcessingPipeline } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
 import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 
@@ -44,11 +41,6 @@ const evaluationEventSchema = z.discriminatedUnion("type", [
 ]);
 const parseEvaluationEvent = (value: unknown): EvaluationProcessingEvent =>
   evaluationEventSchema.parse(value);
-
-const quietAutomations: EvaluationAutomationReactions = {
-  handleEvaluationTriggerMatch: () => Promise.resolve(),
-  handleEvaluationGraphTriggerActivity: () => Promise.resolve(),
-};
 
 function foldStore<State>(): FoldProjectionStore<State> {
   return {
@@ -264,7 +256,6 @@ describe("evaluation processing live FIFO", () => {
       executeEvaluationCommand: ExecuteEvaluationCommand.create({
         execute: async () => [],
       }),
-      automations: quietAutomations,
     });
 
     expect(

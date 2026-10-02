@@ -1,8 +1,8 @@
 import {
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/error-presentation/presentation";
-import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
+} from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 import { describe, expect, it } from "vitest";
 
 import {

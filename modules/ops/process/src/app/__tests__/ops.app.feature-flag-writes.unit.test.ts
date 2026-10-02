@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 /**
  * Operator writes reach explicit registry entries and the kill switches the
@@ -6,12 +5,13 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
  * @see specs/ops/internal-feature-flags.feature
  */
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
   OpsEventingIntrospection,
   OpsKillSwitchDescriptor,
-  OpsApp,
+  OpsModule,
   OpsCapability,
 } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
@@ -39,7 +39,7 @@ class OneSwitchIntrospection implements OpsEventingIntrospection {
   }
 }
 
-function buildApp(): { app: OpsApp; written: string[] } {
+function buildApp(): { app: OpsModule; written: string[] } {
   const written: string[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
     setEnabled: async ({ key }: { key: string }) => {

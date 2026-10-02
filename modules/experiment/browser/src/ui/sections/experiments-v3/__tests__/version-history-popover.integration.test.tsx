@@ -3,8 +3,8 @@
  * The workbench's version history popover: real button and list against
  * mocked tRPC — the two-step restore, permission gate, popover closing.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,8 +63,8 @@ let versionsQuery: {
   isError: boolean;
 } = { data: undefined, isLoading: true, isError: false };
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     experiments: {
       listWorkbenchVersions: { useQuery: () => versionsQuery },
       restoreWorkbenchVersion: {
@@ -134,11 +134,7 @@ const historyTrigger = () => screen.getByRole("button", { name: "Version history
  */
 const openHistory = async () => {
   const user = userEvent.setup();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <VersionHistoryButton />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<VersionHistoryButton />);
   await user.click(historyTrigger());
   await screen.findByTestId("version-history-popover");
   await waitFor(() => {

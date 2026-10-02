@@ -4,7 +4,7 @@ import { createContext, type ReactNode, useContext, useMemo } from "react";
  * How the trace surface is being viewed.
  */
 export interface TraceViewer {
-  /** Overrides `drawerStore.traceId` when set. */
+  /** Overrides the drawer address's trace id when set. */
   traceId?: string;
   isReadOnly: boolean;
 }

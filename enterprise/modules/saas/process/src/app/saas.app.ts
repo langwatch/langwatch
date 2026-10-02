@@ -6,23 +6,23 @@ import {
   type SaasApi as SaasApiContract,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 
 import { productAnalyticsChannels } from "../channels/product-analytics-channels.registry.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
-const SAAS_CLOSED_READS = reads("logger", "clock", "rateLimiter");
+const SAAS_CLOSED_READS = ["logger", "clock", "rateLimiter"] as const;
 
 /** The process members Cloud reads: three of the closed record, and the process's `isSaas` fact. */
 export type SaasProcessMembers = MembersRead<typeof SAAS_CLOSED_READS> &
   Readonly<{ isSaas: boolean }>;
 
-type SaasSetup = FeatureSetup<typeof SaasApp.dependencies, SaasProcessMembers, undefined>;
+type SaasSetup = FeatureSetup<typeof SaasModule.dependencies, SaasProcessMembers, undefined>;
 
-export class SaasApp implements SaasApiContract {
+export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;
   static readonly dependencies = {
     /** Where this deployment's product analytics goes. */
@@ -39,14 +39,14 @@ export class SaasApp implements SaasApiContract {
     this.#usageReports = usageReports;
   }
 
-  static create({ dependencies, members, resources }: SaasSetup): SaasApp {
+  static create({ dependencies, members, resources }: SaasSetup): SaasModule {
     const analytics = productAnalyticsChannels.live.create({
       targets: () => dependencies.ops.findProductAnalyticsTargets(),
       logger: members.logger,
     });
     resources.own("LangWatch Cloud product-analytics client", () => analytics.close());
 
-    return new SaasApp(
+    return new SaasModule(
       UsageReportReceiverService.create({
         cloud: LangWatchCloudService.create({ isSaas: members.isSaas }),
         rateLimiter: members.rateLimiter,

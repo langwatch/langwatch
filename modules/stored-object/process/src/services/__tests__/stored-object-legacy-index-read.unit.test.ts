@@ -1,10 +1,10 @@
-/**
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ClickHouseQueryClient, TenantGuard, type QueryDriver } from "@langwatch/clickhouse-client";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption, ObjectStorage } from "@langwatch/process-stores/members";
+/**
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { buildStoredObjectInfrastructure } from "#app/stored-object-composition.build";

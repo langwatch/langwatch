@@ -4,14 +4,14 @@
  * the drawer writes through, so a suggestion is edited in exactly one place.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 import { useState, type MouseEvent } from "react";
 
-import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceAnnotations } from "../../../../behavior/reads/use-annotation-reads.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { PersonAvatar } from "../../person-avatar.tsx";
 import { AnnotationPopover } from "./conversation-view/annotation-popover.tsx";
 
 export function AnnotationExpectedOutputs({
@@ -24,10 +24,7 @@ export function AnnotationExpectedOutputs({
   const { project } = useOrganizationTeamProject();
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
 
-  const annotations = api.annotation.getByTraceId.useQuery(
-    { projectId: project?.id ?? "", traceId },
-    { enabled: !!project?.id },
-  );
+  const annotations = useTraceAnnotations({ projectId: project?.id, traceId });
 
   const suggestions = (annotations.data ?? []).filter((annotation) => {
     const suggestion = annotationSuggestedOutput({ annotation, traceId });
@@ -43,7 +40,7 @@ export function AnnotationExpectedOutputs({
         <HStack width="full" key={annotation.id} align="start" gap={2}>
           <Tooltip content={annotation.user?.name ?? ""}>
             <Box display="inline-flex">
-              <UserAvatar
+              <PersonAvatar
                 size="xs"
                 name={annotation.user?.name ?? ""}
                 image={annotation.user?.image}

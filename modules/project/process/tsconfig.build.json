@@ -33,6 +33,9 @@
       "path": "../../audit-log/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -45,13 +48,10 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../../langy/contract/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"
@@ -63,10 +63,16 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/task/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

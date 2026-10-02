@@ -3,7 +3,7 @@
  * and factory functions. Note: vi.mock() must be called per-file (vitest hoists them), and
  * factory functions here are called from those vi.mock() calls.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type React from "react";
 import { vi } from "vitest";
 
@@ -208,9 +208,24 @@ export function createRouterMock() {
   };
 }
 
+export function createEvaluatorClientMock() {
+  return {
+    evaluatorClient: {
+      evaluators: {
+        getById: {
+          useQuery: vi.fn(({ id }: { id: string }) => ({
+            data: mockEvaluators.find((e) => e.id === id) ?? null,
+            isLoading: false,
+          })),
+        },
+      },
+    },
+  };
+}
+
 export function createApiMock() {
   return {
-    api: {
+    evaluatorApi: {
       publicEnv: {
         useQuery: () => ({
           data: { IS_SAAS: false },
@@ -420,7 +435,7 @@ export function createLicenseEnforcementMock() {
 }
 
 export const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 /**

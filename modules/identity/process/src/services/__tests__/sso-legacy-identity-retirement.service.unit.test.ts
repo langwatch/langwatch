@@ -1,3 +1,8 @@
+import {
+  emptySsoConnection,
+  type IdentifierFact,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 /**
  * @vitest-environment node
  * What retiring a grandfathered connection does to the identifiers it minted:
@@ -5,12 +10,7 @@
  * is left alone, and the accounts go through the module that owns them.
  * @see specs/identity/sso-connection-lifecycle.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  emptySsoConnection,
-  type IdentifierFact,
-  type SsoConnectionState,
-} from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";

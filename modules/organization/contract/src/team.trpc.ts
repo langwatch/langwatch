@@ -4,7 +4,7 @@
  * `team:manage` administers, `organization:manage` creates.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import { organizationApiScopeSchema } from "./organization.trpc-schemas.ts";
 import {
@@ -33,7 +33,7 @@ export const teamTrpc = defineTrpcContract("team")
   .withOutput(teamWithProjectsSchema.array())
 
   /** The access matrix an administrator edits: who holds what, and through what. */
-  .query("getTeamsWithRoleBindings")
+  .query("getTeamsWithGrants")
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationTeamAccessSchema.array())
 

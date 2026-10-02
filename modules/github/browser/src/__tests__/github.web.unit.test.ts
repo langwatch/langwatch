@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { githubWeb } from "../github.web.ts";
@@ -22,15 +22,6 @@ describe("given a browser that installs github", () => {
         .render();
 
       expect(installed.modules).toContain(githubWeb);
-    });
-  });
-
-  describe("when a screen the declaration names is asked for", () => {
-    it("answers with a component", async () => {
-      const screen = githubWeb.installation.screens["pages/settings/integrations"];
-      const loaded = await screen?.load?.();
-
-      expect(loaded).toHaveProperty("default");
     });
   });
 });

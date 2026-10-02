@@ -5,10 +5,10 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { ledgerActorSchema } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzPrincipalRefSchema,
-  grantsLedgerActorSchema,
   roleBindingRestCreateSchema,
   roleBindingRestDeletedSchema,
   roleBindingRestListQuerySchema,
@@ -30,7 +30,7 @@ export const roleBindingRestFacts = defineRestMiddleware(
   "roleBindingRestFacts",
   z.object({
     organizationId: z.string(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     caller: authzPrincipalRefSchema,
   }),
 );
@@ -83,6 +83,7 @@ export const authzRoleBindingRest: Readonly<{
   .get("/", "listRoleBindings")
   .withQuery(roleBindingRestListQuerySchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(roleBindingRestListSchema)
   .withDocs({
     tags: ["Role Bindings"],
@@ -107,6 +108,7 @@ export const authzRoleBindingRest: Readonly<{
   .post("/", "createRoleBinding")
   .withInput(roleBindingRestCreateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(roleBindingRestSchema)
   .withStatus(201)
   .withDocs({
@@ -150,6 +152,7 @@ export const authzRoleBindingRest: Readonly<{
   .withParams(roleBindingRestParamsSchema)
   .withInput(roleBindingRestUpdateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(roleBindingRestSchema)
   .withDocs({
     tags: ["Role Bindings"],
@@ -172,6 +175,7 @@ export const authzRoleBindingRest: Readonly<{
   .delete("/:id", "deleteRoleBinding")
   .withParams(roleBindingRestParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(roleBindingRestDeletedSchema)
   .withDocs({
     tags: ["Role Bindings"],

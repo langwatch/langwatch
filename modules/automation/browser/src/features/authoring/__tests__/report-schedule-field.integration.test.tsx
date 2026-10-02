@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -17,10 +17,6 @@ vi.mock("../model/report-schedule.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof reportScheduleModule>();
   return { ...actual, defaultTimezone: () => "Europe/Amsterdam" };
 });
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -61,7 +57,7 @@ function Harness({
 }
 
 const renderField = (props: Parameters<typeof Harness>[0]) =>
-  render(<Harness {...props} />, { wrapper: Wrapper });
+  renderWithDesignSystem(<Harness {...props} />);
 
 function selectContainingOption(optionName: RegExp): HTMLSelectElement {
   const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];

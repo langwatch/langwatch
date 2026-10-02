@@ -1,6 +1,14 @@
-import { Box, Button, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toDate, toZonedDateTime } from "@langwatch/time";
 import { Crosshair, Lightbulb, MessageCircle, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";

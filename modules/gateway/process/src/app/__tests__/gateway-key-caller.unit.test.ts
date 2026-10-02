@@ -1,13 +1,13 @@
 /**
  * @vitest-environment node
- * `GatewayApp.authorizeKeyCaller`: any API key, including an organization key
+ * `GatewayModule.authorizeKeyCaller`: any API key, including an organization key
  * that names no project, is authorized for organization-owned budget rows.
  * @see specs/ai-gateway/per-team-budget-reorganization.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -16,7 +16,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 function peer(name: string): never {
   return new Proxy(
@@ -36,17 +36,17 @@ const TEAM_ID = "team_1";
 
 const hasApiKeyPermission = vi.fn<AuthzApi["hasApiKeyPermission"]>();
 const findOrganizationId = vi.fn<ProjectApi["findOrganizationId"]>();
-const findProject = vi.fn();
+const findProject = vi.fn<ProjectApi["findIdentity"]>();
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-async function gatewayApp(): Promise<GatewayApp> {
-  return GatewayApp.create({
+async function gatewayApp(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: createApiFixture<AuthzApi>({ hasApiKeyPermission }),
-      projects: createApiFixture<ProjectApi>({ findOrganizationId }),
+      projects: createApiFixture<ProjectApi>({ findOrganizationId, findIdentity: findProject }),
       evaluators: peer("evaluators"),
       evaluations: peer("evaluations"),
       monitors: peer("monitors"),
@@ -55,9 +55,10 @@ async function gatewayApp(): Promise<GatewayApp> {
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
+      apiKeys: peer("apiKeys"),
     },
     members: {
-      prisma: prismaDouble({ project: { findUnique: findProject } }) as PrismaClient,
+      prisma: prismaDouble({}) as PrismaClient,
       clickhouse: clickHouseQueryClientDouble({
         query: async () => ({ rows: [] }),
         insert: async () => {},
@@ -72,6 +73,7 @@ async function gatewayApp(): Promise<GatewayApp> {
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,
@@ -91,12 +93,20 @@ const projectKey = {
   resolvedProject: { id: PROJECT_ID, teamId: TEAM_ID },
 };
 
-describe("GatewayApp.authorizeKeyCaller", () => {
+describe("GatewayModule.authorizeKeyCaller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hasApiKeyPermission.mockResolvedValue(true);
     findOrganizationId.mockResolvedValue(ORGANIZATION_ID);
-    findProject.mockResolvedValue({ id: PROJECT_ID, teamId: TEAM_ID });
+    findProject.mockResolvedValue({
+      id: PROJECT_ID,
+      name: "Project",
+      slug: "project",
+      teamId: TEAM_ID,
+      organizationId: ORGANIZATION_ID,
+      isPersonal: false,
+      ownerUserId: null,
+    });
   });
 
   describe("given an organization key that names no project", () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { SimpleGrid } from "@chakra-ui/react";
+import { SimpleGrid } from "@langwatch/design-system/primitives";
 
 import { type SampleSeries } from "../../behavior/use-sample-series.ts";
 import { fmtWhole } from "../../model/cost-figure-format.ts";
@@ -86,7 +86,7 @@ export function HeadlinePanels({
           grouped
           empty={costPanelEmpty({
             what: "Seats bought against seats assigned, period by period.",
-            source: "Fills once seat licences are collected from a source.",
+            source: "Fills once seat licenses are collected from a source.",
             action: ADD_A_SOURCE,
           })}
         />

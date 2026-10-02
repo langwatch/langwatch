@@ -4,7 +4,6 @@
  * turn sees no entry rather than one that refuses when pressed.
  */
 
-import { isLangyDemoProject } from "@langwatch/langy-browser-kit";
 import type { NavigationOpsAccess } from "@langwatch/navigation-browser/navigation";
 
 /**
@@ -33,7 +32,8 @@ export function offersLangyAsk({
 }): boolean {
   if (!hasPermission(LANGY_CREATE_PERMISSION)) return false;
   if (!isFeatureEnabled(LANGY_RELEASE_FLAG)) return false;
-  return !isLangyDemoProject({ projectSlug, demoProjectSlug });
+  // Both sides present: an unset demo slug never matches an unloaded project.
+  return !demoProjectSlug || demoProjectSlug !== projectSlug;
 }
 
 export function offersPresenceMenuItem(routePattern: string): boolean {

@@ -1,6 +1,6 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
@@ -36,7 +36,6 @@ import {
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 /**
@@ -46,13 +45,15 @@ import { NotificationService } from "@langwatch/notification-contract";
  */
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
+import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -143,6 +144,7 @@ import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
+import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
 import {
   SsoLegacyIdentityRetirementService,
   type SsoLegacyAccessRetirement,
@@ -159,6 +161,7 @@ import {
   type SsoTestArrivalAccounts,
   type SsoTestArrivalMemberships,
 } from "../services/sso-test-arrival.service.ts";
+import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
@@ -178,14 +181,13 @@ type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption",
   Readonly<{
     /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
     isSaas: boolean;
-    adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
      *  is told LangWatch is called. A process fact, not one of the fourteen. */
     publicBaseUrl: string | undefined;
   }>;
 
 type IdentitySetup = FeatureSetup<
-  typeof IdentityApp.dependencies,
+  typeof IdentityModule.dependencies,
   IdentityMembers,
   IdentityServerConfig
 > &
@@ -394,7 +396,7 @@ function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit
   };
 }
 
-export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
+export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -419,20 +421,22 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     notifications: NotificationService,
   };
   static readonly reads = [
-    ...reads("prisma", "eventing", "encryption", "rateLimiter"),
+    "prisma",
+    "eventing",
+    "encryption",
+    "rateLimiter",
     "isSaas",
-    "adminEmails",
     "publicBaseUrl",
   ] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
-  static async create(setup: IdentitySetup): Promise<IdentityApp> {
+  static async create(setup: IdentitySetup): Promise<IdentityModule> {
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
     const signupAnnouncements = await setup.secrets.into(
-      IdentityApp.secrets.internalSlackSignupsWebhook,
+      IdentityModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -451,7 +455,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       repositories: setup.repositories,
       eventing: setup.members.eventing,
       identityEventing,
-      adminEmails: setup.members.adminEmails,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -521,6 +524,8 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         mailer,
         baseUrl: setup.members.publicBaseUrl ?? "",
       }),
+      licensing: setup.dependencies.licensing,
+      authorization: setup.dependencies.permissions,
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
@@ -535,8 +540,21 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
             history: () => ssoConnectionHistory,
           })
         : null;
+    // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
+    const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
+    // The same fence the published-proof reads go through: an issuer is a
+    // string an administrator typed.
+    const issuerDiscovery = ssoIssuerDiscoveryChannels.live.create({
+      policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+      dialableInternalOrigins: dialableIdpOrigins,
+    });
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
+      endpointOrigins: SsoIssuerEndpointOriginsService.create({
+        discovery: issuerDiscovery,
+        resolveHost: systemHostAddresses,
+        dialableInternalOrigins: dialableIdpOrigins,
+      }),
     });
     // The ceremony and the sweep read the SAME published evidence where it
     // lives, so they share one pair of live channels rather than each
@@ -556,6 +574,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         ? SsoDomainCeremonyService.create({
             connections: () => ssoConnections,
             reads: setup.repositories.ssoConnections,
+            licensing: setup.dependencies.licensing,
             ...domainProofChannels,
           })
         : null;
@@ -574,6 +593,13 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         organizations: setup.dependencies.organizations,
       }),
       breakGlass,
+      resolution: SsoUserResolutionService.create({
+        people: setup.repositories.ssoRegistrants,
+        connections: setup.repositories.ssoConnections,
+        directory: setup.dependencies.scim,
+        memberships: setup.dependencies.organizations,
+        isHosted: setup.members.isSaas,
+      }),
     });
     const joinRequests = JoinRequestsService.create({
       requests: JoinRequestService.create(joinRequestGuards, infrastructure.joinRequestLedger),
@@ -636,16 +662,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
           activity: setup.repositories.ssoMigrationEvidence,
           credentials: setup.repositories.ssoCredentials,
           breakGlass,
-          registrations: SsoIdpRegistrationService.create({
-            // The same fence the published-proof reads go through: an issuer
-            // is a string an administrator typed.
-            discovery: ssoIssuerDiscoveryChannels.live.create({
-              policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
-              // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-              dialableInternalOrigins: () =>
-                setup.dependencies.auth.findDialableIdentityProviderOrigins(),
-            }),
-          }),
+          registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
             evidence: ssoMigrationProgress,
@@ -706,7 +723,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       }),
     });
 
-    return new IdentityApp({
+    return new IdentityModule({
       emails,
       ceremonies,
       identityGuards,
@@ -724,6 +741,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         }),
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,
+        accountAddress: async ({ userId }) => {
+          const user = await setup.dependencies.users.findById({ id: userId });
+          return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
+        },
+        hasMailDelivery: async () =>
+          (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
       }),
       microsoftAccountRekey: MicrosoftAccountRekeyService.create({
         accounts: setup.repositories.accountRekey,
@@ -766,7 +789,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
           proposals: setup.repositories.identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        platformOperators: setup.repositories.ssoPlatformOperators,
+        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,

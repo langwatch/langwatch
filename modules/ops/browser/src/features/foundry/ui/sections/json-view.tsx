@@ -1,5 +1,5 @@
-import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type { Monaco } from "@monaco-editor/react";
 import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";

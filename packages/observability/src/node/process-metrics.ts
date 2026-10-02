@@ -8,7 +8,7 @@ import { HostMetrics } from "@opentelemetry/host-metrics";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { AggregationType, MeterProvider } from "@opentelemetry/sdk-metrics";
 
-import { activateMetrics, metricHistogramViews } from "../metrics/index.ts";
+import { activateMetrics, deactivateMetrics, metricHistogramViews } from "../metrics/index.ts";
 import { startOtlpMetricsExport } from "./otlp-metrics.ts";
 import { PrometheusPullReader } from "./prometheus-exposition.ts";
 import { prometheusMetrics } from "./prometheus-metrics-door.ts";
@@ -88,7 +88,14 @@ function scrapeDoor({
   new HostMetrics({ meterProvider, name: serviceName }).start();
 
   return [
-    { name: "process metrics", stop: () => meterProvider.shutdown() },
+    {
+      name: "process metrics",
+      stop: async () => {
+        await meterProvider.shutdown();
+        metrics.disable();
+        deactivateMetrics();
+      },
+    },
     prometheusMetrics({
       ...(token === undefined ? {} : { token }),
       readMetrics: () => reader.read(),

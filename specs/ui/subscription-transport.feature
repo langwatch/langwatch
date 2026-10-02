@@ -38,10 +38,10 @@ Rule: A live procedure is opened on the live channel, and everything else is unc
     And no live channel is opened
 
   @unit
-  Scenario: Reads asked for their own connection still get one
-    When a screen reads a procedure and asks for its own connection
-    Then that read travels on its own request
-    And other reads in the same moment still share one
+  Scenario: Every read travels on its own request
+    When a screen reads two procedures in the same moment
+    Then each read travels on its own request
+    And no read is batched with another
 
   @unit
   Scenario: What the screen is watching for travels with the channel

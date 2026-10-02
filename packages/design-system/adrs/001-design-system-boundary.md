@@ -155,9 +155,9 @@ components would make the package render differently in isolation and leave
 feature packages dependent on app composition.
 
 Wrapping every Chakra layout primitive would create a second UI framework.
-Feature web code may use Chakra layout primitives directly; the design system
-owns shared semantics, recipes and components whose behaviour must remain
-consistent.
+The design system owns shared semantics, recipes and components whose
+behaviour must remain consistent. Layout primitives are re-exported unchanged
+(see the amendment below); feature code does not import Chakra itself.
 
 ## Consequences
 
@@ -171,3 +171,20 @@ consistent.
 - Explicit exports and accessibility fixes increase initial extraction work.
 - The app may keep short-lived compatibility re-exports while imports move,
   but new code targets the package directly.
+
+## Amendment 2026-10-01: only the design system imports Chakra
+
+Supersedes "Feature web code may use Chakra layout primitives directly".
+`@chakra-ui/*` and `@emotion/*` are imported by this package alone. Kits,
+feature browser packages, apps and tests import
+`@langwatch/design-system/<subpath>`.
+
+`@langwatch/design-system/primitives` re-exports Chakra's layout primitives,
+hooks and raw compound parts unchanged: the same objects, so no visual change.
+It never re-exports a part the package already wraps (Checkbox, Switch,
+Tooltip, RadioGroup, CloseButton, InputGroup, Slider, Kbd, Menu, Popover,
+Dialog, Drawer, Avatar); consumers take those from the wrapper subpath.
+
+Raw parts with no wrapper (Field, Table, Card, Alert, NativeSelect, Portal)
+are re-exported now and replaced by real components later, screen by screen.
+Tests mount `renderWithDesignSystem` from `./testing`, never `defaultSystem`.

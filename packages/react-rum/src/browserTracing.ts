@@ -15,6 +15,7 @@ import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
+import { startBrowserErrorCapture } from "./browserErrors.ts";
 import {
   RUM_DEFAULT_SAMPLE_RATIO,
   RUM_SERVICE_NAME,
@@ -25,6 +26,7 @@ import { NavigationContextManager } from "./navigationContextManager.ts";
 import { createBrowserSampler } from "./sampling.ts";
 import { currentSessionId } from "./session.ts";
 import { SessionSpanProcessor } from "./sessionSpanProcessor.ts";
+import { UrlScrubSpanProcessor } from "./urlScrubSpanProcessor.ts";
 
 let started = false;
 
@@ -62,6 +64,8 @@ export function startBrowserTracing({
       }),
       spanProcessors: [
         new SessionSpanProcessor(),
+        // Ahead of the exporter, so no query string is in what it reads.
+        new UrlScrubSpanProcessor(),
         new BatchSpanProcessor(
           new OTLPTraceExporter({
             url: RUM_TRACES_PATH,
@@ -98,6 +102,8 @@ export function startBrowserTracing({
         }),
       ],
     });
+
+    startBrowserErrorCapture();
   } catch {
     // Leave the page untraced rather than broken.
     return;

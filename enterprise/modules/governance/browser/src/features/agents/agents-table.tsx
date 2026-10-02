@@ -1,5 +1,5 @@
-import { Badge, HStack, Table, Text } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Badge, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {

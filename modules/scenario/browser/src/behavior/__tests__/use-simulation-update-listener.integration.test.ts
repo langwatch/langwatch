@@ -9,13 +9,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let capturedOnData: ((data: { event: string }) => void) | undefined;
 
 let mockIsVisible = true;
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
-  );
+vi.mock("@langwatch/browser-host/page-visibility", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     usePageVisibility: () => mockIsVisible,
+  };
+});
+vi.mock("@langwatch/browser-host/sse-subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useSSESubscription: (
       _subscription: unknown,
       _input: Record<string, unknown>,
@@ -38,8 +42,8 @@ vi.mock("@langwatch/trace-browser-kit", async () => {
 
 const mockInvalidateRunState = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../scenario-api.ts", () => ({
-  api: {
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     useUtils: () => ({
       scenarios: {
         getScenarioSetBatchHistory: { invalidate: vi.fn() },
@@ -56,7 +60,8 @@ vi.mock("../scenario-api.ts", () => ({
   },
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule0 from "@langwatch/browser-host/page-visibility";
+import type * as actualModule1 from "@langwatch/browser-host/sse-subscription";
 
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 

@@ -1,9 +1,3 @@
-/**
- * The worker installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
- * @vitest-environment node
- * @see specs/platform/process-installation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import {
@@ -13,15 +7,15 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
+import { ModuleApiToken } from "@langwatch/module";
 import {
   bootInstalledProcess,
-  ModuleApiToken,
+  type InstallableServerFeature,
+  processConfig,
   storesBackedMembers,
   withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -36,6 +30,12 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The worker installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
+ * @vitest-environment node
+ * @see specs/platform/process-installation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "worker";
@@ -66,7 +66,7 @@ const SAAS_ENVIRONMENT: Readonly<Record<string, string>> = {
 
 async function bootWorker({ live = false, saas = false }: { live?: boolean; saas?: boolean } = {}) {
   const environment = saas ? SAAS_ENVIRONMENT : SYNTHETIC_ENVIRONMENT;
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment });
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
   refuseDoubleClaims(owners);
@@ -103,7 +103,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -123,7 +123,6 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-worker",
         storageResolver: void 0,
@@ -145,7 +144,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   return { runtime, eventing };
 }
 
-const moduleApis = serverModules.flatMap((module) =>
+const moduleApis = processModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
 
@@ -231,7 +230,7 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "The worker forwards coding-agent spans, logs and metric points to coding-agent" */
-  it("hosts a coding-agent dispatch on the trace, log and metric pipelines", async () => {
+  it("hosts the span dispatch on trace and coding-agent's log and metric peer lanes", async () => {
     const { runtime, eventing } = await bootWorker();
 
     try {
@@ -243,16 +242,16 @@ describe("the worker process installation", () => {
           .get("trace_processing")
           ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
       ]).toContain("codingAgentSpanFactsDispatch");
-      expect([
-        ...(byName
-          .get("log_processing")
-          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
-      ]).toContain("codingAgentLogFactsDispatch");
-      expect([
-        ...(byName
-          .get("metric_processing")
-          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
-      ]).toContain("codingAgentMetricFactsDispatch");
+      expect(
+        byName
+          .get("coding_agent_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "coding_agent_processing.codingAgentLogFactsDispatch",
+          "coding_agent_processing.codingAgentMetricFactsDispatch",
+        ]),
+      );
     } finally {
       await runtime.stop();
     }

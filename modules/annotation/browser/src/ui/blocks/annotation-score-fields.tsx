@@ -1,7 +1,15 @@
-import { Box, Button, HStack, Icon, Text, Textarea, VStack } from "@chakra-ui/react";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import { Checkbox, CheckboxGroup } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

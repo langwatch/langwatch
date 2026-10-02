@@ -204,7 +204,7 @@ describe("SCIM user parity", () => {
     });
     const repo = repository({
       addMembership,
-      findRoleBindings: vi.fn(async () => []),
+      findGrantRows: vi.fn(async () => []),
     });
     const { writer, service } = harness({
       repository: repo,
@@ -225,7 +225,7 @@ describe("SCIM user parity", () => {
   });
 
   it("reconciles only the SCIM organization-membership grant slice", async () => {
-    const findRoleBindings = vi.fn(async () => [
+    const findGrantRows = vi.fn(async () => [
       {
         id: "org-member",
         userId: "user-1",
@@ -237,7 +237,7 @@ describe("SCIM user parity", () => {
         customRoleId: null,
       },
     ]);
-    const repo = repository({ findRoleBindings });
+    const repo = repository({ findGrantRows });
     const { writer, service } = harness({
       repository: repo,
       existingUser: user(),
@@ -252,7 +252,7 @@ describe("SCIM user parity", () => {
       },
     });
 
-    expect(findRoleBindings).toHaveBeenCalledWith({
+    expect(findGrantRows).toHaveBeenCalledWith({
       kind: "organization-membership",
       organizationId: "org-1",
       userId: "user-1",
@@ -309,7 +309,7 @@ describe("SCIM user parity", () => {
         organizationId: "org-1",
         user: user(),
       })),
-      findRoleBindings: vi.fn(async () => [
+      findGrantRows: vi.fn(async () => [
         {
           id: "grant-1",
           userId: "user-1",

@@ -18,7 +18,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ZodType } from "zod";
 
-import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityModule } from "../app/identity.app.ts";
 import type { JoinRequestMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
@@ -203,7 +203,7 @@ export function composeJoinRequestNotifications(options: {
 
 export const joinRequestEventing = defineEventingModule({
   pipeline: JOIN_REQUEST_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.joinRequestPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.joinRequestPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: JOIN_REQUEST_PIPELINE_NAME, commands }),
 });

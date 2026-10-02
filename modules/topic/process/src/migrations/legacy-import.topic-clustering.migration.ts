@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringClaimRepository } from "../repositories/topic-clustering-claim.repository.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import type { EventingTopicClusteringCommandsService } from "../services/topic-clustering-commands.service.ts";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
 const scheduleLogger = createLogger("langwatch:topic-clustering:schedule-seed");
@@ -43,13 +43,16 @@ export interface TopicClusteringBackfillSummary {
 export class LegacyImportTopicClusteringMigration {
   private readonly repository: TopicClusteringRepository;
   private readonly claims: TopicClusteringClaimRepository;
-  private readonly commands: TopicClusteringCommands;
+  private readonly commands: Pick<
+    EventingTopicClusteringCommandsService,
+    "recordTopics" | "requestClustering"
+  >;
   private readonly schedulePageSize?: number;
 
   private constructor(deps: {
     repository: TopicClusteringRepository;
     claims: TopicClusteringClaimRepository;
-    commands: TopicClusteringCommands;
+    commands: Pick<EventingTopicClusteringCommandsService, "recordTopics" | "requestClustering">;
     schedulePageSize?: number;
   }) {
     this.repository = deps.repository;
@@ -62,7 +65,7 @@ export class LegacyImportTopicClusteringMigration {
     repository: TopicClusteringRepository;
     /** Coordination only — when it cannot answer, both seeds still run safely. */
     claims: TopicClusteringClaimRepository;
-    commands: TopicClusteringCommands;
+    commands: Pick<EventingTopicClusteringCommandsService, "recordTopics" | "requestClustering">;
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {

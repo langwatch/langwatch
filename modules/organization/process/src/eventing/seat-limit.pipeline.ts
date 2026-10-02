@@ -6,7 +6,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { ServerOrganizationApp } from "../app/organization.app.ts";
+import type { OrganizationModule } from "../app/organization.app.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import { RecordSeatLimitReachedCommand } from "./seat-limit.commands.ts";
 import {
@@ -50,7 +50,7 @@ export function buildSeatLimitPipeline(input: {
 
 export const seatLimitEventing = defineEventingModule({
   pipeline: SEAT_LIMIT_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<OrganizationRepositories, ServerOrganizationApp>) =>
+  build: ({ app, participation }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
     app.seatLimitPipeline({ participation }),
   connect: ({ app, commands }) => app.connectSeatLimit(commands),
 });

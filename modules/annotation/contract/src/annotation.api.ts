@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { AnnotationQueueItem, AnnotationQueueListedItem } from "./annotation-queue.schemas.ts";
 import type {

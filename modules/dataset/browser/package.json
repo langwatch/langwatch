@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/dataset.web.ts",
       "types": "./dist/dataset.web.d.ts",
       "default": "./src/dataset.web.ts"
-    },
-    "./dataset-drawer": {
-      "langwatch-declaration-source": "./src/dataset-drawer.ts",
-      "types": "./dist/dataset-drawer.d.ts",
-      "default": "./src/dataset-drawer.ts"
-    },
-    "./dataset-record-sync": {
-      "langwatch-declaration-source": "./src/dataset-record-sync.ts",
-      "types": "./dist/dataset-record-sync.d.ts",
-      "default": "./src/dataset-record-sync.ts"
     }
   },
   "scripts": {
@@ -36,22 +26,19 @@
     "@emotion/react": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/csv": "workspace:*",
-    "@langwatch/dataset-browser-kit": "workspace:*",
+    "@langwatch/dataset-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
-    "@langwatch/langy-browser-kit": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/stored-object-browser-kit": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",
     "@tanstack/react-virtual": "catalog:",
@@ -62,6 +49,7 @@
     "react-hook-form": "catalog:",
     "react-papaparse": "^4.4.0",
     "use-debounce": "catalog:",
+    "zod": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {

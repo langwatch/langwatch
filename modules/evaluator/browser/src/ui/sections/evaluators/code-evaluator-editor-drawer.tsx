@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import type { UiCodeEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
@@ -9,28 +8,27 @@ import {
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import {
   type CodeEvaluatorConfig,
   codeEvaluatorOutputFields,
   defaultCodeEvaluatorConfig,
 } from "@langwatch/evaluator-contract";
-import {
-  type FieldMapping as UIFieldMapping,
-  type Variable,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit";
-import { rewriteCodeSignature, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+import { type FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
+import { rewriteCodeSignature } from "../../../model/workflow/code-signature.ts";
 import {
   CodeEvaluatorEditor,
   type CodeEvaluatorField,
   validCodeEvaluatorFields,
 } from "../../blocks/code-evaluator-editor.tsx";
+import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
+import { type Variable, VariablesSection } from "../prompt/variables/variables-section.tsx";
 import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
 import { EvaluatorGateSection, type EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
 
@@ -118,7 +116,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
   const complexProps = getComplexProps();
-  const utils = api.useUtils();
+  const utils = evaluatorClient.useUtils();
 
   const evaluatorId =
     props.evaluatorId ??
@@ -142,7 +140,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     mappingsConfig?.initialMappings ?? {},
   );
 
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorClient.evaluators.getById.useQuery(
     { id: evaluatorId ?? "", projectId: project?.id ?? "" },
     { enabled: isEditing && !!project?.id && isOpen },
   );
@@ -188,7 +186,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     handOffSaved({ evaluator, onSave: props.onSave, closeDrawer });
   };
 
-  const createMutation = api.evaluators.create.useMutation({
+  const createMutation = evaluatorClient.evaluators.create.useMutation({
     onSuccess: finishSave,
     onError: (error) =>
       showErrorToast({
@@ -197,7 +195,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
       }),
   });
 
-  const updateMutation = api.evaluators.update.useMutation({
+  const updateMutation = evaluatorClient.evaluators.update.useMutation({
     onSuccess: finishSave,
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });

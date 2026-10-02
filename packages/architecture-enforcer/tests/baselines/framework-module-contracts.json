@@ -1,0 +1,24 @@
+{
+  "record": "dev/docs/ARCHITECTURE.md §10.1, framework packages depend on no module contract (Alex, 2026-10-01). Shrink-only: remove an edge in the change that drops the dependency.",
+  "findings": {
+    "packages/browser-host -> @langwatch/agent-contract": 1,
+    "packages/browser-host -> @langwatch/annotation-contract": 1,
+    "packages/browser-host -> @langwatch/automation-contract": 1,
+    "packages/browser-host -> @langwatch/dashboard-contract": 1,
+    "packages/browser-host -> @langwatch/dataset-contract": 1,
+    "packages/browser-host -> @langwatch/enterprise-licensing-contract": 1,
+    "packages/browser-host -> @langwatch/evaluator-contract": 1,
+    "packages/browser-host -> @langwatch/experiment-contract": 1,
+    "packages/browser-host -> @langwatch/feature-flag-contract": 1,
+    "packages/browser-host -> @langwatch/langy-contract": 1,
+    "packages/browser-host -> @langwatch/prompt-contract": 1,
+    "packages/browser-host -> @langwatch/scenario-contract": 1,
+    "packages/browser-host -> @langwatch/trace-contract": 1,
+    "packages/browser-host -> @langwatch/workflow-contract": 1,
+    "packages/clickhouse-client -> @langwatch/data-retention-contract": 1,
+    "packages/clickhouse-migrations -> @langwatch/data-retention-contract": 1,
+    "packages/group-queue -> @langwatch/stored-object-contract": 1,
+    "packages/prisma-client -> @langwatch/api-key-contract": 1,
+    "packages/process -> @langwatch/ops-contract": 1
+  }
+}

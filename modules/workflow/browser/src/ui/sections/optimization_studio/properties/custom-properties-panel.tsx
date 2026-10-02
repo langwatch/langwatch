@@ -1,8 +1,8 @@
-import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { Avatar } from "@langwatch/design-system/avatar";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";

@@ -2,10 +2,10 @@
  * The dataset the reader last added rows to, remembered per browser.
  */
 
+import { datasetClient } from "@langwatch/dataset-client";
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useState } from "react";
 
-import { api } from "./trace-api.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 const logger = createLogger("useLocalStorageSelectedDataSetId");
@@ -35,7 +35,7 @@ function writeStoredDatasetId(datasetId: string): void {
 
 export const useLocalStorageSelectedDataSetId = () => {
   const { project } = useOrganizationTeamProject();
-  const trpc = api.useUtils();
+  const trpc = datasetClient.useUtils();
   const [selectedDataSetId, setSelectedDataSetId] = useState<string>(readStoredDatasetId);
 
   const clear = useCallback(() => {

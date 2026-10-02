@@ -1,4 +1,4 @@
-import { Button, Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";

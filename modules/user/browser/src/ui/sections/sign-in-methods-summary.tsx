@@ -4,8 +4,8 @@
  * would be two places for the same refusal to be worded differently.
  */
 
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 

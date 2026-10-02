@@ -1,4 +1,4 @@
-import { Input } from "@chakra-ui/react";
+import { Input } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 

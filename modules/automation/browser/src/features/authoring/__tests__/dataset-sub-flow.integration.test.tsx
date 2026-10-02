@@ -19,7 +19,10 @@ const { refetchMock, datasets } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../behavior/automation-api.ts", () => ({
-  api: {
+  api: {},
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
     dataset: {
       getAll: {
         useQuery: () => ({
@@ -70,6 +73,7 @@ describe("creating a dataset from the automation", () => {
   describe("given the project has no dataset yet", () => {
     describe("when the user chooses to create one", () => {
       /** @scenario "Creating a dataset from the automation is offered and works" */
+      /** @scenario "Creating a dataset inline from a zero-dataset project" */
       it("opens the dataset drawer, takes what was created, and comes back with the draft", async () => {
         const { onChange, host } = renderSection();
 

@@ -3,8 +3,8 @@ import {
   SurfaceUnconfiguredError,
   SurfaceUnverifiedError,
 } from "../errors.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
-import { isInternalSecretValid } from "./security.ts";
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { isInternalSecretValid } from "../access-policy.ts";
 
 export class BearerIdentity implements RestIdentity {
   readonly #name: string;

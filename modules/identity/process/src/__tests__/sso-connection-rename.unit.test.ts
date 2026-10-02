@@ -12,6 +12,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -33,7 +34,8 @@ function guardsOver({ state, name }: { state: SsoConnectionState["state"]; name:
     registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(false),
     stranding: new StubStranding(),
-    platformOperators: new StubPlatformOperators(),
+    authorization: new StubPlatformOperators(),
+    licensing: licensingFixture(),
   });
 }
 

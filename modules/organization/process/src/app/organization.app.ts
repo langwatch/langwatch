@@ -1,18 +1,16 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { type LedgerActor, SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AuthzApi,
   type AuthzListTeamMemberBindingsInput,
   type AuthzTeamMemberBinding,
   type AuthzAccessBreakdownOutput,
-  type GrantsLedgerActor,
+  type AuthzGrantCaller,
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
-import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { NotificationService } from "@langwatch/notification-contract";
 import type {
   GuidedOnboardingRecord,
@@ -50,7 +48,7 @@ import {
   type OrganizationRestMemberTeamBinding,
   type OrganizationUpdatedMember,
   type OrganizationSettings,
-  type AddOrganizationGroupBindingInput,
+  type AddOrganizationGroupGrantInput,
   type AddOrganizationTeamMemberInput,
   type ApplyOrganizationGroupEditsInput,
   type ChangeOrganizationGroupMemberInput,
@@ -74,7 +72,7 @@ import {
   type OrganizationBillingProfile,
   type OrganizationWithAdministrators,
   type OrganizationGroup,
-  type OrganizationGroupBinding,
+  type OrganizationGroupGrant,
   type JoinRequestJoining,
   type OrganizationGroupDetails,
   type OrganizationGroupPage,
@@ -89,7 +87,7 @@ import {
   type PersonalWorkspace,
   type PersonalWorkspaceInput,
   type PersonalWorkspaceFeaturesInput,
-  type RemoveOrganizationGroupBindingInput,
+  type RemoveOrganizationGroupGrantInput,
   type RemoveOrganizationTeamMemberInput,
   type RenameOrganizationGroupInput,
   type UpdateOrganizationSettingsInput,
@@ -110,15 +108,18 @@ import {
   type GroupListItem,
   type GroupMembershipView,
   type TeamWithProjects,
+  type OrganizationDirectoryCounts,
   type OrganizationMemberProvenance,
   type OrganizationGroupService,
   type OrganizationFounding,
   type OrganizationMemberSeats,
   type LimitCheckResult,
   type LimitType,
+  type ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
@@ -138,11 +139,13 @@ import {
 } from "../eventing/seat-limit.pipeline.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
+import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
+import { OrganizationGrantCeilingService } from "../services/organization-grant-ceiling.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
@@ -152,6 +155,10 @@ import type {
   OrganizationLifecycleSenders,
 } from "../services/organization-lifecycle-notice.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import {
+  OrganizationScopeGraphService,
+  type OrganizationScopeGraphReader,
+} from "../services/organization-scope-graph.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import {
@@ -177,7 +184,6 @@ import type {
   OrganizationDirectory,
   OrganizationInvitations,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationSignals,
 } from "./organization.members.ts";
@@ -221,6 +227,8 @@ type OrganizationProjectApi = ProjectApi;
 /** Who a write is attributed to. */
 export interface OrganizationCaller {
   readonly id: string;
+  /** The key a management-API call arrived on; see the contract's OrganizationCaller. */
+  readonly apiKeyId?: string | null;
 }
 
 /** What the process composes this feature's application from. */
@@ -248,7 +256,7 @@ type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger
   }>;
 
 type OrganizationSetup = FeatureSetup<
-  typeof ServerOrganizationApp.dependencies,
+  typeof OrganizationModule.dependencies,
   OrganizationMembers,
   undefined,
   OrganizationRepositories
@@ -274,7 +282,6 @@ export type OrganizationInfrastructure = Readonly<{
   inviteCreationThrottle: InviteCreationThrottleService;
   /** The join-request ledger, or none. */
   joinRequests: OrganizationJoinRequests | null;
-  plans: OrganizationPlanGate;
   signals: OrganizationSignals;
   /** Where a reached seat limit is recorded as this module's event (§9). */
   seatLimits: SeatLimitNoticeService;
@@ -289,6 +296,11 @@ export type OrganizationInfrastructure = Readonly<{
 /** The page size the two project lookups read an organization at. */
 const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 
+/** What a team read says of one project: its name and address, never its keys. */
+function teamProjectOf({ id, name, slug }: { id: string; name: string; slug: string }) {
+  return { id, name, slug };
+}
+
 /** The page size the group list is read at. */
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
 
@@ -297,7 +309,7 @@ const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
  * and {@link TeamManagementApi} explicitly, so a `/api/teams` member this
  * class doesn't serve fails the build instead of throwing at request time.
  */
-export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi {
+export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -315,18 +327,17 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     entitlement: EntitlementApi,
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
-    /** Seeds the standard AI-tool catalogue during the sign-up ceremony. */
-    governance: GovernanceRestApi,
     /** Told of a reached seat limit by this module's own subscriber, as §9 rules. */
     billing: BillingApi,
-    /** Told of a sign-up, an invitation batch and an acceptance by this module's subscriber. */
-    nurturing: NurturingApi,
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
-    ...reads("prisma", "encryption", "logger", "redis"),
+    "prisma",
+    "encryption",
+    "logger",
+    "redis",
     "publicBaseUrl",
     "processName",
   ] as const;
@@ -334,9 +345,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   static readonly secrets = { internalSlackSignupsWebhook } as const;
   #dependencies: ServerOrganizationAppDependencies;
 
-  static async create(setup: OrganizationSetup): Promise<ServerOrganizationApp> {
+  static async create(setup: OrganizationSetup): Promise<OrganizationModule> {
     const signupAnnouncements = await setup.secrets.into(
-      ServerOrganizationApp.secrets.internalSlackSignupsWebhook,
+      OrganizationModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -366,7 +377,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,
         entitlement: setup.dependencies.entitlement,
-        governance: setup.dependencies.governance,
         permissions: setup.dependencies.permissions,
         roles: setup.dependencies.roles,
         notifications: setup.dependencies.notifications,
@@ -393,6 +403,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
       admissions: setup.dependencies.permissions,
+      ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
       // Resolved per call: the peer API is unreachable while the process constructs.
       testArrivals: {
         standingFor: (args) => setup.dependencies.identity.ssoTestArrival().standingFor(args),
@@ -402,7 +413,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       organizations,
       projects: setup.dependencies.projects,
     });
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       organizations,
       membership,
       groups,
@@ -414,7 +425,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     application.#members = members;
     application.#billing = setup.dependencies.billing;
-    application.#nurturing = setup.dependencies.nurturing;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
       notices: members.seatLimits,
@@ -435,6 +445,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       secrets: members.settingsSecrets,
       demoProject: members.demoProject,
     });
+    application.#scopeGraph = OrganizationScopeGraphService.create({
+      reader: setup.repositories.scopeGraph,
+      permissions: setup.dependencies.permissions,
+    });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
@@ -442,10 +456,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       ? OrganizationInvitationDoorService.create({
           invitations: members.invitations,
           joinRequests: members.joinRequests,
-          plans: members.plans,
           signals: members.signals,
           lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
+          ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
@@ -478,10 +492,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     members: OrganizationInfrastructure;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
+    /** Defaults to a reader that finds no organizations. */
+    scopeGraph?: OrganizationScopeGraphReader;
     memberProvenance: MemberProvenanceService;
-  }): ServerOrganizationApp {
+  }): OrganizationModule {
     const { groups, ...dependencies } = setup.dependencies;
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       ...dependencies,
       groups:
         groups ??
@@ -509,6 +525,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       secrets: members.settingsSecrets,
       demoProject: members.demoProject,
     });
+    application.#scopeGraph = OrganizationScopeGraphService.create({
+      reader: setup.scopeGraph ?? { findScopeGraphForUser: async () => [] },
+      permissions: dependencies.permissions,
+    });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.personalTeamScope ?? {
         findPersonalTeamsInScopes: async () => [],
@@ -519,10 +539,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       ? OrganizationInvitationDoorService.create({
           invitations: members.invitations,
           joinRequests: members.joinRequests,
-          plans: members.plans,
           signals: members.signals,
           lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
+          ceiling: OrganizationGrantCeilingService.create(dependencies.permissions),
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
@@ -555,9 +575,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   #licenseLimits!: LicenseLimitService;
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
   #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
-  /** The peer the worker's lifecycle subscriber tells; absent only in a test's app. */
-  #nurturing: Pick<NurturingApi, "recordSignal"> | undefined;
   #visibility!: OrganizationVisibilityService;
+  #scopeGraph!: OrganizationScopeGraphService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
   #joinDoor!: OrganizationJoinDoorService | null;
@@ -580,6 +599,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   /** The ledger actor a write is recorded under — one spelling, shared by every door. */
   #ledgerActor(by: OrganizationCaller): { type: "user"; id: string } {
     return { type: "user", id: by.id };
+  }
+
+  /** Whose holdings bound what this call may grant: the key it arrived on, else the person. */
+  #grantCaller(by: OrganizationCaller): AuthzGrantCaller {
+    return grantCallerOf(by);
   }
 
   // -- the organization, its membership and its invitations ------------------
@@ -742,7 +766,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   ): Promise<OrganizationUpdatedMember> {
     return this.#dependencies.membership.updateMember({
       ...input,
-      actingUser: by ? { id: by.id, name: by.name ?? null, email: by.email ?? null } : null,
+      actingUser:
+        by && by.id !== SYSTEM_ACTORS.managementApi
+          ? { id: by.id, name: by.name ?? null, email: by.email ?? null }
+          : null,
+      caller: by ? this.#grantCaller(by) : { type: "anonymous" },
     });
   }
 
@@ -872,7 +900,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Readonly<{
       organizationId: string;
       userId: string;
-      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+      admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
   ): Promise<"created" | "already-present"> {
     return this.#dependencies.membership.createMembership(input);
@@ -1056,13 +1084,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /** Changes one member's role inside one team. */
-  updateTeamMemberRole(
+  async updateTeamMemberRole(
     input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
     by: OrganizationCaller,
   ): Promise<void> {
+    const team = await this.getTeamById({ teamId: input.teamId });
     return this.#dependencies.membership.updateTeamMemberRole({
       ...input,
+      organizationId: team.organizationId,
       currentUserId: by.id,
+      caller: this.#grantCaller(by),
     });
   }
 
@@ -1080,6 +1111,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.changeMemberRole({
       ...input,
       currentUserId: by?.id ?? null,
+      // No caller to answer for: nothing is held, so any grant is beyond it.
+      caller: by ? this.#grantCaller(by) : { type: "anonymous" },
     });
   }
 
@@ -1199,22 +1232,24 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Creates a team with its initial members, attributed to its caller. */
   createTeamWithMembers(
-    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam> {
     return this.#dependencies.organizations.createTeamWithMembers({
       ...input,
+      caller: this.#grantCaller(by),
       actor: this.#ledgerActor(by),
     });
   }
 
   /** Saves the team settings form's whole diff, attributed to its caller. */
   updateTeamWithMembers(
-    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#dependencies.organizations.updateTeamWithMembers({
       ...input,
+      caller: this.#grantCaller(by),
       actor: this.#ledgerActor(by),
     });
   }
@@ -1276,18 +1311,19 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   resolveBindingScopeNames(input: {
     organizationId: string;
-    bindings: readonly organizationContractModule.OrganizationGroupBinding[];
+    bindings: readonly organizationContractModule.OrganizationGroupGrant[];
   }): Promise<ReadonlyMap<string, string>> {
     return this.#dependencies.groups.resolveBindingScopeNames(input);
   }
 
   /** Creates a group, attributed to the caller who asked for it. */
   createGroup(
-    input: Omit<CreateOrganizationGroupInput, "actor">,
+    input: Omit<CreateOrganizationGroupInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup> {
     return this.#dependencies.organizations.createGroup({
       ...input,
+      caller: this.#grantCaller(by),
       actor: this.#ledgerActor(by),
     });
   }
@@ -1309,8 +1345,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /** Adds one member to a group. */
-  addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    return this.#dependencies.organizations.addGroupMember(input);
+  addGroupMember(input: ChangeOrganizationGroupMemberInput, by: OrganizationCaller): Promise<void> {
+    return this.#dependencies.organizations.addGroupMember({
+      ...input,
+      caller: this.#grantCaller(by),
+    });
   }
 
   /** Removes one member from a group. */
@@ -1319,27 +1358,28 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /** Every access binding one group holds. */
-  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupGrant[]> {
     return this.#dependencies.organizations.listGroupBindings(input);
   }
 
   /** Adds one access binding to a group, attributed to its caller. */
-  addGroupBinding(
-    input: Omit<AddOrganizationGroupBindingInput, "actor">,
+  addGroupGrant(
+    input: Omit<AddOrganizationGroupGrantInput, "actor" | "caller">,
     by: OrganizationCaller,
-  ): Promise<OrganizationGroupBinding> {
-    return this.#dependencies.organizations.addGroupBinding({
+  ): Promise<OrganizationGroupGrant> {
+    return this.#dependencies.organizations.addGroupGrant({
       ...input,
+      caller: this.#grantCaller(by),
       actor: this.#ledgerActor(by),
     });
   }
 
   /** Removes one access binding from a group, attributed to its caller. */
-  removeGroupBinding(
-    input: Omit<RemoveOrganizationGroupBindingInput, "actor">,
+  removeGroupGrant(
+    input: Omit<RemoveOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.#dependencies.organizations.removeGroupBinding({
+    return this.#dependencies.organizations.removeGroupGrant({
       ...input,
       actor: this.#ledgerActor(by),
     });
@@ -1347,11 +1387,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Applies the group editor's whole diff, attributed to its caller. */
   applyGroupEdits(
-    input: Omit<ApplyOrganizationGroupEditsInput, "actor">,
+    input: Omit<ApplyOrganizationGroupEditsInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#dependencies.organizations.applyGroupEdits({
       ...input,
+      caller: this.#grantCaller(by),
       actor: this.#ledgerActor(by),
     });
   }
@@ -1427,6 +1468,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#visibility.listVisible(input, by);
   }
 
+  /** The caller's scope graph, narrowed; the host versions it. */
+  getScopeGraph(by: OrganizationCaller): Promise<ScopeGraphOrganization[]> {
+    return this.#scopeGraph.getScopeGraph(by);
+  }
+
   getOrganizationWithMembersForPicker(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
@@ -1468,14 +1514,25 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#invitations().list(input);
   }
 
+  async checkInvitesWithinCaller(
+    input: Readonly<{
+      organizationId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    return this.#invitations().checkInvitesWithinCaller(input, by);
+  }
+
   async createPaymentPendingInvites(
     input: Readonly<{
       organizationId: string;
       subscriptionId: string;
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
+    by: OrganizationCaller,
   ): Promise<void> {
-    return this.#invitations().createPaymentPending(input);
+    return this.#invitations().createPaymentPending(input, by);
   }
 
   async cancelPaymentPendingInvites(
@@ -1504,14 +1561,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return buildSeatLimitPipeline({ billing: this.#billing });
   }
 
-  /** organization_lifecycle for this role: the worker also tells nurturing (§9). */
-  lifecyclePipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): OrganizationLifecycleDefinition {
-    if (participation === "produce") return buildOrganizationLifecyclePipeline({});
-    return buildOrganizationLifecyclePipeline({ nurturing: this.#nurturing });
+  /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
+  lifecyclePipeline(): OrganizationLifecycleDefinition {
+    return buildOrganizationLifecyclePipeline();
   }
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
@@ -1567,9 +1619,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * One team-role change, with three guards ahead of it: a personal team is
-   * never role-administered from here, a custom role needs the plan that
-   * carries custom roles, and a Lite Member seat allows the Viewer role only.
+   * One team-role change, with two guards ahead of it: a personal team is
+   * never role-administered from here, and a Lite Member seat allows the
+   * Viewer role only. The custom-role plan is declared on the door.
    */
   async changeTeamMemberRole(
     input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
@@ -1583,11 +1635,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       teamId: input.teamId,
     });
 
-    if (isOrganizationApiCustomRole(input.role)) {
-      if (input.customRoleId) {
-        await this.#members.plans.assertCustomRolesAllowed({ organizationId });
-      }
-    } else {
+    if (!isOrganizationApiCustomRole(input.role)) {
       await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
     }
 
@@ -1614,10 +1662,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }>,
     by: OrganizationCaller,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    await this.#members.plans.assertAuditLogsAllowed({
-      organizationId: input.organizationId,
-    });
-
     if (input.projectId) {
       const permitted = await this.#dependencies.permissions.hasPermission({
         userId: by.id,
@@ -1628,6 +1672,30 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }
 
     return this.getAuditLogs(input);
+  }
+
+  /** The Directory's tab badges: each a count, so no tab's list is read to number it. */
+  async getDirectoryCounts(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationDirectoryCounts> {
+    const { organizationId } = input;
+    const [members, invites, requests, groups, teams] = await Promise.all([
+      this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
+      this.listPendingInvitations({ organizationId }),
+      this.listPendingJoinRequests({ organizationId }),
+      this.listGroups({ organizationId, page: 1, limit: 1 }),
+      this.listTeams({ organizationId, page: 1, limit: 1 }),
+    ]);
+
+    return {
+      members: members.totalCount,
+      openInvites: invites.filter(
+        ({ displayStatus }) => displayStatus === "PENDING" || displayStatus === "EXPIRED",
+      ).length,
+      joinRequests: requests.length,
+      groups: groups.pagination.total,
+      teams: teams.pagination.total,
+    };
   }
 
   // -- the team doors --------------------------------------------------------
@@ -1648,8 +1716,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     return teams.map((team) => ({
       ...team,
-      projects: projects.data.filter((project) => project.teamId === team.id),
-    })) as TeamWithProjects[];
+      projects: projects.data.filter((project) => project.teamId === team.id).map(teamProjectOf),
+    }));
   }
 
   /** The access matrix an administrator edits: who holds what, and through what. */
@@ -1678,31 +1746,20 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       teamId: team.id,
     });
 
-    return { ...team, projects } as TeamWithProjects;
+    return { ...team, projects: projects.map(teamProjectOf) };
   }
 
   async updateTeamMembers(
-    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void> {
-    const team = await this.getTeamById({ teamId: input.teamId });
-    await this.#assertMemberRolesLicensed({
-      organizationId: team.organizationId,
-      members: input.members,
-    });
-
     await this.updateTeamWithMembers(input, by);
   }
 
   async createTeamWithGatedMembers(
-    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam> {
-    await this.#assertMemberRolesLicensed({
-      organizationId: input.organizationId,
-      members: input.members,
-    });
-
     return this.createTeamWithMembers(input, by);
   }
 
@@ -1727,12 +1784,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   async listGroupsWithScopeNames(
     input: Readonly<{ organizationId: string }>,
   ): Promise<GroupListItem[]> {
-    await this.#members.plans.assertScimAllowed(input);
-
     const page = await this.listGroups({ ...input, ...GROUP_PAGE });
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: page.data.flatMap(({ bindings }) => bindings),
+      bindings: page.data.flatMap(({ grants }) => grants),
     });
 
     return page.data.map((group) => ({
@@ -1742,7 +1797,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       externalId: group.externalId,
       scimSource: group.scimSource,
       memberCount: group.memberCount,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         ...binding,
         scopeName: scopeNames.get(binding.scopeId) ?? null,
       })),
@@ -1754,7 +1809,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const group = await this.getGroup(input);
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: group.bindings,
+      bindings: group.grants,
     });
 
     return {
@@ -1763,7 +1818,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       slug: group.slug,
       externalId: group.externalId,
       scimSource: group.scimSource,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         ...binding,
         scopeName: scopeNames.get(binding.scopeId) ?? null,
       })),
@@ -1772,11 +1827,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   async createLicensedGroup(
-    input: Omit<CreateOrganizationGroupInput, "actor">,
+    input: Omit<CreateOrganizationGroupInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup> {
-    await this.#members.plans.assertScimAllowed({ organizationId: input.organizationId });
-
     return this.createGroup(input, by);
   }
 
@@ -1787,14 +1840,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const groups = await this.listGroupsForMember(input);
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: groups.flatMap(({ bindings }) => bindings),
+      bindings: groups.flatMap(({ grants }) => grants),
     });
 
     return groups.map((group) => ({
       id: group.id,
       name: group.name,
       scimSource: group.scimSource,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         id: binding.id,
         role: binding.role,
         customRoleName: binding.customRoleName,
@@ -1919,18 +1972,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.permissions.hasPermission({
       userId: input.by.id,
       permission: "organization:manage",
-      organizationId: input.organizationId,
-    });
-  }
-
-  /** Refuses a member list that assigns a custom role the plan does not carry. */
-  async #assertMemberRolesLicensed(input: {
-    organizationId: string;
-    members: readonly Readonly<{ role: string }>[];
-  }): Promise<void> {
-    if (!input.members.some((member) => isOrganizationApiCustomRole(member.role))) return;
-
-    await this.#members.plans.assertCustomRolesAllowed({
       organizationId: input.organizationId,
     });
   }

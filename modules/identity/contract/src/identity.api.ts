@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type {
@@ -33,6 +33,7 @@ import type {
   SsoConnectionLifecycleState,
   SsoDomainVerification,
   SsoMigrationRoute,
+  SsoVerificationCeremonyMethod,
 } from "./connection.ts";
 import type {
   AttachIdentifierCommandData,
@@ -71,6 +72,8 @@ import type {
   SsoArrivingUser,
   SsoAssertionDecision,
   SsoTestArrivalStanding,
+  SsoUserResolution,
+  SsoUserResolutionInput,
 } from "./sso-admission.ts";
 import type {
   OrganizationSsoConnection,
@@ -81,7 +84,11 @@ import type {
   SelfServeIssuedDnsRecord,
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
-import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
+import type {
+  SsoIdentityProviderView,
+  SsoIdpRegistration,
+  SsoIdpUpdate,
+} from "./sso-idp-registration.ts";
 import type {
   SsoMigrationAccountLinkDecision,
   SsoMigrationAuthenticationDecision,
@@ -290,6 +297,10 @@ export interface SsoIssuerDirectoryApi {
   /** The issuer of the connection that proved this domain. Empty where the
    *  domain is unproved, or its connection is not one anybody may dial. */
   findIssuersForDomain(args: { domain: string }): Promise<string[]>;
+  /** The origins these issuers' discovery documents serve their endpoints
+   *  from, each public https (Google's `*.googleapis.com`, a Cognito hosted
+   *  UI). Empty for an issuer that has no document or does not answer. */
+  findEndpointOrigins(args: { issuers: readonly string[] }): Promise<string[]>;
 }
 
 /**
@@ -390,18 +401,24 @@ export interface SsoDomainCeremonyCommand {
   actor: SelfServeActor;
 }
 
+/** A claim or an ask to prove, with how this organization proves a domain: the
+ *  setup surface's answer, which the guards check again rather than trust. */
+export interface SsoDomainProvingCommand extends SsoDomainCeremonyCommand {
+  proof: SsoVerificationCeremonyMethod;
+}
+
 /**
- * The domain ceremony an administrator runs themselves (ADR-123, D05 tier 3).
- * A claim somebody else already proved waits for a person; everything else is
- * decided by what the domain publishes.
+ * The domain ceremony an administrator runs themselves (ADR-123, D05 tiers 2 and 3).
+ * Where the licence is the proof a claim is verified at once; elsewhere a claim
+ * somebody else proved waits for a person, and the rest is what the domain publishes.
  */
 export interface SsoDomainCeremonyApi {
   claimDomain(
-    command: SsoDomainCeremonyCommand,
-  ): Promise<{ waitsForReview: boolean; disputed: boolean }>;
-  /** The record to publish, with its value answered once. */
+    command: SsoDomainProvingCommand,
+  ): Promise<{ waitsForReview: boolean; disputed: boolean; verified: boolean }>;
+  /** The record to publish, with its value answered once; `proved` where the licence proves it. */
   proveDomain(
-    command: SsoDomainCeremonyCommand,
+    command: SsoDomainProvingCommand,
   ): Promise<{ proved: true } | { proved: false; record: SelfServeIssuedDnsRecord }>;
   checkDomainRecord(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
   checkDomainFile(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
@@ -489,6 +506,15 @@ export interface SsoSetupCommandsApi {
   selectMigrationRoute(args: SsoSetupCommand & { route: SsoMigrationRoute }): Promise<void>;
   /** The word on the card; nothing routes on it. */
   rename(args: SsoSetupCommand & { name: string }): Promise<void>;
+  /** The connection's current identity provider settings, for the edit form.
+   *  Null for one with none of its own (a grandfathered one). Never the secret. */
+  getIdentityProvider(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SsoIdentityProviderView>;
+  /** Replaces what the connection dials, keeping its id and so the redirect
+   *  address at the provider. Checked exactly as a registration is. */
+  updateIdentityProvider(args: SsoSetupCommand & { idp: SsoIdpUpdate }): Promise<void>;
   setArrivals(args: SsoSetupCommand & { arrivalPolicy: SsoArrivalPolicy }): Promise<void>;
   /** Takes the connection live on the strength of the test sign-in it
    *  recorded: the account is resolved here, never supplied by a caller. */
@@ -514,6 +540,9 @@ export interface SsoAssertionApi {
     accountId?: string;
     email: string | null | undefined;
   }): Promise<SsoAssertionDecision>;
+  /** Which existing person an assertion `decide` admitted signs in as, asked
+   *  after it and never instead of it (specs/identity/scim-sso-signin.feature). */
+  resolveUser(args: SsoUserResolutionInput): Promise<SsoUserResolution>;
 }
 
 /**

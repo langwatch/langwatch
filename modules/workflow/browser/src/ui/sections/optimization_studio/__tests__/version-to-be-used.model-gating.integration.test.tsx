@@ -3,7 +3,7 @@
  * Commit-message autogen gating: with no Fast model resolved, generation
  * never auto-fires and the field degrades to an explicit sparkles button.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,8 +34,8 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     modelProvider: {
       getResolvedDefault: {
         useQuery: () => ({
@@ -86,11 +86,11 @@ const { NewVersionFields } = await import("../version-to-be-used.tsx");
 function Harness() {
   const form = useForm({ defaultValues: { version: "", commitMessage: "" } });
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <FormProvider {...form}>
         <NewVersionFields canSaveOverride={true} />
       </FormProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

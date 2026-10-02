@@ -1,17 +1,13 @@
-import { Box } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import {
-  useLangyStore,
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-  LangyProvider,
-  useLangy,
-} from "@langwatch/langy-browser-kit";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
+import { Box } from "@langwatch/design-system/primitives";
 import { memo, type ReactNode, useEffect } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
+import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
 import { LangySidecar } from "./langy-panel.tsx";

@@ -1,9 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * The token check counts its callers: past the registry's per-minute ceiling
@@ -18,10 +16,11 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp } from "../auth.app.ts";
+import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -48,8 +47,8 @@ function countingLimiter() {
 
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
-): Promise<AuthApp> {
-  return AuthApp.create({
+): Promise<AuthModule> {
+  return AuthModule.create({
     config: {
       sessionUrl: undefined,
       mfaEnrollmentOpen: false,
@@ -59,6 +58,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories: MemoryAuthRepositories.create(),
@@ -75,7 +75,6 @@ async function appFor(
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),
-      nurturing: createApiFixture<NurturingApi>(),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),

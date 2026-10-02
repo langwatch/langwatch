@@ -1,4 +1,4 @@
-import { Card, HStack, Icon, Text } from "@chakra-ui/react";
+import { Card, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { CheckCircle2 } from "lucide-react";
 
 export interface HealthLineProps {

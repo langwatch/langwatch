@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
-import type { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
+import type { McpCallerAuthService, McpCallerLookup } from "./mcp-caller-auth.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
 import {
   MAX_SESSIONS_PER_KEY,
@@ -40,7 +40,7 @@ export class McpSseTransportService {
     const { http, auth, sessions } = this.#collaborators;
     const authentication = await auth.authenticate(req, res);
     if (authentication.kind === "answered") return;
-    const { apiKey } = authentication;
+    const { apiKey, projectId } = authentication;
 
     const caller = await auth.resolveOptionalCaller(auth.extractBearer(req));
     const userId = caller.kind === "resolved" ? caller.userId : undefined;
@@ -56,13 +56,13 @@ export class McpSseTransportService {
     const sessionId = transport.sessionId;
     http.noteLogFields(res, { sessionId });
 
-    const session = sessions.openSession({ transport, apiKey, userId });
+    const session = sessions.openSession({ transport, apiKey, projectId, userId });
     sessions.sse.set(sessionId, session);
 
     // Published before the stream opens: a client can post its first message to another
     // replica the instant it reads the endpoint event.
     try {
-      await sessions.storeRecord({ transport: "sse", sessionId, apiKey });
+      await sessions.storeRecord({ transport: "sse", sessionId, apiKey, projectId });
     } catch (err) {
       logger.error({ error: err }, "Failed to record MCP SSE session in Redis");
     }
@@ -78,7 +78,7 @@ export class McpSseTransportService {
       sessions.releaseSse(sessionId, apiKey).catch(() => undefined);
     });
 
-    await sessions.connectServer({ transport, apiKey, userId });
+    await sessions.connectServer({ transport, apiKey, projectId, userId });
   }
 
   /**
@@ -107,7 +107,7 @@ export class McpSseTransportService {
 
     const local = sessions.sse.get(sessionId);
     if (local) {
-      await this.#postLocally({ req, res, sessionId, apiKey: caller.apiKey, session: local });
+      await this.#postLocally({ req, res, sessionId, caller, session: local });
       return;
     }
     await this.#relayToHolder({ req, res, sessionId, apiKey: caller.apiKey });
@@ -117,15 +117,16 @@ export class McpSseTransportService {
     req: IncomingMessage;
     res: ServerResponse;
     sessionId: string;
-    apiKey: string;
+    caller: McpCallerLookup;
     session: McpSseSession;
   }): Promise<void> {
     const { http, sessions } = this.#collaborators;
-    const { session } = input;
-    if (input.apiKey !== session.apiKey) {
+    const { session, sessionId, caller } = input;
+    if (!sessions.adoptsCaller({ transport: "sse", sessionId, session, caller })) {
       http.send401(input.res, "Bearer token does not match session");
       return;
     }
+    http.noteLogFields(input.res, { projectId: session.projectId });
     sessions.markActive(session);
     void sessions.touchRecord({
       transport: "sse",
@@ -148,7 +149,7 @@ export class McpSseTransportService {
     sessionId: string;
     apiKey: string;
   }): Promise<void> {
-    const { http, sessions } = this.#collaborators;
+    const { http, auth, sessions } = this.#collaborators;
     const { res, sessionId } = input;
     const record = await sessions.getRecordKey({ transport: "sse", sessionId });
     if (record.kind === "missing") {
@@ -159,6 +160,10 @@ export class McpSseTransportService {
       http.send401(res, "Bearer token does not match session");
       return;
     }
+
+    const projectId = record.projectId ?? (await auth.projectIdOf(record.apiKey));
+    http.noteLogFields(res, { projectId });
+    await sessions.backfillRecordProject({ transport: "sse", sessionId, record, projectId });
 
     const read = await http.readJsonBody(input.req, res);
     if (read.kind === "answered") return;

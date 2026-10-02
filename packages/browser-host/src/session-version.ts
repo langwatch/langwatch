@@ -1,8 +1,10 @@
 /**
- * The session-version stamp: every tRPC answer names the version of the
- * caller's session-tier state, and a newer one than the session tier was
- * fetched under marks that tier stale. A 403 does the same. ADR-164.
+ * The session-version stamp: every tRPC answer names the version of the caller's session state,
+ * and a newer one than was seen marks every read stale (ADR-170). A query answer also names its
+ * read's schema hash, which the disk mirror checks against the bundle's (ARCHITECTURE.md §10.2).
  */
+
+import { SCHEMA_HASH_HEADER } from "@langwatch/module";
 
 /** The response header the API stamps on every tRPC answer. */
 export const SESSION_VERSION_HEADER = "x-lw-session-version";
@@ -17,6 +19,7 @@ export function parseSessionVersion(value: string | null): number | undefined {
 export class SessionVersionWatch {
   #seen: number | undefined;
   readonly #listeners = new Set<() => void>();
+  readonly #servedSchemas = new Map<string, string>();
 
   private constructor() {}
 
@@ -40,9 +43,25 @@ export class SessionVersionWatch {
     if (seen === undefined) return;
     for (const listener of this.#listeners) listener();
   }
+
+  /** Records the schema hash a query answer carried for its procedure path. */
+  observeSchema({ path, hash }: { path: string; hash: string }): void {
+    this.#servedSchemas.set(path, hash);
+  }
+
+  /** The schema hash the server last answered this path under; undefined before any answer. */
+  servedSchemaHashFor(path: string): string | undefined {
+    return this.#servedSchemas.get(path);
+  }
 }
 
-/** A fetch that hands every answer's stamp to the watch; passed as the transport's `fetch`. */
+/** The one procedure a tRPC request names: its last path segment, since calls are not batched. */
+function procedurePathOfRequest(input: Parameters<typeof globalThis.fetch>[0]): string {
+  const href = typeof input === "object" && "url" in input ? input.url : String(input);
+  return decodeURIComponent(new URL(href, "http://localhost").pathname.split("/").pop() ?? "");
+}
+
+/** A fetch that hands every answer's stamps to the watch; passed as the transport's `fetch`. */
 export function sessionVersionFetch({
   fetch = globalThis.fetch,
   watch,
@@ -53,6 +72,10 @@ export function sessionVersionFetch({
   return async (input, init) => {
     const response = await fetch(input, init);
     watch.observe(response.headers.get(SESSION_VERSION_HEADER));
+    const schemaHash = response.headers.get(SCHEMA_HASH_HEADER);
+    if (schemaHash !== null) {
+      watch.observeSchema({ path: procedurePathOfRequest(input), hash: schemaHash });
+    }
     return response;
   };
 }

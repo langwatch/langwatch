@@ -4,6 +4,7 @@ export {
   type ScimDeliveryReceipt,
   type ScimDirectoryScope,
   type ScimTokenAuditEntry,
+  type ScimTokenCaller,
 } from "./scim.api.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export * from "./scim-token.rest.ts";

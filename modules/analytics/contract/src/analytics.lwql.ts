@@ -1,3 +1,4 @@
+import { authzPermissionSchema, type AuthzPermission } from "@langwatch/authorization";
 import { z } from "zod";
 
 import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";
@@ -61,13 +62,23 @@ export const langWatchQLQueryResultSchema = z
   .strict();
 export type LangWatchQLQueryResult = z.infer<typeof langWatchQLQueryResultSchema>;
 
+/**
+ * A gate the schema publishes: captured content, a registry permission, or `costs`, which is
+ * published beside `cost:view` so a reader of main's schema keeps its meaning.
+ */
+export const langWatchQLGateSchema = z.union([
+  z.enum(["input", "output", "costs"]),
+  authzPermissionSchema,
+]);
+export type LangWatchQLGate = z.infer<typeof langWatchQLGateSchema>;
+
 export const langWatchQLSchemaColumnSchema = z
   .object({
     name: z.string(),
     type: z.string(),
     description: z.string(),
     unit: z.string().nullable(),
-    gates: z.array(z.string()).readonly(),
+    gates: z.array(langWatchQLGateSchema).readonly(),
     available: z.boolean(),
   })
   .strict();
@@ -113,7 +124,7 @@ export const langWatchQLSchemaAppFunctionSchema = z
     /** How many distinct keys of that kind one run may read. */
     cap: z.number().int().positive(),
     /** Permissions that must all be held to call it. Empty for an ungated one. */
-    gates: z.array(z.string()).readonly(),
+    gates: z.array(langWatchQLGateSchema).readonly(),
     available: z.boolean(),
     exampleSql: z.string(),
   })
@@ -166,11 +177,18 @@ export type LangWatchQLCaller = Readonly<{
   lwqlKey: string;
 }>;
 
-/** The caller-specific content gates the LangWatchQL catalog understands. */
+/**
+ * The catalogue permissions a caller holds at one scope, as authz answered them. Every table and
+ * column the catalogue declares resolves from this set; an absent permission reads as denied.
+ */
+export type LangWatchQLCatalogueAccess = Readonly<{ permissions: readonly AuthzPermission[] }>;
+
+/** The caller-specific gates the LangWatchQL catalog understands. */
 export type LangWatchQLProtections = Readonly<{
   canSeeCosts?: boolean | null;
   canSeeCapturedInput?: boolean | null;
   canSeeCapturedOutput?: boolean | null;
+  catalogue: LangWatchQLCatalogueAccess;
 }>;
 
 /**

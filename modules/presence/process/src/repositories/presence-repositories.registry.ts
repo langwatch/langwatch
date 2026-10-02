@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryPresenceRepositories } from "./memory/memory.presence.repositories.ts";
 import { RedisPresenceRepositories } from "./redis/redis.presence.repositories.ts";

@@ -3,7 +3,7 @@
  * the turn holds until they answer. Four states, read from the wait: pending, answered, expired,
  * cancelled.
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, CircleSlash, Clock, Terminal } from "lucide-react";

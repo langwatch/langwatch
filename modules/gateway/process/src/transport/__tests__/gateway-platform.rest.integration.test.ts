@@ -4,8 +4,6 @@
  * @see specs/security/resource-scope-permission-checks.feature
  */
 
-// @vitest-environment node
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   apiErrorBody,
   bindRestMiddleware,
@@ -13,7 +11,7 @@ import {
   type IdempotentRunner,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   type GatewayApi,
   type GatewayKeyCaller,
@@ -26,6 +24,8 @@ import {
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
+// @vitest-environment node
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -133,7 +133,7 @@ function mountFamily({
   });
   const runtime = createRestRuntime({
     identity: { authenticate: projectDoor, identify: projectDoor },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency,
   });
 
@@ -551,8 +551,36 @@ describe("the gateway platform family's caller", () => {
     });
   });
 
+  describe("given a scoped API key creating a virtual key", () => {
+    /** @scenario Writes from a scoped API key are attributed to its user */
+    it("mints the key as the key's owning user, 201", async () => {
+      const createVirtualKey = vi.fn(async () => ({
+        virtualKey: virtualKeyRow(),
+        secret: "secret_1",
+      }));
+      const post = mountAs({
+        credential: scopedKey,
+        app: createApiFixture<GatewayApi>({
+          ...callerOf,
+          organizationIdForProject: async () => ORGANIZATION_ID,
+          authorizeVirtualKeyCreate: async () => {},
+          createVirtualKey,
+          toVirtualKeySnakeDto: async () => virtualKeyDto,
+        }),
+      });
+
+      const response = await post("/virtual-keys", { name: "ci-key" });
+
+      expect(response.status).toBe(201);
+      expect(createVirtualKey).toHaveBeenCalledWith(
+        expect.objectContaining({ actorUserId: "user_1" }),
+      );
+    });
+  });
+
   describe("given a legacy project key", () => {
     /** @scenario "A legacy project key's own-project key is attributed to the machine principal" */
+    /** @scenario Writes from a legacy project key are attributed to the machine principal */
     it("mints its own project's key as svc_<projectId>, 201", async () => {
       const createVirtualKey = vi.fn(async () => ({
         virtualKey: virtualKeyRow(),

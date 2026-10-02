@@ -1,5 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { CornerDownLeft } from "lucide-react";
 
 import { getIconInfo, type ListItem } from "../../model/command-icon-info.ts";

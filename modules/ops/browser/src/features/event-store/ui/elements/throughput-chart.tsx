@@ -1,4 +1,12 @@
-import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo, useRef, useState } from "react";
 import {

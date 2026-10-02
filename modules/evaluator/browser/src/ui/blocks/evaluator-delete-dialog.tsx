@@ -4,8 +4,17 @@
  * Requires typed confirmation because deletion is destructive with no undo.
  */
 
-import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Alert,
+  Button,
+  HStack,
+  Input,
+  List,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
 

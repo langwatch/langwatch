@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SimulationRunResult as ScenarioResults } from "@langwatch/scenario-contract";
 
 function VerdictSection({ verdict }: { verdict: string }) {

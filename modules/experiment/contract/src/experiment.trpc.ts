@@ -1,8 +1,8 @@
 // Every `experiments.*` procedure in three groups: workbench, project list,
 // and runs. Legacy wizard setup stored as open record, verbatim.
 
-import { defineTrpcContract } from "@langwatch/api/contract";
 import { mappingStateSchema } from "@langwatch/dataset-contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { z } from "zod";

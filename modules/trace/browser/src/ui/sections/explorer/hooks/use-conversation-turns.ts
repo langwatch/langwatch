@@ -53,7 +53,6 @@ export function useConversationTurns(conversationId: string | null) {
       // traces-table query with arbitrary filters). A share grant must never
       // open it, so read-only viewers skip conversation turns entirely.
       enabled: !!projectId && !!conversationId && !isReadOnly,
-      staleTime: 30_000,
       placeholderData: keepPreviousData,
     },
   );

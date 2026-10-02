@@ -1,11 +1,10 @@
 /**
  * The members a process hands its modules, and the function that builds them
  * from parsed config. No pool noun on purpose: a module names the members it
- * reads with {@link reads} and is handed exactly those.
+ * reads in `static readonly reads` and is handed exactly those.
  */
 export {
   MEMBER_NAMES,
-  reads,
   type Cache,
   type Clock,
   type Encryption,
@@ -20,13 +19,13 @@ export {
   type RateLimitDecision,
   type RateLimiter,
   type SecretResolver,
+  type StoresMemberSource,
   type SignedObjectUpload,
   type StoredObjectAddress,
   type Telemetry,
   type UploadFacts,
 } from "./members.ts";
 export {
-  createProcessMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   type MemberSource,
@@ -79,6 +78,6 @@ export {
   ConsumerPipelines,
   type PipelineSettings,
 } from "./pipeline-selection.ts";
-export { openProcessStores } from "./open-stores.ts";
+export { openStores } from "./open-stores.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

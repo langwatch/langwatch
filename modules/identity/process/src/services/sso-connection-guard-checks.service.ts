@@ -1,9 +1,16 @@
+import type { LedgerActor } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type {
+  DomainClaimLicenseAuthority,
+  LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  type IdentityActor,
   type SsoConnectionCommandType,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  type SsoDomainClaimAuthority,
+  SsoLicenseRequiredError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionOperatorActRequiredError,
@@ -19,6 +26,8 @@ import {
   REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   RENAME_CONNECTION_COMMAND_TYPE,
+  SSO_IDP_EDITABLE_STATES,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
   FINALIZE_MIGRATION_COMMAND_TYPE,
@@ -41,7 +50,6 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
 import { isTerminalSsoConnection } from "../rules/sso-domain-ownership.rules.ts";
 
@@ -145,6 +153,9 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
     "SUSPENDED",
     "TEARDOWN_PENDING",
   ],
+  // Shared with the setup surface, so the edit control and this guard
+  // cannot disagree about where it works.
+  [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: SSO_IDP_EDITABLE_STATES,
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -152,7 +163,10 @@ export interface SsoConnectionGuardsDeps {
   registrationSlots: SsoConnectionRegistrationRepository;
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
-  platformOperators: SsoPlatformOperatorRepository;
+  /** Asked at the platform: a caller-supplied "I am an operator" would authorize itself. */
+  authorization: Pick<AuthzApi, "can">;
+  /** What the installation's licence may decide (D05 tier 2), asked per ceremony. */
+  licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 }
 
 export class SsoConnectionGuardChecksService {
@@ -164,14 +178,66 @@ export class SsoConnectionGuardChecksService {
   private readonly registrationSlots: SsoConnectionRegistrationRepository;
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
-  private readonly platformOperators: SsoPlatformOperatorRepository;
+  private readonly authorization: Pick<AuthzApi, "can">;
+  private readonly licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 
   private constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
     this.registrationSlots = deps.registrationSlots;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
-    this.platformOperators = deps.platformOperators;
+    this.authorization = deps.authorization;
+    this.licensing = deps.licensing;
+  }
+
+  /** Asked afresh at every decision rather than trusted from the request. */
+  getLicenseAuthority(): Promise<DomainClaimLicenseAuthority> {
+    return this.licensing.getDomainClaimAuthority();
+  }
+
+  /**
+   * Who may decide a claim on the authority the command names. `dns-proof` is only
+   * `verifyDomain`'s to state, in the commit of the record it read; the licence speaks
+   * for an installation, so the hosted service's port answers no to every organization.
+   */
+  async assertClaimAuthority({
+    authority,
+    actor,
+    act,
+  }: {
+    authority: SsoDomainClaimAuthority;
+    actor: LedgerActor;
+    act: string;
+  }): Promise<void> {
+    if (authority === "dns-proof") {
+      throw new SsoConnectionInvalidTransitionError(
+        `nothing may ${act} on a published record's authority except the check that read the record`,
+      );
+    }
+    if (authority === "platform-operator") {
+      await this.assertPlatformOperator({ actor, act });
+      return;
+    }
+    const licence = await this.getLicenseAuthority();
+    if (!licence.authorizesDomainClaims) {
+      throw new SsoLicenseRequiredError(`no license on this deployment authorizes ${act}`);
+    }
+    await this.assertLicenseSpeaksFor({ licence, actor, act });
+  }
+
+  /** With one organization its administrator runs the installation; with several,
+   *  only a platform operator may use the licence in place of a published proof. */
+  async assertLicenseSpeaksFor({
+    licence,
+    actor,
+    act,
+  }: {
+    licence: DomainClaimLicenseAuthority;
+    actor: LedgerActor;
+    act: string;
+  }): Promise<void> {
+    if (licence.hostsSingleOrganization) return;
+    await this.assertPlatformOperator({ actor, act });
   }
 
   /**
@@ -273,13 +339,7 @@ export class SsoConnectionGuardChecksService {
   /**
    * The operator gate, asked of the port rather than of the command.
    */
-  async assertPlatformOperator({
-    actor,
-    act,
-  }: {
-    actor: IdentityActor;
-    act: string;
-  }): Promise<void> {
+  async assertPlatformOperator({ actor, act }: { actor: LedgerActor; act: string }): Promise<void> {
     // A system actor is refused before the port is asked. These acts record
     // WHO decided, and an unattributable trust decision is precisely what the
     // attestation's visibility requirement forbids — so "the platform did it"
@@ -290,8 +350,10 @@ export class SsoConnectionGuardChecksService {
       );
     }
 
-    const isOperator = await this.platformOperators.isPlatformOperator({
-      actorId: actor.id,
+    const isOperator = await this.authorization.can({
+      principal: { type: "user", id: actor.id },
+      permission: "ops:manage",
+      scope: { type: "platform" },
     });
     if (isOperator) {
       return;

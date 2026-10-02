@@ -81,7 +81,10 @@ export class MemorySecretRepository implements SecretRepository {
     const row = this.#rows.get(input.id);
     if (!row || row.secret.projectId !== input.projectId) throw new SecretNotFoundError();
 
-    const secret = secretSchema.parse({ ...row.secret, updatedAt: toDate(nowInstant()) });
+    const secret = secretSchema.parse({
+      ...row.secret,
+      updatedAt: toDate(nowInstant()),
+    });
     this.#rows.set(secret.id, { secret, encryptedValue: input.encryptedValue });
 
     return structuredClone(secret);

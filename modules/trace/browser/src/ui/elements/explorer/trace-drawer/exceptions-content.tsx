@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
 

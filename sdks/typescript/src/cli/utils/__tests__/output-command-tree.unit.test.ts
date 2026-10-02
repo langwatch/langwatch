@@ -58,6 +58,7 @@ describe("the real command tree", () => {
       ["trace", "facets"],
       ["trace", "fields"],
       ["trigger", "delete"],
+      ["slack-connection", "list"],
       ["secret", "update"],
       ["run-plan", "run"],
       ["test-suite", "run"],

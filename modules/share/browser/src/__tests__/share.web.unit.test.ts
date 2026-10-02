@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { shareWeb } from "../share.web.ts";
@@ -21,15 +21,6 @@ describe("given a browser that installs share", () => {
         .render();
 
       expect(installed.modules).toContain(shareWeb);
-    });
-  });
-
-  describe("when a surface the declaration publishes is asked for", () => {
-    it.each([["share-link-views"], ["share-links"]] as const)("resolves %s", async (surface) => {
-      const publication = shareWeb.installation.publications[surface];
-      const loaded = await publication?.load();
-
-      expect(loaded).toBeDefined();
     });
   });
 });

@@ -1,5 +1,14 @@
-import { Accordion, Box, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Accordion,
+  Box,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
 import { toEpochMs, type TimeInput } from "@langwatch/time";
 import { LuChevronDown } from "react-icons/lu";

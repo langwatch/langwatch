@@ -1,3 +1,12 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Chip } from "@langwatch/design-system/chip";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import {
   Box,
   Button,
@@ -6,25 +15,13 @@ import {
   HStack,
   Icon,
   Portal,
+  Skeleton,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import {
-  Chip,
-  useFilterStore,
-  formatAbsoluteTime,
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-  formatTokens,
-  STATUS_COLORS,
-} from "@langwatch/trace-browser-kit";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -37,10 +34,16 @@ import {
   LuX,
 } from "react-icons/lu";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { useTraceDrawer, type TraceDrawerState } from "../../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import {
+  formatAbsoluteTime,
+  formatRelativeTimeAgo,
+  STATUS_COLORS,
+} from "../../../../../model/display-formatters.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import {
   formatPinValue,
@@ -79,6 +82,8 @@ import { TraceOverflowMenu } from "./trace-overflow-menu.tsx";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
+  /** The header is the list row's fields; the chips and pins its read supplies are loading. */
+  isPlaceholder?: boolean;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
   /**
@@ -164,8 +169,8 @@ function TraceIdChip({ traceId }: { traceId: string }) {
  * Trace status indicator.
  */
 function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: string }) {
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const selectSpan = useTraceDrawer((s) => s.selectSpan);
+  const setViewMode = useTraceDrawer((s) => s.setViewMode);
   const requestFocus = useFocusSectionStore((s) => s.request);
   const spanTree = useSpanTree();
   const errorSpans = useMemo(() => rankedErrorSpans(spanTree.data ?? []), [spanTree.data]);
@@ -397,6 +402,7 @@ const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set(["metadata.model", "metadata.m
 
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
+  isPlaceholder = false,
   onClose,
   readOnly = false,
 }: DrawerHeaderProps) {
@@ -404,15 +410,15 @@ export const DrawerHeader = memo(function DrawerHeader({
   // full summary → refetch) so chips never vanish once shown for the same
   // traceId — see useRetainedTraceHeader for the root-cause writeup.
   const trace = useRetainedTraceHeader(traceProp);
-  const isMaximized = useDrawerStore((s) => s.isMaximized);
-  const pinned = useDrawerStore((s) => s.pinned);
-  const togglePinned = useDrawerStore((s) => s.togglePinned);
-  const viewMode = useDrawerStore((s) => s.viewMode);
-  const isEditing = useDrawerStore((s) => s.isEditing);
-  const setViewMode = useDrawerStore((s) => s.setViewMode);
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
-  const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
+  const isMaximized = useTraceDrawer((s) => s.isMaximized);
+  const pinned = useTraceDrawer((s) => s.pinned);
+  const togglePinned = useTraceDrawer((s) => s.togglePinned);
+  const viewMode = useTraceDrawer((s) => s.viewMode);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
+  const setViewMode = useTraceDrawer((s) => s.setViewMode);
+  const selectSpan = useTraceDrawer((s) => s.selectSpan);
+  const toggleMaximized = useTraceDrawer((s) => s.toggleMaximized);
+  const toggleSnapMaximize = useTraceDrawer((s) => s.toggleSnapMaximize);
   // The Maximize / Restore icon drives the same width snap that double-clicking the
   // edge grip uses — `widthPx` is the actual size signal, while the boolean
   // `isMaximized` is kept in sync for components that read it to swap the icon label.
@@ -423,7 +429,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     }
     toggleSnapMaximize(window.innerWidth);
   };
-  const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+  const setShortcutsOpen = useTraceDrawer((s) => s.setShortcutsOpen);
 
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } = useTraceDrawerNavigation();
 
@@ -645,6 +651,7 @@ export const DrawerHeader = memo(function DrawerHeader({
         grandCost={grandCost}
         hasAuthoritativeTokens={hasAuthoritativeTokens}
         isBundledCost={isBundledCost}
+        isPlaceholder={isPlaceholder}
         nonBilledCost={nonBilledCost}
         primaryChips={primaryChips}
         reasoningEffort={reasoningEffort}
@@ -655,11 +662,15 @@ export const DrawerHeader = memo(function DrawerHeader({
 
       {/* Pin strip only renders when there's something to show — many traces have no auto-pins,
           and a small height jump between trace-with-pins and trace-without beats dead chrome. */}
-      {(pinResult.inline.length > 0 || pinResult.overflow != null) && (
-        <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-          {pinResult.inline}
-          {pinResult.overflow}
-        </HStack>
+      {isPlaceholder ? (
+        <Skeleton height="22px" width="180px" borderRadius="md" />
+      ) : (
+        (pinResult.inline.length > 0 || pinResult.overflow != null) && (
+          <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
+            {pinResult.inline}
+            {pinResult.overflow}
+          </HStack>
+        )
       )}
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
@@ -800,8 +811,8 @@ interface PinBuildContext {
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
   pins: ReturnType<typeof usePinnedAttributes>["pins"];
   resourceAttributes: ReturnType<typeof useTraceResources>["resourceAttributes"];
-  selectSpan: ReturnType<typeof useDrawerStore.getState>["selectSpan"];
-  setViewMode: ReturnType<typeof useDrawerStore.getState>["setViewMode"];
+  selectSpan: TraceDrawerState["selectSpan"];
+  setViewMode: TraceDrawerState["setViewMode"];
   toggleFacet: ReturnType<typeof useFilterStore.getState>["toggleFacet"];
   trace: TraceHeader;
 }
@@ -1215,6 +1226,7 @@ function HeaderMetricsRow({
   grandCost,
   hasAuthoritativeTokens,
   isBundledCost,
+  isPlaceholder,
   nonBilledCost,
   primaryChips,
   reasoningEffort,
@@ -1232,6 +1244,7 @@ function HeaderMetricsRow({
   grandCost: number;
   hasAuthoritativeTokens: boolean;
   isBundledCost: boolean;
+  isPlaceholder: boolean;
   nonBilledCost: number;
   primaryChips: ReturnType<typeof splitChipsForOverflow>["primary"];
   reasoningEffort: string | null;
@@ -1346,6 +1359,14 @@ function HeaderMetricsRow({
         <Chip key={c.id} {...c} />
       ))}
       {chipsOverflow}
+      {isPlaceholder && (
+        <Skeleton
+          data-testid="trace-header-metric-skeleton"
+          height="22px"
+          width="120px"
+          borderRadius="md"
+        />
+      )}
     </HStack>
   );
 }
@@ -1365,10 +1386,10 @@ function HeaderModeSwitch({
 }: {
   conversationContext: ReturnType<typeof useConversationContext>;
   isEditing: boolean;
-  onViewModeChange: ReturnType<typeof useDrawerStore.getState>["setViewMode"];
+  onViewModeChange: TraceDrawerState["setViewMode"];
   readOnly: boolean;
   trace: TraceHeader;
-  viewMode: ReturnType<typeof useDrawerStore.getState>["viewMode"];
+  viewMode: TraceDrawerState["viewMode"];
 }) {
   return (
     <Box marginX={-4}>

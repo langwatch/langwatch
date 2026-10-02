@@ -70,6 +70,8 @@ export interface CheckupGatewayFacts {
 export interface CheckupEmailFacts {
   readonly provider: string | undefined;
   readonly smtpConfigured: boolean;
+  /** The transport logs in to the relay; an internal relay often takes none. */
+  readonly smtpSendsCredentials: boolean;
   readonly verifySmtp: () => Promise<void>;
 }
 
@@ -705,7 +707,9 @@ export class CheckupService {
       await email.verifySmtp();
       return {
         outcome: "verified",
-        detail: "The SMTP server accepted a connection and the credentials.",
+        detail: email.smtpSendsCredentials
+          ? "The SMTP server accepted a connection and the credentials."
+          : "The SMTP server accepted a connection.",
       };
     } catch (error) {
       return {

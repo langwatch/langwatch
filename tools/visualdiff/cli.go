@@ -16,7 +16,7 @@ import (
 const usage = `visualdiff — render every route and every flow on two refs and diff them
 
   visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
-                 [-viewport 1440x900] [-config visualdiff.yaml] [-root DIR]
+                 [-viewport 1440x900] [-color-scheme light|dark|both] [-config visualdiff.yaml] [-root DIR]
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
@@ -219,6 +219,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	root := flags.String("root", ".", "repository root")
 	configPath := flags.String("config", "", "configuration file (default <root>/"+ConfigFile+")")
 	viewport := flags.String("viewport", "1440x900", "browser viewport, WIDTHxHEIGHT")
+	colorScheme := flags.String("color-scheme", "light", "colour scheme to capture: light, dark or both (both keys the dark pass \"<key>@dark\")")
 	routesOnly := flags.Bool("routes-only", false, "capture the route list and skip the flows")
 	flowList := flags.String("flows", "", "comma-separated flow ids to run; naming any route or flow runs only those")
 	routeList := flags.String("routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
@@ -267,8 +268,13 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	if err != nil {
 		return nil, err
 	}
+	scheme, err := ParseColorScheme(*colorScheme)
+	if err != nil {
+		return nil, err
+	}
 	options := Options{
-		Root: absoluteRoot, BaseRef: *baseRef, CandidateRef: *candidateRef, RunDir: *runDir,
+		ColorScheme: scheme,
+		Root:        absoluteRoot, BaseRef: *baseRef, CandidateRef: *candidateRef, RunDir: *runDir,
 		BasePort: *basePort, Viewport: parsedViewport, RoutesOnly: *routesOnly,
 		Agent: *agent, DryRun: *dryRun, Keep: *keep,
 		BootTimeout: *bootTimeout, Stall: *stall, SmokeTimeout: *smokeTimeout,

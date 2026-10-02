@@ -18,7 +18,7 @@ const state = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: (flag: string) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
     isLoading: state.flagLoading,
@@ -26,7 +26,7 @@ vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
 }));
 
 // The v1 page itself is not under test: whether it renders at all is.
-vi.mock("../../../../ui/sections/suites/simulations-page.tsx", () => ({
+vi.mock("../../suites/simulations-page.tsx", () => ({
   default: () => <div>v1 simulations page</div>,
 }));
 

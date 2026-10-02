@@ -19,9 +19,9 @@ import { z } from "zod";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
-import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { AuthzGrantManagementService } from "../../services/authz-grant-management.service.ts";
+import { AuthzGrantWriterService } from "../../services/authz-grant-writer.service.ts";
 import { authzGrantRest, grantRestFacts } from "../authz-grant.rest.ts";
 import { authzRoleBindingRest, roleBindingRestFacts } from "../authz-role-binding.rest.ts";
 
@@ -79,13 +79,16 @@ function world({
   rows = [] as AuthzManagedOrganizationBinding[],
   lacks = [] as string[],
   deprecationLog,
+  enterprise = true,
 }: {
   rows?: AuthzManagedOrganizationBinding[];
   lacks?: string[];
   deprecationLog?: RestDeprecationLog;
+  /** Whether the organization's plan is Enterprise, as the process's plan port answers. */
+  enterprise?: boolean;
 } = {}) {
   let next = 0;
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockImplementation(async ({ scopes }) =>
     SCOPES.filter((row) =>
       scopes.some((scope) => scope.scopeType === row.type && scope.scopeId === row.id),
@@ -153,7 +156,7 @@ function world({
       input.permissions.filter((permission) => lacks.includes(permission)),
     listManagedBindingsForOrganization: async () => [...rows],
   };
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     bindings,
     ledger,
     newBindingId: () => `rb_${++next}`,
@@ -190,6 +193,7 @@ function world({
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
     idempotency: memoryIdempotency(),
+    entitlements: { holds: async () => enterprise },
     ...(deprecationLog ? { deprecationLog } : {}),
   });
   const onError = createCanonicalFamilyErrorHandler({
@@ -409,8 +413,7 @@ describe("given the /api/grants family", () => {
     });
   });
 
-  describe("when an organization below Enterprise grants and changes a role", () => {
-    /** @scenario Any plan grants and changes roles, with or without an end date */
+  describe("when a role is granted with an end date and then changed", () => {
     it("grants with an end date and changes the role, keeping the end date", async () => {
       const { send } = world();
       const endsAt = "2099-01-01T00:00:00.000Z";
@@ -432,6 +435,27 @@ describe("given the /api/grants family", () => {
         role: { id: "viewer" },
         expiresAt: endsAt,
       });
+    });
+  });
+
+  describe("when the organization is below Enterprise", () => {
+    /** @scenario Both grant families answer 402 below Enterprise, naming the management API */
+    it("refuses every grant route with enterprise_plan_required naming MANAGEMENT_API", async () => {
+      const { send, created } = world({ enterprise: false });
+
+      const answers = await Promise.all([
+        send("/api/grants"),
+        send("/api/grants", { method: "POST", body: grantBody() }),
+        send("/api/role-bindings"),
+      ]);
+
+      for (const answer of answers) {
+        expect(await answer.json()).toMatchObject({
+          code: "enterprise_plan_required",
+          meta: { feature: "MANAGEMENT_API" },
+        });
+      }
+      expect(created).not.toHaveBeenCalled();
     });
   });
 

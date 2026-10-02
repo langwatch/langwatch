@@ -12,7 +12,6 @@ flows:
           name: vd-expwb-{uid}
         as:
           expSlug: slug
-          expName: name
     steps:
       - action: go
         with:
@@ -23,19 +22,19 @@ flows:
           min: "1"
       - action: expect
         with:
-          text: "{expName}"
+          text: "vd-expwb-{uid}"
       - action: go
         with:
           path: /{slug}/experiments
       - action: expect
         with:
-          text: "{expName}"
+          text: "vd-expwb-{uid}"
           role: row
-          name: "{expName}"
+          name: "vd-expwb-{uid}"
       - action: expect
         with:
           api: /api/experiments/{expSlug}
-          contains: "{expName}"
+          contains: "vd-expwb-{uid}"
 
   - id: experiment-results-open
     title: Open a batch run's results from the experiment list and read its rows
@@ -50,7 +49,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-a
+          run_id: vd-run-a-{uid}
           progress: 2
           total: 2
           dataset:
@@ -101,7 +100,7 @@ flows:
           url: /experiments/{expSlug}
       - action: expect
         with:
-          testId: run-item-vd-run-a
+          testId: run-item-vd-run-a-{uid}
           timeout: "30000"
       - action: expect
         with:
@@ -131,7 +130,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-a
+          run_id: vd-run-a-{uid}
           progress: 2
           total: 2
           dataset:
@@ -168,7 +167,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-b
+          run_id: vd-run-b-{uid}
           progress: 2
           total: 2
           dataset:
@@ -208,11 +207,11 @@ flows:
           path: /{slug}/experiments/{expSlug}
       - action: expect
         with:
-          testId: run-item-vd-run-a
+          testId: run-item-vd-run-a-{uid}
           timeout: "30000"
       - action: expect
         with:
-          testId: run-item-vd-run-b
+          testId: run-item-vd-run-b-{uid}
           timeout: "30000"
       - action: click
         with:
@@ -220,9 +219,6 @@ flows:
       - action: expect
         with:
           testId: exit-compare-button
-      - action: click
-        with:
-          testId: run-checkbox-vd-run-a
       - action: expect
         with:
           testIdPrefix: run-checkbox-
@@ -586,6 +582,18 @@ flows:
           state:
             <<: *runnableState
             name: vd-exppop-{uid}
+            datasets:
+              - id: test-data
+                name: Test Data
+                type: inline
+                inline:
+                  columns: *runnableColumns
+                  records:
+                    input:
+                      - vd row alpha is a sentence long enough for the language detector
+                      - vd row beta is a sentence long enough for the language detector
+                      - vd row gamma is a sentence long enough for the language detector
+                columns: *runnableColumns
             evaluators:
               - id: evaluator-1
                 evaluatorType: lingua/language_detection
@@ -668,7 +676,7 @@ flows:
           timeout: "60000"
       - action: hover
         with:
-          selector: 'text=/^3\/3$/'
+          selector: '[data-testid="target-summary"]'
       - action: expect
         with:
           text: /^Rows$/
@@ -750,3 +758,31 @@ flows:
       - action: expect
         with:
           testId: compare-button
+
+  # The New Experiment button saves the browser's initial state (three sample rows in an inline dataset)
+  # and the workbench then loads it back, so the rows seen here survived save and load; main keeps them.
+  - id: experiment-create-from-button-shows-sample-rows
+    title: Create an experiment from the New Experiment button and see the inline dataset's sample rows after it loads
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: expect
+        with:
+          url: /experiments/workbench/
+          timeout: "30000"
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          text: billing information
+          timeout: "20000"

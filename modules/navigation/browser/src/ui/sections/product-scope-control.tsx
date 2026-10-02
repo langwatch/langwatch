@@ -4,8 +4,8 @@
  * specs/navigation/product-switcher-navigation.feature
  */
 
-import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";

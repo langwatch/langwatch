@@ -2353,9 +2353,28 @@ model SlackIntegration {
   updatedById         String
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @default(now()) @updatedAt
+  claims              SlackConnectionClaim[]
 
   @@unique([organizationId, scopeType, scopeId, secretFingerprint])
   @@index([scopeType, scopeId])
+}
+
+/// An automation holding a Slack connection in use (ARCHITECTURE.md §3, the
+/// claims ruling): a claimed connection is never deleted. `projectId` is the
+/// claimant's project; `organizationId` is the connection's tenancy anchor.
+model SlackConnectionClaim {
+  connectionId   String
+  connection     SlackIntegration @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  claimantId     String
+  claimantLabel  String
+  organizationId String
+  projectId      String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+
+  @@id([connectionId, claimantId])
+  @@index([organizationId])
+  @@map("slack_connection_claim")
 }
 
 enum WebhookDeliveryOutcome {
@@ -4069,6 +4088,14 @@ model GroupMembership {
   @@index([groupId])
 }
 
+/// Who authz treats as gone, from user's and identity's facts; authz never reads User (ARCHITECTURE.md, "Platform operators are a grant").
+model AuthzUserStanding {
+  userId            String    @id
+  deactivatedAt     DateTime?
+  erasedAt          DateTime?
+  standingChangedAt DateTime
+}
+
 model RoleBinding {
   id             String       @id @default(nanoid())
   organizationId String
@@ -4298,6 +4325,12 @@ model ApiKey {
   /// a CLI old enough to predate device metadata.
   createdByDeviceLabel String?
 
+  /// True for a key LangWatch minted for itself (a run, the gateway's trace
+  /// export, a Langy session). Hides it from listings, refuses customer edits
+  /// and revokes, and lets an ownerless run key act as the system. Never set
+  /// by a customer create; rows before the column stay false.
+  isSystemManaged Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
@@ -4340,6 +4373,25 @@ model ProjectActiveDay {
   createdAt DateTime @default(now())
 
   @@unique([projectId, day])
+}
+
+/// Nurturing's read model: which organization a project belongs to, from project's created event.
+model NurturingProject {
+  projectId      String @id
+  organizationId String
+
+  @@index([organizationId])
+}
+
+/// Nurturing's read model per organization: its admin and its milestone counts.
+/// `seeded` marks an organization learned from the project backfill: its first_* already happened.
+model NurturingOrganization {
+  organizationId     String   @id
+  adminUserId        String?
+  seeded             Boolean  @default(false)
+  evaluationCount    Int      @default(0)
+  simulationRunCount Int      @default(0)
+  updatedAt          DateTime @updatedAt
 }
 
 model BillingMeterCheckpoint {
@@ -5358,6 +5410,15 @@ model GatewayConnectUpstream {
   encryptedToken String
   instanceId     String
   updatedAt      DateTime @updatedAt
+}
+
+// The ownerless `traces:create` key a gateway trace project's spans are exported with. Minted
+// once by the gateway, never expiring; the token is encrypted and its id folds into the ETag.
+model GatewayTraceExportKey {
+  projectId      String   @id
+  apiKeyId       String
+  encryptedToken String
+  createdAt      DateTime @default(now())
 }
 
 model GatewayBudget {

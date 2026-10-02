@@ -7,7 +7,7 @@
  * against a recording ledger so that separation is what is asserted —
  * including the thing that must NOT happen: a connection id used as an actor.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncCommand,

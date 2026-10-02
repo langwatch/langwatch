@@ -2,13 +2,13 @@
  * Trace-sample card (`langwatch.trace.search`).
  */
 
-import { Button, Text } from "@chakra-ui/react";
-import { traceContextChip, LangyContextTarget } from "@langwatch/langy-browser-kit";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
-import { useExplorerLinkLensId } from "@langwatch/trace-browser-kit";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
+import { useTraceExplorerScope } from "../../../../../behavior/trace-explorer-scope.ts";
 import {
   collectionOf,
   textValue,
@@ -20,6 +20,7 @@ import {
   readTraceSearchQuery,
   type TraceSearchQuery,
 } from "../../../../../model/langy-trace-explorer-link.ts";
+import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target.tsx";
 import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
@@ -52,7 +53,7 @@ interface SampledTrace {
 export function LangyTraceSampleCard({ input, output, digest, projectSlug }: CapabilityCardInput) {
   const parsed = parseTraceSearch(output);
   const search = readTraceSearchQuery(input);
-  const lensId = useExplorerLinkLensId();
+  const lensId = useTraceExplorerScope((s) => s.linkLensId);
   const explorerHref = buildTraceExplorerHref({
     projectSlug,
     search,

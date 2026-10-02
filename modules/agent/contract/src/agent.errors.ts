@@ -46,6 +46,21 @@ export class AgentTestRefusedError extends HandledError {
   }
 }
 
+/** Stored credentials stay at the address they were saved for: a test call, a run or an update
+ * that would carry them elsewhere is refused, and the credential is re-entered for the new one. */
+export class AgentStoredCredentialsDestinationError extends HandledError {
+  declare readonly code: "agent_stored_credentials_destination_mismatch";
+
+  constructor() {
+    super(
+      "agent_stored_credentials_destination_mismatch",
+      "Stored credentials are only sent to the agent's saved address.",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "AgentStoredCredentialsDestinationError";
+  }
+}
+
 /** Only the SDK may change connected-agent registration fields; callers may archive it. */
 export class AgentRegisterOnlyError extends HandledError {
   declare readonly code: "agent_register_only";

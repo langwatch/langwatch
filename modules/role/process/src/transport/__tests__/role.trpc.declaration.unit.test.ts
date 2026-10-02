@@ -4,11 +4,10 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
  * A rename is a cache-key change in every browser, and a widened decision is a
  * privilege-escalation surface.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { roleBindingTrpc, roleTrpc } from "@langwatch/role-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import { roleTrpc } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 
-import { roleBindingTrpcTransport } from "../role-binding.trpc.ts";
 import { roleTrpcTransport } from "../role.trpc.ts";
 
 type Declared = Record<string, readonly string[]>;
@@ -65,17 +64,30 @@ describe("given the role transport declared by the feature", () => {
       }
     });
 
-    it("publishes the binding surface at manage, apart from the caller's own standing", () => {
-      const claims = claimsOf(roleBindingTrpcTransport);
-
-      expect(Object.keys(claims).toSorted()).toEqual(
-        Object.keys(roleBindingTrpc.members).toSorted(),
+    /**
+     * @scenario Assigning a custom role is refused below Enterprise on every grant door
+     * @scenario "Non-enterprise org cannot create custom roles"
+     * @scenario "Non-enterprise org cannot assign custom roles to users"
+     */
+    it("asks for Enterprise, naming RBAC, before defining or assigning a custom role", () => {
+      const gates: Record<string, unknown> = {};
+      roleTrpcTransport.router(
+        {
+          procedure: ({ procedure, entitlement }) => {
+            gates[procedure.slice(procedure.indexOf(".") + 1)] = entitlement;
+            return {};
+          },
+          router: (record) => record,
+        },
+        () => {
+          throw new Error("the wire table never resolves an application");
+        },
       );
-      expect(claims.getMyAccessBreakdown).toEqual(["organization:view"]);
-      for (const [name, claimed] of Object.entries(claims)) {
-        if (name === "getMyAccessBreakdown") continue;
-        expect(claimed).toEqual(["organization:manage"]);
-      }
+
+      expect(gates.create).toEqual({ entitlement: "enterprise", feature: "RBAC" });
+      expect(gates.assignToUser).toEqual({ entitlement: "enterprise", feature: "RBAC" });
+      expect(gates.removeFromUser).toBeUndefined();
+      expect(gates.delete).toBeUndefined();
     });
   });
 });

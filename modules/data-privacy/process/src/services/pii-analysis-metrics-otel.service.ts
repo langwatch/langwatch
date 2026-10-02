@@ -5,7 +5,8 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import { type PiiAnalysisMetrics, type PiiAnalysisOutcome } from "../app/data-privacy.members.ts";
+/** How a Presidio batch ended, as the counter labels it. */
+export type PiiAnalysisOutcome = "processed" | "skipped" | "error";
 
 /**
  * Series names and evaluator labels are pinned and read externally; renamed
@@ -17,7 +18,7 @@ export const PII_ANALYSIS_STATUS_METRIC_NAME = "evaluation_status_counter";
 export const PII_ANALYSIS_EVALUATOR_TYPE = "presidio/pii_detection";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
-export class PiiAnalysisMetricsOtelService implements PiiAnalysisMetrics {
+export class PiiAnalysisMetricsOtelService {
   static create(): PiiAnalysisMetricsOtelService {
     return new PiiAnalysisMetricsOtelService(
       counter({

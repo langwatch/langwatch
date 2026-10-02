@@ -1,5 +1,15 @@
-import { Badge, Box, Button, HStack, Input, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
@@ -184,7 +194,7 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
       pageSize: PAGE_SIZE,
       search: search.trim() || undefined,
     },
-    { refetchInterval: 15_000 },
+    {},
   );
   const now = query.dataUpdatedAt || nowInstant().epochMilliseconds;
   const total = query.data?.total ?? 0;

@@ -1,11 +1,11 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  * Who an asserted address and a connection subject belong to. Both halves are
  * load-bearing: the address keeps a colleague's out of a connection under
  * setup, the membership stops a registrant who has left.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";

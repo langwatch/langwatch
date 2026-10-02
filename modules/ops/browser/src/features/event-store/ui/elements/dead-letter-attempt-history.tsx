@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { DeadLetterAttempt } from "../../model/dead-letter-types.ts";
 

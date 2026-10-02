@@ -12,6 +12,7 @@ import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/lang
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
@@ -25,6 +26,7 @@ const MCP_FIXTURE_PATH = fileURLToPath(
 );
 
 const EVERYTHING: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,

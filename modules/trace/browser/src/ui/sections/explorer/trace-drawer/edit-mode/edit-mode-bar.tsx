@@ -1,18 +1,21 @@
-import { Button, HStack, Icon, Spinner, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Spinner, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 
 import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import { api } from "../../../../../behavior/trace-api.ts";
 import {
   buildTraceEditPatch,
   summarizeTraceEdit,
   useTraceEditStore,
 } from "../../../../../behavior/trace-edit.store.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import {
+  useFetchStoredTraceEdit,
+  useUpsertTraceEdit,
+} from "../../../../../behavior/writes/use-trace-writes.ts";
 import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
 import { exitTraceEditMode } from "../../utils/trace-edit-mode.ts";
@@ -95,26 +98,10 @@ function holdsSessionFor(traceId: string): boolean {
 /** Writing the correction, confirming it, and leaving edit mode behind it. */
 function useSaveTraceEdit({ traceId }: { traceId: string }) {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
+  const fetchStoredEdit = useFetchStoredTraceEdit();
   const [isRebasing, setIsRebasing] = useState(false);
 
-  const upsert = api.traceEditOverlay.upsert.useMutation({
-    onSuccess: () => {
-      if (project) {
-        void utils.traceEditOverlay.getByTraceId.invalidate({
-          projectId: project.id,
-          traceId,
-        });
-      }
-      toaster.create({ title: "Trace corrections saved", type: "success" });
-      exitTraceEditMode();
-    },
-    onError: (error) =>
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't save trace corrections",
-      }),
-  });
+  const upsert = useUpsertTraceEdit();
 
   /**
    * Moves the session onto the correction as it stands right now. The one adopted when
@@ -125,10 +112,7 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
     async ({ projectId }: { projectId: string }) => {
       setIsRebasing(true);
       try {
-        const latest = await utils.traceEditOverlay.getByTraceId.fetch(
-          { projectId, traceId },
-          { staleTime: 0 },
-        );
+        const latest = await fetchStoredEdit({ projectId, traceId });
         if (latest?.patch) {
           useTraceEditStore.getState().rebaseBasePatch({ traceId, basePatch: latest.patch });
         }
@@ -143,7 +127,7 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
         setIsRebasing(false);
       }
     },
-    [traceId, utils],
+    [traceId, fetchStoredEdit],
   );
 
   const save = useCallback(async () => {
@@ -154,11 +138,21 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
     // the session has to be claimed again before anything is written.
     if (!holdsSessionFor(traceId)) return;
 
-    upsert.mutate({
-      projectId: project.id,
-      traceId,
-      patch: buildTraceEditPatch(useTraceEditStore.getState()),
-    });
+    upsert.mutate(
+      {
+        projectId: project.id,
+        traceId,
+        patch: buildTraceEditPatch(useTraceEditStore.getState()),
+      },
+      {
+        onSuccess: () => {
+          toaster.create({ title: "Trace corrections saved", type: "success" });
+          exitTraceEditMode();
+        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save trace corrections" }),
+      },
+    );
   }, [project, rebaseOntoStoredCorrection, traceId, upsert]);
 
   return { save, isSaving: upsert.isPending || isRebasing };
@@ -183,7 +177,7 @@ export function EditModeBar({ traceId }: { traceId: string }) {
   const clearPendingExit = useTraceEditStore((s) => s.clearPendingExit);
   const confirmOpen = cancelConfirmOpen || pendingExit !== null;
 
-  const setViewModeTransient = useDrawerStore((s) => s.setViewModeTransient);
+  const setViewModeTransient = useTraceDrawer((s) => s.setViewModeTransient);
   const requestFocusSection = useFocusSectionStore((s) => s.request);
 
   const draft = useTraceEditDraft();

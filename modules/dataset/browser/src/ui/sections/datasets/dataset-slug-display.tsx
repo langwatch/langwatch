@@ -1,5 +1,12 @@
-import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { CopyButton } from "@langwatch/browser-host/copy-button";
+import {
+  Box,
+  type BoxProps,
+  Field,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useCallback } from "react";
 
 import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation.ts";

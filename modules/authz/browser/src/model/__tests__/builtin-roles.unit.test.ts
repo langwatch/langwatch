@@ -11,8 +11,8 @@ import {
   builtinRoleGrantedPermissions,
   peopleHoldingBuiltinRole,
 } from "../builtin-roles.ts";
+import type { ManagedGrant } from "../managed-grant.ts";
 import { ORDERED_RESOURCES } from "../permission-catalogue.ts";
-import type { RoleBinding } from "../role-binding-principals.ts";
 import { offeredPermissions } from "../role-permissions.ts";
 
 const OFFERED = ORDERED_RESOURCES.flatMap((resource) => offeredPermissions(resource));
@@ -126,7 +126,7 @@ describe("the built-in roles", () => {
   });
 
   describe("when people are counted for a built-in role", () => {
-    const held = (overrides: Partial<RoleBinding>): RoleBinding => ({
+    const held = (overrides: Partial<ManagedGrant>): ManagedGrant => ({
       id: "b",
       userId: null,
       userName: null,

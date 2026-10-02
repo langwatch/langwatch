@@ -11,7 +11,8 @@ const brandedCard = readFileSync(join(here, "..", "src", "components", "branded-
 describe("given a branded card on a small viewport", () => {
   describe("when the card is laid out", () => {
     it("goes full bleed on a phone and stays a narrow column above it", () => {
-      expect(brandedCard).toContain('maxW={{ base: "100%", sm: "408px" }}');
+      expect(brandedCard).toContain('maxWidth={{ base: "100%", sm: CARD_WIDTHS[size] }}');
+      expect(brandedCard).toContain('narrow: "408px"');
       expect(brandedCard).toContain('borderWidth={{ base: 0, sm: "1px" }}');
       expect(brandedCard).toContain('borderRadius={{ base: 0, sm: "14px" }}');
       // A fixed pixel width is what produces a page that scrolls sideways.

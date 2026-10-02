@@ -4,7 +4,7 @@
  * document already carries, so a rename here renames an integrator's client.
  */
 
-import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,7 +51,7 @@ describe("the dataset REST declaration", () => {
         },
         {
           method: "post",
-          path: "/:slug/entries",
+          path: "/:datasetSlug/entries",
           operation: "postApiDatasetBySlugEntries",
           permission: "datasets:update",
         },
@@ -107,6 +107,12 @@ describe("the dataset REST declaration", () => {
           method: "get",
           path: "/:slugOrId/records",
           operation: "getApiDatasetBySlugOrIdRecords",
+          permission: "datasets:view",
+        },
+        {
+          method: "get",
+          path: "/:datasetSlug/entries",
+          operation: "getApiDatasetBySlugEntries",
           permission: "datasets:view",
         },
         {

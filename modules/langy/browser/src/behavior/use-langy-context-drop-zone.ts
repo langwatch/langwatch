@@ -1,10 +1,11 @@
+import type { DragEvent } from "react";
+import { useCallback, useState } from "react";
+
 import {
   absorbContextTarget,
   LANGY_CONTEXT_DRAG_MIME,
   readDraggedTarget,
-} from "@langwatch/langy-browser-kit";
-import type { DragEvent } from "react";
-import { useCallback, useState } from "react";
+} from "./langy-context-target.store.ts";
 
 /**
  * Makes the panel a place you can drop things on.

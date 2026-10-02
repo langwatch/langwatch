@@ -69,7 +69,7 @@ const viewWith = ({
   goLive: null,
   legacyRoute: null,
   migration,
-  availability: { available: true },
+  availability: { available: true, proof: "dns-txt" },
   serviceProvider: {
     redirectUrl: "https://app.test/redirect",
     assertionConsumerServiceUrl: "https://app.test/acs",

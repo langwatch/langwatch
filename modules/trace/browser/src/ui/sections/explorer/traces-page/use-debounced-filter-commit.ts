@@ -1,5 +1,6 @@
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
+
+import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 
 // The store's query only changes on discrete actions: Enter in the search bar, a
 // facet click, a chip removed, a range slider released. None of them is a keystroke

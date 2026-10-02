@@ -12,9 +12,6 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
@@ -24,7 +21,7 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

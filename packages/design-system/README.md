@@ -41,10 +41,18 @@ component takes variants or sizes, one story shows them side by side. Use CSF3,
 keep `tags: ["autodocs"]`, and leave controls on for the props a person would
 change.
 
+## Colour
+
+Tokens live in `src/system/config.ts`; the scale in `src/color-mode`. A new colour
+need is a semantic token here, with a light and a dark value from the palette and
+a row in `colour.stories.tsx`, never a literal at the call site. Code that must
+hand a library a string uses Chakra's `useToken` or `system.token.var` (a CSS
+variable), or `getRawColorValue` / `useColorRawValue` for a literal in the current mode.
+
 ## Checklist
 
 - Tokens, never literals: `fg.muted`, `border.emphasized`, `red.solid` — no hex.
-- No `@chakra-ui/react` import outside this package.
+- No `@chakra-ui/*` or `@emotion/*` import outside this package, tests included: take layout primitives from `./primitives`, wrapped parts from their own subpath, and mount tests with `renderWithDesignSystem` from `./testing`.
 - Sizes and variants are props, not copies of the component.
 - Accessible name on every control; decorative icons carry `aria-hidden`.
 - Copy follows `dev/docs/best_practices/copywriting.md`: no abbreviations, no

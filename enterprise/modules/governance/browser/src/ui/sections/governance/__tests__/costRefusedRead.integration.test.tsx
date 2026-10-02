@@ -1,8 +1,8 @@
-/** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { builtinRolePermissions } from "@langwatch/authz-contract";
+/** @vitest-environment jsdom */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
@@ -73,12 +73,10 @@ const costsHost = () =>
   });
 
 function renderPage() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostProvider value={costsHost()}>
-        <CostsPage />
-      </GovernanceHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <GovernanceHostProvider value={costsHost()}>
+      <CostsPage />
+    </GovernanceHostProvider>,
   );
 }
 
@@ -159,5 +157,12 @@ describe("Costs page, a read that genuinely broke", () => {
     // Offered, not applied: we do not know what is behind a fault, so the page
     // does not decide on the reader's behalf that the screen is empty.
     expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
+  });
+
+  /** @scenario "A failed cost read never renders as zero" */
+  it("shows the error state and draws no lane amount", async () => {
+    expect(screen.getByTestId("cost-lanes-error")).toBeInTheDocument();
+    expect(document.querySelector('[data-testid^="cost-lane-"]')).toBeNull();
+    expect(screen.queryByText(/\$0/)).not.toBeInTheDocument();
   });
 });

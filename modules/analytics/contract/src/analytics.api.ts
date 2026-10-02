@@ -1,5 +1,5 @@
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {

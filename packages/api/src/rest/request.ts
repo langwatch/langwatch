@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
+import { defineRestMiddleware, type RestTransportMiddleware } from "@langwatch/module";
 import {
+  classifyClient,
   createLogger,
+  endpointClassOf,
   getStatusCodeFromError,
   logHttpRequest,
   type Logger,
@@ -25,7 +28,6 @@ import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
-import { defineRestMiddleware, type RestTransportMiddleware } from "../contract/rest-middleware.ts";
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
@@ -38,7 +40,7 @@ import {
   type Declined,
   type ServiceContext,
 } from "./response.ts";
-import type { RestIdentity } from "./runtime.ts";
+import type { RestIdentity } from "../hosting/api-door.ts";
 
 // Validation: install the hook so failures reach the route's onError (ADR-045).
 
@@ -746,6 +748,10 @@ function logRequestOutcome({
     duration,
     userAgent: c.req.header("user-agent") ?? null,
     error: requestError,
+    attribution: {
+      endpointClass: endpointClassOf(c.req.path),
+      ...classifyClient((name) => c.req.header(name)),
+    },
     extra: {
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
@@ -873,9 +879,9 @@ export function loggerMiddleware(options?: { name?: string }) {
 
 /** Records a declared answer without inventing a cause. */
 function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
-  const { extra, error: _cause, ...request } = data;
+  const { extra, attribution, error: _cause, ...request } = data;
 
-  logger.info({ ...extra, ...request }, "request handled");
+  logger.info({ ...extra, ...attribution, ...request }, "request handled");
 }
 
 function runAfterSSECompletion({
@@ -1061,25 +1067,6 @@ export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
 /** Returns the current SSE handler lifecycle for request instrumentation. */
 export function getSSECompletion(c: Context): Promise<SSECompletion> | undefined {
   return completions.get(c);
-}
-
-// Fan-out to every browser watching one tenant. Delivery is Redis pub/sub with a local
-// fallback; which is live depends on the process. Rate-limited calls return whether the event
-// was published (families that broadcast deltas don't act on it).
-
-export interface AppRestBroadcast {
-  broadcastToTenant(
-    tenantId: string,
-    message: string,
-    eventType: "simulation_updated" | "export_progress",
-  ): Promise<unknown>;
-
-  broadcastToTenantRateLimited(
-    tenantId: string,
-    message: string,
-    eventType: "simulation_updated",
-    tier: "structural" | "delta",
-  ): Promise<unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

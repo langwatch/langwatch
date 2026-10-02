@@ -1,11 +1,6 @@
-/**
- * The three suite REST families over the REAL suite application: memory
- * repositories, the real execution service recording the commands it would
- * have queued, and the process ports a mount supplies.
- */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
+  principalOfCredential,
   bindRestHeader,
   bindRestMiddleware,
   createRestRuntime,
@@ -13,6 +8,12 @@ import {
   type RestErrorHandler,
   type RestMountOptions,
 } from "@langwatch/api/rest";
+/**
+ * The three suite REST families over the REAL suite application: memory
+ * repositories, the real execution service recording the commands it would
+ * have queued, and the process ports a mount supplies.
+ */
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -29,13 +30,14 @@ import {
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import { suiteSchema, type Suite, type SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
-import { SuiteApp } from "../../app/suite.app.ts";
+import { SuiteModule } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
-import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteCallerKeyFact, suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 import { createRunPlansRest } from "../run-plans.rest.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
@@ -425,8 +427,18 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
   return body.error?.code;
 }
 
+/** The key row the door binds: only an API key principal has one. */
+function keyRowOf(credential: RestResolvedProjectCredential): string | null {
+  const principal = principalOfCredential(credential);
+  return principal?.type === "apiKey" ? principal.id : null;
+}
+
 /** Who the credential chain resolved the caller as. */
-export type RestFamilyCaller = { userId?: string | null | undefined };
+export type RestFamilyCaller = {
+  userId?: string | null | undefined;
+  /** The API key the caller presented; absent for a legacy project key. */
+  apiKeyId?: string | undefined;
+};
 
 /** The three families, one application, one world. */
 export function mountSuiteFamilies(
@@ -442,7 +454,7 @@ export function mountSuiteFamilies(
   const commands = new CollapsingRunCommands();
   const scenarios = memoryScenarioApi(world, commands);
 
-  const app = SuiteApp.createForTesting({
+  const app = SuiteModule.createForTesting({
     repositories: { suites: MemorySuiteRepository.create({ database }) },
     dependencies: {
       scenarios,
@@ -486,6 +498,19 @@ export function mountSuiteFamilies(
         actorId: caller.userId ?? "project-key-1",
       })),
       bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
+      bindRestMiddleware(suiteCallerKeyFact, () =>
+        caller.apiKeyId === undefined
+          ? null
+          : keyRowOf({
+              type: "apiKey",
+              apiKeyId: caller.apiKeyId,
+              userId: caller.userId ?? null,
+              organizationId: TEST_PROJECT.organizationId,
+              ingestSourceType: null,
+              ingestionTemplateId: null,
+              project: TEST_PROJECT,
+            }),
+      ),
     ],
   });
 

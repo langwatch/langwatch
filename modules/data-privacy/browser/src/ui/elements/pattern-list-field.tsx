@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 
 /** Editable regular-expression rows, each with its own validation message and remove button. */

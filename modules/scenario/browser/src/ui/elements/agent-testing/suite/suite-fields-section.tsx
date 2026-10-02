@@ -5,16 +5,6 @@
  */
 
 import {
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   closestCenter,
   DndContext,
   type DragEndEvent,
@@ -30,14 +20,24 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Box,
+  chakra,
+  HStack,
+  IconButton,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SUITE_FIELD_TYPES, type SuiteFieldType } from "@langwatch/scenario-contract";
 import { GripVertical, X } from "lucide-react";
 
+import type { SuiteFieldRow } from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { DIALOG_FIELD_STYLE, FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
-import type { SuiteFieldRow } from "./suite-editor-store.ts";
 
 /** What each type is called where a person picks one. */
 export const SUITE_FIELD_TYPE_LABELS: Record<SuiteFieldType, string> = {

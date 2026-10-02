@@ -1,25 +1,14 @@
+import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { nowInstant } from "@langwatch/time";
-import { usePageVisibility, useFilterStore } from "@langwatch/trace-browser-kit";
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
-
-const FAST_MS = 5_000;
-const SLOW_MS = 30_000;
-const IDLE_MS = 120_000;
-const BACKOFF_THRESHOLD = 3;
 
 interface TraceNewCountResult {
   count: number;
@@ -28,52 +17,20 @@ interface TraceNewCountResult {
   acknowledge: () => void;
 }
 
-function nextBackoffInterval(consecutiveZeros: number, current: number): number {
-  if (consecutiveZeros >= BACKOFF_THRESHOLD * 2 && current < IDLE_MS) {
-    return IDLE_MS;
-  }
-  if (consecutiveZeros >= BACKOFF_THRESHOLD && current < SLOW_MS) {
-    return SLOW_MS;
-  }
-  return current;
-}
-
 // What a tab returning to view refetches depends on the operator's live-updates mode.
 function resumeLiveUpdates({
-  resetPolling,
   refresh,
   invalidateCount,
 }: {
-  resetPolling: () => void;
   refresh: () => void;
   invalidateCount: () => Promise<void>;
 }): void {
   const mode = useSseStatusStore.getState().liveUpdatesMode;
-  if (mode !== "paused") resetPolling();
   if (mode === "live") {
     refresh();
     return;
   }
   if (mode === "ask") void invalidateCount();
-}
-
-// Every zero-count poll steps the backoff; any new trace returns to the fast cadence.
-function stepZeroBackoff({
-  count,
-  consecutiveZeros,
-  setIntervalMs,
-}: {
-  count: number;
-  consecutiveZeros: { current: number };
-  setIntervalMs: Dispatch<SetStateAction<number>>;
-}): void {
-  if (count !== 0) {
-    consecutiveZeros.current = 0;
-    setIntervalMs(FAST_MS);
-    return;
-  }
-  consecutiveZeros.current += 1;
-  setIntervalMs((current) => nextBackoffInterval(consecutiveZeros.current, current));
 }
 
 function newCountQueryInput({
@@ -116,35 +73,14 @@ export function useTraceNewCount(): TraceNewCountResult {
   const { refresh } = useTraceListRefresh();
 
   const isVisible = usePageVisibility();
-  const [intervalMs, setIntervalMs] = useState(FAST_MS);
-  const consecutiveZerosRef = useRef(0);
 
-  // SSE is the primary freshness signal. When it's connected, the listener
-  // in useTraceFreshness invalidates this query as soon as data changes,
-  // so polling is unnecessary. We only fall back to polling when SSE is
-  // unavailable (connecting / disconnected / error).
-  const sseConnectionState = useSseStatusStore((s) => s.sseConnectionState);
-  const sseConnected = sseConnectionState === "connected";
-
-  // Reset to fast polling when SSE events signal new data
-  const fastPollRequestedAt = useSseStatusStore((s) => s.fastPollRequestedAt);
-  useEffect(() => {
-    if (fastPollRequestedAt === 0) return;
-    consecutiveZerosRef.current = 0;
-    setIntervalMs(FAST_MS);
-  }, [fastPollRequestedAt]);
-
-  // Reset to fast polling when tab becomes visible again. What we refetch depends on
-  // the operator's live-updates mode:
+  // When the tab becomes visible again, what we refetch depends on the operator's
+  // live-updates mode:
   const trpcUtils = api.useUtils();
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     if (isVisible && !prevVisibleRef.current) {
       resumeLiveUpdates({
-        resetPolling: () => {
-          consecutiveZerosRef.current = 0;
-          setIntervalMs(FAST_MS);
-        },
         refresh,
         invalidateCount: () => trpcUtils.traces.newCount.invalidate(),
       });
@@ -176,31 +112,22 @@ export function useTraceNewCount(): TraceNewCountResult {
   const query = api.traces.newCount.useQuery(
     newCountQueryInput({ projectId: project?.id, timeRange, since, queryText, evalRuns }),
     {
-      // Honour the store contract: paused = "no updates, no pill, no
-      // polling". Stops the query from firing at all so a paused
-      // operator can leave the tab without burning quota on count
-      // pings they explicitly turned off.
+      // Honour the store contract: paused = "no updates, no pill". Stops the
+      // query from firing at all.
       enabled: !!project?.id && liveUpdatesMode !== "paused",
       staleTime: 0,
-      // A failing poll is almost always ClickHouse easing us off under
-      // concurrent load. One client-side retry is enough; the refetch
-      // interval (backed off in onError) will try again shortly.
+      // A failing count is almost always ClickHouse easing us off under
+      // concurrent load. One client-side retry is enough.
       retry: 1,
-      refetchInterval: isVisible && !sseConnected ? intervalMs : false,
     },
   );
 
   // Per-fetch success handling. Keyed on `dataUpdatedAt`, NOT on `data`:
-  // structural sharing keeps `data` identity stable across polls returning
-  // the same count, and the zero-backoff must step on every poll.
-  const { data: countData, dataUpdatedAt, errorUpdatedAt } = query;
+  // structural sharing keeps `data` identity stable across reads returning
+  // the same count.
+  const { data: countData, dataUpdatedAt } = query;
   useEffect(() => {
     if (!dataUpdatedAt || !countData) return;
-    stepZeroBackoff({
-      count: countData.count,
-      consecutiveZeros: consecutiveZerosRef,
-      setIntervalMs,
-    });
     // Fire the aurora pulse only on the 0→N transition in live
     // mode. Ask mode stays quiet (the floating pill is the
     // operator's chosen signal). High-throughput projects no longer
@@ -214,19 +141,8 @@ export function useTraceNewCount(): TraceNewCountResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt]);
 
-  useEffect(() => {
-    if (!errorUpdatedAt) return;
-    // Ease off when the count query fails (typically ClickHouse
-    // "Too many simultaneous queries" under load) so the client does
-    // not amplify the storm with fast polling. Recovers to the fast
-    // cadence on the next successful poll or SSE fast-poll signal.
-    setIntervalMs(SLOW_MS);
-  }, [errorUpdatedAt]);
-
   const acknowledge = useCallback(() => {
     setSince(nowInstant().epochMilliseconds);
-    consecutiveZerosRef.current = 0;
-    setIntervalMs(FAST_MS);
     refresh();
   }, [refresh]);
 

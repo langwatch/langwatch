@@ -4,7 +4,7 @@
  * chrome — the settings frame is applied by whichever app serves the address.
  */
 
-import { Skeleton } from "@chakra-ui/react";
+import { Skeleton } from "@langwatch/design-system/primitives";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";

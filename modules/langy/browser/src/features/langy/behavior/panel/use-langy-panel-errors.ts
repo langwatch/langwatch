@@ -1,6 +1,6 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   explainLangyError,
   isLangyConversationPending,

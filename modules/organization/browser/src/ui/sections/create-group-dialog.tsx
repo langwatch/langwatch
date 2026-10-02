@@ -1,3 +1,5 @@
+import { Dialog } from "@langwatch/design-system/dialog";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Badge,
   Box,
@@ -8,22 +10,20 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
-  BindingInputRow,
-  type PendingBinding,
+  GrantInputRow,
+  type PendingGrant,
   roleBadgeColor,
   scopeTypeLabel,
-} from "./group-binding-input-row.tsx";
+} from "./group-grant-input-row.tsx";
+import { MemberAvatar } from "./member-avatar.tsx";
 
 export function CreateGroupDialog({
   organizationId,
@@ -37,13 +37,13 @@ export function CreateGroupDialog({
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
   const [name, setName] = useState("");
-  const [pendingBindings, setPendingBindings] = useState<PendingBinding[]>([]);
+  const [pendingGrants, setPendingGrants] = useState<PendingGrant[]>([]);
   const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: open },
   );
 
@@ -51,7 +51,7 @@ export function CreateGroupDialog({
 
   function reset() {
     setName("");
-    setPendingBindings([]);
+    setPendingGrants([]);
     setPendingMemberIds([]);
     setAddMemberId("");
     setMemberSearch("");
@@ -63,7 +63,7 @@ export function CreateGroupDialog({
       await createGroup.mutateAsync({
         organizationId,
         name: name.trim(),
-        bindings: pendingBindings.map((b) => ({
+        grants: pendingGrants.map((b) => ({
           role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
@@ -72,6 +72,7 @@ export function CreateGroupDialog({
         memberIds: pendingMemberIds,
       });
       void queryClient.group.listAll.invalidate();
+      void queryClient.organization.getDirectoryCounts.invalidate();
       reset();
       onClose();
     } catch (e) {
@@ -118,14 +119,14 @@ export function CreateGroupDialog({
               onChange={(e) => setName(e.target.value)}
             />
 
-            {/* Bindings */}
+            {/* Grants */}
             <Box>
               <Text fontSize="sm" fontWeight="semibold" mb={3}>
                 Access
               </Text>
-              {pendingBindings.length > 0 && (
+              {pendingGrants.length > 0 && (
                 <VStack gap={2} align="stretch" mb={2}>
-                  {pendingBindings.map((b, i) => (
+                  {pendingGrants.map((b, i) => (
                     <HStack key={i} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
                       <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                         {b.customRoleName ?? b.role}
@@ -139,8 +140,8 @@ export function CreateGroupDialog({
                         size="xs"
                         variant="ghost"
                         color="fg.muted"
-                        aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
-                        onClick={() => setPendingBindings((prev) => prev.filter((_, j) => j !== i))}
+                        aria-label={`Remove ${b.customRoleName ?? b.role} access on ${b.scopeName ?? b.scopeId}`}
+                        onClick={() => setPendingGrants((prev) => prev.filter((_, j) => j !== i))}
                       >
                         <X size={14} />
                       </Button>
@@ -148,9 +149,9 @@ export function CreateGroupDialog({
                   ))}
                 </VStack>
               )}
-              <BindingInputRow
+              <GrantInputRow
                 organizationId={organizationId}
-                onAdd={(b) => setPendingBindings((prev) => [...prev, b])}
+                onAdd={(b) => setPendingGrants((prev) => [...prev, b])}
               />
             </Box>
 
@@ -165,7 +166,7 @@ export function CreateGroupDialog({
                     const member = orgMembers.data?.members.find((m) => m.userId === userId);
                     return (
                       <HStack key={userId} py={1} fontSize="sm">
-                        <RandomColorAvatar
+                        <MemberAvatar
                           name={member?.user.name ?? member?.user.email ?? "?"}
                           image={member?.user.image}
                           size="xs"

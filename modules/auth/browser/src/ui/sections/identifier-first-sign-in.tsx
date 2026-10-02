@@ -1,11 +1,11 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
-import { hardNavigate, replaceLocation } from "../../behavior/browser-navigation.ts";
+import { replaceLocation } from "../../behavior/browser-navigation.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
@@ -25,6 +25,10 @@ import { readHandledError } from "../../model/read-handled-error.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
+import {
+  rememberSoleConnectionAutoDial,
+  soleConnectionAutoDialAllowed,
+} from "../../model/sole-connection-auto-dial.ts";
 import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
@@ -58,6 +62,8 @@ export function IdentifierFirstSignIn() {
   const askedOnMount = useRef(false);
   const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  // Read once per mount, before this page dials anything itself.
+  const [soleAutoDialAllowed] = useState(() => soleConnectionAutoDialAllowed());
   // The address is becoming an account; nothing is created or sent yet.
   const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
   // The account's link is on its way, and nobody is signed in.
@@ -187,7 +193,7 @@ export function IdentifierFirstSignIn() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
-        autoStart={submittedIdentifier !== null}
+        {...routedHandOff({ decision, submittedIdentifier, soleAutoDialAllowed })}
       />
     );
   }
@@ -329,10 +335,18 @@ function signInDepth({
   return "entry";
 }
 
+/** What the log-in door says about an unknown address where no confirmation
+ *  link can be sent: what is missing, and who can fix it. */
+const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
+  title: "There is no account for that email address yet",
+  describe:
+    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
+} as const;
+
 /**
- * The address routed to no account (ADR-117, revision 2026-08-25). Says what
- * happened, offers the sign-up, keeps a mistyped address one click away. It
- * sends the sign-up door's link; no credential is mounted until it returns.
+ * The address routed to no account (ADR-117, revision 2026-08-25). Offers the
+ * sign-up and keeps a mistyped address one click away. Without an email
+ * provider it sends no link and says what is missing instead.
  */
 function NoAccountYet({
   email,
@@ -354,15 +368,28 @@ function NoAccountYet({
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
   const sendsEmail = usePublicEnv().data.HAS_EMAIL_PROVIDER_KEY;
 
+  if (!sendsEmail) {
+    return (
+      <AuthCard
+        title={NO_ACCOUNT_WITHOUT_EMAIL_COPY.title}
+        intro={NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe}
+        finePrint={<FrontDoorFinePrint />}
+      >
+        <VStack width="full" align="stretch" gap="14px">
+          <div data-testid="unknown-identifier" hidden>
+            {email}
+          </div>
+          <Button variant="outline" onClick={onUseDifferentEmail}>
+            Use a different email
+          </Button>
+        </VStack>
+      </AuthCard>
+    );
+  }
+
   const beginSignUp = async () => {
     try {
-      const result = await requestVerification.mutateAsync({ email });
-      if (!result.sent) {
-        // Nothing was mailed: the sign-up door takes the unconfirmed proof straight to the
-        // password step, the same step its own address form leads to on this installation.
-        hardNavigate(signUpHref({ callbackUrl, email, addressProof: result.addressProof }));
-        return;
-      }
+      await requestVerification.mutateAsync({ email });
       onAwaitingConfirmation(email);
     } catch (failure) {
       if (readHandledError(failure)?.code === "email_already_registered") {
@@ -394,7 +421,7 @@ function NoAccountYet({
           loading={requestVerification.isPending}
           onClick={() => void beginSignUp()}
         >
-          {sendsEmail ? "Send confirmation link" : "Continue"}
+          Send confirmation link
         </Button>
         <Button variant="outline" onClick={onUseDifferentEmail}>
           Use a different email
@@ -416,6 +443,26 @@ function NoAccountYet({
 const HANDOFF_QUIET_MS = 400;
 
 /**
+ * Whether a routed hand-off starts on its own. A typed address always dials; with no address
+ * only the self-hosted sole connection does, and only if this tab was not just sent there,
+ * so a failed round trip shows the button rather than looping.
+ */
+function routedHandOff({
+  decision,
+  submittedIdentifier,
+  soleAutoDialAllowed,
+}: {
+  decision: RoutingDecision;
+  submittedIdentifier: string | null;
+  soleAutoDialAllowed: boolean;
+}): { autoStart: boolean; onAutoStart?: () => void } {
+  if (submittedIdentifier !== null) return { autoStart: true };
+  if (decision.reasonCode !== "sole_active_connection") return { autoStart: false };
+
+  return { autoStart: soleAutoDialAllowed, onAutoStart: () => rememberSoleConnectionAutoDial() };
+}
+
+/**
  * The decision routed this address to an identity provider; nothing is drawn
  * while the browser is on its way there. A slow or refused hand-off shows a
  * card saying where it's going, with a button for the refused case.
@@ -428,6 +475,7 @@ export function RoutedToConnection({
   title = "Log in to LangWatch",
   footer,
   autoStart = true,
+  onAutoStart,
 }: {
   decision: RoutingDecision;
   onContinue: (method: SignInMethod) => void;
@@ -438,8 +486,10 @@ export function RoutedToConnection({
   title?: string;
   /** The way out, which differs by the screen that routed here. */
   footer?: ReactNode;
-  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  /** Whether the hand-off starts on its own or waits for the button. */
   autoStart?: boolean;
+  /** Called once, when the hand-off starts on its own. */
+  onAutoStart?: () => void;
 }) {
   const method: SignInMethod | undefined = decision.methodSet[0];
   const dialed = useRef(false);
@@ -450,8 +500,9 @@ export function RoutedToConnection({
     dialed.current = true;
     // Parked here too: the people routed by address are the dial nobody presses.
     rememberPendingMethod(method);
+    onAutoStart?.();
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [autoStart, method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);

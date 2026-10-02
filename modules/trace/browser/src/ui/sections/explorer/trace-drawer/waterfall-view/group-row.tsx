@@ -1,6 +1,6 @@
-import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 

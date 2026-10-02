@@ -1,4 +1,4 @@
-import { Input } from "@chakra-ui/react";
+import { Input } from "@langwatch/design-system/primitives";
 
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 

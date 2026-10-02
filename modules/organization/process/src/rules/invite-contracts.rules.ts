@@ -18,12 +18,6 @@ import type { OrganizationInviteRepository } from "../repositories/organization-
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 
 /**
- * The KSUID resource prefix a role binding is minted under, restated next to every writer that
- * mints one rather than in a constants module a package cannot see.
- */
-export const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
-
-/**
  * Duration in milliseconds before an invite expires (14 days, D11).
  * Resend is one click, so the window can be generous; the old 48-hour
  * window plus an ops-only resend was where invitations went to die.

@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -54,7 +54,7 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
   const needsLoading = isSavedDataset && !dataset.savedRecords;
 
   // Declarative query - tRPC batches these automatically
-  const query = api.datasetRecord.getAll.useQuery(
+  const query = datasetClient.datasetRecord.getAll.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: dataset?.datasetId ?? "",
@@ -137,7 +137,7 @@ export const useDatasetSelectionLoader = ({
   const [pendingDatasetLoad, setPendingDatasetLoad] = useState<PendingDatasetLoad | null>(null);
 
   // Query to load dataset records when adding a saved dataset
-  const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
+  const savedDatasetRecords = datasetClient.datasetRecord.getAll.useQuery(
     {
       projectId: projectId ?? "",
       datasetId: pendingDatasetLoad?.datasetId ?? "",

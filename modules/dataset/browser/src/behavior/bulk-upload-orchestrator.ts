@@ -3,7 +3,7 @@
  */
 
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";
 
 import type { DatasetImportTransport } from "./use-stored-object-upload.ts";

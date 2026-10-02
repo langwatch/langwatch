@@ -21,7 +21,6 @@ const NOTHING_DONE: IntegrationsCheckStatus = {
   customGraphs: 0,
   datasets: 0,
   onlineEvaluations: 0,
-  triggers: 0,
   simulations: 0,
   modelProviders: 0,
   prompts: 0,

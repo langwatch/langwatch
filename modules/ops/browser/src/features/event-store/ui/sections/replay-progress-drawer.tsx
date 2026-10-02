@@ -1,3 +1,5 @@
+import { Stat } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
   Box,
@@ -5,12 +7,10 @@ import {
   HStack,
   Progress,
   Separator,
-  Stat,
   Status,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
@@ -33,9 +33,7 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
 
-  const statusQuery = useReplayStatus({
-    refetchInterval: open ? 1000 : false,
-  });
+  const statusQuery = useReplayStatus();
 
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => void statusQuery.refetch(),

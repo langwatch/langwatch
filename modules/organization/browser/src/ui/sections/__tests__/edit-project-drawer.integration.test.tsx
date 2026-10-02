@@ -25,25 +25,38 @@ const invalidator = (name: string) => ({
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
-      organization: { getAll: invalidator("organization.getAll") },
+      organization: {
+        getAll: invalidator("organization.getAll"),
+        getScopeGraph: invalidator("organization.getScopeGraph"),
+      },
       team: {
-        getTeamsWithMembers: invalidator("team.getTeamsWithMembers"),
-        getTeamsWithRoleBindings: invalidator("team.getTeamsWithRoleBindings"),
+        getTeamsWithGrants: invalidator("team.getTeamsWithGrants"),
       },
     }),
-    team: {
-      getTeamsWithMembers: {
+    organization: {
+      getScopeGraph: {
         useQuery: () => ({
           data: [
             {
-              id: "team-1",
-              name: "Engineering",
-              slug: "engineering",
-              isPersonal: false,
-              projects: [],
+              id: "org-1",
+              teams: [
+                {
+                  id: "team-1",
+                  name: "Engineering",
+                  slug: "engineering",
+                  isPersonal: false,
+                  projects: [],
+                },
+                {
+                  id: "team-2",
+                  name: "Analytics",
+                  slug: "analytics",
+                  isPersonal: false,
+                  projects: [],
+                },
+                { id: "team-3", name: "Ada", slug: "ada", isPersonal: true, projects: [] },
+              ],
             },
-            { id: "team-2", name: "Analytics", slug: "analytics", isPersonal: false, projects: [] },
-            { id: "team-3", name: "Ada", slug: "ada", isPersonal: true, projects: [] },
           ],
         }),
       },
@@ -141,7 +154,7 @@ describe("given the edit-project drawer", () => {
 
       expect(host.successes.map((notice) => notice.title)).toContain("Project updated");
       expect(host.overlays).toContainEqual({ name: null });
-      expect(invalidations.current).toContain("team.getTeamsWithMembers");
+      expect(invalidations.current).toContain("organization.getScopeGraph");
     });
   });
 

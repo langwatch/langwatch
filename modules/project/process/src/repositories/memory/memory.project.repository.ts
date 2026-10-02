@@ -595,7 +595,6 @@ export class MemoryProjectRepository implements ProjectRepository {
     return traceDestinationProjectSchema.parse({
       id: project.id,
       teamId: project.teamId,
-      apiKey: project.apiKey,
       archivedAt: project.archivedAt,
     });
   }

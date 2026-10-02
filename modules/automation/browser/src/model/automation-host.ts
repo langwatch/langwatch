@@ -4,6 +4,8 @@
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { createContext, useContext } from "react";
 
+import type { SlackConnectionSaved } from "./slack/slack-connection-types.ts";
+
 /** The organization, team and project the current page is about. */
 export type AutomationScope = {
   organizationId: string | null;
@@ -42,6 +44,7 @@ export type AutomationSuccessNotice = {
   title: string;
   description?: string;
   id?: string;
+  action?: { label: string; run: () => void };
 };
 
 /**
@@ -110,10 +113,19 @@ export abstract class AutomationHost {
     params?: Readonly<Record<string, string | undefined>>;
   }): void;
 
+  /** Closes the open drawer and its whole stack, as a registered drawer's own close does. */
+  abstract closeDrawer(): void;
+
   /** Hands over to dataset drawer and returns with created dataset; reports dataset via
    *  handover callback and navigates back rather than closing the stack. */
   abstract createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
+    returned: () => void;
+  }): void;
+
+  /** Hands over to slack's connection drawer and returns, as createDataset does. */
+  abstract createSlackConnection(handover: {
+    created: (saved: SlackConnectionSaved) => void;
     returned: () => void;
   }): void;
 
@@ -123,6 +135,9 @@ export abstract class AutomationHost {
    * host and a test can state it directly.
    */
   abstract appBaseUrl(): string;
+
+  /** Whether the installation can send email; without it the email channel is disabled (§6). */
+  abstract hasEmailProvider(): boolean;
 
   abstract succeeded(notice: AutomationSuccessNotice): void;
 

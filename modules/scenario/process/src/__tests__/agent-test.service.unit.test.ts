@@ -4,8 +4,8 @@
  * @see specs/agents/agent-test-run.feature
  */
 import { type AgentApi, type AgentOverview, type AgentWithFields } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentTestTurnChild } from "../app/scenario.app.ts";
@@ -100,6 +100,7 @@ function serviceFor(options: {
   const service = AgentTestService.create({
     agents,
     projects: { findById: vi.fn().mockResolvedValue(null) } as never,
+    apiKeys: { mintRunKey: vi.fn() },
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,

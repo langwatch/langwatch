@@ -76,6 +76,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       : null;
   }
 
+  async hasStoredS3Secret(organizationId: string): Promise<boolean> {
+    return !!this.memory.organizations.get(organizationId)?.s3SecretAccessKey;
+  }
+
   async getJoinSetting({
     organizationId,
   }: {

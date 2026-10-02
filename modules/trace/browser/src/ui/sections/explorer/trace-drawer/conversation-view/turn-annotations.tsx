@@ -1,22 +1,23 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
-import {
-  isSessionMarked,
-  readableDate,
-  useAnnotationQueueSessionStore,
-} from "@langwatch/trace-browser-kit";
-import { UserAvatar } from "@langwatch/user-browser-kit";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
-import { api, type RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../behavior/annotation-queue-session.store.ts";
+import { useTraceAnnotations } from "../../../../../behavior/reads/use-annotation-reads.ts";
+import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
+import { PersonAvatar } from "../../../person-avatar.tsx";
 import {
   openTraceEditorFromConversation,
   tracePartitionHint,
@@ -107,12 +108,12 @@ export function TurnAnnotationBadges({
   // What the turn carries is what was said about the turn. A comment about one
   // of its spans reads beside it in the rail and is counted nowhere, so one
   // reviewer marking up six steps of a turn leaves its count where it was.
-  const annotations = api.annotation.getByTraceId.useQuery(
-    { projectId: project?.id ?? "", traceId, anchor: "trace" },
-    {
-      enabled: !!project?.id && hasPermission("annotations:view") && prefetchedItems === undefined,
-    },
-  );
+  const annotations = useTraceAnnotations({
+    projectId: project?.id,
+    traceId,
+    anchor: "trace",
+    enabled: hasPermission("annotations:view") && prefetchedItems === undefined,
+  });
 
   const items = prefetchedItems ?? annotations.data ?? [];
   const annotationCount = items.length;
@@ -238,7 +239,7 @@ function AnnotationListRow({
 function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }) {
   return (
     <HStack gap={2} align="start">
-      <UserAvatar
+      <PersonAvatar
         size="xs"
         background="gray.solid"
         color="white"

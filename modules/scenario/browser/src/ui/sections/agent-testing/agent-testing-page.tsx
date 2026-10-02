@@ -3,35 +3,33 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
-import { NowProvider } from "@langwatch/suite-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 
 import { toRunPlanSuites } from "../../../behavior/agent-testing/results/run-plans.ts";
 import { useAgentTestingLiveUpdates } from "../../../behavior/agent-testing/use-agent-testing-live-updates.ts";
 import { useAgentTestingRouting } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
-import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useAgentTestingStore } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
+import { useSuites } from "../../../behavior/suites/use-suites.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
+import { NowProvider } from "../../elements/suite/runs/now-provider.tsx";
 import { AgentTestingHeader } from "./agent-testing-header.tsx";
 import { AgentTestingCaseEditor } from "./cases/agent-testing-case-editor.tsx";
 import { TestCasesTab } from "./cases/test-cases-tab.tsx";
 import { ResultsTab } from "./results/results-tab.tsx";
 import { RunPlanDialogHost } from "./run/run-plan-dialog-host.tsx";
 import { useHydrateViewFromUrl } from "./use-agent-testing-page-flows.ts";
-import { useAgentTestingStore } from "./use-agent-testing-store.ts";
 
 /**
  * How many scenarios and how many run plans the tabs count.
  */
 function useTabCounts(projectId: string) {
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
-  const { data: suites } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["run_plan", "test_suite"] },
-    { enabled: !!projectId },
-  );
+  const { data: scenarios } = useScenarios({ projectId });
+  const { data: suites } = useSuites({
+    projectId,
+    kinds: ["run_plan", "test_suite"],
+  });
 
   return {
     casesCount: scenarios?.length,

@@ -17,6 +17,7 @@
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than four.
  */
+import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
@@ -48,6 +49,7 @@ import {
   type ScimDeliveryReceipt,
   type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
+  type ScimTokenCaller,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
   type ScimUser,
@@ -63,16 +65,19 @@ import {
 import { scimTokenPepperSecrets } from "@langwatch/enterprise-scim-contract/token-pepper";
 import {
   ENTERPRISE_FEATURE_ERRORS,
-  EnterprisePlanRequiredError,
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventSourcing } from "@langwatch/eventing";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  EventSourcing,
+} from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
@@ -106,10 +111,12 @@ import { ScimReconciliationService } from "../services/scim-reconciliation.servi
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
+import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 type ScimSetup = FeatureSetup<
-  typeof ScimApp.dependencies,
-  MembersRead<typeof ScimApp.reads>,
+  typeof ScimModule.dependencies,
+  MembersRead<typeof ScimModule.reads>,
   ScimServerConfig,
   ScimRepositories
 >;
@@ -225,9 +232,6 @@ function scimSyncEventStore(eventing: EventSourcing): () => Promise<ScimSyncEven
   };
 }
 
-/** Whether this user is on the staff list that may read across every customer. */
-type ScimOperatorGate = (userId: string) => Promise<boolean>;
-
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
@@ -240,10 +244,13 @@ type ScimAppOptions = {
   webhookSecret: () => string | undefined;
   /** Absent in a test that exercises only the protocol doors. */
   oversight?: ScimOversightService;
-  operators?: ScimOperatorGate;
+  /** Asked whether the caller holds the platform-operator grant; absent, nobody does. */
+  platformOperators?: Pick<AuthzApi, "can">;
+  /** Only a full organization admin may mint a directory token. */
+  minting: Pick<ScimTokenMintService, "assertMayMint">;
 };
 
-export class ScimApp implements ScimApiContract {
+export class ScimModule implements ScimApiContract {
   static readonly contract = ScimApi;
   static readonly dependencies = {
     authorization: AuthzApi,
@@ -253,11 +260,10 @@ export class ScimApp implements ScimApiContract {
     auditLog: AuditLogApi,
     identity: IdentityApi,
     organization: OrganizationApi,
-    operators: OpsApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly reads = reads("eventing");
+  static readonly reads = ["eventing"] as const;
   static readonly operatorReads = scimOperatorReads;
 
   readonly #scim: ScimService;
@@ -269,7 +275,8 @@ export class ScimApp implements ScimApiContract {
   readonly #retirement: ScimConnectionRetirementService;
   readonly #reconciliation: ScimReconciliationService;
   readonly #oversight: ScimOversightService | undefined;
-  readonly #operators: ScimOperatorGate | undefined;
+  readonly #platformOperators: Pick<AuthzApi, "can"> | undefined;
+  readonly #minting: Pick<ScimTokenMintService, "assertMayMint">;
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
@@ -277,12 +284,13 @@ export class ScimApp implements ScimApiContract {
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
     this.#oversight = options.oversight;
-    this.#operators = options.operators;
+    this.#platformOperators = options.platformOperators;
     this.#connections = options.connections;
     this.#directoryExternalIds = options.directoryExternalIds;
     this.#reconciliation = options.reconciliation;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
+    this.#minting = options.minting;
     this.#retirement = ScimConnectionRetirementService.create({
       connections: options.connections,
       tokens: options.scim,
@@ -294,11 +302,11 @@ export class ScimApp implements ScimApiContract {
     });
   }
 
-  static async create(setup: ScimSetup): Promise<ScimApp> {
+  static async create(setup: ScimSetup): Promise<ScimModule> {
     const { dependencies, members, config, secrets, repositories } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
-    const tokenPepper = await secrets.into(ScimApp.secrets.tokenPepper, (credentials) =>
-      secrets.into(ScimApp.secrets.tokenPepperFallback, (session) => credentials ?? session),
+    const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
+      secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
     );
     const scimSyncLedger = ScimSyncLedgerWriterService.create();
     const lifecycle = ScimSyncLifecycleService.create({
@@ -329,7 +337,7 @@ export class ScimApp implements ScimApiContract {
 
     const connections = ScimConnectionsService.create(dependencies.identity);
 
-    const app = ScimApp.createWithService({
+    const app = ScimModule.createWithService({
       scim,
       connections,
       directoryExternalIds: ScimDirectoryExternalIdsService.create({
@@ -346,6 +354,7 @@ export class ScimApp implements ScimApiContract {
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
+      minting: ScimTokenMintService.create(dependencies.authorization),
       oversight: ScimOversightService.create({
         syncs,
         organizations: dependencies.organization,
@@ -357,10 +366,7 @@ export class ScimApp implements ScimApiContract {
           organization: dependencies.organization,
         }),
       }),
-      operators: async (userId) => {
-        const profile = await dependencies.users.findById({ id: userId });
-        return dependencies.operators.isAdmin({ email: profile?.email });
-      },
+      platformOperators: dependencies.authorization,
     });
     app.#directoryMove = ScimDirectoryMoveService.create({
       directory: repositories.scim,
@@ -404,8 +410,8 @@ export class ScimApp implements ScimApiContract {
    * and the two peers the doors exercise, without a real database or the
    * three peers `create` resolves only to build the service.
    */
-  static createWithService(options: ScimAppOptions): ScimApp {
-    return new ScimApp(options);
+  static createWithService(options: ScimAppOptions): ScimModule {
+    return new ScimModule(options);
   }
 
   /** Drops recorded requests past their retention window; the worker's sweep. */
@@ -429,11 +435,24 @@ export class ScimApp implements ScimApiContract {
     return this.#directoryExternalIds.findForOrganization(input);
   }
 
-  generateToken(input: {
-    organizationId: string;
-    connectionId?: string | undefined;
-    description?: string | undefined;
-  }): Promise<IssuedScimToken> {
+  isDirectoryUserInactive(input: { organizationId: string; userId: string }): Promise<boolean> {
+    return this.#directoryExternalIds.isDirectoryUserInactive(input);
+  }
+
+  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+    return this.#directoryExternalIds.findDirectoryConnectionsForUser(input);
+  }
+
+  async generateToken(
+    input: {
+      organizationId: string;
+      connectionId?: string | undefined;
+      description?: string | undefined;
+    },
+    by: ScimTokenCaller,
+  ): Promise<IssuedScimToken> {
+    await this.#minting.assertMayMint({ organizationId: input.organizationId, by });
+
     return this.#scim.generateToken(input);
   }
 
@@ -457,6 +476,29 @@ export class ScimApp implements ScimApiContract {
   }
 
   // ── The directory credential ─────────────────────────────────────────────
+
+  /** The `scimToken` door, bound to this module's own families (ARCHITECTURE.md §4). */
+  get directoryDoor(): RestIdentity {
+    return {
+      authenticate: () => {
+        throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
+      },
+      identify: async ({ request }) => {
+        const directory = await this.authenticateDirectory({
+          authorization: request.headers.get("authorization"),
+          method: request.method,
+          path: new URL(request.url).pathname,
+        });
+
+        recordScimCredential(request, directory);
+
+        return {
+          actor: { type: "api_key", id: directory.id },
+          scope: { tier: "organization", id: directory.organizationId },
+        };
+      },
+    };
+  }
 
   async authenticateDirectory(input: {
     authorization: string | null;
@@ -523,29 +565,17 @@ export class ScimApp implements ScimApiContract {
     return this.#scim.verifyToken(input);
   }
 
-  /** Plan-gated, unlike the request log: main's reconciliation read asks the plan. */
-  async getDirectoryReconciliation(
-    input: ScimReconciliationScope,
-  ): Promise<OrganizationReconciliation> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
+  getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation> {
     return this.#reconciliation.getAll(input);
   }
 
-  async findConnectionReconciliation(
+  findConnectionReconciliation(
     input: ScimConnectionRequestsInput,
   ): Promise<ConnectionReconciliation[]> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
     return this.#reconciliation.findById(input);
   }
 
-  /** Plan-gated like the panel it sits in, as main's getActivity asked the plan. */
-  async findDirectoryActivity(
-    input: ScimConnectionRequestsInput,
-  ): Promise<ScimDirectoryActivityEntry[]> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
+  findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]> {
     return this.#reconciliation.findActivity(input);
   }
 
@@ -601,7 +631,7 @@ export class ScimApp implements ScimApiContract {
 
   /**
    * Gate, then record, then act: the record lands before the act so an act
-   * that then failed is still in the trail. Anyone off the staff list gets a
+   * that then failed is still in the trail. Anyone without the platform-operator grant gets a
    * 404 that says nothing about why; an impersonator is checked, not the user.
    */
   async #overseen<T>({
@@ -617,7 +647,11 @@ export class ScimApp implements ScimApiContract {
   }): Promise<T> {
     const userId = by.impersonatorId ?? by.id;
     const oversight = this.#oversight;
-    const isOperator = this.#operators ? await this.#operators(userId) : false;
+    const isOperator = await this.#platformOperators?.can({
+      principal: { type: "user", id: userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
     if (!oversight || !isOperator) throw new AdminSurfaceHiddenError();
     await this.#auditLog.record({
       userId,

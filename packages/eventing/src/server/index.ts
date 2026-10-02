@@ -47,6 +47,14 @@ export {
 } from "./maintenance/blob-cleanup.process.ts";
 export { runBlobCleanup, type BlobCleanupDeps } from "./maintenance/blob-cleanup.intent.ts";
 export {
+  createReadHintsPipeline,
+  publishReadHints,
+  READ_HINT_BROADCAST_CHANNEL,
+  READ_HINT_COALESCE_MS,
+  readHintDedupId,
+  type ReadHintPublish,
+} from "./read-hints.pipeline.ts";
+export {
   createProcessManagerMaintenancePipeline,
   type ProcessManagerMaintenancePipelineDeps,
 } from "./maintenance/process-manager-maintenance.pipeline.ts";

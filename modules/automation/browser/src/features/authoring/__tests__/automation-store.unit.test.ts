@@ -11,10 +11,39 @@ describe("automationStore", () => {
     });
 
     it("starts fresh", () => {
-      const { draft, section, testHistory } = useAutomationStore.getState();
+      const { draft, section, testHistory, step, furthestStep } = useAutomationStore.getState();
       expect(draft).toEqual(INITIAL_DRAFT);
       expect(section).toBeNull();
       expect(testHistory).toEqual([]);
+      expect(step).toBe("watch");
+      expect(furthestStep).toBe("watch");
+    });
+
+    describe("when the author steps forward and then back", () => {
+      it("keeps the furthest step reached, so the rail stays clickable", () => {
+        const { setStep } = useAutomationStore.getState();
+        setStep("delivery");
+        setStep("review");
+        setStep("watch");
+
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(useAutomationStore.getState().furthestStep).toBe("review");
+      });
+    });
+
+    describe("when a condition row on the watch step is invalid", () => {
+      it("stays on watch until the row is fixed", () => {
+        const { setStep, setHasInvalidConditionRows } = useAutomationStore.getState();
+        setHasInvalidConditionRows(true);
+        setStep("delivery");
+
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(useAutomationStore.getState().furthestStep).toBe("watch");
+
+        setHasInvalidConditionRows(false);
+        setStep("delivery");
+        expect(useAutomationStore.getState().step).toBe("delivery");
+      });
     });
 
     describe("when dispatch is called", () => {
@@ -60,8 +89,9 @@ describe("automationStore", () => {
     });
 
     describe("when reset is called after edits", () => {
-      it("wipes draft + section + history", () => {
+      it("wipes draft + section + step + history", () => {
         useAutomationStore.getState().setSection("configuration");
+        useAutomationStore.getState().setStep("review");
         useAutomationStore.getState().pushTestAttempt({
           at: 1,
           channel: "email",
@@ -69,10 +99,12 @@ describe("automationStore", () => {
           recipientCount: 1,
         });
         useAutomationStore.getState().reset();
-        const { draft, section, testHistory } = useAutomationStore.getState();
+        const { draft, section, testHistory, step, furthestStep } = useAutomationStore.getState();
         expect(draft).toEqual(INITIAL_DRAFT);
         expect(section).toBeNull();
         expect(testHistory).toEqual([]);
+        expect(step).toBe("watch");
+        expect(furthestStep).toBe("watch");
       });
     });
   });

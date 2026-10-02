@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, chakra, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import {

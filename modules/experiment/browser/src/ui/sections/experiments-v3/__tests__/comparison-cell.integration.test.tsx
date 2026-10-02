@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,8 +33,7 @@ vi.mock("@langwatch/browser-host/markdown", () => ({
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
-const wrap = (node: ReactNode) =>
-  render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+const wrap = (node: ReactNode) => renderWithDesignSystem(node);
 
 const variantTargets: TargetConfig[] = [
   {

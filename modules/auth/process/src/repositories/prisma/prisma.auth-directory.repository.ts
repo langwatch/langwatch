@@ -71,26 +71,44 @@ export class PrismaAuthDirectoryRepository {
   }: {
     projectId: string;
     organizationId: string;
-  }): Promise<{
-    id: string;
-    slug: string;
-    name: string;
-    apiKey: string;
-    isPersonal: boolean;
-    ownerUserId: string | null;
-  }> {
+  }) {
     const project = await this.database.project.findFirst({
       where: { id: projectId, archivedAt: null, team: { organizationId } },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        apiKey: true,
-        isPersonal: true,
-        ownerUserId: true,
-      },
+      select: PROJECT_FIELDS,
     });
     if (project === null) throw new ProjectNotFoundError();
     return project;
   }
+
+  /** A live project of the organization by id, else by slug. */
+  async getLiveProjectByRef({
+    projectRef,
+    organizationId,
+  }: {
+    projectRef: string;
+    organizationId: string;
+  }) {
+    const live = { archivedAt: null, team: { organizationId } };
+    const project =
+      (await this.database.project.findFirst({
+        where: { id: projectRef, ...live },
+        select: PROJECT_FIELDS,
+      })) ??
+      (await this.database.project.findFirst({
+        where: { slug: projectRef, ...live },
+        select: PROJECT_FIELDS,
+        orderBy: { createdAt: "asc" },
+      }));
+    if (project === null) throw new ProjectNotFoundError();
+    return project;
+  }
 }
+
+const PROJECT_FIELDS = {
+  id: true,
+  slug: true,
+  name: true,
+  teamId: true,
+  isPersonal: true,
+  ownerUserId: true,
+} as const;

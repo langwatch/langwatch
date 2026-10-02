@@ -1,10 +1,11 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 
+import type { Authorize } from "../access/access.ts";
 import { SurfaceUnverifiedError } from "../errors.ts";
-import { recordBrowserCaller, type SessionReader } from "./credential.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
-import { BrowserOriginGuard } from "./security.ts";
+import { recordBrowserCaller } from "./credential.ts";
+import type { SessionReader } from "../hosting/session-reader.ts";
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { BrowserOriginGuard } from "../policy/browser-origin.ts";
 
 export class BrowserOriginRefusedError extends HandledError {
   constructor() {
@@ -16,7 +17,7 @@ export class BrowserOriginRefusedError extends HandledError {
 
 export class BrowserSessionIdentity implements RestIdentity {
   readonly #sessions: SessionReader;
-  readonly #authz: AuthzApi;
+  readonly #authz: Pick<Authorize, "getDecision">;
   readonly #publicOrigin: string | null;
 
   private constructor({
@@ -25,7 +26,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicOrigin,
   }: {
     sessions: SessionReader;
-    authz: AuthzApi;
+    authz: Pick<Authorize, "getDecision">;
     publicOrigin: string | null;
   }) {
     this.#sessions = sessions;
@@ -40,7 +41,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicBaseUrl,
   }: {
     sessions: SessionReader;
-    authz: AuthzApi;
+    authz: Pick<Authorize, "getDecision">;
     publicBaseUrl: string | undefined;
   }): BrowserSessionIdentity {
     const publicOrigin =
@@ -72,7 +73,11 @@ export class BrowserSessionIdentity implements RestIdentity {
 
     recordBrowserCaller(request, { userId: caller.userId });
 
-    return { actor: { type: "user", id: caller.userId }, scope: null };
+    const impersonatorId = caller.impersonator?.id;
+    const actor = impersonatorId
+      ? { type: "user" as const, id: caller.userId, impersonatorId }
+      : { type: "user" as const, id: caller.userId };
+    return { actor, scope: null };
   }
 
   #isFromOwnPages(request: Request): boolean {

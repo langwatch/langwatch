@@ -148,6 +148,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
   });
 
   /** @scenario "A second retroactive update is refused while the first is still running" */
+  /** @scenario "Rate-limited to one mutation per tenant, category, and table" */
   it("refuses by name and lists every blocking mutation with its id and table", async () => {
     const { commands, repository } = createRepository([
       {

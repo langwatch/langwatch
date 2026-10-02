@@ -10,10 +10,7 @@ const NEW_ACCOUNT_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
  * estate for genuinely new users; everyone else gets the compact icon-only variant.
  */
 export function useIsNewAccount(): boolean {
-  const { data } = api.user.getAccountInfo.useQuery(
-    {},
-    { staleTime: Infinity, refetchOnWindowFocus: false },
-  );
+  const { data } = api.user.getAccountInfo.useQuery({});
   if (!data?.createdAt) return false;
   return nowInstant().epochMilliseconds - toEpochMs(data.createdAt) < NEW_ACCOUNT_WINDOW_MS;
 }

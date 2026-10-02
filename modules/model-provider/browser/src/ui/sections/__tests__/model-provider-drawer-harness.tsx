@@ -2,7 +2,7 @@
  * Recovered from the deleted `modelProviderDrawerHarness.tsx`, adapted to the current
  * `ModelProviderListEntry` wire shape. Not exported — a test imports it relatively.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
 import { screen } from "@testing-library/react";
@@ -12,7 +12,7 @@ import { vi } from "vitest";
 export const SELF_HOSTED_URL = "https://llm.internal.acme.example/v1";
 
 export const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 /** Providers whose registry schema accepts either an API key or a base URL. */

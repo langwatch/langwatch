@@ -1,7 +1,7 @@
+import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Main's cost breakdown reads over the memory twins. @see specs/governance/governance-cost-screen.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -69,6 +69,52 @@ describe("GovernanceCostBreakdownService", () => {
   });
 
   describe("when the spender breakdown is read", () => {
+    /** @scenario "Pulled spend is grouped by who spent it" */
+    it("totals each spender's rows under that spender and nobody else's", async () => {
+      const { costRollup, service, window } = setup();
+      costRollup.seed(cell({ rawActorId: "u-1" }));
+      costRollup.seed(cell({ rawActorId: "u-1", day: "2026-09-21" }));
+      costRollup.seed(cell({ rawActorId: "u-2", amountNanoUsd: 5_000_000_000 }));
+
+      const { rows } = await service.spenderBreakdown(window);
+
+      expect(rows.map((row) => [row.rawActorId, row.amountUsd])).toEqual([
+        ["u-2", 5],
+        ["u-1", 2],
+      ]);
+    });
+
+    /** @scenario "Spend nobody is named for gathers under one honest bucket" */
+    it("gathers rows with no spender id under one not-named row with no invented name", async () => {
+      const { costRollup, service, window } = setup();
+      costRollup.seed(cell({ rawActorId: "" }));
+      costRollup.seed(cell({ rawActorId: "", model: "o3", day: "2026-09-21" }));
+
+      const { rows } = await service.spenderBreakdown(window);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ rawActorId: "", label: null, amountUsd: 2 });
+    });
+
+    /** @scenario "An erased spender is shown by pseudonym" */
+    it("labels a row recorded under a pseudonym with that pseudonym", async () => {
+      const { costRollup, discoveredPeople, service, window } = setup();
+      costRollup.seed(cell({ rawActorId: "erased-3f9a" }));
+      await discoveredPeople.recordActivitySighting({
+        organizationId: "org_1",
+        provider: "openai",
+        rawActorId: "erased-3f9a",
+        displayText: "erased-3f9a",
+        kind: "user",
+        earliestAt: NOW,
+        latestAt: NOW,
+      });
+
+      const { rows } = await service.spenderBreakdown(window);
+
+      expect(rows[0]?.label).toBe("erased-3f9a");
+    });
+
     /** @scenario "Gateway rows never enter the spender breakdown" */
     it("counts pulled rows only", async () => {
       const { costRollup, service, window } = setup();

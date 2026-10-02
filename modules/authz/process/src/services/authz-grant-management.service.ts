@@ -38,9 +38,9 @@ import {
   storedScopeType,
 } from "../rules/grant-wire.rules.ts";
 import type {
-  AuthzBindingWriterPermissions,
-  AuthzBindingWriterService,
-} from "./authz-binding-writer.service.ts";
+  AuthzGrantWriterPermissions,
+  AuthzGrantWriterService,
+} from "./authz-grant-writer.service.ts";
 
 type RefusalContext = Readonly<{
   grantId?: string;
@@ -111,16 +111,16 @@ function principalFieldsOf(principal: GrantCreate["principal"]): {
 
 export class AuthzGrantManagementService {
   static create(options: {
-    writer: AuthzBindingWriterService;
-    permissions: AuthzBindingWriterPermissions;
+    writer: AuthzGrantWriterService;
+    permissions: AuthzGrantWriterPermissions;
   }): AuthzGrantManagementService {
     return new AuthzGrantManagementService(options);
   }
 
   private constructor(
     private readonly options: {
-      writer: AuthzBindingWriterService;
-      permissions: AuthzBindingWriterPermissions;
+      writer: AuthzGrantWriterService;
+      permissions: AuthzGrantWriterPermissions;
     },
   ) {}
 

@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { VirtualItem } from "@tanstack/react-virtual";
 
 import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";

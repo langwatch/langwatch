@@ -4,8 +4,8 @@
  * open to this address, and nothing on it creates an organization for
  * somebody who did not choose to. Spec: specs/identity/join-before-create.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,12 +54,7 @@ vi.mock("../../../behavior/hard-redirect.ts", () => ({
 
 import Join from "../join-screen.tsx";
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Join />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<Join />);
 
 const acme = { organizationId: "org_acme", name: "Acme", colleagueCount: 10 };
 

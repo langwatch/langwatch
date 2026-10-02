@@ -4,8 +4,8 @@
  * only flows wide to narrow — saving it as empty config surfaced a raw 500 and stacked rows.
  * Binds specs/model-providers/role-based-default-models.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
 import { featuresByRole } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,9 +36,9 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 // The picker stub exposes one button that picks the organization scope,
 // so create-mode tests can drive the scope selection without the real
 // multi-select dropdown.
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "@langwatch/design-system/scope-chip-picker",
   );
   return {
     ...actual,
@@ -125,11 +125,11 @@ let host: FakeModelProviderHost;
 
 function drawerTree(editingId?: string) {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ModelProviderHostProvider value={host}>
         <DefaultModelOverrideDrawer editingId={editingId} />
       </ModelProviderHostProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

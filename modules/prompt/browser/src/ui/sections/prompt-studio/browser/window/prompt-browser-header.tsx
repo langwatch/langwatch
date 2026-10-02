@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 
@@ -18,7 +18,7 @@ export function PromptBrowserHeader() {
   const formMethods = useFormContext<PromptConfigFormValues>();
   const { handleSaveVersion } = useHandleSavePrompt();
   const tabId = useTabId();
-  const hasUnsavedChanges = useHasUnsavedChanges(tabId);
+  const hasUnsavedChanges = useHasUnsavedChanges({ tabId, liveValues: formMethods.watch() });
   const openHistoryOnLoad = useDraggableTabsBrowserStore(({ windows }) => {
     const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
     return tab?.data.meta.openHistoryOnLoad;

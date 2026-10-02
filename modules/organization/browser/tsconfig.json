@@ -22,10 +22,13 @@
       "path": "../../auth/contract/tsconfig.build.json"
     },
     {
-      "path": "../../authz/browser-kit/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
@@ -52,13 +55,10 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../user/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

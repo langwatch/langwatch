@@ -1,9 +1,9 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type MakeDefaultWritePlan,

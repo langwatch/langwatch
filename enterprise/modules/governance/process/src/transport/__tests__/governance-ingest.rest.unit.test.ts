@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * `/api/ingest`: the gate every push-mode receiver shares, the origin metadata
- * it stamps authoritatively, and what an exporter is told about a signal this
- * deployment folds nowhere. Spec: specs/ai-gateway/governance/
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type {
   GovernanceIngestionSource,
@@ -16,6 +9,13 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { memoryRateLimiter } from "@langwatch/test-harness";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * `/api/ingest`: the gate every push-mode receiver shares, the origin metadata
+ * it stamps authoritatively, and what an exporter is told about a signal this
+ * deployment folds nowhere. Spec: specs/ai-gateway/governance/
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";

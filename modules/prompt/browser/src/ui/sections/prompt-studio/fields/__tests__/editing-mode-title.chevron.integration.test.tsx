@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/prompts/editing-modes.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { EditingModeTitle } from "../editing-mode-title.tsx";
@@ -11,11 +11,7 @@ import { EditingModeTitle } from "../editing-mode-title.tsx";
 afterEach(() => cleanup());
 
 function renderTitle() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EditingModeTitle mode="prompt" onChange={() => undefined} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<EditingModeTitle mode="prompt" onChange={() => undefined} />);
 }
 
 describe("<EditingModeTitle/>", () => {

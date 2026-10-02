@@ -1,14 +1,14 @@
+import { instantEvalRunKey } from "@langwatch/trace-contract";
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
+
 // @vitest-environment jsdom
 /**
  * The map the explorer's reads send: the query's eval chips against the runs
  * the store registered.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-import { instantEvalRunKey } from "@langwatch/trace-contract";
-import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useInstantEvalRuns } from "../use-instant-eval-runs.ts";
 
 const WINDOW = { from: 1_000, to: 2_000 };

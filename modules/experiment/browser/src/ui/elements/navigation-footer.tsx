@@ -1,5 +1,5 @@
-import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Button, Field, HStack, NativeSelect, Text } from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

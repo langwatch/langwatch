@@ -1,4 +1,12 @@
-import { Card, EmptyState, GridItem, Heading, HStack, SimpleGrid, VStack } from "@chakra-ui/react";
+import {
+  Card,
+  EmptyState,
+  GridItem,
+  Heading,
+  HStack,
+  SimpleGrid,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";

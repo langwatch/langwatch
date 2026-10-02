@@ -24,6 +24,9 @@ export function computeScheduledFor(input: {
   }
 
   const windowMs = CADENCE_WINDOW_MS[input.cadence];
+  // A stored cadence this build does not know degrades to immediate, as next-firing reads it,
+  // rather than scheduling for NaN.
+  if (!windowMs) return input.now;
 
   return Temporal.Instant.fromEpochMilliseconds(
     (Math.floor(input.now.epochMilliseconds / windowMs) + 1) * windowMs,

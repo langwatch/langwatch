@@ -1,8 +1,5 @@
-import {
-  type LangyProgressSample,
-  type LangyTurnMetric,
-  useLangyStore,
-} from "@langwatch/langy-browser-kit";
+import { type LangyProgressSample, type LangyTurnMetric } from "../model/values/langy-turn.ts";
+import { useLangyStore } from "./langy.store.ts";
 
 export interface LangyTurnSignals {
   /** From `status_reported` — e.g. "Analysing 1,204 traces". */

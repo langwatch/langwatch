@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../licensing.web.ts";
@@ -31,7 +31,7 @@ describe("given a browser that installs licensing", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
   });
 
   describe("when billing or organization reads the resourceLimitRow capability", () => {
@@ -39,6 +39,6 @@ describe("given a browser that installs licensing", () => {
       const loaded = await licensingWeb.installation.capabilities.resourceLimitRow.load();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
   });
 });

@@ -1,7 +1,7 @@
 /** Inline failure display (harvested from platform/app). Registry and ErrorActions
  * are later slice; uses generic line for unknown codes. */
 
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error.ts";

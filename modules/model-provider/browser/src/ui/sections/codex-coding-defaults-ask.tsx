@@ -1,4 +1,3 @@
-import { Button, Text } from "@chakra-ui/react";
 import {
   DialogBody,
   DialogContent,
@@ -8,42 +7,21 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { isCodexModel, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { useEffect } from "react";
-import { create } from "zustand";
 
+import {
+  type CodexCodingDefaultsAskState,
+  useCodexCodingDefaultsAskStore,
+} from "../../behavior/codex-coding-defaults-ask.store.ts";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useResolvedDefaultModel } from "../../behavior/use-resolved-default-model.ts";
 import {
   useModelProviderHost,
   type ModelProviderHostApi,
 } from "../../model/model-provider-host.ts";
 import type { ScopeAssignment } from "../../model/scope-assignment.ts";
-
-/**
- * Settings asks post-connect (unlike Langy/onboarding, which set it inline) since adding a row
- * isn't necessarily choosing org defaults. Queued here, not shown in-drawer, because the drawer
- * closes the moment connect completes and would unmount a dialog mid-question.
- */
-
-interface CodexCodingDefaultsAsk {
-  projectId: string;
-  /** The scopes the sign-in just saved the provider row at. */
-  scopes: ScopeAssignment[];
-}
-
-interface CodexCodingDefaultsAskState {
-  pending: CodexCodingDefaultsAsk | null;
-  request: (ask: CodexCodingDefaultsAsk) => void;
-  clear: () => void;
-}
-
-export const useCodexCodingDefaultsAskStore = create<CodexCodingDefaultsAskState>(
-  (set): CodexCodingDefaultsAskState => ({
-    pending: null,
-    request: (ask: CodexCodingDefaultsAsk) => set({ pending: ask }),
-    clear: () => set({ pending: null }),
-  }),
-);
 
 /**
  * Mounted once on the model-providers settings page. Renders the queued ask,
@@ -56,13 +34,11 @@ export function CodexCodingDefaultsAskHost() {
   );
   const clear = useCodexCodingDefaultsAskStore((state: CodexCodingDefaultsAskState) => state.clear);
 
-  const resolvedDefault = modelProviderApi.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: pending?.projectId ?? "",
-      featureKey: LANGY_CHAT_FEATURE_KEY,
-    },
-    { enabled: !!pending },
-  );
+  const resolvedDefault = useResolvedDefaultModel({
+    projectId: pending?.projectId,
+    featureKey: LANGY_CHAT_FEATURE_KEY,
+    enabled: !!pending,
+  });
 
   // "Definitely codex already" is the only reason to skip; while the resolver
   // is still loading nothing renders, and a resolver error falls through to

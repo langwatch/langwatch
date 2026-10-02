@@ -1,10 +1,17 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Popover } from "@langwatch/design-system/popover";
 /**
  * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
  */
-import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { RowHeightMode } from "@langwatch/dataset-browser-kit";
-import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";
@@ -12,6 +19,7 @@ import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import type { RowHeightMode } from "../../../model/dataset/dataset-table-context.tsx";
 import { DEFAULT_CONCURRENCY } from "../../../model/experiments-v3/types.ts";
 import { RunViaApiDialogContainer } from "./run-via-api-button.tsx";
 
@@ -54,9 +62,11 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
   const [inputValue, setInputValue] = useState(value.toString());
 
   // Sync input when value changes externally
-  React.useEffect(() => {
+  const [valueFrom, setValueFrom] = useState(value);
+  if (valueFrom !== value) {
+    setValueFrom(value);
     setInputValue(value.toString());
-  }, [value]);
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);

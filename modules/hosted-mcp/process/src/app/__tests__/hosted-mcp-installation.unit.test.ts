@@ -1,24 +1,25 @@
 import { createServer, type Server } from "node:http";
 
 import { RawHttpHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
  * The hosted MCP feature, booted over its store members and peers alone.
  */
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { hostedMcpServer } from "../../hosted-mcp.server.ts";
+import { hostedMcpProcessModule } from "../../hosted-mcp.module.ts";
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([hostedMcpServer])
+    .withModules([hostedMcpProcessModule])
     .withMember("keyvalue", null)
     .withMember("encryption", {
       encrypt: (value: string) => value,
@@ -27,6 +28,7 @@ function process() {
     .withMember("publicBaseUrl", "https://app.langwatch.ai")
     .provide({
       project: createApiFixture<ProjectApi>(),
+      auth: createApiFixture<AuthApi>(),
       authz: createApiFixture<AuthzApi>(),
       governance: createApiFixture<GovernanceRestApi>(),
     });
@@ -39,7 +41,7 @@ describe("hosted MCP app installation", () => {
 
     try {
       const app = runtime.service(HostedMcpApi);
-      expect(runtime.module(hostedMcpServer).provided).toBe(app);
+      expect(runtime.module(hostedMcpProcessModule).provided).toBe(app);
 
       const handler = app.createHandler();
       expect(handler.isMcpRoute("/mcp")).toBe(true);

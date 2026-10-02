@@ -1,3 +1,6 @@
+import { Avatar } from "@langwatch/design-system/avatar";
+import { HistoryIcon } from "@langwatch/design-system/history-icon";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   type BoxProps,
@@ -8,11 +11,8 @@ import {
   Tag,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Avatar } from "@langwatch/design-system/avatar";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
 import { useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 

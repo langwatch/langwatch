@@ -1,5 +1,5 @@
 import "../../model/ambient.d.ts";
-import { Box, IconButton, Input } from "@chakra-ui/react";
+import { Box, IconButton, Input } from "@langwatch/design-system/primitives";
 import { Eye, EyeOff } from "lucide-react";
 import type { Ref } from "react";
 import { useState } from "react";

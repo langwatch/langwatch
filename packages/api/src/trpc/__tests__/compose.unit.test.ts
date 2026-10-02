@@ -4,11 +4,10 @@
  * both fragments are still in view.
  */
 
-import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
 import { composeTrpcRouters, type ComposableTrpcRouter } from "../compose.ts";
 import {
   createTrpcRuntime,

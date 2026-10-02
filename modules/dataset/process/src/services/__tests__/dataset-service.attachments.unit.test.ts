@@ -1,12 +1,12 @@
-/**
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
   type StoredObjectMetadata,
 } from "@langwatch/stored-object-contract";
+/**
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

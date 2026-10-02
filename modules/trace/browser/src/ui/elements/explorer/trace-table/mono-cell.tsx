@@ -1,4 +1,4 @@
-import { Text, type TextProps } from "@chakra-ui/react";
+import { Text, type TextProps } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export const MonoCell: React.FC<TextProps> = ({ children, ...rest }) => (

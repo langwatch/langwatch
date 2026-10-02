@@ -1,6 +1,15 @@
-import { Badge, Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Separator,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
@@ -68,9 +77,11 @@ export function GuardrailAttachmentsSection({
   const serverAttachedIds = useMemo(() => flattenAttachedIds(attachments), [attachments]);
   const [checked, setChecked] = useState<Set<string>>(serverAttachedIds);
 
-  useEffect(() => {
+  const [attachedFrom, setAttachedFrom] = useState(serverAttachedIds);
+  if (attachedFrom !== serverAttachedIds) {
+    setAttachedFrom(serverAttachedIds);
     setChecked(new Set(serverAttachedIds));
-  }, [serverAttachedIds]);
+  }
 
   const guardrailsQuery = api.gatewayGuardrails.list.useQuery(
     { projectId: projectId ?? "" },

@@ -4,7 +4,7 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { Button, Input, Text } from "@chakra-ui/react";
+import { Button, Input, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useEffect, useState } from "react";
 

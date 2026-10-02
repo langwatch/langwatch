@@ -50,11 +50,9 @@ export type { TraceProcessingPipelineDefinition } from "../eventing/trace-proces
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -431,7 +429,6 @@ export const traceDependencies = {
    */
   apiKeys: ApiKeyApi,
   authz: AuthzApi,
-  automations: AutomationApi,
   codingAgents: CodingAgentApi,
   dataPrivacy: DataPrivacyApi,
   dataRetention: DataRetentionApi,
@@ -450,8 +447,6 @@ export const traceDependencies = {
   share: ShareApi,
   storedObjects: StoredObjectApi,
   topics: TopicApi,
-  /** Told the project's first trace, for product analytics (§9). */
-  nurturing: NurturingApi,
 };
 
 export type TraceInfrastructure = Readonly<{

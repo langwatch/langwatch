@@ -38,7 +38,7 @@ Rule: Summary tab accordion layout
 
   Scenario: Summary tab is active by default when the drawer opens
     When the drawer opens with no `drawer.span` and no `drawer.tab` URL hint
-    Then `drawerStore.activeTab === "summary"`
+    Then the summary tab is active
     And `<TraceSummaryAccordions>` renders below the SpanTabBar
 
   Scenario: Returning to the summary tab from a span tab

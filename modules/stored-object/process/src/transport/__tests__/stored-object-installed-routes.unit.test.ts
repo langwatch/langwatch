@@ -1,19 +1,20 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { Logger } from "@langwatch/observability";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 /**
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-object-file-routes.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { createApp } from "@langwatch/kernel";
-import type { Logger } from "@langwatch/observability";
-import { memoryStores } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { storedObjectServer } from "../../stored-object.server.ts";
+import { storedObjectProcessModule } from "../../stored-object.module.ts";
 import { storedObjectFileRest } from "../stored-object-file.rest.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = "project_1";
 const OBJECT_ID = "so_absent";
@@ -25,7 +26,7 @@ type Scripted = {
 
 function installed({ authz, allowed = true }: Scripted) {
   return createApp({ role: "api" })
-    .withModules([storedObjectServer])
+    .withModules([storedObjectProcessModule])
     .withConfig({
       "stored-object": {
         azureSpoolRetentionConfirmed: false,
@@ -71,9 +72,9 @@ function restHost(): RestHost {
     identities: {
       project: projectDoor,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -91,7 +92,7 @@ async function readThroughInstalledModule({
 
   try {
     const host = restHost();
-    const provided = runtime.module(storedObjectServer).provided;
+    const provided = runtime.module(storedObjectProcessModule).provided;
     host.mount(storedObjectFileRest.router(), () => provided);
 
     const response = await host.app.request(new Request(`http://api.test${path}`, { headers }));

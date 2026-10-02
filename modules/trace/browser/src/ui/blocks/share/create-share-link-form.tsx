@@ -1,5 +1,12 @@
-import { Button, createListCollection, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { shareVisibilitySchema, type ShareVisibility } from "@langwatch/share-contract";
 import { useState } from "react";

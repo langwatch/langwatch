@@ -5,8 +5,8 @@
  * @see modules/annotation/specs/annotation-queue-workflow.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -89,10 +89,8 @@ const TRACE = {
 };
 
 function renderConversation(conversationId: string | null) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationQueueConversation traceId="trace-1" conversationId={conversationId} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotationQueueConversation traceId="trace-1" conversationId={conversationId} />,
   );
 }
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The `/api/internal/gateway` family on a runtime standing in for the
  * process: no framework credential, the family's own HMAC gate, the Go
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 

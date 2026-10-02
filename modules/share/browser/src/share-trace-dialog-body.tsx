@@ -1,4 +1,4 @@
-import { Separator, VStack } from "@chakra-ui/react";
+import { Separator, VStack } from "@langwatch/design-system/primitives";
 
 import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form.tsx";
 import type { ShareLinkView } from "./share-link-status.ts";

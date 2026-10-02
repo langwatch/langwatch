@@ -1,4 +1,4 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { CheckCircle, Plus } from "lucide-react";
 
 export type EvaluatorListEmptyStateProps = {

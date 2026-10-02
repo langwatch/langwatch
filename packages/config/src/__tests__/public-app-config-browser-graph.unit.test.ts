@@ -12,11 +12,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const readSource = (relative: string) => readFileSync(resolve(here, "..", relative), "utf8");
 
 /**
- * The browser's reader, in ui-kernel. Read across the workspace on purpose:
+ * The browser's reader, in browser. Read across the workspace on purpose:
  * the edge spans two packages and a guard must check both of them.
  */
 const readApplicationReader = () =>
-  readFileSync(resolve(here, "..", "..", "..", "ui-kernel", "src", "public-config.ts"), "utf8");
+  readFileSync(resolve(here, "..", "..", "..", "browser", "src", "public-config.ts"), "utf8");
 
 describe("given the browser's public-config reader", () => {
   describe("when it is imported by client code", () => {

@@ -1,4 +1,4 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import { LuSend, LuSquare } from "react-icons/lu";
 
 /**

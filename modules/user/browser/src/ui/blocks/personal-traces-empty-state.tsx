@@ -1,7 +1,15 @@
 /**
  * Empty state for /me "Recent activity", with personal-user-specific trace sources.
  */
-import { Box, chakra, Flex, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  Flex,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Bot, KeyRound, Webhook } from "lucide-react";
 import type React from "react";
 

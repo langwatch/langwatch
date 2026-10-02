@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
@@ -167,9 +167,12 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
   const isActive = currentFrom !== undefined || currentTo !== undefined;
   const span = max - min || 1;
 
-  useEffect(() => {
+  const propsKey = `${currentFrom}|${currentTo}|${min}|${max}`;
+  const [valueFrom, setValueFrom] = useState(propsKey);
+  if (valueFrom !== propsKey) {
+    setValueFrom(propsKey);
     setLocalValue([currentFrom ?? min, currentTo ?? max]);
-  }, [currentFrom, currentTo, min, max]);
+  }
 
   useEffect(
     () => () => {

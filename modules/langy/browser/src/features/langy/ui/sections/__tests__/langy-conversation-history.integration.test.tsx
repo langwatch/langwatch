@@ -101,15 +101,6 @@ const projectRef = {
 // release_ui_langy_peek_dock_enabled). This suite is about conversation
 // history, not the closed state, so pin the flag off (the classic launcher) —
 // the same render path this suite had before the flag landed.
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
 
 // Hoisted so the mock factory below can share it, and so assertions can hold
 // this reference directly instead of extracting the real module's
@@ -330,13 +321,14 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   return { api: withFallback(explicitApi) };
 });
 
-import { useLangyStore, LangyProvider } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyDeletedConversationsStore } from "../../../behavior/stores/langy-deleted-conversations.store.ts";
 import { LangySidecar } from "../langy-panel.tsx";
 
 // ---------------------------------------------------------------------------
@@ -494,6 +486,7 @@ async function deleteRecentOption(option: HTMLElement): Promise<void> {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  useLangyDeletedConversationsStore.setState({ ids: new Set<string>() });
   projectRef.current = { id: "project-demo", slug: "demo" };
   chatRef.messages = [];
   chatRef.status = "ready";

@@ -1,13 +1,12 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { RoleApi } from "@langwatch/role-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { roleServer } from "../../role.server.ts";
+import { roleProcessModule } from "../../role.module.ts";
 import { testPlan, testRolePrisma } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -27,15 +26,14 @@ function process(role: "api" | "worker") {
     ],
   });
   const organization = createApiFixture<OrganizationApi>();
-  const user = createApiFixture<UserApi>();
   const entitlement = createApiFixture<EntitlementApi>({
     getActivePlan: async () => testPlan(),
   });
 
   return createApp({ role })
-    .withModules([withMemoryRepositories(roleServer)])
+    .withModules([withMemoryRepositories(roleProcessModule)])
     .withRelational(testRolePrisma())
-    .provide({ authz, organization, user, entitlement });
+    .provide({ authz, organization, entitlement });
 }
 
 describe("role app installation", () => {
@@ -45,7 +43,7 @@ describe("role app installation", () => {
     try {
       const app = runtime.service(RoleApi);
 
-      expect(runtime.module(roleServer).provided).toBe(app);
+      expect(runtime.module(roleProcessModule).provided).toBe(app);
       await expect(
         app.listRoles({ organizationId: ORGANIZATION_ID, builtIn: false }),
       ).resolves.toMatchObject([{ id: "role-1", name: "Auditor", kind: "custom" }]);

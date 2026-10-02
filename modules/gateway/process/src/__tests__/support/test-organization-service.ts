@@ -47,7 +47,7 @@ export class TestOrganizationService extends OrganizationService {
   addGroupMember = unsupported<OrganizationService["addGroupMember"]>();
   removeGroupMember = unsupported<OrganizationService["removeGroupMember"]>();
   listGroupBindings = unsupported<OrganizationService["listGroupBindings"]>();
-  addGroupBinding = unsupported<OrganizationService["addGroupBinding"]>();
-  removeGroupBinding = unsupported<OrganizationService["removeGroupBinding"]>();
+  addGroupGrant = unsupported<OrganizationService["addGroupGrant"]>();
+  removeGroupGrant = unsupported<OrganizationService["removeGroupGrant"]>();
   applyGroupEdits = unsupported<OrganizationService["applyGroupEdits"]>();
 }

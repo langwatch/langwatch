@@ -5,7 +5,8 @@
  * Spec: specs/model-providers/providers-without-a-project.feature
  */
 
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
+import type * as providerScopeChipsModule from "@langwatch/design-system/provider-scope-chips";
+import type * as scopeFilterModule from "@langwatch/design-system/scope-filter";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,13 +66,22 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("@langwatch/design-system/scope-filter", async () => {
+  const actual = await vi.importActual<typeof scopeFilterModule>(
+    "@langwatch/design-system/scope-filter",
   );
   return {
     ...actual,
     ScopeFilter: () => <div data-testid="scope-filter" />,
+  };
+});
+
+vi.mock("@langwatch/design-system/provider-scope-chips", async () => {
+  const actual = await vi.importActual<typeof providerScopeChipsModule>(
+    "@langwatch/design-system/provider-scope-chips",
+  );
+  return {
+    ...actual,
     ProviderScopeChips: ({ scopes }: { scopes?: { scopeType: string; name?: string }[] }) => (
       <div
         data-testid="provider-scope-chips"

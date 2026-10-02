@@ -1,20 +1,16 @@
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * `/api/auth/cli`: who each route admits, in which order, and the
- * `{ error, error_description }` bodies released `langwatch` builds parse. The
- * bearer itself is refused at the CLI token door, in the framework's body.
- * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   canonicalErrorResponse,
   CliTokenIdentity,
   createRestRuntime,
   type CliTokenHolder,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import {
+  NoEligibleProvidersError,
+  PersonalVirtualKeyAlreadyExistsError,
+  type EnterpriseGatewayApi,
+} from "@langwatch/enterprise-gateway-contract";
 import {
   IngestionKeyNotFoundError,
   IngestionKeySourceNotAllowedError,
@@ -25,6 +21,14 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * `/api/auth/cli`: who each route admits, in which order, and the
+ * `{ error, error_description }` bodies released `langwatch` builds parse. The
+ * bearer itself is refused at the CLI token door, in the framework's body.
+ * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -47,7 +51,7 @@ const BEARER = "Bearer lw_at_token";
 
 const TOKEN_KEY = "lwcli:access:lw_at_token";
 
-const HOLDER: CliTokenHolder = {
+const HOLDER = {
   userId: USER_ID,
   organizationId: ORGANIZATION_ID,
   tokenKey: TOKEN_KEY,
@@ -77,7 +81,7 @@ type World = {
   templates?: Partial<Pick<IngestionTemplateService, "listForUser">>;
   users?: Partial<Pick<UserApi, "findById">>;
   organizations?: Partial<Pick<OrganizationApi, "isMember">>;
-  projects?: Partial<Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">>;
+  projects?: Partial<Pick<ProjectApi, "findLiveByRef">>;
   budgets?: Partial<Pick<GatewayApi, "checkBudget" | "budgetOverviewForUser">>;
   verify?: () => Promise<CliTokenHolder>;
   planType?: string;
@@ -122,8 +126,7 @@ function mountCli(world: World = {}) {
     isMember: vi.fn().mockResolvedValue(true),
     ...world.organizations,
   });
-  const projects = createApiFixture<Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">>({
-    findLiveBySlug: vi.fn().mockResolvedValue([PROJECT]),
+  const projects = createApiFixture<Pick<ProjectApi, "findLiveByRef">>({
     findLiveByRef: vi.fn().mockResolvedValue([PROJECT]),
     ...world.projects,
   });
@@ -207,7 +210,6 @@ function mountCli(world: World = {}) {
       cliBudgetOverview: (input) => cli.budgetOverview(input),
       cliPersonalProject: (input) => cli.personalProject(input),
       cliVirtualKey: (input) => cli.virtualKey(input),
-      cliProjectKey: (input) => cli.projectKey(input),
       cliIngestionSources: (input) => cli.ingestionSources(input),
       cliIngestionSourceEvents: (input) => cli.ingestionSourceEvents(input),
       cliIngestionSourceHealth: (input) => cli.ingestionSourceHealth(input),
@@ -330,59 +332,6 @@ describe("the CLI governance plane", () => {
     });
   });
 
-  describe("given a caller who can update but not administer the project", () => {
-    /** @scenario A project member cannot read the base key */
-    it("refuses the handout and discloses no base API key", async () => {
-      const api = mountCli({ permittedOnProject: vi.fn().mockResolvedValue(false) });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
-
-      expect(response.status).toBe(403);
-      expect(await response.text()).not.toContain(PROJECT.apiKey);
-    });
-
-    it("asks for project:manage, not project:update", async () => {
-      const api = mountCli({ permittedOnProject: vi.fn().mockResolvedValue(false) });
-
-      await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
-
-      expect(api.permittedOnProject).toHaveBeenCalledWith({
-        userId: USER_ID,
-        projectId: PROJECT.id,
-        permission: "project:manage",
-      });
-    });
-  });
-
-  describe("given a caller who can administer the project", () => {
-    /** @scenario A signed-in project admin reads the base key */
-    it("returns the project's base API key", async () => {
-      const api = mountCli();
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        api_key: PROJECT.apiKey,
-        project: { id: PROJECT.id, slug: PROJECT.slug, name: PROJECT.name },
-      });
-    });
-
-    it("answers not_found for a slug no project in the organization carries", async () => {
-      const api = mountCli({
-        projects: { findLiveBySlug: vi.fn().mockResolvedValue([]) },
-      });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: "elsewhere" });
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({
-        error: "not_found",
-        error_description: 'No project with slug "elsewhere" in your organization',
-      });
-    });
-  });
-
   describe("when the CLI mints a personal ingestion key", () => {
     /** @scenario A personal key is minted only for a tool the CLI wraps */
     it("answers 400 for a source type no wrapped tool stamps, and mints nothing", async () => {
@@ -423,6 +372,148 @@ describe("the CLI governance plane", () => {
       expect(ingestionKeyIssueForPersonalProject).toHaveBeenCalledWith(
         expect.objectContaining({ createdByDeviceLabel: "laptop", fromCliSession: true }),
       );
+    });
+  });
+
+  describe("when the CLI asks for a personal virtual key", () => {
+    const workspace = {
+      team: { id: "team-personal" },
+      project: { id: "project-personal", slug: "personal-bob", name: "Bob", apiKey: "pk" },
+    };
+
+    /** @scenario A second machine asks for a key of its own */
+    it("issues a further key named after the device once the default exists", async () => {
+      const personalVirtualKeyIssue = vi.fn().mockResolvedValue({
+        virtualKey: { id: "vk_desktop", displayPrefix: "lw_vk_desk" },
+        secret: "lw_vk_desk_secret",
+      });
+      const api = mountCli({
+        personalKeys: {
+          personalVirtualKeyEnsureDefault: vi
+            .fn()
+            .mockRejectedValue(new PersonalVirtualKeyAlreadyExistsError("vk_default")),
+          personalVirtualKeyIssue,
+        },
+        ensurePersonalWorkspace: async () => workspace,
+      });
+
+      const response = await api.post("/api/auth/cli/virtual-key", { device_label: "desktop" });
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        id: "vk_desktop",
+        secret: "lw_vk_desk_secret",
+        prefix: "lw_vk_desk",
+      });
+      expect(personalVirtualKeyIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID, label: "device-desktop" }),
+      );
+    });
+
+    /** @scenario Asking for a personal virtual key with no providers configured is refused */
+    it("answers 409 no_eligible_providers and issues no key", async () => {
+      const personalVirtualKeyIssue = vi.fn();
+      const api = mountCli({
+        personalKeys: {
+          personalVirtualKeyEnsureDefault: vi
+            .fn()
+            .mockRejectedValue(new NoEligibleProvidersError("org_1")),
+          personalVirtualKeyIssue,
+        },
+      });
+
+      const response = await api.post("/api/auth/cli/virtual-key", {});
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({ error: "no_eligible_providers" });
+      expect(personalVirtualKeyIssue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the CLI mints an ingestion key for a named project", () => {
+    const issued = { token: "ik-lw-abc_secret", prefix: "ik-lw-abc" };
+    const mintFor = (project: string) => ({ source_type: "internal_codex", project });
+
+    /** @scenario The CLI mints an ingestion key for a project named by id */
+    it("answers 201 with the token, endpoint and resolved project, bound to that project", async () => {
+      const issueForProject = vi.fn().mockResolvedValue(issued);
+      const api = mountCli({ ingestionKeys: { issueForProject } });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.id),
+      );
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        ...issued,
+        endpoint: "https://app.test/api/otel",
+        project: { id: PROJECT.id, slug: PROJECT.slug, name: PROJECT.name },
+      });
+      expect(issueForProject).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT.id, ownerUserId: null }),
+      );
+    });
+
+    /** @scenario The CLI mints an ingestion key for a project named by slug */
+    it("resolves the reference inside the caller's organization, so a slug works too", async () => {
+      const findLiveByRef = vi.fn().mockResolvedValue([PROJECT]);
+      const api = mountCli({
+        ingestionKeys: { issueForProject: vi.fn().mockResolvedValue(issued) },
+        projects: { findLiveByRef },
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.slug),
+      );
+
+      expect(response.status).toBe(201);
+      expect(findLiveByRef).toHaveBeenCalledWith({
+        projectRef: PROJECT.slug,
+        organizationId: ORGANIZATION_ID,
+      });
+    });
+
+    /** @scenario Minting into a project the caller cannot write to is refused */
+    it("answers 403 forbidden and mints nothing without traces:create on it", async () => {
+      const issueForProject = vi.fn();
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        permittedOnProject: vi.fn().mockResolvedValue(false),
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.slug),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "forbidden" });
+      expect(api.permittedOnProject).toHaveBeenCalledWith({
+        userId: USER_ID,
+        projectId: PROJECT.id,
+        permission: "traces:create",
+      });
+      expect(issueForProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A project in another organization is not found */
+    it("answers 404 project_not_found for a project its organization does not hold", async () => {
+      const issueForProject = vi.fn();
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        projects: { findLiveByRef: vi.fn().mockResolvedValue([]) },
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor("other-co-api"),
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "project_not_found" });
+      expect(issueForProject).not.toHaveBeenCalled();
     });
   });
 
@@ -599,30 +690,8 @@ const OFFBOARDED = { isMember: vi.fn().mockResolvedValue(false) };
 describe("the CLI credential routes' tenancy boundary", () => {
   describe("given a caller who can administer their own personal project", () => {
     /** @scenario GET /api/auth/cli/personal-project returns the caller's personal project */
-    it("returns its id, slug, name and api_key", async () => {
+    it("returns its id, slug and name, never a key", async () => {
       const api = mountCli({ ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE });
-
-      const response = await api.get("/api/auth/cli/personal-project");
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        project: {
-          id: "project_personal",
-          slug: "bob",
-          name: "Bob",
-          api_key: "lw-personal-key-secret",
-        },
-      });
-    });
-  });
-
-  describe("given a caller who cannot administer their own personal project", () => {
-    /** @scenario GET /api/auth/cli/personal-project withholds the key without breaking the session */
-    it("answers the identity alone, with no api_key, and does not revoke the session", async () => {
-      const api = mountCli({
-        ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE,
-        permittedOnProject: vi.fn().mockResolvedValue(false),
-      });
 
       const response = await api.get("/api/auth/cli/personal-project");
 
@@ -630,12 +699,22 @@ describe("the CLI credential routes' tenancy boundary", () => {
       await expect(response.json()).resolves.toEqual({
         project: { id: "project_personal", slug: "bob", name: "Bob" },
       });
-      expect(api.permittedOnProject).toHaveBeenCalledWith({
-        userId: USER_ID,
-        projectId: "project_personal",
-        permission: "project:manage",
+    });
+  });
+
+  describe("given an old CLI asking for a project key", () => {
+    /** @scenario An old CLI asking for a project key is told to upgrade */
+    it("answers 410 gone with the upgrade hint", async () => {
+      const api = mountCli({ ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE });
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
+
+      expect(response.status).toBe(410);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "gone",
+        error_description:
+          "This version of the LangWatch CLI is too old to log in to a project. Run: npm i -g langwatch@latest",
       });
-      expect(api.revoke).not.toHaveBeenCalled();
     });
   });
 
@@ -693,63 +772,6 @@ describe("the CLI credential routes' tenancy boundary", () => {
       expect(response.status).toBe(403);
       expect(ensure).not.toHaveBeenCalled();
       expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
-    });
-  });
-
-  describe("given a token whose user is not an active member of the token's organization", () => {
-    /** @scenario POST /api/auth/cli/project-key applies the same membership boundary */
-    it("answers 403, returns no project key and revokes the presented token", async () => {
-      const api = mountCli({ organizations: OFFBOARDED });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
-
-      expect(response.status).toBe(403);
-      expect(await response.text()).not.toContain(PROJECT.apiKey);
-      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
-    });
-  });
-});
-
-describe("the CLI project-key route and personal projects", () => {
-  const PERSONAL = { ...PROJECT, slug: "bob", isPersonal: true, ownerUserId: USER_ID };
-
-  describe("given a project the caller cannot manage", () => {
-    /** @scenario the project-key endpoint refuses a project the caller cannot manage */
-    it("answers 403 and returns no key", async () => {
-      const api = mountCli({ permittedOnProject: vi.fn().mockResolvedValue(false) });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
-
-      expect(response.status).toBe(403);
-      expect(await response.text()).not.toContain(PROJECT.apiKey);
-    });
-  });
-
-  describe("given the caller's own personal project slug", () => {
-    /** @scenario the project-key endpoint returns the caller's own personal project key */
-    it("returns the personal project's api key", async () => {
-      const api = mountCli({ projects: { findLiveBySlug: vi.fn().mockResolvedValue([PERSONAL]) } });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ api_key: PROJECT.apiKey });
-    });
-  });
-
-  describe("given another user's personal project slug", () => {
-    /** @scenario the project-key endpoint refuses another user's personal project */
-    it("answers 400 personal_project_not_allowed and asks nothing of the permission model", async () => {
-      const other = { ...PERSONAL, ownerUserId: "user_2" };
-      const api = mountCli({ projects: { findLiveBySlug: vi.fn().mockResolvedValue([other]) } });
-
-      const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
-
-      const body = await response.text();
-      expect(response.status).toBe(400);
-      expect(body).toContain('"error":"personal_project_not_allowed"');
-      expect(body).not.toContain(PROJECT.apiKey);
-      expect(api.permittedOnProject).not.toHaveBeenCalled();
     });
   });
 });

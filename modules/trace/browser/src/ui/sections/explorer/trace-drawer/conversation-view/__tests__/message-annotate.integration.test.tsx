@@ -2,15 +2,17 @@
  * The boxed action cluster each message of a turn carries.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({ canManageAnnotations: true }));
 
-vi.mock("../../scenario-roles.tsx", async () => {
-  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
+vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+  const actual = await vi.importActual<typeof scenarioRolesModule>(
+    "../../../../../../behavior/scenario-role.store.tsx",
+  );
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -57,9 +59,9 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
+import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
-import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 import type { TurnLayout } from "../types.ts";
 
@@ -116,22 +118,20 @@ function renderTurn({
   userText = "a question",
   assistantText = "the original answer",
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ChatTurnRow
-        layout={layout}
-        turn={turnItem}
-        userText={userText}
-        assistantText={assistantText}
-        assistantReasoning=""
-        gapSecs={0}
-        shouldShowGap={false}
-        index={1}
-        isCurrent={false}
-        onSelect={() => undefined}
-        anchoredAnnotationItems={anchoredAnnotationItems}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ChatTurnRow
+      layout={layout}
+      turn={turnItem}
+      userText={userText}
+      assistantText={assistantText}
+      assistantReasoning=""
+      gapSecs={0}
+      shouldShowGap={false}
+      index={1}
+      isCurrent={false}
+      onSelect={() => undefined}
+      anchoredAnnotationItems={anchoredAnnotationItems}
+    />,
   );
 }
 

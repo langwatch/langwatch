@@ -1,6 +1,6 @@
 /** Summary cards for varied-shape summaries; composable, non-querying. */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { GOVERNANCE_SUMMARY_UNMEASURED } from "./governance-summary-bar.tsx";

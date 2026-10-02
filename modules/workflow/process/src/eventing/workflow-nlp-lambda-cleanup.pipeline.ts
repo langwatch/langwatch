@@ -11,7 +11,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { WorkflowApp } from "../app/workflow.app.ts";
+import type { WorkflowModule } from "../app/workflow.app.ts";
 import type { WorkflowRepositories } from "../repositories/workflow-repositories.registry.ts";
 import {
   NLP_LAMBDA_CLEANUP_INTERVAL_MS,
@@ -51,7 +51,7 @@ export function buildNlpLambdaCleanupPipeline(
 
 export const workflowNlpLambdaCleanupEventing = defineEventingModule({
   pipeline: NLP_LAMBDA_CLEANUP_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<WorkflowRepositories, WorkflowApp>) =>
+  build: ({ app, processStore }: EventingSetup<WorkflowRepositories, WorkflowModule>) =>
     app.nlpLambdaCleanupPipeline({
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
     }),

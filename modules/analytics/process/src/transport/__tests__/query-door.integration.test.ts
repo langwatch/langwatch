@@ -14,13 +14,15 @@ import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { mountQueryDoor } from "./query-door.harness.ts";
 
 const DATABASE = "analytics";
 const TENANT = { id: "project-a", lwqlKey: "lwql-key-a" };
 const PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
@@ -51,6 +53,7 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
     executor,
     database: DATABASE,
     views: [...LWQL_VIEW_CATALOG, GATED_DATASET],
+    catalog: { ...LWQL_CATALOG, [GATED_DATASET.name]: LWQL_CATALOG.traces },
   });
   const door = mountQueryDoor({ tenant: () => TENANT, service: () => service, protections });
 

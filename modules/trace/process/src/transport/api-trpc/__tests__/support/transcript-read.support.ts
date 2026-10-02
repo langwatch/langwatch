@@ -1,12 +1,12 @@
 // Real implementations everywhere; only the two stores are mocked.
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
 } from "@langwatch/data-privacy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
@@ -26,7 +26,7 @@ import {
 import type { TracesReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 
-// Real TraceApp required: readSpans decides tenant key and visibility cutoff.
+// Real TraceModule required: readSpans decides tenant key and visibility cutoff.
 export function createTranscriptApp(
   codingAgents: CodingAgentApi,
   protections?: Partial<TraceViewerProtectionService>,

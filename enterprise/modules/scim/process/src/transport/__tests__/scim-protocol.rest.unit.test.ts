@@ -7,7 +7,12 @@
  * The /Schemas discovery copy is what an identity-provider administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { bindRestMiddleware, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  bindRestMiddleware,
+  RestHost,
+  scimCredentialOfRequest,
+} from "@langwatch/api/rest";
 import {
   ScimProtocolError,
   ScimWriteOutsideConnectionError,
@@ -22,6 +27,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 type PublishedSchema = Readonly<{
   type?: string;
@@ -109,40 +115,19 @@ function mount(
 ) {
   const scim = options.scim ?? new DirectoryFake();
   const { app } = scimTestApp({ scim, connections: options.connections });
-  const directories = new WeakMap<Request, { connectionId: string | null }>();
   const closed: RestIdentity = {
     authenticate: () => {
       throw new Error("Only the directory door answers this family.");
     },
-  };
-  const door: RestIdentity = {
-    authenticate: () => {
-      throw new Error("This family resolves its own credential.");
-    },
-    identify: ({ request }) =>
-      app
-        .authenticateDirectory({
-          authorization: request.headers.get("authorization"),
-          method: request.method,
-          path: new URL(request.url).pathname,
-        })
-        .then((directory) => {
-          directories.set(request, { connectionId: directory.connectionId });
-
-          return {
-            actor: { type: "api_key" as const, id: directory.id },
-            scope: { tier: "organization" as const, id: directory.organizationId },
-          };
-        }),
   };
 
   const host = RestHost.create({
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: door,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -151,12 +136,10 @@ function mount(
 
   host.mount(scimProtocolRest.router(), () => app, {
     facts: [
-      bindRestMiddleware(scimRestCredential, (c) => {
-        const directory = directories.get(c.req.raw);
-        if (!directory) throw new Error("The directory door resolved no credential");
-
-        return directory;
-      }),
+      bindRestCredential("scim_token", () => app.directoryDoor),
+      bindRestMiddleware(scimRestCredential, (c) => ({
+        connectionId: scimCredentialOfRequest(c.req.raw).connectionId,
+      })),
     ],
   });
 
@@ -868,7 +851,7 @@ describe("given the SCIM 2.0 protocol declaration", () => {
 
   describe("when the door each route answers behind is read", () => {
     it("keeps the three discovery routes public and the twelve behind the directory token", () => {
-      expect(declaration.credential).toBe("scimToken");
+      expect(declaration.credential).toBe("scim_token");
 
       const kinds = Object.fromEntries(
         declaration.routes.map((route) => [route.operation, route.access?.kind]),

@@ -4,9 +4,8 @@
  * `setFlowCallbacks` side channel: `onChange` is just a prop here.
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useEffect, useState } from "react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../../model/analytics-filter-params.ts";
@@ -25,11 +24,7 @@ export function SeriesFiltersDialog({
   filters?: Record<FilterField, FilterParam>;
   onChange: (input: { filters: Record<FilterField, FilterParam> }) => void;
 }) {
-  const [filters, setFilters] = useState(seriesFilters ?? emptyFilters);
-
-  useEffect(() => {
-    setFilters(seriesFilters ?? emptyFilters);
-  }, [seriesFilters]);
+  const filters = seriesFilters ?? emptyFilters;
 
   return (
     <Dialog.Root open={open} size="lg" onOpenChange={({ open: isOpen }) => onOpenChange(isOpen)}>
@@ -50,7 +45,6 @@ export function SeriesFiltersDialog({
                   Object.entries(next).filter(([, value]) => value !== void 0),
                 ) as Record<FilterField, FilterParam>;
                 onChange({ filters: updated });
-                setFilters(updated);
               }}
             />
           </VStack>

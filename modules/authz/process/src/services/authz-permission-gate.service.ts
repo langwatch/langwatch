@@ -7,25 +7,27 @@ import {
   LiteMemberRestrictedError,
   PermissionDeniedError,
   ProjectPermissionDeniedError,
+  type AuthzDeclaredScopeId,
+  type AuthzGetDecisionInput,
+  type AuthzGetProjectAnyDecisionInput,
+  type AuthzPermission,
+  type DeclaredScopeTier,
+  type PermissionDecision,
+  type PermissionScopeArg,
+  type TierOfScopeArg,
+} from "@langwatch/authorization";
+import {
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzCanAnyByIdsInput,
   type AuthzCanAnyByIdsOutput,
   type AuthzCheckByIdsInput,
   type AuthzCheckByIdsOutput,
-  type AuthzDeclaredScopeId,
   type AuthzGetApiKeyProjectDecisionInput,
-  type AuthzGetDecisionInput,
-  type AuthzGetProjectAnyDecisionInput,
-  type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzRequireProjectPermissionInput,
   type AuthzScopeRef,
   type Authorized,
-  type BindingScopeTier,
-  type PermissionDecision,
-  type PermissionScopeArg,
-  type TierOfScopeArg,
   AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
 
@@ -37,7 +39,7 @@ type ScopeIds = {
 
 /** The decision seams this gate composes, all owned by the service that constructs it. */
 type AuthzPermissionGateOptions = {
-  authorize: <Tier extends BindingScopeTier, Permission extends AuthzPermission>(input: {
+  authorize: <Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(input: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;

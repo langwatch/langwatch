@@ -1,7 +1,15 @@
-import { Alert, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Link } from "@langwatch/browser-host/link";
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { useEffect } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
@@ -175,8 +183,9 @@ function SignInErrorDescription({
       <Alert.Description>
         <VStack gap={1} align="start">
           <Text>
-            This email is already registered with a different sign-in method. To get back in, sign
-            out completely and sign in again using the method you used originally.
+            An account with this email address already exists, and this sign-in method can&apos;t be
+            added to it because the provider didn&apos;t confirm the address. Sign in with the
+            method you used before, then connect this one in Settings &gt; Security.
             <br />
             <br />
             If your organization uses single sign-on, enter your work email and choose your company

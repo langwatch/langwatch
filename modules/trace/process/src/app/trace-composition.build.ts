@@ -8,6 +8,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -22,10 +23,7 @@ import {
   type TraceDerivedEventsInput,
 } from "@langwatch/trace-contract";
 
-import type { TraceTenantBroadcastPublisher } from "../channels/redis/redis.trace-tenant-broadcast.channel.ts";
 import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
-import { traceTenantBroadcastChannels } from "../channels/trace-tenant-broadcast-channels.registry.ts";
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
@@ -57,6 +55,7 @@ import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
+import { TraceEdgeSpoolService } from "../services/trace-edge-spool.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
@@ -113,8 +112,6 @@ export type TraceCollaborators = Readonly<{
   blobStore: TraceBlobStoreService;
   summaryStore?: FoldProjectionStore<TraceSummaryData>;
   commands: TraceProcessingCommands;
-  /** Trace's own tenant pushes onto Redis; presence relays them in the serving process. */
-  tenantBroadcast: TraceTenantBroadcast;
   fallbackVisibilityDays: number;
   processName: string;
   publicBaseUrl?: string;
@@ -126,7 +123,6 @@ export type TraceCollaborators = Readonly<{
 export type TraceBuildMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   logger: Logger;
-  redis: TraceTenantBroadcastPublisher;
 }>;
 
 /** The config slice the deployment states for this module. */
@@ -166,7 +162,6 @@ export function buildTraceCollaborators(input: {
       logger: members.logger,
     }),
     commands: input.commands,
-    tenantBroadcast: traceTenantBroadcastChannels.live.create(members.redis),
     dedup: input.dedup,
     fallbackVisibilityDays: config.fallbackVisibilityDays,
     processName: config.processName,
@@ -235,7 +230,7 @@ export type TraceReaderCompositionOptions = {
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
   /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
-  tenantBroadcast: TraceTenantBroadcast;
+  tenantBroadcast: Pick<PresenceApi, "publishProjectEvent">;
   commands: TraceProcessingCommands;
   /**
    * The tier-effective request bounds the read graph clamps and refuses by.
@@ -294,7 +289,13 @@ export function composeTraceAppDependencies(
   const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
   const spanStorageRepository = options.repositories.spanStorage;
   const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
-  const edgeMedia = options.featureFlags
+  // ADR-022: media extraction first, then the whole-payload spool over 256 KB, as main ordered.
+  const edgeSpool = TraceEdgeSpoolService.create({
+    spool: options.blobStore,
+    logger: createLogger("langwatch:traces:edge-spool"),
+    featureFlags: options.featureFlags,
+  });
+  const payloads = options.featureFlags
     ? TraceEdgeMediaPayloadService.create({
         deps: {
           featureFlags: options.featureFlags,
@@ -304,8 +305,9 @@ export function composeTraceAppDependencies(
           service: TraceStoredMediaStoreService.create(options.storedObjects),
         },
         logger: createLogger("langwatch:traces:edge-media-extraction"),
+        next: edgeSpool,
       })
-    : undefined;
+    : edgeSpool;
   const logRecords = LogRecordStorageService.create({
     repository: options.repositories.logRecords,
     canonical: options.logs,
@@ -403,7 +405,7 @@ export function composeTraceAppDependencies(
       codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
       dedup: options.dedup,
       commands: TraceComposedIngressCommand.create(options.commands),
-      ...(edgeMedia ? { payloads: edgeMedia } : {}),
+      payloads,
     }),
     viewer: TraceViewerReadService.create({
       read,
@@ -564,7 +566,7 @@ export type TraceTreeCompositionOptions = {
   fullIo: TraceFullIo;
 };
 
-/** Where TraceApp builds the trace-tree read from its ClickHouse and query-value boundaries. */
+/** Where TraceModule builds the trace-tree read from its ClickHouse and query-value boundaries. */
 export class TraceTreeComposition {
   private constructor(private readonly options: TraceTreeCompositionOptions) {}
 

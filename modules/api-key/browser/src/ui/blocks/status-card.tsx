@@ -1,7 +1,7 @@
 // CLI authorize flow state message. Traces-v2 visual language. Role derived (alert vs status)
 // matters for screen readers (refusals interrupt; success/explanation are polite).
 
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export function StatusCard({

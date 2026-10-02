@@ -1,4 +1,4 @@
-export { agentServer } from "./agent.server.ts";
+export { agentProcessModule } from "./agent.module.ts";
 export { agentTrpcTransport } from "./transport/agent.trpc.ts";
 export { httpProxyTrpcTransport } from "./transport/http-proxy.trpc.ts";
 

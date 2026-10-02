@@ -1,6 +1,6 @@
 @adr-132
 Feature: The browser-node-leak policy
-  A browser-reachable package (a `*-contract`, `*-browser` or `*-browser-kit`
+  A browser-reachable package (a `*-contract` or `*-browser`
   package, or the Design System) that value-imports a Node builtin — even
   deep in its own dependency graph — throws when the browser bundle loads it.
   The importing file can be legitimate server code; the defect is that a
@@ -52,6 +52,6 @@ Feature: The browser-node-leak policy
 
   @unit
   Scenario: A server package outside the browser-reachable set is not reported
-    Given a process package, never a contract, browser or browser-kit package, imports "node:fs"
+    Given a process package, never a contract or browser package, imports "node:fs"
     When the browser-node-leak policy runs over the workspace
     Then it reports nothing

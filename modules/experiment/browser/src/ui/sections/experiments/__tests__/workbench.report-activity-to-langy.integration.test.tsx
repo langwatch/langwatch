@@ -3,8 +3,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-page-activity-narration.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execution = vi.hoisted(() => ({
@@ -93,7 +92,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
 // `stale-page-refuses-agent-actions`; this test only reads `useLangyStore`,
 // so the two hooks are stood down and everything else (including the store)
 // stays real.
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../langy/langy-page-context.tsx", async (importOriginal) => {
   const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
@@ -135,50 +134,76 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({}),
     evaluators: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
       delete: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
     prompts: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     dataset: { upsert: { useMutation: () => ({ mutate: vi.fn() }) } },
     datasetRecord: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
   },
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import type * as langyPageRegistrationModule from "@langwatch/langy-browser-kit";
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import {
+  LANGY_ABSENT_SURFACE,
+  LANGY_STORE_SLICE,
+  type LangySliceSurface,
+} from "@langwatch/langy-contract";
 
+// Stands in for Langy, the owner of the slice, which this package only reads.
+const langy = defineSlice<LangySliceSurface>({
+  name: LANGY_STORE_SLICE,
+  create: (set) => ({
+    ...LANGY_ABSENT_SURFACE,
+    setPageActivity: (pageActivity) => set({ pageActivity }),
+  }),
+});
+import type * as langyPageRegistrationModule from "../../langy/langy-page-context.tsx";
 import WorkbenchPage from "../workbench.screen.tsx";
 
-const reported = () => useLangyStore.getState().pageActivity;
+const reported = () => langy.getState().pageActivity;
 
 beforeEach(() => {
   execution.status = "idle";
   execution.progress = { completed: 0, total: 0 };
-  useLangyStore.getState().setPageActivity(null);
+  langy.getState().setPageActivity(null);
 });
 
 afterEach(() => {
-  useLangyStore.getState().setPageActivity(null);
+  langy.getState().setPageActivity(null);
   vi.clearAllMocks();
 });
 
 describe("given the workbench is open", () => {
   describe("when nothing is running", () => {
     it("reports nothing, leaving the line to the turn", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<WorkbenchPage />);
 
       expect(reported()).toBeNull();
     });
@@ -190,11 +215,7 @@ describe("given the workbench is open", () => {
       execution.status = "running";
       execution.progress = { completed: 12, total: 20 };
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<WorkbenchPage />);
 
       expect(reported()).toContain("12 of 20 cells");
     });
@@ -206,11 +227,7 @@ describe("given the workbench is open", () => {
       execution.status = "running";
       execution.progress = { completed: 5, total: 20 };
 
-      const view = render(
-        <ChakraProvider value={defaultSystem}>
-          <WorkbenchPage />
-        </ChakraProvider>,
-      );
+      const view = renderWithDesignSystem(<WorkbenchPage />);
       expect(reported()).not.toBeNull();
 
       view.unmount();

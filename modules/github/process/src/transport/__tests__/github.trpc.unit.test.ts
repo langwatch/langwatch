@@ -1,11 +1,11 @@
+import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { GithubNotConnectedError, type GithubApi } from "@langwatch/github-contract";
 /**
  * @vitest-environment node
  * The `github.*` procedures over the real tRPC runtime.
  * @see specs/integrations/github-connection.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { GithubNotConnectedError, type GithubApi } from "@langwatch/github-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

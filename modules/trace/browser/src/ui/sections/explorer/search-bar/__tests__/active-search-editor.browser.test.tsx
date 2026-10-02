@@ -2,8 +2,8 @@
  * Real-browser end-to-end tests for the SearchBar editor.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
@@ -45,13 +45,11 @@ const StatefulEditor: React.FC<{
 function renderEditor() {
   const applied: AppliedQuery[] = [];
   const submitted: AppliedQuery[] = [];
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <StatefulEditor
-        onApplied={(text) => applied.push({ text })}
-        onSubmitted={(text) => submitted.push({ text })}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <StatefulEditor
+      onApplied={(text) => applied.push({ text })}
+      onSubmitted={(text) => submitted.push({ text })}
+    />,
   );
   // Focused as a reader would reach it, so a keystroke lands in the editor.
   getEditor().focus();
@@ -1195,11 +1193,7 @@ describe("SearchBar in real Chromium", () => {
           />
         );
       };
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Wrapper />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<Wrapper />);
       const editor = getEditor();
 
       // Place caret mid-value (`err|or`). userEvent.click doesn't position
@@ -1239,11 +1233,7 @@ describe("SearchBar in real Chromium", () => {
           />
         );
       };
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Wrapper />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<Wrapper />);
       const editor = getEditor();
 
       // Caret to mid-value (`appli|cation`).

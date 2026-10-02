@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
@@ -66,6 +66,7 @@ describe("the governance CLI session inventory", () => {
     ]);
   });
 
+  /** @scenario Revoking a device from the devices tab retires its login key and its ingest keys */
   it("revokes one session by asking auth for exactly its tokens", async () => {
     const { service, revokeCliTokens } = inventory();
 
@@ -87,6 +88,7 @@ describe("the governance CLI session inventory", () => {
     expect(revokeCliTokens).not.toHaveBeenCalled();
   });
 
+  /** @scenario Revoking a device from the devices tab retires its login key and its ingest keys */
   it("retires the session's login key through api-key, as main's revoke did", async () => {
     const { service, loginKeyRevoke } = inventory();
 

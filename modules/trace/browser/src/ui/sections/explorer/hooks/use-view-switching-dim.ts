@@ -1,7 +1,7 @@
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef, useState } from "react";
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 
 interface DimInputs {

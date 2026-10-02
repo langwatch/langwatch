@@ -1,3 +1,5 @@
+import { Switch } from "@chakra-ui/react";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Badge,
   Box,
@@ -5,12 +7,10 @@ import {
   HStack,
   Input,
   NativeSelect,
-  Switch,
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+} from "@langwatch/design-system/primitives";
 
 export type CacheRuleFormState = {
   name: string;

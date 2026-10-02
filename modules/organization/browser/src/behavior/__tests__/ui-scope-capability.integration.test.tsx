@@ -4,10 +4,10 @@
  * @vitest-environment jsdom
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { UiSession } from "@langwatch/browser-host/capabilities";
 import type { UiSessionReading, UiSessionSnapshot } from "@langwatch/browser-host/session";
 import type { UiScopeTeam } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";

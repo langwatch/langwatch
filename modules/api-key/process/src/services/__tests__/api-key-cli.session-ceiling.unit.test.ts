@@ -1,15 +1,15 @@
-/** Main's `applySessionCeiling` (cli-login-key-reaper.ts). Spec: modules/api-key/specs */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { newAuthzGrantId, type AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+/** Main's `applySessionCeiling` (cli-login-key-reaper.ts). Spec: modules/api-key/specs */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
-import { ApiKeyBindingIdService } from "../api-key-binding-id.service.ts";
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
@@ -65,11 +65,12 @@ function setup(rows: ApiKeyRow[], options: { childrenUnreadable?: boolean } = {}
   const grants = createApiFixture<AuthzApi>({ revokeBindingsWhere: vi.fn(async () => 0) });
   const service = ApiKeyService.create({
     repository,
+    answers: MemoryApiKeyAnswerCacheRepository.create(),
     authz,
     grants,
     organizations: createApiFixture<OrganizationApi>({}),
     projects: createApiFixture<ProjectApi>({}),
-    bindingIds: ApiKeyBindingIdService.create(),
+    bindingIds: { generateBindingId: newAuthzGrantId },
     legacyGrants: LegacyApiKeyGrantService.create({
       authz,
       grants,

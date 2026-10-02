@@ -1,9 +1,9 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthApi } from "@langwatch/auth-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";

@@ -12,22 +12,6 @@
       "langwatch-declaration-source": "./src/organization.web.ts",
       "types": "./dist/organization.web.d.ts",
       "default": "./src/organization.web.ts"
-    },
-    "./surfaces/personal-workspace-features": {
-      "types": "./dist/behavior/personal-workspace-features-api.d.ts",
-      "default": "./src/behavior/personal-workspace-features-api.ts"
-    },
-    "./surfaces/department-picker": {
-      "types": "./dist/department-picker.d.ts",
-      "default": "./src/department-picker.ts"
-    },
-    "./surfaces/organization-facts": {
-      "types": "./dist/behavior/ui-organization-facts.d.ts",
-      "default": "./src/behavior/ui-organization-facts.ts"
-    },
-    "./surfaces/scope-capability": {
-      "types": "./dist/behavior/scope-capability.d.ts",
-      "default": "./src/behavior/scope-capability.ts"
     }
   },
   "scripts": {
@@ -37,8 +21,9 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
-    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
@@ -47,8 +32,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/user-browser-kit": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
@@ -60,7 +44,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

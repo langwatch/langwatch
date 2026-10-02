@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   IngestionSourceNotFoundError,
   governanceCliBudgetStatusAnswers,
@@ -7,7 +7,6 @@ import {
   governanceCliBudgetOverviewAnswers,
   governanceCliPersonalProjectAnswers,
   governanceCliVirtualKeyAnswers,
-  governanceCliProjectKeyAnswers,
   governanceCliIngestionSourcesAnswers,
   governanceCliIngestionSourceEventsAnswers,
   governanceCliIngestionSourceHealthAnswers,
@@ -17,7 +16,6 @@ import {
   governanceCliIngestionKeysAnswers,
   governanceCliIngestionKeyStateAnswers,
   governanceCliIngestionKeyRequestSchema,
-  governanceCliProjectKeyRequestSchema,
   governanceCliRefusalAnswers,
   governanceCliVirtualKeyRequestSchema,
   type GovernanceCliBudgetStatusAnswer,
@@ -25,7 +23,6 @@ import {
   type GovernanceCliBudgetOverviewAnswer,
   type GovernanceCliPersonalProjectAnswer,
   type GovernanceCliVirtualKeyAnswer,
-  type GovernanceCliProjectKeyAnswer,
   type GovernanceCliIngestionSourcesAnswer,
   type GovernanceCliIngestionSourceEventsAnswer,
   type GovernanceCliIngestionSourceHealthAnswer,
@@ -159,7 +156,6 @@ export class GovernanceCliService {
         id: resolved.project.id,
         slug: resolved.project.slug,
         name: resolved.project.name,
-        ...(resolved.project.apiKey === undefined ? {} : { api_key: resolved.project.apiKey }),
       },
     });
   }
@@ -186,42 +182,6 @@ export class GovernanceCliService {
       secret: issued.secret,
       prefix: issued.prefix,
     });
-  }
-
-  async projectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer> {
-    const gate = await this.#admit({ ...input, requireActiveMembership: true });
-    if ("refusal" in gate) return gate.refusal;
-    const parsed = governanceCliProjectKeyRequestSchema.safeParse(posted(input.raw));
-    if (!parsed.success) return refuse("invalid_request", "slug is required", 400);
-    const handout = await this.#credentials.handOutProjectKey({
-      caller: gate.caller,
-      slug: parsed.data.slug,
-    });
-    switch (handout.outcome) {
-      case "project-not-found":
-        return refuse(
-          "not_found",
-          `No project with slug "${handout.slug}" in your organization`,
-          404,
-        );
-      case "personal-project-not-allowed":
-        return refuse(
-          "personal_project_not_allowed",
-          "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
-          400,
-        );
-      case "forbidden":
-        return refuse(
-          "forbidden",
-          "You need write access to this project to retrieve its API key.",
-          403,
-        );
-      case "granted":
-        return ok(governanceCliProjectKeyAnswers[200], {
-          api_key: handout.apiKey,
-          project: handout.project,
-        });
-    }
   }
 
   async ingestionSources(

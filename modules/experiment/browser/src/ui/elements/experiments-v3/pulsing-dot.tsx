@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 
 /**
  * Pulsing radar-style dot indicator for drawing attention to an action.

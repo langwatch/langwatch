@@ -1,19 +1,15 @@
 import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  BearerIdentity,
-  type RestIdentity,
-  SessionKeyIdentity,
-  type SessionKeyHolder,
-  type SessionKeyPresented,
-} from "@langwatch/api/rest";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
+import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import type { EventingParticipation, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
@@ -22,7 +18,6 @@ import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import {
   type LangyConversationDetail,
   type LangyConversationEventPage,
@@ -101,7 +96,8 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
@@ -151,6 +147,7 @@ import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
@@ -225,17 +222,17 @@ export interface LangyLocalControl {
   baseHost: string | undefined;
 }
 
-const langyStores = reads("prisma", "redis", "rateLimiter");
+const langyStores = ["prisma", "redis", "rateLimiter"] as const;
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<
-  typeof LangyApp.dependencies,
+  typeof LangyModule.dependencies,
   MembersRead<typeof langyStores> & Readonly<{ publicBaseUrl: string | undefined }>,
   LangyServerConfig,
   LangyRepositories
 >;
 
-export class LangyApp implements LangyApiContract {
+export class LangyModule implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
   /**
    * presence: same per-tenant fabric. featureFlags: deployment rollout store
@@ -278,21 +275,25 @@ export class LangyApp implements LangyApiContract {
   /** `rateLimiter` is the per-project counter every turn is checked against. */
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
-  static async create(setup: LangySetup): Promise<LangyApp> {
-    const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
-      assertLangyServerConfig(setup.config, internalSecret);
-      const metrics = LangyWorkerMetricsOtelService.create();
-      const channel =
-        setup.config.agentUrl && internalSecret
-          ? HttpLangyWorkerChannel.create({
-              agentUrl: setup.config.agentUrl,
-              internalSecret,
-              metrics,
-            })
-          : UnavailableLangyWorkerChannel.create(metrics);
-      const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
-      return { channel, door };
-    });
+  static async create(setup: LangySetup): Promise<LangyModule> {
+    const { channel, door, configured } = await setup.secrets.into(
+      langySecrets.internal,
+      (internalSecret) => {
+        assertLangyServerConfig(setup.config, internalSecret);
+        const metrics = LangyWorkerMetricsOtelService.create();
+        const configured = Boolean(setup.config.agentUrl && internalSecret);
+        const channel =
+          setup.config.agentUrl && internalSecret
+            ? HttpLangyWorkerChannel.create({
+                agentUrl: setup.config.agentUrl,
+                internalSecret,
+                metrics,
+              })
+            : UnavailableLangyWorkerChannel.create(metrics);
+        const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
+        return { channel, door, configured };
+      },
+    );
     const adapter = LangyPostgresService.create({
       repositories: createLangyDatabaseRepositories(setup.members.prisma),
     });
@@ -305,7 +306,8 @@ export class LangyApp implements LangyApiContract {
       redis: setup.members.redis,
       config: setup.config,
       publicBaseUrl: setup.members.publicBaseUrl,
-      worker: channel,
+      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
+      worker: configured ? channel : null,
       repositories: setup.repositories,
       models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
       sessionKeys,
@@ -315,6 +317,7 @@ export class LangyApp implements LangyApiContract {
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
       github: LangyGithubTurnTokenService.create(setup.dependencies.github),
+      skillGates: LangySkillGatesService.create(setup.dependencies.featureFlags),
       navigateFallback: LangyNavigateFallbackService.create({
         projects: setup.dependencies.projects,
         resources: LangyNavigateResourceLocatorService.create({
@@ -453,7 +456,7 @@ export class LangyApp implements LangyApiContract {
           })
         : null,
     });
-    return new LangyApp({
+    return new LangyModule({
       langy,
       uiActionDoor,
       internalDoor: door,
@@ -554,6 +557,7 @@ export class LangyApp implements LangyApiContract {
         reap: () => this.dependencies.sessionKeyReap.reap(),
         deleteDispatchedBefore: deps.deleteDispatchedBefore,
       },
+      virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
     }).buildProcessing();
   }
 
@@ -743,14 +747,6 @@ export class LangyApp implements LangyApiContract {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.dependencies.langy.countUsage(input);
-  }
-
-  provisionVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void> {
-    return this.dependencies.virtualKeyProvisioning.provision(input);
   }
 
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }> {

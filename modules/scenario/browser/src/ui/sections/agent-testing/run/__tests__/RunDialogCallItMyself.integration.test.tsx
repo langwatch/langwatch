@@ -5,9 +5,9 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -24,23 +24,21 @@ const controller: RunDialogController = {
 
 function renderFooter(over: { onCallItMyself?: () => void } = {}) {
   const ui: ReactNode = (
-    <ChakraProvider value={defaultSystem}>
-      <Dialog.Root open onOpenChange={() => {}}>
-        <Dialog.Content>
-          <RunDialogFooter
-            controller={controller}
-            isRunBlocked={false}
-            blockedReason={null}
-            caseCount={1}
-            targetCount={1}
-            onClose={vi.fn()}
-            {...over}
-          />
-        </Dialog.Content>
-      </Dialog.Root>
-    </ChakraProvider>
+    <Dialog.Root open onOpenChange={() => {}}>
+      <Dialog.Content>
+        <RunDialogFooter
+          controller={controller}
+          isRunBlocked={false}
+          blockedReason={null}
+          caseCount={1}
+          targetCount={1}
+          onClose={vi.fn()}
+          {...over}
+        />
+      </Dialog.Content>
+    </Dialog.Root>
   );
-  return render(ui);
+  return renderWithDesignSystem(ui);
 }
 
 describe("RunDialog footer", () => {

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createDepartmentTestService } from "@langwatch/enterprise-governance-process/testing";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
@@ -16,6 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node

@@ -2,11 +2,11 @@
  * every 1000ms while typing continues.
  */
 
+import { datasetClient } from "@langwatch/dataset-client";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SlugValidation } from "../model/dataset-slug-validation.ts";
-import { datasetApi } from "./dataset-api.ts";
 
 /** How long typing has to settle before the trailing check runs. */
 const SETTLE_MS = 500;
@@ -25,13 +25,13 @@ export function useDatasetSlugValidation({
   const [slugInfo, setSlugInfo] = useState<SlugValidation>(null);
 
   /** The stored slug, so an edit can show "old -> new" rather than just "new". */
-  const existing = datasetApi.dataset.getById.useQuery(
+  const existing = datasetClient.dataset.getById.useQuery(
     { projectId: projectId ?? "", datasetId: datasetId ?? "" },
     { enabled: !!datasetId && !!projectId },
   );
   const dbSlug = existing.data?.slug;
 
-  const check = datasetApi.dataset.validateDatasetName.useQuery(
+  const check = datasetClient.dataset.validateDatasetName.useQuery(
     { projectId: projectId ?? "", proposedName: name, excludeDatasetId: datasetId },
     // Asked by hand on the schedule below, never on render.
     { enabled: false },

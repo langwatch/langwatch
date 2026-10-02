@@ -1,8 +1,19 @@
-import { Alert, Box, Button, Code, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Alert,
+  Box,
+  Button,
+  Code,
+  HStack,
+  Link,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
+
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 
 interface SecretsIndicatorProps {
   projectId: string;
@@ -17,7 +28,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
   const [open, setOpen] = useState(false);
   // Only list secrets once the popover is opened — the trigger is static, so
   // there's no need to fetch on mount for every editor that renders this.
-  const secretsQuery = api.secrets.list.useQuery({ projectId }, { enabled: open });
+  const secretsQuery = workflowApi.secrets.list.useQuery({ projectId }, { enabled: open });
   const secrets = secretsQuery.data ?? [];
 
   const handleSecretClick = (secretName: string) => {

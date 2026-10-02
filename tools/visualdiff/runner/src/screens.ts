@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { captureMessage, type Side } from "./capture.ts";
+import { DARK_SUFFIX } from "./color-scheme.ts";
 import { DeadlineAlarm } from "./deadline-alarm.ts";
 import { fillPath, sideFixtures } from "./flows/context.ts";
 import { describeExpect } from "./flows/expect.ts";
@@ -327,10 +328,11 @@ export const flowProject = ({
   return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
 };
 
-/** actorValues are `{actor}` and `{actorPassword}`: the account the flow's own steps sign in as. */
+/** actorValues are `{actor}`, `{actorPassword}` and `{projectKey}`: the signed-in account. */
 const actorValues = ({ credential }: FlowProject): Record<string, string> => ({
   actor: credential.email,
   actorPassword: credential.password,
+  projectKey: credential.projectKey,
 });
 
 /** FlowWalk is what every step of one flow's walk shares. */
@@ -462,9 +464,10 @@ export const captureFlow = async ({
   const project = flowProject({ plan, flow, fixtures });
   const values: Record<string, string> = {
     ...fixtures,
+    uid: uidFor(plan.colorScheme === "dark" ? `${flow.id}${DARK_SUFFIX}` : flow.id),
+    // A flow with a setup names things from the setup's uid, so that one wins.
     ...flowValues({ fixtures, flowId: flow.id }),
     slug: project.slug,
-    uid: uidFor(flow.id),
   };
   const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
   const walk: FlowWalk = { plan, flow, side, collect, project, values, mailUrl, everyStep };

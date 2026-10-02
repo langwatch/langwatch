@@ -1,12 +1,12 @@
 import type { ProtocolConnection } from "@langwatch/api";
 import type {
-  RequestActor,
+  Actor,
+  AuthzPermission,
   RestResolvedProjectCredential,
   SessionKeyHolder,
   SessionKeyPresented,
-} from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+} from "@langwatch/authorization";
+import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
@@ -109,7 +109,7 @@ export type LangyLocalCaller = Readonly<{
 
 /** Who the project door put behind a key (its owner, or none), and the project it resolved. */
 export type LangyKeyCaller = Readonly<{
-  actor: RequestActor | null;
+  actor: Actor | null;
   projectId: string;
 }>;
 
@@ -125,7 +125,7 @@ export type LangyLocalCallInput = LangyKeyCaller &
 export type LangyLocalWaitInput = LangyKeyCaller &
   Readonly<{ waitId: string; signal?: AbortSignal }>;
 /** The terminal's key owner (none for a key no person owns), and the request it addresses. */
-export type LangyControlOwnerInput = Readonly<{ actor: RequestActor | null }>;
+export type LangyControlOwnerInput = Readonly<{ actor: Actor | null }>;
 export type LangyControlRequestInput = LangyControlOwnerInput & Readonly<{ requestId: string }>;
 export type LangyControlRequestCancelled = z.infer<typeof langyControlCancelResultSchema>;
 /** One UI action the page channel serves, as `langwatch ui actions` lists it. */
@@ -340,12 +340,6 @@ export interface LangyApi {
   recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
-  /** Mints a new project's gateway key so it is listed from day one; best effort, never raises. */
-  provisionVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */

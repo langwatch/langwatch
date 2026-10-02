@@ -23,6 +23,13 @@ export class DatasetNamingService {
 
   async validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
     const parsed = datasetNameInputSchema.parse(input);
+    // Editing: the dataset keeps its slug on rename, so that is the one to show.
+    const edited = parsed.excludeDatasetId
+      ? await this.repository.findById({ id: parsed.excludeDatasetId, projectId: parsed.projectId })
+      : null;
+    if (edited && edited.name === parsed.proposedName) {
+      return { available: true, slug: edited.slug };
+    }
     const slug = datasetSlugOf(parsed.proposedName);
     const conflict = await this.repository.findBySlug({
       projectId: parsed.projectId,
@@ -32,8 +39,8 @@ export class DatasetNamingService {
 
     return {
       available: conflict === null,
-      slug,
-      ...(conflict ? { conflictsWith: conflict.id } : {}),
+      slug: edited?.slug ?? slug,
+      ...(conflict ? { conflictsWith: conflict.name } : {}),
     };
   }
 

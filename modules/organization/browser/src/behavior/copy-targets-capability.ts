@@ -73,7 +73,6 @@ export function useUiCopyTargetsReading({
             await transport.query(UI_EFFECTIVE_PERMISSIONS_PROCEDURE, input),
           ),
         staleTime: GRANTS_STALE_TIME_MS,
-        refetchOnWindowFocus: true,
       };
     }),
     combine: landedGrants,

@@ -9,7 +9,7 @@ import { useLangyStickToBottom } from "../use-langy-stick-to-bottom.ts";
 
 // Motion ON — so the tests drive the real default path (smooth scrollIntoView),
 // not the reduced-motion fallback.
-vi.mock("@langwatch/langy-browser-kit", () => ({
+vi.mock("@langwatch/design-system/use-reduced-motion", () => ({
   useReducedMotion: () => false,
 }));
 

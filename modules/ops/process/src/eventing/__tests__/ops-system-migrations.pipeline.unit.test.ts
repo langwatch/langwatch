@@ -1,5 +1,3 @@
-/** Spec: specs/migration/system-migrations-runner.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   EventSourcing,
   EventStoreProducerOnly,
@@ -9,9 +7,11 @@ import {
 } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
+/** Spec: specs/migration/system-migrations-runner.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { opsServer } from "../../ops.server.ts";
+import { opsProcessModule } from "../../ops.module.ts";
 import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
 import { SystemMigrationPassRequestsService } from "../../services/system-migration-pass-requests.service.ts";
 import { SystemMigrationsService } from "../../services/system-migrations.service.ts";
@@ -110,7 +110,7 @@ describe("given ops's system-migrations declaration", () => {
     const { definition, process } = built(async () => undefined);
 
     expect(systemMigrationsEventing.pipeline).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
-    expect(opsServer.eventing?.pipeline.split(", ")).toContain(SYSTEM_MIGRATIONS_PIPELINE_NAME);
+    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(SYSTEM_MIGRATIONS_PIPELINE_NAME);
     expect(definition.metadata.name).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
     expect(process.config.schedule?.everyMs).toBe(HOUR);
   });

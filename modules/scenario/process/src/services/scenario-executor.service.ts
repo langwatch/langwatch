@@ -2,9 +2,10 @@ import path from "node:path";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioServerConfig, SimulationService } from "@langwatch/scenario-contract";
@@ -28,6 +29,7 @@ import { ScenarioExecutionService } from "./scenario-execution.service.ts";
 import { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 import { ScenarioProcessorMetricsService } from "./scenario-processor-metrics.service.ts";
 import { ScenarioProcessorService } from "./scenario-processor.service.ts";
+import { ScenarioVoiceTargetService } from "./scenario-voice-target.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
 import type { VoicePublicUrl } from "./voice-public-url.service.ts";
@@ -45,6 +47,7 @@ export type ScenarioExecutorPeers = Readonly<{
   projects: ProjectApi;
   modelProviders: ModelProviderApi;
   apiKeys: ApiKeyApi;
+  gateway: GatewayApi;
 }>;
 
 /** The repository root: this file sits five folders below it, in source and in dist alike. */
@@ -136,7 +139,12 @@ export class ScenarioExecutorService {
       secrets: peers.secrets,
       traces: peers.traces,
       apiKeys: peers.apiKeys,
-      voiceTargets: null,
+      voiceTargets: ScenarioVoiceTargetService.create({
+        agents: peers.agents,
+        modelProviders: peers.modelProviders,
+        gateway: peers.gateway,
+        voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+      }),
     });
     const execution = ScenarioExecutionService.create({
       pool,

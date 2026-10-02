@@ -3,7 +3,12 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { inviteTrpc, OrganizationApi } from "@langwatch/organization-contract";
 
-import { BEFORE_MEMBERSHIP, callerOf, organizationSessionPersonFact } from "./organization.trpc.ts";
+import {
+  BEFORE_MEMBERSHIP,
+  callerOf,
+  customRoleGate,
+  organizationSessionPersonFact,
+} from "./organization.trpc.ts";
 
 export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof inviteTrpc> =
   defineTrpcRouter(OrganizationApi, inviteTrpc)
@@ -13,6 +18,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
      * a hand-typed batch. `organization-management.rest.ts` asks for `strict`.
      */
     .procedure("createInvites")
+    .withEntitlement("enterprise", customRoleGate)
     .withFacts(organizationSessionPersonFact)
     .withPermission("organization:manage")
     .handle(({ app, input, actor }, person) =>

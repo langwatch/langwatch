@@ -1,18 +1,18 @@
-import { Box, Text } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
 import { createLogger } from "@langwatch/observability/browser";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+} from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectSpanNames } from "../../../behavior/use-project-span-names.ts";
+import { VariablesSection } from "../../sections/prompt/variables/variables-section.tsx";
+import { renderSourceTypeIcon } from "../workflow/workflow-icons.tsx";
 
 const logger = createLogger("EvaluatorMappingsSection");
 
@@ -84,9 +84,11 @@ export function EvaluatorMappingsSection({
   const hasScrolledRef = useRef(false);
 
   // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(initialMappings);
+  if (mappingsFrom !== initialMappings) {
+    setMappingsFrom(initialMappings);
     setLocalMappings(initialMappings);
-  }, [initialMappings]);
+  }
 
   // Compute missingMappingIds REACTIVELY from local state using shared validation
   const missingMappingIds = useMemo(() => {

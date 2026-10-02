@@ -1,4 +1,4 @@
-import { Box, Grid, VStack } from "@chakra-ui/react";
+import { Box, Grid, VStack } from "@langwatch/design-system/primitives";
 import { memo } from "react";
 
 import { FocusedTurnFrame } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";

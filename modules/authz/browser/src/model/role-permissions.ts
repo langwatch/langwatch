@@ -5,9 +5,9 @@ import {
   type Action,
   type AuthzPermission,
   type AuthzResource,
-  bindingScopeCanGrantPermission,
   isRegistryPermission,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
+import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 
 import {
   type AuthzResource as OfferedResource,

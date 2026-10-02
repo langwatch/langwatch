@@ -5,7 +5,7 @@ import {
 } from "@langwatch/api-key-contract";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const MAX_VISIBLE_PROJECT_CANDIDATES = 5_000;
@@ -16,13 +16,13 @@ export class ApiKeyVisibilityService {
     return new ApiKeyVisibilityService(options.repository, options);
   }
 
-  private readonly bindings: ApiKeyBindingsService;
+  private readonly bindings: ApiKeyGrantsService;
 
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
   ) {
-    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
   async resolveVisibleProjects(input: {
@@ -51,21 +51,17 @@ export class ApiKeyVisibilityService {
 
     const teamIds = [
       ...new Set(
-        key.roleBindings.flatMap((binding) =>
-          binding.scopeType === "TEAM" ? [binding.scopeId] : [],
-        ),
+        key.grants.flatMap((binding) => (binding.scopeType === "TEAM" ? [binding.scopeId] : [])),
       ),
     ];
     const projectIds = [
       ...new Set(
-        key.roleBindings.flatMap((binding) =>
-          binding.scopeType === "PROJECT" ? [binding.scopeId] : [],
-        ),
+        key.grants.flatMap((binding) => (binding.scopeType === "PROJECT" ? [binding.scopeId] : [])),
       ),
     ];
     const candidates = await this.options.projects.listActiveByScopes({
       organizationId: parsed.organizationId,
-      organizationWide: key.roleBindings.some((binding) => binding.scopeType === "ORGANIZATION"),
+      organizationWide: key.grants.some((binding) => binding.scopeType === "ORGANIZATION"),
       teamIds,
       projectIds,
       limit: MAX_VISIBLE_PROJECT_CANDIDATES,

@@ -1,2 +1,2 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-export { enterpriseGatewayServer } from "./enterprise-gateway.server.ts";
+export { enterpriseGatewayProcessModule } from "./enterprise-gateway.module.ts";

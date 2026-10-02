@@ -16,7 +16,7 @@ import {
   type ScimGroupRecord,
   type ScimMembershipRecord,
   type ScimOrganizationUserRecord,
-  type ScimRoleBindingRecord,
+  type ScimGrantRecord,
   type ScimTokenIdentity,
   type ScimTokenRecord,
   type ScimUserRecord,
@@ -28,7 +28,7 @@ type StoredRequest = ScimRequestLogEntry;
 type StoredMembership = { organizationId: string; userId: string; role: string };
 type StoredGroupMember = { groupId: string; userId: string };
 type StoredOrganization = { id: string; ssoDomain: string | null };
-type StoredBinding = ScimRoleBindingRecord & { organizationId: string };
+type StoredBinding = ScimGrantRecord & { organizationId: string };
 
 const sameName = (left: string, right: string): boolean =>
   left.trim().toLowerCase() === right.trim().toLowerCase();
@@ -437,7 +437,7 @@ export class MemoryScimRepository extends ScimRepository {
     );
   }
 
-  async findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
+  async findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]> {
     return this.bindings
       .filter((binding) => {
         if (binding.organizationId !== scope.organizationId) return false;

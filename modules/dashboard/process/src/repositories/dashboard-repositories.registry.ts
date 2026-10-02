@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryDashboardRepositories } from "./memory/memory.dashboard.repositories.ts";
 import { PostgresDashboardRepositories } from "./prisma/prisma.dashboard.repositories.ts";

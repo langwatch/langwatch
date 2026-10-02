@@ -5,7 +5,7 @@
  * a signed copy in a cookie on the browser that asked, so a copied
  * authorization address refuses every time. Spec: sso-activation.feature.
  */
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Copy } from "lucide-react";
 

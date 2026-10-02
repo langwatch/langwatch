@@ -5,7 +5,7 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 /** The `langwatch` run metadata this reads, narrowed to what the signal needs.

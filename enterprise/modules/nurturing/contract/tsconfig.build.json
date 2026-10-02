@@ -15,10 +15,13 @@
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"

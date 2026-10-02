@@ -4,9 +4,9 @@
  * per-organization on entitlement, it never gates itself by tier.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const billingWeb = defineWebModule("billing")
+export const billingWeb = defineBrowserModule("billing")
   .withHosts({
     requires: ["BillingHostApi"],
     mounts: { BillingHostApi: { load: () => import("./behavior/billing-host-mount.tsx") } },

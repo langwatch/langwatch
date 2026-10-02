@@ -24,10 +24,7 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"
@@ -42,13 +39,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/plans/tsconfig.build.json"

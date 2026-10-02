@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ async function setup() {
   return { ...fixture, listSummaries, copy, archiveLinked, deleteUncommitted };
 }
 
-describe("AgentApp linked workflow operations", () => {
+describe("AgentModule linked workflow operations", () => {
   /** @scenario "Linked workflow behaviour uses the injected Workflow API" */
   it("reads, copies and archives through the Workflow API", async () => {
     const fixture = await setup();

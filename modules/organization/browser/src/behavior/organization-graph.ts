@@ -1,6 +1,6 @@
 /**
  * The organization graph the host reads its teams-and-projects reading off —
- * this family's own `organization.getAll` query, the shell's shared cache key.
+ * this family's own `organization.getScopeGraph` query, the shell's shared cache key.
  */
 
 import { useMemo } from "react";
@@ -34,7 +34,7 @@ export function useOrganizationGraph(input: {
   organizationId: string | undefined;
   projectId: string | undefined;
 }): OrganizationGraph {
-  const graphQuery = organizationApi.organization.getAll.useQuery({ isDemo: false });
+  const graphQuery = organizationApi.organization.getScopeGraph.useQuery({});
 
   return useMemo(() => {
     const organization = graphQuery.data?.find(

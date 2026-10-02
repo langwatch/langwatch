@@ -1,5 +1,13 @@
-import { Box, Circle, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import {
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type React from "react";
 import { useMemo } from "react";

@@ -1,11 +1,9 @@
-import { Box, HStack, VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 
 import { useSidebarSectionState } from "../../behavior/use-sidebar-section-state.ts";
 import { SideMenuSectionLabel } from "../elements/side-menu-section-label.tsx";
-
-export { getSidebarSectionStorageKey } from "../../behavior/use-sidebar-section-state.ts";
 
 type SidebarSectionProps = {
   id: string;

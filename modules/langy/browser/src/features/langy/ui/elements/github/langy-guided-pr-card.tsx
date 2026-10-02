@@ -4,10 +4,11 @@
  * reader can act on (card taxonomy: spotlight).
  * @see specs/langy/langy-guided-onboarding.feature
  */
-import { Button, Text, VStack } from "@chakra-ui/react";
-import { LangyCard } from "@langwatch/langy-browser-kit";
-import type { GuidedPullRequest } from "@langwatch/onboarding-browser-kit";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowUpRight, GitBranch, GitPullRequest } from "lucide-react";
+
+import { LangyCard } from "../../../../../ui/sections/langy-card.tsx";
+import type { GuidedPullRequest } from "../../../../guided-onboarding/model/guided-conversation.ts";
 
 function BranchLine({ branch }: { branch: string }) {
   return (

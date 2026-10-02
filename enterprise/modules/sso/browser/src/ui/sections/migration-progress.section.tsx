@@ -4,7 +4,14 @@
  * now, what is left before finishing, and the two levers that move it. The
  * copy is the customer's, never the ledger's. Props-driven; the screen owns I/O.
  */
-import { Badge, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle } from "lucide-react";
 

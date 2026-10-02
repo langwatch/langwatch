@@ -22,6 +22,9 @@ export interface SsoConnectionHistoryEntry {
   policy: string | null;
   /** The name a `connection_renamed` fact gives the connection. */
   name: string | null;
+  /** The issuer a `connection_idp_updated` fact sets. Public: it is the
+   *  address the provider identifies itself by, shown on the card. */
+  issuer: string | null;
   /** Free text an actor gave: a claim's rejection note, an attestation's note,
    *  or a suspend/teardown reason. Never a secret — the connection's own
    *  projection already carries these same words back to whoever reads it. */

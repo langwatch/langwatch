@@ -43,7 +43,7 @@ export class RecordScenarioCreatedCommand implements CommandHandler<
         tenantId: createTenantId(command.tenantId),
         type: SCENARIO_CREATED_EVENT_TYPE,
         version: SCENARIO_CREATED_EVENT_VERSION,
-        data,
+        data: { ...data, occurredAt: command.data.occurredAt },
         occurredAt: command.data.occurredAt,
         idempotencyKey: `${command.tenantId}:${data.scenarioId}:created`,
       }),

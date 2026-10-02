@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type {
-  AuthzGrantsService,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/authz-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
   type ScimListResponse,
@@ -38,10 +34,10 @@ import { ScimUserPatchService } from "./scim-user-patch.service.ts";
  * sign in with.
  */
 export type ScimUserProvisioning = Pick<UserApi, "findById" | "findByEmail" | "create">;
-import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import { parseScimFilter, type ScimFilterTerm } from "../rules/scim-filter.rules.ts";
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import { isUniqueViolation, nameFromScimRequest, scimUserOf } from "../rules/scim-user.rules.ts";
+import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 /** The person this organization holds, and what it says about them. */
 type ScimOrganizationUser = {
@@ -149,7 +145,7 @@ export class ScimProvisioningService {
           principal: { userId },
           role: "MEMBER" as TeamUserRole,
           customRoleId: null,
-          scopeType: "ORGANIZATION" as RoleBindingScopeType,
+          scopeType: "ORGANIZATION" as GrantScopeTier,
           scopeId: organizationId,
         },
       ],
@@ -263,7 +259,7 @@ export class ScimProvisioningService {
     }
 
     await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
-    const visibleGrants = await this.prisma.findRoleBindings({
+    const visibleGrants = await this.prisma.findGrantRows({
       kind: "member-offboarding",
       organizationId,
       userId,

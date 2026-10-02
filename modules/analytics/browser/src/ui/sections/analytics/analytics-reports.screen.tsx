@@ -1,11 +1,29 @@
-import { Alert, Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
+import {
+  DashboardRefetchIntervalContext,
+  useDashboardAutoRefresh,
+} from "../../../behavior/use-dashboard-auto-refresh.ts";
+import {
+  useDashboardGraphs,
+  useDashboards,
+  useDashboardWidgets,
+  useFirstDashboard,
+} from "../../../behavior/use-dashboards.ts";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -16,10 +34,7 @@ import { CreateDashboardWidgetDrawer } from "../create-dashboard-widget-drawer.t
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
 import { ReportGrid } from "../report-grid.tsx";
-import {
-  DashboardRefreshedAtContext,
-  useDashboardAutoRefresh,
-} from "../use-dashboard-auto-refresh.ts";
+import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
 
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();
@@ -32,10 +47,7 @@ function ReportsContent() {
   const urlDashboardId = host.route().query.dashboard;
 
   // Get or create first dashboard
-  const getOrCreateFirst = api.dashboards.getOrCreateFirst.useQuery(
-    { projectId },
-    { enabled: !!projectId && !urlDashboardId },
-  );
+  const getOrCreateFirst = useFirstDashboard({ projectId, enabled: !urlDashboardId });
 
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
 
@@ -53,32 +65,25 @@ function ReportsContent() {
     },
   );
 
-  // Scheduled refresh: widgets follow refreshedAt through their dashboard
-  // context; builder graphs and placed charts re-fetch through tRPC.
+  // Scheduled refresh: builder graphs poll on the chosen refetchInterval; widgets that run
+  // through a mutation or a frame follow refreshedAt.
   const utils = api.useUtils();
-  const autoRefresh = useDashboardAutoRefresh({
-    onTick: () => {
-      void utils.analytics.invalidate();
-    },
-  });
+  const autoRefresh = useDashboardAutoRefresh();
 
   // Fetch all dashboards to get current dashboard name
-  const dashboardsQuery = api.dashboards.getAll.useQuery({ projectId }, { enabled: !!projectId });
+  const dashboardsQuery = useDashboards({ projectId });
 
   const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
   const dashboardTitle = currentDashboard?.name ?? "Reports";
 
   // Graphs for the active dashboard
-  const graphsQuery = api.graphs.getAll.useQuery(
-    { projectId, dashboardId: activeDashboardId },
-    { enabled: !!projectId && !!activeDashboardId },
-  );
+  const graphsQuery = useDashboardGraphs({ projectId, dashboardId: activeDashboardId });
 
   // `graphs.getAll` answers builder rows only; the placed widgets come from their own list.
-  const widgetsQuery = api.dashboardWidgets.list.useQuery(
-    { projectId },
-    { enabled: !!projectId && !!activeDashboardId && customChartPlaygroundEnabled },
-  );
+  const widgetsQuery = useDashboardWidgets({
+    projectId,
+    enabled: !!activeDashboardId && customChartPlaygroundEnabled,
+  });
   const widgets = (widgetsQuery.data ?? []).filter(
     (widget) => widget.dashboardId === activeDashboardId,
   );
@@ -125,7 +130,9 @@ function ReportsContent() {
       { projectId, id: graphId },
       {
         onSuccess: () => {
-          void graphsQuery.refetch();
+          // Every graphs.getAll key, not just this dashboard's: the automation composer
+          // reads the list keyed by {projectId} alone and kept offering a deleted graph.
+          void utils.graphs.getAll.invalidate();
         },
         onError: (error) => {
           showErrorToast({ error, fallbackTitle: "Couldn't delete this graph" });
@@ -248,27 +255,29 @@ function ReportsContent() {
       )}
 
       {/* Main content */}
-      <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
-        <HStack align="start" gap={6} width="full">
-          <Box flex={1}>
-            {graphsQuery.isLoading ? (
-              <Skeleton height="300px" />
-            ) : (
-              <ReportGrid
-                graphs={graphs}
-                projectSlug={project?.slug ?? ""}
-                projectId={projectId}
-                dashboardId={activeDashboardId ?? undefined}
-                onGraphDelete={handleGraphDelete}
-                onGraphGranularityChange={handleGraphGranularityChange}
-                onGraphsPlacementChange={handleGraphsPlacementChange}
-                deletingGraphId={pendingDeleteId({ mutations: [deleteGraph, deleteWidget] })}
-              />
-            )}
-          </Box>
-          {showFilters ? <FilterSidebar /> : null}
-        </HStack>
-      </DashboardRefreshedAtContext.Provider>
+      <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
+        <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+          <HStack align="start" gap={6} width="full">
+            <Box flex={1}>
+              {graphsQuery.isLoading ? (
+                <Skeleton height="300px" />
+              ) : (
+                <ReportGrid
+                  graphs={graphs}
+                  projectSlug={project?.slug ?? ""}
+                  projectId={projectId}
+                  dashboardId={activeDashboardId ?? undefined}
+                  onGraphDelete={handleGraphDelete}
+                  onGraphGranularityChange={handleGraphGranularityChange}
+                  onGraphsPlacementChange={handleGraphsPlacementChange}
+                  deletingGraphId={pendingDeleteId({ mutations: [deleteGraph, deleteWidget] })}
+                />
+              )}
+            </Box>
+            {showFilters ? <FilterSidebar /> : null}
+          </HStack>
+        </DashboardRefreshedAtContext.Provider>
+      </DashboardRefetchIntervalContext.Provider>
     </AnalyticsLayout>
   );
 }

@@ -26,10 +26,9 @@
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"
   },

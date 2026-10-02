@@ -1,5 +1,4 @@
-import { Box, chakra, Icon, Text } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, chakra, Icon, Text, keyframes } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { LuBrain, LuChevronDown, LuChevronRight } from "react-icons/lu";
 

@@ -99,7 +99,9 @@ func TestAFlowsSetupPostsItsPrerequisitesAndFilesWhatTheyAnswerUnderTheFlow(t *t
 		fixtures: map[string]string{FixtureIsolatedSlug: "iso", FixtureIsolatedKey: "sk-iso"}, flows: flows,
 	})
 
-	if len(warnings) != 0 || captured["suite/agentId"] != "agent_1" || len(captured) != 1 {
+	// The setup's own uid is filed too, so the flow's steps name what the setup made.
+	if len(warnings) != 0 || captured["suite/agentId"] != "agent_1" || captured["suite/uid"] == "" ||
+		len(captured) != 2 {
 		t.Fatalf("captured %v, warnings %v", captured, warnings)
 	}
 	if bodies[0]["name"] != `in "iso"` || bodies[1]["agent"] != "agent_1" || keys[0] != "sk-iso" {

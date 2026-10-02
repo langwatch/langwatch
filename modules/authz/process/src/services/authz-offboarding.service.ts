@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import { OffboardIncompleteError, type AuthzOffboardOutput } from "@langwatch/authz-contract";
 
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";

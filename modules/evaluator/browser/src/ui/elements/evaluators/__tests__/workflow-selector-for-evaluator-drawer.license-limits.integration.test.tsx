@@ -6,10 +6,10 @@
  * @see specs/licensing/enforcement-resources.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { markHandledGlobally } from "@langwatch/browser-host/errors";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => ({
@@ -42,12 +42,17 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: calls.push, replace: vi.fn(), query: {}, asPath: "/", isReady: true }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/evaluator-api.ts", () => ({
+  evaluatorApi: {
     useUtils: () => ({ evaluators: { getAll: { invalidate: vi.fn() } } }),
     workflow: {
       create: { useMutation: () => ({ mutateAsync: calls.createWorkflow, isPending: false }) },
     },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({ evaluators: { getAll: { invalidate: vi.fn() } } }),
     evaluators: {
       create: {
         useMutation: (options?: { onSuccess?: (evaluator: unknown) => void }) => ({
@@ -81,11 +86,7 @@ const answeredLimitRefusal = (limitType: string) => async () => {
 const toasts: string[] = [];
 
 const renderDrawer = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WorkflowSelectorForEvaluatorDrawer open={true} onClose={vi.fn()} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<WorkflowSelectorForEvaluatorDrawer open={true} onClose={vi.fn()} />);
 
 const submit = () => {
   fireEvent.change(screen.getByPlaceholderText("Enter evaluator name"), {

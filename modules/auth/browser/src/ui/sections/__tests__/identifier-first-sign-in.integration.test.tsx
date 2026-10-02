@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Identifier-first sign-in renders routing decisions; holds no routing logic.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,6 @@ const {
   registerMock,
   signInMock,
   replaceMock,
-  hardNavigateMock,
   sessionRef,
   searchParamsRef,
   publicEnvRef,
@@ -27,7 +26,6 @@ const {
   registerMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
-  hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: {
@@ -80,7 +78,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 
 vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replaceMock,
-  hardNavigate: hardNavigateMock,
+  hardNavigate: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
@@ -122,12 +120,7 @@ const unknownIdentifier: RoutingDecision = {
   reasonCode: "identifier_unknown",
 };
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <IdentifierFirstSignIn />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<IdentifierFirstSignIn />);
 
 /**
  * The rendered picker, with the two things that legitimately differ between
@@ -165,6 +158,7 @@ describe("given the identifier-first sign-in screen", () => {
     publicEnvRef.current = { IS_SAAS: true, HAS_EMAIL_PROVIDER_KEY: true };
     priorSessionRef.current = undefined;
     window.localStorage.clear();
+    window.sessionStorage.clear();
     _resetTwoStepChallengeForTests();
   });
 
@@ -245,25 +239,72 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
-  /** @scenario "A sole SSO provider waits for a sign-in gesture" */
-  it("waits for an explicit click before using the sole provider", async () => {
-    routeMock.mockResolvedValue({
+  describe("when a self-hosted deployment has one live connection", () => {
+    const soleConnection: RoutingDecision = {
       outcome: "redirect_to_connection",
-      connectionId: "org:acme",
       methodSet: [oktaMethod],
-      reasonCode: "sole_connection",
+      reasonCode: "sole_active_connection",
+    };
+
+    /** @scenario "A self-hosted sign-in page goes straight to the sole live connection" */
+    it("starts the provider sign-in without a click", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      expect(signInMock).toHaveBeenCalledWith(
+        "okta",
+        expect.objectContaining({ callbackUrl: undefined }),
+      );
     });
-    renderScreen();
-    const continueButton = await screen.findByRole("button", {
-      name: /continue with okta/i,
+
+    /** @scenario "The sole connection is not dialed twice in a row" */
+    it("offers a button instead when it already sent this tab there moments ago", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      const first = renderScreen();
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      first.unmount();
+      signInMock.mockClear();
+
+      renderScreen();
+      const continueButton = await screen.findByRole("button", {
+        name: /continue with okta/i,
+      });
+      expect(signInMock).not.toHaveBeenCalled();
+      await userEvent.click(continueButton);
+      expect(signInMock).toHaveBeenCalledTimes(1);
     });
-    expect(signInMock).not.toHaveBeenCalled();
-    await userEvent.click(continueButton);
-    expect(signInMock).toHaveBeenCalledTimes(1);
-    expect(signInMock).toHaveBeenCalledWith(
-      "okta",
-      expect.objectContaining({ callbackUrl: undefined }),
-    );
+
+    /** @scenario "A failed sign-in return never redirects to the sole connection" */
+    it("shows the error and starts no provider sign-in", async () => {
+      searchParamsRef.current = new URLSearchParams("error=sign_in_failed");
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      expect(await screen.findByRole("link", { name: /try sign in again/i })).toBeTruthy();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The break-glass sign-in page never redirects to the sole connection" */
+    it("renders the local sign-in for the break-glass parameter", async () => {
+      searchParamsRef.current = new URLSearchParams("local=1");
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [passwordMethod],
+        reasonCode: "break_glass",
+      } satisfies RoutingDecision);
+      renderScreen();
+
+      expect(await screen.findByLabelText("Password")).toBeTruthy();
+      expect(routeMock).toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: null, breakGlass: true }),
+      );
+      expect(signInMock).not.toHaveBeenCalled();
+    });
   });
 
   describe("when an address routes to an identity provider", () => {
@@ -830,27 +871,32 @@ describe("given the identifier-first sign-in screen", () => {
       );
     });
 
-    /** @scenario An address with no account on an installation that cannot send email goes to the password step */
-    it("hands the unconfirmed proof to the sign-up door instead of saying to check email", async () => {
+    /** @scenario An address with no account on an installation that cannot send email is told what is missing */
+    it("says what is missing and offers no confirmation link", async () => {
       publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };
       routeMock.mockResolvedValue(unknownIdentifier);
-      requestSignUpVerificationMock.mockResolvedValue({ sent: false, addressProof: "proof-1" });
 
       renderScreen();
-      await enterEmail("nobody@example.com");
-      await screen.findByTestId("unknown-identifier");
+      await enterEmail("colleague@example.com");
 
+      expect(await screen.findByText(/no account for that email address yet/i)).toBeTruthy();
+      expect(screen.getByText(/set up an email provider/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
       expect(screen.queryByRole("button", { name: /send confirmation link/i })).toBeNull();
-      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+    });
 
-      await waitFor(() => expect(hardNavigateMock).toHaveBeenCalledTimes(1));
-      const target = new URL(hardNavigateMock.mock.calls[0]?.[0] as string, "http://x");
-      expect(target.pathname).toBe("/auth/signup");
-      const fragment = new URLSearchParams(target.hash.replace(/^#/, ""));
-      expect(fragment.get("email")).toBe("nobody@example.com");
-      expect(fragment.get("proof")).toBe("proof-1");
-      expect(target.search).not.toContain("proof");
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+    /** @scenario An address with no account on an installation that cannot send email is told what is missing */
+    it("goes back to the address step for a mistyped address", async () => {
+      publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };
+      routeMock.mockResolvedValue(unknownIdentifier);
+
+      renderScreen();
+      await enterEmail("colleague@example.com");
+      await userEvent.click(await screen.findByRole("button", { name: /use a different email/i }));
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
     });
 
     /**

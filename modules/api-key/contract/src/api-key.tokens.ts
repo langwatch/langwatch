@@ -69,6 +69,8 @@ export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
       ingestSourceType: z.string().nullable(),
       ingestionTemplateId: z.string().nullable(),
       isLangySessionKey: z.boolean().optional(),
+      /** An ownerless key minted for a run nobody started: its calls act as the system. */
+      isUnattendedRunKey: z.boolean().optional(),
       ...resolvedApiKeyProjectShape,
     })
     .strict(),

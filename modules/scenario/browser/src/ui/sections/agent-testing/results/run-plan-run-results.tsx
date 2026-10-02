@@ -5,9 +5,8 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { type BatchRun, ScenarioRunContent, targetKeyOfRun } from "@langwatch/suite-browser-kit";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type {
@@ -15,7 +14,9 @@ import type {
   RunPlanSelection,
 } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
+import { type BatchRun, targetKeyOfRun } from "../../../../model/suite/run-history-transforms.ts";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
+import { ScenarioRunContent } from "../../suite/scenario-run-content.tsx";
 import { ComparisonChartsBlock } from "./comparison-charts-block.tsx";
 import { ComparisonResultsTable } from "./comparison-results-table.tsx";
 import type { PeriodControls } from "./period-controls.ts";

@@ -5,9 +5,17 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
-import { Box, Button, Checkbox, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
@@ -19,6 +27,7 @@ import {
   TABLE_HEADER_BG,
 } from "../../../../model/agent-testing/shared/design.ts";
 import { RunCaseButton } from "../../../elements/agent-testing/cases/run-case-button.tsx";
+import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
 import { MenuActionLabel } from "./menu-action-label.tsx";
 import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";

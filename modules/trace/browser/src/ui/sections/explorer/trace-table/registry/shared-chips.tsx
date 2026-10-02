@@ -1,4 +1,13 @@
-import { Circle, chakra, HoverCard, HStack, Icon, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  Circle,
+  chakra,
+  HoverCard,
+  HStack,
+  Icon,
+  Portal,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 import type React from "react";
 import { useState } from "react";

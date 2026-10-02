@@ -3,9 +3,17 @@
  * with substitutions for design-system and link components.
  */
 
-import { Badge, Box, HStack, IconButton, Table, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  HStack,
+  IconButton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {

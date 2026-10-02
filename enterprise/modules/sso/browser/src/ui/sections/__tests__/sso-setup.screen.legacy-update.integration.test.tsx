@@ -86,7 +86,7 @@ function grandfatheredSetup(): SsoSetupPageView {
     goLive: null,
     legacyRoute: null,
     migration: null,
-    availability: { available: true },
+    availability: { available: true, proof: "dns-txt" },
     serviceProvider: SERVICE_PROVIDER,
   };
 }

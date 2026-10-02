@@ -6,9 +6,9 @@
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import { createOpsTestApp, OPS_STAFF_ADDRESS, OPS_STAFF_ID } from "./ops.fixture.ts";
 
-const STAFF: OpsOperator = { id: "operator", email: OPS_STAFF_ADDRESS };
+const STAFF: OpsOperator = { id: OPS_STAFF_ID, email: OPS_STAFF_ADDRESS };
 const CUSTOMER: OpsOperator = { id: "customer", email: "someone@acme.com" };
 
 function appOn({ cloudOps }: { cloudOps: boolean }) {
@@ -42,12 +42,10 @@ describe("given the cloud-ops capability is off", () => {
   });
 
   /** @scenario "Cloud admin refuses as not found where the cloud-ops capability is off" */
-  it("refuses staff admission as not found and reports the capability off", () => {
+  it("refuses staff admission as not found and reports the capability off", async () => {
     const { app } = appOn({ cloudOps: false });
 
-    expect(() => app.admitCloudAdmin(STAFF)).toThrowError(
-      expect.objectContaining({ code: "not_found" }),
-    );
+    await expect(app.admitCloudAdmin(STAFF)).rejects.toMatchObject({ code: "not_found" });
     expect(app.offersCloudOps()).toBe(false);
   });
 });
@@ -60,18 +58,16 @@ describe("given the cloud-ops capability is on", () => {
     expect(adminOperation).toHaveBeenCalledOnce();
   });
 
-  it("admits staff and reports the capability on", () => {
+  it("admits staff and reports the capability on", async () => {
     const { app } = appOn({ cloudOps: true });
 
-    expect(app.admitCloudAdmin(STAFF).id).toBe("operator");
+    expect((await app.admitCloudAdmin(STAFF)).id).toBe(OPS_STAFF_ID);
     expect(app.offersCloudOps()).toBe(true);
   });
 
-  it("still refuses a caller who is not staff as not found", () => {
+  it("still refuses a caller who holds no platform grant as not found", async () => {
     const { app } = appOn({ cloudOps: true });
 
-    expect(() => app.admitCloudAdmin(CUSTOMER)).toThrowError(
-      expect.objectContaining({ code: "not_found" }),
-    );
+    await expect(app.admitCloudAdmin(CUSTOMER)).rejects.toMatchObject({ code: "not_found" });
   });
 });

@@ -1,4 +1,4 @@
-import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
+import { Badge, Button, Card, HStack, Status, Text } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";

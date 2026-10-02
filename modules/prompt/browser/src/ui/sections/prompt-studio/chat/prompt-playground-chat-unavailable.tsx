@@ -4,7 +4,7 @@
  * Both sentences are the host's, from the error registry; this component just arranges them.
  */
 
-import { EmptyState, VStack } from "@chakra-ui/react";
+import { EmptyState, VStack } from "@langwatch/design-system/primitives";
 import { MessageSquareOff } from "lucide-react";
 
 export function PromptPlaygroundChatUnavailable({

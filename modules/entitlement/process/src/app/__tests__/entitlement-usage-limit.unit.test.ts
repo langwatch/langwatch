@@ -15,7 +15,7 @@ const free: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-describe("EntitlementApp.assertWithinUsageLimit", () => {
+describe("EntitlementModule.assertWithinUsageLimit", () => {
   describe("given an organization past its monthly allowance", () => {
     /** @scenario "An organization past its monthly allowance is refused with the plan limit" */
     it("throws the plan limit with the reading it decided from", async () => {

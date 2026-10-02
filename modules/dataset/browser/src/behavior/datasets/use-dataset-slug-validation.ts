@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
 import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -55,7 +55,7 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   const projectId = project?.id;
 
   // Fetch existing dataset slug from DB if editing
-  const { data: existingDataset } = api.dataset.getById.useQuery(
+  const { data: existingDataset } = datasetClient.dataset.getById.useQuery(
     {
       projectId: projectId ?? "",
       datasetId: datasetId ?? "",
@@ -68,7 +68,7 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   const dbSlug = existingDataset?.slug;
 
   // API query for slug validation
-  const validateDatasetName = api.dataset.validateDatasetName.useQuery(
+  const validateDatasetName = datasetClient.dataset.validateDatasetName.useQuery(
     {
       projectId: projectId ?? "",
       proposedName: name,

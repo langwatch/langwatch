@@ -89,60 +89,6 @@ export type GovernanceActorWorkspace = {
 
 /** The organization's session-lifetime policy. Zero days means unbounded. */
 
-/**
- * The plan an organization's usage is measured against. Restated here
- * rather than imported: it belongs to `@langwatch/entitlement-contract`, and
- * `limits` is the one procedure whose payload no governance type describes.
- */
-export type GovernancePlanInfo = {
-  planSource: "license" | "subscription" | "free";
-  type: string;
-  name: string;
-  free: boolean;
-  visibilityDays?: number | null;
-  trialDays?: number;
-  daysSinceCreation?: number;
-  overrideAddingLimitations?: boolean;
-  maxMembers: number;
-  maxMembersLite: number;
-  maxMessagesPerMonth: number;
-  canPublish: boolean;
-  webhookEndpointsEnabled?: boolean;
-  maxTriggerPersistDispatchesPerDay?: number;
-  usageUnit?: string;
-  userPrice?: { USD: number; EUR: number };
-  tracesPrice?: { USD: number; EUR: number };
-  prices: { USD: number; EUR: number };
-};
-
-/**
- * The limit reading with its copy already composed server-side — the same
- * number appears in the sidebar, settings page and approaching-limit email,
- * and three renderings of one number is how they start disagreeing.
- */
-export type GovernanceMessageLimitInfo = {
-  status: "ok" | "warning" | "exceeded";
-  current: number;
-  max: number;
-  currentFormatted: string;
-  maxFormatted: string;
-  percentageFormatted: string;
-  message: string;
-};
-
-/** One organization's usage for the current period, against its allowance. */
-export type GovernanceUsageStats = {
-  /** Null on a legacy or unlimited response, which has no count to show. */
-  currentMonthMessagesCount: number | null;
-  currentMonthCost: number;
-  activePlan: GovernancePlanInfo;
-  maxMonthlyUsageLimit: number;
-  membersCount: number;
-  membersLiteCount: number;
-  messageLimitInfo: GovernanceMessageLimitInfo;
-  usageUnit: "traces" | "events";
-};
-
 // Procedures: hand-written (meant to be generated from mounted router).
 // Segment names load-bearing (mount points, cache keys); inputs are z.input, dates are ISO strings.
 // Organization graph view: org, teams, projects (shares cache with app shell).
@@ -403,19 +349,19 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
     };
 
     organization: {
-      getAll: {
+      getScopeGraph: {
         query: {
-          input: { isDemo?: boolean };
+          input: Record<string, never>;
           output: GovernanceOrganizationGraph[];
         };
       };
     };
 
-    limits: {
-      getUsage: {
+    plan: {
+      getActivePlan: {
         query: {
           input: { organizationId: string };
-          output: GovernanceUsageStats;
+          output: { type: string };
         };
       };
     };

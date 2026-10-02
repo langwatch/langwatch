@@ -1,5 +1,8 @@
-/** Execution environment: project API key and decrypted secrets with injected cipher. */
-import { type WorkflowProjectEnvironment } from "../app/workflow.app.ts";
+/** Execution environment: decrypted project secrets with an injected cipher. */
+import {
+  type WorkflowProjectEnvironment,
+  type WorkflowRunEnvironment,
+} from "../app/workflow.app.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../repositories/workflow-project-environment.repository.ts";
 
 /** The stored-secret cipher, as this service asks it. */
@@ -22,20 +25,14 @@ export class WorkflowProjectEnvironmentService implements WorkflowProjectEnviron
     },
   ) {}
 
-  async get(input: {
-    projectId: string;
-  }): Promise<{ apiKey: string; secrets: Record<string, string> }> {
+  async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
     const stored = await this.options.repository.findEnvironment(input);
+    const environment: WorkflowRunEnvironment = { secrets: {} };
+    for (const { name, encryptedValue } of stored.secrets) {
+      environment.secrets[name] = this.options.encryption.decrypt(encryptedValue);
+    }
 
-    return {
-      apiKey: stored.apiKey,
-      secrets: Object.fromEntries(
-        stored.secrets.map((secret) => [
-          secret.name,
-          this.options.encryption.decrypt(secret.encryptedValue),
-        ]),
-      ),
-    };
+    return environment;
   }
 }
 

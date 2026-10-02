@@ -3,7 +3,7 @@
  * API path same, PricingModel.SEAT_EVENT as string, isSaaS from host.
  */
 
-import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Progress, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 

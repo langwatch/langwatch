@@ -25,7 +25,7 @@ const egress: ModelProviderEgress = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  HttpModelProviderCredentialProbeService.validateProviderApiKey(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeService.validateProviderApiKey({ provider, customKeys, egress });
 
 const AGENT_PLATFORM_CREDENTIALS = {
   GEMINI_API_KEY: "AQ.AnAgentPlatformKey",

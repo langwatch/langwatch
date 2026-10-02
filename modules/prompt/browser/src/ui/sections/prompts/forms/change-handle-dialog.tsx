@@ -1,13 +1,21 @@
-import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { PromptScope } from "@langwatch/workflow-contract";
+import { PromptScope } from "@langwatch/prompt-contract";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
-import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-handle-check.ts";
+import { usePromptHandleCheck } from "../../../../behavior/use-prompt-handle-check.ts";
 import {
   type ChangeHandleFormValues,
   createChangeHandleFormSchema,

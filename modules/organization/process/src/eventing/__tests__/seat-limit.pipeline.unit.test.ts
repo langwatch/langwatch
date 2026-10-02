@@ -1,3 +1,8 @@
+import type {
+  BillingApi,
+  ResourceLimitNotifierInput,
+} from "@langwatch/enterprise-billing-contract";
+import { createTenantId } from "@langwatch/eventing";
 /**
  * @vitest-environment node
  *
@@ -5,12 +10,7 @@
  * subscriber on this pipeline tells billing through its Api (ARCHITECTURE §9).
  * @see specs/licensing/resource-limit-notifications.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  BillingApi,
-  ResourceLimitNotifierInput,
-} from "@langwatch/enterprise-billing-contract";
-import { createTenantId } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { RecordSeatLimitReachedCommand } from "../seat-limit.commands.ts";

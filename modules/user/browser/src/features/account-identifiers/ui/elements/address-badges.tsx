@@ -1,4 +1,4 @@
-import { Badge, HStack, Text } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 
 /** The address, whether it is primary, and whether it has been confirmed when that is known. */
 export function AddressBadges({

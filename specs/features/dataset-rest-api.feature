@@ -3,7 +3,7 @@ Feature: Dataset REST API
   I want full CRUD access to datasets and records via REST endpoints
   So that I can programmatically manage datasets without the UI
 
-  # All 38 scenarios are now bound to integration tests in
+  # All scenarios are bound to integration tests in
   # [gone] src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
 
   Background:
@@ -92,20 +92,29 @@ Feature: Dataset REST API
     Given a dataset with slug "old-name" exists
     When I call PATCH /api/dataset/old-name with name "New Name" and columnTypes [{"name": "question", "type": "string"}]
     Then the dataset is updated
-    And the slug changes to "new-name"
+    And the slug stays "old-name"
     And the response reflects the updated name and columnTypes
 
   @integration
-  Scenario: Update a dataset name regenerates the slug
+  Scenario: Renaming a dataset keeps its slug
     Given a dataset with slug "original" exists
     When I call PATCH /api/dataset/original with name "Renamed Dataset"
-    Then the slug changes to "renamed-dataset"
+    Then the slug stays "original"
+    And GET /api/dataset/original still returns the dataset, now named "Renamed Dataset"
 
   @integration
-  Scenario: Update a dataset fails when new slug conflicts
+  Scenario: Update a dataset fails when the new name collides with another dataset's slug
     Given datasets "alpha" and "beta" exist
     When I call PATCH /api/dataset/alpha with name "Beta"
     Then the request fails with 409 Conflict
+
+  @integration
+  Scenario: Editing columns of a renamed dataset does not collide on its unchanged name
+    Given a dataset named "Alpha" kept the slug "first-alpha" from before a rename
+    And another dataset holds the slug "alpha"
+    When I call PATCH /api/dataset/first-alpha with only new columnTypes
+    Then the dataset is updated
+    And the slug stays "first-alpha"
 
   @integration
   Scenario: Update a non-existent dataset returns 404
@@ -128,6 +137,12 @@ Feature: Dataset REST API
     Then the dataset is soft-deleted with an archivedAt timestamp
     And the slug is modified to prevent future conflicts
     And subsequent GET /api/dataset/to-delete returns 404
+
+  @integration
+  Scenario: Archiving a renamed dataset suffixes the slug it kept
+    Given a dataset with slug "kept-slug" was renamed to "Something Else"
+    When I call DELETE /api/dataset/kept-slug
+    Then the archived slug starts with "kept-slug-archived-"
 
   @integration
   Scenario: Delete a non-existent dataset returns 404
@@ -153,6 +168,17 @@ Feature: Dataset REST API
   @integration
   Scenario: List records for non-existent dataset returns 404
     When I call GET /api/dataset/ghost/records
+    Then the request fails with 404 Not Found
+
+  @integration
+  Scenario: List entries through the legacy GET /:slug/entries path
+    Given a dataset "my-dataset" has 100 records
+    When I call GET /api/dataset/my-dataset/entries?page=2&limit=10
+    Then I receive the same page GET /api/dataset/my-dataset/records?page=2&limit=10 returns
+
+  @integration
+  Scenario: List entries for non-existent dataset returns 404
+    When I call GET /api/dataset/ghost/entries
     Then the request fails with 404 Not Found
 
   # ── Batch Create Records ──────────────────────────────────────

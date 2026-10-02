@@ -1,3 +1,5 @@
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,
   Box,
@@ -10,19 +12,17 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/browser-host/errors";
+} from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
 import {
   classifyGenerationError,
   reportableGenerationFailure,
 } from "../../../behavior/scenarios/classify-generation-error.ts";
+import { useResolvedDefaultModel } from "../../../behavior/scenarios/use-scenario-models.ts";
 import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import {
   type GeneratedScenario,
   generateScenarioWithAI,
@@ -122,10 +122,10 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   });
 
   // Cascade-resolved model for scenario generation.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = useResolvedDefaultModel({
+    projectId: project?.id,
+    featureKey: "scenarios.generator",
+  });
 
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,

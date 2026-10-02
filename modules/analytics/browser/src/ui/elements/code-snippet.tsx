@@ -4,8 +4,8 @@
  * its highlighter). Lazy by construction: grammars load on first render.
  */
 
-import { ClientOnly, CodeBlock, IconButton } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { ClientOnly, CodeBlock, IconButton } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 
 export function CodeSnippet({ code, language }: { code: string; language: string }) {

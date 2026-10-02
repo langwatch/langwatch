@@ -3,28 +3,26 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  GroupRow,
-  type RunGroup,
-  type RunGroupSummary,
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-  RunRow,
-} from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  type RunGroup,
+  type RunGroupSummary,
+} from "../../../model/suite/run-history-transforms.ts";
+import { GroupRow } from "../../../ui/sections/suite/group-row.tsx";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+} from "../../../ui/sections/suite/run-history-filters.tsx";
+import { RunRow } from "../../../ui/sections/suite/run-row.tsx";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const emptyFilters: RunHistoryFilterValues = {
   scenarioId: "",
@@ -82,7 +80,7 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
     /** @scenario "Filter bar shows a list/grid view toggle on suite detail" */
     /** @scenario "Filter bar shows a list/grid view toggle on all runs" */
     it("renders list and grid view toggle buttons", () => {
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
@@ -90,7 +88,6 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
           viewMode="grid"
           onViewModeChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByLabelText("List view")).toBeInTheDocument();
@@ -98,7 +95,7 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
     });
 
     it("defaults to grid view selected", () => {
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
@@ -106,7 +103,6 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
           viewMode="grid"
           onViewModeChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const gridButton = screen.getByLabelText("Grid view");
@@ -121,7 +117,7 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
         const user = userEvent.setup();
         const onViewModeChange = vi.fn();
 
-        render(
+        renderWithDesignSystem(
           <RunHistoryFilters
             scenarioOptions={scenarioOptions}
             filters={emptyFilters}
@@ -129,7 +125,6 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
             viewMode="grid"
             onViewModeChange={onViewModeChange}
           />,
-          { wrapper: Wrapper },
         );
 
         await user.click(screen.getByLabelText("List view"));
@@ -142,7 +137,7 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
         const user = userEvent.setup();
         const onViewModeChange = vi.fn();
 
-        render(
+        renderWithDesignSystem(
           <RunHistoryFilters
             scenarioOptions={scenarioOptions}
             filters={emptyFilters}
@@ -150,7 +145,6 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
             viewMode="list"
             onViewModeChange={onViewModeChange}
           />,
-          { wrapper: Wrapper },
         );
 
         await user.click(screen.getByLabelText("Grid view"));
@@ -161,13 +155,12 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
 
   describe("when viewMode and onViewModeChange are not provided", () => {
     it("does not render toggle buttons", () => {
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
           onFiltersChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByLabelText("List view")).not.toBeInTheDocument();
@@ -184,7 +177,7 @@ describe("<RunRow/> view mode", () => {
   describe("when expanded in grid view", () => {
     /** @scenario "Switching to grid view shows scenario results as cards" */
     it("renders scenario results in a grid container", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -194,7 +187,6 @@ describe("<RunRow/> view mode", () => {
           onScenarioRunClick={vi.fn()}
           viewMode="grid"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();
@@ -202,7 +194,7 @@ describe("<RunRow/> view mode", () => {
     });
 
     it("renders ScenarioGridCard for each scenario run", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -212,7 +204,6 @@ describe("<RunRow/> view mode", () => {
           onScenarioRunClick={vi.fn()}
           viewMode="grid"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText(/Angry refund request/)).toBeInTheDocument();
@@ -222,7 +213,7 @@ describe("<RunRow/> view mode", () => {
 
   describe("when expanded in list view", () => {
     it("renders scenario results in a list container", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -232,7 +223,6 @@ describe("<RunRow/> view mode", () => {
           onScenarioRunClick={vi.fn()}
           viewMode="list"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-list")).toBeInTheDocument();
@@ -242,7 +232,7 @@ describe("<RunRow/> view mode", () => {
 
   describe("when expanded with default viewMode", () => {
     it("defaults to grid view", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -251,7 +241,6 @@ describe("<RunRow/> view mode", () => {
           resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();
@@ -266,7 +255,7 @@ describe("<GroupRow/> view mode", () => {
 
   describe("when expanded in grid view", () => {
     it("renders scenario results in a grid container", () => {
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={makeGroup()}
           summary={makeGroupSummary()}
@@ -276,7 +265,6 @@ describe("<GroupRow/> view mode", () => {
           resolveTargetName={() => null}
           viewMode="grid"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();
@@ -286,7 +274,7 @@ describe("<GroupRow/> view mode", () => {
 
   describe("when expanded in list view", () => {
     it("renders scenario results in a list container", () => {
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={makeGroup()}
           summary={makeGroupSummary()}
@@ -296,7 +284,6 @@ describe("<GroupRow/> view mode", () => {
           resolveTargetName={() => null}
           viewMode="list"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-list")).toBeInTheDocument();
@@ -306,7 +293,7 @@ describe("<GroupRow/> view mode", () => {
 
   describe("when expanded with default viewMode", () => {
     it("defaults to grid view", () => {
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={makeGroup()}
           summary={makeGroupSummary()}
@@ -315,7 +302,6 @@ describe("<GroupRow/> view mode", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();

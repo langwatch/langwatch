@@ -1,18 +1,19 @@
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi, AuthzPrincipalRef } from "@langwatch/authz-contract";
 
 import type { WorkflowPermissionProbe } from "../app/workflow.app.ts";
 
 /** Whether one person holds a permission on a project, answered by the authz peer. */
 export class WorkflowPermissionService implements WorkflowPermissionProbe {
   static create(options: {
-    authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
+    authz: Pick<AuthzApi, "hasPermission" | "can">;
   }): WorkflowPermissionService {
     return new WorkflowPermissionService(options.authz);
   }
 
-  readonly #authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
+  readonly #authz: Pick<AuthzApi, "hasPermission" | "can">;
 
-  private constructor(authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">) {
+  private constructor(authz: Pick<AuthzApi, "hasPermission" | "can">) {
     this.#authz = authz;
   }
 
@@ -24,22 +25,21 @@ export class WorkflowPermissionService implements WorkflowPermissionProbe {
     });
   }
 
-  /** One permission asked of an API key itself, so a key with no owning user is judged by its
-   * own bindings. */
-  hasApiKeyPermission(input: {
-    apiKeyId: string;
-    userId: string | null;
-    organizationId: string;
-    projectId: string;
-    teamId: string;
+  /** One permission asked of a credential's principal at the project scope. */
+  holds(input: {
+    principal: AuthzPrincipalRef;
+    project: Readonly<{ id: string; teamId: string; organizationId: string }>;
     permission: AuthzPermission;
   }): Promise<boolean> {
-    return this.#authz.hasApiKeyPermission({
-      apiKeyId: input.apiKeyId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      scope: { type: "project", id: input.projectId, teamId: input.teamId },
+    return this.#authz.can({
+      principal: input.principal,
       permission: input.permission,
+      scope: {
+        type: "project",
+        id: input.project.id,
+        teamId: input.project.teamId,
+        organizationId: input.project.organizationId,
+      },
     });
   }
 

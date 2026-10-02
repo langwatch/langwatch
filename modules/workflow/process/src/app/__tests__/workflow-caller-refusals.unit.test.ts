@@ -1,13 +1,16 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +19,7 @@ import type { WorkflowLineageRepository } from "../../repositories/workflow-line
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import {
-  WorkflowApp,
+  WorkflowModule,
   type NlpLambdaArnCache,
   type WorkflowInfrastructure,
 } from "../workflow.app.ts";
@@ -35,10 +38,10 @@ class NoopTestEncryption {
 async function appWith(
   overrides: Partial<WorkflowInfrastructure>,
   authz: AuthzApi = createApiFixture<AuthzApi>({}, "AuthzApi"),
-): Promise<WorkflowApp> {
+): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure(overrides);
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -52,10 +55,13 @@ async function appWith(
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz,
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
-      nurturing: createApiFixture<NurturingApi>({}, "NurturingApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       stagingThresholdBytes: void 0,
@@ -77,7 +83,7 @@ async function appWith(
   });
 }
 
-describe("WorkflowApp caller refusals", () => {
+describe("WorkflowModule caller refusals", () => {
   describe("given a key that cannot read the run it would start", () => {
     /** @scenario A workflows-only key cannot start a run it could not read */
     it("refuses before the trigger is reached", async () => {

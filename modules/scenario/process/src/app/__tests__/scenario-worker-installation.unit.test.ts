@@ -5,26 +5,25 @@
 import { EventEmitter } from "node:events";
 
 import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -35,14 +34,14 @@ import {
   scenarioInstallationSecrets,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import { scenarioServer } from "../../scenario.server.ts";
+import { scenarioProcessModule } from "../../scenario.module.ts";
 import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 const projectId = "project-1";
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([withMemoryRepositories(scenarioServer)])
+    .withModules([withMemoryRepositories(scenarioProcessModule)])
     .withConfig({ scenario: scenarioTestConfig })
     .withStores(memoryStores())
     .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())
@@ -77,7 +76,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       }),
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
-      nurturing: createApiFixture<NurturingApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),
@@ -141,8 +139,6 @@ const SIMULATION_KEYS = [
   "projectionRebuild:simulationRunState",
   "subscriber:pm:scenario_evaluations",
   "subscriber:pm:simulation_run_execution",
-  "subscriber:scenarioRunSucceededNurturing",
-  "subscriber:simulationRunFinishedNurturing",
   "subscriber:snapshotUpdateBroadcast",
   "subscriber:suiteRunSync",
   "subscriber:traceMetricsSync",

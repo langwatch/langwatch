@@ -1,7 +1,7 @@
 /** Test harness for activity tables; fakes host, records writes, owns query-string state. */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
@@ -150,9 +150,9 @@ function CodingAgentHostHarness({
  */
 export function codingAgentHostWrapper(host: FakeCodingAgentActivityHost) {
   return ({ children }: { children: ReactNode }) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <CodingAgentHostHarness host={host}>{children}</CodingAgentHostHarness>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

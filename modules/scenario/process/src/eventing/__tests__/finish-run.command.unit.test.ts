@@ -280,6 +280,7 @@ describe("FinishRunCommand", () => {
       expect(events[0]!.data).toEqual({
         scenarioRunId: "run-1",
         traceIds: [],
+        occurredAt: expect.any(Number),
       });
     });
   });
@@ -291,7 +292,7 @@ describe("FinishRunCommand", () => {
       const events = await handler.handle(makeCommand());
 
       expect(events).toHaveLength(1);
-      expect(events[0]!.data).toEqual({ scenarioRunId: "run-1" });
+      expect(events[0]!.data).toEqual({ scenarioRunId: "run-1", occurredAt: expect.any(Number) });
     });
   });
 

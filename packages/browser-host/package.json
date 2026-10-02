@@ -38,10 +38,6 @@
       "types": "./dist/feature-flag-overrides.d.ts",
       "default": "./src/feature-flag-overrides.ts"
     },
-    "./query-client": {
-      "types": "./dist/query-client.d.ts",
-      "default": "./src/query-client.ts"
-    },
     "./analytics": {
       "types": "./dist/analytics.d.ts",
       "default": "./src/analytics.ts"
@@ -90,6 +86,14 @@
       "types": "./dist/query-persistence.d.ts",
       "default": "./src/query-persistence.ts"
     },
+    "./read-freshness": {
+      "types": "./dist/read-freshness.d.ts",
+      "default": "./src/read-freshness.ts"
+    },
+    "./query-sync": {
+      "types": "./dist/query-sync.d.ts",
+      "default": "./src/query-sync.ts"
+    },
     "./query-retry": {
       "types": "./dist/query-retry.d.ts",
       "default": "./src/query-retry.ts"
@@ -105,6 +109,10 @@
     "./use-drawer": {
       "types": "./dist/use-drawer.d.ts",
       "default": "./src/use-drawer.ts"
+    },
+    "./global-store": {
+      "types": "./dist/global-store.d.ts",
+      "default": "./src/global-store.ts"
     },
     "./upgrade-modal-store": {
       "types": "./dist/upgrade-modal-store.d.ts",
@@ -146,18 +154,6 @@
       "types": "./dist/drawer/index.d.ts",
       "default": "./src/drawer/index.ts"
     },
-    "./transport": {
-      "types": "./dist/transport.d.ts",
-      "default": "./src/transport.ts"
-    },
-    "./sse-subscription-link": {
-      "types": "./dist/sse-subscription-link.d.ts",
-      "default": "./src/sse-subscription-link.ts"
-    },
-    "./browser-rpc": {
-      "types": "./dist/browser-rpc.d.ts",
-      "default": "./src/browser-rpc.ts"
-    },
     "./address": {
       "types": "./dist/address.d.ts",
       "default": "./src/address.ts"
@@ -170,14 +166,6 @@
       "types": "./dist/posthog.d.ts",
       "default": "./src/posthog.ts"
     },
-    "./gtag-readiness": {
-      "types": "./dist/gtag-readiness.d.ts",
-      "default": "./src/gtag-readiness.ts"
-    },
-    "./poll-for-global": {
-      "types": "./dist/poll-for-global.d.ts",
-      "default": "./src/poll-for-global.ts"
-    },
     "./browser-tracing": {
       "types": "./dist/browser-tracing.d.ts",
       "default": "./src/browser-tracing.ts"
@@ -189,6 +177,22 @@
     "./feedback": {
       "types": "./dist/ui-feedback.d.ts",
       "default": "./src/ui-feedback.ts"
+    },
+    "./lent": {
+      "types": "./dist/lent.d.ts",
+      "default": "./src/lent.ts"
+    },
+    "./sse-subscription": {
+      "types": "./dist/sse-subscription.d.ts",
+      "default": "./src/sse-subscription.ts"
+    },
+    "./page-visibility": {
+      "types": "./dist/page-visibility.d.ts",
+      "default": "./src/page-visibility.ts"
+    },
+    "./model-error": {
+      "types": "./dist/model-error.d.ts",
+      "default": "./src/model-error.ts"
     }
   },
   "scripts": {
@@ -201,18 +205,17 @@
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
@@ -221,11 +224,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
-    "@tanstack/query-async-storage-persister": "catalog:",
     "@tanstack/react-query": "catalog:",
-    "@tanstack/react-query-persist-client": "catalog:",
-    "@trpc/client": "catalog:",
-    "@trpc/server": "catalog:",
     "idb-keyval": "catalog:",
     "lucide-react": "catalog:",
     "posthog-js": "catalog:",

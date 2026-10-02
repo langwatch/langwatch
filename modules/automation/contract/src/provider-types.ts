@@ -37,5 +37,7 @@ export interface SharedDef {
   readonly label: string;
   readonly description: string;
   readonly alertDescription?: string;
+  /** Report-flavoured variant: a report sends on its schedule, never because a trace matched. */
+  readonly reportDescription?: string;
   readonly actionParamsSchema: ZodTypeAny;
 }

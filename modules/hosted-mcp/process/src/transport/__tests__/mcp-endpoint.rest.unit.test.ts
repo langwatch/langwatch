@@ -1,6 +1,6 @@
 import { RawHttpHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { HostedMcpApiContract, HostedMcpHandler } from "@langwatch/hosted-mcp-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { mcpEndpointDoor } from "../mcp-endpoint.rest.ts";

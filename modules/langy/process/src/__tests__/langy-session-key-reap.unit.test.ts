@@ -1,12 +1,13 @@
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import {
-  LangyMaintenanceService,
-  LANGY_SESSION_KEYS_METRIC_NAME,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   langySessionKeyReapWake,
   runLangySessionKeyReap,
 } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
+
+import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
+import { LANGY_SESSION_KEYS_METRIC_NAME } from "../services/langy-session-key-metrics-otel.service.ts";
 
 const wakeContext = (at: number) => ({
   at,
@@ -94,6 +95,7 @@ describe("langySessionKeyReap process", () => {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
+          virtualKeyProvisioning: { provisionCreated: async () => undefined },
         }).buildProcessing();
 
         const pm = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
@@ -121,6 +123,7 @@ describe("the Langy maintenance pipeline's frozen twin", () => {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
+          virtualKeyProvisioning: { provisionCreated: async () => undefined },
         }).buildProcessing();
 
         expect(pipeline.metadata.name).toBe("langy_maintenance");

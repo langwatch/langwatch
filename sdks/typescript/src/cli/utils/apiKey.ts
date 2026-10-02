@@ -450,19 +450,20 @@ async function resolveSessionCredential(
       }
       return undefined;
     }
+    const personalKeyNow = trimmedOrUndefined(project.api_key);
     cfg.personal_project = {
       id: project.id,
       slug: project.slug,
       name: project.name,
-      api_key: project.api_key,
+      ...(personalKeyNow ? { api_key: personalKeyNow } : {}),
       validated_at: Math.floor(Date.now() / 1000),
     };
     saveConfig(cfg);
-    return {
-      apiKey: loginKey ?? project.api_key,
-      projectId: project.id,
-      isLoginKey: loginKey !== undefined,
-    };
+    // Current servers send no personal key: the login key is the session's only credential.
+    const apiKey = loginKey ?? personalKeyNow;
+    return apiKey
+      ? { apiKey, projectId: project.id, isLoginKey: apiKey === loginKey }
+      : undefined;
   } catch (err) {
     if (err instanceof SessionApiError && (err.status === 401 || err.status === 403)) {
       // Session revoked, expired or refused: 403 counts the same as 401.

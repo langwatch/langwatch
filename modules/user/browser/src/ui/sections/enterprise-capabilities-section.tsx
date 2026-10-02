@@ -3,8 +3,17 @@
  * Cloud only; self-hosted shows capabilities and setup guide.
  */
 
-import { Badge, Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
 
@@ -147,7 +156,7 @@ function SsoConfiguredButNotInUseNotice() {
             {unlicensed ? (
               <>
                 so everyone is signing in by email until a license is activated. Activate one and
-                restart the server to switch single sign-on on.
+                single sign-on turns on within a minute, no restart needed.
               </>
             ) : (
               <>
@@ -166,14 +175,14 @@ function SsoConfiguredButNotInUseNotice() {
 export function EnterpriseCapabilitiesSection() {
   const host = usePersonalWorkspaceHost();
   const organizationId = host.scope().organizationId ?? "";
-  const usage = api.limits.getUsage.useQuery(
+  const activePlan = api.plan.getActivePlan.useQuery(
     { organizationId },
     {
       enabled: !!organizationId && host.hasPermission("organization:view"),
       retry: false,
     },
   );
-  const isEnterprise = usage.data?.activePlan.type === "ENTERPRISE";
+  const isEnterprise = activePlan.data?.type === "ENTERPRISE";
 
   if (host.deployment().isSaas) return null;
 

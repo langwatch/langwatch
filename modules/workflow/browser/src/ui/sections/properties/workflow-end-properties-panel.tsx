@@ -1,4 +1,4 @@
-import { Alert, Box, HStack, Text } from "@chakra-ui/react";
+import { Alert, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { End, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";

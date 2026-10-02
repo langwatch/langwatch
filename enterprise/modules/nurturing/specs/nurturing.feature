@@ -79,3 +79,24 @@ Feature: Nurturing sends the signals its owners record
   # UserApi itself needs is disproportionate to an isolated boot check; the api and worker
   # installation tests (apps/api, apps/worker) already boot nurturing for real, with UserApi
   # provided, and assert it records a signal.
+
+  # Evaluation milestones (Alex, 2026-09-30, option D1a): nurturing names the admin and counts
+  # evaluations from its own store, fed by project's created event and evaluation's completion
+  # fact. Accepted wire difference: evaluation_count restarts from zero at the cutover.
+  @unit
+  Scenario: The evaluation milestone names the admin from project's created event
+    Given project's created event named the organization's admin
+    When an evaluation in that project settles
+    Then Customer.io is told about it against that admin, with nurturing's own count of the organization's evaluations
+
+  @unit
+  Scenario: A seeded organization's first counted evaluation is not its first milestone
+    Given nurturing learned an organization from project's backfill
+    When the first evaluation nurturing counts for it settles
+    Then no first_evaluation_created is sent and the traits carry the count since the cutover
+
+  @unit
+  Scenario: Project's backfill is idempotent for nurturing
+    Given nurturing learned an organization from a live project creation
+    When project's backfill records that project again, once or many times
+    Then the organization stays unseeded and its first evaluation still raises the milestone

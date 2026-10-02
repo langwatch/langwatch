@@ -4,8 +4,15 @@
  * Spec: specs/api-keys/token-created-snippets.feature
  */
 
-import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Alert,
+  Box,
+  createListCollection,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
 

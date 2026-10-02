@@ -28,16 +28,6 @@ const workspaceInvalidate = vi.fn(() => Promise.resolve());
 // test delivers a freshness signal through the real hook logic.
 let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: PROJECT_ID } }),
 }));
@@ -64,8 +54,7 @@ vi.mock("../use-langy-conversation-update-listener.ts", () => ({
   },
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyFreshness } from "../use-langy-freshness.ts";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({

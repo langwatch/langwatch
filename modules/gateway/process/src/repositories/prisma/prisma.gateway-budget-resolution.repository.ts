@@ -33,6 +33,11 @@ export type BudgetResolutionTarget = {
    * resolves as itself.
    */
   endUserId?: string | null;
+  /**
+   * The groups the organization feature says the principal belongs to in this
+   * organization, which this walk never reads for itself.
+   */
+  memberGroupIds: readonly string[];
 };
 
 export type ResolvedBudget = {
@@ -59,7 +64,7 @@ export type ResolvedBudget = {
  * satisfies as readily as the connection itself — the walk runs inside a
  * spend write as often as outside one.
  */
-type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virtualKeyScope">;
+type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "virtualKeyScope">;
 
 /**
  * Which budgets a request is subject to: a budget names a SCOPE, not
@@ -129,13 +134,8 @@ export class PrismaGatewayBudgetResolutionRepository {
     if (!target.principalUserId) return ors;
 
     ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
-    const groupIds = await this.memberGroupIds({
-      client,
-      organizationId: target.organizationId,
-      userId: target.principalUserId,
-    });
-    if (groupIds.length > 0) {
-      ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
+    if (target.memberGroupIds.length > 0) {
+      ors.push({ scopeType: "GROUP", scopeId: { in: [...target.memberGroupIds] } });
     }
     return ors;
   }
@@ -166,27 +166,6 @@ export class PrismaGatewayBudgetResolutionRepository {
       select: { scopeId: true },
     });
     return scopes.map((scope) => scope.scopeId);
-  }
-
-  /**
-   * Group ids the user belongs to within this organization. Scoped to the
-   * org so a user in several orgs never drags another org's group
-   * budget into this one's cascade.
-   */
-  private async memberGroupIds({
-    client,
-    organizationId,
-    userId,
-  }: {
-    client: PrismaLike;
-    organizationId: string;
-    userId: string;
-  }): Promise<string[]> {
-    const memberships = await client.groupMembership.findMany({
-      where: { userId, group: { organizationId } },
-      select: { groupId: true },
-    });
-    return memberships.map((m) => m.groupId);
   }
 
   private byScopeThenId(a: ResolvedBudget, b: ResolvedBudget): number {

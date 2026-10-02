@@ -1,4 +1,5 @@
 import type { AuthzAdmissionScope, AuthzResolveAdmissionInput } from "@langwatch/authz-contract";
+import { z } from "zod";
 
 import {
   AuthzAdmissionRepository,
@@ -18,7 +19,6 @@ export type PrismaAuthzAdmissionDatabase = {
         userId: string;
         organizationId: string;
         disabledAt: null;
-        user: { deactivatedAt: null };
         pendingSsoGrantId: { not: null };
       };
       select: { pendingSsoGrantId: true; createdAt: true };
@@ -38,7 +38,10 @@ export type PrismaAuthzAdmissionDatabase = {
     }): Promise<{ revokedAt: Date | null } | null>;
   };
   $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
+  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
 };
+
+const inactiveRowsSchema = z.array(z.object({ userId: z.string() }));
 
 export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
   static create(options: {
@@ -60,12 +63,12 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
         userId,
         organizationId,
         disabledAt: null,
-        user: { deactivatedAt: null },
         pendingSsoGrantId: { not: null },
       },
       select: { pendingSsoGrantId: true, createdAt: true },
     });
     if (!membership?.pendingSsoGrantId) return { found: false };
+    if (await this.isInactive(userId)) return { found: false };
     return {
       found: true,
       grantId: membership.pendingSsoGrantId,
@@ -107,11 +110,11 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
         AND membership."organizationId" = ${organizationId}
         AND membership."pendingSsoGrantId" = ${grantId}
         AND membership."disabledAt" IS NULL
-        AND EXISTS (
+        AND NOT EXISTS (
           SELECT 1
-          FROM "User" AS user_row
-          WHERE user_row."id" = membership."userId"
-            AND user_row."deactivatedAt" IS NULL
+          FROM "AuthzUserStanding" AS standing
+          WHERE standing."userId" = membership."userId"
+            AND (standing."deactivatedAt" IS NOT NULL OR standing."erasedAt" IS NOT NULL)
         )
         AND EXISTS (
           SELECT 1
@@ -147,5 +150,16 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
         AND "pendingSsoGrantId" = ${grantId}
     `;
     return updated === 1;
+  }
+
+  /** Deactivated or erased, as authz's own standing table says (never the User table). */
+  private async isInactive(userId: string): Promise<boolean> {
+    const rows = await this.database.$queryRaw`
+      -- @tenancy: platform-wide; a user's standing belongs to no organization
+      SELECT "userId" FROM "AuthzUserStanding"
+      WHERE "userId" = ${userId}
+        AND ("deactivatedAt" IS NOT NULL OR "erasedAt" IS NOT NULL)
+    `;
+    return inactiveRowsSchema.parse(rows).length > 0;
   }
 }

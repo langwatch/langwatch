@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { EvaluatorAttachment, EvaluatorInputSpec } from "@langwatch/scenario-contract";
 
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";

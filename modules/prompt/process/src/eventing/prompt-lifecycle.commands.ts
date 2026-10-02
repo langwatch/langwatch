@@ -6,14 +6,16 @@ import {
   stripEnvelope,
   withCommandEnvelope,
 } from "@langwatch/eventing";
+import {
+  PROMPT_CREATED_EVENT_TYPE,
+  promptCreatedEventDataSchema,
+} from "@langwatch/prompt-contract";
 import type { z } from "zod";
 
 import {
   PROMPT_AGGREGATE_TYPE,
-  PROMPT_CREATED_EVENT_TYPE,
   PROMPT_CREATED_EVENT_VERSION,
   RECORD_PROMPT_CREATED_COMMAND_TYPE,
-  promptCreatedEventDataSchema,
   type PromptCreatedEvent,
 } from "./prompt-lifecycle.events.ts";
 
@@ -42,7 +44,7 @@ export class RecordPromptCreatedCommand implements CommandHandler<
         tenantId: createTenantId(command.tenantId),
         type: PROMPT_CREATED_EVENT_TYPE,
         version: PROMPT_CREATED_EVENT_VERSION,
-        data,
+        data: { ...data, occurredAt: command.data.occurredAt },
         occurredAt: command.data.occurredAt,
         idempotencyKey: `${command.tenantId}:${data.promptId}:created`,
       }),

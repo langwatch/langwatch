@@ -1,10 +1,11 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CustomGraph,
   GraphTriggerEvaluationReason,
   Trigger,
+  TriggerLatestEvaluation,
 } from "@langwatch/automation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +22,7 @@ import {
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import { createTestSlackDestinations } from "./testing.ts";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {
@@ -237,6 +239,8 @@ interface Harness {
   updateLastRunAt: ReturnType<typeof vi.fn>;
   loadTrigger: ReturnType<typeof vi.fn>;
   loadCustomGraph: ReturnType<typeof vi.fn>;
+  recorded: TriggerLatestEvaluation[];
+  record: ReturnType<typeof vi.fn<(evaluation: TriggerLatestEvaluation) => Promise<void>>>;
 }
 
 function makeHarness({
@@ -261,6 +265,10 @@ function makeHarness({
   const loadTrigger = vi.fn(async () => trigger);
   const loadCustomGraph = vi.fn(async () => graph);
   const triggerSent = new FakeTriggerSentRepo();
+  const recorded: TriggerLatestEvaluation[] = [];
+  const record = vi.fn(async (evaluation: TriggerLatestEvaluation) => {
+    recorded.push(evaluation);
+  });
 
   const deps: GraphTriggerEvaluationDeps = {
     triggers: {
@@ -282,11 +290,12 @@ function makeHarness({
       info: () => undefined,
       warn: () => undefined,
     },
-    slackTokens: { findDecryptedToken: () => null } as never,
+    slackDestinations: createTestSlackDestinations(),
     dispatchErrors: {
       isTerminal: (error: unknown) => (error as { retryable?: unknown }).retryable === false,
       createTerminal: (message: string) => new Error(message),
     } as never,
+    latestEvaluations: { record },
     clock: { now: () => NOW } as never,
     baseHost: "https://app.langwatch.test",
   };
@@ -298,6 +307,8 @@ function makeHarness({
     updateLastRunAt,
     loadTrigger,
     loadCustomGraph,
+    recorded,
+    record,
   };
 }
 
@@ -878,6 +889,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    /** @scenario "A terminally failing endpoint is not re-posted every evaluation" */
     it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
       harness.dispatch.mockRejectedValue(
         new DispatchError({ message: "webhook revoked", retryable: false }),
@@ -1211,6 +1223,153 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("skipped");
       expect(result.detail).toContain("threshold");
+    });
+  });
+
+  describe("given a metric below its threshold", () => {
+    describe("when the evaluator checks it", () => {
+      /** @scenario "An evaluation that did not breach records its observed value" */
+      it("records the observed value, the threshold, and that it did not fire", async () => {
+        harness = makeHarness({ series: timeseries(5) });
+
+        const result = await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(result.status).toBe("not_breached");
+        expect(harness.recorded).toEqual([
+          {
+            triggerId: TRIGGER_ID,
+            projectId: PROJECT_ID,
+            evaluatedAt: toDate(NOW),
+            verdict: "not_breached",
+            observedValue: 5,
+            threshold: 10,
+            operator: "gt",
+            timePeriodMinutes: 60,
+            skipCode: null,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("given a timeseries read that exceeds the row ceiling", () => {
+    describe("when the evaluator checks it", () => {
+      /** @scenario "A skipped check records why it was skipped" */
+      it("records the skip as an oversized result, keeping the condition it tried", async () => {
+        harness.getTimeseries.mockRejectedValue(
+          Object.assign(new Error("TOO_MANY_ROWS_OR_BYTES"), { code: 396 }),
+        );
+
+        const result = await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(result.status).toBe("skipped");
+        expect(harness.recorded[0]).toMatchObject({
+          verdict: "skipped",
+          skipCode: "result_too_large",
+          observedValue: null,
+          threshold: 10,
+          operator: "gt",
+          timePeriodMinutes: 60,
+        });
+      });
+    });
+  });
+
+  describe("given an alert with no series selected", () => {
+    describe("when the evaluator checks it", () => {
+      /** @scenario "A misconfigured automation records the configuration that is missing" */
+      it("records the skip as incomplete configuration", async () => {
+        harness = makeHarness({
+          trigger: makeTrigger({ actionParams: { threshold: 10, operator: "gt", timePeriod: 60 } }),
+          series: timeseries(5),
+        });
+
+        const result = await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(result.status).toBe("skipped");
+        expect(harness.recorded[0]).toMatchObject({
+          verdict: "skipped",
+          skipCode: "incomplete_configuration",
+          observedValue: null,
+          threshold: null,
+        });
+      });
+    });
+  });
+
+  describe("given an alert whose graph no longer exists", () => {
+    describe("when the evaluator checks it", () => {
+      it("records the subject as missing, with the condition it would have checked", async () => {
+        harness = makeHarness({ graph: null, series: timeseries(5) });
+
+        await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(harness.recorded[0]).toMatchObject({
+          verdict: "skipped",
+          skipCode: "subject_missing",
+          threshold: 10,
+          operator: "gt",
+          timePeriodMinutes: 60,
+        });
+      });
+    });
+  });
+
+  describe("given an alert that is switched off", () => {
+    describe("when the evaluator checks it", () => {
+      it("records the skip as inactive", async () => {
+        harness = makeHarness({ trigger: makeTrigger({ active: false }), series: timeseries(5) });
+
+        await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(harness.recorded[0]).toMatchObject({ verdict: "skipped", skipCode: "inactive" });
+      });
+    });
+  });
+
+  describe("given recording the evaluation fails", () => {
+    describe("when the evaluator checks an alert that crossed its threshold", () => {
+      /** @scenario "A failure to record an evaluation never fails the automation" */
+      it("still fires the alert", async () => {
+        harness = makeHarness({ series: timeseries(250) });
+        harness.record.mockRejectedValue(new Error("the recording table is unreachable"));
+
+        const result = await evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        });
+
+        expect(harness.record).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe("fired");
+        expect(result.didSend).toBe(true);
+      });
     });
   });
 });

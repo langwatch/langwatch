@@ -1,7 +1,15 @@
 /**
  * Upgrade Plan Block - displays upgrade CTA with features and dynamic pricing
  */
-import { Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Card,
+  Flex,
+  HStack,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 import type React from "react";
 
@@ -25,7 +33,7 @@ export function UpgradePlanBlock({
   isLoading?: boolean;
 }) {
   return (
-    <Card.Root data-testid="upgrade-plan-block" borderWidth={1} borderColor="border">
+    <Card.Root data-testid="upgrade-plan-block">
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
           <Flex justifyContent="space-between" alignItems="center">
@@ -42,8 +50,9 @@ export function UpgradePlanBlock({
               />
             </VStack>
             <Button
-              colorPalette="blue"
-              size="md"
+              variant="outline"
+              colorPalette="orange"
+              size="sm"
               onClick={onUpgrade}
               loading={isLoading}
               disabled={isLoading}
@@ -56,13 +65,12 @@ export function UpgradePlanBlock({
             data-testid="upgrade-plan-features-grid"
             templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
             gap={2}
+            color="fg.muted"
           >
             {features.map((feature, index) => (
               <HStack key={index} gap={2}>
-                <Check size={16} color="var(--chakra-colors-blue-solid)" />
-                <Text fontSize="sm" color="fg.muted">
-                  {feature}
-                </Text>
+                <Check size={16} />
+                <Text fontSize="sm">{feature}</Text>
               </HStack>
             ))}
           </SimpleGrid>

@@ -30,7 +30,7 @@ flows:
           selector: .react-flow__node[data-id="entry"]
       - action: click
         with:
-          testId: attach-dataset-button
+          text: /^\s*Replace\s*$/
       - action: click
         with:
           testId: dataset-card-Visual Diff QA
@@ -47,7 +47,7 @@ flows:
           equals: "0"
       - action: click
         with:
-          selector: button:has(path[d^="M3.51 14A9"])
+          selector: '[data-testid="workflow-history-open"]'
       - action: click
         with:
           text: Save new version
@@ -56,7 +56,7 @@ flows:
           path: /{slug}/workflows
       - action: click
         with:
-          text: "vd-cv1wfdet-{uid}"
+          selector: 'button[aria-label="vd-cv1wfdet-{uid}"]'
       - action: click
         with:
           selector: .react-flow__node[data-id="entry"]
@@ -101,7 +101,7 @@ flows:
           text: "vd-cv1wfcard-{uid}"
       - action: click
         with:
-          text: "vd-cv1wfcard-{uid}"
+          selector: 'button[aria-label="vd-cv1wfcard-{uid}"]'
       - action: expect
         with:
           count: .react-flow__node
@@ -166,7 +166,7 @@ flows:
           text: "vd-cv1wfb-{uid}"
       - action: click
         with:
-          selector: a:has-text("vd-cv1wfa-{uid}") button.js-inner-menu
+          selector: '[data-testid="workflow-card-vd-cv1wfa-{uid}"] button.js-inner-menu'
       - action: click
         with:
           text: /^\s*Delete\s*$/

@@ -4,37 +4,16 @@
  * still import the full surface's type from here.
  */
 export type { ExperimentServiceOptions } from "./services/experiment.service.ts";
-export { ExperimentDspyRetentionRepository } from "./repositories/experiment-dspy-retention.repository.ts";
 export type { ExperimentDatabase } from "./repositories/prisma/prisma.experiment.repository.ts";
 export type { ExperimentWorkflowVersionDatabase } from "./repositories/prisma/prisma.experiment-workflow-version.repository.ts";
-export {
-  RedisExperimentRunProcessingRepository,
-  type ClickHouseExperimentRunProcessingAdapterOptions,
-} from "./repositories/redis/redis.experiment-run-processing.repository.ts";
-export {
-  ClickHouseExperimentRunProcessingRepository,
-  type ExperimentRunEventingIdLookup,
-  type ExperimentRunEventingResultRecord,
-  type ExperimentRunEventingState,
-  type ExperimentRunEventingStateRepository,
-} from "./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 export type {
   ClickhouseExperimentRunProcessingRepository,
   ExperimentRunProcessingPipeline,
 } from "./eventing/experiment-run-processing.pipeline.ts";
-export type {
-  ExperimentAppDependencies,
-  ExperimentModelCosts,
-  ExperimentBroadcast,
-  ExperimentMonitorCascade,
-  ExperimentPeople,
-  ExperimentPermissions,
-  ExperimentWorkflowAuthoring,
-} from "./app/experiment.app.ts";
-export { experimentServer } from "./experiment.server.ts";
+export type { ExperimentAppDependencies, ExperimentPeople } from "./app/experiment.app.ts";
+export { experimentProcessModule } from "./experiment.module.ts";
 export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
-export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.service.ts";
 
 export {
   buildStripScoreEvaluatorIds,
@@ -42,7 +21,6 @@ export {
 } from "./eventing/experiment-evaluator-score-filter.process.ts";
 
 export type { ExperimentRunProgressState } from "./repositories/experiment-run-fold.repository.ts";
-export { ExperimentSandboxCredential } from "./services/experiment-run-sandbox-key.service.ts";
 
 export type { ExperimentRunCollaborators } from "./rules/experiment-run-input.rules.ts";
 export type {
@@ -75,7 +53,7 @@ export {
   type ExperimentV3RestApi,
   experimentWorkbenchCredential,
 } from "./transport/experiment-v3.rest.ts";
-export type { ExperimentWorkbenchObserver } from "./app/experiment-workbench.members.ts";
+export type { ExperimentWorkbenchObserver } from "./services/experiment-workbench-observer.service.ts";
 export { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 export type { ExperimentFindOrCreateInput } from "./services/experiment-find-or-create.service.ts";
 export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";

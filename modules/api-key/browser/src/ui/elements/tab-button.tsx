@@ -1,6 +1,6 @@
 /** Tab in the token dialog; family-local copy used by other onboarding surfaces. */
 
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export function TabButton({

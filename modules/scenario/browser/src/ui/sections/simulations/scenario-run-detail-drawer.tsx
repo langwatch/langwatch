@@ -1,14 +1,23 @@
-import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import {
   type UiScenarioRunDetailDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
+import { Chip } from "@langwatch/design-system/chip";
+import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import {
+  Accordion,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
-import { Chip, ConversationExpandContext } from "@langwatch/trace-browser-kit";
-import { CopyButton } from "@langwatch/workflow-browser-kit";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { Suspense, useState } from "react";
 
@@ -27,6 +36,7 @@ import { AgentTestingRunDrawer } from "../agent-testing/drawers/agent-testing-ru
 import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
 import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
+import { CopyButton } from "../workflow/copy-button.tsx";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
 import { useScenarioRunDetail } from "./use-scenario-run-detail.ts";
 

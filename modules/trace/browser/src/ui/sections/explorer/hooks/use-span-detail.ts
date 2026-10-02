@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
@@ -13,28 +12,15 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  * view.
  */
 export function useSpanDetailCanonical() {
-  const shared = useSharedTrace();
   const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
-  const spanId = useDrawerStore((s) => s.selectedSpanId);
+  const spanId = useTraceDrawer((s) => s.selectedSpanId);
 
-  const query = api.traces.spanDetail.useQuery(
+  return api.traces.spanDetail.useQuery(
     { ...queryArgs, spanId: spanId ?? "" },
     {
-      enabled: isReady && hintReady && !!spanId && !shared,
-      staleTime: 300_000,
+      enabled: isReady && hintReady && !!spanId,
     },
   );
-
-  if (shared) {
-    // The shared payload's spansFull entries are the bulk-mapped details:
-    // they carry no per-span events and no llm ancestor-prompt enrichment
-    // (both live only on the single-span `traces.spanDetail` read). The
-    // trace-level events timeline covers the share page; per-span events in
-    // the payload are an ADR-057 follow-up.
-    const detail = spanId ? shared.spansFull.find((s) => s.spanId === spanId) : undefined;
-    return asSharedQueryResult(detail);
-  }
-  return query;
 }
 
 /**

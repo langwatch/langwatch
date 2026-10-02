@@ -39,11 +39,10 @@ import { z } from "zod";
 
 import {
   type ActivityMonitorRepository,
+  type ActivityMonitorTenant,
   type GovernanceClickHouseClient,
   type GovernanceClickHouseResolver,
 } from "../../app/governance.members.ts";
-
-const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 
 interface SummaryResult {
   spentThisWindowUsd: number;
@@ -384,29 +383,14 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     };
   }
 
-  /**
-   * Resolves the org's hidden internal_governance Project ID. Returns null
-   * when the org has no Gov Project yet (no IngestionSource has ever been
-   * minted) - callers short-circuit to empty results in that case.
-   */
-  private async tryResolveGovProjectId(organizationId: string): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
-  }
-
-  async summary(input: { organizationId: string; windowDays: number }): Promise<SummaryResult> {
+  async summary(
+    input: { organizationId: string; windowDays: number } & ActivityMonitorTenant,
+  ): Promise<SummaryResult> {
     const anomalyBreakdown = await this.openAnomalyBreakdown(input.organizationId);
     const openAnomalyCount =
       anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
 
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+    const { govProjectId } = input;
     if (!govProjectId) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
@@ -495,15 +479,17 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     return breakdown;
   }
 
-  async spendByUser(input: {
-    organizationId: string;
-    windowDays: number;
-    limit?: number;
-    offset?: number;
-    sortBy?: SpendSortField;
-    sortDir?: SortDir;
-  }): Promise<SpendByUserRow[]> {
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+  async spendByUser(
+    input: {
+      organizationId: string;
+      windowDays: number;
+      limit?: number;
+      offset?: number;
+      sortBy?: SpendSortField;
+      sortDir?: SortDir;
+    } & ActivityMonitorTenant,
+  ): Promise<SpendByUserRow[]> {
+    const { govProjectId } = input;
     if (!govProjectId) return [];
 
     const ch = await this.clickhouse.getClient(input.organizationId);
@@ -831,15 +817,17 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
    * govProjectId`, where `govProjectId` is the caller's hidden
    * Governance Project - cross-org leak is structurally impossible.
    */
-  async spendByTeam(input: {
-    organizationId: string;
-    windowDays: number;
-    limit?: number;
-    offset?: number;
-    sortBy?: SpendSortField;
-    sortDir?: SortDir;
-  }): Promise<SpendByTeamRow[]> {
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+  async spendByTeam(
+    input: {
+      organizationId: string;
+      windowDays: number;
+      limit?: number;
+      offset?: number;
+      sortBy?: SpendSortField;
+      sortDir?: SortDir;
+    } & ActivityMonitorTenant,
+  ): Promise<SpendByTeamRow[]> {
+    const { govProjectId } = input;
     if (!govProjectId) return [];
 
     const ch = await this.clickhouse.getClient(input.organizationId);
@@ -1001,18 +989,20 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
    *   §"spendOverTime API contract"
    *   §"spendOverTime CH query honors TenantId scoping"
    */
-  async spendOverTime(input: {
-    organizationId: string;
-    windowDays: number;
-    groupBy: SpendOverTimeGroupBy;
-  }): Promise<SpendOverTimeResult> {
+  async spendOverTime(
+    input: {
+      organizationId: string;
+      windowDays: number;
+      groupBy: SpendOverTimeGroupBy;
+    } & ActivityMonitorTenant,
+  ): Promise<SpendOverTimeResult> {
     const windowDays = Math.max(1, Math.floor(input.windowDays));
     const dayMs = 24 * 60 * 60 * 1000;
     const now = Date.now();
     const todayStart = PrismaActivityMonitorRepository.startOfUtcDay(now);
     const windowStart = todayStart - (windowDays - 1) * dayMs;
 
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+    const { govProjectId } = input;
     if (!govProjectId) {
       return {
         buckets: PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays),
@@ -1341,16 +1331,16 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     return (await result.json()) as SourceEventCountRow[];
   }
 
-  async ingestionSourcesHealth(input: {
-    organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]> {
+  async ingestionSourcesHealth(
+    input: { organizationId: string } & ActivityMonitorTenant,
+  ): Promise<IngestionSourceHealthRow[]> {
     const sources = await this.prisma.ingestionSource.findMany({
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
     });
     if (sources.length === 0) return [];
 
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+    const { govProjectId } = input;
 
     const eventsBySource = new Map<string, number>();
     if (govProjectId) {
@@ -1490,13 +1480,15 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     );
   }
 
-  async eventsForSource(input: {
-    organizationId: string;
-    sourceId: string;
-    limit?: number;
-    beforeIso?: string;
-  }): Promise<ActivityEventDetailRow[]> {
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+  async eventsForSource(
+    input: {
+      organizationId: string;
+      sourceId: string;
+      limit?: number;
+      beforeIso?: string;
+    } & ActivityMonitorTenant,
+  ): Promise<ActivityEventDetailRow[]> {
+    const { govProjectId } = input;
     if (!govProjectId) return [];
 
     const ch = await this.clickhouse.getClient(input.organizationId);
@@ -1648,11 +1640,10 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     return ((await result.json()) as WindowCountRow[])[0];
   }
 
-  async sourceHealthMetrics(input: {
-    organizationId: string;
-    sourceId: string;
-  }): Promise<SourceHealthMetrics> {
-    const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
+  async sourceHealthMetrics(
+    input: { organizationId: string; sourceId: string } & ActivityMonitorTenant,
+  ): Promise<SourceHealthMetrics> {
+    const { govProjectId } = input;
     if (!govProjectId) return PrismaActivityMonitorRepository.emptySourceHealthMetrics();
 
     const ch = await this.clickhouse.getClient(input.organizationId);

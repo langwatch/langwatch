@@ -39,8 +39,7 @@ vi.mock("../use-session-groups.ts", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { useExplorerCounts } from "../use-explorer-counts.ts";
 
 beforeEach(() => {

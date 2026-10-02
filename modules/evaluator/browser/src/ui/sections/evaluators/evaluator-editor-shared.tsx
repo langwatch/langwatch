@@ -1,4 +1,3 @@
-import { Box, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type {
   UiEvaluatorEditorDrawerProps,
   UiEvaluatorGateConfig,
@@ -14,8 +13,18 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
+import {
+  Box,
+  Field,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import { evaluatorClient } from "@langwatch/evaluator-client";
+import { type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -29,14 +38,8 @@ import type {
 } from "@langwatch/experiment-contract";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { toEpochMs } from "@langwatch/time";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  WorkflowCardDisplay,
-  WorkflowCardLink,
-  FormServerError,
-} from "@langwatch/workflow-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -44,12 +47,16 @@ import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
 } from "../../elements/evaluator-editor-chrome.tsx";
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
+import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
+import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
@@ -137,6 +144,49 @@ export type EvaluatorEditorController = {
 };
 
 /**
+ * Fills a new evaluator's form once per evaluator type, then latches, so
+ * late-resolving defaults never overwrite what the user has typed. It waits for
+ * both default queries, or the configured default would never replace the fallback.
+ */
+function useResetCreateForm({
+  form,
+  evaluatorDef,
+  evaluatorId,
+  evaluatorType,
+  defaultSettings,
+  forceUserToDecideAName,
+  isLoading,
+}: {
+  form: UseFormReturn<EvaluatorFormValues>;
+  evaluatorDef: { name: string } | undefined;
+  evaluatorId: string | undefined;
+  evaluatorType: string | undefined;
+  defaultSettings: Record<string, unknown>;
+  forceUserToDecideAName: boolean;
+  isLoading: boolean;
+}) {
+  const didInitializeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!evaluatorDef || evaluatorId || isLoading) return;
+    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
+    if (didInitializeRef.current === key) return;
+    form.reset({
+      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
+      settings: defaultSettings,
+    });
+    didInitializeRef.current = key;
+  }, [
+    evaluatorDef,
+    evaluatorId,
+    evaluatorType,
+    defaultSettings,
+    form,
+    forceUserToDecideAName,
+    isLoading,
+  ]);
+}
+
+/**
  * Owns all state/behavior for the evaluator editor. Consumers render the
  * returned controller via <EvaluatorEditorBody/> and <EvaluatorEditorFooter/>.
  */
@@ -147,7 +197,7 @@ export function useEvaluatorEditorController(
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const utils = api.useUtils();
+  const utils = evaluatorClient.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -188,7 +238,7 @@ export function useEvaluatorEditorController(
 
   const { isOpen } = props;
 
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorClient.evaluators.getById.useQuery(
     { id: evaluatorId ?? "", projectId: project?.id ?? "" },
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
@@ -215,7 +265,11 @@ export function useEvaluatorEditorController(
 
   const settingsSchema = useMemo(() => settingsSchemaOf(evaluatorType), [evaluatorType]);
 
-  const defaultSettings = useResolvedDefaultSettings({ evaluatorDef, project, isOpen });
+  const { defaultSettings, isLoading: resolvedDefaultsLoading } = useResolvedDefaultSettings({
+    evaluatorDef,
+    project,
+    isOpen,
+  });
 
   const forceUserToDecideAName = mustChooseName(evaluatorType);
 
@@ -228,21 +282,15 @@ export function useEvaluatorEditorController(
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // `defaultSettings` can resolve (new reference) after the user has already
-  // started filling the form; `form.formState.isDirty` doesn't survive that
-  // race reliably. Latch a ref so late-resolving defaults never re-fire the
-  // reset once the form is live.
-  const didInitializeCreateFormRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!evaluatorDef || evaluatorId) return;
-    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
-    if (didInitializeCreateFormRef.current === key) return;
-    form.reset({
-      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
-      settings: defaultSettings,
-    });
-    didInitializeCreateFormRef.current = key;
-  }, [evaluatorDef, evaluatorId, evaluatorType, defaultSettings, form, forceUserToDecideAName]);
+  useResetCreateForm({
+    form,
+    evaluatorDef,
+    evaluatorId,
+    evaluatorType,
+    defaultSettings,
+    forceUserToDecideAName,
+    isLoading: resolvedDefaultsLoading,
+  });
 
   const savedFormValuesRef = useRef<EvaluatorFormValues | null>(null);
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
@@ -296,7 +344,7 @@ export function useEvaluatorEditorController(
     };
   }, [form, debouncedUpdateLocalConfig]);
 
-  const createMutation = api.evaluators.create.useMutation({
+  const createMutation = evaluatorClient.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onLocalConfigChangeRef.current?.(undefined);
@@ -312,7 +360,7 @@ export function useEvaluatorEditorController(
     },
   });
 
-  const updateMutation = api.evaluators.update.useMutation({
+  const updateMutation = evaluatorClient.evaluators.update.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       void utils.evaluators.getById.invalidate({
@@ -431,7 +479,9 @@ export function useEvaluatorEditorController(
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
-    isLoadingEvaluator: evaluatorQuery.isLoading,
+    // A new evaluator's form holds until its default models answer, so the
+    // reset that fills them in never lands on top of something typed.
+    isLoadingEvaluator: evaluatorQuery.isLoading || (!evaluatorId && resolvedDefaultsLoading),
     workflowCard,
     isWorkflowEvaluator,
     hasSettings,
@@ -506,7 +556,6 @@ export function EvaluatorGateSection({
 export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEditorController }) {
   const {
     form,
-    evaluatorId,
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
@@ -532,7 +581,7 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
   // drawer transitions wipe flowCallbacks/complexProps mid-flight.
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
-  if (evaluatorId && isLoadingEvaluator) {
+  if (isLoadingEvaluator) {
     return (
       <HStack justify="center" paddingY={8}>
         <Spinner size="md" />
@@ -690,6 +739,7 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
     handleDiscard,
     handleApply,
     handleClose,
+    isLoadingEvaluator,
   } = controller;
 
   return (
@@ -699,6 +749,7 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
       hasUnsavedChanges={hasUnsavedChanges}
       isSaving={isSaving}
       isValid={isValid}
+      isLoading={isLoadingEvaluator}
       isComparisonEditor={!!onComparisonChange}
       saveButtonText={saveButtonText}
       onSave={handleSave}
@@ -765,9 +816,11 @@ function useComparisonDraft({
     comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
   );
   const initialComparison = comparisonContext?.initialComparison;
-  useEffect(() => {
+  const [comparisonFrom, setComparisonFrom] = useState(initialComparison);
+  if (comparisonFrom !== initialComparison) {
+    setComparisonFrom(initialComparison);
     setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
-  }, [initialComparison]);
+  }
 
   const handleComparisonChange = useCallback(
     (next: ComparisonEvaluatorConfig) => {
@@ -788,9 +841,11 @@ function useRequiredToggle({
 }) {
   // The switch flips right away; the attachment follows through the callback.
   const [required, setRequired] = useState(gateRequired ?? false);
-  useEffect(() => {
+  const [requiredFrom, setRequiredFrom] = useState(gateRequired);
+  if (requiredFrom !== gateRequired) {
+    setRequiredFrom(gateRequired);
     setRequired(gateRequired ?? false);
-  }, [gateRequired]);
+  }
   const handleRequiredChange = useCallback(
     (next: boolean) => {
       setRequired(next);
@@ -815,17 +870,10 @@ function useResolvedDefaultSettings({
   // embeddings_model values reflect what this project actually has
   // configured (claude-opus, gemini-pro, etc.) instead of the generic
   // DEFAULT_MODEL constant baked into the evaluator zod schemas.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id && isOpen },
-  );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id && isOpen },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
 
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
@@ -848,7 +896,10 @@ function useResolvedDefaultSettings({
     resolvedDefaultModel.data?.model,
     resolvedDefaultEmbeddings.data?.model,
   ]);
-  return defaultSettings;
+  return {
+    defaultSettings,
+    isLoading: resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading,
+  };
 }
 
 /** A flow callback that handled navigation wins; otherwise step back, or close the last drawer. */
@@ -888,7 +939,7 @@ function isEditorValid({
 }
 
 function workflowCardOf(
-  evaluator: RouterOutputs["evaluators"]["getById"] | undefined,
+  evaluator: EvaluatorOutputs["evaluators"]["getById"] | undefined,
 ): EvaluatorEditorController["workflowCard"] {
   if (!evaluator?.workflowId) return undefined;
   return {

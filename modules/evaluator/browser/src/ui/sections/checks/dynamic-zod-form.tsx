@@ -1,3 +1,5 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Box,
   Button,
@@ -8,10 +10,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+} from "@langwatch/design-system/primitives";
 import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
@@ -19,7 +18,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import {
@@ -35,6 +34,7 @@ import {
 import { type ZodType, z } from "zod";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
@@ -336,17 +336,9 @@ const DynamicZodForm = ({
   const { project } = useOrganizationTeamProject();
 
   // Cascade-resolved defaults for evaluator model + embeddings fields.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+  });
 
   const ctx: ZodFieldContext = {
     register,

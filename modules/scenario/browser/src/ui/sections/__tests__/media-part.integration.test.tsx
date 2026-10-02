@@ -3,26 +3,24 @@
  * @see specs/traces-v2/media-rendering.feature
  * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { MediaProbeResult } from "@langwatch/scenario-contract";
 import type { MediaPartData } from "@langwatch/trace-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
 
-vi.mock("@langwatch/stored-object-browser-kit", () => ({ useStoredObjectUrl: mint }));
+vi.mock("../../../behavior/stored-object/use-stored-object-url.ts", () => ({
+  useStoredObjectUrl: mint,
+}));
 
 import { MediaPart } from "../media-part.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const TEST_PROJECT_ID = "proj_test";
 
@@ -71,7 +69,7 @@ describe("<MediaPart/>", () => {
   describe("when a message has a url-shape audio part", () => {
     /** @scenario "Trace timeline renders the new file id shape as an inline media tag" */
     it("renders an <audio> element pointing at the URL", () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -83,7 +81,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -94,7 +91,7 @@ describe("<MediaPart/>", () => {
     });
 
     it("renders an <img> element for a url-shape image part", () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -106,7 +103,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const img = screen.getByTestId("media-part-image") as HTMLImageElement;
@@ -116,7 +112,7 @@ describe("<MediaPart/>", () => {
     });
 
     it("renders a <video> element for a url-shape video part", () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -128,7 +124,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const video = screen.getByTestId("media-part-video") as HTMLVideoElement;
@@ -147,7 +142,7 @@ describe("<MediaPart/>", () => {
       // echoed back. A parser that returned the first segment would yield
       // "owner_proj" and fail the assertion.
       const onId = vi.fn();
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "image",
@@ -159,7 +154,6 @@ describe("<MediaPart/>", () => {
           }}
           onId={onId}
         />,
-        { wrapper: Wrapper },
       );
 
       const img = screen.getByTestId("media-part-image") as HTMLImageElement;
@@ -172,7 +166,7 @@ describe("<MediaPart/>", () => {
   describe("when the url is the legacy id-only shape", () => {
     it("probes with the id from the single path segment", () => {
       const onId = vi.fn();
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "image",
@@ -184,7 +178,6 @@ describe("<MediaPart/>", () => {
           }}
           onId={onId}
         />,
-        { wrapper: Wrapper },
       );
 
       const img = screen.getByTestId("media-part-image") as HTMLImageElement;
@@ -199,7 +192,7 @@ describe("<MediaPart/>", () => {
     it("renders an <audio> element with a data: URI", () => {
       const base64 = Buffer.from("fake-audio-bytes").toString("base64");
 
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -211,7 +204,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -223,7 +215,7 @@ describe("<MediaPart/>", () => {
     it("renders an <img> element with a data: URI for legacy inline-data image part", () => {
       const base64 = Buffer.from("fake-image-bytes").toString("base64");
 
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -235,7 +227,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const img = screen.getByTestId("media-part-image") as HTMLImageElement;
@@ -247,7 +238,7 @@ describe("<MediaPart/>", () => {
   describe("when the probe answers 'missing' (row exists, blob gone)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "audio",
@@ -259,7 +250,6 @@ describe("<MediaPart/>", () => {
           }}
           answer={{ status: "missing", mediaType: "audio/mp3" }}
         />,
-        { wrapper: Wrapper },
       );
 
       // Simulate native element error event (browser fires this when src 404s)
@@ -284,7 +274,7 @@ describe("<MediaPart/>", () => {
   describe("when the part holds a size summary instead of the media", () => {
     /** @scenario "Media the pipeline chose not to capture says so, and says how large it was" */
     it("says the media was not captured, and how large it was", () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -297,7 +287,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const placeholder = screen.getByTestId("media-part-not-captured");
@@ -315,7 +304,7 @@ describe("<MediaPart/>", () => {
       // Row never existed (e.g. id was made up / deleted). The renderer
       // collapses 'not_found' into 'missing' since the user-visible state
       // is the same: there is nothing to play.
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "audio",
@@ -327,7 +316,6 @@ describe("<MediaPart/>", () => {
           }}
           answer={{ status: "not_found" }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -344,7 +332,7 @@ describe("<MediaPart/>", () => {
       // Row exists AND storage confirms bytes are present, but the browser
       // element still errored — transient decode / network failure. MediaPart
       // should land on "error", not "missing".
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "audio",
@@ -356,7 +344,6 @@ describe("<MediaPart/>", () => {
           }}
           answer={{ status: "available", mediaType: "audio/mp3" }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -382,7 +369,7 @@ describe("<MediaPart/>", () => {
       // there. Before, status stayed "loading" and the player sat at zero
       // seconds forever. `probe === null` is the caller's "the query itself
       // errored" answer.
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "audio",
@@ -394,7 +381,6 @@ describe("<MediaPart/>", () => {
           }}
           answer={null}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -417,7 +403,7 @@ describe("<MediaPart/>", () => {
     it("shows a placeholder while the probe is still in flight", async () => {
       // Probe requested, no answer yet: the failed element is already gone
       // and its place is held.
-      render(
+      renderWithDesignSystem(
         <ProbeHarness
           part={{
             type: "audio",
@@ -428,7 +414,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -443,7 +428,7 @@ describe("<MediaPart/>", () => {
 
   describe("when a url that is not a stored object fails to load", () => {
     it("states the failure straight away, with no probe to wait for", async () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -455,7 +440,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const img = screen.getByTestId("media-part-image") as HTMLImageElement;
@@ -474,7 +458,7 @@ describe("<MediaPart/>", () => {
   describe("when the browser fires loadeddata on a URL-shape audio part", () => {
     /** @scenario "MediaPart audio playback reports a non-zero duration once the browser has decoded the media" */
     it("the <audio> element exposes controls and a non-zero duration so the play button is enabled", async () => {
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -486,7 +470,6 @@ describe("<MediaPart/>", () => {
             },
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
@@ -536,7 +519,7 @@ describe("<MediaPart/>", () => {
       vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
 
       try {
-        render(
+        renderWithDesignSystem(
           <MediaPart
             projectId={TEST_PROJECT_ID}
             part={{
@@ -544,7 +527,6 @@ describe("<MediaPart/>", () => {
               source: { type: "url", value: "/api/files/p1/legacy-pcm", mimeType: "audio/pcm16" },
             }}
           />,
-          { wrapper: Wrapper },
         );
 
         const audio = await screen.findByTestId("media-part-audio");
@@ -578,7 +560,7 @@ describe("<MediaPart/>", () => {
       ["video", "media-part-video"],
     ] as const)("loads the %s element from the minted URL", (type, testId) => {
       mint.mockReturnValue({ status: "ready", url: MINTED });
-      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored(type)} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<MediaPart projectId={TEST_PROJECT_ID} part={stored(type)} />);
 
       expect(mint).toHaveBeenCalledWith({
         reference: "/api/files/proj_test/so_1",
@@ -589,7 +571,7 @@ describe("<MediaPart/>", () => {
 
     it("opens an attachment chip at the URL minted under its filename", () => {
       mint.mockReturnValue({ status: "ready", url: MINTED });
-      render(
+      renderWithDesignSystem(
         <MediaPart
           projectId={TEST_PROJECT_ID}
           part={{
@@ -599,7 +581,6 @@ describe("<MediaPart/>", () => {
             filename: "report.pdf",
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(mint).toHaveBeenCalledWith(expect.objectContaining({ filename: "report.pdf" }));
@@ -608,9 +589,7 @@ describe("<MediaPart/>", () => {
 
     it("mounts no media element while the URL mints", () => {
       mint.mockReturnValue({ status: "pending" });
-      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />);
 
       expect(screen.queryByTestId("media-part-image")).toBeNull();
       expect(screen.getByTestId("media-part-probing")).toBeInTheDocument();
@@ -619,9 +598,9 @@ describe("<MediaPart/>", () => {
     it("asks the probe and lands on the unavailable state when the mint fails", async () => {
       mint.mockReturnValue({ status: "failed" });
       const onId = vi.fn();
-      render(<ProbeHarness part={stored("audio")} answer={{ status: "not_found" }} onId={onId} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <ProbeHarness part={stored("audio")} answer={{ status: "not_found" }} onId={onId} />,
+      );
 
       expect(screen.queryByTestId("media-part-audio")).toBeNull();
       await waitFor(() => expect(screen.getByTestId("media-part-missing")).toBeInTheDocument());
@@ -630,9 +609,7 @@ describe("<MediaPart/>", () => {
 
     it("shows the error state when the mint fails and no probe is wired", async () => {
       mint.mockReturnValue({ status: "failed" });
-      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />);
 
       await waitFor(() => expect(screen.getByTestId("media-part-error")).toBeInTheDocument());
       expect(screen.queryByTestId("media-part-image")).toBeNull();

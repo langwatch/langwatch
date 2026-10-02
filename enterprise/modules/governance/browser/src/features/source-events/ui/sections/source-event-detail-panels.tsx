@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Box, Code, SimpleGrid, Table, Text } from "@chakra-ui/react";
+import { Box, Code, SimpleGrid, Table, Text } from "@langwatch/design-system/primitives";
 
 import type { SourceEventRowData } from "./source-events-table.tsx";
 

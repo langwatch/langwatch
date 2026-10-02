@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

@@ -1,10 +1,10 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { Field } from "@langwatch/workflow-contract";
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
@@ -87,7 +87,7 @@ export const useSyncWorkflowTargetFields = () => {
 
   // The project's agents, the same query the agent picker uses, so this
   // usually costs nothing beyond a cache read.
-  const agentsQuery = api.agents.getAll.useQuery(
+  const agentsQuery = experimentApi.agents.getAll.useQuery(
     { projectId },
     { enabled: !!projectId && workflowTargets.length > 0, staleTime: 60_000 },
   );

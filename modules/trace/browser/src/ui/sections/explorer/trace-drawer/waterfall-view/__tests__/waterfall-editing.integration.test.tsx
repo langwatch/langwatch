@@ -9,14 +9,20 @@ const mocks = vi.hoisted(() => ({
   storedPatch: null as TraceEditOverlayPatch | null,
 }));
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({
     data: mocks.storedPatch ? { patch: mocks.storedPatch } : undefined,
   }),
 }));
 
-const { useDrawerStore } = await import("../../../../../../index.ts");
-const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { getTraceDrawer, useTraceEditStore } = await import("../../../../../../index.ts");
+const { openTraceDrawerAt, setWindowAddress } =
+  await import("../../../../../../__tests__/window-location-router.ts");
 const { useCorrectionMarks } = await import("../use-correction-marks.ts");
 const { useWaterfallEditing } = await import("../use-waterfall-editing.ts");
 
@@ -49,14 +55,13 @@ const storedCorrection: TraceEditOverlayPatch = {
 beforeEach(() => {
   mocks.storedPatch = null;
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().setIsEditing(false);
-  useDrawerStore.getState().clearSpan();
+  setWindowAddress({ url: "/my-project/traces" });
 });
 
 describe("given a trace that was already corrected once", () => {
   beforeEach(() => {
     mocks.storedPatch = storedCorrection;
-    useDrawerStore.getState().setIsEditing(true);
+    openTraceDrawerAt({ edit: "1" });
     useTraceEditStore.getState().startEditing({ traceId: "trace-1", basePatch: storedCorrection });
   });
 
@@ -96,9 +101,8 @@ describe("given a trace that was already corrected once", () => {
 
 describe("given a span open in the detail pane while editing", () => {
   beforeEach(() => {
-    useDrawerStore.getState().setIsEditing(true);
+    openTraceDrawerAt({ edit: "1", span: "span-2" });
     useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
-    useDrawerStore.getState().selectSpan("span-2");
   });
 
   describe("when the reviewer deletes it", () => {
@@ -108,7 +112,7 @@ describe("given a span open in the detail pane while editing", () => {
 
       act(() => result.current.toggleSpanDeleted("span-2"));
 
-      expect(useDrawerStore.getState().selectedSpanId).toBeNull();
+      expect(getTraceDrawer().selectedSpanId).toBeNull();
     });
   });
 });

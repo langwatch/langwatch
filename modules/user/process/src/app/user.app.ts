@@ -15,10 +15,8 @@ import {
   describePasswordProblem,
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OpsApi, type AdminIdentity } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   EnsuredPersonalWorkspace,
@@ -26,7 +24,8 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
@@ -61,6 +60,7 @@ import type {
   UserFullProfile,
   UserHomePagePickerState,
   UserIdInput,
+  UserLifecycleChangeInput,
   UserLinkedAccount,
   UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
@@ -108,6 +108,10 @@ import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
+import {
+  UserLifecycleNoticeService,
+  type UserLifecycleSenders,
+} from "../services/user-lifecycle-notice.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
 import { buildUserInfrastructure } from "./user-composition.build.ts";
@@ -149,7 +153,6 @@ interface UserAppDependencies {
     GovernanceRestApi,
     "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap"
   >;
-  ops: OpsApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
 }
@@ -163,16 +166,16 @@ type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
 
 type UserSetup = FeatureSetup<
-  typeof UserApp.dependencies,
+  typeof UserModule.dependencies,
   UserMembers,
   undefined,
   UserRepositories
 >;
 
-export class UserApp implements UserApi {
+export class UserModule implements UserApi {
   static readonly contract = UserApi;
   /** `publicBaseUrl` is named raw: the process answers it, no store does. */
-  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
+  static readonly reads = ["prisma", "redis", "publicBaseUrl"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
@@ -181,7 +184,6 @@ export class UserApp implements UserApi {
     governance: typeof GovernanceRestApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
-    ops: typeof OpsApi;
     projects: typeof ProjectApi;
     storedObjects: typeof StoredObjectApi;
   } = {
@@ -192,12 +194,11 @@ export class UserApp implements UserApi {
     governance: GovernanceRestApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
-    ops: OpsApi,
     projects: ProjectApi,
     storedObjects: StoredObjectApi,
   };
 
-  static create(setup: UserSetup): UserApp {
+  static create(setup: UserSetup): UserModule {
     const members = buildUserInfrastructure({
       prisma: setup.members.prisma,
       redis: setup.members.redis,
@@ -212,7 +213,7 @@ export class UserApp implements UserApi {
       storedObjects: setup.dependencies.storedObjects,
     });
 
-    return UserApp.#build({
+    return UserModule.#build({
       members,
       dependencies: setup.dependencies,
       repositories: setup.repositories,
@@ -236,8 +237,8 @@ export class UserApp implements UserApi {
     dependencies: UserAppDependencies;
     members: UserInfrastructure;
     facts: UserFacts;
-  }): UserApp {
-    return UserApp.#build(setup);
+  }): UserModule {
+    return UserModule.#build(setup);
   }
 
   static #build({
@@ -250,10 +251,11 @@ export class UserApp implements UserApi {
     dependencies: UserAppDependencies;
     repositories: UserRepositories;
     facts: UserFacts;
-  }): UserApp {
+  }): UserModule {
     const now = members.now;
+    const lifecycle = UserLifecycleNoticeService.create();
 
-    return new UserApp({
+    return new UserModule({
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
@@ -261,7 +263,11 @@ export class UserApp implements UserApi {
         avatarStorage: members.avatarStorage,
         credentialIssuer: CREDENTIAL_ISSUER,
         ...(now ? { now } : {}),
+        platformOperators: dependencies.authz,
+        lifecycle,
+        cliCredentials: members.cliCredentials,
       }),
+      lifecycle,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords: members.passwords,
@@ -273,6 +279,7 @@ export class UserApp implements UserApi {
   }
 
   readonly #users: UserService;
+  readonly #lifecycle: UserLifecycleNoticeService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -281,18 +288,21 @@ export class UserApp implements UserApi {
 
   private constructor({
     users,
+    lifecycle,
     credentials,
     dependencies,
     members,
     facts,
   }: {
     users: UserService;
+    lifecycle: UserLifecycleNoticeService;
     credentials: UserCredentialService;
     dependencies: UserAppDependencies;
     members: UserInfrastructure;
     facts: UserFacts;
   }) {
     this.#users = users;
+    this.#lifecycle = lifecycle;
     this.#credentials = credentials;
     this.#account = UserAccountService.create(dependencies);
     this.#peers = dependencies;
@@ -388,19 +398,13 @@ export class UserApp implements UserApi {
     return this.#users.setNotificationPreference(input);
   }
 
-  /**
-   * Whether an identity is a platform operator. Synchronous, and it takes the
-   * identity rather than an id, because that is what the operator list is.
-   */
-  isAdmin(identity: AdminIdentity): boolean {
-    return this.#account.isAdmin(identity);
-  }
-
-  /** The same lookup from an id, resolving the address through this directory. */
-  async isOperator({ userId }: { userId: string }): Promise<boolean> {
-    const profile = await this.#users.findById({ id: userId });
-
-    return this.#account.isAdmin({ email: profile?.email ?? null });
+  /** Whether the account behind an id holds the platform-operator grant. */
+  isOperator({ userId }: { userId: string }): Promise<boolean> {
+    return this.#peers.authz.can({
+      principal: { type: "user", id: userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
   }
 
   // -- credentials -----------------------------------------------------------
@@ -421,6 +425,10 @@ export class UserApp implements UserApi {
    * Decision 4), and blocking this path would kill fresh-signup recovery (5c).
    */
   async registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
+    // Before anything is claimed or written: the sign-in that follows is refused on a foreign
+    // origin, and an account created first would be left with nobody signed in to it.
+    await this.#peers.auth.assertSignUpOrigin({ origin: input.origin, referer: input.referer });
+
     // The same rules the form ran, from the same module, so the two cannot
     // drift into accepting different passwords. Carried as `fieldErrors` so the
     // refusal lands on the password box rather than in a banner over it.
@@ -715,21 +723,22 @@ export class UserApp implements UserApi {
 
   // -- the account's lifecycle -----------------------------------------------
 
-  /** Retires an account. The effects that follow it are the process's. */
-  deactivate(input: UserIdInput): Promise<UserProfile> {
+  /** user_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: UserLifecycleSenders): void {
+    this.#lifecycle.connect(senders);
+  }
+
+  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
+  deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.deactivate(input);
   }
 
   /** Restores a retired account. */
-  reactivate(input: UserIdInput): Promise<UserProfile> {
+  reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.reactivate(input);
   }
 
-  /**
-   * Retirement is three writes, not one: the durable flag, then the two credential
-   * families that would otherwise outlive it. Stopping at the flag would leave a live
-   * session and a live CLI token belonging to somebody the product says is gone.
-   */
+  /** Self-service or an operator's call; `deactivate` ends every credential family. */
   async deactivateAccount({
     userId,
     caller,
@@ -737,16 +746,19 @@ export class UserApp implements UserApi {
     userId: string;
     caller: UserCaller;
   }): Promise<void> {
-    if (userId !== caller.id && !(await this.isOperator({ userId: caller.operatorId }))) {
+    // Retiring someone else may revoke an operator, so it is never done while impersonating.
+    const isOthers = userId !== caller.id;
+    if (
+      isOthers &&
+      (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId })))
+    ) {
       throw new UserAccountAccessDeniedError();
     }
 
-    await this.#users.deactivate({ id: userId });
-    await this.#account.revokeAllBrowserSessions({ userId });
-    await this.#members.cliCredentials.revokeForUser({ userId });
+    await this.#users.deactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
-  /** Restoring is an operator's call alone. */
+  /** An operator's call alone, never while impersonating: it can restore an operator's grant. */
   async reactivateAccount({
     userId,
     caller,
@@ -754,11 +766,11 @@ export class UserApp implements UserApi {
     userId: string;
     caller: UserCaller;
   }): Promise<void> {
-    if (!(await this.isOperator({ userId: caller.operatorId }))) {
+    if (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId }))) {
       throw new UserAccountAccessDeniedError();
     }
 
-    await this.#users.reactivate({ id: userId });
+    await this.#users.reactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
   // -- the avatar ------------------------------------------------------------
@@ -844,17 +856,9 @@ export class UserApp implements UserApi {
       organizationId,
       personalTeamId: workspace.team.id,
     });
-    const canManageProject = await this.#peers.authz.hasPermission({
-      userId,
-      permission: "project:manage",
-      projectId: workspace.project.id,
-    });
 
     return {
-      workspace: {
-        ...workspace,
-        project: { ...workspace.project, apiKey: canManageProject ? workspace.project.apiKey : "" },
-      },
+      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" } },
       routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
     };
   }
@@ -1025,7 +1029,7 @@ export class UserApp implements UserApi {
     const project = await this.#requireProject({ projectId });
     const ownerUserId = this.#account.personalUsageCallerFor({ project, credential });
     const organizationId =
-      (credential.kind === "apiKey" ? credential.organizationId : null) ??
+      (credential.kind === "legacyProjectKey" ? null : credential.organizationId) ??
       (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
     const tenant = organizationId
       ? await this.#members.governanceProjects.findGovernanceProject({ organizationId })

@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see modules/langy/specs/langy-github-turn-token.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { GithubApi } from "@langwatch/github-contract";
 import { describe, expect, it } from "vitest";
 

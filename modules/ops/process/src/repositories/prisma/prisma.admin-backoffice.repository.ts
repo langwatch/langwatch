@@ -7,7 +7,6 @@ import type {
   UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
-import { type Instant, toDate } from "@langwatch/time";
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
 import { toBackofficeUserRow } from "../../rules/backoffice-user-row.rules.ts";
@@ -65,13 +64,6 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
   async findUserById(id: string): Promise<AdminDataResult> {
     const data = await this.database.user.findUnique({ where: { id } });
     return { data };
-  }
-
-  async setUserDeactivatedAt(id: string, value: Instant): Promise<void> {
-    await this.database.user.update({
-      where: { id },
-      data: { deactivatedAt: toDate(value) },
-    });
   }
 
   private async getList(

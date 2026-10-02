@@ -116,15 +116,14 @@ export interface OrganizationSeatLicense {
   }): Promise<OrganizationSeatDecision>;
 
   /**
-   * Refuses a role change the organization's plan does not carry: seat classification first,
-   * then the Enterprise requirement a custom-role assignment implies. Throws, never a soft answer.
+   * Refuses a role change the organization's seats do not carry. Throws, never a soft answer.
+   * The custom-role plan is declared on the door.
    */
   assertRoleChangeAllowed(input: {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
 }
@@ -374,20 +373,6 @@ export interface OrganizationInvitations {
 }
 
 /**
- * What the organization's plan carries. Each one throws by name; a refusal is
- * never turned into a different answer.
- */
-export interface OrganizationPlanGate {
-  // A property of function type rather than method shorthand: a test holds
-  // a mock built to this interface and asserts on this member via
-  // `expect(...).not.toHaveBeenCalled()`, which is unsafe against a
-  // method-shorthand member under `unbound-method`.
-  assertCustomRolesAllowed: (input: Readonly<{ organizationId: string }>) => Promise<void>;
-  assertAuditLogsAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
-  assertScimAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
-}
-
-/**
  * The trail a sign-up, an invitation and a chosen integration leave outside
  * this feature. Every one of them is fire-and-forget by construction: an
  * organization that could not be announced is still an organization.
@@ -434,8 +419,7 @@ export interface OrganizationSignals {
 }
 
 /**
- * The parts of the sign-up ceremony that belong to other features: the
- * standard AI-tool catalogue Enterprise governance seeds, and the first
+ * The part of the sign-up ceremony that belongs to another feature: the first
  * project, created through the SAME project service every other door uses.
  */
 export interface OrganizationCeremony {
@@ -443,7 +427,6 @@ export interface OrganizationCeremony {
   // mock built to this interface and asserts on these members via
   // `expect(...).toHaveBeenCalledWith`/`.not.toHaveBeenCalled()`, which is
   // unsafe against a method-shorthand member under `unbound-method`.
-  ensureDefaultAiToolCatalog: (input: Readonly<{ organizationId: string }>) => Promise<void>;
   createProject: (
     input: Readonly<{
       organizationId: string;

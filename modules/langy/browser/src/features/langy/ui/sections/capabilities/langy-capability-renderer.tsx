@@ -2,7 +2,7 @@
  * Capability-card dispatcher.
  */
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import {
   asJsonDocument,
   type CliToolResult,
@@ -22,6 +22,7 @@ import {
   withDecidedCard,
 } from "../../../model/capabilities/capability-registry.ts";
 import { deriveFollowUpChips } from "../../../model/capabilities/follow-up-chips.ts";
+import { LangyAutomationCard } from "../automations/langy-automation-card.tsx";
 import { LangyDatasetCard } from "./langy-dataset-card.tsx";
 import { LangyDeclarativeCard } from "./langy-declarative-card.tsx";
 import { LangyEvalRunCard } from "./langy-eval-run-card.tsx";
@@ -190,6 +191,8 @@ function CapabilityCard({
   projectSlug: string | null;
 }) {
   const props = { descriptor, input, output, digest, projectSlug };
+  // An automation is drawn by what it is, whichever verb touched it.
+  if (descriptor.command.resource === "trigger") return <LangyAutomationCard {...props} />;
   switch (descriptor.render) {
     // `traces` is a trace SEARCH — the sample card, matched traces plus a way
     // through to the Trace Explorer. `trace` is a single `get`.

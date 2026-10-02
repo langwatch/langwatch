@@ -1,15 +1,10 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EvaluatorEditorActions } from "../../elements/evaluator-editor-chrome.tsx";
 import { CodeEvaluatorEditor, type CodeEvaluatorField } from "../code-evaluator-editor.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const inputs: CodeEvaluatorField[] = [{ identifier: "output", type: "str" }];
 
@@ -20,7 +15,7 @@ describe("code evaluator editor", () => {
   it("presents the fixed evaluator result contract", () => {
     const renderCodeEditor = vi.fn(() => <div data-testid="code-editor" />);
 
-    render(
+    renderWithDesignSystem(
       <CodeEvaluatorEditor
         name="My evaluator"
         code="class Evaluator: pass"
@@ -29,7 +24,6 @@ describe("code evaluator editor", () => {
         onInputsChange={vi.fn()}
         renderCodeEditor={renderCodeEditor}
       />,
-      { wrapper: Wrapper },
     );
 
     for (const field of ["passed", "score", "label", "details"]) {
@@ -53,7 +47,7 @@ describe("code evaluator editor", () => {
   it("delegates input authoring to its host state", () => {
     const onInputsChange = vi.fn();
 
-    render(
+    renderWithDesignSystem(
       <CodeEvaluatorEditor
         name="My evaluator"
         code="class Evaluator: pass"
@@ -62,7 +56,6 @@ describe("code evaluator editor", () => {
         onInputsChange={onInputsChange}
         renderCodeEditor={() => null}
       />,
-      { wrapper: Wrapper },
     );
 
     fireEvent.click(screen.getByTestId("code-evaluator-input-add"));
@@ -83,14 +76,13 @@ describe("evaluator editor actions", () => {
   };
 
   it("keeps apply enabled for an incomplete non-comparison local editor", () => {
-    render(
+    renderWithDesignSystem(
       <EvaluatorEditorActions
         {...actions}
         mode="local"
         isValid={false}
         isComparisonEditor={false}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("evaluator-save-button")).toBeDisabled();
@@ -98,9 +90,8 @@ describe("evaluator editor actions", () => {
   });
 
   it("blocks apply for an incomplete comparison editor", () => {
-    render(
+    renderWithDesignSystem(
       <EvaluatorEditorActions {...actions} mode="local" isValid={false} isComparisonEditor />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("evaluator-apply-button")).toBeDisabled();

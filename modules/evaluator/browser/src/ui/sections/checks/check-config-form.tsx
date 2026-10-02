@@ -1,3 +1,13 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+  type MappingState,
+  mappingStateSchema,
+} from "@langwatch/dataset-contract";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Accordion,
   Button,
@@ -9,18 +19,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-  type MappingState,
-  mappingStateSchema,
-} from "@langwatch/dataset-contract";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+} from "@langwatch/design-system/primitives";
 import { slugify } from "@langwatch/design-system/slugify";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -33,7 +32,6 @@ import {
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
   type ComponentProps,
@@ -54,12 +52,15 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { EvaluatorTracesMapping } from "../../../behavior/lent-peers.tsx";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
 import DynamicZodForm from "./dynamic-zod-form.tsx";
 import { EvaluationManualIntegration } from "./evaluation-manual-integration.tsx";
@@ -91,22 +92,14 @@ export default function CheckConfigForm({
   loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
-  const isNameAvailable = api.monitors.isNameAvailable.useMutation();
+  const isNameAvailable = evaluatorApi.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
   // Cascade-resolved defaults so the form's initial model /
   // embeddings_model values reflect the project's configured
   // providers instead of the generic DEFAULT_MODEL fallback.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+  });
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({

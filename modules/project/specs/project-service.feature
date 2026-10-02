@@ -107,3 +107,17 @@ Feature: Shared project service
     Given an organization holds an application project and its hidden governance project in one team
     When a caller lists the organization's or the team's projects with includeGovernance
     Then both projects are listed
+
+  @unit
+  Scenario: A new project's created event names the organization's admin
+    Given an organization whose oldest ADMIN member is a known user
+    When a new project in it is recorded as created
+    Then project's created event carries that admin's user id
+    And it is not marked as backfilled
+
+  @unit
+  Scenario: Existing projects are recorded as created by the backfill, idempotently
+    Given an organization with two projects that existed before project recorded its creations
+    When the backfill-project-created task runs twice
+    Then each run records both projects as created, marked backfilled, with the organization's admin
+    And the second run records the same facts as the first, keyed alike, so peers treat it as a repeat

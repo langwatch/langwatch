@@ -16,9 +16,8 @@ const listData: { data: unknown; isError: boolean; error: unknown } = {
   error: null,
 };
 
-vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
-  personalWorkspaceApi: {},
-  api: {
+vi.mock("@langwatch/api-key-client", () => ({
+  apiKeyClient: {
     apiKey: { list: { useQuery: () => listData } },
   },
 }));

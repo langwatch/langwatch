@@ -124,7 +124,6 @@ export class RepositoryStub extends AdminBackofficeRepository {
     data: {},
   }));
   findUserById = vi.fn(async () => ({ data: backofficeOperator }));
-  setUserDeactivatedAt = vi.fn(async () => undefined);
 }
 
 export class AuditStub extends AdminAuditSink {

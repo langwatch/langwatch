@@ -22,6 +22,8 @@ func catalogueServer(t *testing.T) (*httptest.Server, func() map[string][]map[st
 		switch {
 		case r.URL.Path == "/api/dashboards" || r.URL.Path == "/api/workflows":
 			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.URL.Path == "/api/trpc/annotationScore.getAll":
+			_, _ = w.Write([]byte(`{"result":{"data":[]}}`))
 		case r.URL.Path == "/api/trpc/departments.list":
 			_, _ = w.Write([]byte(`{"result":{"data":[]}}`))
 		case r.URL.Path == "/api/trpc/departments.create":
@@ -67,6 +69,32 @@ func TestTheCatalogueSeedNamesItsDashboardsAndPutsTheAdminInADepartment(t *testi
 	}
 	if len(calls["/api/v1/agents/connect/register"]) != 2 {
 		t.Errorf("registrations: %+v", calls["/api/v1/agents/connect/register"])
+	}
+}
+
+// @scenario "Each stack offers the Langy echo model and one annotation score metric"
+func TestTheCatalogueSeedOffersTheLangyModelAndAScoreMetric(t *testing.T) {
+	server, read := catalogueServer(t)
+
+	warnings := seedCatalogue(t.Context(), catalogueRequest{
+		client: server.Client(), apiURL: server.URL, key: DefaultProjectKey,
+		identity: SeedIdentity{Email: SeededEmail, Password: SeededPassword},
+	})
+
+	if len(warnings) != 0 {
+		t.Fatalf("warnings: %v", warnings)
+	}
+	calls := read()
+	models, _ := calls["/api/model-providers/openai"][0]["customModels"].([]any)
+	if len(models) != 1 || models[0] != SeedLangyModel {
+		t.Errorf("provider write: %+v", calls["/api/model-providers/openai"])
+	}
+	if _, keyed := calls["/api/model-providers/openai"][0]["customKeys"]; keyed {
+		t.Errorf("the provider write replaces the process's credentials: %+v", calls["/api/model-providers/openai"])
+	}
+	scores := calls["/api/trpc/annotationScore.upsert"]
+	if len(scores) != 1 || scores[0]["name"] != SeedAnnotationScoreName {
+		t.Errorf("score upserts: %+v", scores)
 	}
 }
 

@@ -1,7 +1,7 @@
 /**
  * Update seats Block - allows Growth plan users to finalize seat changes
  */
-import { Button, Card, Flex, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, Card, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { PricingSummary } from "../elements/pricing-summary.tsx";
 
@@ -21,7 +21,7 @@ export function UpdateSeatsBlock({
   isLoading?: boolean;
 }) {
   return (
-    <Card.Root data-testid="update-seats-block" borderWidth={1} borderColor="border">
+    <Card.Root data-testid="update-seats-block">
       <Card.Body paddingY={5} paddingX={6}>
         <Flex justifyContent="space-between" alignItems="center">
           <VStack align="start" gap={1}>
@@ -37,16 +37,17 @@ export function UpdateSeatsBlock({
           <HStack gap={2}>
             <Button
               data-testid="discard-seat-changes-button"
-              variant="ghost"
-              size="md"
+              variant="outline"
+              size="sm"
               onClick={onDiscard}
               disabled={isLoading}
             >
               Discard
             </Button>
             <Button
-              colorPalette="blue"
-              size="md"
+              variant="outline"
+              colorPalette="orange"
+              size="sm"
               onClick={onUpdate}
               loading={isLoading}
               disabled={isLoading}

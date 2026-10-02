@@ -1,5 +1,4 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
@@ -37,30 +36,17 @@ import {
 import type { EventingCommands } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  EvaluationCustomEvaluators,
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationInputsResolution,
-  EvaluationInstallEnvironment,
-  EvaluationRetentionLookup,
-  EvaluationReport,
-  EvaluationRescore,
-  EvaluationRunAnalytics,
-  EvaluationWarmupProbe,
-} from "../app/evaluation.members.ts";
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
@@ -68,11 +54,11 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
   EvaluationProcessingPipelineAdapter,
-  type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
+import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
 import {
@@ -89,6 +75,7 @@ import { EvaluationExecutionReceiptService } from "../services/evaluation-execut
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
 import { EvaluationExperimentRunService } from "../services/evaluation-experiment-run.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
+import { EvaluationGuardrailCheckService } from "../services/evaluation-guardrail-check.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -115,14 +102,14 @@ import { WorkflowEvaluationService } from "../services/workflow-evaluation.servi
 
 export type EvaluationInfrastructure = Readonly<{
   retention: EvaluationRetentionLookup;
-  execution: EvaluationExecution;
-  inputResolution: EvaluationInputsResolution;
-  environment: EvaluationInstallEnvironment;
+  execution: Pick<EvaluationExecutionService, "execute">;
+  inputResolution: Pick<EvaluationInputsOffloadService, "resolveInputs">;
+  environment: Pick<EvaluatorEnvironmentService, "read">;
   customEvaluators: EvaluationCustomEvaluators;
   rescore: EvaluationRescore;
   warmup: EvaluationWarmupProbe;
   analytics: EvaluationRunAnalytics;
-  report: EvaluationReport;
+  report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   // What the public evaluation doors reach beyond the module: the experiment
   // an SDK batch is written into, the rows a slug names, the saved-evaluator
   // directory, the model cascade, the cost ledger and the evaluator runtime.
@@ -180,6 +167,32 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
   };
 }
 
+/** The project's own workflow-backed evaluators, each with its published version. */
+export interface EvaluationCustomEvaluators {
+  findAll(input: Readonly<{ projectId: string }>): Promise<CustomEvaluator[]>;
+}
+
+/** Scores one stored trace with one evaluator, read through the caller's protections. */
+export interface EvaluationRescore {
+  runForTrace(
+    input: RunTraceEvaluationInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<EvaluationRunOutcome>;
+}
+
+/**
+ * One liveness probe at the evaluator backend. A failed probe is not an error,
+ * only a probe that did not warm anything.
+ */
+export interface EvaluationWarmupProbe {
+  probe(input: Readonly<{ projectId: string }>): Promise<void>;
+}
+
+/** Product analytics for a completed run. */
+export interface EvaluationRunAnalytics {
+  evaluationRan(input: Readonly<{ userId: string; projectId: string }>): void;
+}
+
 /** The monitors and datasets an evaluate call addresses by slug. */
 export interface EvaluationSlugDirectory {
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
@@ -212,8 +225,8 @@ export interface EvaluationRunner {
 }
 
 type EvaluationSetup = FeatureSetup<
-  typeof EvaluationApp.dependencies,
-  MembersRead<typeof EvaluationApp.reads>,
+  typeof EvaluationModule.dependencies,
+  MembersRead<typeof EvaluationModule.reads>,
   EvaluationServerConfig,
   EvaluationRepositories
 >;
@@ -249,7 +262,7 @@ function verdictOf(
 }
 
 /** The one process-owned Evaluation capability. */
-export class EvaluationApp implements EvaluationApiContract {
+export class EvaluationModule implements EvaluationApiContract {
   static readonly contract = EvaluationApi;
   /** `langevalsEndpoint`: where this deployment's evaluator and clustering service answers. */
   static readonly config = evaluationConfig;
@@ -262,20 +275,16 @@ export class EvaluationApp implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read per request (queued runs, slug lookups), never in construction: MonitorApp needs us. */
+    /** Read per request (queued runs, slug lookups), not in construction: monitor needs us. */
     monitors: MonitorApi,
-    /** Wakes trigger matching and graph alerts when an evaluation settles. */
-    automations: AutomationApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
     /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
     datasets: DatasetApi,
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
-    /** Names the organization's admin and its projects when an evaluation settles. */
-    projects: ProjectApi,
   };
-  static readonly reads = reads("objectStorage");
+  static readonly reads = ["objectStorage"] as const;
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
@@ -283,12 +292,12 @@ export class EvaluationApp implements EvaluationApiContract {
 
   readonly #service: EvaluationService;
   readonly #azureSafety: AzureSafetyCredentialsService;
-  readonly #environment: EvaluationInstallEnvironment;
+  readonly #environment: Pick<EvaluatorEnvironmentService, "read">;
   readonly #customEvaluators: EvaluationCustomEvaluators;
   readonly #rescore: EvaluationRescore;
   readonly #warmup: EvaluationWarmupProbe;
   readonly #analytics: EvaluationRunAnalytics;
-  readonly #report: EvaluationReport;
+  readonly #report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
@@ -298,12 +307,12 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #models: EvaluationModelCascade;
   readonly #ledger: EvaluationLedger;
   readonly #runner: EvaluationRunner;
+  readonly #guardrails: EvaluationGuardrailCheckService;
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
-  readonly #executionIntent: EvaluationExecutionIntent;
+  readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
-  readonly #automations: EvaluationAutomationReactions;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
 
   private constructor({
@@ -323,7 +332,7 @@ export class EvaluationApp implements EvaluationApiContract {
     commands: EvaluationCommandDispatcherService | undefined;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
-    executionIntent: EvaluationExecutionIntent;
+    executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
     lifecycle: EvaluationLifecycleService | undefined;
   }) {
@@ -333,7 +342,6 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#piiDetection = piiDetection;
     this.#executionIntent = executionIntent;
     this.#eventing = eventing;
-    this.#automations = dependencies.automations;
     this.#azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     this.#environment = members.environment;
     this.#customEvaluators = members.customEvaluators;
@@ -347,6 +355,10 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#models = members.models;
     this.#ledger = members.ledger;
     this.#runner = members.runner;
+    this.#guardrails = EvaluationGuardrailCheckService.create({
+      runner: members.runner,
+      ledger: members.ledger,
+    });
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
@@ -358,10 +370,10 @@ export class EvaluationApp implements EvaluationApiContract {
   }
 
   /** The closed stub answers what has no port yet (see the port-evaluation-runtime handoff). */
-  static async create(setup: EvaluationSetup): Promise<EvaluationApp> {
+  static async create(setup: EvaluationSetup): Promise<EvaluationModule> {
     const { secrets } = setup;
-    const environment = await secrets.into(EvaluationApp.secrets.openAi, (openAi) =>
-      secrets.into(EvaluationApp.secrets.azureContentSafety, (azureContentSafety) =>
+    const environment = await secrets.into(EvaluationModule.secrets.openAi, (openAi) =>
+      secrets.into(EvaluationModule.secrets.azureContentSafety, (azureContentSafety) =>
         EvaluatorEnvironmentService.create({
           config: setup.config,
           openAiApiKey: openAi,
@@ -370,18 +382,15 @@ export class EvaluationApp implements EvaluationApiContract {
       ),
     );
 
-    return EvaluationApp.withEnvironment(setup, environment);
+    return EvaluationModule.withEnvironment(setup, environment);
   }
 
   private static withEnvironment(
     { dependencies, repositories, members, config }: EvaluationSetup,
     environment: EvaluatorEnvironmentService,
-  ): EvaluationApp {
+  ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
-    const lifecycle = EvaluationLifecycleService.create({
-      projects: dependencies.projects,
-      runs: repositories.runs,
-    });
+    const lifecycle = EvaluationLifecycleService.create();
     const langevals = config.langevalsEndpoint
       ? langevalsChannels.live.create({
           config,
@@ -429,7 +438,7 @@ export class EvaluationApp implements EvaluationApiContract {
       telemetry,
     });
 
-    return EvaluationApp.fromInfrastructure({
+    return EvaluationModule.fromInfrastructure({
       infrastructure: {
         ...unavailable,
         customEvaluators: {
@@ -524,9 +533,9 @@ export class EvaluationApp implements EvaluationApiContract {
     lifecycle?: EvaluationLifecycleService;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
-    executionIntent: EvaluationExecutionIntent;
+    executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
-  }): EvaluationApp {
+  }): EvaluationModule {
     const {
       infrastructure: members,
       dependencies,
@@ -539,7 +548,7 @@ export class EvaluationApp implements EvaluationApiContract {
       eventing,
     } = setup;
 
-    return new EvaluationApp({
+    return new EvaluationModule({
       service: EvaluationService.create({
         repository: repositories.runs,
         monitorPerformance: repositories.monitorPerformance,
@@ -564,7 +573,6 @@ export class EvaluationApp implements EvaluationApiContract {
     return EvaluationProcessingPipelineAdapter.createPipeline({
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
-      automations: this.#automations,
       ...(this.#lifecycle ? { lifecycle: this.#lifecycle } : {}),
     });
   }
@@ -614,6 +622,8 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#batchLog.log(input);
   runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>
     this.#runner.runEvaluation(input);
+  checkGuardrail: EvaluationApiContract["checkGuardrail"] = (input) =>
+    this.#guardrails.check(input);
   resolveSavedEvaluator: EvaluationApiContract["resolveSavedEvaluator"] = (input) =>
     this.#savedEvaluators.resolveForExecution(input);
   findMonitorBySlug: EvaluationApiContract["findMonitorBySlug"] = (input) =>

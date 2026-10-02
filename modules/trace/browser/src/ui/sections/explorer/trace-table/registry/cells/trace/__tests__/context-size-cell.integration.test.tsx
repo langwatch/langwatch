@@ -3,8 +3,8 @@
  * call ran.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../../types/trace.ts";
@@ -37,11 +37,7 @@ function row(over: Partial<TraceListItem>): TraceListItem {
 }
 
 function renderCell(item: TraceListItem) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {ContextSizeCell.render({ row: item } as never)}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(ContextSizeCell.render({ row: item } as never));
 }
 
 describe("ContextSizeCell", () => {

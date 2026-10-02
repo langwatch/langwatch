@@ -1,14 +1,11 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  getMaxTokenLimit,
-} from "@langwatch/prompt-browser-kit";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getMaxTokenLimit } from "../../model/max-token-limit.ts";
 import { localConfigToFormValues } from "../../model/prompts/local-config-to-form-values.ts";
 import {
   autoMappingsFor,
@@ -22,7 +19,7 @@ import {
   buildDefaultFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../prompt-form.ts";
-import { usePromptConfigForm } from "./use-prompt-config-form.ts";
+import { usePromptConfigForm } from "../use-prompt-config-form.ts";
 
 type OnMappingChange = (identifier: string, mapping: FieldMapping | undefined) => void;
 
@@ -40,9 +37,11 @@ export function useEditorInputMappings({
 }) {
   const [inputMappings, setInputMappings] = useState(fromProps);
 
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(fromProps);
+  if (mappingsFrom !== fromProps) {
+    setMappingsFrom(fromProps);
     setInputMappings(fromProps);
-  }, [fromProps]);
+  }
 
   const onInputMappingsChange = useCallback<OnMappingChange>(
     (identifier, mapping) => {

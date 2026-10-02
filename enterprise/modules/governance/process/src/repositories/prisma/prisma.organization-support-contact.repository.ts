@@ -5,10 +5,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { OrganizationSupportContactRepository } from "../organization-support-contact.repository.ts";
 
 /** The client slice the support-contact reads bind to. */
-export type OrganizationSupportContactDatabase = Pick<
-  PrismaClient,
-  "organization" | "organizationUser" | "user"
->;
+export type OrganizationSupportContactDatabase = Pick<PrismaClient, "organizationUser" | "user">;
 
 /** Private Prisma owner for the rows behind "contact your admin". */
 export class PrismaOrganizationSupportContactRepository extends OrganizationSupportContactRepository {
@@ -45,18 +42,5 @@ export class PrismaOrganizationSupportContactRepository extends OrganizationSupp
     });
 
     return new Map(users.map((user) => [user.id, user.email]));
-  }
-
-  async findConfiguredSupportContact({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string | null> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { supportContact: true },
-    });
-
-    return organization?.supportContact ?? null;
   }
 }

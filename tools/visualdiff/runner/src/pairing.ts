@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { withoutScheme } from "./color-scheme.ts";
 import type { DiffFiles, PixelDiff } from "./diff.ts";
 import type { CaptureMessage, DiffMessage, Plan } from "./protocol.ts";
 
@@ -77,6 +78,8 @@ export const readReplay = ({
     .filter((line) => line.trim() !== "")
     .map((line) => ({ ...(JSON.parse(line) as CaptureMessage), type: "capture" as const, side }))
     .filter((capture) =>
-      capture.kind === "route" ? routes.has(capture.key) : flows.has(capture.key),
+      capture.kind === "route"
+        ? routes.has(withoutScheme(capture.key))
+        : flows.has(withoutScheme(capture.key)),
     );
 };

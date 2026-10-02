@@ -4,7 +4,7 @@
  * `lastRuns`/`onRun` come from the card's shared executor, so Run here or in the chart agree.
  */
 
-import { Accordion, VStack } from "@chakra-ui/react";
+import { Accordion, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
@@ -54,6 +54,7 @@ export function remapOpenValuesAfterRemoval(openValues: string[], removedIndex: 
 }
 
 interface DashboardWidgetQueriesPanelProps {
+  projectId: string;
   queries: DashboardWidgetQuery[];
   onChange: (queries: DashboardWidgetQuery[]) => void;
   lastRuns: Record<string, QueryLastRun>;
@@ -61,6 +62,7 @@ interface DashboardWidgetQueriesPanelProps {
 }
 
 export function DashboardWidgetQueriesPanel({
+  projectId,
   queries,
   onChange,
   lastRuns,
@@ -136,6 +138,7 @@ export function DashboardWidgetQueriesPanel({
               // Index, not name: a row mid-rename (typing toward a duplicate,
               // or briefly blank) must not remount and lose editor focus.
               key={index}
+              projectId={projectId}
               value={valueOf(index)}
               isOpen={openValues.includes(valueOf(index))}
               query={query}

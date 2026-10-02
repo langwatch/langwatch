@@ -12,6 +12,7 @@ import {
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -217,7 +218,11 @@ export class WebhooksApiService {
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: mergeHeaders(
-        { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+        {
+          ...buildSdkIdentityHeaders(),
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
         init?.headers,
       ),
     });

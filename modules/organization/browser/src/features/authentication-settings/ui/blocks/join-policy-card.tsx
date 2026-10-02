@@ -1,10 +1,11 @@
+import { RadioGroup } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 /**
  * How people join without an invitation. Opening policies need the Enterprise plan; the saved
  * setting stays selectable after a lapse so it can always be closed.
  * Spec: specs/identity/domain-auto-join.feature
  */
-import { Box, Button, HStack, Input, RadioGroup, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { DomainJoinSetting } from "@langwatch/identity-contract";

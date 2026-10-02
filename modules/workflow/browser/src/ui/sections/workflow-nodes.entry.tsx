@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";

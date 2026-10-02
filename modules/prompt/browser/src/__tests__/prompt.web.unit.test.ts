@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
-import { resolveUiPageAccess } from "@langwatch/ui-kernel/page-guard";
+import { createUi } from "@langwatch/browser";
+import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
 import { describe, expect, it } from "vitest";
 
 import { promptWeb } from "../prompt.web.ts";

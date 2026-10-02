@@ -1,5 +1,6 @@
 import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DOMAIN_CLAIM_QUEUE_LIMIT,
   IDENTITY_LOOKUP_AUDIT_PREFIX,
@@ -30,7 +31,6 @@ import type {
   LookupDomainClaimRow,
   LookupIdentifierRow,
 } from "../repositories/identity-lookup.repository.ts";
-import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type { LinkProposalService } from "./link-proposal.service.ts";
@@ -42,7 +42,7 @@ export interface IdentityLookupServiceDeps {
   router: Pick<AuthApi, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
   links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
-  platformOperators: SsoPlatformOperatorRepository;
+  authorization: Pick<AuthzApi, "can">;
   auditLog: AuditLogApi;
   rateLimiter: RateLimiter;
   sessions: Pick<
@@ -324,8 +324,10 @@ export class IdentityLookupService {
     args: Record<string, AuditLogJsonValue>;
     targetId?: string;
   }): Promise<void> {
-    const isOperator = await this.deps.platformOperators.isPlatformOperator({
-      actorId: operator.userId,
+    const isOperator = await this.deps.authorization.can({
+      principal: { type: "user", id: operator.userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
     });
     const withinBudget = isOperator || (await this.withinAttemptBudget(operator.userId));
 

@@ -38,6 +38,7 @@
     "@clickhouse/parser": "0.3.0",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
@@ -49,10 +50,11 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
@@ -68,7 +70,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
     "@testcontainers/postgresql": "^12.1.0",

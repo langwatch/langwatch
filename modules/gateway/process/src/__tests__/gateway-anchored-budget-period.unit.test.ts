@@ -5,7 +5,9 @@
  */
 
 import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -210,6 +212,7 @@ describe("GatewayService.create with a cycle anchor", () => {
   function serviceOver(prisma: PrismaClient) {
     return PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
       projects: {
         findWithTeam: vi.fn().mockResolvedValue({
           id: "project_1",

@@ -1,17 +1,42 @@
-import type {
-  AutomationGraphNotifier,
-  AutomationRunawayNotice,
-  AutomationRunawaySignals,
-} from "../index.ts";
+import type { AutomationRunawaySignals } from "../app/automation.members.ts";
 import {
   AutomationDispatchError,
-  AutomationEmailCapService,
   AutomationLogger,
   AutomationHeartbeat,
-  AutomationRunawayRepository,
-  AutomationSlackBotTokenDecryptor,
-  AutomationTestFire,
-} from "../index.ts";
+} from "../app/automation.members.ts";
+import type { AutomationGraphNotifier, AutomationRunawayNotice } from "../index.ts";
+import { AutomationTestFire } from "../index.ts";
+import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
+import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
+import { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import { SlackDestinationService } from "../services/slack-destination.service.ts";
+
+/** A cipher that stores what it is given, for fixtures that never read a real secret. */
+const PLAIN_CRYPTO = { encrypt: (value: string) => value, decrypt: (value: string) => value };
+
+/** Slack as a project with no connections: every destination is the automation's own. */
+export function createTestSlackDestinations(): SlackDestinationService {
+  return SlackDestinationService.create({
+    slack: { findUsableSlackSecret: async () => [] },
+    crypto: PLAIN_CRYPTO,
+  });
+}
+
+/** Saves that name no connection and claims that land nowhere. */
+export function createTestSlackConnections(): AutomationSlackConnectionService {
+  return AutomationSlackConnectionService.create({
+    slack: {
+      getUsableSlackConnection: () =>
+        Promise.reject(new Error("no Slack connection in this fixture")),
+      findOrCreateSlackConnectionForSecret: () =>
+        Promise.reject(new Error("no Slack connection in this fixture")),
+      claimConnection: async () => {},
+      releaseConnection: async () => {},
+    },
+    projects: { getOrganizationId: async () => "organization-test" },
+    crypto: PLAIN_CRYPTO,
+  });
+}
 
 /**
  * The graph-alert vertical's fixtures, so a composition root can prove its own
@@ -50,11 +75,6 @@ class TestLogger extends AutomationLogger {
 }
 class TestHeartbeat extends AutomationHeartbeat {
   async findClickHouseClient(): Promise<null> {
-    return null;
-  }
-}
-class TestSlackTokens extends AutomationSlackBotTokenDecryptor {
-  findDecryptedToken(): null {
     return null;
   }
 }
@@ -119,7 +139,7 @@ export function createAutomationTestRuntime(): {
   notifier: TestNotifier;
   baseHost: string;
   logger: TestLogger;
-  slackTokens: TestSlackTokens;
+  slackDestinations: SlackDestinationService;
   dispatchErrors: TestDispatchErrors;
   heartbeat: TestHeartbeat;
   runaway: TestRunaway;
@@ -135,7 +155,7 @@ export function createAutomationTestRuntime(): {
     notifier: new TestNotifier(),
     baseHost: "http://automation.test",
     logger: new TestLogger(),
-    slackTokens: new TestSlackTokens(),
+    slackDestinations: createTestSlackDestinations(),
     dispatchErrors: new TestDispatchErrors(),
     heartbeat: new TestHeartbeat(),
     runaway: new TestRunaway(),

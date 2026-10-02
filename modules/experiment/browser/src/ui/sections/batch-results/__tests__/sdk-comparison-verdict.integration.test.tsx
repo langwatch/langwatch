@@ -4,20 +4,20 @@ import "@testing-library/jest-dom/vitest";
  * A comparison logged by the code-first SDKs must reach the experiment results page
  * with no server-side and no frontend change.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type BatchComparisonColumn,
-  type BatchComparisonVerdict,
-  transformBatchEvaluationData,
-  BatchEvaluationResultsTable,
-  ComparisonWinnerCell,
-} from "@langwatch/experiment-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  type BatchComparisonColumn,
+  type BatchComparisonVerdict,
+  transformBatchEvaluationData,
+} from "../../batch-evaluation-results.types.ts";
+import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table.tsx";
+import { ComparisonWinnerCell } from "../comparison-winner-cell.tsx";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts renders its bars through internal layout, so under jsdom there is
@@ -42,10 +42,6 @@ vi.mock("recharts", () => {
     LabelList: MockComponent,
   };
 });
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 afterEach(() => {
   cleanup();
@@ -282,13 +278,12 @@ describe("an n-way comparison logged by the code-first SDK", () => {
 
     describe("when the results table renders that run", () => {
       const renderTable = () =>
-        render(
+        renderWithDesignSystem(
           <BatchEvaluationResultsTable
             data={transformBatchEvaluationData(SDK_RUN)}
             isLoading={false}
             disableVirtualization
           />,
-          { wrapper: Wrapper },
         );
 
       /** @scenario "The verdict reaches the results page" */
@@ -355,9 +350,7 @@ describe("an n-way comparison logged by the code-first SDK", () => {
       it("charts every candidate plus ties, including the candidate that never won", () => {
         const column = comparisonColumnOf(SDK_RUN);
 
-        render(<WinRateChart column={column} chartHeight={200} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<WinRateChart column={column} chartHeight={200} />);
 
         expect(JSON.parse(screen.getByTestId("bar-chart-data").textContent ?? "[]")).toEqual([
           { name: "gpt-5-mini", wins: 2 },
@@ -405,9 +398,9 @@ describe("a verdict too long to fit its cell", () => {
   const expandVerdict = async () => {
     const user = userEvent.setup();
 
-    render(<ComparisonWinnerCell column={OVERFLOWING_COLUMN} verdict={OVERFLOWING_VERDICT} />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(
+      <ComparisonWinnerCell column={OVERFLOWING_COLUMN} verdict={OVERFLOWING_VERDICT} />,
+    );
 
     await user.click(screen.getByTestId("comparison-winner-expand"));
 

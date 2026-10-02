@@ -1,5 +1,4 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { shouldShowArrivals } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";

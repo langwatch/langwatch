@@ -1,3 +1,5 @@
+import { AgentNotFoundError, agentOverviewSchema, type AgentApi } from "@langwatch/agent-contract";
+import type { MintRunKeyInput } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
   studioClientEventSchema,
@@ -9,6 +11,7 @@ import {
   type WorkflowLlmParameters,
   type WorkflowProjectEnvironment,
   type WorkflowLlmParameterResolution,
+  type WorkflowRunEnvironment,
 } from "../../app/workflow.app.ts";
 import { StudioWorkflowEventEnricherService } from "../studio-workflow-event-enricher.service.ts";
 
@@ -17,16 +20,25 @@ const projectId = "project-123";
 class FakeProjectEnvironment implements WorkflowProjectEnvironment {
   readonly projectIds: string[] = [];
 
-  constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {}
+  constructor(
+    private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" },
+  ) {}
 
-  async get(input: {
-    projectId: string;
-  }): Promise<{ apiKey: string; secrets: Record<string, string> }> {
+  async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
     this.projectIds.push(input.projectId);
-    return {
-      apiKey: "test-api-key",
-      secrets: this.secrets,
-    };
+    return { secrets: this.secrets };
+  }
+}
+
+const DISPATCH_FLOOR_MS = 960_000;
+
+class FakeRunKeys {
+  readonly calls: MintRunKeyInput[] = [];
+
+  async mintRunKey(input: MintRunKeyInput): Promise<string> {
+    this.calls.push(input);
+
+    return input.userId ? "minted-run-key" : "ownerless-run-key";
   }
 }
 
@@ -79,15 +91,80 @@ const llmNode = (value: unknown) => ({
   },
 });
 
+const storedHttpAgent = agentOverviewSchema.parse({
+  id: "agent-1",
+  projectId,
+  name: "Stored agent",
+  type: "http",
+  config: {
+    url: "https://agent.example/chat",
+    method: "POST",
+    headers: [{ key: "x-tenant-key", value: "stored-tenant" }],
+    auth: { type: "bearer", token: "stored-token" },
+  },
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
+  environment: null,
+  ownerUserId: null,
+  hostLabel: null,
+  lastSeenAt: null,
+  parameters: [],
+  owner: null,
+  status: "offline",
+  instances: [],
+  selectable: true,
+  notSelectableReason: null,
+});
+
+const fakeAgents = (
+  agents: Record<string, typeof storedHttpAgent> = { "agent-1": storedHttpAgent },
+): Pick<AgentApi, "getById"> => ({
+  getById: async ({ id, projectId: agentProjectId }) => {
+    const agent = agents[id];
+    if (!agent) throw new AgentNotFoundError(id, agentProjectId);
+
+    return agent;
+  },
+});
+
 const createEnricher = (
   resolution: Partial<WorkflowLlmParameterResolution> = {},
   projectEnvironment = new FakeProjectEnvironment(),
   llmParameters = new FakeLlmParameters(resolution),
+  agents = fakeAgents(),
+  runKeys = new FakeRunKeys(),
 ) =>
   StudioWorkflowEventEnricherService.create({
     projectEnvironment,
     llmParameters,
+    agents,
+    runKeys,
+    dispatchKeyFloorMs: DISPATCH_FLOOR_MS,
   });
+
+const httpAgentNode = (
+  parameters: { identifier: string; value: unknown }[],
+  url = "https://agent.example/chat",
+) => ({
+  id: "http_agent",
+  type: "agent",
+  position: { x: 0, y: 0 },
+  data: {
+    name: "HTTP agent",
+    agent: "agents/agent-1",
+    parameters: [
+      { identifier: "agent_type", type: "str", value: "http" },
+      { identifier: "url", type: "str", value: url },
+      ...parameters,
+    ].map((parameter) => ({ type: "str", ...parameter })),
+  },
+});
 
 describe("StudioWorkflowEventEnricherService", () => {
   it("returns non-workflow events unchanged without reading dependencies", async () => {
@@ -103,15 +180,93 @@ describe("StudioWorkflowEventEnricherService", () => {
     expect(llmParameters.calls).toEqual([]);
   });
 
-  it("adds the project API key and decrypted secrets", async () => {
+  it("adds a minted run key and the decrypted secrets", async () => {
     const result = await createEnricher().enrich({ event: event(), projectId });
     if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
 
     expect(result.payload.workflow).toMatchObject({
-      api_key: "test-api-key",
+      api_key: "ownerless-run-key",
       project_id: projectId,
       secrets: { OPENAI_API_KEY: "sk-abc123" },
     });
+  });
+
+  /** @scenario "A workflow run calls LangWatch with a key minted for that run, never the project key" */
+  it("puts a key minted for the starter in the run, not the project key", async () => {
+    const runKeys = new FakeRunKeys();
+    const result = await createEnricher({}, undefined, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+      principal: { userId: "user-1" },
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    expect(result.payload.workflow).toMatchObject({ api_key: "minted-run-key" });
+    expect(runKeys.calls).toEqual([
+      {
+        userId: "user-1",
+        projectId,
+        permissions: ["traces:create"],
+        minRemainingMs: DISPATCH_FLOOR_MS,
+      },
+    ]);
+  });
+
+  /** @scenario "A run started with a personal access token holds no more than that token" */
+  it("names the key the starter called with, so the run's key holds no more than it", async () => {
+    const runKeys = new FakeRunKeys();
+    await createEnricher({}, undefined, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+      principal: { userId: "user-1", callerApiKeyId: "pat-1" },
+    });
+
+    expect(runKeys.calls[0]).toMatchObject({ userId: "user-1", callerApiKeyId: "pat-1" });
+  });
+
+  /** @scenario "A workflow run calls LangWatch with a key minted for that run, never the project key" */
+  it("asks for evaluations only when the graph has an evaluator node", async () => {
+    const runKeys = new FakeRunKeys();
+    const evaluatorNode = { id: "eval", type: "evaluator", position: { x: 0, y: 0 }, data: {} };
+    await createEnricher({}, undefined, undefined, undefined, runKeys).enrich({
+      event: studioClientEventSchema.parse({
+        type: "execute_flow",
+        payload: {
+          trace_id: "trace-1",
+          workflow: {
+            spec_version: "1.5",
+            workflow_id: "workflow-1",
+            name: "Test Workflow",
+            icon: "test",
+            description: "test",
+            version: "1.0",
+            nodes: [evaluatorNode],
+            edges: [],
+            state: { execution: { status: "idle" } },
+          },
+          inputs: [{}],
+        },
+      }),
+      projectId,
+      principal: { userId: "user-1" },
+    });
+
+    expect(runKeys.calls[0]?.permissions).toEqual(["traces:create", "evaluations:manage"]);
+  });
+
+  /** @scenario "A run nobody started calls LangWatch with a project key holding only what it needs" */
+  it("mints an ownerless key for a run that names nobody, never the project key", async () => {
+    const runKeys = new FakeRunKeys();
+    const result = await createEnricher({}, undefined, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    expect(result.payload.workflow).toMatchObject({ api_key: "ownerless-run-key" });
+    expect(runKeys.calls).toEqual([
+      { userId: null, projectId, permissions: ["traces:create"], minRemainingMs: DISPATCH_FLOOR_MS },
+    ]);
   });
 
   it("keeps empty project secrets", async () => {
@@ -181,5 +336,84 @@ describe("StudioWorkflowEventEnricherService", () => {
         projectId,
       }),
     ).rejects.toThrow("Model provider not configured: openai");
+  });
+
+  /** @scenario A run fills a saved HTTP agent's blank credentials from the agent */
+  it("fills a saved HTTP agent node's blank credentials from the stored agent", async () => {
+    const result = await createEnricher().enrich({
+      event: event([
+        httpAgentNode([
+          { identifier: "auth_type", value: "bearer" },
+          { identifier: "auth_token", value: "" },
+          { identifier: "headers", value: { "x-tenant-key": "", "x-own": "own-value" } },
+        ]),
+      ]),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    const parameters = result.payload.workflow.nodes[0]?.data.parameters ?? [];
+    expect(parameters.find(({ identifier }) => identifier === "auth_token")?.value).toBe(
+      "stored-token",
+    );
+    expect(parameters.find(({ identifier }) => identifier === "headers")?.value).toEqual({
+      "x-tenant-key": "stored-tenant",
+      "x-own": "own-value",
+    });
+  });
+
+  /** @scenario A run fills a saved HTTP agent's blank credentials from the agent */
+  it("keeps a credential the node already carries", async () => {
+    const result = await createEnricher().enrich({
+      event: event([
+        httpAgentNode([
+          { identifier: "auth_type", value: "bearer" },
+          { identifier: "auth_token", value: "node-token" },
+        ]),
+      ]),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    const parameters = result.payload.workflow.nodes[0]?.data.parameters ?? [];
+    expect(parameters.find(({ identifier }) => identifier === "auth_token")?.value).toBe(
+      "node-token",
+    );
+  });
+
+  /** @scenario A run fills a saved HTTP agent's credentials only at the agent's saved address */
+  it("fills nothing on a node that calls another address than the agent's", async () => {
+    const result = await createEnricher().enrich({
+      event: event([
+        httpAgentNode(
+          [
+            { identifier: "auth_type", value: "bearer" },
+            { identifier: "auth_token", value: "" },
+          ],
+          "https://elsewhere.example/chat",
+        ),
+      ]),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    expect(JSON.stringify(result.payload.workflow.nodes)).not.toContain("stored-token");
+  });
+
+  /** @scenario A run whose saved HTTP agent no longer exists leaves the node as it is */
+  it("leaves the node blank when the saved agent is gone", async () => {
+    const result = await createEnricher({}, undefined, undefined, fakeAgents({})).enrich({
+      event: event([
+        httpAgentNode([
+          { identifier: "auth_type", value: "bearer" },
+          { identifier: "auth_token", value: "" },
+        ]),
+      ]),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    const parameters = result.payload.workflow.nodes[0]?.data.parameters ?? [];
+    expect(parameters.find(({ identifier }) => identifier === "auth_token")?.value).toBe("");
   });
 });

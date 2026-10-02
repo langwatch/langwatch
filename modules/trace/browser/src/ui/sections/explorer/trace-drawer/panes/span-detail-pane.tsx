@@ -1,8 +1,8 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { memo } from "react";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import { SpanTabBar } from "../span-tab-bar.tsx";
 import { TraceAccordions } from "../trace-accordions/index.ts";
@@ -35,9 +35,9 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   layout,
   isSpansLoading,
 }: SpanDetailPaneProps) {
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const collapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
+  const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
+  const selectSpan = useTraceDrawer((s) => s.selectSpan);
+  const collapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
 
   return (
     <Box

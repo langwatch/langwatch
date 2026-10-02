@@ -3,8 +3,8 @@
  * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
  * accepted steps ARE the published contract, so both doors read one copy.
  */
-import { defineRestMiddleware } from "@langwatch/api/contract";
-import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
+import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
+import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -20,6 +20,7 @@ export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
     canSeeCosts: z.boolean().nullable().optional(),
     canSeeCapturedInput: z.boolean().nullable().optional(),
     canSeeCapturedOutput: z.boolean().nullable().optional(),
+    catalogue: z.object({ permissions: z.array(authzPermissionSchema).readonly() }).strict(),
   })
   .strict();
 

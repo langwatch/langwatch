@@ -1,17 +1,18 @@
 /* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
 
-.analytics-row {
-  display: grid;
-  gap: var(--space-1);
+.analytics-search {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
-.analytics-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: baseline;
+.analytics-kind {
+  flex: 0 1 14rem;
+  min-width: 0;
 }
 
-.analytics-muted {
-  color: var(--ink-500);
+@media (max-width: 719px) {
+  .analytics-search,
+  .analytics-kind {
+    flex-basis: 100%;
+  }
 }

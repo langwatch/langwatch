@@ -21,20 +21,22 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
@@ -46,7 +48,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

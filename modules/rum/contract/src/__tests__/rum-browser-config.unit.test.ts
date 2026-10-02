@@ -11,10 +11,19 @@ async function projected(environment: Readonly<Record<string, string | undefined
 }
 
 describe("rum's browser config", () => {
+  describe("given nothing sets the switch", () => {
+    /** @scenario "RUM is on by default" */
+    it("enables browser tracing for every session once a collector is configured", async () => {
+      expect(await projected({ RUM_COLLECTOR_ENDPOINT: COLLECTOR })).toEqual({
+        enabled: true,
+        sampleRatio: 1,
+      });
+    });
+  });
+
   describe("given the switch is off", () => {
     /** @scenario "Browser tracing stays off while the switch is off" */
     it("disables browser tracing even with a collector configured", async () => {
-      expect((await projected({ RUM_COLLECTOR_ENDPOINT: COLLECTOR })).enabled).toBe(false);
       const off = await projected({ RUM_ENABLED: "false", RUM_COLLECTOR_ENDPOINT: COLLECTOR });
       expect(off.enabled).toBe(false);
     });

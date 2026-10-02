@@ -1,10 +1,10 @@
+import { createTenantId } from "@langwatch/eventing";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-projections.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTenantId } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
@@ -38,6 +38,7 @@ function compose() {
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+    milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>(),
   }).build({ participation: "consume" });
   return { pipeline, get, set };
 }

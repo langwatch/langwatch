@@ -1,7 +1,7 @@
 import type { UiProjectDepartmentFieldProps } from "@langwatch/browser-host/declarations";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 
 import { useDepartmentColumn } from "../../behavior/use-department-column.ts";
-import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
 import { DepartmentPicker } from "./department-picker.tsx";
 
 /** A project's department row on its settings form, lent to project; absent while unused. */

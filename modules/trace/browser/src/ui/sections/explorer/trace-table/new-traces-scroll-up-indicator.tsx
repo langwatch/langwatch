@@ -1,4 +1,4 @@
-import { Box, Flex, Icon, Text } from "@chakra-ui/react";
+import { Box, Flex, Icon, Text } from "@langwatch/design-system/primitives";
 import { ArrowUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";

@@ -1,13 +1,16 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { HandledError } from "@langwatch/handled-error";
 import type {
   LangyApi,
   LangyKeyCaller,
   LangyStartConversationTurnInput,
   LangyTurnSettlementWait,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyCanaryService } from "../langy-canary.service.ts";
+
+class FakeHandledError extends HandledError {}
 
 const KEY: LangyKeyCaller = { actor: { type: "user", id: "owner-1" }, projectId: "project-1" };
 const SETTLED: LangyTurnSettlementWait = {
@@ -135,6 +138,21 @@ describe("LangyCanaryService", () => {
     const body = await (await service.probe(KEY)).json();
     expect(body).toMatchObject({ reason: "turn_failed" });
     expect(body).not.toHaveProperty("conversationId");
+  });
+
+  /** @scenario "A Langy canary turn that cannot start reports the start error's cause" */
+  it("reports turn_failed with the start error's code as its cause", async () => {
+    const { service } = canary({
+      start: async () => {
+        throw new FakeHandledError("budget_exceeded", "Budget exceeded.", { httpStatus: 402 });
+      },
+    });
+
+    expect(await (await service.probe(KEY)).json()).toMatchObject({
+      status: "unhealthy",
+      reason: "turn_failed",
+      cause: "budget_exceeded",
+    });
   });
 
   /** @scenario "A second Langy check for the same caller while one is in flight is busy" */

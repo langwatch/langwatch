@@ -14,10 +14,12 @@ import {
   type WebhookDeliveryOutcome,
   type WebhookDestinationKind,
   type WebhookEndpointView,
+  webhookRequestFailureResponseSchema,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
+import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   describeDestination,
   findUrlProblem,
@@ -34,8 +36,15 @@ import {
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
 } from "../../rules/webhook-endpoint-policy.rules.ts";
-import type { WebhookEndpointRepository } from "../webhook-endpoint.repository.ts";
+import type {
+  WebhookEndpointRepository,
+  WebhookRequestAttempt,
+  WebhookRequestAttemptRow,
+} from "../webhook-endpoint.repository.ts";
 import { PrismaWebhookRetentionRepository } from "./prisma.webhook-retention.repository.ts";
+
+/** A stored failure response; an unreadable one reads as absent rather than failing the list. */
+const storedFailureResponseSchema = webhookRequestFailureResponseSchema.nullable().catch(null);
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
@@ -395,6 +404,18 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       },
     });
     return endpoint ? PrismaWebhookEndpointRepository.toView(endpoint) : null;
+  }
+
+  async getDeliveryDisposition(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition> {
+    const endpoint = await this.prisma.webhookEndpoint.findFirst({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+    });
+    if (!endpoint || endpoint.archivedAt !== null) return { state: "gone" };
+    if (endpoint.status !== "ACTIVE") return { state: "paused" };
+    return { state: "deliverable", endpoint: PrismaWebhookEndpointRepository.toView(endpoint) };
   }
 
   /**
@@ -795,6 +816,46 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     lastFailureAt: Instant | null;
   }> {
     return statusSnapshotOf(await this.getEndpoint(params));
+  }
+
+  async recordRequestAttempt(attempt: WebhookRequestAttempt): Promise<void> {
+    await this.prisma.webhookEndpointDelivery.create({
+      data: {
+        channel: "automations",
+        projectId: attempt.projectId,
+        triggerId: attempt.triggerId,
+        dispatchId: attempt.dispatchId,
+        responseStatus: attempt.responseStatus,
+        latencyMs: attempt.latencyMs,
+        error: attempt.error,
+        response: attempt.response ?? undefined,
+        outcome: attempt.outcome,
+      },
+    });
+  }
+
+  async findRequestAttempts(input: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+  }): Promise<WebhookRequestAttemptRow[]> {
+    const rows = await this.prisma.webhookEndpointDelivery.findMany({
+      where: { channel: "automations", projectId: input.projectId, triggerId: input.triggerId },
+      orderBy: { firedAt: "desc" },
+      take: input.limit,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: input.projectId,
+      triggerId: input.triggerId,
+      dispatchId: row.dispatchId,
+      responseStatus: row.responseStatus,
+      latencyMs: row.latencyMs,
+      error: row.error,
+      response: storedFailureResponseSchema.parse(row.response),
+      outcome: row.outcome,
+      firedAt: fromDate(row.firedAt),
+    }));
   }
 
   /** 30-day delivery-log prune; returns the deleted count. Runs the shared

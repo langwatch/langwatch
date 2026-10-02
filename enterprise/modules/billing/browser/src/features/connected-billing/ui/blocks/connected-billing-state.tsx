@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Badge, Button, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  HStack,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { Temporal } from "@langwatch/time";
 import type { ReactNode } from "react";

@@ -1,10 +1,10 @@
+import type { DatasetSummary } from "@langwatch/dataset-contract";
 /**
  * Renders the real dataset picker used by the "Add to Dataset" drawer.
  * @vitest-environment jsdom
  * Spec: specs/datasets/add-to-dataset-picker.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetSummary } from "@langwatch/dataset-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ const buildDataset = ({ name, id }: { name: string; id: string }): DatasetSummar
 type SelectorProps = Parameters<typeof DatasetSelector>[0];
 
 const selector = (props: Partial<SelectorProps> = {}) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <DatasetSelector
       datasets={undefined}
       localStorageDatasetId=""
@@ -47,7 +47,7 @@ const selector = (props: Partial<SelectorProps> = {}) => (
       onCreateNew={vi.fn()}
       {...props}
     />
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 const renderSelector = (props: Partial<SelectorProps> = {}) => render(selector(props));

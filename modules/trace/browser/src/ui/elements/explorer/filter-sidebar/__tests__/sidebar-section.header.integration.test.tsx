@@ -3,8 +3,8 @@
  * SidebarSection header layout: grip lifted, toggle affordance.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { Activity } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -16,12 +16,10 @@ afterEach(() => {
 });
 
 const renderSection = (props: Partial<React.ComponentProps<typeof SidebarSection>> = {}) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SidebarSection title="STATUS" icon={Activity} open {...props}>
-        <div data-testid="section-body">body</div>
-      </SidebarSection>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <SidebarSection title="STATUS" icon={Activity} open {...props}>
+      <div data-testid="section-body">body</div>
+    </SidebarSection>,
   );
 
 describe("<SidebarSection /> header", () => {

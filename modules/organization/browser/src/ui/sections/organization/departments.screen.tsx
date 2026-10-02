@@ -1,10 +1,10 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * The Directory's Departments tab: every department, read-only. They are managed on
  * Governance's People page, so the one action sends the reader there.
  * Spec: specs/ai-gateway/governance/departments.feature
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Building2 } from "lucide-react";
 
 import { api } from "../../../behavior/organization-api.ts";

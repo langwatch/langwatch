@@ -32,7 +32,7 @@ function groupsRepository(): ScimDirectoryRepository {
     })),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
-    findRoleBindings: vi.fn(async () => []),
+    findGrantRows: vi.fn(async () => []),
     groupSlugExists: vi.fn(async () => false),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+import type { Cluster, Redis } from "ioredis";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import { McpSessionRelayChannel } from "../mcp-session-relay.channel.ts";
 
 const logger = createLogger("langwatch:mcp");
@@ -16,16 +16,16 @@ function relayChannel(sessionId: string): string {
  * command, so listening opens one dedicated connection, lazily, that covers every session.
  */
 export class RedisMcpSessionRelayChannel extends McpSessionRelayChannel {
-  readonly #redis: HostedMcpRedis | null;
+  readonly #redis: Redis | Cluster | null;
   readonly #listeners = new Map<string, (raw: string) => void>();
-  #subscriber: HostedMcpRedis | undefined;
+  #subscriber: Redis | Cluster | undefined;
 
-  private constructor({ redis }: { redis: HostedMcpRedis | null }) {
+  private constructor({ redis }: { redis: Redis | Cluster | null }) {
     super();
     this.#redis = redis;
   }
 
-  static create({ redis }: { redis: HostedMcpRedis | null }): RedisMcpSessionRelayChannel {
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpSessionRelayChannel {
     return new RedisMcpSessionRelayChannel({ redis });
   }
 
@@ -68,7 +68,7 @@ export class RedisMcpSessionRelayChannel extends McpSessionRelayChannel {
     this.#subscriber = undefined;
   }
 
-  #openSubscriber(): HostedMcpRedis | undefined {
+  #openSubscriber(): Redis | Cluster | undefined {
     if (this.#subscriber) return this.#subscriber;
     if (!this.#redis) return undefined;
     try {

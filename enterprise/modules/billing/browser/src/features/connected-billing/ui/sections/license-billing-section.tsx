@@ -1,9 +1,9 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 import { describeError } from "@langwatch/browser-host/errors";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { connectedBillingApi } from "../../behavior/connected-billing-api.ts";
 import { useConnectedBillingCommands } from "../../behavior/use-connected-billing-commands.ts";
@@ -14,22 +14,16 @@ import {
   dollarsToCents,
   onboardPayload,
 } from "../../model/connected-billing-form.ts";
-import {
-  hasUnsettledSeatChange,
-  UNSETTLED_SEAT_CHANGE_POLL_MS,
-} from "../../model/seat-change-copy.ts";
 import { ConnectedBillingFields } from "../blocks/connected-billing-fields.tsx";
 import { ConnectedBillingState, OpenInvoices } from "../blocks/connected-billing-state.tsx";
 
 /** Invoice billing for a connected customer, on the license it was sold with. */
 export default function LicenseBillingSection(license: UiLicenseBillingSectionProps) {
-  // A seat change settles on the worker within about a minute; reread until it has.
   const query = connectedBillingApi.connectedBilling.get.useQuery(
     { organizationId: license.organizationId },
     {
       retry: false,
-      refetchInterval: (current) =>
-        hasUnsettledSeatChange(current.state.data) ? UNSETTLED_SEAT_CHANGE_POLL_MS : false,
+      // needs a read hint: seat change settled on the worker (about a minute)
     },
   );
 
@@ -81,9 +75,11 @@ function BillingPanel({
     billingFormFrom({ account: overview.account, license }),
   );
 
-  useEffect(() => {
+  const [seededFrom, setSeededFrom] = useState({ account: overview.account, license });
+  if (seededFrom.account !== overview.account || seededFrom.license !== license) {
+    setSeededFrom({ account: overview.account, license });
     setForm(billingFormFrom({ account: overview.account, license }));
-  }, [overview.account, license]);
+  }
 
   return (
     <VStack align="start" gap={4} width="full">

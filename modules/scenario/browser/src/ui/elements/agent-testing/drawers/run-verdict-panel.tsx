@@ -4,8 +4,8 @@
  * criteria count or duration: the chip strip at the top of the drawer already reads all four.
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   deriveCriterionResults,
   ScenarioRunStatus,

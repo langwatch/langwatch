@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AssignTopicCommandData, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -9,13 +9,13 @@ import { SpanCostService } from "../../services/span-cost.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceModelCostService } from "../../services/trace-model-cost.service.ts";
 import { TraceTopicClusteringReadService } from "../../services/trace-topic-clustering-read.service.ts";
-import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
+import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 
 const canonicalisation = TraceCanonicalisationService.create();
 
-function createTraceApp(overrides: Partial<TraceAppDependencies> = {}): TraceApp {
-  return TraceApp.create(
+function createTraceApp(overrides: Partial<TraceAppDependencies> = {}): TraceModule {
+  return TraceModule.create(
     createApiFixture<TraceAppDependencies>({
       traces: createApiFixture<TraceAppDependencies["traces"]>({
         canonicalisation,

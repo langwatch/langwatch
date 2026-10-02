@@ -4,7 +4,8 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient, type ScenarioOutputs } from "@langwatch/scenario-client";
 import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
@@ -12,19 +13,24 @@ import {
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
-import { api, type RouterOutputs } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useAgents } from "../../../../behavior/agents/use-agents.ts";
+import type { RouterOutputs } from "../../../../behavior/scenario-api.ts";
+import { useLastResultSummaries } from "../../../../behavior/scenarios/use-last-result-summaries.ts";
+import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
+import { useExternalSetSummaries } from "../../../../behavior/suites/use-set-summaries.ts";
+import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
 import {
   type ExternalSetEntry,
   orderSuitesDefaultFirst,
   type TestCase,
   type TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import type { CaseLastResult } from "./cases-table.tsx";
 
-type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
+type ScenarioRows = ScenarioOutputs["scenarios"]["getAll"];
 type TestSuiteRows = RouterOutputs["suites"]["testSuites"]["getAll"];
-type ExternalSetRows = RouterOutputs["scenarios"]["getExternalSetSummaries"];
+type ExternalSetRows = ScenarioOutputs["scenarios"]["getExternalSetSummaries"];
 
 /**
  * The newest run that covered a scenario of one test suite, which is what
@@ -67,27 +73,16 @@ function useTestCasesQueries(period: Period) {
   const endDate = period.endDate.epochMilliseconds;
   const runWindow = { projectId, startDate, endDate };
 
-  const { data: testSuites, isLoading: isTestSuitesLoading } =
-    api.suites.testSuites.getAll.useQuery({ projectId }, { enabled: !!project });
+  const { data: testSuites, isLoading: isTestSuitesLoading } = useTestSuites({ projectId });
 
-  const { data: scenarios, isLoading: isScenariosLoading } = api.scenarios.getAll.useQuery(
-    { projectId },
-    { enabled: !!project },
-  );
+  const { data: scenarios, isLoading: isScenariosLoading } = useScenarios({ projectId });
 
-  const { data: externalSetSummaries } = api.scenarios.getExternalSetSummaries.useQuery(runWindow, {
-    enabled: !!project,
-  });
+  const { data: externalSetSummaries } = useExternalSetSummaries(runWindow);
 
   const { data: lastResultRows, isLoading: isLastResultsLoading } =
-    api.scenarios.getLastResultSummaries.useQuery(runWindow, {
-      enabled: !!project,
-    });
+    useLastResultSummaries(runWindow);
 
-  const { data: agents, isLoading: isAgentsLoading } = api.agents.getAll.useQuery(
-    { projectId },
-    { enabled: !!project },
-  );
+  const { data: agents, isLoading: isAgentsLoading } = useAgents({ projectId });
 
   return {
     testSuites,
@@ -265,7 +260,7 @@ export function useExternalSetCases({
 } {
   const { project } = useOrganizationTeamProject();
 
-  const { data, isLoading } = api.scenarios.getScenarioSetRunData.useQuery(
+  const { data, isLoading } = scenarioClient.scenarios.getScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: setId,

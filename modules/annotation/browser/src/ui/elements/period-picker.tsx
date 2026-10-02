@@ -4,8 +4,17 @@
  * and address writes), copied from `PeriodSelector` since a migration forbids reuse.
  */
 
-import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { format, nowInstant, toDate, toZonedDateTime } from "@langwatch/time";
 import { Calendar, ChevronDown } from "lucide-react";
 

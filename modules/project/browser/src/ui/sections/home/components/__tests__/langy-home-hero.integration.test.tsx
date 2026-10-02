@@ -21,9 +21,13 @@ const langyState = {
   activeConversationId: null as string | null,
   pendingPrompt: null as string | null,
 };
-vi.mock("@langwatch/langy-browser-kit", () => ({
-  LangyMark: () => null,
+vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
+
+vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: typeof langyState) => unknown) => selector(langyState),
+}));
+
+vi.mock("../../../langy/langy-home-suggestions.ts", () => ({
   selectLangySuggestions: ({ reach }: { reach: { hasTraces: boolean } }) =>
     reach.hasTraces
       ? [{ label: "Compare two runs", icon: () => null, prompt: "compare two runs" }]

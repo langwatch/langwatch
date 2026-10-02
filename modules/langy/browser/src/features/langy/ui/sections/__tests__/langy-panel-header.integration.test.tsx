@@ -24,16 +24,6 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
     messages: [],
@@ -137,13 +127,13 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   return { api: withFallback(explicitApi) };
 });
 
-import { useLangyStore, LangyProvider } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 class FakeLangyHost extends LangyHostApi {

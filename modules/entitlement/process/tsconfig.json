@@ -18,7 +18,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
@@ -36,7 +36,7 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -49,6 +49,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"
@@ -64,9 +67,6 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

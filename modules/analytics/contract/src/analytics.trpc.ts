@@ -3,7 +3,7 @@
  * cache keys. The shared inputs are the REST body's and the traces filter's too.
  * @see modules/analytics/specs/analytics-timeseries.feature
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { filterFieldsEnum } from "./analytics.filter-field.ts";

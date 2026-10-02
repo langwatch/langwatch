@@ -1,4 +1,4 @@
-import { Box, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Input, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 

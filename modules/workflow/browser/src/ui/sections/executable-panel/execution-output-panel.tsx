@@ -1,3 +1,4 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   Box,
   type BoxProps,
@@ -7,8 +8,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+} from "@langwatch/design-system/primitives";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";

@@ -167,6 +167,34 @@ export class PrismaTriggerRepository extends TriggerRepository {
     });
     return rows.map((row: unknown) => mapTriggerRow(row));
   }
+  async findSlackTriggers(input: { projectIds: readonly string[] }): Promise<Trigger[]> {
+    if (input.projectIds.length === 0) return [];
+    const rows = await this.database.trigger.findMany({
+      where: {
+        projectId: { in: [...input.projectIds] },
+        action: "SEND_SLACK_MESSAGE",
+        deleted: false,
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row: unknown) => mapTriggerRow(row));
+  }
+  async replaceActionParamsIfUnchanged(input: {
+    triggerId: string;
+    projectId: string;
+    expected: unknown;
+    actionParams: Record<string, unknown>;
+  }): Promise<boolean> {
+    const { count } = await this.database.trigger.updateMany({
+      where: {
+        id: input.triggerId,
+        projectId: input.projectId,
+        actionParams: { equals: toPrismaJsonValue(input.expected ?? {}) ?? {} },
+      },
+      data: { actionParams: toPrismaJsonObject(input.actionParams) },
+    });
+    return count === 1;
+  }
   async findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;

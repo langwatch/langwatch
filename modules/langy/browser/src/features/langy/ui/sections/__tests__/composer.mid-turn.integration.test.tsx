@@ -26,8 +26,7 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { Composer } from "../composer.tsx";
 
 const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";

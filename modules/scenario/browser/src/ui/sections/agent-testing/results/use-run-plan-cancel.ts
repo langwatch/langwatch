@@ -5,15 +5,15 @@
  */
 
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toaster } from "@langwatch/design-system/toaster";
 import { isOnPlatformSet, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback } from "react";
 
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useCancelScenarioRun } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 
 /** What the person is told once a cancellation lands, and the list reread. */
 function cancelCallbacks({

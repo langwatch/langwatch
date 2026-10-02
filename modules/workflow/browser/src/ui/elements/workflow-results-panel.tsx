@@ -8,8 +8,8 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
+} from "@langwatch/design-system/primitives";
+import { useState, type ReactNode } from "react";
 import { X } from "react-feather";
 import { LuSquareCheckBig } from "react-icons/lu";
 
@@ -124,9 +124,11 @@ export function WorkflowEvaluationResultsLayout(props: WorkflowEvaluationResults
 export function useWorkflowSelectedEvaluationRun(evaluationRunId: string | undefined) {
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(evaluationRunId);
 
-  useEffect(() => {
+  const [runIdFrom, setRunIdFrom] = useState(evaluationRunId);
+  if (runIdFrom !== evaluationRunId) {
+    setRunIdFrom(evaluationRunId);
     setSelectedRunId(evaluationRunId);
-  }, [evaluationRunId]);
+  }
 
   return { selectedRunId, setSelectedRunId };
 }

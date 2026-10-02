@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon, Text } from "@langwatch/design-system/primitives";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 
 function EarlierTurnsHeader({

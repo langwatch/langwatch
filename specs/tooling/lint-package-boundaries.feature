@@ -1,12 +1,12 @@
 Feature: The package-boundaries lint rule
   Which workspace package may import which, and which runtime a package role
   may touch at all, over the module tree ARCHITECTURE.md §3 describes: every
-  module's contract, process, browser and browser-kit package, core and
-  enterprise. Each shape of violation has its own id, so the reported id names
+  module's contract, process and browser package and its portable
+  libraries, core and enterprise. Each shape of violation has its own id, so the reported id names
   the actual mistake and its fix names the door to use instead.
 
   Background:
-    Given a workspace whose agent and project modules each have a contract, process, browser and browser-kit package
+    Given a workspace whose agent and project modules each have a contract, process and browser package
     And an enterprise governance module with a contract and a process package
 
   @unit
@@ -14,26 +14,7 @@ Feature: The package-boundaries lint rule
     Given a browser module that imports a subpath of another module's browser package
     When the package-boundaries rule runs over it
     Then it reports crossModuleBrowser at that import
-    And the fix names the owner's browser kit
-
-  @unit
-  Scenario: A browser package importing another module's kit is left alone
-    Given a browser module that imports another module's browser kit
-    When the package-boundaries rule runs over it
-    Then it reports nothing
-
-  @unit
-  Scenario: A browser kit importing a browser package or another kit is reported as kitLeaf
-    Given a browser kit that imports its own module's browser package, another kit, or only contracts, the design system and the host
-    When the package-boundaries rule runs over it
-    Then it reports kitLeaf for the browser package and for the other kit
-    And it reports nothing for contracts, the design system and the host
-
-  @unit
-  Scenario: A browser kit that fetches is reported as kitFetches
-    Given a browser kit that imports the browser tRPC client
-    When the package-boundaries rule runs over it
-    Then it reports kitFetches
+    And the fix names where shared things go
 
   @unit
   Scenario: A process package importing another module's process package is reported as crossModuleProcess
@@ -63,7 +44,7 @@ Feature: The package-boundaries lint rule
 
   @unit
   Scenario: A process package importing a browser package is reported as processImportsBrowser
-    Given a service that imports a browser kit
+    Given a service that imports a browser package
     When the package-boundaries rule runs over it
     Then it reports processImportsBrowser with the import specifier
 
@@ -72,6 +53,36 @@ Feature: The package-boundaries lint rule
     Given a contract module that imports a node runtime module
     When the package-boundaries rule runs over it
     Then it reports contractRuntime with the import specifier
+
+  @unit
+  Scenario: A module library importing a runtime or implementation is reported as libraryRuntime
+    Given a module's portable library that imports node, react, a framework package, its own process or browser package, or another module's contract
+    When the package-boundaries rule runs over it
+    Then it reports libraryRuntime at that import
+
+  @unit
+  Scenario: A module library importing its own contract and other libraries is left alone
+    Given a module's portable library that imports its own contract, another module's library and zod
+    When the package-boundaries rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: A module client may take react for generic hooks and nothing else of the browser
+    Given a module's client file that imports react, and another that imports react-dom or chakra
+    When the package-boundaries rule runs over them
+    Then react is allowed and the others are reported as libraryRuntime
+
+  @unit
+  Scenario: Process, browser and application code may import any module's library
+    Given a service, a browser module and an application file that import another module's library
+    When the package-boundaries rule runs over them
+    Then it reports nothing
+
+  @unit
+  Scenario: A contract importing its module's library is reported as contractRuntime
+    Given a contract module that imports its own module's library
+    When the package-boundaries rule runs over it
+    Then it reports contractRuntime
 
   @unit
   Scenario: Core code importing an enterprise implementation is reported as coreImportsEnterprise

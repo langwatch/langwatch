@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { useEffect, useRef } from "react";
 
 import { formatTimestamp, hashEventTypeColor } from "../../model/deja-view-fragment.ts";

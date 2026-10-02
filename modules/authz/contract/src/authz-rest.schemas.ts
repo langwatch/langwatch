@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 
-import { roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz.ts";
+import { grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
 
 export const roleBindingPrincipalSchema = z.object({
   type: z.enum(["user", "group", "apiKey"]),
@@ -20,7 +20,7 @@ export const roleBindingRestSchema = z.object({
   role: teamUserRoleSchema,
   customRoleId: z.string().nullable(),
   customRoleName: z.string().nullable(),
-  scopeType: roleBindingScopeTypeSchema,
+  scopeType: grantScopeTierSchema,
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   createdAt: z.date(),
@@ -33,7 +33,7 @@ export const roleBindingRestListQuerySchema = z.object({
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
-  scopeType: roleBindingScopeTypeSchema.optional(),
+  scopeType: grantScopeTierSchema.optional(),
   scopeId: z.string().min(1).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -53,7 +53,7 @@ export const roleBindingRestCreateSchema = z.object({
   apiKeyId: z.string().min(1).optional(),
   role: teamUserRoleSchema,
   customRoleId: z.string().min(1).optional(),
-  scopeType: roleBindingScopeTypeSchema,
+  scopeType: grantScopeTierSchema,
   scopeId: z.string().min(1),
   /** Optional ISO-8601 end date, strictly in the future (`grant_expiry_in_past`, 422 otherwise). */
   expiresAt: z.coerce.date().optional(),

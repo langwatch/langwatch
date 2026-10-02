@@ -2,13 +2,14 @@
  * The checkup's facts, each answered by the module that owns it.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { MintRunKeyInput } from "@langwatch/api-key-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayDeploymentAddresses } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OpsServerConfig } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
@@ -25,6 +26,7 @@ const CONFIG: OpsServerConfig = {
   collectClickHouseBackupMetrics: true,
   productAnalytics: { key: undefined, host: undefined },
   cloudOps: false,
+  adminEmails: [],
 };
 
 const PROJECT: Project = {
@@ -63,6 +65,7 @@ let world: UsageReportWorld;
 let probedProjects: string[];
 let provisionable: boolean[];
 let probes: MemoryCheckupProbeChannel;
+let mintedKeys: MintRunKeyInput[];
 let gatewayAddresses: GatewayDeploymentAddresses;
 
 function checkup() {
@@ -108,6 +111,7 @@ function service() {
         getMailDelivery: async () => ({
           provider: "smtp",
           smtpConfigured: true,
+          smtpSendsCredentials: false,
           misconfigured: false,
         }),
         verifySmtp: async () => {
@@ -122,6 +126,12 @@ function service() {
       },
       lwql: { findAppFunctionsProvisionable: async () => provisionable },
       gateway: { ...world.peers().gateway, getDeploymentAddresses: () => gatewayAddresses },
+      apiKeys: {
+        mintRunKey: async (input) => {
+          mintedKeys.push(input);
+          return "sk-lw-canary";
+        },
+      },
     },
     repositories: { postgres: datastores, clickhouse: datastores, redis: datastores },
     channels: {
@@ -142,6 +152,7 @@ beforeEach(() => {
   probedProjects = [];
   provisionable = [true];
   probes = MemoryCheckupProbeChannel.create();
+  mintedKeys = [];
   gatewayAddresses = {
     baseUrl: void 0,
     publicUrl: void 0,
@@ -203,6 +214,17 @@ describe("OpsCheckupService", () => {
 
       expect(rows.find((row) => row.id === "storage_probe")?.verdict.outcome).toBe("verified");
       expect(probedProjects).toEqual(["project-1"]);
+    });
+  });
+
+  describe("given a canary runs against the oldest project", () => {
+    /** @scenario "A checkup canary runs with a minimal key of its own, never the project key" */
+    it("mints an ownerless key holding only what that canary calls", async () => {
+      await checkup().explicit({ checks: ["canary_collector"] });
+
+      expect(mintedKeys).toEqual([
+        { userId: null, projectId: "project-1", permissions: ["traces:create"] },
+      ]);
     });
   });
 

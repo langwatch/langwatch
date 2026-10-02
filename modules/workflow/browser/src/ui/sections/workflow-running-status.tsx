@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 

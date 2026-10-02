@@ -1,8 +1,8 @@
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, ExternalLink, Plus } from "lucide-react";
 
 export const CreateExperimentButton = ({

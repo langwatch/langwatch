@@ -1,5 +1,6 @@
-import { evaluationPassed } from "@langwatch/evaluator-browser-kit";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
+
+import { evaluationPassed } from "./evaluation-status.ts";
 
 /**
  * Verdict-aware counts for a trace's evaluations (#6835). Tracks three distinct states:

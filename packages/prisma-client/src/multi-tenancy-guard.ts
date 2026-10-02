@@ -698,6 +698,33 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // A connection's claims (ARCHITECTURE.md §3). A query is bounded by the
+  // organizationId anchor or the full (connectionId, claimantId) id, bare or
+  // as the compound key an upsert names.
+  SlackConnectionClaim: {
+    validateWhere: (where) => {
+      const reason = "requires organizationId or (connectionId, claimantId) in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.organizationId === "string" ||
+          (typeof c.connectionId === "string" && typeof c.claimantId === "string") ||
+          typeof clauseField(c.connectionId_claimantId, "claimantId") === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = createRecords(data);
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Org-anchored webhook platform (no projectId column): every query must be
   // bounded by the organization or a row id; the cross-org delivery sweep and
   // the retention prune use the raw-SQL tenancy opt-out instead.

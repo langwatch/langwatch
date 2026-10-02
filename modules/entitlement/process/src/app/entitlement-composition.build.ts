@@ -4,6 +4,7 @@
  * counting on core-tier deployments that cannot compose Enterprise features.
  */
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
 import {
   type BaselinePlanSource,
   type Plan,
@@ -220,7 +221,7 @@ export type EntitlementUsagePeers = Readonly<{
   projects: Pick<ProjectApi, "listIdsByOrganization">;
 }>;
 
-/** What this module hands `EntitlementApp` at boot. */
+/** What this module hands `EntitlementModule` at boot. */
 export function buildEntitlementInfrastructure(input: {
   logger: Logger;
   /** OUT OF SCOPE for this port; carried through exactly as before. */
@@ -240,6 +241,8 @@ export function buildEntitlementInfrastructure(input: {
     baseline: subscription ?? coreBaseline(input.isSaas),
     license: input.license,
     subscription: subscription ? BillingSubscriptionGrants.create(subscription) : undefined,
+    // Main's PlanProviderService: every leg's plan gets the entitlements its tier grants.
+    enrichers: [{ enrich: applyPlanTypeEntitlements }],
   };
 
   const plans = EntitlementService.create(sources);

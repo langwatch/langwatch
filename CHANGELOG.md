@@ -1,5 +1,62 @@
 # Changelog
 
+## [3.19.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.2...langwatch@v3.19.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* **sso:** let the link evidence hook see the resolver's confirmation ([#8389](https://github.com/langwatch/langwatch/issues/8389)) ([2008a34](https://github.com/langwatch/langwatch/commit/2008a34f2414ebea03206b182d73e90ac53f5799))
+
+## [3.19.2](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.1...langwatch@v3.19.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **chart:** stop committing charts/langwatch/Chart.lock so releases cannot publish with a stale lock ([#8386](https://github.com/langwatch/langwatch/issues/8386)) ([36cb176](https://github.com/langwatch/langwatch/commit/36cb176db151a5d20d87345d2c5e3391969d4c0f))
+* **chart:** sync Chart.lock to the 3.19.1 gateway and langyagent subcharts ([5c1687f](https://github.com/langwatch/langwatch/commit/5c1687f46e7e6b9071574b01f3560dd08052954a))
+* **chart:** sync Chart.lock to the 3.19.1 subcharts ([#8382](https://github.com/langwatch/langwatch/issues/8382)) ([5c1687f](https://github.com/langwatch/langwatch/commit/5c1687f46e7e6b9071574b01f3560dd08052954a))
+* **gateway:** prefix a model with slashes of its own on customer spans ([#8376](https://github.com/langwatch/langwatch/issues/8376)) ([d74ebca](https://github.com/langwatch/langwatch/commit/d74ebcaa342f58ed16e7ac7d0d0d2ff8cad24739))
+* **gateway:** prefix a model with slashes of its own on customer spans, as nlpgo does ([d74ebca](https://github.com/langwatch/langwatch/commit/d74ebcaa342f58ed16e7ac7d0d0d2ff8cad24739))
+* **sso:** link an unconfirmed password account when the connection verified its domain ([#8387](https://github.com/langwatch/langwatch/issues/8387)) ([cd7630e](https://github.com/langwatch/langwatch/commit/cd7630e0a734274cfd53ef933e4f35a15a85e2f2))
+
+## [3.19.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.0...langwatch@v3.19.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* 3.19.0 self-host dogfood findings (model id on Studio spans, mirror markers, Langy turns in CLI analytics) ([#8370](https://github.com/langwatch/langwatch/issues/8370)) ([5d70883](https://github.com/langwatch/langwatch/commit/5d708830634f2b63b0743970ddefa2a71b45e577))
+
+## [3.19.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.1...langwatch@v3.19.0) (2026-09-30)
+
+
+### Features
+
+* **automations:** one automation flow: wizard composer, Slack connections, always-on webhooks and API parity ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **automations:** run the Slack connection migration automatically ([#8365](https://github.com/langwatch/langwatch/issues/8365)) ([fcb0e17](https://github.com/langwatch/langwatch/commit/fcb0e171af7f7bfa0d6d745bc00204b577b23837))
+* **sdk:** list the Slack connections a project can use, through GET /api/slack-connections, langwatch slack-connection list, Python list_slack_connections and Go SlackConnections ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+
+
+### Bug Fixes
+
+* 3.18.1 self-host dogfood findings (sign-up origin gate, default model, Langy card and worker reuse, checkup SMTP copy) ([#8360](https://github.com/langwatch/langwatch/issues/8360)) ([3ca36ef](https://github.com/langwatch/langwatch/commit/3ca36ef7372f929c98e88818ec252897918727c2))
+* **gateway:** keep serving keys through slow config fetches, name health probe causes ([#8356](https://github.com/langwatch/langwatch/issues/8356)) ([02103b7](https://github.com/langwatch/langwatch/commit/02103b750c38b069160401f2336899279a82c9fd))
+* **langy:** write the project credentials without asking, and retry a transient model failure ([#8325](https://github.com/langwatch/langwatch/issues/8325)) ([9eb281d](https://github.com/langwatch/langwatch/commit/9eb281d953227f8cfaebff4c44df441890ff15aa))
+
+## [3.18.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.0...langwatch@v3.18.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **home:** join requests card washed out by the hero glow in light mode ([#8318](https://github.com/langwatch/langwatch/issues/8318)) ([e910323](https://github.com/langwatch/langwatch/commit/e91032307fef7f8d84b438619f46368796c7fcc3))
+* **pii:** keep model and tool names out of strict name detection ([#8332](https://github.com/langwatch/langwatch/issues/8332)) ([669c666](https://github.com/langwatch/langwatch/commit/669c666f5973a75c4ae77cd48f1d6d485aafd176))
+* **selfhost:** issues found on a fresh 3.18.0 Helm install on EKS ([#8326](https://github.com/langwatch/langwatch/issues/8326)) ([e494045](https://github.com/langwatch/langwatch/commit/e494045ab02a63459a49592a203314b0f7736cee))
+* **traces:** treat codex-app-server as a codex scope in the span filter and extractor ([#8337](https://github.com/langwatch/langwatch/issues/8337)) ([6f30bbc](https://github.com/langwatch/langwatch/commit/6f30bbcbbf5e8204c7938f6aca7b500e7443bae5))
+
+
+### Documentation
+
+* **agent-testing:** one Voice Agents page, platform first, code as a hand-off ([#8122](https://github.com/langwatch/langwatch/issues/8122)) ([50f8f08](https://github.com/langwatch/langwatch/commit/50f8f08fb3bb206d10f35d7cb9a7887f8315d78b))
+
 ## [3.18.0](https://github.com/langwatch/langwatch/compare/langwatch-3.17.0...langwatch@v3.18.0) (2026-09-27)
 
 

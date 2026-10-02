@@ -1,6 +1,6 @@
 /** Surfaces open the run plan editor by its drawer name; the name must resolve to the editor. */
 
-import { installedDrawerLoaders } from "@langwatch/ui-kernel";
+import { installedDrawerLoaders } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { scenarioWeb } from "../scenario.web.ts";

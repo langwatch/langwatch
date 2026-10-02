@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {

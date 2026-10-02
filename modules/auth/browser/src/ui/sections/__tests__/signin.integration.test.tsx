@@ -3,8 +3,8 @@
  * The sign-in page: a signed-in arrival bounces same-origin only, and a
  * signed-out arrival says so instead of asking for an address.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { routeMock, sessionRef, searchParamsRef, replace } = vi.hoisted(() => ({
@@ -49,12 +49,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import SignIn from "../signin-screen.tsx";
 
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SignIn />
-    </ChakraProvider>,
-  );
+const renderPage = () => renderWithDesignSystem(<SignIn />);
 
 describe("SignIn already-authenticated redirect", () => {
   beforeEach(() => {

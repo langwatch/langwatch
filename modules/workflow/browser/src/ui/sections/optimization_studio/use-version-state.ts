@@ -1,8 +1,9 @@
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
-import { hasDSLChanged, type Project, studioWorkflowSchema } from "@langwatch/workflow-contract";
+import { hasDSLChanged, studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { useEffect, useMemo } from "react";
 
+import type { StudioProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 
 function parseStudioDsl(dsl: unknown) {
   if (!dsl) return undefined;
@@ -15,7 +16,7 @@ export const useVersionState = ({
   form,
   allowSaveIfAutoSaveIsCurrentButNotLatest = true,
 }: {
-  project?: Project;
+  project?: StudioProject;
   form?: { setValue(name: "version", value: string): void };
   allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
 }) => {

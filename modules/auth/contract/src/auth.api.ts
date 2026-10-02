@@ -3,7 +3,8 @@ import type {
   RoutingDecision,
   SignedInWith,
 } from "@langwatch/identity-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
+import { z } from "zod";
 
 import type {
   BrowserSessionInventoryEntry,
@@ -33,15 +34,27 @@ import type {
  * The subject carried by an unexpired CLI access bearer. The device-session
  * store remains Auth-owned; peers receive only the caller facts they need.
  */
-export type CliAccessSession = Readonly<{
-  userId: string;
-  organizationId: string;
+export const cliAccessSessionSchema = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
+  /** The one project the session is capped at; absent for a session bound to none. */
+  projectId: z.string().optional(),
+  /** Set when the person consented to that one project only (hosted MCP); never org-wide. */
+  projectLocked: z.boolean().optional(),
   /** The login key the session minted at sign-in, where it minted one. */
-  cliApiKeyId?: string | undefined;
-  clientInfo?: Readonly<{
-    deviceLabel?: string | undefined;
-    hostname?: string | undefined;
-  }>;
+  cliApiKeyId: z.string().optional(),
+  clientInfo: z
+    .object({ deviceLabel: z.string().optional(), hostname: z.string().optional() })
+    .optional(),
+});
+export type CliAccessSession = Readonly<z.infer<typeof cliAccessSessionSchema>>;
+
+/** An access and refresh pair, with the seconds each lives. */
+export type CliSessionTokens = Readonly<{
+  accessToken: string;
+  refreshToken: string;
+  accessTtlSeconds: number;
+  refreshTtlSeconds: number;
 }>;
 
 /**
@@ -118,6 +131,22 @@ export interface AuthApi {
   getCliAccessSession(input: {
     authorization: string;
   }): Promise<CliAccessSession & Readonly<{ tokenKey: string }>>;
+  /**
+   * Mints the person-bound session a sign-in approved: an access token capped and
+   * locked at one project, and a rotating refresh token. Refuses when the person
+   * is no longer an active member who can view that project.
+   */
+  issueProjectCliSession(input: {
+    userId: string;
+    organizationId: string;
+    projectId: string;
+    clientLabel: string;
+  }): Promise<CliSessionTokens>;
+  /**
+   * Rotates a refresh token into a new pair, keeping its person and project. The
+   * old token ends; an unknown, expired or revoked one refuses as `invalid_grant`.
+   */
+  refreshCliSession(input: { refreshToken: string }): Promise<CliSessionTokens>;
   /** Every CLI token this person still holds; lapsed and unreadable ones are skipped. */
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]>;
   /**
@@ -167,6 +196,13 @@ export interface AuthApi {
   ): Promise<RoutingDecision>;
   /** Whether an account already exists for this address. */
   addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean>;
+  /**
+   * The `/api/auth/*` origin rule for a sign-up that writes before any such call: `origin`, or
+   * with none `referer`, must match the configured address. Throws `auth_invalid_origin`.
+   */
+  assertSignUpOrigin(
+    input: Readonly<{ origin: string | null; referer: string | null }>,
+  ): Promise<void>;
   /** Mails a fresh confirmation link. Asking twice sends twice. */
   requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void>;
   /**

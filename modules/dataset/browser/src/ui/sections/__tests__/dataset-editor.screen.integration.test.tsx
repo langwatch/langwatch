@@ -23,7 +23,10 @@ const { datasetQuery } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../behavior/dataset-api.ts", () => ({
-  datasetApi: {
+  datasetApi: {},
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
     dataset: {
       getById: { useQuery: () => datasetQuery.current },
       retryNormalize: { useMutation: () => ({ mutateAsync: vi.fn() }) },

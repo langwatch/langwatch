@@ -16,14 +16,19 @@ flows:
       - action: click
         with:
           selector: '[role="menuitem"]'
-          hasText: /^\s*Groq\s*$/
+          hasText: /^\s*ElevenLabs\s*$/
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: "gsk-vd-cv2-{uid}"
+          value: "elk-vd-cv2-{uid}"
       - action: click
         with:
-          text: /^\s*Add model\s*$/
+          selector: button
+          hasText: /^\s*Add\s*$/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Add model\s*$/
       - action: expect
         with:
           text: Add Model
@@ -46,18 +51,18 @@ flows:
           path: /settings/model-providers
       - action: expect
         with:
-          count: 'tr:has-text("Groq")'
+          count: 'tr:has-text("ElevenLabs")'
           min: "1"
           timeout: "20000"
       - action: expect
         with:
           api: /api/model-providers
-          field: groq.models
+          field: elevenlabs.customModels
           contains: "vd-cv2-model-{uid}"
           timeout: "20000"
       - action: click
         with:
-          selector: 'tr:has-text("Groq") button'
+          selector: 'tr:has-text("ElevenLabs") button'
       - action: click
         with:
           selector: '[role="menuitem"]'
@@ -79,11 +84,11 @@ flows:
       - action: click
         with:
           selector: '[role="menuitem"]'
-          hasText: /^\s*Mistral\s*$/
+          hasText: /^\s*Voyage AI\s*$/
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: "msk-vd-cv2-{uid}"
+          value: "vsk-vd-cv2-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -92,12 +97,12 @@ flows:
           path: /settings/model-providers
       - action: expect
         with:
-          count: 'tr:has-text("Mistral")'
+          count: 'tr:has-text("Voyage AI")'
           min: "1"
           timeout: "20000"
       - action: click
         with:
-          selector: 'tr:has-text("Mistral") button'
+          selector: 'tr:has-text("Voyage AI") button'
       - action: click
         with:
           selector: '[role="menuitem"]'
@@ -111,13 +116,13 @@ flows:
           path: /settings/model-providers
       - action: expect
         with:
-          count: 'tr:has-text("Mistral")'
+          count: 'tr:has-text("Voyage AI")'
           min: "1"
           timeout: "20000"
       - action: expect
         with:
           api: /api/model-providers
-          field: mistral.enabled
+          field: voyage.enabled
           equals: "true"
 
   - id: cv2-model-defaults-drawer-shows-roles
@@ -127,6 +132,11 @@ flows:
       - action: go
         with:
           path: /settings/model-providers
+      - action: expect
+        with:
+          count: '[data-testid="add-config-button"], [data-testid="empty-state-add-config"]'
+          min: "1"
+          timeout: "30000"
       - action: click
         with:
           selector: '[data-testid="add-config-button"], [data-testid="empty-state-add-config"]'

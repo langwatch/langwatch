@@ -38,7 +38,7 @@ vi.mock("../../../../model/onboarding-host.ts", () => ({
   useOnboardingHost: () => ({ signOut: state.signOut }),
 }));
 
-vi.mock("@langwatch/onboarding-browser-kit", () => ({
+vi.mock("../../../blocks/tech-stack.tsx", () => ({
   TechStackSelector: () => null,
 }));
 
@@ -46,7 +46,9 @@ vi.mock("../../../../behavior/onboarding-api.ts", () => ({
   api: {
     team: {
       getBySlug: { useQuery: () => ({ data: state.teamBySlug, isFetched: true }) },
-      getTeamsWithMembers: { useQuery: () => ({ data: state.teams }) },
+    },
+    organization: {
+      getScopeGraph: { useQuery: () => ({ data: [{ id: "org_1", teams: state.teams }] }) },
     },
     project: {
       create: {
@@ -69,6 +71,12 @@ vi.mock("../../../../behavior/onboarding-api.ts", () => ({
         getAll: {
           invalidate: () => {
             state.order.push("invalidate organization.getAll");
+            return Promise.resolve();
+          },
+        },
+        getScopeGraph: {
+          invalidate: () => {
+            state.order.push("invalidate organization.getScopeGraph");
             return Promise.resolve();
           },
         },
@@ -133,7 +141,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /support-bot"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /support-bot",
+        ]);
       });
       expect(state.mutations).toEqual([
         {
@@ -155,7 +167,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /settings/projects"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /settings/projects",
+        ]);
       });
     });
 
@@ -167,7 +183,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /support-bot"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /support-bot",
+        ]);
       });
     });
   });

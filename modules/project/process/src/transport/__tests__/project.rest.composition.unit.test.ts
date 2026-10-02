@@ -1,7 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
- * `/api/projects` against the real `ProjectApp`, not a stub — the stub
+ * `/api/projects` against the real `ProjectModule`, not a stub — the stub
  * passed while production 500'd because the proxy refuses uncomposed calls.
  * Spec: specs/projects/projects-management-door.feature
  */
@@ -12,17 +11,17 @@ import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
-import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectApp } from "../../app/project.app.ts";
+import { ProjectModule } from "../../app/project.app.ts";
 import type { RecordProjectCreatedCommandData } from "../../eventing/project-lifecycle.events.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
@@ -45,7 +44,6 @@ function unreachablePeers() {
   apis.declare(AuthzApi);
   apis.declare(TraceApi);
   apis.declare(AuditLogApi);
-  apis.declare(LangyApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
@@ -54,7 +52,6 @@ function unreachablePeers() {
     authorization: apis.reference(AuthzApi),
     trace: apis.reference(TraceApi),
     auditLog: apis.reference(AuditLogApi),
-    langy: apis.reference(LangyApi),
   };
 }
 
@@ -111,12 +108,12 @@ function project(overrides: Partial<Project> = {}): Project {
 const REACHES_EVERYTHING: ApiKeyVisibleProjects = { kind: "all" };
 
 /**
- * The application exactly as `ProjectApp.create` builds it at boot, over the
+ * The application exactly as `ProjectModule.create` builds it at boot, over the
  * in-memory backing of its own repository interface, seeded with one project
  * in this organization and one in another.
  */
 function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
-  app: ProjectApp;
+  app: ProjectModule;
   database: MemoryProjectDatabase;
 } {
   const database = MemoryProjectDatabase.create();
@@ -158,7 +155,7 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     },
   });
 
-  const app = ProjectApp.create({
+  const app = ProjectModule.create({
     dependencies: { apiKeys, ...unreachablePeers(), organizations, dataPrivacy },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
@@ -196,7 +193,7 @@ const MINTED_KEY_ROW = {
   ingestionTemplateId: null,
   createdAt: NOW,
   updatedAt: NOW,
-  roleBindings: [],
+  grants: [],
 };
 
 describe("the projects REST family over the application the composition builds", () => {
@@ -247,7 +244,10 @@ describe("the projects REST family over the application the composition builds",
     beforeEach(() => {
       recorded.mockClear();
       app = application().app;
-      app.connectLifecycle({ recordProjectCreated: { send: recorded } });
+      app.connectLifecycle({
+        recordProjectCreated: { send: recorded },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      });
     });
 
     /** @scenario "A project created through the REST API is recorded as created" */

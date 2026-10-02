@@ -3,7 +3,7 @@
  * audiences share one namespace: the unsubscribe pair from a session-less
  * mail client, the operator pair from settings. Access binds server-side.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

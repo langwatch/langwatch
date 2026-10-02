@@ -1,18 +1,18 @@
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  * The production composition reads the instance registry from Postgres, as main did on every
  * deployment.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -22,7 +22,7 @@ import {
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
 import { PrismaSelfHostedInstanceRepository } from "../../repositories/prisma/prisma.self-hosted-instance.repository.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const RUN = `instlist-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -61,7 +61,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
         lastUnknownFields: 0,
         raisedSignals: [],
       });
-      const app = await LicensingApp.create({
+      const app = await LicensingModule.create({
         dependencies: {
           instantEval: createApiFixture<InstantEvalApi>(),
           projects: createApiFixture<ProjectApi>(),

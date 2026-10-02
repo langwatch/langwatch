@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -10,11 +9,11 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -23,12 +22,13 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * per-organization refusal here, and a bad config reads as main's handled complaint.
  */
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const ADMIN = { id: "user-1" };
@@ -49,12 +49,12 @@ function planOfType(type: string): Plan {
 
 async function buildApp(planType: string) {
   const plansAsked: unknown[] = [];
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>({
         getActivePlan: async (input) => {

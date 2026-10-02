@@ -10,7 +10,7 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 
-import type { TopicApp } from "../app/topic.app.ts";
+import type { TopicModule } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
@@ -135,6 +135,6 @@ export function createTopicClusteringProcessingPipeline(
 /** Passive in the api process, which only sends; the worker folds and drives the runs. */
 export const topicClusteringEventing = defineEventingModule({
   pipeline: TOPIC_CLUSTERING_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<TopicRepositories, TopicApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<TopicRepositories, TopicModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

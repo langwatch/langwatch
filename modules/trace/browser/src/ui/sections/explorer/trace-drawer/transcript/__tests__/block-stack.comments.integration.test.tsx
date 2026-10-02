@@ -2,8 +2,8 @@
  * Commenting on one message of a transcript.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -96,8 +96,11 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 import { withBlockKeys } from "@langwatch/trace-contract/transcript";
 import type { ContentBlock } from "@langwatch/trace-contract/transcript";
 
+import { TerminalOutput } from "../../../../../elements/coding-agent/trace/terminal-output.tsx";
+import { TranscriptRenderProvider } from "../../../../../elements/transcript-render-ports.tsx";
+import { TraceMediaPart } from "../../../../traces/trace-media-part.tsx";
+import { BlockStack } from "../../../../transcript/block-stack.tsx";
 import type * as useAnchoredAnnotationsModule from "../../../hooks/use-anchored-annotations.ts";
-import { BlockStack } from "../block-stack.tsx";
 import { MessageCommentScope } from "../message-comments.tsx";
 
 const TRACE_ID = "trace-1";
@@ -107,12 +110,15 @@ const BLOCKS: ContentBlock[] = [
 ];
 
 function renderTranscript({ inTrace = true } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <MessageCommentScope traceId={inTrace ? TRACE_ID : undefined}>
+  return renderWithDesignSystem(
+    <MessageCommentScope traceId={inTrace ? TRACE_ID : undefined}>
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
         <BlockStack blocks={BLOCKS} toolCalls={[]} />
-      </MessageCommentScope>
-    </ChakraProvider>,
+      </TranscriptRenderProvider>
+    </MessageCommentScope>,
   );
 }
 

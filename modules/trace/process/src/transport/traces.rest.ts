@@ -9,6 +9,7 @@ import {
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -214,7 +215,7 @@ async function searchTraces({
   input: z.infer<typeof traceSearchBodySchema>;
   scope: { id: string };
   project: { projectSlug: string };
-  caller: { apiKeyId: string | null; userId: string | null };
+  caller: { principal: PrincipalRef | null };
 }): Promise<string> {
   const params = input;
   const {
@@ -238,8 +239,7 @@ async function searchTraces({
   const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
-    apiKeyId: caller.apiKeyId,
-    userId: caller.userId,
+    principal: caller.principal,
   });
 
   const { projection } = compileRequestedProjection({ from, select, protections });
@@ -354,8 +354,7 @@ export function createTracesRest(): Readonly<{
       app.readTraceFacetsForApiKey({
         projectId: scope.id,
         query: input,
-        apiKeyId: caller.apiKeyId,
-        userId: caller.userId,
+        principal: caller.principal,
       }),
     );
 
@@ -392,8 +391,7 @@ export function createTracesRest(): Readonly<{
         await app.readTraceTranscript({
           projectId: scope.id,
           traceId: input.traceId,
-          apiKeyId: caller.apiKeyId,
-          userId: caller.userId,
+          principal: caller.principal,
         }),
       ),
     );
@@ -453,8 +451,7 @@ export function createTracesRest(): Readonly<{
         traceId: input.traceId,
         format: resolveTraceFormat({ format: input.format, llmMode: input.llmMode }),
         projectSlug: project.projectSlug,
-        apiKeyId: caller.apiKeyId,
-        userId: caller.userId,
+        principal: caller.principal,
       });
     });
 

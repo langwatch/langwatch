@@ -1,8 +1,12 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { computeLineDiff, type DiffLine, diffStat } from "@langwatch/coding-agent-browser-kit";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { useMemo, useState } from "react";
 
+import {
+  computeLineDiff,
+  type DiffLine,
+  diffStat,
+} from "../../../../model/coding-agent/trace/terminal-line-diff.ts";
 import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
 import { Dialog } from "../../dialog.tsx";

@@ -1,9 +1,10 @@
-import { transformBatchEvaluationData } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * Tests for batch evaluation data transformer
  */
 import { describe, expect, it } from "vitest";
+
+import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
 
 // Helper to create base timestamps
 const createTimestamps = () => ({

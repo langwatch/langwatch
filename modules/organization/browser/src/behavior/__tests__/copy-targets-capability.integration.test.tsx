@@ -4,8 +4,8 @@
  * @vitest-environment jsdom
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UiScopeOrganization } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

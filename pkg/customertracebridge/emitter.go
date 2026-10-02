@@ -112,6 +112,10 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 // customer spans in production. Scrubbing at the export boundary holds
 // regardless of how the provider was built.
 //
+// It also removes the reserved ADR-061 mirror markers. This exporter is in the
+// chain whether or not a mirror is armed, so the markers never reach a project
+// even on an install with no mirror (the self-hosted default).
+//
 // tracetest is imported in production code deliberately: ReadOnlySpan is a
 // sealed interface, and SpanStub is the SDK's only public way to reconstruct
 // one with a chosen resource.
@@ -125,6 +129,7 @@ func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace
 	for _, s := range spans {
 		stub := tracetest.SpanStubFromReadOnlySpan(s)
 		stub.Resource = r.policy.ApplyResource(s.Resource())
+		stub.Attributes = withoutMirrorMarkers(stub.Attributes)
 		scrubbed = append(scrubbed, stub.Snapshot())
 	}
 	return r.inner.ExportSpans(ctx, scrubbed)
@@ -456,11 +461,13 @@ func (e *Emitter) EndSpan(ctx context.Context, params aitrace.AITraceParams) {
 // strips the prefix for provider routing, and stamping the stripped name made
 // the gateway the one surface reporting bare wire-names: a Langy turn's
 // Models filter listed the SAME model twice, once bare (this span), once
-// prefixed (the worker's own span). A model whose provider is unknown
-// (implicit resolution never fills it) or that already carries a path
-// segment is reported as requested.
+// prefixed (the worker's own span). Resolution cuts the prefix at the first slash, so a model
+// with slashes of its own ("Qwen/Qwen2.5-32B-Instruct") still gets its
+// provider, as nlpgo does. A model whose provider is unknown (implicit
+// resolution never fills it) or that already starts with its provider is
+// reported as requested.
 func canonicalModelID(provider aitrace.ProviderID, model string) string {
-	if provider == "" || model == "" || strings.Contains(model, "/") {
+	if provider == "" || model == "" || strings.HasPrefix(model, string(provider)+"/") {
 		return model
 	}
 	return string(provider) + "/" + model

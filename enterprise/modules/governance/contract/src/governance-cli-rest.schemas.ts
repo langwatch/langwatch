@@ -1,10 +1,11 @@
+import { cliAccessSessionSchema } from "@langwatch/auth-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What `/api/auth/cli` reads off the wire, on the shapes released `langwatch`
  * builds already send: snake_case bodies, a `1` flag for a boolean query and a
  * bounded page size. The transport declares these; nothing here knows Hono.
  */
-import type { CliTokenActor } from "@langwatch/api/rest";
+import type { CliTokenActor } from "@langwatch/authorization";
 import { z } from "zod";
 
 import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
@@ -21,10 +22,6 @@ const EVENTS_PAGE_MAX = 200;
 
 export const governanceCliVirtualKeyRequestSchema = z.object({
   device_label: z.string().optional(),
-});
-
-export const governanceCliProjectKeyRequestSchema = z.object({
-  slug: z.string().min(1),
 });
 
 export const governanceCliIngestionKeyRequestSchema = z.object({
@@ -147,16 +144,17 @@ export const governanceCliBudgetOverviewAnswers = {
 } as const;
 export const governanceCliPersonalProjectAnswers = {
   200: z.object({
-    project: z.object({ ...cliProjectSchema.shape, api_key: z.string().optional() }),
+    project: cliProjectSchema,
   }),
   ...governanceCliRefusalAnswers,
 } as const;
+/** The deleted project-key door: a 2xx the framework requires, never returned, and the 410 old CLIs read. */
+export const governanceCliProjectKeyGoneAnswers = {
+  ...governanceCliPersonalProjectAnswers,
+  410: cliRefusalSchema,
+} as const;
 export const governanceCliVirtualKeyAnswers = {
   201: z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
-  ...governanceCliRefusalAnswers,
-} as const;
-export const governanceCliProjectKeyAnswers = {
-  200: z.object({ api_key: z.string(), project: cliProjectSchema }),
   ...governanceCliRefusalAnswers,
 } as const;
 export const governanceCliIngestionSourcesAnswers = {
@@ -238,9 +236,6 @@ export type GovernanceCliPersonalProjectAnswer = GovernanceCliAnswerOf<
 export type GovernanceCliVirtualKeyAnswer = GovernanceCliAnswerOf<
   typeof governanceCliVirtualKeyAnswers
 >;
-export type GovernanceCliProjectKeyAnswer = GovernanceCliAnswerOf<
-  typeof governanceCliProjectKeyAnswers
->;
 export type GovernanceCliIngestionSourcesAnswer = GovernanceCliAnswerOf<
   typeof governanceCliIngestionSourcesAnswers
 >;
@@ -266,8 +261,20 @@ export type GovernanceCliIngestionKeyStateAnswer = GovernanceCliAnswerOf<
   typeof governanceCliIngestionKeyStateAnswers
 >;
 
-/** The caller the CLI token door let in, and the organization its session is bound to. */
-export type GovernanceCliRequest = Readonly<{ actor: CliTokenActor; organizationId: string }>;
+/** The session the CLI token door hands beside the actor: the device it named and the key that severs it. */
+export const governanceCliSessionSchema = z.object({
+  cliApiKeyId: cliAccessSessionSchema.shape.cliApiKeyId,
+  clientInfo: cliAccessSessionSchema.shape.clientInfo,
+  tokenKey: z.string().min(1),
+});
+export type GovernanceCliSession = z.infer<typeof governanceCliSessionSchema>;
+
+/** The caller the CLI token door let in, its session, and the organization that session is bound to. */
+export type GovernanceCliRequest = Readonly<{
+  actor: CliTokenActor;
+  session: GovernanceCliSession;
+  organizationId: string;
+}>;
 export type GovernanceCliRawRequest = GovernanceCliRequest & Readonly<{ raw: string }>;
 export type GovernanceCliSourcesRequest = GovernanceCliRequest &
   Readonly<{ includeArchived: boolean }>;

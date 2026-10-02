@@ -172,6 +172,21 @@ export function getPlanTemplate(
   }
 }
 
+/**
+ * The lite seats a licence carries: the contract's number when one was agreed,
+ * otherwise the plan template's. A plan with no template (CUSTOM) cannot be
+ * minted, so it resolves to 0.
+ */
+export function resolveMembersLite({
+  planType,
+  maxMembersLite,
+}: {
+  planType: string;
+  maxMembersLite: number | undefined;
+}): number {
+  return maxMembersLite ?? getPlanTemplate(planType)?.maxMembersLite ?? 0;
+}
+
 /** A template's levers, as the mint form fills them in. */
 export function templateFormDefaults(template: LicensePlanTemplate): {
   maxMembers: number;

@@ -1,8 +1,15 @@
-import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { AISparklesLoader } from "@langwatch/design-system/ai-sparkles-loader";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { AISparklesLoader, allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -12,6 +19,7 @@ import { useDebounceCallback } from "usehooks-ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { useVersionState } from "./use-version-state.ts";
 
 export const VersionToBeUsed = () => {
@@ -104,7 +112,7 @@ export function NewVersionFields({
   // Cascade-resolved Fast model for commit-message autogen: null when
   // nothing is configured at any scope, so the doomed generation call
   // (and the missing-model toast it would surface) never auto-fires.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefault = workflowApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "workflows.commit_message" },
     { enabled: !!project?.id },
   );
@@ -118,7 +126,7 @@ export function NewVersionFields({
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
   const isModelConfigured = resolvedDefault.data != null && !isDefaultModelDisabled;
 
-  const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
+  const generateCommitMessage = workflowApi.workflow.generateCommitMessage.useMutation();
 
   const userEditedCommitMessage = useRef(false);
   const hasTriggeredGeneration = useRef(false);

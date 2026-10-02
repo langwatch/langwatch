@@ -4,16 +4,17 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 
+import { scenarioClient } from "@langwatch/scenario-client";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback } from "react";
 import { flushSync } from "react-dom";
 
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { type RunAttempt, useRunAttempt } from "../../../../behavior/suites/use-run-attempt.ts";
 import { useModelProvidersSettings } from "../../../../behavior/use-model-providers-settings.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { writeScenarioTarget } from "../../use-scenario-target.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 import { type RunScope, toSuiteScope } from "./run-configuration.ts";
 import type { RunStartedInfo } from "./run-dialog-types.ts";
 import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit.ts";
@@ -89,7 +90,15 @@ function runStartedInfoOf({
  * Queues a run under the name the dialog holds.
  */
 function useQueuePlanRun(input: BatchRunInput) {
-  const runPlan = api.suites.runPlan.useMutation();
+  const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
+  const runPlan = api.suites.runPlan.useMutation({
+    onSuccess: () => {
+      void utils.suites.getAll.invalidate();
+      void utils.suites.getSummaries.invalidate();
+      void scenarioUtils.scenarios.getSuiteRunData.invalidate();
+    },
+  });
   const { projectId, target, noteInput, runParameters, suiteTargets } = input;
   const { runName, scope, scopedScenarioIds, evaluators } = input;
   const { repeatCount, simulatorModel, judgeModel } = input;

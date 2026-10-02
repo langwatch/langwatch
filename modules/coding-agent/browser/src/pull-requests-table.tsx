@@ -1,14 +1,9 @@
-import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
-import {
-  PeerComparisonCell,
-  peerComparisonSentence,
-  percentileStats,
-} from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { Pagination } from "@langwatch/design-system/pagination";
+import { Button, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
@@ -23,6 +18,7 @@ import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-ap
 import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
 import { formatLastUpdate } from "./last-update.ts";
+import { percentileStats } from "./model/percentile.ts";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
 import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
 import {
@@ -37,6 +33,7 @@ import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
 import { derivePullRequestStatus, type PullRequestStatus } from "./pull-request-status.ts";
 import type { Period, PeriodMode } from "./session-filters.ts";
 import { SortableColumnHeader } from "./sortable-column-header.tsx";
+import { PeerComparisonCell, peerComparisonSentence } from "./ui/elements/peer-comparison-cell.tsx";
 
 /**
  * What a pull request cost in assistant usage over its whole lifetime, across

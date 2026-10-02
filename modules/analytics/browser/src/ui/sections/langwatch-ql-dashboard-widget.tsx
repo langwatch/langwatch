@@ -4,13 +4,13 @@
  * every dashboard showing it; a too-fine step asks to coarsen, not refuse.
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
@@ -43,7 +43,7 @@ export function LangWatchQLDashboardWidget({
   granularitySeconds,
   name,
 }: LangWatchQLDashboardWidgetProps) {
-  const { period } = usePeriodSelector();
+  const { period } = useAnalyticsPeriod();
   const refreshedAt = useDashboardRefreshedAt();
 
   const chartQuery = api.analytics.savedWorkbenchCharts.getById.useQuery(
@@ -51,8 +51,8 @@ export function LangWatchQLDashboardWidget({
     { enabled: !!projectId && !!chartId },
   );
 
-  // Epoch milliseconds rather than the `Date` objects `usePeriodSelector`
-  // hands back: two `Date`s for the same instant are never `Object.is`-equal,
+  // Epoch milliseconds rather than the `Instant` objects `useAnalyticsPeriod`
+  // hands back: two `Instant`s for the same instant are never `Object.is`-equal,
   // so a dependency built on them would re-run the query on every render.
   const { result, error } = useLangWatchQLWidgetRun({
     chartId,

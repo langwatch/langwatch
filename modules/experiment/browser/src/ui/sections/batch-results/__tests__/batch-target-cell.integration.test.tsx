@@ -4,21 +4,18 @@ import "@testing-library/jest-dom/vitest";
  *
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   type BatchEvaluatorResult,
   type BatchTargetOutput,
-  BatchTargetCell,
-} from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+} from "../../batch-evaluation-results.types.ts";
+import { BatchTargetCell } from "../batch-target-cell.tsx";
 
 // Wrapper with Chakra provider
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 // Helper to create target output data
 const createTargetOutput = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
@@ -48,9 +45,7 @@ describe("BatchTargetCell", () => {
         output: { message: "Hello world" },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText(/Hello world/)).toBeInTheDocument();
     });
@@ -60,9 +55,7 @@ describe("BatchTargetCell", () => {
         output: { key: "value", nested: { foo: "bar" } },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText(/key/)).toBeInTheDocument();
       expect(screen.getByText(/value/)).toBeInTheDocument();
@@ -71,9 +64,7 @@ describe("BatchTargetCell", () => {
     it("shows 'No output' when output is null", () => {
       const targetOutput = createTargetOutput({ output: null });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("No output")).toBeInTheDocument();
     });
@@ -85,9 +76,7 @@ describe("BatchTargetCell", () => {
         error: "Connection timeout",
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("Connection timeout")).toBeInTheDocument();
     });
@@ -106,9 +95,7 @@ describe("BatchTargetCell", () => {
           error: longError,
         });
 
-        render(<BatchTargetCell targetOutput={targetOutput} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
       });
 
       /** @scenario Reveal full error message on hover */
@@ -147,9 +134,7 @@ describe("BatchTargetCell", () => {
         output: { text: longText },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("(truncated)")).toBeInTheDocument();
     });
@@ -179,9 +164,7 @@ describe("BatchTargetCell", () => {
         ],
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
       expect(screen.getByText("LLM Judge")).toBeInTheDocument();
@@ -200,9 +183,7 @@ describe("BatchTargetCell", () => {
         ],
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("0.75")).toBeInTheDocument();
     });
@@ -220,9 +201,7 @@ describe("BatchTargetCell", () => {
         ],
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByText("Failed Eval")).toBeInTheDocument();
     });
@@ -243,12 +222,11 @@ describe("BatchTargetCell", () => {
         <span>Rendered evaluator: {input.result.evaluatorName}</span>
       ));
 
-      render(
+      renderWithDesignSystem(
         <BatchTargetCell
           targetOutput={targetOutput}
           renderEvaluatorResult={renderEvaluatorResult}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(renderEvaluatorResult).toHaveBeenCalledWith({
@@ -266,12 +244,11 @@ describe("BatchTargetCell", () => {
         raw: "provider_error",
       }));
 
-      render(
+      renderWithDesignSystem(
         <BatchTargetCell
           targetOutput={createTargetOutput({ error: "provider_error", output: null })}
           describeFailure={describeFailure}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(describeFailure).toHaveBeenCalledWith({
@@ -286,12 +263,11 @@ describe("BatchTargetCell", () => {
       const user = userEvent.setup();
       const onOpenTrace = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <BatchTargetCell
           targetOutput={createTargetOutput({ traceId: "trace-123" })}
           onOpenTrace={onOpenTrace}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("trace-link-target-1"));
@@ -300,9 +276,9 @@ describe("BatchTargetCell", () => {
     });
 
     it("hides the trace action when no trace opener is supplied", () => {
-      render(<BatchTargetCell targetOutput={createTargetOutput({ traceId: "trace-123" })} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <BatchTargetCell targetOutput={createTargetOutput({ traceId: "trace-123" })} />,
+      );
 
       expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
     });
@@ -314,9 +290,7 @@ describe("BatchTargetCell", () => {
         duration: 1500,
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       // Latency is shown in action buttons on hover, check data-testid
       expect(screen.getByTestId("latency-target-1")).toBeInTheDocument();
@@ -326,9 +300,7 @@ describe("BatchTargetCell", () => {
     it("displays cost when present", () => {
       const targetOutput = createTargetOutput({ cost: 0.05 });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       expect(screen.getByTestId("cost-target-1")).toBeInTheDocument();
       expect(screen.getByText("$0.0500")).toBeInTheDocument();
@@ -338,9 +310,9 @@ describe("BatchTargetCell", () => {
     it("hides cost and latency when showCostAndLatency is false", () => {
       const targetOutput = createTargetOutput({ cost: 0.05, duration: 1500 });
 
-      render(<BatchTargetCell targetOutput={targetOutput} showCostAndLatency={false} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <BatchTargetCell targetOutput={targetOutput} showCostAndLatency={false} />,
+      );
 
       expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
       expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();
@@ -352,9 +324,7 @@ describe("BatchTargetCell", () => {
     it("applies the row-height tier to the collapsed output box", () => {
       const targetOutput = createTargetOutput();
 
-      render(<BatchTargetCell targetOutput={targetOutput} rowHeight="l" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} rowHeight="l" />);
 
       expect(screen.getByText(/Test output/).closest("[data-row-height]")).toHaveAttribute(
         "data-row-height",
@@ -369,9 +339,7 @@ describe("BatchTargetCell", () => {
         output: { output: "The actual answer is 42" },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       // Should display the unwrapped content, not the JSON
       expect(screen.getByText("The actual answer is 42")).toBeInTheDocument();
@@ -384,9 +352,7 @@ describe("BatchTargetCell", () => {
         output: { output: "answer", metadata: "extra info" },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       // Should display as JSON since there are multiple keys
       expect(screen.getByText(/output/)).toBeInTheDocument();
@@ -398,9 +364,7 @@ describe("BatchTargetCell", () => {
         output: { response: "This is the response" },
       });
 
-      render(<BatchTargetCell targetOutput={targetOutput} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
       // Should display as JSON since the key is not "output"
       expect(screen.getByText(/response/)).toBeInTheDocument();

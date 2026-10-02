@@ -1,3 +1,6 @@
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { downloadCsv } from "@langwatch/csv/download";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import {
   Box,
   Button,
@@ -11,17 +14,14 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { downloadCsv } from "@langwatch/csv/download";
-import { formatMoney } from "@langwatch/design-system/format-money";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { readableDate } from "@langwatch/experiment-browser-kit";
 import { toEpochMs } from "@langwatch/time";
-import type { Experiment } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { Download } from "react-feather";
 
+import { readableDate } from "../../../model/display-formatters.ts";
+import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { cellText, readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";
 import type { BatchEvaluation } from "../../../model/prisma-types.ts";
 
@@ -294,7 +294,7 @@ export default function BatchEvaluation({
   evaluations,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
   evaluations: { data?: BatchEvaluation[]; isLoading: boolean };
 }) {
   const data = evaluations.data ?? [];

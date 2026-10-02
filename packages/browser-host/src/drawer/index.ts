@@ -7,6 +7,7 @@
 export {
   absoluteDrawerAddress,
   drawerRouterRef,
+  readDrawerLocation,
   readFlatQuery,
   useDrawerRouter,
   type DrawerRouter,
@@ -17,8 +18,6 @@ export {
   type DrawerPreloader,
 } from "./behavior/drawer-preloader.ts";
 export {
-  clearDrawerOpenRewrite,
-  clearDrawerStack,
   clearFlowCallbacks,
   getAllFlowCallbacks,
   getComplexProps,
@@ -26,7 +25,6 @@ export {
   getDrawerStack,
   getFlowCallbacks,
   getTopDrawer,
-  installDrawerOpenRewrite,
   navigateToDrawer,
   setComplexProps,
   setFlowCallbacks,
@@ -34,9 +32,14 @@ export {
   useDrawer,
   useDrawerParams,
   useUpdateDrawerParams,
-  type DrawerOpenRewrite,
   type DrawerType,
+  updateDrawerParams,
 } from "./behavior/use-drawer.ts";
+export {
+  readDrawerAncestors,
+  readDrawerStack,
+  type DrawerStackEntry,
+} from "./model/drawer-stack.ts";
 export {
   lazyDrawer,
   preloadDrawer,
@@ -79,10 +82,6 @@ export type {
   UiWorkflowSelectorForEvaluatorDrawerProps,
 } from "./model/evaluator-drawers.ts";
 export type { UiAutomationDrawerProps } from "./model/automation-drawers.ts";
-export type {
-  UiSelectDatasetDrawerProps,
-  UiUploadCsvDrawerProps,
-} from "./model/dataset-drawers.ts";
 export type { UiFoundryDrawerProps } from "./model/ops-drawers.ts";
 export type { UiInviteMemberDrawerProps } from "./model/organization-drawers.ts";
 export type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./model/prompt-drawers.ts";

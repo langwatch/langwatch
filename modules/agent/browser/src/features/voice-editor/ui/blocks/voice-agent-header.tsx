@@ -1,5 +1,5 @@
-import { Button, HStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 export function VoiceAgentHeader({

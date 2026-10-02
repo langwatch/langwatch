@@ -1,5 +1,5 @@
-import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";

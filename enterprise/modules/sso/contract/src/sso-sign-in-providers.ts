@@ -1,15 +1,23 @@
+import type { SecretHandle } from "@langwatch/secrets/secret";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Which sign-in providers this deployment configured, decided over config and
  * credentials alone: auth mounts exactly these on Better Auth, sso reports
  * whether the named one mounted. main's ee/sso/providers.ts, D09 included.
  */
-import { signInProviderSecrets } from "@langwatch/secrets";
-import type { SecretHandle } from "@langwatch/secrets/secret";
+import { signInProviderSecrets } from "@langwatch/secrets/shared-secrets";
 
 import type { SsoConfig, SsoConfiguration } from "./sso.config.ts";
 
 export type SignInProviderConfiguration = Omit<SsoConfiguration, "isSaas">;
+
+/**
+ * The callback path segment Azure app registrations carry for Microsoft
+ * sign-in (pre-3.17 and the self-hosting docs). Better Auth mounts the
+ * provider as `microsoft`, so the door hands this path on to that one.
+ */
+export const MICROSOFT_LEGACY_CALLBACK_ID = "azure-ad";
+export const MICROSOFT_PROVIDER_CALLBACK_ID = "microsoft";
 
 export type SocialProviderConfiguration = Pick<
   SsoConfiguration,

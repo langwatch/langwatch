@@ -1,3 +1,4 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Collapsible,
   Field,
@@ -7,8 +8,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { zodResolver } from "@hookform/resolvers/zod";
+} from "@langwatch/design-system/primitives";
 import {
   callerVoiceConfigSchema,
   DEFAULT_CALLER_VOICE,

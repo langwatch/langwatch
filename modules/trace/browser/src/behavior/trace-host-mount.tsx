@@ -5,7 +5,7 @@
  */
 
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { traceApi } from "./trace-api.ts";
 import {
@@ -120,30 +120,25 @@ class CapabilityTraceHost extends TraceHostApi {
 }
 
 type ProjectRecord = {
-  apiKey: string | undefined;
-  firstMessage: boolean | undefined;
   presenceEnabled: boolean | undefined;
   organizationPresenceEnabled: boolean | undefined;
 };
 
 const NO_RECORD: ProjectRecord = {
-  apiKey: void 0,
-  firstMessage: void 0,
   presenceEnabled: void 0,
   organizationPresenceEnabled: void 0,
 };
 
 /**
- * What the session scope does not carry, off the project's `organization.getAll`
- * row: the legacy base key (blanked for a reader who may not manage the project),
- * the first-trace flag and the presence switches. The shared-trace page asks nothing.
+ * What the session scope does not carry, off the project's row in the scope graph:
+ * the presence switches. The shared-trace page asks nothing.
  */
 function useProjectRecord(input: {
   projectId: string | undefined;
   enabled: boolean;
 }): ProjectRecord {
-  const graph = traceApi.organization.getAll.useQuery(
-    { isDemo: false },
+  const graph = traceApi.organization.getScopeGraph.useQuery(
+    {},
     { enabled: input.enabled && input.projectId !== void 0 },
   );
   if (!input.projectId) return NO_RECORD;
@@ -152,8 +147,6 @@ function useProjectRecord(input: {
       const project = team.projects.find((candidate) => candidate.id === input.projectId);
       if (project) {
         return {
-          apiKey: project.apiKey || void 0,
-          firstMessage: project.firstMessage,
           presenceEnabled: project.presenceEnabled,
           organizationPresenceEnabled: organization.presenceEnabled,
         };
@@ -163,59 +156,34 @@ function useProjectRecord(input: {
   return NO_RECORD;
 }
 
-const FIRST_TRACE_POLL_MS = 5_000;
-
-/** Self-stopping poll interval: re-read until the project has its first trace. */
-export function firstTracePollInterval(
-  data: { firstMessage: boolean } | undefined,
-): number | false {
-  return data?.firstMessage ? false : FIRST_TRACE_POLL_MS;
-}
-
-/**
- * The organization graph is re-read only on focus or a route change, so while
- * the flag is false this polls the small first-trace read. When it flips, the
- * explorer follows at once and the graph is refreshed for every other reader.
- */
+/** The first-trace flag, read until the project has one, then left alone. */
 function useFirstMessage(input: {
   projectId: string | undefined;
-  recorded: boolean | undefined;
+  enabled: boolean;
 }): boolean | undefined {
-  const utils = traceApi.useUtils();
-  const waiting = input.projectId !== void 0 && input.recorded === false;
   const firstTrace = traceApi.project.getHasFirstMessage.useQuery(
     { projectId: input.projectId ?? "" },
     {
-      enabled: waiting,
-      refetchOnWindowFocus: false,
-      refetchInterval: (query) => firstTracePollInterval(query.state.data),
+      enabled: input.enabled && input.projectId !== void 0,
+      // needs a read hint: first trace received for the project
     },
   );
-  const arrived = waiting && firstTrace.data?.firstMessage === true;
-
-  useEffect(() => {
-    if (!arrived) return;
-    void utils.organization.getAll.invalidate();
-  }, [arrived, utils]);
-
-  return arrived ? true : input.recorded;
+  return firstTrace.data?.firstMessage;
 }
 
 function projectReading(input: {
   id: string | undefined;
   slug: string | undefined;
   name: string | undefined;
-  apiKey: string | undefined;
   firstMessage: boolean | undefined;
   presenceEnabled: boolean | undefined;
 }): TraceHostProject | undefined {
   if (input.id === void 0) return void 0;
-  const { apiKey, firstMessage, presenceEnabled } = input;
+  const { firstMessage, presenceEnabled } = input;
   return {
     id: input.id,
     slug: input.slug ?? "",
     name: input.name ?? "",
-    ...(apiKey ? { apiKey } : {}),
     ...(firstMessage === void 0 ? {} : { firstMessage }),
     ...(presenceEnabled === void 0 ? {} : { presenceEnabled }),
   };
@@ -260,8 +228,8 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const actorEmail = actor?.email;
   const actorImage = actor?.image;
   const record = useProjectRecord({ projectId, enabled: actorId !== void 0 });
-  const { apiKey, presenceEnabled, organizationPresenceEnabled } = record;
-  const firstMessage = useFirstMessage({ projectId, recorded: record.firstMessage });
+  const { presenceEnabled, organizationPresenceEnabled } = record;
+  const firstMessage = useFirstMessage({ projectId, enabled: actorId !== void 0 });
 
   const host = useMemo(
     () =>
@@ -271,7 +239,6 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
             id: projectId,
             slug: projectSlug,
             name: projectName,
-            apiKey,
             firstMessage,
             presenceEnabled,
           }),
@@ -309,7 +276,6 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
       projectId,
       projectName,
       projectSlug,
-      apiKey,
       firstMessage,
       presenceEnabled,
       organizationPresenceEnabled,

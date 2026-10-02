@@ -33,6 +33,43 @@ const semanticColours = [
   "red.solid",
 ] as const;
 
+const accentColours = [
+  "accent.solid",
+  "accent.hover",
+  "accent.subtle",
+  "accent.muted",
+  "accent.emphasized",
+  "accent.fg",
+] as const;
+
+const statusColours = [
+  "fg.error",
+  "bg.error",
+  "border.error",
+  "fg.success",
+  "bg.success",
+  "border.success",
+  "fg.warning",
+  "bg.warning",
+  "border.warning",
+  "fg.info",
+  "bg.info",
+  "border.info",
+] as const;
+
+const chartColours = [
+  "chart.1",
+  "chart.2",
+  "chart.3",
+  "chart.4",
+  "chart.5",
+  "chart.6",
+  "chart.7",
+  "chart.8",
+] as const;
+
+const overlayColours = ["bg.scrim"] as const;
+
 function Swatch({ token }: { token: string }) {
   return (
     <Stack gap="2">
@@ -74,6 +111,42 @@ function ColourFoundations() {
         <Heading size="md">Semantic tokens</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {semanticColours.map((token) => (
+            <Swatch key={token} token={token} />
+          ))}
+        </Grid>
+      </Stack>
+
+      <Stack gap="4">
+        <Heading size="md">Accent (brand orange)</Heading>
+        <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
+          {accentColours.map((token) => (
+            <Swatch key={token} token={token} />
+          ))}
+        </Grid>
+      </Stack>
+
+      <Stack gap="4">
+        <Heading size="md">Status</Heading>
+        <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
+          {statusColours.map((token) => (
+            <Swatch key={token} token={token} />
+          ))}
+        </Grid>
+      </Stack>
+
+      <Stack gap="4">
+        <Heading size="md">Chart series</Heading>
+        <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
+          {chartColours.map((token) => (
+            <Swatch key={token} token={token} />
+          ))}
+        </Grid>
+      </Stack>
+
+      <Stack gap="4">
+        <Heading size="md">Overlay</Heading>
+        <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
+          {overlayColours.map((token) => (
             <Swatch key={token} token={token} />
           ))}
         </Grid>

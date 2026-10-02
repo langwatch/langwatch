@@ -5,7 +5,7 @@
  * IS the record, which is why this step cannot be ticked by pressing a button
  * — only by coming back. Spec: specs/identity/sso-activation.feature.
  */
-import { Alert, Button, Code, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, Code, Text, VStack } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 import { ExternalLink, RefreshCw } from "lucide-react";
 

@@ -12,7 +12,7 @@ import {
 } from "@/cli/utils/governance/global-config-isolation";
 import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
-import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
+import { mintProjectIngestionKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -38,7 +38,7 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --project [slug]           project SDK key into .env; with a slug, no browser (uses your device login)",
+      "  --project [slug]           project ingestion key into .env; with a slug, no browser (uses your device login)",
     ),
   );
   console.log(
@@ -127,9 +127,8 @@ const failFastHeadlessProjectLogin = (): never => {
 };
 
 /**
- * Non-interactive project login: trades the device session for the named
- * project's existing API key over POST /api/auth/cli/project-key and writes
- * it to $CWD/.env. No browser, no prompts, works headless.
+ * Non-interactive project login: mints this machine's ingestion key for the named project
+ * from the device session and writes it to $CWD/.env. No browser, no prompts, works headless.
  */
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
@@ -144,11 +143,11 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     process.exit(1);
   }
   try {
-    const result = await fetchProjectKeyBySlug(cfg, slug);
+    const result = await mintProjectIngestionKey(cfg, slug);
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
     console.log(
-      chalk.green(`✓ API key for project ${chalk.bold(result.project.name)} saved to .env`),
+      chalk.green(`✓ Ingestion key for project ${chalk.bold(result.project.name)} saved to .env`),
     );
     if (envResult.created) {
       console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));

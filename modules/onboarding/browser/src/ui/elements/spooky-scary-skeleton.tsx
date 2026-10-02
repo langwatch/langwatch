@@ -1,4 +1,4 @@
-import { Box, HStack, Skeleton, SkeletonText, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, SkeletonText, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 interface SpookyScarySkeletonProps {

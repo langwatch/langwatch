@@ -1,5 +1,5 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 /** Who last wrote the newer version, named by the actor the server reported. */

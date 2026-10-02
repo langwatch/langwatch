@@ -1,5 +1,4 @@
 import { nowInstant } from "@langwatch/time";
-import { LENS_CAPABILITIES, useExplorerStore } from "@langwatch/trace-browser-kit";
 import {
   type AnyExplorerTransform,
   EXPLORER_ACTION_KINDS,
@@ -11,6 +10,8 @@ import { useMemo } from "react";
 import type { z } from "zod";
 
 import { type LiveExplorerRead, readLiveExplorer } from "../../model/explorer/explorer-read.ts";
+import { LENS_CAPABILITIES } from "../../model/lens-capabilities.ts";
+import { useExplorerStore } from "../explorer.store.ts";
 import { commitExplorerState, readExplorerState } from "../explorer/commit-explorer-state.ts";
 
 /**

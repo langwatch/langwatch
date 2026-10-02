@@ -3,7 +3,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useGovernanceHost } from "../model/governance-host.ts";
+import { type GovernanceHostApi, useGovernanceHost } from "../model/governance-host.ts";
 
 /** The subset of the application toaster's create options these screens use. */
 export type GovernanceToast = {
@@ -15,28 +15,19 @@ export type GovernanceToast = {
 
 export type GovernanceToaster = { create: (toast: GovernanceToast) => void };
 
+/** Routes one toast to the host: an error to `failed`, anything else to `succeeded`. */
+function raise({ host, toast }: { host: GovernanceHostApi; toast: GovernanceToast }): void {
+  const { title, description, id } = toast;
+  if (toast.type === "error") {
+    host.failed({ error: void 0, fallbackTitle: title, description, id });
+    return;
+  }
+  host.succeeded({ title, description, id });
+}
+
 export function useGovernanceToaster(): GovernanceToaster {
   const host = useGovernanceHost();
-  return useMemo(
-    () => ({
-      create: (toast: GovernanceToast) => {
-        if (toast.type === "error") {
-          host.failed({
-            error: void 0,
-            fallbackTitle: toast.title,
-            ...(toast.id ? { id: toast.id } : {}),
-          });
-          return;
-        }
-        host.succeeded({
-          title: toast.title,
-          ...(toast.description ? { description: toast.description } : {}),
-          ...(toast.id ? { id: toast.id } : {}),
-        });
-      },
-    }),
-    [host],
-  );
+  return useMemo(() => ({ create: (toast: GovernanceToast) => raise({ host, toast }) }), [host]);
 }
 
 export type GovernanceErrorToastOptions = {

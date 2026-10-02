@@ -14,8 +14,8 @@ type Fakes = {
   can?: boolean;
   allow?: (permission: string) => boolean;
   permissionsAsked?: string[];
-  userBindings?: { scopeType: string; scopeId: string; role: string }[];
-  scopeBindings?: { apiKeyId: string; role: string }[];
+  userBindings?: { scopeType: string; scopeId: string; role: string; expiresAt?: Date | null }[];
+  scopeBindings?: { apiKeyId: string; role: string; expiresAt?: Date | null }[];
   customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
   project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
@@ -29,8 +29,8 @@ function policyWith(fakes: Fakes = {}) {
   const service = ApiKeyGrantPolicyService.create({
     authz: {
       hasPermission: async () => true,
-      can: async (input: { permission: string }) => {
-        calls.push({ method: "can", permission: input.permission });
+      can: async (input: { permission: string; principal: unknown }) => {
+        calls.push({ method: "can", permission: input.permission, principal: input.principal });
         return fakes.allow?.(input.permission) ?? fakes.can ?? true;
       },
       listUserBindings: async () => fakes.userBindings ?? [],
@@ -87,7 +87,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -106,7 +106,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const member = policyWith(memberCeiling);
         await expect(
           member.service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "MEMBER" })],
             permissions: [],
@@ -116,7 +116,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const admin = policyWith(memberCeiling);
         await expect(
           admin.service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -131,7 +131,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -143,13 +143,32 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service, calls } = policyWith({});
 
         await service.assertCeiling({
-          userId: "user-1",
+          principal: { type: "user", id: "user-1" },
           organizationId: ORG,
           bindings: [scope()],
           permissions: [],
         });
 
         expect(calls.filter((call) => call.method === "can")).toHaveLength(1);
+      });
+    });
+
+    describe("given an organization key as the granting credential", () => {
+      /** @scenario A key-authenticated request grants at most what the requesting key holds */
+      it("asks the ceiling of the key, not of its owner", async () => {
+        const { service, calls } = policyWith({});
+
+        await service.assertCeiling({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationId: ORG,
+          bindings: [scope()],
+          permissions: [],
+        });
+
+        expect(calls.find((call) => call.method === "can")?.principal).toEqual({
+          type: "apiKey",
+          id: "key-1",
+        });
       });
     });
 
@@ -170,7 +189,7 @@ describe("ApiKeyGrantPolicyService", () => {
           const { service, calls } = policyWith({});
 
           await service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [
               scope({ role, scopeType, scopeId: scopeType === "ORGANIZATION" ? ORG : "project-1" }),
@@ -190,7 +209,7 @@ describe("ApiKeyGrantPolicyService", () => {
         });
 
         await service.assertCeiling({
-          userId: "user-1",
+          principal: { type: "user", id: "user-1" },
           organizationId: ORG,
           bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
           permissions: [],
@@ -206,7 +225,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
             permissions: [],
@@ -219,7 +238,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
             permissions: [],
@@ -299,6 +318,38 @@ describe("ApiKeyGrantPolicyService", () => {
             scopes: [scope()],
             organizationId: ORG,
             ownerUserId: "user-1",
+            isSystemManaged: false,
+          }),
+        ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
+      });
+    });
+
+    /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
+    describe("given a system-managed key with no owner", () => {
+      it("allows a personal workspace without making the key the owner's", async () => {
+        const { service } = policyWith({ personalOwner: "user-2" });
+
+        await expect(
+          service.assertPersonalScopesOwnedBy({
+            scopes: [scope()],
+            organizationId: ORG,
+            ownerUserId: null,
+            isSystemManaged: true,
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("given an ownerless key a person asked for", () => {
+      it("refuses a personal workspace", async () => {
+        const { service } = policyWith({ personalOwner: "user-2" });
+
+        await expect(
+          service.assertPersonalScopesOwnedBy({
+            scopes: [scope()],
+            organizationId: ORG,
+            ownerUserId: null,
+            isSystemManaged: false,
           }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
@@ -313,6 +364,7 @@ describe("ApiKeyGrantPolicyService", () => {
             scopes: [scope()],
             organizationId: ORG,
             ownerUserId: "user-1",
+            isSystemManaged: false,
           }),
         ).resolves.toBeUndefined();
       });
@@ -426,6 +478,26 @@ describe("ApiKeyGrantPolicyService", () => {
       });
     });
 
+    describe("given an organization admin grant past its end moment", () => {
+      /** @scenario An expired organization admin is not an admin for API key management */
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          userBindings: [
+            {
+              scopeType: "ORGANIZATION",
+              scopeId: ORG,
+              role: "ADMIN",
+              expiresAt: new Date("2020-01-01T00:00:00.000Z"),
+            },
+          ],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
     describe("given an organization admin binding", () => {
       it("counts it", async () => {
         const { service } = policyWith({
@@ -439,14 +511,63 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
+  describe("isOrgAdminApiKey()", () => {
+    describe("given the key's organization admin grant past its end moment", () => {
+      /** @scenario An expired organization admin is not an admin for API key management */
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          scopeBindings: [
+            { apiKeyId: "key-1", role: "ADMIN", expiresAt: new Date("2020-01-01T00:00:00.000Z") },
+          ],
+        });
+
+        await expect(
+          service.isOrgAdminApiKey({ apiKeyId: "key-1", organizationId: ORG }),
+        ).resolves.toBe(false);
+      });
+    });
+  });
+
   describe("writeBindings()", () => {
     const input = {
       apiKeyId: "key-1",
       organizationId: ORG,
       bindings: [scope()],
       actor: { type: "user" as const, id: "user-1" },
+      caller: { type: "user" as const, id: "user-1" },
       replace: true,
     };
+
+    describe("given a key created by a person", () => {
+      /** @scenario A service key's grants are bounded by the person who creates it */
+      it("asks authz's ceiling as that person for built-in roles, and as the system for the key's own role", async () => {
+        const { service, calls } = policyWith({});
+
+        await service.writeBindings({
+          ...input,
+          bindings: [
+            scope({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+            scope({ role: "CUSTOM" }),
+          ],
+          permissions: ["traces:view"],
+        });
+
+        expect(
+          calls
+            .filter((call) => call.method === "attachBindings")
+            .map((call) => ({ caller: call.caller, bindings: call.bindings })),
+        ).toEqual([
+          {
+            caller: { type: "user", id: "user-1" },
+            bindings: [expect.objectContaining({ role: "ADMIN", scopeType: "ORGANIZATION" })],
+          },
+          {
+            caller: { type: "system" },
+            bindings: [expect.objectContaining({ role: "CUSTOM", customRoleId: "apikey:key-1" })],
+          },
+        ]);
+      });
+    });
 
     describe("given a replace where every requested binding already exists", () => {
       // The ordinary edit: the form resubmits the key's current scopes while

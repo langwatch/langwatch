@@ -2,13 +2,12 @@
   "name": "@langwatch/egress",
   "version": "0.0.1",
   "private": true,
-  "description": "The fence outbound requests leave LangWatch through: the SSRF address policy, the IP-pinned fetch it resolves, and the customer-supplied webhook sender that stands on both",
+  "description": "The fence outbound requests leave LangWatch through: the SSRF address policy, the IP-pinned fetch it resolves, and the outbound proxy",
   "keywords": [
     "egress",
     "langwatch",
     "security",
-    "ssrf",
-    "webhook"
+    "ssrf"
   ],
   "license": "MIT",
   "type": "module",
@@ -37,11 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/automation-contract": "workspace:*",
-    "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/task": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "undici": "catalog:"
   },
   "devDependencies": {

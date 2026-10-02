@@ -90,5 +90,12 @@ export interface EventSubscriberDefinition<E extends Event = Event> {
 export interface PeerSubscriberDefinition<Data extends z.ZodType> {
   eventType: string;
   data: Data;
-  handle: (data: z.output<Data>, context: EventSubscriberContext) => Promise<void>;
+  handle: (data: z.output<Data>, context: PeerSubscriberContext) => Promise<void>;
+  /** Enqueue shaping as an event subscriber declares it: delay, dedup and group lane. */
+  options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn">;
+}
+
+/** A peer subscriber's context: the event's tenant, aggregate and instant. */
+export interface PeerSubscriberContext extends EventSubscriberContext {
+  occurredAt: number;
 }

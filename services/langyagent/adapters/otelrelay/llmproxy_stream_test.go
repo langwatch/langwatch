@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -215,5 +216,39 @@ func TestLLMProxyStreamCut_TransientInStreamErrorNeverCuts(t *testing.T) {
 		if _, ok := relay.LastLLMError(token); !ok {
 			t.Fatalf("call %d left no captured cause", i+1)
 		}
+	}
+}
+
+// In-stream errors are not rejected calls, so they do not count toward the
+// consecutive-429 cut: a 429 after several of them is still a first strike.
+func TestLLMProxyStreamCut_InStreamErrorsDoNotCountTowardRateLimitCut(t *testing.T) {
+	var streaming atomic.Bool
+	streaming.Store(true)
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if streaming.Load() {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(overloadedStream))
+			return
+		}
+		w.Header().Set("Retry-After", "1")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(rateLimitBurstBody))
+	}))
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-stream-then-429", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	for i := 0; i < rateLimitCutAfter; i++ {
+		resp := rateLimitCall(t, relay, token)
+		_, _ = io.ReadAll(resp.Body)
+	}
+	streaming.Store(false)
+
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("first 429 after in-stream errors answered %d, want the 429 passed through for the SDK's own backoff", resp.StatusCode)
 	}
 }

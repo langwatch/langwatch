@@ -1,4 +1,4 @@
-import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
+import { Box, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";

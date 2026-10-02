@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { asMarkdownBody, type ContentBlock } from "@langwatch/trace-contract/transcript";
 
 import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";

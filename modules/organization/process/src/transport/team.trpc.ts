@@ -3,6 +3,8 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OrganizationApi, teamTrpc } from "@langwatch/organization-contract";
 
+import { customRoleGate } from "./organization.trpc.ts";
+
 export const teamTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof teamTrpc> =
   defineTrpcRouter(OrganizationApi, teamTrpc)
     .procedure("getBySlug")
@@ -15,7 +17,7 @@ export const teamTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof te
       app.listTeamsWithProjects({ organizationId: input.organizationId }, { id: actor.id }),
     )
 
-    .procedure("getTeamsWithRoleBindings")
+    .procedure("getTeamsWithGrants")
     .withPermission("organization:manage")
     .handle(({ app, input }) => app.listTeamAccessMatrix({ organizationId: input.organizationId }))
 
@@ -24,6 +26,7 @@ export const teamTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof te
     .handle(({ app, input, actor }) => app.getTeamWithProjects(input, { id: actor.id }))
 
     .procedure("update")
+    .withEntitlement("enterprise", customRoleGate)
     .withPermission("team:manage")
     .handle(async ({ app, input, actor }) => {
       await app.updateTeamMembers(input, { id: actor.id });
@@ -32,6 +35,7 @@ export const teamTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof te
     })
 
     .procedure("createTeamWithMembers")
+    .withEntitlement("enterprise", customRoleGate)
     .withPermission("organization:manage")
     .handle(({ app, input, actor }) => app.createTeamWithGatedMembers(input, { id: actor.id }))
 

@@ -1,15 +1,28 @@
-import { Badge, Box, Button, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import {
+  Badge,
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { HelpCircle, Plus } from "lucide-react";
+import { Fragment } from "react";
 
 import { readableDate } from "../../../../model/display-formatters.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import { ClampedText } from "../../../../ui/elements/clamped-text.tsx";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
 
 const OPERATOR_LABELS: Record<string, string> = {
@@ -144,7 +157,6 @@ export function SectionHeader({
   accent,
   title,
   count,
-  summary,
   details,
   addLabel,
   onAdd,
@@ -153,13 +165,12 @@ export function SectionHeader({
   accent: string;
   title: string;
   count: number;
-  summary: string;
   details: string;
   addLabel: string;
   onAdd: () => void;
 }) {
   return (
-    <HStack width="full" align="center" gap={3}>
+    <HStack width="full" align="center" gap={3} flexWrap="wrap">
       <Box
         colorPalette={accent}
         bg="colorPalette.subtle"
@@ -171,22 +182,17 @@ export function SectionHeader({
       >
         {icon}
       </Box>
-      <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-        <HStack gap={2} align="center">
-          <Heading size="md">{title}</Heading>
-          <Badge colorPalette={accent} variant="subtle" borderRadius="full">
-            {count}
-          </Badge>
-          <Tooltip content={details}>
-            <Box color="fg.muted" display="inline-flex" cursor="help">
-              <HelpCircle size={13} />
-            </Box>
-          </Tooltip>
-        </HStack>
-        <Text textStyle="sm" color="fg.muted">
-          {summary}
-        </Text>
-      </VStack>
+      <HStack gap={2} align="center" flex="1 0 auto">
+        <Heading size="md">{title}</Heading>
+        <Badge colorPalette={accent} variant="subtle" borderRadius="full">
+          {count}
+        </Badge>
+        <Tooltip content={details}>
+          <Box color="fg.muted" display="inline-flex" cursor="help">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
       <Button
         size="sm"
         variant="outline"
@@ -271,12 +277,11 @@ export function TableShell({ children }: { children: React.ReactNode }) {
       <Box
         overflowX="auto"
         css={{
-          // Percentage column widths only bind under a fixed layout, and they
-          // only mean anything above a floor: without one, `width="full"`
-          // shrinks the table to the shell at any cost, and the cost is the
-          // Name column collapsing to its longest single word. Below this the
-          // shell scrolls instead.
-          "& table": { tableLayout: "fixed", minWidth: "1000px" },
+          // Percentage widths only bind under a fixed layout above a floor;
+          // without one the Name column collapses to its longest word. 880px is
+          // what a 1440px laptop leaves beside the sidebar; below it, scroll.
+          // A two-word header wraps rather than spilling into its neighbour.
+          "& table": { tableLayout: "fixed", minWidth: "880px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
             fontSize: "11px",
@@ -284,7 +289,7 @@ export function TableShell({ children }: { children: React.ReactNode }) {
             textTransform: "uppercase",
             letterSpacing: "0.04em",
             color: "var(--chakra-colors-fg-muted)",
-            whiteSpace: "nowrap",
+            verticalAlign: "bottom",
             paddingTop: "0.6rem",
             paddingBottom: "0.6rem",
             borderBottomColor: "var(--chakra-colors-border)",
@@ -316,7 +321,8 @@ export function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AlertSubjectCell({
+/** The "Watches" cell of a graph-watching row, named "Graph · <name>" as the wizard names it. */
+export function GraphWatchCell({
   graphName,
   graph,
   seriesName,
@@ -330,7 +336,7 @@ export function AlertSubjectCell({
     <VStack align="start" gap={0}>
       {graphName ? (
         <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
-          {graphName}
+          {`Graph · ${graphName}`}
         </Text>
       ) : (
         <Text textStyle="sm" color="fg.muted">
@@ -346,9 +352,8 @@ export function AlertSubjectCell({
   );
 }
 
-/** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
- *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
- *  both creation paths read the same. */
+/** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
+ *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`). */
 export function AlertRuleCell({ actionParams }: { actionParams: TriggerActionParams }) {
   const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
   const window = actionParams.timePeriod ? TIME_PERIOD_LABELS[actionParams.timePeriod] : null;
@@ -365,6 +370,75 @@ export function AlertRuleCell({ actionParams }: { actionParams: TriggerActionPar
       {actionParams.threshold !== undefined ? actionParams.threshold : ""}
       {window ? ` · over ${window}` : ""}
     </Text>
+  );
+}
+
+/**
+ * The subject cell of a trace-filter row: the matches-every-trace notice the
+ * caller decides on, which monitors apply, and the saved query (or the legacy
+ * structured filters).
+ */
+export function TraceFilterCell({
+  notice,
+  checks,
+  filterQuery,
+  filters,
+}: {
+  notice: React.ReactNode;
+  checks: React.ReactNode;
+  filterQuery: string | null;
+  filters: unknown;
+}) {
+  return (
+    <VStack gap={2} align="stretch" minWidth={0}>
+      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+        Trace filter
+      </Text>
+      {notice}
+      {checks}
+      {traceSubjectOf({ filterQuery, filters })}
+    </VStack>
+  );
+}
+
+/** ADR-043: the search query when set, else the legacy structured filters, else nothing. */
+function traceSubjectOf({
+  filterQuery,
+  filters,
+}: {
+  filterQuery: string | null;
+  filters: unknown;
+}): React.ReactNode {
+  if (filterQuery) {
+    return (
+      <ClampedText lineClamp={2}>
+        <Code size="sm" variant="surface" display="block" minWidth={0} wordBreak="break-word">
+          {filterQuery}
+        </Code>
+      </ClampedText>
+    );
+  }
+  if (typeof filters === "string" && filters && filters !== "{}") {
+    return <FilterDisplay filters={filters} hasBorder={true} shouldClampValues={false} />;
+  }
+  return null;
+}
+
+/** Email addresses that wrap at their seams (after `@`, before a `.`), never mid-word. */
+export function EmailList({ emails }: { emails: string[] }) {
+  return (
+    <>
+      {emails.map((email, i) => (
+        <Fragment key={`${i}-${email}`}>
+          {i > 0 ? ", " : null}
+          <span>
+            {email
+              .split(/(?=\.)|(?<=@)/)
+              .flatMap((part, j) => (j === 0 ? [part] : [<wbr key={`${j}-${part}`} />, part]))}
+          </span>
+        </Fragment>
+      ))}
+    </>
   );
 }
 

@@ -8,8 +8,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { publicEnvRef } = vi.hoisted(() => ({
@@ -27,18 +27,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const castleSnakeSource = readFileSync(join(here, "..", "castle-snake.tsx"), "utf8");
 
 const renderDoor = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FrontDoorShell
-        headline="See what your agents are actually doing."
-        headlineAccent="actually"
-        tagline="Log in and pick up where you left off."
-      >
-        <AuthCard title="Log in to LangWatch">
-          <input aria-label="Email" />
-        </AuthCard>
-      </FrontDoorShell>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FrontDoorShell
+      headline="See what your agents are actually doing."
+      headlineAccent="actually"
+      tagline="Log in and pick up where you left off."
+    >
+      <AuthCard title="Log in to LangWatch">
+        <input aria-label="Email" />
+      </AuthCard>
+    </FrontDoorShell>,
   );
 
 const castle = () => screen.getByTestId("front-door-panel-logo");

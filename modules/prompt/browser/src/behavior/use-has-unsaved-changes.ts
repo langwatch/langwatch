@@ -1,61 +1,48 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useMemo } from "react";
+import type { DeepPartial } from "react-hook-form";
 
 import {
   areFormValuesEqual,
   computeInitialFormValuesForPrompt,
 } from "../model/prompt-form/index.ts";
-import { promptApi } from "./prompt-api.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
+import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
+import { usePromptVersion } from "./use-prompt-version.ts";
 import { useTabById } from "./use-tab-by-id.ts";
 
 /**
- * Whether the prompt in this tab has unsaved changes: current form values
- * against the LOADED version (not latest) - an older version with no edits
- * shows none, keeping "Update" enabled for rollback.
+ * Whether the prompt in this tab has unsaved changes: form values against the LOADED version
+ * (not latest), so an older version with no edits shows none and "Update" stays on for rollback.
  * @param tabId - The ID of the tab to check for unsaved changes
+ * @param liveValues - The mounted form's values; read in place of the tab's
+ *   debounced mirror of them, which trails an edit by half a second
  * @returns true if there are unsaved changes, false otherwise
  */
-export function useHasUnsavedChanges(tabId: string): boolean {
-  const { project } = usePromptProject();
+export function useHasUnsavedChanges({
+  tabId,
+  liveValues,
+}: {
+  tabId: string;
+  liveValues?: DeepPartial<PromptConfigFormValues>;
+}): boolean {
   const tab = useTabById(tabId);
 
   // Cascade-resolved model for new-prompt defaults used when computing
   // baseline form values to compare against.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    {
-      enabled: !!project?.id,
-      // Project-level config; changes rarely. Don't re-fetch on every window
-      // focus — this hook runs in every open tab's always-mounted label.
-      staleTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const resolvedDefault = usePromptDefaultModel();
   const resolvedDefaultModel = resolvedDefault.data?.model;
 
-  const configId = tab?.data.form.currentValues.configId;
-  const currentValues = tab?.data.form.currentValues;
-  const handle = tab?.data.form.currentValues.handle;
+  const currentValues = liveValues ?? tab?.data.form.currentValues;
+  const configId = currentValues?.configId;
+  const handle = currentValues?.handle;
   // Get the version ID from the form to compare against the correct version
-  const versionId = tab?.data.form.currentValues.versionMetadata?.versionId;
+  const versionId = currentValues?.versionMetadata?.versionId;
 
   // Fetch the specific version that's loaded in the form, not the latest
-  const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
-    promptApi.prompts.getByIdOrHandle.useQuery(
-      {
-        idOrHandle: configId ?? "",
-        projectId: project?.id ?? "",
-        versionId: versionId, // Fetch the specific version loaded in the form
-      },
-      {
-        enabled: !!configId && !!project?.id,
-        // This runs in every open tab's always-mounted label. The saved
-        // version is stable within a session (a save invalidates this key),
-        // so don't re-fetch it for every tab on each window focus.
-        staleTime: 30_000,
-        refetchOnWindowFocus: false,
-      },
-    );
+  const { data: savedPrompt, isLoading: isLoadingSavedPrompt } = usePromptVersion({
+    idOrHandle: configId,
+    versionId,
+  });
 
   return useMemo(() => {
     // Never been saved

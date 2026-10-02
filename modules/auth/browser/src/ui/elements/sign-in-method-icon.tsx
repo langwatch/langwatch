@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import { Fingerprint, KeyRound, Mail } from "lucide-react";
 import type { ReactNode } from "react";

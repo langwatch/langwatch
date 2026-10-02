@@ -1,6 +1,8 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { clearReaderUiStorage, setUiStorageReader } from "@langwatch/browser-host/storage";
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * A refresh must put the user back where they were: the panel open or closed as they
@@ -8,7 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
  * Spec: specs/langy/langy-navigation-persistence.feature.
  */
 const readPersisted = (): Record<string, unknown> => {
-  const raw = window.localStorage.getItem("langy:store");
+  const raw = window.localStorage.getItem("langwatch:user:reader-1:langy:store");
   if (!raw) return {};
   const parsed = JSON.parse(raw) as { state?: Record<string, unknown> };
   return parsed.state ?? {};
@@ -16,7 +18,12 @@ const readPersisted = (): Record<string, unknown> => {
 
 describe("Langy open-state persistence", () => {
   beforeEach(() => {
+    setUiStorageReader("reader-1");
     useLangyStore.getState().closePanel();
+  });
+
+  afterEach(() => {
+    clearReaderUiStorage();
   });
 
   describe("given the user opens the panel", () => {

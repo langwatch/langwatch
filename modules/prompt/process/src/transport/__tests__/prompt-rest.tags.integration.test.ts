@@ -1,11 +1,11 @@
+import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
+import type { PromptApi } from "@langwatch/prompt-contract";
 /**
  * The org-level tag routes of the prompts REST family: what a caller gets back when they
  * list, create and delete a custom prompt tag.
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
-import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it } from "vitest";
 

@@ -7,7 +7,7 @@
  * @see specs/webhooks/webhook-endpoints.feature
  * @see modules/webhook/specs/webhooks.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import {
   endpointArchivedResponseSchema,

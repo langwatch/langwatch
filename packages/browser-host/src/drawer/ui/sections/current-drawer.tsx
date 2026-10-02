@@ -4,8 +4,8 @@
  * `true`, never the address's drawer name. Restriction is one `restriction` prop.
  */
 
-import { Center, Spinner } from "@chakra-ui/react";
 import { DrawerOffsetProvider } from "@langwatch/design-system/drawer";
+import { Center, Spinner } from "@langwatch/design-system/primitives";
 import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -15,6 +15,7 @@ import {
   getComplexProps,
   getDrawerPropsVersion,
   getFlowCallbacks,
+  splitAsPath,
   subscribeDrawerProps,
 } from "../../behavior/use-drawer.ts";
 import type { UiDrawerRegistry } from "../../model/drawer-registry.ts";
@@ -59,7 +60,8 @@ export function CurrentDrawer({
   // setComplexProps notifies this subscription; callers pair it with a
   // setFlowCallbacks so getFlowCallbacks() also sees fresh values.
   useSyncExternalStore(subscribeDrawerProps, getDrawerPropsVersion, getDrawerPropsVersion);
-  const queryString = router.asPath.split("?")[1] ?? "";
+  // A `#fragment` after the query is not part of any drawer prop.
+  const { queryString } = splitAsPath(router.asPath);
   // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,
   // handing the rendered drawer a fresh props object each time and cascading
   // a re-render through its subtree even when nothing drawer-relevant changed.

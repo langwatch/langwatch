@@ -1,4 +1,3 @@
-import { Box } from "@chakra-ui/react";
 import {
   AnthropicIcon,
   AWSIcon,
@@ -10,6 +9,7 @@ import {
   OpenTelemetryIcon,
   WorkatoIcon,
 } from "@langwatch/design-system/icons";
+import { Box } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import type { SourceType } from "../../model/ingestion-source-catalog.ts";

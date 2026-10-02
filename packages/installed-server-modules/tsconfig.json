@@ -120,9 +120,6 @@
       "path": "../../modules/instant-eval/process/tsconfig.build.json"
     },
     {
-      "path": "../kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/langy/process/tsconfig.build.json"
     },
     {
@@ -156,6 +153,9 @@
       "path": "../../modules/presence/process/tsconfig.build.json"
     },
     {
+      "path": "../process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/project/process/tsconfig.build.json"
     },
     {
@@ -178,6 +178,9 @@
     },
     {
       "path": "../../modules/share/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/slack/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/stored-object/process/tsconfig.build.json"

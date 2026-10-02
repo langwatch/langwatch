@@ -3,11 +3,25 @@
  * Risk of remount: only AttributeEditor's newKey draft lives in React; other
  * fields controlled through traceStore. Test protects the draft.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/api-key-client", () => ({
+  apiKeyClient: {
+    apiKey: {
+      create: {
+        useMutation: () => ({
+          mutateAsync: async () => ({ token: "sk-lw-test" }),
+          reset: () => undefined,
+        }),
+      },
+    },
+  },
+  personalTokenInput: () => ({}),
+}));
+
+import { renderWithOpsHost } from "../../../testing.tsx";
 import { FoundryRuntimeProvider, type FoundryTransport } from "../behavior/foundry-runtime.tsx";
 import { createDefaultTrace, useTraceStore } from "../behavior/trace.store.ts";
 import { PlaygroundContent } from "../ui/sections/playground-content.tsx";
@@ -24,7 +38,6 @@ const NEW_ATTRIBUTE_KEY = "my.pending.attribute";
 const transport: FoundryTransport = {
   currentProject: {
     id: "proj-1",
-    apiKey: "sk-lw-test",
   },
   projects: [],
   loadPrompts: async () => [],
@@ -37,12 +50,10 @@ function renderPlaygroundWithSelectedSpan() {
 
   useTraceStore.setState({ trace, selectedSpanId: firstSpan.id });
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FoundryRuntimeProvider transport={transport}>
-        <PlaygroundContent />
-      </FoundryRuntimeProvider>
-    </ChakraProvider>,
+  return renderWithOpsHost(
+    <FoundryRuntimeProvider transport={transport}>
+      <PlaygroundContent />
+    </FoundryRuntimeProvider>,
   );
 }
 

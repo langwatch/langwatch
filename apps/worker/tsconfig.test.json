@@ -173,9 +173,6 @@
       "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -204,6 +201,9 @@
     },
     {
       "path": "../../modules/model-provider/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../modules/monitor/contract/tsconfig.build.json"
@@ -242,7 +242,7 @@
       "path": "../../packages/prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../../packages/process-server/tsconfig.build.json"
+      "path": "../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/process-stores/tsconfig.build.json"
@@ -336,9 +336,6 @@
     },
     {
       "path": "../../modules/workflow/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../packages/test-harness/tsconfig.build.json"

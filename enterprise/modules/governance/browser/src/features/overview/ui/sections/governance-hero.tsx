@@ -1,9 +1,3 @@
-/**
- * The overview's opening: a greeting, the inline command palette, and the
- * short ways in. Ported from `.../governance/GovernanceHero.tsx` (main).
- * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
- */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AskChip } from "@langwatch/design-system/ask-chip";
 import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
 import {
@@ -13,6 +7,12 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@langwatch/design-system/menu";
+/**
+ * The overview's opening: a greeting, the inline command palette, and the
+ * short ways in. Ported from `.../governance/GovernanceHero.tsx` (main).
+ * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
+ */
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Bot, Building2, PackageOpen, Settings2 } from "lucide-react";
 import type React from "react";
 
@@ -92,7 +92,7 @@ export function GovernanceHero({
       <VStack align="center" gap={1.5}>
         <GovernanceWelcomeHeader />
         <Text fontSize="sm" color="fg.muted" textAlign="center">
-          Every AI tool, agent, licence and dollar across the organization.
+          Every AI tool, agent, license and dollar across the organization.
         </Text>
       </VStack>
 

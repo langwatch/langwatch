@@ -1,9 +1,8 @@
 import { collectAuthDiagnostics } from "@langwatch/api/rest";
 import type { LogOtlpDoorResult } from "@langwatch/log-contract";
-import { createLogger } from "@langwatch/observability";
+import { canonicalOtlpPath, createLogger } from "@langwatch/observability";
 import {
   applyReceiverProvenance,
-  canonicalOtlpPath,
   decodeOtlpBody,
   ingestDoorRefusalStatus,
   isIngestDoorRefusal,

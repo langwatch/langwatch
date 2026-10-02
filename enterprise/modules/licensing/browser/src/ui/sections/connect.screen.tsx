@@ -3,13 +3,14 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { CloudOff, KeyRound } from "lucide-react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { SettingsBlock } from "../elements/settings-block.tsx";
 import { ConnectServicesSection } from "./connect-services-section.tsx";
 import { ConnectSpendSection } from "./connect-spend-section.tsx";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
@@ -22,7 +23,10 @@ export default function ConnectScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Connect</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={2} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          Which LangWatch-hosted services this install may call, what they send and what they cost.
+        </Text>
         {organizationId ? <ConnectStatusPanel organizationId={organizationId} /> : null}
       </VStack>
     </>
@@ -39,12 +43,17 @@ function ConnectStatusPanel({ organizationId }: { organizationId: string }) {
   if (status.isLoading) return <Skeleton height="120px" width="full" />;
   if (status.error) {
     return (
-      <Text color="fg.error" data-testid="connect-load-error">
-        {host.describeFailure({
-          error: status.error,
-          fallbackTitle: "Couldn't load hosted services",
-        })}
-      </Text>
+      <Alert.Root status="error" data-testid="connect-load-error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>
+            {host.describeFailure({
+              error: status.error,
+              fallbackTitle: "Couldn't load hosted services",
+            })}
+          </Alert.Title>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
   if (!status.data) return null;
@@ -71,14 +80,19 @@ function ConnectedOrganization({
   const host = useLicensingHost();
   const refusal = status.refusal;
   return (
-    <VStack width="full" align="stretch" gap={0}>
+    <VStack width="full" align="stretch" gap={6}>
       {refusal ? (
-        <Text color="fg.error" data-testid="connect-refusal">
-          {host.describeFailure({
-            error: { error: { code: refusal.code, meta: refusal.meta } },
-            fallbackTitle: "Hosted services are refusing this install",
-          })}
-        </Text>
+        <Alert.Root status="error" data-testid="connect-refusal">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              {host.describeFailure({
+                error: { error: { code: refusal.code, meta: refusal.meta } },
+                fallbackTitle: "Hosted services are refusing this install",
+              })}
+            </Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
       ) : null}
       <ConnectServicesSection
         organizationId={organizationId}
@@ -93,29 +107,28 @@ function ConnectedOrganization({
 
 function DeploymentOff() {
   return (
-    <SettingsBlock
-      title="Hosted services are switched off for this deployment"
+    <NoDataInfoBlock
       testId="connect-deployment-off"
-    >
-      <Text fontSize="sm" color="fg.muted">
-        Nothing is sent to LangWatch from this install.
-      </Text>
-      <Text fontSize="sm" color="fg.muted">
-        To use hosted services here, remove app.connect.disabled from your Helm values, or unset
-        LANGWATCH_CONNECT_DISABLED in the environment, then restart LangWatch. What this install may
-        call is then decided by its license.
-      </Text>
-    </SettingsBlock>
+      icon={<CloudOff />}
+      title="Hosted services are switched off for this deployment"
+      description="Nothing is sent to LangWatch from this install. To use hosted services here, remove app.connect.disabled from your Helm values, or unset LANGWATCH_CONNECT_DISABLED in the environment, then restart LangWatch. What this install may call is then decided by its license."
+    />
   );
 }
 
 function NoLicense() {
   return (
-    <SettingsBlock title="Hosted services need a license" testId="connect-no-license">
-      <Text fontSize="sm" color="fg.muted">
-        Activate a license on the <Link href="/settings/license">License</Link> page, then come back
-        to choose which hosted services this install may call.
-      </Text>
-    </SettingsBlock>
+    <NoDataInfoBlock
+      testId="connect-no-license"
+      icon={<KeyRound />}
+      title="Hosted services need a license"
+      description="Activate a license, then come back to choose which hosted services this install may call."
+    >
+      <Button asChild size="sm" variant="outline" colorPalette="orange">
+        <Link unstyled href="/settings/license">
+          Open the License page
+        </Link>
+      </Button>
+    </NoDataInfoBlock>
   );
 }

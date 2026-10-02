@@ -4,7 +4,15 @@
  * saved one. Spec: specs/settings/profile.feature
  */
 
-import { Badge, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { UserRound } from "lucide-react";
 import { useState } from "react";
 

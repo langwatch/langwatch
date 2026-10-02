@@ -2,9 +2,9 @@
  * The reviewer's corrections are opt-in per read, and only the dataset path opts in.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -92,15 +92,13 @@ describe("given a mapping filled from traces that carry corrections", () => {
   describe("when it reads the conversation behind them", () => {
     /** @scenario "A field mapping reads the conversation the way it reads the traces" */
     it("reads the thread with corrections too", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TracesMapping
-            traces={[TRACE_IN_A_THREAD]}
-            traceMapping={{ mapping: {}, expansions: [] }}
-            targetFields={["input"]}
-            shouldApplyCorrections
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <TracesMapping
+          traces={[TRACE_IN_A_THREAD]}
+          traceMapping={{ mapping: {}, expansions: [] }}
+          targetFields={["input"]}
+          shouldApplyCorrections
+        />,
       );
 
       expect(threadReadInput().withEditOverlay).toBe(true);
@@ -112,14 +110,12 @@ describe("given a mapping filled from the traces as they were captured", () => {
   describe("when it reads the conversation behind them", () => {
     /** @scenario "A field mapping reads the conversation the way it reads the traces" */
     it("reads the thread as captured", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TracesMapping
-            traces={[TRACE_IN_A_THREAD]}
-            traceMapping={{ mapping: {}, expansions: [] }}
-            targetFields={["input"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <TracesMapping
+          traces={[TRACE_IN_A_THREAD]}
+          traceMapping={{ mapping: {}, expansions: [] }}
+          targetFields={["input"]}
+        />,
       );
 
       expect(threadReadInput().withEditOverlay).toBe(false);
@@ -131,15 +127,13 @@ describe("given a mapping whose column is the AI-readable trace", () => {
   describe("when the traces it maps carry corrections", () => {
     /** @scenario "The AI-readable column is read the way the rest of the mapping is" */
     it("reads the trace behind that column with corrections", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TracesMapping
-            traces={[TRACE_IN_A_THREAD]}
-            traceMapping={AI_READABLE_MAPPING}
-            targetFields={["input"]}
-            shouldApplyCorrections
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <TracesMapping
+          traces={[TRACE_IN_A_THREAD]}
+          traceMapping={AI_READABLE_MAPPING}
+          targetFields={["input"]}
+          shouldApplyCorrections
+        />,
       );
 
       expect(digestReadInput().withEditOverlay).toBe(true);
@@ -149,14 +143,12 @@ describe("given a mapping whose column is the AI-readable trace", () => {
   describe("when the traces it maps are the captured ones", () => {
     /** @scenario "The AI-readable column is read the way the rest of the mapping is" */
     it("reads the trace behind that column as captured", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TracesMapping
-            traces={[TRACE_IN_A_THREAD]}
-            traceMapping={AI_READABLE_MAPPING}
-            targetFields={["input"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <TracesMapping
+          traces={[TRACE_IN_A_THREAD]}
+          traceMapping={AI_READABLE_MAPPING}
+          targetFields={["input"]}
+        />,
       );
 
       expect(digestReadInput().withEditOverlay).toBe(false);
@@ -168,13 +160,11 @@ describe("given an evaluator being set up against sample traces", () => {
   describe("when its mapping reads the conversation behind them", () => {
     /** @scenario "A field mapping reads the conversation the way it reads the traces" */
     it("reads the thread as captured", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <EvaluatorTracesMapping
-            traceMapping={{ mapping: {}, expansions: [] }}
-            targetFields={["input"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <EvaluatorTracesMapping
+          traceMapping={{ mapping: {}, expansions: [] }}
+          targetFields={["input"]}
+        />,
       );
 
       expect(threadReadInput().withEditOverlay).toBe(false);

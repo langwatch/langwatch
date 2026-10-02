@@ -1,3 +1,4 @@
+import type { AgentInputBinding, Field as AgentField } from "@langwatch/agent-contract";
 import {
   Alert,
   Box,
@@ -9,8 +10,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { AgentInputBinding, Field as AgentField } from "@langwatch/agent-contract";
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, HelpCircle } from "lucide-react";

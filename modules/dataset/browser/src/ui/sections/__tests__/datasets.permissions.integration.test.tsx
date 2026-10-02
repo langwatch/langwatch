@@ -23,6 +23,14 @@ vi.mock("../../../behavior/dataset-api.ts", () => ({
       limits: { getUsage: { invalidate: vi.fn() } },
       licenseEnforcement: { checkLimit: { invalidate: vi.fn() } },
     }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({
+      limits: { getUsage: { invalidate: vi.fn() } },
+      licenseEnforcement: { checkLimit: { invalidate: vi.fn() } },
+    }),
     dataset: {
       getAll: { useQuery: () => datasetsQuery.current },
       deleteById: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },

@@ -1,17 +1,19 @@
+import type { GrantScopeTier } from "@langwatch/authz-contract";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
-import type { RoleBindingScopeType } from "@langwatch/organization-contract";
 
-export interface RoleBindingScope {
-  scopeType: RoleBindingScopeType;
+export interface PersonalTeamGrantScope {
+  scopeType: GrantScopeTier;
   scopeId: string;
 }
 
 /** The two personal-workspace reads the refusals below rest on. */
 export interface PersonalTeamScopeReader {
-  findPersonalTeamsInScopes(input: { scopes: RoleBindingScope[] }): Promise<{ name: string }[]>;
+  findPersonalTeamsInScopes(input: {
+    scopes: PersonalTeamGrantScope[];
+  }): Promise<{ name: string }[]>;
 
   findForeignPersonalTeamsInScopes(input: {
-    scopes: RoleBindingScope[];
+    scopes: PersonalTeamGrantScope[];
     ownerUserId: string | null;
   }): Promise<{ name: string }[]>;
 }
@@ -24,7 +26,11 @@ export class PersonalTeamScopeService {
 
   private constructor(private readonly reader: PersonalTeamScopeReader) {}
 
-  async scopesTouchPersonalTeam({ scopes }: { scopes: RoleBindingScope[] }): Promise<boolean> {
+  async scopesTouchPersonalTeam({
+    scopes,
+  }: {
+    scopes: PersonalTeamGrantScope[];
+  }): Promise<boolean> {
     return (await this.reader.findPersonalTeamsInScopes({ scopes })).length > 0;
   }
 
@@ -32,7 +38,7 @@ export class PersonalTeamScopeService {
    * Refuse any role-binding write that would change who reaches a personal team. A personal
    * team holds exactly one member, its owner.
    */
-  async assertNoPersonalTeamScope({ scopes }: { scopes: RoleBindingScope[] }): Promise<void> {
+  async assertNoPersonalTeamScope({ scopes }: { scopes: PersonalTeamGrantScope[] }): Promise<void> {
     const [personalTeam] = await this.reader.findPersonalTeamsInScopes({ scopes });
     if (personalTeam) {
       throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
@@ -47,7 +53,7 @@ export class PersonalTeamScopeService {
     scopes,
     ownerUserId,
   }: {
-    scopes: RoleBindingScope[];
+    scopes: PersonalTeamGrantScope[];
     /**
      * The user the credential acts as. `null` owns no personal workspace, so
      * every personal scope is refused.

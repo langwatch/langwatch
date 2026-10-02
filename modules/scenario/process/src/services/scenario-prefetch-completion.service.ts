@@ -1,8 +1,7 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { resolveRunModels } from "@langwatch/scenario-contract";
 import type {
   ScenarioExecutionPrefetchInput,
@@ -21,6 +20,7 @@ import {
   type ScenarioModelParametersService,
   type ModelParamsResult,
 } from "./scenario-model-parameters.service.ts";
+import type { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -64,7 +64,7 @@ type ValidatedLookups =
   | {
       success: true;
       scenario: ScenarioResult;
-      project: { apiKey: string };
+      project: { id: string };
       adapter: TargetAdapterData;
       suite: RunSuite;
     }
@@ -90,8 +90,8 @@ type CompletionOptions = {
   lookups: ScenarioExecutionLookupService;
   modelParameters: ScenarioModelParametersService;
   traces: TraceApi;
-  projects: Pick<ProjectApi, "findOrganizationId">;
-  apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+  /** Mints the per-run key a code agent's sandbox holds. */
+  runKeys: Pick<ScenarioRunKeyService, "sandboxTokenFor">;
 };
 
 export class ScenarioPrefetchCompletionService {
@@ -105,6 +105,11 @@ export class ScenarioPrefetchCompletionService {
     context: ScenarioExecutionPrefetchInput["context"];
     target: TargetConfig;
     lookups: ScenarioPrefetchLookups;
+    /** The run's key, minted once by the prefetcher and shared with the child's environment. */
+    runKey: Promise<string | undefined>;
+    /** Whose run this is, and the key they started it with; the sandbox key acts as them too. */
+    startedByUserId?: string | undefined;
+    startedByApiKeyId?: string | undefined;
   }): Promise<ScenarioExecutionPrefetchResult> {
     const [scenario, project, adapter, suite] = await Promise.allSettled([
       input.lookups.scenario,
@@ -122,8 +127,24 @@ export class ScenarioPrefetchCompletionService {
       return validated.result;
     }
 
+    let runKey: string | undefined;
+    try {
+      runKey = await input.runKey;
+    } catch (error) {
+      // A starter who lacks what the target needs is refused before the run, not partway in.
+      if (error instanceof ApiKeyPermissionDeniedError)
+        return { success: false, error: error.message };
+      throw error;
+    }
+    if (runKey === undefined) throw new Error("A scenario run key was not minted");
+
     this.applyPromptMappings(validated.adapter, input.target, validated.suite);
-    await this.applySandboxKey(validated.adapter, input.context.projectId);
+    await this.applySandboxKey({
+      adapter: validated.adapter,
+      projectId: input.context.projectId,
+      startedByUserId: input.startedByUserId,
+      startedByApiKeyId: input.startedByApiKeyId,
+    });
     const models = await this.resolveModels(input.context, validated);
     if (!models.success) {
       return models.result;
@@ -158,6 +179,7 @@ export class ScenarioPrefetchCompletionService {
       models,
       prepared,
       traceWaitTimeoutMs,
+      runKey,
     });
   }
 
@@ -283,21 +305,21 @@ export class ScenarioPrefetchCompletionService {
   }
 
   /**
-   * One key for the whole run, the one the project's other runs hold, so turns share the cache
-   * entries it writes. A run that cannot get one still runs (main's tryGetAgentSandboxApiKey).
+   * The run's own sandbox key, holding only the agent cache. A run that cannot get one, its
+   * starter lacking the cache included, still runs (main's tryGetAgentSandboxApiKey).
    */
-  private async applySandboxKey(adapter: TargetAdapterData, projectId: string): Promise<void> {
-    if (adapter.type !== "code") return;
+  private async applySandboxKey(input: {
+    adapter: TargetAdapterData;
+    projectId: string;
+    startedByUserId: string | undefined;
+    startedByApiKeyId: string | undefined;
+  }): Promise<void> {
+    if (input.adapter.type !== "code") return;
     try {
-      const organizationId = await this.options.projects.findOrganizationId(projectId);
-      if (!organizationId) return;
-      adapter.sandboxApiKey = await this.options.apiKeys.getOrMintAgentSandboxKey({
-        projectId,
-        organizationId,
-      });
+      input.adapter.sandboxApiKey = await this.options.runKeys.sandboxTokenFor(input);
     } catch (error) {
       logger.warn(
-        { projectId, error },
+        { projectId: input.projectId, error },
         "could not get an agent sandbox key; the run continues without the agent cache",
       );
     }
@@ -423,8 +445,9 @@ export class ScenarioPrefetchCompletionService {
     models: Extract<ResolvedModels, { success: true }>;
     prepared: PreparedModels;
     traceWaitTimeoutMs: number | undefined;
+    runKey: string;
   }): ScenarioExecutionPrefetchResult {
-    const { context, target, validated, models, prepared, traceWaitTimeoutMs } = input;
+    const { context, target, validated, models, prepared, traceWaitTimeoutMs, runKey } = input;
     const modelParams = prepared.adapter?.success ? prepared.adapter.params : void 0;
     if (!prepared.simulator.success || !prepared.judge.success) {
       throw new Error("Prepared model results were not validated");
@@ -447,7 +470,7 @@ export class ScenarioPrefetchCompletionService {
       },
       telemetry: {
         endpoint: this.options.config.langwatchEndpoint,
-        apiKey: validated.project.apiKey,
+        apiKey: runKey,
       },
       // The names, not the params: the caller that queues the run records
       // which models it ran on, and reads them back off the run a month later.

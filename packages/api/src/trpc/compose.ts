@@ -1,3 +1,4 @@
+import type { TrpcContract, TrpcContractMember, TrpcContractMembers } from "@langwatch/module";
 /**
  * Several built routers, one namespace claim. A namespace outgrowing one declaration chain
  * is declared in fragments (builder's recursive generics give up at ~50 procedures).
@@ -9,11 +10,6 @@ import type {
   TRPCDecorateCreateRouterOptions,
 } from "@trpc/server";
 
-import type {
-  TrpcContract,
-  TrpcContractMember,
-  TrpcContractMembers,
-} from "../contract/trpc-contract.ts";
 import type {
   TrpcContractProcedures,
   TrpcFeatureApiWitness,

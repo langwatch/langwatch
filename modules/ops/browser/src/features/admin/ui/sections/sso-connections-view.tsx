@@ -1,3 +1,5 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -10,9 +12,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import type {
   BackofficeSsoConnection,
   SsoSetupMigration,
@@ -99,7 +99,7 @@ const STATE_TONE: Record<string, string> = {
 
 const METHOD_LABEL: Record<string, string> = {
   "dns-txt": "Published record",
-  "license-token": "Licence",
+  "license-token": "License",
   "operator-attested": "Attested by LangWatch",
   "legacy-configuration": "Earlier configuration",
 };

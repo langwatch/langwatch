@@ -1,11 +1,11 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * Tests department chip consistency with actual screen filtering.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -114,12 +114,10 @@ const costsHost = () =>
   });
 
 const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostProvider value={costsHost()}>
-        <CostsPage />
-      </GovernanceHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <GovernanceHostProvider value={costsHost()}>
+      <CostsPage />
+    </GovernanceHostProvider>,
   );
 
 /** Opens a filter chip by its label and picks one of its options. */

@@ -1,21 +1,25 @@
 import { create } from "zustand";
 
-// The API key is held in memory only, for the session: The Foundry is
-// gated behind ops permissions, the key is the project's own (fetched via
-// an authenticated tRPC call), and it's only used to send OTel traces to
-// the same origin. Clearing on drawer close would force a re-fetch with no security gain.
+// The minted token is held in memory only, keyed by organisation, project and user: one holder
+// for every Foundry surface, so the first send mints and the rest reuse it. Closing the drawer
+// does not clear it; a new mint per open would only pile up tokens.
+type HeldToken = { scopeKey: string; token: Promise<string> };
 interface FoundryProjectStore {
   selectedProjectId: string | null;
-  selectedApiKey: string | null;
+  heldToken: HeldToken | null;
   // Property-typed: destructured off the store's return value, which
   // extracts it unbound. Doesn't read `this`, so this is a lint fix only.
-  setSelectedProject: (projectId: string, apiKey: string) => void;
+  setSelectedProject: (projectId: string) => void;
+  holdToken: (held: HeldToken | null) => void;
 }
 
 export const useFoundryProjectStore = create<FoundryProjectStore>((set) => ({
   selectedProjectId: null,
-  selectedApiKey: null,
-  setSelectedProject(projectId, apiKey) {
-    set({ selectedProjectId: projectId, selectedApiKey: apiKey });
+  heldToken: null,
+  setSelectedProject(projectId) {
+    set({ selectedProjectId: projectId });
+  },
+  holdToken(held) {
+    set({ heldToken: held });
   },
 }));

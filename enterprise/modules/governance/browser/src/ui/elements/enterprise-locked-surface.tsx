@@ -1,5 +1,5 @@
-import { Box, Button, Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 

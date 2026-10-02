@@ -2,10 +2,9 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  // Dozens of files now mock the shared `@langwatch/trace-browser-kit`
-  // specifier with different partial shapes (it folds what used to be many
-  // independently-mocked store files) — isolate:false's default shared
-  // registry lets one file's mock leak into the next.
+  // Dozens of files mock the same store and hook modules with different
+  // partial shapes — isolate:false's default shared registry lets one
+  // file's mock leak into the next.
   isolate: true,
   test: {
     setupFiles: ["./vitest.setup.ts"],

@@ -1,4 +1,5 @@
-import { Box, Button, Checkbox, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 import { LuColumns3, LuMoveHorizontal } from "react-icons/lu";

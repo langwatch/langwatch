@@ -4,8 +4,14 @@
  * the outcome is handed back to the caller, which tells the host.
  */
 
-import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  createListCollection,
+  Field,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 

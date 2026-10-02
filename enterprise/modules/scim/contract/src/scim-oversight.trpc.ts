@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every `scimOversight.*` procedure: the back office's directory-sync
- * oversight (ADR-122), gated on the staff list like `ssoConnections.*`.
+ * oversight (ADR-122), gated on the platform-operator grant like `ssoConnections.*`.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   directoryIdentityRowSchema,

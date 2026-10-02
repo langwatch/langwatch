@@ -3,17 +3,17 @@
  * half of a contract (`defineTrpcRouter`), the one execution path a mounted
  * procedure runs, and the wire shape a failed call arrives in.
  */
-import { actorSchema, toLedgerActor, type Actor } from "@langwatch/actor";
 import {
+  actorSchema,
+  toLedgerActor,
+  type Actor,
   declaredScopeIdSchema,
-  type AuthzDeclaration,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
-  type EnforcedScopeFields,
   type ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { ModuleApiToken } from "@langwatch/kernel";
+import type { ModuleApiToken, TrpcContract, TrpcContractMember } from "@langwatch/module";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { nowInstant } from "@langwatch/time";
@@ -51,16 +51,19 @@ import {
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
+  refuseImpersonatedMint,
   sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenial,
   type ApiEntitlement,
   type Authorize,
   type Caller,
+  type EntitlementGate,
+  type EntitlementOptions,
   type Entitlements,
   type PublicRouteAccess,
 } from "../access/access.ts";
-import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
+import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
@@ -111,8 +114,11 @@ export class TrpcRootDefinition {
 // actor and the scope a governed handler is trusted with.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** An authenticated tRPC actor, normalized with a stable identifier for every kind. */
-export type TrpcHandlerActor = Actor & Readonly<{ id: string }>;
+/**
+ * An authenticated tRPC actor, normalized with a stable identifier for every kind.
+ * `impersonatorId` is the session's real principal when a user actor is impersonated.
+ */
+export type TrpcHandlerActor = Actor & Readonly<{ id: string; impersonatorId?: string }>;
 
 export type ApiHandlerAdapter<TContext, App> = <Input>(input: {
   readonly ctx: TContext;
@@ -292,7 +298,7 @@ type StreamResult<Output extends z.ZodType> =
   | Promise<AsyncIterable<z.input<Output>>>;
 
 /** What a handler may answer: the declared output, one stream value, or nothing. */
-type MemberResult<Member extends TrpcContractMember> =
+type DeclaredResult<Member extends TrpcContractMember> =
   Member extends TrpcContractMember<infer Kind, z.ZodType, infer Output>
     ? Output extends z.ZodType
       ? Kind extends "subscription"
@@ -344,7 +350,9 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   member: TrpcContractMember;
   access: TrpcAccess;
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
+  /** Present exactly when the procedure mints a credential: the permission its refusal names. */
+  mintsCredential?: AuthzPermission;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
@@ -427,12 +435,21 @@ export interface TrpcRouterAccess<
     ...facts: Added
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Facts, ...Added]>;
   /**
-   * What the tenant behind the call must hold beside the permission. Asked
-   * after access is decided, at the scope access resolved, so a caller who may
-   * not do this at all is refused before the plan is ever looked up.
+   * What the tenant must hold beside the permission, asked after access at the scope it
+   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
+   * `when` asks only for an input it holds for.
    */
   withEntitlement(
     entitlement: ApiEntitlement,
+    options?: EntitlementOptions,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * The procedure mints a credential (a key, token or secret). The runtime refuses it with
+   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * after access and before the handler.
+   */
+  mintsCredential(
+    permission: AuthzPermission,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
@@ -480,13 +497,14 @@ export interface TrpcRouterImplementation<
     handler: (
       args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
       ...facts: TrpcFactValues<Facts>
-    ) => MemberResult<Contract["members"][Name]>,
+    ) => DeclaredResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
 }
 
 type Implementation = Readonly<{
   access: TrpcAccess;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -515,6 +533,9 @@ function mountRouter<Api, Contract extends TrpcContract>(
         member,
         access: implementation.access,
         ...(implementation.entitlement ? { entitlement: implementation.entitlement } : {}),
+        ...(implementation.mintsCredential
+          ? { mintsCredential: implementation.mintsCredential }
+          : {}),
         facts: implementation.facts,
         handle: implementation.handle,
         app,
@@ -530,10 +551,16 @@ function mountRouter<Api, Contract extends TrpcContract>(
 
 type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
 
+/** What a selected procedure has declared beside its facts, before its access. */
+type ProcedureMarks = Readonly<{
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
+}>;
+
 type EntitlementQuestion = {
   contract: TrpcContract;
   name: string;
-  entitlement: ApiEntitlement | undefined;
+  entitlement: EntitlementGate | undefined;
 };
 
 /** A procedure asks one entitlement question at most. */
@@ -541,7 +568,7 @@ function assertSingleEntitlement({ contract, name, entitlement }: EntitlementQue
   if (!entitlement) return;
   throw new Error(
     `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
-      `"${entitlement}"`,
+      `"${entitlement.entitlement}"`,
   );
 }
 
@@ -550,7 +577,7 @@ function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQues
   if (!entitlement) return;
   throw new Error(
     `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
-      `ask whether it holds "${entitlement}"`,
+      `ask whether it holds "${entitlement.entitlement}"`,
   );
 }
 
@@ -572,18 +599,14 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
   /** One selected procedure, with the facts it has named so far. */
-  const selected = (name: string, facts: readonly TrpcFact[], entitlement?: ApiEntitlement) => {
+  const selected = (name: string, facts: readonly TrpcFact[], marks: ProcedureMarks = {}) => {
+    const { entitlement } = marks;
     const implement = (access: TrpcAccess) => ({
       handle: (handle: (args: never, ...values: never[]) => unknown) =>
         routerBuilder(
           api,
           contract,
-          new Map(implementations).set(name, {
-            access,
-            facts,
-            handle,
-            ...(entitlement ? { entitlement } : {}),
-          }),
+          new Map(implementations).set(name, { access, facts, handle, ...marks }),
         ),
     });
 
@@ -591,17 +614,25 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       withFacts: (...added: readonly TrpcFact[]) => {
         assertFactsDistinct({ contract, name, facts: [...facts, ...added] });
 
-        return selected(name, [...facts, ...added], entitlement);
+        return selected(name, [...facts, ...added], marks);
       },
-      withEntitlement: (named: ApiEntitlement) => {
+      withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
 
-        return selected(name, facts, named);
+        return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
+      mintsCredential: (permission: AuthzPermission) =>
+        selected(name, facts, { ...marks, mintsCredential: permission }),
       withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
         implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
       withAccess: (access: PublicRouteAccess) => {
         assertNoTenantQuestion({ contract, name, entitlement });
+
+        if (marks.mintsCredential) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} mints a credential, so it cannot run with no caller`,
+          );
+        }
 
         assertAnonymousProcedure({ contract, name });
 
@@ -942,6 +973,7 @@ export function createTrpcRuntime<
           app: request.app,
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
+          ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
         }),
       );
 
@@ -1108,26 +1140,36 @@ function access<TContext extends object>({
   declaration,
   procedure,
   entitlement,
+  mintsCredential,
   app,
   facts,
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
   if (entitlement && !members.entitlements) {
     throw new Error(
-      `tRPC ${procedure} asks whether its tenant holds "${entitlement}", and this runtime ` +
-        "supplied no entitlements port to ask",
+      `tRPC ${procedure} asks whether its tenant holds "${entitlement.entitlement}", and ` +
+        "this runtime supplied no entitlements port to ask",
     );
   }
 
   return declareAccessMiddleware(
     declaration,
-    check({ members, declaration, procedure, app, facts, ...(entitlement ? { entitlement } : {}) }),
+    check({
+      members,
+      declaration,
+      procedure,
+      app,
+      facts,
+      ...(entitlement ? { entitlement } : {}),
+      ...(mintsCredential ? { mintsCredential } : {}),
+    }),
   );
 }
 
@@ -1138,13 +1180,15 @@ function check<TContext extends object>({
   declaration,
   procedure,
   entitlement,
+  mintsCredential,
   app,
   facts,
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
+  mintsCredential?: AuthzPermission;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1179,12 +1223,22 @@ function check<TContext extends object>({
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
     }
 
+    if (mintsCredential) {
+      refuseImpersonatedMint({
+        permission: mintsCredential,
+        actor: decision.actor,
+        scope: decision.scope,
+        address: `tRPC ${procedure}`,
+      });
+    }
+
     // After access, never before it: a caller who may not do this at all is
     // told that rather than told to buy something.
     if (entitlement && members.entitlements) {
       await decideEntitlement({
-        entitlement,
+        gate: entitlement,
         scope: decision.scope,
+        input,
         entitlements: members.entitlements,
         address: `tRPC ${procedure}`,
       });
@@ -1255,8 +1309,8 @@ async function authorized<TContext extends object>({
 }
 
 /**
- * Reports an answer its own declared schema refuses without changing the
- * transport answer. A response mismatch is a server defect, not a new 500.
+ * Parses an answer with its declared schema. One the schema refuses is logged
+ * and raised as a plain Error (a 500); the raw value is never sent.
  */
 function validateDeclaredOutput({
   procedure,
@@ -1280,13 +1334,12 @@ function validateDeclaredOutput({
     "tRPC handler response did not match its declared output schema",
   );
 
-  return value;
+  throw new Error(`tRPC ${procedure} answered a value its declared output schema refuses`);
 }
 
 /**
- * The handler, with its answer checked against the declaration. A stream is
- * checked one value at a time, because a subscription's shape drifts one event
- * at a time and a single wrong yield is what a client crashes on.
+ * The handler, with its answer checked against the declaration. A stream is checked one value at
+ * a time, because a single wrong yield is what a client crashes on.
  */
 function guardOutput({
   procedure,
@@ -1299,8 +1352,8 @@ function guardOutput({
   output: z.ZodType | undefined;
   handler: (args: never, ...facts: never[]) => unknown;
 }): (opts: ResolverOptions) => unknown {
-  const invoke = (opts: ResolverOptions): unknown => {
-    const { args, facts } = invocation(opts);
+  const invoke = (opts: ResolverOptions, input: unknown = opts.input): unknown => {
+    const { args, facts } = invocation(opts, input);
 
     return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(args, ...facts);
   };
@@ -1325,7 +1378,7 @@ function guardOutput({
     validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
 }
 
-/** Reports a value from a procedure that declared no output at all. */
+/** A procedure that declared no output answers nothing; any value is a 500 (Alex, 2026-10-01). */
 function voidOutput({ procedure, value }: { procedure: string; value: unknown }): unknown {
   if (value === undefined) return value;
 
@@ -1338,11 +1391,14 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
     "tRPC handler response did not match its declared output schema",
   );
 
-  return value;
+  throw new Error(`tRPC ${procedure} answered a value but declares no output schema`);
 }
 
 /** The handler's own arguments, and the facts that follow them. */
-function invocation(request: ResolverOptions): {
+function invocation(
+  request: ResolverOptions,
+  input: unknown = request.input,
+): {
   args: HandlerArguments;
   facts: readonly unknown[];
 } {
@@ -1352,7 +1408,7 @@ function invocation(request: ResolverOptions): {
 
   const { facts, ...access } = resolved;
 
-  return { args: { ...access, input: request.input, signal: request.signal }, facts };
+  return { args: { ...access, input, signal: request.signal }, facts };
 }
 
 /** Reads back what the access step wrote, and nothing it did not write. */
@@ -1687,6 +1743,14 @@ function isInheritedFromCause(message: string, cause: unknown): boolean {
   return current !== null && current !== undefined;
 }
 
+/** A handled error that renders its own `data.cause` body (`toResponseBody`), read by shape. */
+function ownCauseBody(handled: HandledError | null): unknown {
+  if (!handled || !("toResponseBody" in handled)) return null;
+  const render: unknown = handled.toResponseBody;
+
+  return typeof render === "function" ? render.call(handled) : null;
+}
+
 export function createTrpcErrorFormatter(
   members: Readonly<{
     causePayload: TrpcErrorCausePayload;
@@ -1727,7 +1791,7 @@ export function createTrpcErrorFormatter(
       message,
       data: {
         ...shapeData,
-        cause: members.causePayload.payloadFor(error.cause),
+        cause: ownCauseBody(handled) ?? members.causePayload.payloadFor(error.cause),
         error: handled?.serialize() ?? null,
         authored: isAuthoredMessage,
         traceId: members.traceIds.find(error),

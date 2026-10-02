@@ -1,9 +1,6 @@
 import { api } from "../../../behavior/ops-api.ts";
 
-export function useReplayStatus({
-  refetchInterval = 2000,
-}: {
-  refetchInterval?: number | false;
-} = {}) {
-  return api.ops.getReplayStatus.useQuery(undefined, { refetchInterval });
+export function useReplayStatus() {
+  // needs a read hint: replay progressed or finished
+  return api.ops.getReplayStatus.useQuery(undefined);
 }

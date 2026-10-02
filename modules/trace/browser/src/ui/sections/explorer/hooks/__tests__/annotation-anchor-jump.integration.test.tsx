@@ -8,11 +8,17 @@ import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
 import { useSectionFocusGlow } from "../../trace-drawer/trace-accordions/use-section-focus-glow.ts";
 import { useJumpToAnnotationAnchor } from "../use-jump-to-annotation-anchor.ts";
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";
@@ -57,8 +63,9 @@ function JumpHarness({ anchorPath }: { anchorPath: string | null }) {
 }
 
 beforeEach(() => {
-  useDrawerStore.getState().clearSpan();
-  useDrawerStore.getState().setViewModeTransient("conversation");
+  setWindowAddress({
+    url: `/my-project/traces?drawer.open=traceV2Details&drawer.traceId=${TRACE_ID}&drawer.mode=conversation`,
+  });
   useFocusSectionStore.getState().clear();
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -90,8 +97,8 @@ describe("given a span carries a comment about its output", () => {
 
       fireEvent.click(screen.getByText("Go to the comment"));
 
-      expect(useDrawerStore.getState().selectedSpanId).toBe(SPAN_ID);
-      expect(useDrawerStore.getState().viewMode).toBe("trace");
+      expect(getTraceDrawer().selectedSpanId).toBe(SPAN_ID);
+      expect(getTraceDrawer().viewMode).toBe("trace");
       expect(useSpanPulseStore.getState().pulsingIds.has(SPAN_ID)).toBe(true);
     });
   });

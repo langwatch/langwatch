@@ -165,6 +165,7 @@ export const langyWorkerCredentialsSchema = z
     egressAllowlist: langyEgressAllowlistSchema.optional(),
     mirrorTier: langyMirrorTierSchema.optional(),
     harness: z.enum(["opencode", "pi"]).optional(),
+    disabledSkillIds: z.array(z.string().min(1)).optional(),
   })
   .strict();
 export type LangyWorkerCredentials = z.infer<typeof langyWorkerCredentialsSchema>;

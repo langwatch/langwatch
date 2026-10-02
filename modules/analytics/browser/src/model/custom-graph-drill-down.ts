@@ -17,7 +17,6 @@ export type DataPointClickParams = {
 };
 
 const BAR_GRAPH_TYPES: readonly string[] = ["bar", "stacked_bar", "horizontal_bar"];
-const MINUTES_PER_DAY = 1440;
 const MS_PER_MINUTE = 60 * 1000;
 
 /** Colour slots of the positive/negative/neutral set, by the outcome a group names. */
@@ -37,26 +36,6 @@ const OUTCOME_COLOR_INDEX: Readonly<Record<string, number>> = {
 
 export function isBarGraph(graphType: string): boolean {
   return BAR_GRAPH_TYPES.includes(graphType);
-}
-
-/**
- * Only a summary reads one aggregated bucket; pie and donut take a numeric scale with a
- * pipeline. A daily scale over two days or less reads by the hour.
- */
-export function graphTimeScale({
-  graphType,
-  timeScale,
-  daysDifference,
-}: {
-  graphType: string;
-  timeScale: "full" | number;
-  daysDifference: number;
-}): "full" | number {
-  if (graphType === "summary") return "full";
-  const requested = timeScale === "full" ? timeScale : parseInt(timeScale.toString(), 10);
-  const isShortDailyRange =
-    typeof requested === "number" && requested >= MINUTES_PER_DAY && daysDifference <= 2;
-  return isShortDailyRange ? 60 : requested;
 }
 
 /** Pie, donut and summary-bar charts drill into the Trace Explorer when nobody else handles it. */

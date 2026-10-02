@@ -1,11 +1,11 @@
-import { Box, Circle, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import {
   formatCost,
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
-import { STATUS_COLORS } from "@langwatch/trace-browser-kit";
+import { Box, Circle, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
+import { STATUS_COLORS } from "../../model/display-formatters.ts";
 import { useTraceHeader } from "./use-trace-header.ts";
 
 export type TracePeekSummaryProps = {

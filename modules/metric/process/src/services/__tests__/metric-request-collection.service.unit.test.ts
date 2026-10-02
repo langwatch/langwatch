@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CanonicalMetricDataPoint,
   MetricRequestCollectionResult,
 } from "@langwatch/metric-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordMetricCorrelationCommandData, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,6 +1,4 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AutomationApi } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
  */
@@ -10,12 +8,13 @@ import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-con
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -75,7 +74,6 @@ describe("given a process that installs the evaluation module over its repositor
           monitor: createApiFixture<MonitorApi>(),
           dataset: createApiFixture<DatasetApi>(),
           experiment: createApiFixture<ExperimentApi>(),
-          automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
           project: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({

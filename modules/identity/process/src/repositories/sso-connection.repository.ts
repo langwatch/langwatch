@@ -42,15 +42,6 @@ export abstract class SsoBreakGlassBindingRepository {
 }
 
 /**
- * Whether an actor is a LangWatch PLATFORM operator (D05 amendment). A port,
- * not a wire boolean — a caller-supplied "I am an operator" would be the
- * caller authorizing itself, and self-hosted has platform operators too.
- */
-export abstract class SsoPlatformOperatorRepository {
-  abstract isPlatformOperator(args: { actorId: string }): Promise<boolean>;
-}
-
-/**
  * Who a teardown would strand: users whose only live sign-in identifiers
  * belong to this connection. Reads the `Identifier` projection (D01) —
  * teardown must not invent a second answer to "how can this person get in".

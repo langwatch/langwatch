@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type LicensingApi,
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { isNamedProviderMounted } from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";
@@ -54,9 +54,17 @@ describe("SsoGateService", () => {
   let licensing: LicensingApi;
   const inspectPlatformAccess = vi.fn<() => Promise<PlatformLicenseAccess>>();
   let logger: FakeLogger;
+  let revision = 0;
+  let now = 1_000_000;
 
   beforeEach(() => {
-    licensing = createApiFixture<LicensingApi>({ inspectPlatformAccess });
+    revision = 0;
+    now = 1_000_000;
+    inspectPlatformAccess.mockReset();
+    licensing = createApiFixture<LicensingApi>({
+      inspectPlatformAccess,
+      licenseRevision: async () => revision,
+    });
     logger = new FakeLogger();
     inspectPlatformAccess.mockResolvedValue({
       allowed: false,
@@ -74,6 +82,7 @@ describe("SsoGateService", () => {
       logger,
       providerMountInspector: new FakeProviderMountInspector(),
       evaluationTimeoutMs,
+      now: () => now,
     });
 
   /** @scenario "SaaS is unaffected by license gating" */
@@ -230,4 +239,56 @@ describe("SsoGateService", () => {
       expect(await service.resolveProvider()).toBe("email");
     },
   );
+
+  describe("when a license is stored after the gate denied", () => {
+    /** @scenario "Another replica picks up an activation within a minute" */
+    it("keeps the deny for a minute, then allows without a restart", async () => {
+      const service = create();
+      expect(await service.platformAllowed()).toBe(false);
+      inspectPlatformAccess.mockResolvedValue(validAccess());
+
+      now += 59_000;
+      expect(await service.platformAllowed()).toBe(false);
+      now += 1_000;
+      expect(await service.platformAllowed()).toBe(true);
+      expect(inspectPlatformAccess).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "Activating a license turns SSO on without a restart" */
+    it("allows at once when this process stored the license", async () => {
+      const service = create();
+      expect(await service.platformAllowed()).toBe(false);
+      inspectPlatformAccess.mockResolvedValue(validAccess());
+
+      revision += 1;
+
+      expect(await service.platformAllowed()).toBe(true);
+    });
+  });
+
+  describe("when the gate is asked again", () => {
+    /** @scenario "An allow is kept and a deny is not re-read on every request" */
+    it("keeps an allow, reuses a recent deny, and warns about email mode once", async () => {
+      const denying = create();
+      await denying.platformAllowed();
+      await denying.platformAllowed();
+      now += 60_000;
+      await denying.platformAllowed();
+      expect(inspectPlatformAccess).toHaveBeenCalledTimes(2);
+      expect(
+        logger.warn.mock.calls.filter(([, message]) =>
+          String(message).includes("no genuine license was found"),
+        ),
+      ).toHaveLength(1);
+
+      inspectPlatformAccess.mockClear();
+      inspectPlatformAccess.mockResolvedValue(validAccess());
+      const allowing = create();
+      await allowing.platformAllowed();
+      now += 600_000;
+      revision += 1;
+      expect(await allowing.platformAllowed()).toBe(true);
+      expect(inspectPlatformAccess).toHaveBeenCalledOnce();
+    });
+  });
 });

@@ -1,8 +1,8 @@
 // A read-only input field for copying values: toggle visibility, click to copy.
 // Uses lucide-react icons.
 
-import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
+import { Input } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Copy as FiCopy, Eye as FiEye, EyeOff as FiEyeOff } from "lucide-react";
 import { useState } from "react";

@@ -1,5 +1,5 @@
-import { Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Text } from "@langwatch/design-system/primitives";
 
 /**
  * Caption shown next to a scenario Generate button: which model generation will use,

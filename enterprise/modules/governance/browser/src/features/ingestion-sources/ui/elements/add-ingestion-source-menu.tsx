@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { HStack, Spacer, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Lock } from "lucide-react";

@@ -1,4 +1,4 @@
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import { createAgentCommandSchema, updateAgentCommandSchema } from "./agent.commands.ts";
 import {

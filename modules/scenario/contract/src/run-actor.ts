@@ -16,6 +16,8 @@ export const runActorSchema = z
     /** The platform user id. */
     id: z.string().min(1),
     label: runActorLabelSchema,
+    /** The API key they started it with; the run's own key holds no more than it. */
+    apiKeyId: z.string().min(1).optional(),
   })
   .strict();
 export type RunActor = z.infer<typeof runActorSchema>;
@@ -27,8 +29,14 @@ export type RunActor = z.infer<typeof runActorSchema>;
  */
 export function withActor(
   actor: RunActor | undefined,
-): { actorId: string; actorLabel: RunActorLabel } | Record<string, never> {
-  return actor?.id ? { actorId: actor.id, actorLabel: actor.label } : {};
+): { actorId: string; actorLabel: RunActorLabel; actorApiKeyId?: string } | Record<string, never> {
+  if (!actor?.id) return {};
+
+  return {
+    actorId: actor.id,
+    actorLabel: actor.label,
+    ...(actor.apiKeyId ? { actorApiKeyId: actor.apiKeyId } : {}),
+  };
 }
 
 /**
@@ -39,8 +47,13 @@ export function withActor(
 export function deriveRunActor(params: {
   userId: string | null | undefined;
   surfaceHeader: string | null | undefined;
+  apiKeyId?: string | null | undefined;
 }): RunActor | undefined {
   if (!params.userId) return undefined;
   const declared = params.surfaceHeader?.toLowerCase();
-  return { id: params.userId, label: declared === "cli" ? "cli" : "api" };
+  return {
+    id: params.userId,
+    label: declared === "cli" ? "cli" : "api",
+    ...(params.apiKeyId ? { apiKeyId: params.apiKeyId } : {}),
+  };
 }

@@ -11,7 +11,7 @@ import {
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
   type ProviderDisabledExtracted,
-} from "@langwatch/model-provider-browser-kit";
+} from "@langwatch/browser-host/model-error";
 
 import {
   showAiCallFailedToast,

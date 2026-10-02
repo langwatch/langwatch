@@ -1,24 +1,22 @@
+import { ledgerActorFor } from "@langwatch/authorization";
 /**
  * Accepting an invitation: the membership write and the grant tail that follows it, both
  * idempotent so a retry repairs rather than duplicates.
  */
-import { ledgerActorFor } from "@langwatch/actor";
+import { GrantScopeTier, newAuthzGrantId } from "@langwatch/authz-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   InviteNotFoundError,
   InviteNotReadyError,
   OrganizationUserRole,
-  RoleBindingScopeType,
   TeamUserRole,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
-  ROLE_BINDING_KSUID_RESOURCE,
   type InviteAssignableRoles,
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
@@ -155,7 +153,7 @@ export class InviteAcceptanceService {
       organizationId: invite.organizationId,
       where: {
         userId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeType: GrantScopeTier.ORGANIZATION,
         scopeId: invite.organizationId,
       },
       actor,
@@ -165,17 +163,18 @@ export class InviteAcceptanceService {
       organizationId: invite.organizationId,
       bindings: [
         {
-          bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId },
           // The declared mapping, not a cast through `unknown`: the two enums
           // share three names by coincidence and EXTERNAL is not one of them,
           // so a cast would be right until somebody adds a seat.
           role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
           customRoleId: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeType: GrantScopeTier.ORGANIZATION,
           scopeId: invite.organizationId,
         },
       ],
+      caller: { type: "system" },
       actor,
       source: "invite",
       onDuplicate: "skip",
@@ -258,7 +257,7 @@ export class InviteAcceptanceService {
         organizationId: invite.organizationId,
         where: {
           userId,
-          scopeType: RoleBindingScopeType.TEAM,
+          scopeType: GrantScopeTier.TEAM,
           scopeId: member.teamId,
         },
         actor,
@@ -270,13 +269,14 @@ export class InviteAcceptanceService {
       await writer.attachBindings({
         organizationId: invite.organizationId,
         bindings: teamMembershipData.map((member) => ({
-          bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId },
           role: member.role,
           customRoleId: member.customRoleId ?? null,
-          scopeType: RoleBindingScopeType.TEAM,
+          scopeType: GrantScopeTier.TEAM,
           scopeId: member.teamId,
         })),
+        caller: { type: "system" },
         actor,
         source: "invite",
         onDuplicate: "skip",

@@ -1,9 +1,9 @@
 import { toaster } from "@langwatch/design-system/toaster";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { isSendUnanswered } from "@langwatch/langy-contract";
 import { useCallback, useEffect } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { resolveLangyStopTarget } from "../../../../model/langy-stop-target.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 

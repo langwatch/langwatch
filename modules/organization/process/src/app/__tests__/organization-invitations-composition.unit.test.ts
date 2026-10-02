@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `InviteServiceOrganizationInvitations` maps `InviteService`'s method names onto
  * the port the door reads; the app still refuses a role it composed none for.
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -30,7 +30,7 @@ import type { OrganizationLifecycleNoticeService } from "../../services/organiza
 import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import type { OrganizationPlanGate, OrganizationSignals } from "../organization.members.ts";
+import type { OrganizationSignals } from "../organization.members.ts";
 import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -373,7 +373,6 @@ function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: n
   const door = OrganizationInvitationDoorService.create({
     invitations: invitations({ seatsFull, notices }),
     joinRequests: null,
-    plans: createApiFixture<OrganizationPlanGate>(),
     signals,
     lifecycle: createApiFixture<OrganizationLifecycleNoticeService>({
       membersInvited: () => {},
@@ -382,6 +381,7 @@ function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: n
     creationThrottle: createApiFixture<InviteCreationThrottleService>({
       assertCreationAllowed: async () => {},
     }),
+    ceiling: { assertWithinCaller: async () => {} },
     ensurePersonalWorkspace: async () => undefined,
   });
   return { door, recorded };

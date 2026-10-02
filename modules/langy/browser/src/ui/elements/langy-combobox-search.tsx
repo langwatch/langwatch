@@ -1,4 +1,4 @@
-import { Box, Combobox, HStack } from "@chakra-ui/react";
+import { Box, Combobox, HStack } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 /**

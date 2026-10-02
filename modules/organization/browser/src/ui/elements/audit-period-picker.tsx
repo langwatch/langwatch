@@ -4,8 +4,8 @@
  * inputs or "All time" entry, presets only, matching what its URL carries.
  */
 
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Calendar, ChevronDown } from "lucide-react";
 import { useState } from "react";
 

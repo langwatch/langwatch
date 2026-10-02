@@ -160,8 +160,8 @@ langevals:
     limits: { cpu: 500m, memory: 4Gi }
 ```
 
-The limit is a ceiling, not a reservation, so a generous one costs nothing until
-an evaluator actually loads a model.
+The limit is a ceiling, not a reservation, so a generous one uses no extra
+memory until an evaluator actually loads a model.
 
 To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
 
@@ -243,17 +243,21 @@ kubectl -n langwatch exec deploy/langwatch-app -- \
 
 ### SSO callback URL mismatch
 
-The callback URL configured in your identity provider must exactly match:
+The redirect URI registered in your identity provider must exactly match the one shown on the connection's setup page:
 
 ```
-https://your-langwatch-domain.com/api/auth/callback/{provider}
+https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
 Check that `app.http.publicUrl` matches your actual domain (including `https://`).
 
-### "Email already exists" during SSO migration
+### Issuer mismatch on the test sign-in
 
-This happens when a user already has an email/password account. Follow the [SSO migration steps](/self-hosting/configuration/sso#migrating-from-emailpassword-to-sso) to link existing accounts.
+If you see "Your identity provider names a different issuer" on the test sign-in, compare the two issuers it lists: the connection's, and the one in the `iss` claim of the ID token. See [Issuer](/self-hosting/configuration/sso#issuer).
+
+### Existing account refused during SSO sign-in
+
+When SSO sign-in says "An account with this address already exists", the identity provider reported the address as unverified, or the connection has not verified the address's domain. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts).
 
 ### Sessions expire too quickly
 

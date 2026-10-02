@@ -1,7 +1,16 @@
-import { Badge, Button, Code, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Badge,
+  Button,
+  Code,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

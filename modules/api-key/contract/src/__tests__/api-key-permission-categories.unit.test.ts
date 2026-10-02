@@ -1,4 +1,4 @@
-import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

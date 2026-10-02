@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { buildIntentAccessor, createTenantId, type IntentContext } from "@langwatch/eventing";
 import {
   SCENARIO_EVALUATIONS_JOB,
@@ -11,6 +10,7 @@ import {
   type SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createGradeRunHandler, gradeRunIntentSchema } from "../scenario-evaluations.intent.ts";

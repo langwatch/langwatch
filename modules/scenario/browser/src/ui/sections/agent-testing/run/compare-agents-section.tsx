@@ -4,7 +4,14 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, chakra, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Plus, X } from "lucide-react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";

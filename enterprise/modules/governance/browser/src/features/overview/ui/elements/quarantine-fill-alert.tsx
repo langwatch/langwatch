@@ -1,4 +1,4 @@
-import { Alert, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export type QuarantineFillStats = {

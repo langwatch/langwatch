@@ -1,28 +1,31 @@
 import { InvokeWithResponseStreamCommand } from "@aws-sdk/client-lambda";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * A deployment that names its per-project fleet runs the studio on each project's own function,
  * and one that names a fleet it cannot use refuses rather than falling back to the address.
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import { NLP_LAMBDA_ARN_CACHE_PREFIX } from "../../services/nlp-lambda-runtime.service.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 const lambda = vi.hoisted(() => {
@@ -88,10 +91,10 @@ function appWith({
 }: {
   fleetSecret: string;
   repositories?: WorkflowRepositories;
-}): Promise<WorkflowApp> {
+}): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure();
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -108,10 +111,13 @@ function appWith({
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
-      nurturing: createApiFixture<NurturingApi>({}, "NurturingApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       stagingThresholdBytes: void 0,

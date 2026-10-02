@@ -494,7 +494,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 
-{{/* Redis secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
+{{/* Chart-managed Redis and PostgreSQL generate their passwords only with
+     autogen.enabled=true; with it off, templates/redis/secret.yaml and
+     templates/postgresql/secret.yaml require an existingSecret or a password. */}}
 
 {{- if not .Values.redis.chartManaged }}
   {{- if .Values.redis.external.connectionString.secretKeyRef.name }}
@@ -514,7 +516,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- else if empty .Values.postgresql.external.connectionString.value }}
     {{- $errors = append $errors "postgresql.chartManaged is false but connectionString is not configured" }}
   {{- end }}
-{{/* PostgreSQL secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
 {{- end }}
 
 {{- if not .Values.prometheus.chartManaged }}
@@ -626,7 +627,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
     {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
     {{- if (.Values.gateway).chartManaged }}
-      {{- $reserved = concat $reserved (list "LW_GATEWAY_INTERNAL_SECRET" "LW_GATEWAY_JWT_SECRET") }}
+      {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
     {{- if has $langyKey $reserved }}
       {{- $errors = append $errors (printf "langyagent.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. Langy would overwrite that credential with its own value. Pick a distinct key name (the default is LANGY_INTERNAL_SECRET), or point langyagent.secrets.existingSecretName at a separate Secret." $langyKey $langySecretName) }}
@@ -981,18 +982,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of
      the pod dying in CreateContainerConfigError. */}}
 {{- if .Values.lwql.enabled }}
-{{- $lwqlPwSecret := .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) }}
+{{- $lwqlPwSecret := include "langwatch.lwql.passwordSecret" . }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $lwqlPwSecret }}
-      key: LWQL_CLICKHOUSE_PASSWORD
+      key: {{ include "langwatch.lwql.clickhousePasswordKey" . }}
       optional: true
 - name: LWQL_POSTGRES_READER_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $lwqlPwSecret }}
-      key: LWQL_POSTGRES_READER_PASSWORD
+      key: {{ include "langwatch.lwql.postgresReaderPasswordKey" . }}
       optional: true
 {{- end }}
 
@@ -1331,6 +1332,46 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   `tpl .Values.lwqlAccess.secretName $`, so `$` is the parent context and the
   helper resolves there — one source of truth, no literal to keep in sync.
 */}}
+{{/* Key names in the app Secret for the AI Gateway shared-auth values. The
+     gateway pod reads gateway.secrets.internalSecretKey / jwtSecretKey from the
+     same Secret, so the app reads (and autogen writes) the same names. */}}
+{{- define "langwatch.gatewayInternalSecretKey" -}}
+{{- ((.Values.gateway).secrets).internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" -}}
+{{- end -}}
+
+{{- define "langwatch.gatewayJwtSecretKey" -}}
+{{- ((.Values.gateway).secrets).jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" -}}
+{{- end -}}
+
+{{/* Whether the LangWatchQL passwords come from the chart-owned passwords
+     Secret (autogen with no secrets.existingSecret). That Secret always uses
+     the default key names; an operator-owned Secret uses
+     secrets.secretKeys.lwqlClickhousePassword / lwqlPostgresReaderPassword. */}}
+{{- define "langwatch.lwql.passwordsChartOwned" -}}
+{{- if and .Values.autogen.enabled (not .Values.secrets.existingSecret) }}true{{ end -}}
+{{- end -}}
+
+{{/* The Secret the LangWatchQL passwords are read from. */}}
+{{- define "langwatch.lwql.passwordSecret" -}}
+{{- .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) -}}
+{{- end -}}
+
+{{- define "langwatch.lwql.clickhousePasswordKey" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+LWQL_CLICKHOUSE_PASSWORD
+{{- else -}}
+{{- .Values.secrets.secretKeys.lwqlClickhousePassword | default "LWQL_CLICKHOUSE_PASSWORD" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "langwatch.lwql.postgresReaderPasswordKey" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+LWQL_POSTGRES_READER_PASSWORD
+{{- else -}}
+{{- .Values.secrets.secretKeys.lwqlPostgresReaderPassword | default "LWQL_POSTGRES_READER_PASSWORD" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.lwql.accessSecretName" -}}
   {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
 {{- end -}}
@@ -1530,6 +1571,31 @@ containers:
 {{- end -}}
 
 {{/*
+  The release's stored-objects upgrade fingerprint: a digest of the chart
+  version and every value. The workers Deployment carries it as an annotation,
+  and the pre-upgrade hook compares the live annotation with the release about
+  to be applied. Equal means the sync renders what is already running (Argo CD
+  maps these hooks to PreSync and PostSync and runs them on every sync), so no
+  pod rolls. The hook also requires both rollouts to be finished before it
+  skips, since an equal fingerprint does not prove the last rollout completed.
+
+  Values, not the rendered Deployments: a Deployment cannot hash a manifest
+  that carries the hash. Any value change counts as a change, which keeps the
+  ordering on every real upgrade at the cost of also running it for a change
+  that does not roll a pod.
+*/}}
+{{- define "langwatch.storedObjects.upgradeFingerprint" -}}
+{{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
+{{- end -}}
+
+{{/* Whether the stored-objects upgrade hooks render for this release. */}}
+{{- define "langwatch.storedObjects.serializeUpgradesActive" -}}
+{{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
   Shell functions both stored-objects upgrade hook Jobs use. They read the
   `ns`, `deploy` and `selector` variables the Job's script sets above them.
 */}}
@@ -1590,12 +1656,17 @@ is_number() {
 }
 
 app_rollout_done() {
+  rollout_done "$app"
+}
+
+# Whether the named Deployment has finished rolling out.
+rollout_done() {
   # Pipe-separated, not space-separated. A status field that is absent (which
   # is how the API reports zero) renders as nothing, so on whitespace splitting
   # every later field shifts left and is read as the wrong one. With an
   # explicit separator the empty field keeps its place, and an empty field
   # fails is_number below, which reads as "not done yet" and keeps waiting.
-  state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
+  state=$(kubectl -n "$ns" get deployment "${1}" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
   old_ifs=$IFS
   IFS='|'
   set -- $state
@@ -1742,7 +1813,7 @@ here, once, by name, so both consuming templates agree.
                                                 in-flight jobs here
                                                 (packages/process-stores/src/config-owner.ts)
        PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
-                                                (packages/process-server/src/config.ts)
+                                                (packages/process/src/config.ts)
        required grace               = D + 30s   the kubelet SIGKILLs here
 
      The 20s above the drain pays for App.close (5s) and process teardown
@@ -1864,12 +1935,12 @@ here, once, by name, so both consuming templates agree.
   valueFrom:
     secretKeyRef:
       name: {{ include "langwatch.appSecretName" . }}
-      key: LW_GATEWAY_INTERNAL_SECRET
+      key: {{ include "langwatch.gatewayInternalSecretKey" . }}
 - name: LW_GATEWAY_JWT_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "langwatch.appSecretName" . }}
-      key: LW_GATEWAY_JWT_SECRET
+      key: {{ include "langwatch.gatewayJwtSecretKey" . }}
 {{- end }}
 
 {{- if (index .Values "langyagent").chartManaged }}
@@ -1912,16 +1983,15 @@ here, once, by name, so both consuming templates agree.
 # cursor) at login. Without it the CLI falls back to
 # http://localhost:5563, which a developer laptop can't reach
 # against a remote cluster. Prefer the explicit gateway.publicUrl
-# knob; otherwise derive it from an operator-set gateway ingress
-# host (the SaaS default host is skipped so a self-host install
-# never silently points at gateway.langwatch.ai).
+# knob; otherwise derive it from ingress.gateway.host when the
+# app Ingress publishes the gateway.
 {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
 {{- if not $gwPublic }}
-{{- $gwIngress := .Values.gateway.ingress | default dict }}
-{{- $gwHost := $gwIngress.host | default "" }}
-{{- if and $gwIngress.enabled $gwHost (ne $gwHost "gateway.langwatch.ai") }}
+{{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+{{- $gwHost := $gwRoute.host | default "" }}
+{{- if and .Values.ingress.enabled $gwHost }}
 {{- $scheme := "http" }}
-{{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+{{- if ($gwRoute.tls | default dict).secretName }}{{- $scheme = "https" }}{{- end }}
 {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
 {{- end }}
 {{- end }}
@@ -2055,3 +2125,53 @@ azure.workload.identity/use: "true"
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+PodDisruptionBudget pass-through: whether to render it, and a refusal for a
+budget that blocks node drains.
+
+Prints "true" when the component runs more than one pod. A budget over a
+single pod can never let a drain evict it, so node upgrades and autoscaler
+scale-downs hang; the PDB is skipped there. With more pods, a budget that
+leaves none evictable (minAvailable that resolves to replicaCount or more,
+or maxUnavailable that resolves to 0; percentages round up as in Kubernetes) is refused, since it hangs drains the same way and
+admission policies reject it.
+
+Usage: {{- if include "langwatch.pdbRenders" (dict "name" "app" "spec" .Values.app.podDisruptionBudget "replicas" .Values.app.replicaCount) }}
+*/}}
+{{- define "langwatch.pdbRenders" -}}
+{{- $spec := .spec | default dict -}}
+{{- $replicas := int (.replicas | default 1) -}}
+{{- if and $spec (gt $replicas 1) -}}
+  {{- $min := get $spec "minAvailable" -}}
+  {{- $max := get $spec "maxUnavailable" -}}
+  {{- if and (hasKey $spec "minAvailable") (ne (toString $min) "") -}}
+    {{- if ge (include "langwatch.pdbPods" (dict "value" $min "replicas" $replicas) | int) $replicas -}}
+      {{- fail (printf "%s.podDisruptionBudget.minAvailable is %v with replicaCount %d, so no pod may ever be evicted and every node drain hangs. Use a value that keeps fewer than %d pods required, or maxUnavailable: 1." .name $min $replicas $replicas) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if and (hasKey $spec "maxUnavailable") (ne (toString $max) "") -}}
+    {{- if lt (include "langwatch.pdbPods" (dict "value" $max "replicas" $replicas) | int) 1 -}}
+      {{- fail (printf "%s.podDisruptionBudget.maxUnavailable is %v, so no pod may ever be evicted and every node drain hangs. Use 1 or more." .name $max) -}}
+    {{- end -}}
+  {{- end -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+A PodDisruptionBudget field as a pod count, the way Kubernetes resolves it:
+an integer as written, a percentage of `replicas` rounded up (Kubernetes
+rounds both minAvailable and maxUnavailable percentages up).
+Usage: {{ include "langwatch.pdbPods" (dict "value" $v "replicas" $replicas) | int }}
+*/}}
+{{- define "langwatch.pdbPods" -}}
+{{- $v := toString .value -}}
+{{- if hasSuffix "%" $v -}}
+{{- $pct := int (trimSuffix "%" $v) -}}
+{{- div (add (mul $pct (int .replicas)) 99) 100 -}}
+{{- else -}}
+{{- int $v -}}
+{{- end -}}
+{{- end -}}
+

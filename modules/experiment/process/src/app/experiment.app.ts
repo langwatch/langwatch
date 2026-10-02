@@ -1,5 +1,3 @@
-import { on, type EventEmitter } from "node:events";
-
 /**
  * The experiment feature's application: what both of its doors call.
  */
@@ -83,15 +81,16 @@ import {
   type ExperimentWizardSaveInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { PresenceApi } from "@langwatch/presence-contract";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { SuiteApi } from "@langwatch/suite-contract";
-import { nowInstant } from "@langwatch/time";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -100,108 +99,54 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type { ExperimentWorkbenchObserver } from "#app/experiment-workbench.members";
-
-import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import {
   buildExperimentLifecyclePipeline,
   type ExperimentLifecyclePipeline,
 } from "../eventing/experiment-lifecycle.pipeline.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
-import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
-import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
-import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
+import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
+import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
+import { ClickHouseExperimentSession } from "../repositories/clickhouse/clickhouse.experiment-session.store.ts";
+import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
+import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
+import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
-import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
+import {
+  EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE,
+  slugifyExperimentName,
+} from "../rules/experiment-slug.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
-import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
+import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunHistoryTelemetryService } from "../services/experiment-run-history-telemetry.service.ts";
+import type { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
+import {
+  ExperimentRunService,
+  type ExperimentRunProcessing,
+} from "../services/experiment-run.service.ts";
+import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
+import {
+  ExperimentUpdateStreamService,
+  type ExperimentUpdateEmitters,
+} from "../services/experiment-update-stream.service.ts";
+import {
+  ExperimentWorkbenchObserverService,
+  type ExperimentWorkbenchObserver,
+} from "../services/experiment-workbench-observer.service.ts";
+import { ExperimentWorkbenchPresenceUpdatesService } from "../services/experiment-workbench-presence-updates.service.ts";
 import {
   ExperimentWorkbenchRunService,
   type WorkbenchExecutionRequest,
 } from "../services/experiment-workbench-run.service.ts";
+import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
 import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
+import { ExperimentWorkflowAuthoringService } from "../services/experiment-workflow-authoring.service.ts";
 import type { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
-import type { ExperimentService } from "../services/experiment.service.ts";
-import {
-  buildExperimentIdLookup,
-  buildExperimentInfrastructure,
-  buildExperimentRunProcessing,
-} from "./experiment-composition.build.ts";
-
-/**
- * The project-scoped signal fan-out an editor tab follows. Declared as the two
- * methods the transports call: the emitter itself is the host's, shared with
- * every other subscription surface.
- */
-export type ExperimentBroadcast = Readonly<{
-  getTenantEmitter(projectId: string): EventEmitter;
-  cleanupTenantEmitter(projectId: string): void;
-}>;
-
-/** The two monitor writes an experiment drives: its publication and its archive. */
-export type ExperimentMonitorCascade = Readonly<{
-  deleteForExperiment(
-    input: Readonly<{ projectId: string; experimentId: string }>,
-  ): Promise<unknown>;
-  /**
-   * Creates or replaces the monitor an experiment is published as. `mappings`
-   * arrives as the wizard stored it; canonicalising it is the monitor side's,
-   * because the mapping vocabulary is the tracer's rather than this feature's.
-   */
-  upsertForExperiment(
-    input: Readonly<{
-      projectId: string;
-      experimentId: string;
-      monitor: Readonly<{
-        name: string;
-        checkType: string;
-        slug: string;
-        preconditions: unknown;
-        parameters: Record<string, unknown>;
-        mappings: unknown;
-        sample: number;
-        enabled: boolean;
-        executionMode: string;
-      }>;
-    }>,
-  ): Promise<ExperimentPublishedMonitor>;
-}>;
-
-/**
- * The studio writes a wizard experiment drives. Separate from the read-only
- * `WorkflowService` because these three CREATE graphs, and a read surface
- * that could create one would be a different promise.
- */
-export type ExperimentWorkflowAuthoring = Readonly<{
-  create(
-    input: Readonly<{
-      projectId: string;
-      dsl: StudioWorkflow;
-      commitMessage: string;
-      autoSaved: boolean;
-    }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<Readonly<{ id: string }>>;
-  saveVersion(input: ExperimentWorkflowVersionInput, by: Readonly<{ id: string }>): Promise<void>;
-  copyWithDatasets(
-    input: ExperimentWorkflowCopyInput,
-  ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>>;
-}>;
-
-/** What the doors ask about the caller, beyond the check already declared. */
-export type ExperimentPermissions = Readonly<{
-  mayManageEvaluations(input: Readonly<{ actorId: string; projectId: string }>): Promise<boolean>;
-}>;
-
-/** The project's own model cost rules, as the pricing cascade reads them. */
-export type ExperimentModelCosts = Readonly<{
-  listFor(input: Readonly<{ projectId: string }>): Promise<readonly ModelCostRate[]>;
-}>;
+import { ExperimentService } from "../services/experiment.service.ts";
 
 /** The display names behind the author ids a version history stores. */
 export type ExperimentPeople = Readonly<{
@@ -216,14 +161,18 @@ export interface ExperimentAppDependencies {
   /** The ONE find-or-create rule this deployment resolves an SDK slug through. */
   runLookup: ExperimentFindOrCreateService;
   workflows: WorkflowApi;
-  workflowAuthoring: ExperimentWorkflowAuthoring;
+  workflowAuthoring: Pick<
+    ExperimentWorkflowAuthoringService,
+    "create" | "saveVersion" | "copyWithDatasets"
+  >;
   dataset: DatasetApi;
-  monitors: ExperimentMonitorCascade;
-  broadcast: ExperimentBroadcast;
-  permissions: ExperimentPermissions;
+  monitors: Pick<MonitorApi, "deleteForExperiment" | "upsertForExperiment">;
+  /** Presence's tenant fan-out, where `experiment_updated` arrives. */
+  broadcast: ExperimentUpdateEmitters;
+  permissions: Pick<AuthzApi, "hasPermission">;
   people: ExperimentPeople;
   /** The project's own model cost rules, as the pricing cascade reads them. */
-  modelCosts: ExperimentModelCosts;
+  modelCosts: Pick<ExperimentRunModelCostService, "listFor">;
   /** The slug this deployment derives from a name. */
   slugify(value: string): string;
   /** Resolves a saved workbench's column names, over the prompts, agents and evaluators. */
@@ -240,41 +189,21 @@ export interface ExperimentAppDependencies {
     pipeline: ExperimentLifecyclePipeline;
     senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> };
   }>;
-  /** `experiment_run_processing`, its senders and run lookup; absent where a suite builds none. */
-  runProcessing?: Readonly<{
-    pipeline: ExperimentRunProcessingPipeline;
-    commands: ExperimentRunCommandDispatcherService;
-    idLookup: ExperimentIdLookupRepository;
-    /** The channel a run's frames reach the process streaming it on. */
-    stream: ExperimentRunEventStream;
-    /** The run's progress fold, which a poll and an abort read by runId. */
-    folds: ExperimentRunFoldRepository;
-    /** The run's stop signal, set on abort. */
-    abort: ExperimentRunAbortRepository;
-    /** This deployment's public origin, for the link a polled run answers with. */
-    publicBaseUrl: string | undefined;
-    /** The peers a run's execution data is loaded through before it is planned. */
-    services: ExecutionDataServices;
-    /** Refuses a run against someone else's personal development agent before it starts. */
-    ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
-    /** Cells in flight at once when a run names no limit of its own. */
-    concurrency: number;
-    /** What this process refuses of a run, for want of Redis or a public address. */
-    refusals: ExperimentRunRefusals;
-  }>;
+  /** The run pipeline, its senders and run lookup; absent where a suite builds none. */
+  runProcessing?: ExperimentRunProcessing;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
 const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
-  typeof ExperimentApp.dependencies,
+  typeof ExperimentModule.dependencies,
   MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
     Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>,
   ExperimentServerConfig
 >;
 
-export class ExperimentApp implements ExperimentApi {
+export class ExperimentModule implements ExperimentApi {
   static readonly contract = ExperimentApi;
   static readonly dependencies = {
     workflows: WorkflowApi,
@@ -284,6 +213,8 @@ export class ExperimentApp implements ExperimentApi {
     evaluators: EvaluatorApi,
     prompts: PromptApi,
     permissions: AuthzApi,
+    /** The one publisher of the live-update wire; a workbench save's notice rides it. */
+    presence: PresenceApi,
     /** The directory that answers which organization a project belongs to. */
     projects: ProjectApi,
     /** The tier-effective row bound an execution's dataset must fit under. */
@@ -303,79 +234,73 @@ export class ExperimentApp implements ExperimentApi {
   };
   static readonly config = experimentConfig;
   static readonly reads = [
-    ...reads("prisma", "clickhouse", "redis", "logger"),
+    "prisma",
+    "clickhouse",
+    "redis",
+    "logger",
     "publicBaseUrl",
     "processName",
     "isSaas",
   ] as const;
 
-  static create(setup: ExperimentSetup): ExperimentApp {
+  static create(setup: ExperimentSetup): ExperimentModule {
     const { members, dependencies, config } = setup;
+    const { prisma, clickhouse, logger } = members;
+    const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
-    const lifecycle = {
-      pipeline: buildExperimentLifecyclePipeline(),
-      senders,
-    };
-    const attachmentEgress = {
-      blockLocal: config.blockLocalHttpCalls,
-      allowedHosts: config.allowedProxyHosts,
-      verifyTls: members.isSaas,
-    };
-    const built = buildExperimentInfrastructure({
-      prisma: members.prisma,
-      clickhouse: members.clickhouse,
-      redis: members.redis,
-      logger: members.logger,
+    const resolveClient = ClickHouseExperimentSession.resolverOver(clickhouse);
+    const telemetry = ExperimentRunHistoryTelemetryService.create(logger);
+    const experiments = ExperimentService.create({
+      repository: PrismaExperimentRepository.create(prisma),
+      runRepository: ClickHouseExperimentRunRepository.create({
+        workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
+        resolveClient,
+        tupleParam: (values) => ClickHouseExperimentRunRepository.tupleParam(values),
+        telemetry,
+      }),
+      dspyRepository: ClickHouseExperimentDspyRepository.create({
+        resolveClient,
+        retention: ExperimentDspyRetentionService.create({ retention }),
+        telemetry,
+      }),
       execution: commands,
-      publicBaseUrl: members.publicBaseUrl,
-      processName: members.processName,
-      runConcurrency: config.runConcurrency,
-      attachmentEgress,
-      dependencies,
-      announceRan: async (ran) => {
-        if (!senders.commands) {
-          throw new Error("experiment_lifecycle pipeline senders are not connected yet");
-        }
-        await senders.commands.recordExperimentRan.send({
-          tenantId: ran.projectId,
-          occurredAt: nowInstant().epochMilliseconds,
-          userId: ran.userId,
-          projectId: ran.projectId,
-          experimentId: ran.experimentId ?? null,
-          fullRun: ran.isFullRun,
-        });
-      },
+      slugify: slugifyExperimentName,
+      newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
+      references: { prompts, agents, evaluators, workflows, dataset },
+      updates: ExperimentWorkbenchPresenceUpdatesService.create({
+        presence: dependencies.presence,
+        logger,
+      }),
     });
-    const { runCells, ...app } = built;
-    return new ExperimentApp({
-      ...app,
-      lifecycle,
-      runLookup: ExperimentFindOrCreateService.create(built.experiments),
-      runProcessing: {
-        pipeline: buildExperimentRunProcessing({
-          clickhouse: members.clickhouse,
-          redis: members.redis,
-          defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
-          retention: {
-            resolve: (tenantId) =>
-              dependencies.retention.getResolvedForProject({ projectId: tenantId }),
-          },
-          workflowEvaluations: built.workflowEvaluations,
-          runCells,
-          commands,
-        }),
-        commands,
-        idLookup: buildExperimentIdLookup(members.clickhouse),
-        stream: runCells.stream,
-        folds: runCells.folds,
-        abort: runCells.abort,
-        publicBaseUrl: members.publicBaseUrl,
-        services: runCells.services,
-        ownership: runCells.ownership,
-        concurrency: runCells.concurrency,
-        refusals: runCells.refusals,
-      },
+    const runs = ExperimentRunService.create({
+      commands,
+      experiments,
+      resolveClient,
+      members,
+      peers: dependencies,
+      config,
+    });
+    const targetNames = ExperimentWorkbenchTargetNamesService.create();
+    const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
+
+    return new ExperimentModule({
+      experiments,
+      runLookup: ExperimentFindOrCreateService.create(experiments),
+      slugify: slugifyExperimentName,
+      workbenchTargetNames: (input) => targetNames.resolve({ ...input, prompts, entities }),
+      workflows,
+      dataset,
+      monitors: dependencies.monitors,
+      broadcast: dependencies.presence,
+      permissions: dependencies.permissions,
+      people: PrismaExperimentPeopleRepository.create(prisma),
+      modelCosts: runs.cost,
+      workflowAuthoring: ExperimentWorkflowAuthoringService.create(workflows),
+      workflowEvaluations: runs.workflowEvaluations,
+      workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
+      lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
+      runProcessing: runs.processing,
     });
   }
 
@@ -384,8 +309,8 @@ export class ExperimentApp implements ExperimentApi {
    * rather than driving the reads/dependencies this App builds them from —
    * the process root never calls this, since a real one is always booted.
    */
-  static createForTesting(dependencies: ExperimentAppDependencies): ExperimentApp {
-    return new ExperimentApp(dependencies);
+  static createForTesting(dependencies: ExperimentAppDependencies): ExperimentModule {
+    return new ExperimentModule(dependencies);
   }
 
   #dependencies: ExperimentAppDependencies;
@@ -733,7 +658,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.saveWorkbenchState({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -750,7 +675,7 @@ export class ExperimentApp implements ExperimentApi {
     return this.#dependencies.experiments.createEvaluationsV3({
       ...rest,
       state: state ?? createBlankWorkbenchState(rest.name ? { name: rest.name } : {}),
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -761,7 +686,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.commitWorkbenchVersion({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -772,7 +697,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.restoreWorkbenchVersion({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -781,7 +706,7 @@ export class ExperimentApp implements ExperimentApi {
     input: Readonly<{ projectId: string; slug: string; version: number }>,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentModule.actorFor(by) });
   }
 
   /** `GET /:slug/workbench-state`'s answer, `fields=version` leaving out the setup. */
@@ -794,7 +719,7 @@ export class ExperimentApp implements ExperimentApi {
     input: SaveWorkbenchStateBySlugRequest,
     by: ExperimentCaller,
   ): Promise<WorkbenchSavedVersion> {
-    return this.#workbenchVersions.saveBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+    return this.#workbenchVersions.saveBySlug({ ...input, actor: ExperimentModule.actorFor(by) });
   }
 
   /** `GET /:slug/versions`: one page of the history, as the REST door publishes it. */
@@ -893,18 +818,9 @@ export class ExperimentApp implements ExperimentApi {
   async *watchUpdates(
     input: Readonly<{ projectId: string; signal?: AbortSignal | undefined }>,
   ): AsyncIterable<ExperimentUpdateFrame> {
-    const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
-    try {
-      for await (const eventArgs of on(
-        emitter,
-        "experiment_updated",
-        input.signal ? { signal: input.signal } : {},
-      )) {
-        yield (eventArgs as unknown[])[0] as ExperimentUpdateFrame;
-      }
-    } finally {
-      this.#dependencies.broadcast.cleanupTenantEmitter(input.projectId);
-    }
+    yield* ExperimentUpdateStreamService.create({
+      emitters: this.#dependencies.broadcast,
+    }).watch(input);
   }
 
   // ── Studio writes ──────────────────────────────────────────────
@@ -957,7 +873,11 @@ export class ExperimentApp implements ExperimentApi {
       }>;
     }>,
   ): Promise<ExperimentPublishedMonitor> {
-    return this.#dependencies.monitors.upsertForExperiment(input);
+    return this.#dependencies.monitors.upsertForExperiment({
+      projectId: input.projectId,
+      experimentId: input.experimentId,
+      ...input.monitor,
+    });
   }
 
   // ── The caller and the deployment ──────────────────────────────
@@ -972,7 +892,11 @@ export class ExperimentApp implements ExperimentApi {
    * never covered.
    */
   mayManageEvaluations(input: Readonly<{ actorId: string; projectId: string }>): Promise<boolean> {
-    return this.#dependencies.permissions.mayManageEvaluations(input);
+    return this.#dependencies.permissions.hasPermission({
+      userId: input.actorId,
+      permission: "evaluations:manage",
+      projectId: input.projectId,
+    });
   }
 
   /** The project's own model cost rules, for the optimizer log's pricing. */
@@ -1044,7 +968,7 @@ export class ExperimentApp implements ExperimentApi {
    * rather than called through the module's reference, because several of
    * those doors read the service the reference only publishes operations on.
    */
-  experiments(): ExperimentApp {
+  experiments(): ExperimentModule {
     return this;
   }
 

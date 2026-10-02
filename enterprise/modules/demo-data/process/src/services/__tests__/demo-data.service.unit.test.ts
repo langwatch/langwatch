@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

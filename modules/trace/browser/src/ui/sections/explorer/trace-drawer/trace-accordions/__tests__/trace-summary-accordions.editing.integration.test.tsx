@@ -3,11 +3,16 @@
  * its output, and its metadata as key and value rows.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
@@ -67,7 +72,10 @@ vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import {
+  openTraceDrawerAt,
+  setWindowAddress,
+} from "../../../../../../__tests__/window-location-router.ts";
 import {
   buildTraceEditPatch,
   useTraceEditStore,
@@ -118,11 +126,7 @@ const header = (overrides: Partial<TraceHeader> = {}): TraceHeader => ({
 });
 
 function renderSummary(trace: TraceHeader = header()) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceSummaryAccordions trace={trace} spans={[]} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TraceSummaryAccordions trace={trace} spans={[]} />);
 }
 
 function draftPatch() {
@@ -133,12 +137,12 @@ describe("correcting the trace's own fields in the summary", () => {
   beforeEach(() => {
     useTraceEditStore.getState().discard();
     useTraceEditStore.getState().startEditing({ traceId: TRACE_ID });
-    useDrawerStore.setState({ isEditing: true });
+    openTraceDrawerAt({ traceId: TRACE_ID, edit: "1" });
   });
 
   afterEach(() => {
     cleanup();
-    useDrawerStore.setState({ isEditing: false });
+    setWindowAddress({ url: "/my-project/traces" });
     useTraceEditStore.getState().discard();
   });
 

@@ -6,7 +6,8 @@
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
 const SAML_ASSERTION_CONSUMER = /^\/api\/auth\/sso\/saml2\/sp\/acs\/[^/?#]+$/;
 
-function parseOrigin(value: string | undefined): string | null {
+/** The scheme, host and port of a URL-ish header value; null where it names none. */
+export function parseOrigin(value: string | undefined): string | null {
   if (!value) return null;
   try {
     return new URL(value).origin;

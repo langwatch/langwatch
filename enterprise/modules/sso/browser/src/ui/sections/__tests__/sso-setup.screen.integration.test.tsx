@@ -20,7 +20,7 @@ const { state } = vi.hoisted(() => ({
     breakGlassInvalidated: 0,
     grants: [] as unknown[],
     candidates: [] as unknown[],
-    polls: [] as ({ enabled?: boolean; refetchInterval?: number | false } | undefined)[],
+    polls: [] as ({ enabled?: boolean } | undefined)[],
   },
 }));
 
@@ -45,6 +45,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             },
           },
           getHistory: { invalidate: () => {} },
+          identityProvider: { invalidate: () => {} },
           breakGlassBindings: {
             invalidate: () => {
               state.breakGlassInvalidated += 1;
@@ -54,10 +55,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
       }),
       ssoSetup: {
         getSetup: {
-          useQuery: (
-            _input: unknown,
-            options?: { enabled?: boolean; refetchInterval?: number | false },
-          ) => {
+          useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
             state.polls.push(options);
             return {
               data: state.view,
@@ -68,6 +66,19 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           },
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+        identityProvider: {
+          useQuery: () => ({
+            data: {
+              protocol: "oidc",
+              issuer: "https://acme.okta.com",
+              clientId: "client_acme",
+              hasClientSecret: true,
+            },
+            isLoading: false,
+            error: null,
+          }),
+        },
+        updateIdentityProvider: mutation("updateIdentityProvider"),
         getMigrationProgress: {
           useQuery: () => ({ data: void 0, isLoading: false, isError: false, refetch: () => {} }),
         },
@@ -159,7 +170,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
     },
     legacyRoute: null,
     migration: null,
-    availability: { available: true },
+    availability: { available: true, proof: "dns-txt" },
     serviceProvider: SERVICE_PROVIDER,
     ...overrides,
   };
@@ -279,7 +290,7 @@ describe("the single sign-on setup page", () => {
 
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active licence/);
+      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active license/);
       expect(screen.queryByTestId("sso-setup")).toBeNull();
     });
   });
@@ -358,6 +369,26 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("connection-name")).toBeInTheDocument();
       expect(screen.queryByTestId("connection-name-edit")).toBeNull();
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+
+    /** @scenario "The settings card offers the edit prefilled with the current settings" */
+    it("offers the identity provider settings for editing, prefilled, on the same card", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      fireEvent.click(screen.getByTestId("identity-provider-edit"));
+
+      const form = screen.getByTestId("edit-identity-provider");
+      expect(within(form).getByLabelText("Issuer address")).toHaveValue("https://acme.okta.com");
+      expect(within(form).getByLabelText("Client id")).toHaveValue("client_acme");
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+
+    it("offers no edit on a live connection that is on its way out", () => {
+      state.view = setupView({ connection: connectionView({ state: "TEARDOWN_PENDING" }) });
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
     });
   });
 
@@ -412,7 +443,7 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByRole("status").textContent).toContain("Activation accepted");
       expect(screen.getByTestId("connection-go-live-activate")).toHaveProperty("disabled", true);
-      expect(state.polls.at(-1)).toEqual({ enabled: true, refetchInterval: 1_000 });
+      expect(state.polls.at(-1)).toEqual({ enabled: true });
 
       state.view = setupView({
         connection: connectionView({ state: "ACTIVE" }),
@@ -420,7 +451,7 @@ describe("the single sign-on setup page", () => {
       });
       rerenderWithSsoHost(<SsoSetupScreen />);
 
-      expect(state.polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+      expect(state.polls.at(-1)).toEqual({ enabled: false });
       expect(screen.queryByText(/Activation accepted/)).toBeNull();
     });
 

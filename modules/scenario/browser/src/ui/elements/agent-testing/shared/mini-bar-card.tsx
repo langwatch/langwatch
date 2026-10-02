@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 

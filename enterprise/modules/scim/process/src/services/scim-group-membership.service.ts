@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import { createLogger } from "@langwatch/observability";
 

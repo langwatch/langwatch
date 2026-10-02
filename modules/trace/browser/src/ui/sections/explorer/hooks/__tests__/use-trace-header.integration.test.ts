@@ -2,18 +2,29 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useTraceHeader } from "../use-trace-header.ts";
 
 const headerData: { traceId?: string; timestamp?: number } = {};
 const capturedHeaderInputs: { full?: boolean }[] = [];
+const capturedHeaderOptions: { placeholderData?: (previous: unknown) => unknown }[] = [];
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     traces: {
       header: {
-        useQuery: (input: { full?: boolean }) => {
+        useQuery: (
+          input: { full?: boolean },
+          options: { placeholderData?: (previous: unknown) => unknown },
+        ) => {
           capturedHeaderInputs.push(input);
+          capturedHeaderOptions.push(options);
           return { data: headerData, isLoading: false };
         },
       },
@@ -34,22 +45,34 @@ vi.mock("../use-trace-query-args.ts", () => ({
   }),
 }));
 
+vi.mock("../use-trace-list-row-header.ts", () => ({
+  useTraceListRowHeader: () => () => undefined,
+}));
+
 vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: () => false,
 }));
+
+const openTrace = (traceId: string, occurredAtMs?: number) =>
+  setWindowAddress({
+    url:
+      `/acme/traces?drawer.open=traceV2Details&drawer.traceId=${traceId}` +
+      (occurredAtMs ? `&drawer.t=${occurredAtMs}` : ""),
+  });
 
 describe("useTraceHeader", () => {
   beforeEach(() => {
     headerData.traceId = undefined;
     headerData.timestamp = undefined;
     capturedHeaderInputs.length = 0;
-    useDrawerStore.setState({ traceId: null, occurredAtMs: null });
+    capturedHeaderOptions.length = 0;
+    setWindowAddress({ url: "/acme/traces" });
   });
 
   describe("given the drawer's own detail read", () => {
     describe("when the drawer opens", () => {
       it("resolves offloaded input/output in full", () => {
-        useDrawerStore.getState().openTrace("trace-1");
+        openTrace("trace-1");
 
         renderHook(() => useTraceHeader());
 
@@ -61,13 +84,13 @@ describe("useTraceHeader", () => {
   describe("given the drawer opened without a partition hint", () => {
     describe("when the header resolves with a trace timestamp", () => {
       it("backfills occurredAtMs from the resolved timestamp", () => {
-        useDrawerStore.getState().openTrace("trace-1");
+        openTrace("trace-1");
         headerData.traceId = "trace-1";
         headerData.timestamp = 1_700_000_000_000;
 
         renderHook(() => useTraceHeader());
 
-        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+        expect(getTraceDrawer().occurredAtMs).toBe(1_700_000_000_000);
       });
     });
   });
@@ -75,13 +98,13 @@ describe("useTraceHeader", () => {
   describe("given the drawer already carries a partition hint", () => {
     describe("when the header resolves with a different timestamp", () => {
       it("leaves the opener-supplied hint untouched", () => {
-        useDrawerStore.getState().openTrace("trace-1", 1_700_000_000_000);
+        openTrace("trace-1", 1_700_000_000_000);
         headerData.traceId = "trace-1";
         headerData.timestamp = 1_699_000_000_000;
 
         renderHook(() => useTraceHeader());
 
-        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+        expect(getTraceDrawer().occurredAtMs).toBe(1_700_000_000_000);
       });
     });
   });
@@ -91,13 +114,26 @@ describe("useTraceHeader", () => {
       it("does not backfill the new trace with the stale timestamp", () => {
         // Drawer is now on trace-1 (no hint), but React Query still holds
         // the previous trace's header until the new fetch lands.
-        useDrawerStore.getState().openTrace("trace-1");
+        openTrace("trace-1");
         headerData.traceId = "trace-OLD";
         headerData.timestamp = 1_699_000_000_000;
 
         renderHook(() => useTraceHeader());
 
-        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+        expect(getTraceDrawer().occurredAtMs).toBeNull();
+      });
+    });
+  });
+
+  describe("given the reader moves to a trace that has no list row", () => {
+    describe("when the read supplies placeholder data", () => {
+      it("never paints the previous trace's header", () => {
+        openTrace("trace-2");
+
+        renderHook(() => useTraceHeader());
+
+        const previous = { traceId: "trace-1" };
+        expect(capturedHeaderOptions.at(-1)?.placeholderData?.(previous)).toBeUndefined();
       });
     });
   });
@@ -105,11 +141,11 @@ describe("useTraceHeader", () => {
   describe("given the header has not resolved yet", () => {
     describe("when no timestamp is available", () => {
       it("leaves occurredAtMs null", () => {
-        useDrawerStore.getState().openTrace("trace-1");
+        openTrace("trace-1");
 
         renderHook(() => useTraceHeader());
 
-        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+        expect(getTraceDrawer().occurredAtMs).toBeNull();
       });
     });
   });

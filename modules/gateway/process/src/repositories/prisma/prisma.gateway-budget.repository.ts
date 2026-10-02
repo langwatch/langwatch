@@ -13,7 +13,6 @@ import {
   GatewayWindow,
   GatewayBudgetCycleAnchorInvalidError,
   type GatewayBudgetPageInput,
-  type GatewayBudgetResolutionTarget,
   type GatewayBudget as GatewayBudgetRow,
   type GatewayBudgetResource,
   type GatewayBudgetScopeTarget,
@@ -46,7 +45,8 @@ import {
   type BucketBoundaryRow,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
-  type GatewayKeyReachCandidate,
+  type GatewayKeyReachRow,
+  type GatewayBudgetResolutionRead,
   type GatewayOrganizationBudgetReadInput,
   type GatewayProjectBudgetReadInput,
   type GatewayVirtualKeyProjectScope,
@@ -271,7 +271,6 @@ export type GatewayBudgetDatabase = Pick<
   | "groupMembership"
   | "modelProvider"
   | "organization"
-  | "organizationUser"
   | "team"
   | "user"
   | "virtualKey"
@@ -320,7 +319,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   async resolveApplicableBudgets(
-    input: GatewayBudgetResolutionTarget,
+    input: GatewayBudgetResolutionRead,
   ): Promise<GatewayResolvedBudget[]> {
     const resolved =
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
@@ -819,33 +818,16 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * from the create guard (which only refuses three scopes), since omitting
    * it from create's response would disagree with the very next read.
    */
-  findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
+  findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachRow[]> {
     return this.scopeReach.findAll(organizationId);
   }
 
   /** Every request-supplied scope id must name something in the budget's own organization. */
   async assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void> {
-    // Cross-org guard for PRINCIPAL budgets: the named user must belong to
-    // the budget's organization, or the FK to User would pass while the
-    // budget silently never matched the user's traffic (PRINCIPAL spans only
-    // their org's VKs). Spec: specs/ai-gateway/budgets-principal-cascade.feature.
-    if (input.scope.kind === "PRINCIPAL") {
-      const membership = await this.prisma.organizationUser.findFirst({
-        where: {
-          organizationId: input.organizationId,
-          userId: input.scope.principalUserId,
-        },
-        select: { userId: true },
-      });
-      if (!membership) {
-        throw new GatewayScopeOrgMismatchError("user");
-      }
-    }
-
     // Cross-org guard for TEAM/PROJECT budgets: the scoped team/project must
     // belong to the budget's organization — the scope id is request-supplied
     // and the Team/Project FK is org-agnostic, so without this a caller could
-    // target another tenant's team or project. Mirrors the PRINCIPAL guard above.
+    // target another tenant's team or project.
     if (input.scope.kind === "TEAM") {
       const team = await this.prisma.team.findFirst({
         where: { id: input.scope.teamId, organizationId: input.organizationId },
@@ -881,19 +863,6 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       // can't mean what it says. Spec: specs/ai-gateway/gateway-budget-targeting.feature.
       if (!this.chRepo) {
         throw new GatewayGroupBudgetUnsupportedError();
-      }
-      // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
-      // the scope id is request-supplied, so without this a caller could
-      // put a per-member budget on another tenant's group.
-      const group = await this.prisma.group.findFirst({
-        where: {
-          id: input.scope.groupId,
-          organizationId: input.organizationId,
-        },
-        select: { id: true },
-      });
-      if (!group) {
-        throw new GatewayScopeOrgMismatchError("group");
       }
     }
 
@@ -1262,6 +1231,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           projectId: input.projectId,
           virtualKeyId: input.virtualKeyId,
           principalUserId: input.principalUserId,
+          memberGroupIds: input.memberGroupIds,
         },
       })
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));

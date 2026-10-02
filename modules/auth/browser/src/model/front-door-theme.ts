@@ -1,4 +1,4 @@
-import { defineConfig } from "@chakra-ui/react";
+import { defineConfig } from "@langwatch/design-system/system";
 
 /** Chakra semantic tokens for the front door: site identity separate from app theme. */
 

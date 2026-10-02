@@ -273,6 +273,17 @@ into the same pipeline as a live span event.
 ```go
 triggers, err := lw.Triggers.List(ctx)
 
+// Slack delivers through a Slack connection; credentials read back as "[redacted]".
+t, err := lw.Triggers.Create(ctx, client.CreateTriggerParams{
+	Name:         "Errors to #alerts",
+	Action:       "SEND_SLACK_MESSAGE",
+	ActionParams: map[string]any{"slackIntegrationId": "slack_abc", "slackChannelId": "C0123"},
+	FilterQuery:  "status:error",
+})
+res, err := lw.Triggers.TestFire(ctx, t.ID)
+_, err = lw.Triggers.Disable(ctx, t.ID) // and Enable, Update, Delete
+page, err := lw.Triggers.Fires(ctx, t.ID, client.TriggerFiresParams{Limit: 50}) // pass page.NextCursor as Cursor
+
 monitors, err := lw.Monitors.List(ctx)
 _, err = lw.Monitors.Toggle(ctx, "monitor_abc", false)
 

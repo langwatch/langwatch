@@ -1,5 +1,5 @@
-import { Badge, Button, Table, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Badge, Button, Table, Text } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { MoreVertical } from "lucide-react";
 

@@ -1,7 +1,8 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
+import type { MintRunKeyInput } from "./api-key.run-key.ts";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
@@ -37,7 +38,8 @@ import type {
 } from "./api-key.ts";
 import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
 
-export type ApiKeyManagementCaller = Readonly<{ id: string }>;
+/** The member a management call acts as, and the operator acting as them, if any. */
+export type ApiKeyManagementCaller = Readonly<{ id: string; impersonatorId?: string | undefined }>;
 /**
  * The credential an organization door resolved: the key itself, and the member
  * it acts as — null for a service key, which acts as nobody.
@@ -86,13 +88,12 @@ export interface ApiKeyApi {
   findVerifiedToken(input: ApiKeyVerifyInput): Promise<ApiKeyVerification | null>;
   /** Resolves either a current API key or the deprecated project credential. */
   findResolvedToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyCredential | null>;
-  /** Rotates a deprecated project credential while preserving its wire format. */
-  regenerateLegacyProjectKey(input: { projectId: string }): Promise<string>;
   /**
-   * The key a code agent's sandbox authenticates with: the one the project's runs share, or a
-   * freshly minted one. Throws when none can be minted; a run then goes without the agent cache.
+   * A key for one run's calls back into LangWatch, reused per (user, project, permissions) while
+   * it has `minRemainingMs` (default 5 minutes) left. With a user, refuses with
+   * `ApiKeyPermissionDeniedError` on the first permission they lack, cached key or not.
    */
-  getOrMintAgentSandboxKey(input: { projectId: string; organizationId: string }): Promise<string>;
+  mintRunKey(input: MintRunKeyInput): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

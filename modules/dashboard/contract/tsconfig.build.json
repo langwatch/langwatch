@@ -27,16 +27,13 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     }
   ]
 }

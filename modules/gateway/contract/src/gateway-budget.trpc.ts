@@ -4,7 +4,7 @@
  * so both list shapes answer the same enriched row.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   gatewayBudgetApiBudgetInputSchema,

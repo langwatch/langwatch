@@ -13,11 +13,6 @@
       "langwatch-declaration-source": "./src/analytics.web.ts",
       "types": "./dist/analytics.web.d.ts",
       "default": "./src/analytics.web.ts"
-    },
-    "./surfaces/custom-graph": {
-      "langwatch-declaration-source": "./src/ui/sections/custom-graph.tsx",
-      "types": "./dist/ui/sections/custom-graph.d.ts",
-      "default": "./src/ui/sections/custom-graph.tsx"
     }
   },
   "scripts": {
@@ -30,21 +25,18 @@
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
-    "@langwatch/analytics-browser-kit": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",

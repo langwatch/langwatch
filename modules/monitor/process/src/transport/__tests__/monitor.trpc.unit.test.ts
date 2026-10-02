@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
@@ -8,6 +7,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +19,7 @@ import {
   FakeMonitorReplication,
 } from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
+import { previousPeriodStartMs } from "../../rules/monitor-performance-window.rules.ts";
 import { monitorTrpcTransport } from "../monitor.trpc.ts";
 import { monitorTrpcTestMembers, type MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
 
@@ -72,7 +73,6 @@ function mount(
     permissions: createApiFixture<AuthzApi>({
       hasProjectPermission: options.hasProjectPermission ?? (async () => true),
     }),
-    generateId: () => "monitor_new",
   });
 
   const trpc = initTRPC.context<MonitorTrpcTestContext>().create();
@@ -227,7 +227,7 @@ describe("the monitors tRPC namespace", () => {
       });
       const query = performance.queries[0]!;
       expect(query.previousStartMs).toBe(
-        query.currentStartMs - (query.endMs - query.currentStartMs),
+        previousPeriodStartMs({ startMs: query.currentStartMs, endMs: query.endMs }),
       );
     });
 

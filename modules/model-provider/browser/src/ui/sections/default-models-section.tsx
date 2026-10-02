@@ -1,3 +1,10 @@
+/**
+ * Default Models — every policy the caller can see, one row per policy.
+ * Contract: specs/model-providers/role-based-default-models.feature,
+ *           specs/model-providers/model-default-config-cascade.feature.
+ */
+import type { WireOf } from "@langwatch/api/web";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -11,14 +18,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-/**
- * Default Models — every policy the caller can see, one row per policy.
- * Contract: specs/model-providers/role-based-default-models.feature,
- *           specs/model-providers/model-default-config-cascade.feature.
- */
-import type { WireOf } from "@langwatch/api/web";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import type {
   ModelDefaultConfigSnapshot,
   ModelDefaultFeature,

@@ -1,3 +1,14 @@
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -8,22 +19,8 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { Link } from "@langwatch/browser-host/link";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { ListTable } from "@langwatch/design-system/list-table";
-import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { readableDate } from "@langwatch/experiment-browser-kit";
+} from "@langwatch/design-system/primitives";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
-import { LangyContextTarget, experimentContextChip } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type { TimeInput } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -38,14 +35,18 @@ import {
   LuTrash,
 } from "react-icons/lu";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
+import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";
 import { CreateExperimentButton } from "../../../ui/elements/experiments/create-experiment-button.tsx";
 import { NavigationFooter, useNavigationFooter } from "../../../ui/elements/navigation-footer.tsx";
 import { FullWidthListPageContent } from "../../../ui/elements/ui/layouts/full-width-list-page-content.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
 
 /** One row of the experiments list, as this table renders it. */
 type ExperimentListRow = {
@@ -356,7 +357,7 @@ export function ExperimentsPage() {
   const { copyExperimentTo, isCopying } = useCopyExperiment();
 
   /** One page of the project's experiments; every field is one the table renders. */
-  const experiments = api.experiments.getAllForEvaluationsList.useQuery(
+  const experiments = experimentApi.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
       pageOffset: navigationFooter.pageOffset,
@@ -372,7 +373,7 @@ export function ExperimentsPage() {
 
   navigationFooter.useUpdateTotalHits(experiments);
 
-  const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation({
+  const deleteExperimentMutation = experimentApi.experiments.deleteExperiment.useMutation({
     onSuccess: () => {
       void experiments.refetch();
       toaster.create({

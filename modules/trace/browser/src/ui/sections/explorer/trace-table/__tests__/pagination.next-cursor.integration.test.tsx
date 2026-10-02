@@ -3,13 +3,13 @@
  * for the shared bar, and what each lens is allowed to reach.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { explorerCountSummary } from "../../../../../model/explorer/explorer-count-summary.ts";
 import { Pagination } from "../pagination.tsx";
 
@@ -47,10 +47,8 @@ function renderPagination({
   mockCounts.totalHits = totalHits;
   mockCounts.itemNoun = itemNoun;
   mockCounts.summary = explorerCountSummary({ totalHits, itemNoun, instantEval: null });
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Pagination nextCursor={nextCursor} visibleCount={visibleCount} maxPageSize={maxPageSize} />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <Pagination nextCursor={nextCursor} visibleCount={visibleCount} maxPageSize={maxPageSize} />,
   );
 }
 

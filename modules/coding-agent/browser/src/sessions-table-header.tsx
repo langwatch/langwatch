@@ -1,4 +1,4 @@
-import { Table } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { SessionsSortColumn, SessionsSortState } from "./session-sort.ts";

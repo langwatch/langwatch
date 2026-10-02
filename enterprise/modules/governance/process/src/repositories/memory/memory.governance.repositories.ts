@@ -13,7 +13,6 @@ import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.rep
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
 import { MemoryGovernanceCostChargeRepository } from "./memory.governance-cost-charge.repository.ts";
 import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
-import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
 import { MemoryGovernanceTenantHistoryRepository } from "./memory.governance-tenant-history.repository.ts";
 import { MemoryGovernanceStore } from "./memory.governance.store.ts";
@@ -59,7 +58,6 @@ export class MemoryGovernanceRepositories {
       costCharges: MemoryGovernanceCostChargeRepository.create(),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
       anomalySpend: MemoryAnomalySpendRepository.create(),
-      ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),
       setupState: MemoryGovernanceSetupStateRepository.create(),
       spendSpikeAnomalies: MemorySpendSpikeAnomalyRepository.create(store),

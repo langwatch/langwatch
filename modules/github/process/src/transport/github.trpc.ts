@@ -12,7 +12,7 @@ import {
   type GithubPullRequestLiveStatus,
   type GithubPullRequestRef,
 } from "@langwatch/github-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 /**
  * What the connection door reaches. The GitHub capability is this module's; the

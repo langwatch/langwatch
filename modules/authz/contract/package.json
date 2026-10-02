@@ -21,11 +21,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/actor": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"

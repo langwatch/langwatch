@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { LuArrowDown, LuArrowUp, LuArrowUpDown, LuTriangleAlert } from "react-icons/lu";
 
 import {

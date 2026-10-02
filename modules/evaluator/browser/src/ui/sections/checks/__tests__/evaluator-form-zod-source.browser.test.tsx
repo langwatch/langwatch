@@ -4,16 +4,8 @@
  * `AVAILABLE_EVALUATORS` (now Zod, not ts-to-zod); captures a screenshot.
  */
 
-import {
-  Badge,
-  Box,
-  ChakraProvider,
-  defaultSystem,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { AVAILABLE_EVALUATORS, evaluatorsSchema } from "@langwatch/evaluator-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -49,7 +41,7 @@ function fieldType(schema: z.ZodTypeAny): string {
 
 function Catalog() {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Box padding={6} background="gray.50" width="820px">
         <Heading size="md" marginBottom={1}>
           Evaluator catalog (Zod-first)
@@ -122,7 +114,7 @@ function Catalog() {
           })}
         </VStack>
       </Box>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

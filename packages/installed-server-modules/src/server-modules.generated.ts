@@ -1,127 +1,129 @@
 /** Generated from modules/catalogue.json. Do not edit by hand. */
 /** Run `pnpm generate:modules` to rewrite it. */
 
-import { agentServer } from "@langwatch/agent-process";
-import { analyticsServer } from "@langwatch/analytics-process";
-import { annotationServer } from "@langwatch/annotation-process";
-import { apiKeyServer } from "@langwatch/api-key-process";
-import { auditLogServer } from "@langwatch/audit-log-process";
-import { authServer } from "@langwatch/auth-process";
-import { authzServer } from "@langwatch/authz-process";
-import { automationServer } from "@langwatch/automation-process";
-import { billingServer } from "@langwatch/enterprise-billing-process";
-import { codingAgentServer } from "@langwatch/coding-agent-process";
-import { dashboardServer } from "@langwatch/dashboard-process";
-import { dataPrivacyServer } from "@langwatch/data-privacy-process";
-import { dataRetentionServer } from "@langwatch/data-retention-process";
-import { datasetServer } from "@langwatch/dataset-process";
-import { demoDataServer } from "@langwatch/enterprise-demo-data-process";
-import { enterpriseGatewayServer } from "@langwatch/enterprise-gateway-process";
-import { enterpriseOpsServer } from "@langwatch/enterprise-ops-process";
-import { entitlementServer } from "@langwatch/entitlement-process";
-import { evaluationServer } from "@langwatch/evaluation-process";
-import { evaluatorServer } from "@langwatch/evaluator-process";
-import { experimentServer } from "@langwatch/experiment-process";
-import { featureFlagServer } from "@langwatch/feature-flag-process";
-import { gatewayServer } from "@langwatch/gateway-process";
-import { githubServer } from "@langwatch/github-process";
-import { governanceServer } from "@langwatch/enterprise-governance-process";
-import { hostedMcpServer } from "@langwatch/hosted-mcp-process";
-import { identityServer } from "@langwatch/identity-process";
-import { instantEvalServer } from "@langwatch/instant-eval-process";
-import { langyServer } from "@langwatch/langy-process";
-import { licensingServer } from "@langwatch/enterprise-licensing-process";
-import { logServer } from "@langwatch/log-process";
-import { managedProviderServer } from "@langwatch/enterprise-managed-provider-process";
-import { metricServer } from "@langwatch/metric-process";
-import { modelProviderServer } from "@langwatch/model-provider-process";
-import { monitorServer } from "@langwatch/monitor-process";
-import { notificationServer } from "@langwatch/notification-process";
-import { nurturingServer } from "@langwatch/enterprise-nurturing-process";
-import { onboardingServer } from "@langwatch/onboarding-process";
-import { opsServer } from "@langwatch/ops-process";
-import { organizationServer } from "@langwatch/organization-process";
-import { platformHealthServer } from "@langwatch/platform-health-process";
-import { presenceServer } from "@langwatch/presence-process";
-import { projectServer } from "@langwatch/project-process";
-import { promptServer } from "@langwatch/prompt-process";
-import { roleServer } from "@langwatch/role-process";
-import { rumServer } from "@langwatch/rum-process";
-import { saasServer } from "@langwatch/enterprise-saas-process";
-import { sampleAgentsServer } from "@langwatch/sample-agents-process";
-import { scenarioServer } from "@langwatch/scenario-process";
-import { scimServer } from "@langwatch/enterprise-scim-process";
-import { secretServer } from "@langwatch/secret-process";
-import { shareServer } from "@langwatch/share-process";
-import { ssoServer } from "@langwatch/enterprise-sso-process";
-import { storedObjectServer } from "@langwatch/stored-object-process";
-import { suiteServer } from "@langwatch/suite-process";
-import { topicServer } from "@langwatch/topic-process";
-import { traceServer } from "@langwatch/trace-process";
-import { userServer } from "@langwatch/user-process";
-import { webhookServer } from "@langwatch/webhook-process";
-import { workflowServer } from "@langwatch/workflow-process";
+import { agentProcessModule } from "@langwatch/agent-process";
+import { analyticsProcessModule } from "@langwatch/analytics-process";
+import { annotationProcessModule } from "@langwatch/annotation-process";
+import { apiKeyProcessModule } from "@langwatch/api-key-process";
+import { auditLogProcessModule } from "@langwatch/audit-log-process";
+import { authProcessModule } from "@langwatch/auth-process";
+import { authzProcessModule } from "@langwatch/authz-process";
+import { automationProcessModule } from "@langwatch/automation-process";
+import { billingProcessModule } from "@langwatch/enterprise-billing-process";
+import { codingAgentProcessModule } from "@langwatch/coding-agent-process";
+import { dashboardProcessModule } from "@langwatch/dashboard-process";
+import { dataPrivacyProcessModule } from "@langwatch/data-privacy-process";
+import { dataRetentionProcessModule } from "@langwatch/data-retention-process";
+import { datasetProcessModule } from "@langwatch/dataset-process";
+import { demoDataProcessModule } from "@langwatch/enterprise-demo-data-process";
+import { enterpriseGatewayProcessModule } from "@langwatch/enterprise-gateway-process";
+import { enterpriseOpsProcessModule } from "@langwatch/enterprise-ops-process";
+import { entitlementProcessModule } from "@langwatch/entitlement-process";
+import { evaluationProcessModule } from "@langwatch/evaluation-process";
+import { evaluatorProcessModule } from "@langwatch/evaluator-process";
+import { experimentProcessModule } from "@langwatch/experiment-process";
+import { featureFlagProcessModule } from "@langwatch/feature-flag-process";
+import { gatewayProcessModule } from "@langwatch/gateway-process";
+import { githubProcessModule } from "@langwatch/github-process";
+import { governanceProcessModule } from "@langwatch/enterprise-governance-process";
+import { hostedMcpProcessModule } from "@langwatch/hosted-mcp-process";
+import { identityProcessModule } from "@langwatch/identity-process";
+import { instantEvalProcessModule } from "@langwatch/instant-eval-process";
+import { langyProcessModule } from "@langwatch/langy-process";
+import { licensingProcessModule } from "@langwatch/enterprise-licensing-process";
+import { logProcessModule } from "@langwatch/log-process";
+import { managedProviderProcessModule } from "@langwatch/enterprise-managed-provider-process";
+import { metricProcessModule } from "@langwatch/metric-process";
+import { modelProviderProcessModule } from "@langwatch/model-provider-process";
+import { monitorProcessModule } from "@langwatch/monitor-process";
+import { notificationProcessModule } from "@langwatch/notification-process";
+import { nurturingProcessModule } from "@langwatch/enterprise-nurturing-process";
+import { onboardingProcessModule } from "@langwatch/onboarding-process";
+import { opsProcessModule } from "@langwatch/ops-process";
+import { organizationProcessModule } from "@langwatch/organization-process";
+import { platformHealthProcessModule } from "@langwatch/platform-health-process";
+import { presenceProcessModule } from "@langwatch/presence-process";
+import { projectProcessModule } from "@langwatch/project-process";
+import { promptProcessModule } from "@langwatch/prompt-process";
+import { roleProcessModule } from "@langwatch/role-process";
+import { rumProcessModule } from "@langwatch/rum-process";
+import { saasProcessModule } from "@langwatch/enterprise-saas-process";
+import { sampleAgentsProcessModule } from "@langwatch/sample-agents-process";
+import { scenarioProcessModule } from "@langwatch/scenario-process";
+import { scimProcessModule } from "@langwatch/enterprise-scim-process";
+import { secretProcessModule } from "@langwatch/secret-process";
+import { shareProcessModule } from "@langwatch/share-process";
+import { slackProcessModule } from "@langwatch/slack-process";
+import { ssoProcessModule } from "@langwatch/enterprise-sso-process";
+import { storedObjectProcessModule } from "@langwatch/stored-object-process";
+import { suiteProcessModule } from "@langwatch/suite-process";
+import { topicProcessModule } from "@langwatch/topic-process";
+import { traceProcessModule } from "@langwatch/trace-process";
+import { userProcessModule } from "@langwatch/user-process";
+import { webhookProcessModule } from "@langwatch/webhook-process";
+import { workflowProcessModule } from "@langwatch/workflow-process";
 
 /** Every installed module's server declaration, in name order. */
-export const serverModules = [
-  agentServer,
-  analyticsServer,
-  annotationServer,
-  apiKeyServer,
-  auditLogServer,
-  authServer,
-  authzServer,
-  automationServer,
-  billingServer,
-  codingAgentServer,
-  dashboardServer,
-  dataPrivacyServer,
-  dataRetentionServer,
-  datasetServer,
-  demoDataServer,
-  enterpriseGatewayServer,
-  enterpriseOpsServer,
-  entitlementServer,
-  evaluationServer,
-  evaluatorServer,
-  experimentServer,
-  featureFlagServer,
-  gatewayServer,
-  githubServer,
-  governanceServer,
-  hostedMcpServer,
-  identityServer,
-  instantEvalServer,
-  langyServer,
-  licensingServer,
-  logServer,
-  managedProviderServer,
-  metricServer,
-  modelProviderServer,
-  monitorServer,
-  notificationServer,
-  nurturingServer,
-  onboardingServer,
-  opsServer,
-  organizationServer,
-  platformHealthServer,
-  presenceServer,
-  projectServer,
-  promptServer,
-  roleServer,
-  rumServer,
-  saasServer,
-  sampleAgentsServer,
-  scenarioServer,
-  scimServer,
-  secretServer,
-  shareServer,
-  ssoServer,
-  storedObjectServer,
-  suiteServer,
-  topicServer,
-  traceServer,
-  userServer,
-  webhookServer,
-  workflowServer,
+export const processModules = [
+  agentProcessModule,
+  analyticsProcessModule,
+  annotationProcessModule,
+  apiKeyProcessModule,
+  auditLogProcessModule,
+  authProcessModule,
+  authzProcessModule,
+  automationProcessModule,
+  billingProcessModule,
+  codingAgentProcessModule,
+  dashboardProcessModule,
+  dataPrivacyProcessModule,
+  dataRetentionProcessModule,
+  datasetProcessModule,
+  demoDataProcessModule,
+  enterpriseGatewayProcessModule,
+  enterpriseOpsProcessModule,
+  entitlementProcessModule,
+  evaluationProcessModule,
+  evaluatorProcessModule,
+  experimentProcessModule,
+  featureFlagProcessModule,
+  gatewayProcessModule,
+  githubProcessModule,
+  governanceProcessModule,
+  hostedMcpProcessModule,
+  identityProcessModule,
+  instantEvalProcessModule,
+  langyProcessModule,
+  licensingProcessModule,
+  logProcessModule,
+  managedProviderProcessModule,
+  metricProcessModule,
+  modelProviderProcessModule,
+  monitorProcessModule,
+  notificationProcessModule,
+  nurturingProcessModule,
+  onboardingProcessModule,
+  opsProcessModule,
+  organizationProcessModule,
+  platformHealthProcessModule,
+  presenceProcessModule,
+  projectProcessModule,
+  promptProcessModule,
+  roleProcessModule,
+  rumProcessModule,
+  saasProcessModule,
+  sampleAgentsProcessModule,
+  scenarioProcessModule,
+  scimProcessModule,
+  secretProcessModule,
+  shareProcessModule,
+  slackProcessModule,
+  ssoProcessModule,
+  storedObjectProcessModule,
+  suiteProcessModule,
+  topicProcessModule,
+  traceProcessModule,
+  userProcessModule,
+  webhookProcessModule,
+  workflowProcessModule,
 ] as const;

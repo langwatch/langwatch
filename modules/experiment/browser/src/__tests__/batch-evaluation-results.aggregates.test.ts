@@ -1,12 +1,13 @@
-import {
-  computeBatchTargetAggregates,
-  type BatchResultRow,
-  type BatchTargetColumn,
-} from "@langwatch/experiment-browser-kit";
 /**
  * Tests for computeBatchAggregates - aggregate statistics computation
  */
 import { describe, expect, it } from "vitest";
+
+import { computeBatchTargetAggregates } from "../ui/sections/batch-evaluation-results.aggregates.ts";
+import {
+  type BatchResultRow,
+  type BatchTargetColumn,
+} from "../ui/sections/batch-evaluation-results.types.ts";
 
 describe("computeBatchTargetAggregates", () => {
   const createTargetColumn = (id: string): BatchTargetColumn => ({

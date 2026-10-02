@@ -6,7 +6,9 @@
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiSession,
   type UiActiveScope,
+  type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
@@ -26,8 +28,8 @@ const ORGANIZATION_GRAPH = {
 
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 vi.mock("../automation-api.ts", () => ({
-  automationApi: { organization: { getAll: { useQuery: () => answer() } } },
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  automationApi: { organization: { getScopeGraph: { useQuery: () => answer() } } },
+  api: { organization: { getScopeGraph: { useQuery: () => answer() } } },
 }));
 
 // The drawer machinery is the router's, not this port's.
@@ -37,6 +39,24 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
 
 import { useAutomationHost } from "../../model/automation-host.ts";
 import AutomationHostMount from "../automation-host-mount.tsx";
+
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
 
 class TestScope extends UiScope {
   constructor(
@@ -67,10 +87,10 @@ class TestScope extends UiScope {
 
 function harness(scope: UiActiveScope) {
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
+    ...createUiCapabilitiesFromHost(
+      { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+      new SignedInSession(),
+    ),
     scope: new TestScope(scope, TEAM_ID),
   };
 

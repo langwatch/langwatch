@@ -16,19 +16,26 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import {
   type EditableQueryName,
   useEditableQueryName,
 } from "../../behavior/use-editable-query-name.ts";
-import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
+import { useLwqlDiagnostics } from "../../behavior/use-lwql-diagnostics.ts";
+import { useLwqlSchema } from "../../behavior/use-lwql-schema.ts";
+import {
+  type DashboardWidgetQuery,
+  RESERVED_PARAMETERS,
+} from "../../model/dashboard-widget-definition.ts";
 import { formatNumber } from "../../model/format.ts";
-import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
+import { type LwqlParameter } from "../../model/lwql-language/lwql-completion.ts";
 import { DashboardWidgetQueryParamsEditor } from "./dashboard-widget-query-params-editor.tsx";
 import { DashboardWidgetQueryResultView } from "./dashboard-widget-query-result-view.tsx";
+import { LwqlEditor } from "./lwql-editor.tsx";
 
 /** The one-line "683 rows · 53ms" (or error) a collapsed row shows without expanding. */
 function runSummary(run: QueryLastRun | undefined): string | null {
@@ -40,7 +47,17 @@ function runSummary(run: QueryLastRun | undefined): string | null {
   return typeof elapsedMs === "number" ? `${rows} · ${elapsedMs}ms` : rows;
 }
 
+/** The parameters the SQL editor offers and colours: the reserved ones, then the declared. */
+function editorParameters(declared: DashboardWidgetQuery["parameters"]): LwqlParameter[] {
+  return [
+    ...RESERVED_PARAMETERS.map((p) => ({ ...p, reserved: true })),
+    ...(declared ?? []).map((p) => ({ name: p.name })),
+  ];
+}
+
 interface DashboardWidgetQueryRowProps {
+  /** The project the SQL editor reads its schema for. */
+  projectId: string;
   /** This row's own Accordion.Item value — index-based, set by the panel. */
   value: string;
   /** Whether the panel currently has this row open — drives the chevron. */
@@ -57,6 +74,7 @@ interface DashboardWidgetQueryRowProps {
 }
 
 export function DashboardWidgetQueryRow({
+  projectId,
   value,
   isOpen,
   query,
@@ -70,6 +88,9 @@ export function DashboardWidgetQueryRow({
 }: DashboardWidgetQueryRowProps) {
   const summary = runSummary(lastRun);
   const nameEdit = useEditableQueryName({ query, onChange });
+  const schema = useLwqlSchema({ projectId });
+  const markers = useLwqlDiagnostics({ projectId, sql: query.sql });
+  const parameters = useMemo(() => editorParameters(query.parameters), [query.parameters]);
 
   return (
     <Card.Root size="sm" width="full" marginBottom={3}>
@@ -123,11 +144,12 @@ export function DashboardWidgetQueryRow({
                 borderRadius="md"
                 overflow="hidden"
               >
-                <DashboardWidgetCodeEditor
-                  language="sql"
+                <LwqlEditor
+                  schema={schema}
+                  markers={markers}
                   value={query.sql}
                   onChange={(sql) => onChange({ ...query, sql })}
-                  declaredParamNames={(query.parameters ?? []).map((p) => p.name)}
+                  parameters={parameters}
                 />
               </Box>
 

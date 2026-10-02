@@ -1,6 +1,5 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
-
 import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";
+import { workflowApi } from "./workflow-api.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {
   const isSharedView =
@@ -15,7 +14,7 @@ export const useFieldRedaction = (field: "input" | "output") => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
-  const { data, isLoading } = api.project.getFieldRedactionStatus.useQuery(
+  const { data, isLoading } = workflowApi.project.getFieldRedactionStatus.useQuery(
     {
       projectId: projectId ?? "",
     },

@@ -3,21 +3,16 @@ import "@testing-library/jest-dom/vitest";
 /**
  * Issue #4632 — group ComparisonTable rows by a dataset-entry metadata field.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type ComparisonRunData,
-  useResultsGrouping,
-  GroupRowsButton,
-  ComparisonTable,
-} from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+import { type ComparisonRunData } from "../../batch-evaluation-results.types.ts";
+import { useResultsGrouping } from "../../use-results-grouping.ts";
+import { GroupRowsButton } from "../batch-evaluation-results-table.tsx";
+import { ComparisonTable } from "../comparison-table.tsx";
 
 const RUN_COLORS = ["#3182ce", "#dd6b20"] as const;
 
@@ -107,9 +102,9 @@ const TWO_RUN_FIXTURE: ComparisonRunData[] = [
 type TableProps = React.ComponentProps<typeof ComparisonTable>;
 
 const renderTable = (props: Partial<TableProps> = {}) =>
-  render(<ComparisonTable comparisonData={TWO_RUN_FIXTURE} disableVirtualization {...props} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(
+    <ComparisonTable comparisonData={TWO_RUN_FIXTURE} disableVirtualization {...props} />,
+  );
 
 /**
  * The same wiring BatchEvaluationResults does — discover the keys, hand
@@ -131,9 +126,7 @@ const GroupableComparison = ({ comparisonData }: { comparisonData: ComparisonRun
 };
 
 const renderGroupable = (comparisonData = TWO_RUN_FIXTURE) =>
-  render(<GroupableComparison comparisonData={comparisonData} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(<GroupableComparison comparisonData={comparisonData} />);
 
 describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => {
   afterEach(() => {
@@ -274,9 +267,8 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
     describe("when the user groups by city", () => {
       /** @scenario "Rows with no value for the selected field fall into an Unspecified group" */
       it("collects missing-city rows under an Unspecified header at the end", () => {
-        render(
+        renderWithDesignSystem(
           <ComparisonTable comparisonData={PARTIAL_FIXTURE} disableVirtualization groupBy="city" />,
-          { wrapper: Wrapper },
         );
 
         // Exclude `group-header-toggle-*` (subcomponents of the header

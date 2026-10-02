@@ -1,10 +1,8 @@
 import type { AlertType, SlackPayload } from "@langwatch/automation-contract";
 import type { TraceRecord } from "@langwatch/trace-contract";
+import type { WebhookSendRequestResult } from "@langwatch/webhook-contract";
 
-import type {
-  WebhookDeliveryRequest,
-  WebhookSendResult,
-} from "./http/http.webhook-delivery.channel.ts";
+import type { WebhookDeliveryRequest } from "./http/http.webhook-delivery.channel.ts";
 
 /** Outbound provider calls. Automation owns when and what to send; the process
  * adapter owns SDKs, HTTP policy, mail rendering members, and secrets. */
@@ -69,5 +67,5 @@ export abstract class AutomationNotificationDelivery {
     triggerName: string;
   }): Promise<void>;
 
-  abstract sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendResult>;
+  abstract sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendRequestResult>;
 }

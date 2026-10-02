@@ -1,10 +1,10 @@
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 /**
  * @vitest-environment node
  * trace_processing declares each tenant's retention from data retention (ARCHITECTURE §9).
  * Spec: packages/eventing/specs/pipeline-retention.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
@@ -35,6 +35,7 @@ describe("TraceProcessingRuntimeAdapter", () => {
         findSummary: async () => null,
         recordTrackedEvent: async () => undefined,
         broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+        milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>(),
       }).build({ participation: "consume" });
 
       await expect(pipeline.retentionPolicyResolver?.resolve("project-1")).resolves.toEqual(

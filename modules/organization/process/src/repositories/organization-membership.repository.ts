@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
-import type { AuthzCustomRole } from "@langwatch/authz-contract";
+import type { AuthzCustomRole, AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
@@ -11,7 +11,6 @@ import type {
   OrganizationUserRole,
   PricingModel,
   ProjectRow as Project,
-  RoleBindingScopeType,
   Team,
   TeamUser,
   TeamUserRole,
@@ -240,6 +239,8 @@ export interface UpdateMemberRoleInput {
    * member, so null simply keeps every self branch closed.
    */
   currentUserId: string | null;
+  /** Whose holdings bound the grants this change writes (authz refuses anything beyond them). */
+  caller: AuthzGrantCaller;
 }
 
 /**
@@ -258,6 +259,7 @@ export interface UpdateTeamMemberRoleInput {
   role: TeamUserRole;
   customRoleId?: string;
   currentUserId: string;
+  caller: AuthzGrantCaller;
 }
 
 export abstract class OrganizationMembershipRepository {
@@ -440,7 +442,7 @@ export abstract class OrganizationMembershipRepository {
    * PROJECT scopes resolve to the same private space.
    */
   abstract findPersonalTeamsInScopes: (params: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }) => Promise<{ name: string }[]>;
 
   /**
@@ -450,7 +452,7 @@ export abstract class OrganizationMembershipRepository {
   abstract findSharedTeamIds: (params: { organizationId: string }) => Promise<string[]>;
 
   /** One member's team-scoped role bindings, restricted to the named teams. */
-  abstract findTeamRoleBindings: (params: {
+  abstract findTeamGrants: (params: {
     organizationId: string;
     userId: string;
     teamIds: string[];

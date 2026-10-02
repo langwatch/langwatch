@@ -48,6 +48,26 @@ describe("toTimeseriesShape", () => {
 
       expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([0.12000000000000001, 0.25]);
     });
+
+    it("sums the measures nested under a group-by dimension", () => {
+      const key = "0/metadata.trace_id/cardinality";
+      const shape = toTimeseriesShape({
+        currentPeriod: [
+          {
+            date: day("2026-07-15"),
+            "metadata.model": { "gpt-5": { [key]: 4 }, "gpt-5-mini": { [key]: 3 } },
+          },
+          {
+            date: day("2026-07-16"),
+            "metadata.model": { "gpt-5-mini": { [key]: 2 } },
+          },
+        ],
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+      });
+
+      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([7, 2]);
+    });
   });
 
   describe("given a bucket with no date", () => {
@@ -113,6 +133,137 @@ describe("toTimeseriesShape", () => {
       });
 
       expect(shape?.comparison).toBeUndefined();
+    });
+  });
+});
+
+describe("given a grouped average over several days", () => {
+  const byModel = (mini: number, terra: number) => ({
+    "metadata.model": {
+      "gpt-5-mini": { "0/performance.completion_time/avg": mini },
+      "gpt-5.6-terra": { "0/performance.completion_time/avg": terra },
+    },
+  });
+  const shape = () =>
+    toTimeseriesShape({
+      currentPeriod: [
+        { date: day("2026-09-28"), ...byModel(1, 3) },
+        { date: day("2026-09-29"), ...byModel(2, 4) },
+      ],
+      previousPeriod: [
+        { date: day("2026-09-26"), ...byModel(1, 1) },
+        { date: day("2026-09-27"), ...byModel(1, 1) },
+      ],
+      metric: "performance.completion_time",
+      aggregation: "avg",
+    });
+
+  describe("when it is shaped for the timeseries card", () => {
+    /** @scenario A grouped average is never summed into one figure */
+    it("draws one line per model instead of summing the averages", () => {
+      expect(shape()?.series).toEqual([
+        {
+          name: "gpt-5-mini",
+          points: [
+            { t: "2026-09-28", v: 1 },
+            { t: "2026-09-29", v: 2 },
+          ],
+        },
+        {
+          name: "gpt-5.6-terra",
+          points: [
+            { t: "2026-09-28", v: 3 },
+            { t: "2026-09-29", v: 4 },
+          ],
+        },
+      ]);
+    });
+
+    /** @scenario A grouped average is never summed into one figure */
+    it("adds no period-over-period total", () => {
+      expect(shape()?.comparison).toBeUndefined();
+    });
+  });
+});
+
+describe("given a distinct count over several days", () => {
+  const daily = (metric: string, values: [number, number]) =>
+    values.map((v, i) => ({
+      date: day(`2026-09-2${8 + i}`),
+      [`0/${metric}/cardinality`]: v,
+    }));
+
+  describe("when it counts users", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("draws the daily counts with no period total, since a user can return", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: daily("metadata.user_id", [3, 4]),
+        previousPeriod: daily("metadata.user_id", [2, 2]),
+        metric: "metadata.user_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([3, 4]);
+      expect(shape?.comparison).toBeUndefined();
+    });
+  });
+
+  describe("when it counts traces", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("totals the period, since each trace falls on one day", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: daily("metadata.trace_id", [3, 4]),
+        previousPeriod: daily("metadata.trace_id", [2, 2]),
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.comparison).toMatchObject({ value: 7, baseline: 4 });
+    });
+
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("draws one line per model when split by model, since a trace can carry two", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: [3, 4].map((v, i) => ({
+          date: day(`2026-09-2${8 + i}`),
+          "metadata.model": {
+            "gpt-5-mini": { "0/metadata.trace_id/cardinality": v },
+            "gpt-5.6-terra": { "0/metadata.trace_id/cardinality": 1 },
+          },
+        })),
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.series.map((s) => s.name)).toEqual(["gpt-5-mini", "gpt-5.6-terra"]);
+      expect(shape?.comparison).toBeUndefined();
+    });
+  });
+});
+
+describe("given a flat average over several days", () => {
+  describe("when it is shaped for the timeseries card", () => {
+    it("draws the daily averages as one line named after the metric", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: [
+          { date: day("2026-09-28"), "0/performance.completion_time/avg": 5 },
+          { date: day("2026-09-29"), "0/performance.completion_time/avg": 7 },
+        ],
+        previousPeriod: [],
+        metric: "performance.completion_time",
+        aggregation: "avg",
+      });
+
+      expect(shape?.series).toEqual([
+        {
+          name: "Completion time",
+          points: [
+            { t: "2026-09-28", v: 5 },
+            { t: "2026-09-29", v: 7 },
+          ],
+        },
+      ]);
     });
   });
 });

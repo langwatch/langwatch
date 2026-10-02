@@ -1,14 +1,15 @@
-import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { monitorApiUpdateInputSchema } from "@langwatch/monitor-contract";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";
 
+import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import CheckConfigForm, { type CheckConfigFormData } from "./checks/check-config-form.tsx";
 
 /**
@@ -20,25 +21,27 @@ export default function EditTraceCheck() {
   const router = useRouter();
 
   const checkId = typeof router.query.id === "string" ? router.query.id : "";
-  const check = api.monitors.getById.useQuery(
+  const check = evaluatorApi.monitors.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
     { enabled: !!project },
   );
-  const updateCheck = api.monitors.update.useMutation();
-  const deleteCheck = api.monitors.delete.useMutation();
-  const utils = api.useUtils();
+  const updateCheck = evaluatorApi.monitors.update.useMutation();
+  const deleteCheck = evaluatorApi.monitors.delete.useMutation();
+  const utils = evaluatorApi.useUtils();
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;
 
     try {
-      await updateCheck.mutateAsync({
-        ...data,
-        checkType: data.checkType,
-        id: checkId,
-        projectId: project.id,
-      });
+      await updateCheck.mutateAsync(
+        monitorApiUpdateInputSchema.parse({
+          ...data,
+          checkType: data.checkType,
+          id: checkId,
+          projectId: project.id,
+        }),
+      );
       toaster.create({
         title: "Check updated successfully",
         type: "success",

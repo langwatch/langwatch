@@ -7,38 +7,36 @@
 ## Context
 
 Dataset behaviour is currently spread over the Dataset and Dataset Record tRPC
-routers, the public Hono dataset API, and `server/datasets`. The same durable
+routers, the public dataset REST API, and a loose server folder. The same durable
 Dataset lifecycle is therefore easy to construct repeatedly and difficult to
 share with workers or later RPC transports. Dataset records, imports, and S3
 JSONL are Dataset implementation details; they are not separate features.
 
 ## Decision
 
-Dataset exposes one portable `DatasetService` contract and one process-owned
-implementation. Existing tRPC procedure names and REST paths keep their exact
+Dataset exposes one `DatasetApi` token in its contract and one process-owned
+implementation, `DatasetModule`. Existing tRPC procedure names and REST paths keep their exact
 shape and delegate to that service. Callers consume only
 `@langwatch/dataset-contract`.
 
 The first strict package slice owns dataset metadata and record lifecycle:
 create/update, name and slug policy, lookup, archive, copy, paginated reads,
 record creation/update/deletion, and the portable error vocabulary. Upload
-normalization and S3 JSONL chunk mutation remain behind an application adapter
-until their storage and queue capabilities are represented by narrow Dataset
-ports. That adapter is not a second Dataset service.
+normalization and S3 JSONL chunk mutation are Dataset services too
+(`DatasetNormalizeService`, the chunk services); there is no second Dataset
+implementation outside the module.
 
 ### Public surfaces and transports
 
 The contract exports Dataset and Dataset Record values, Zod 4 schemas, domain
-errors, and `DatasetService`. The server exports the service, its Postgres
-composition adapter, and the tRPC transports.
+errors, the `DatasetApi` token and the tRPC declarations. The process package
+installs `DatasetModule`, its repositories, the normalization pipeline and the
+REST and tRPC transports through `defineProcessModule("dataset")`.
 
-The `dataset.*`, `datasetRecord.*` and `batchRecord.*` tRPC surfaces are owned
-by `server/src/api/app-trpc/`. Each is a `<Name>TrpcApi.create(root, { protected,
-policy }, ports)` class that owns its procedure names, input schemas and error
-mapping; the process supplies the authenticated procedure, the authorization,
-audit, tracing, logging and scope-lineage policy, and the ports below. The
-process keeps only a thin mount per router under
-`platform/app/src/runtime/app/internal-api/`.
+The `dataset.*`, `datasetRecord.*` and `batchRecord.*` tRPC surfaces are
+declared in the contract and served from `process/src/transport/`. Each
+declaration owns its procedure names, input schemas and permission; the
+framework supplies authentication, authorization, audit, tracing and logging.
 
 The policy is applied by the feature AFTER its own `.input()` parser, never
 composed ahead of it: tRPC appends the input middleware where `.input()` is
@@ -53,52 +51,48 @@ import mapping helpers directly from Dataset.
 
 ### Dependencies
 
-Dataset depends on no other product service for the core lifecycle. Future
-storage and normalization capabilities will be narrow ports owned by Dataset.
+Dataset depends on no other product service for the core lifecycle. Storage
+(Postgres and the object store) is reached through Dataset's own repositories.
 
-Three capabilities the tRPC transports need are NOT Dataset's, and each is
-declared structurally at the transport rather than imported:
+Two capabilities Dataset needs are NOT Dataset's, and each is reached through
+its owner's Api token rather than imported:
 
-- an experiment lookup, so `dataset.upsert` can borrow an experiment's name
-  and `batchRecord.getAllByexperimentSlug` can turn a slug into an id;
-- a project-permission probe, because `dataset.copy` names a SECOND project —
-  the source — that the declared check on `projectId` never covers;
-- the two `BatchEvaluation` reads behind `batchRecord.*`. That table is
-  process-owned state with no feature of its own, so the reads stay in the
-  process mount and the transport takes them as ports with generic result
-  types. This is the one remaining seam in this vertical.
+- an experiment lookup (`ExperimentApi`), so `dataset.upsert` can borrow an
+  experiment's name and `batchRecord.getAllByexperimentSlug` can turn a slug
+  into an id;
+- a project-permission check (`AuthzApi`), because `dataset.copy` names a
+  SECOND project, the source, that the declared check on `projectId` never
+  covers.
 
-`DatasetNormalizationWorkerPort` is the Dataset-owned worker lifecycle port.
-Its durable payload has a contract Zod schema and is parsed before normalization
-work begins. A process composition root connects the service to the shared
-Eventing sender only when that queue is registered; otherwise its existing
-per-dataset inline fallback remains local to the service.
+The two `BatchEvaluation` reads behind `batchRecord.*` go through Dataset's
+`batchEvaluations` repository.
+
+Upload normalization runs as the `datasetNormalize` command on Dataset's
+command-only `dataset_normalization` pipeline, handled by
+`DatasetNormalizeService`. Its durable payload has a contract Zod schema and is
+parsed before normalization work begins.
 
 ### Persistence
 
-The service receives only its Dataset repositories and the optional
-`DatasetExperimentPort` used to derive a name. Prisma is private to
-`server/src/repositories/prisma`; those repositories map generated rows to
-Zod 4 contract values. Storage, queue, object-store, and experiment behaviour
-are injected capabilities rather than imported globals.
+The services receive only Dataset's repositories and the peer Api tokens
+above. Prisma is private to `process/src/repositories/prisma`; those
+repositories map generated rows to Zod 4 contract values. Storage, queue,
+object-store, and experiment behaviour are injected rather than imported
+globals.
 
 ### Runtime and registration
 
-The API or worker composition root constructs one Dataset service and places it
-on the process-owned App. Hono and tRPC handlers reuse that instance; they do
-not call `DatasetService.create`, resolve Prisma, or construct repositories per
-request. The current compatibility middleware remains until its caller is
-migrated to the App graph.
+The process container installs one `DatasetModule` behind `DatasetApi`. REST
+and tRPC handlers reuse that instance; they do not construct the module,
+resolve Prisma, or build repositories per request.
 
-The Trace processing installer registers the current Dataset normalize job as
-part of the shared Eventing registry. This does not enable worker consumers:
-the shared queue remains producer-only until all active pipeline registrations
-are present in the worker process.
+The module's eventing registers the `dataset_normalization` pipeline; the
+worker consumes its commands.
 
 ### Environment and configuration
 
 The feature reads no environment variables. Runtime configuration and concrete
-database, object-store, and queue clients are supplied by the composition root.
+database, object-store, and queue clients are supplied by the process container.
 
 ### Errors
 
@@ -114,9 +108,8 @@ map persistence rows into the same portable schemas.
 
 ## Consequences
 
-Dataset and Dataset Record have one owner — transport included — while all
+Dataset and Dataset Record have one owner, transport included, while all
 existing public URLs and internal tRPC names, inputs, outputs, error codes and
-permissions remain stable. The package can be adopted by the process
-graph without making persistence records part of a cross-feature API. Upload
-and S3 work have a clear next seam instead of being copied into a second
-transport-owned implementation.
+permissions remain stable. Persistence records never become part of a
+cross-module API, and upload and S3 work live in Dataset's services rather
+than in a second transport-owned implementation.

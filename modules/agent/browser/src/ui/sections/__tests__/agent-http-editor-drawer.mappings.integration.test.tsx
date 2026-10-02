@@ -1,12 +1,12 @@
 /* @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 
 /** An agent as the drawer holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -53,11 +53,7 @@ function renderEditor(props: Partial<AgentHttpEditorDrawerProps>) {
     onSaveError: () => void 0,
   };
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentHttpEditorDrawer {...defaults} {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<AgentHttpEditorDrawer {...defaults} {...props} />);
 }
 
 describe("AgentHttpEditorDrawer", () => {

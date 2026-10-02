@@ -8,7 +8,7 @@ import {
   LWQL_GRANULARITY_STEPS,
   lwqlTimeWindowSchema,
 } from "@langwatch/analytics-contract";
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { savedWorkbenchChartSchema } from "./saved-workbench-chart.ts";

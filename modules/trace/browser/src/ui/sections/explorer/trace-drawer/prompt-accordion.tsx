@@ -1,6 +1,14 @@
-import { Badge, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";

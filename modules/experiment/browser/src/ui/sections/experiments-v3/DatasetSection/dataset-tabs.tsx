@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
 import {
   ArrowLeftRight,

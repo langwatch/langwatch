@@ -2,8 +2,8 @@
  * The Events column.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { TraceListEventGroup, TraceListItem } from "../../../../../types/trace.ts";
@@ -55,11 +55,7 @@ function row(over: Partial<TraceListItem>): TraceListItem {
  * than the component, so a change to what the column registers is caught here.
  */
 function renderCell(item: TraceListItem) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {EventsCell.render({ row: item } as never)}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(EventsCell.render({ row: item } as never));
 }
 
 /** Five names in first-occurrence order, two past what the cell shows. */

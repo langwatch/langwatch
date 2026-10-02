@@ -17,15 +17,11 @@ import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.cu
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-} from "../../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { SlackDestinationService } from "../../services/slack-destination.service.ts";
 import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
@@ -88,22 +84,23 @@ describe("createGraphTriggerActivityHandler", () => {
           persistence: AutomationGraphDeliveryService.create({
             triggers,
             suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
-            webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma),
           }),
           clock,
           projects: new OneProject(),
           analytics: breachingAnalytics(),
           delivery,
           webhooks: AutomationWebhookSecretsService.create(crypto),
-          slackTokens: AutomationSlackBotTokenDecryptorService.create(
-            AutomationSlackSecretsService.create(crypto),
-          ),
+          slackDestinations: SlackDestinationService.create({
+            slack: { findUsableSlackSecret: async () => [] },
+            crypto: crypto,
+          }),
           emailCaps: AutomationEmailCapService.create({
             store: MemoryAutomationEmailCapRepository.create(),
             fallback: MemoryAutomationEmailCapRepository.create(),
           }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),
+          latestEvaluations: { record: async () => undefined },
           baseHost: "https://app.langwatch.test",
           emailHourlyCap: 100,
           tenantDailyCap: 10_000,

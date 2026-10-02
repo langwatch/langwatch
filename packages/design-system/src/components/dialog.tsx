@@ -81,3 +81,5 @@ export const Dialog = {
   Trigger: DialogTrigger,
   ActionTrigger: DialogActionTrigger,
 };
+
+export { Dialog as RawDialog } from "@chakra-ui/react";

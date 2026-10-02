@@ -48,10 +48,7 @@ export const projectUpdateInputSchema = z
     const hasAccessKey = !!data.s3AccessKeyId?.trim();
     const hasSecretKey = !!data.s3SecretAccessKey?.trim();
 
-    return (
-      (hasEndpoint && hasAccessKey && hasSecretKey) ||
-      (!hasEndpoint && !hasAccessKey && !hasSecretKey)
-    );
+    return (hasEndpoint && hasAccessKey) || (!hasEndpoint && !hasAccessKey && !hasSecretKey);
   });
 export type ProjectUpdateInput = z.infer<typeof projectUpdateInputSchema>;
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   DATASET_ATTACHMENT_MAX_BYTES,
   type StoreDatasetAttachmentUploadInput,
@@ -7,6 +6,7 @@ import type {
   StoreStoredObjectFromBytesInput,
   StoredObjectApi,
 } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { DatasetAttachmentUploadService } from "../dataset-attachment-upload.service.ts";

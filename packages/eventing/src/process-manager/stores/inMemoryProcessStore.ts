@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 
+import { safeDiagnosticError } from "../failureDiagnostic.ts";
 import type { ProcessRef } from "../processManager.types.ts";
 import type {
   AppendIntentsResult,
@@ -13,6 +14,8 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
+  ProcessTransaction,
+  TransactResult,
 } from "./processStore.types.ts";
 
 interface StoredMessage extends OutboxMessageRecord {
@@ -86,8 +89,14 @@ export class InMemoryProcessStore implements ProcessStore {
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
   }): Promise<PersistedProcessInstance<State> | null> {
-    const instance = this.instances.get(refKey(params.ref));
-    return (instance as PersistedProcessInstance<State> | undefined) ?? null;
+    const [instance] = this.findInstances<State>(params.ref);
+    return instance ?? null;
+  }
+
+  /** The instance at `ref`, if any; `State` is the caller's word, as the durable store's is. */
+  private findInstances<State>(ref: ProcessRef): PersistedProcessInstance<State>[] {
+    const instance = this.instances.get(refKey(ref));
+    return instance ? [instance as PersistedProcessInstance<State>] : [];
   }
 
   async hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean> {
@@ -136,6 +145,39 @@ export class InMemoryProcessStore implements ProcessStore {
       insertedMessageKeys,
       duplicateMessageKeys,
     };
+  }
+
+  /**
+   * Read-modify-write with no await between the read and the write, so the read handed to
+   * `apply` cannot go stale: the property the durable store buys with its advisory lock.
+   */
+  async transact<State = unknown>(transaction: ProcessTransaction<State>): Promise<TransactResult> {
+    const { ref, sourceEventId } = transaction;
+
+    if (sourceEventId !== null && this.inbox.has(inboxKey({ ref, sourceEventId }))) {
+      return { outcome: "duplicateEvent" };
+    }
+
+    const [existing] = this.findInstances<State>(ref);
+    const applied = transaction.apply(existing ?? null);
+
+    const result = await this.commit<State>({
+      ref,
+      tenantId: transaction.tenantId,
+      ...(transaction.userId ? { userId: transaction.userId } : {}),
+      sourceEventId,
+      expectedRevision: existing?.revision ?? 0,
+      state: applied.state,
+      nextWakeAt: applied.nextWakeAt,
+      messages: applied.messages,
+      now: transaction.now,
+    });
+    if (result.outcome === "revisionConflict") {
+      throw safeDiagnosticError(
+        `process transact reported a revision conflict on ${ref.processName}/${ref.processKey}`,
+      );
+    }
+    return result;
   }
 
   /**
@@ -205,6 +247,27 @@ export class InMemoryProcessStore implements ProcessStore {
         message.projectId === params.ref.projectId &&
         message.processKey === params.ref.processKey,
     );
+  }
+
+  async countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }> {
+    let count = 0;
+    let nextAttemptAt: number | null = null;
+    for (const message of this.messages.values()) {
+      const sameInstance =
+        message.processName === params.ref.processName &&
+        message.projectId === params.ref.projectId &&
+        message.processKey === params.ref.processKey;
+      if (!sameInstance || message.intentType !== params.intentType) continue;
+      if (message.status !== "pending") continue;
+      count += 1;
+      if (nextAttemptAt === null || message.nextAttemptAt < nextAttemptAt) {
+        nextAttemptAt = message.nextAttemptAt;
+      }
+    }
+    return { count, nextAttemptAt };
   }
 
   async leaseDueMessages(params: {
@@ -366,15 +429,11 @@ export class InMemoryProcessStore implements ProcessStore {
   }
 
   async deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number> {
-    // Reaped by `updatedAt`, the same column the durable store uses, which
-    // the markFailed that retired the row stamped. `discarded` rides the same
-    // family for the reason given on the durable store: no other predicate
-    // matches it, so leaving it out makes it immortal.
+    // Reaped by `updatedAt`, as the durable store does. Only `discarded` is reaped: a dead row
+    // is undelivered work, kept until it delivers or an operator discards it.
     return this.deleteOutboxBatch(
       params,
-      (message) =>
-        (message.status === "dead" || message.status === "discarded") &&
-        message.updatedAt < params.before,
+      (message) => message.status === "discarded" && message.updatedAt < params.before,
     );
   }
 

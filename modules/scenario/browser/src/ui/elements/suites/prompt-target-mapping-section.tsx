@@ -2,10 +2,11 @@
  * Scenario mappings for the prompt targets in a run plan.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
-import type { FieldMapping, Variable } from "@langwatch/prompt-browser-kit";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SuiteTarget } from "@langwatch/suite-contract";
+import type { FieldMapping } from "@langwatch/workflow-contract";
 
+import type { Variable } from "../../sections/prompt/variables/variables-section.tsx";
 import { ScenarioInputMappingSection } from "./scenario-input-mapping-section.tsx";
 
 /** A prompt as the run-plan form knows it. */

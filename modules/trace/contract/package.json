@@ -30,11 +30,11 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",

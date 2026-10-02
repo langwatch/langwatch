@@ -1,9 +1,9 @@
 /**
- * Shared harness for the scenario evaluator editor tests: the Chakra wrapper, the fixtures, and a
- * chip-like button that opens the editor through scenario's own hook. `vi.mock` calls stay per
- * test file, since they hoist above its imports.
+ * Shared harness for the scenario evaluator editor tests: the design-system wrapper, the fixtures,
+ * and a chip-like button that opens the editor through scenario's own hook. `vi.mock` calls stay
+ * per test file, since they hoist above its imports.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type React from "react";
 
@@ -11,7 +11,7 @@ import { useOpenScenarioEvaluatorEditor } from "../../../../../behavior/agent-te
 import type { AttachableEvaluator } from "../../../../../model/agent-testing/evaluators/attachment-rules.ts";
 
 export const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 export const SUITE_FIELDS = [

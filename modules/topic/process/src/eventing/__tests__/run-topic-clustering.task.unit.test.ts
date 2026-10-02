@@ -7,7 +7,6 @@ describe("RequestTopicClusteringTask", () => {
     const requestClustering = vi.fn(async () => undefined);
     const task = RequestTopicClusteringTask.create({
       commands: {
-        recordTopics: vi.fn(async () => undefined),
         requestClustering,
       },
       now: () => 123,

@@ -1,12 +1,12 @@
 import { createServer, type Server } from "node:http";
 
 import { WebSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LangyApi, LocalControlConnectCredentials } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
-import { langyServer } from "../../langy.server.ts";
+import { langyProcessModule } from "../../langy.module.ts";
 import {
   CONTROL_CONNECT_PATH,
   createLangyLocalControlWebSocketProtocol,
@@ -43,7 +43,7 @@ describe("the local folder's socket", () => {
   /** @scenario "The langy module declares the local folder's socket where main served it" */
   it("is declared among the langy module's transports at main's path", () => {
     expect(CONTROL_CONNECT_PATH).toBe("/api/v1/langy/control/connect");
-    expect(langyServer.transports.some((transport) => transport.protocol === "websocket")).toBe(
+    expect(langyProcessModule.transports.some((transport) => transport.protocol === "websocket")).toBe(
       true,
     );
   });

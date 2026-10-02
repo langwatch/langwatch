@@ -1,18 +1,16 @@
+import { act, render } from "@testing-library/react";
+import { BrowserRouter } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import { INITIAL_TIME_RANGE } from "../../../../../behavior/query.slice.ts";
 // @vitest-environment jsdom
 /**
  * A submitted search is a place Back can return to: query, window and lens push
  * an entry, while the run keys and a mount's first write rewrite it in place.
  * @see specs/traces-v2/search.feature
  */
-import {
-  ACTIVE_LENS_KEY,
-  INITIAL_TIME_RANGE,
-  useExplorerStore,
-} from "@langwatch/trace-browser-kit";
-import { act, render } from "@testing-library/react";
-import { BrowserRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { ACTIVE_LENS_KEY } from "../../../../../behavior/view.slice.ts";
 import { isNewSearchEntry, useURLSync } from "../use-url-sync.ts";
 
 function Mounted() {

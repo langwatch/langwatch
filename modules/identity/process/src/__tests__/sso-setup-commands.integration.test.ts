@@ -1,3 +1,8 @@
+import {
+  emptySsoConnection,
+  type SsoConnectionState,
+  SsoConnectionNotFoundError,
+} from "@langwatch/identity-contract";
 /**
  * @vitest-environment node
  * The verbs the setup journey presses, over the real guards and the real
@@ -5,12 +10,7 @@
  * press sends.
  * @see specs/identity/sso-connection-lifecycle.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  emptySsoConnection,
-  type SsoConnectionState,
-  SsoConnectionNotFoundError,
-} from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityRepositoriesOverMemory } from "../repositories/memory/memory.identity.repositories.ts";
@@ -28,6 +28,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -97,7 +98,8 @@ beforeEach(() => {
       registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
-      platformOperators: new StubPlatformOperators(),
+      authorization: new StubPlatformOperators(),
+      licensing: licensingFixture(),
     }),
     ledger,
   );

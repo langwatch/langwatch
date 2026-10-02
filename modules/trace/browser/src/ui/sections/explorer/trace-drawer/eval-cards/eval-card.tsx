@@ -1,4 +1,14 @@
-import { Box, Button, chakra, Flex, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  Flex,
+  HStack,
+  Icon,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "@langwatch/evaluation-contract";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";

@@ -3,14 +3,14 @@
  * every visible turn preview to English at once and flips back on "Show original".
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));
 
@@ -88,15 +88,13 @@ function current() {
 import { ConversationContext } from "../conversation-context.tsx";
 
 function renderStrip() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationContext
-        conversationId="conv_1"
-        traceId="trace_1"
-        collapsed={false}
-        onToggleCollapsed={() => undefined}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConversationContext
+      conversationId="conv_1"
+      traceId="trace_1"
+      collapsed={false}
+      onToggleCollapsed={() => undefined}
+    />,
   );
 }
 

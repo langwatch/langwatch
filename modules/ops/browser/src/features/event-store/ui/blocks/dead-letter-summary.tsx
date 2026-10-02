@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Card, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Text } from "@langwatch/design-system/primitives";
 import { Skull } from "lucide-react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";

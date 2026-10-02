@@ -1,4 +1,4 @@
-import { Box, Flex, Icon, IconButton, Input, Text } from "@chakra-ui/react";
+import { Box, Flex, Icon, IconButton, Input, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
 

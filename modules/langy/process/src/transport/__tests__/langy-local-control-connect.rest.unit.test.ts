@@ -1,6 +1,5 @@
 /** The long-poll connect family answers main's relay bodies, byte for byte (ADR-129, §8). */
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   BearerIdentity,
   bindRestCredential,
@@ -16,6 +15,7 @@ import {
   LangySessionKeyWrongTypeError,
   LOCAL_CONTROL_PROTOCOL_VERSION,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -84,9 +84,9 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -97,7 +97,7 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     verify: (presented) => app.verifyLocalControlSessionKey(presented),
   });
   host.mount(router.router(), () => app, {
-    facts: [bindRestCredential("sessionKey", () => door)],
+    facts: [bindRestCredential("session_key", () => door)],
   });
   const request = (path: string, init: RequestInit = {}) =>
     host.app.request(`http://api.test/api/v1/langy/control${mount}/connect${path}`, init);

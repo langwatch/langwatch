@@ -5,11 +5,10 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -20,17 +19,13 @@ import { OfflineTargetsNotice } from "../offline-targets-notice.tsx";
 import type { RunDialogAgent } from "../run-target-picker.tsx";
 import { TargetSection } from "../target-section.tsx";
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "project" },
     organization: { id: "org_1" },
     team: null,
   }),
 }));
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const VIEWER = "user_me";
 
@@ -65,7 +60,7 @@ function agentsFor(rows: ReturnType<typeof connectedRow>[]): RunDialogAgent[] {
 }
 
 function renderSection(agents: RunDialogAgent[]) {
-  return render(
+  return renderWithDesignSystem(
     <TargetSection
       mode="agents"
       agents={agents}
@@ -75,7 +70,6 @@ function renderSection(agents: RunDialogAgent[]) {
       onRemovePromptPicker={vi.fn()}
       onSetupAgent={vi.fn()}
     />,
-    { wrapper: Wrapper },
   );
 }
 
@@ -159,7 +153,7 @@ describe("connected agents in the run dialog", () => {
     it("draws it beside the others, disabled", async () => {
       const user = userEvent.setup();
       const onSelect = vi.fn();
-      render(
+      renderWithDesignSystem(
         <TargetSection
           mode="agents"
           agents={agentsFor([
@@ -176,7 +170,6 @@ describe("connected agents in the run dialog", () => {
           onRemovePromptPicker={vi.fn()}
           onSetupAgent={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("run-dialog-agent-agent_on")).toHaveAttribute(
@@ -206,9 +199,8 @@ describe("connected agents in the run dialog", () => {
     it("says that no process is running the agent", () => {
       const agents = agentsFor([connectedRow({ id: "agent_off", status: "offline" })]);
 
-      render(
+      renderWithDesignSystem(
         <OfflineTargetsNotice agents={agents} targets={[{ type: "connected", id: "agent_off" }]} />,
-        { wrapper: Wrapper },
       );
 
       const notice = screen.getByTestId("run-dialog-offline-targets");
@@ -219,9 +211,8 @@ describe("connected agents in the run dialog", () => {
     it("says nothing when every chosen agent is online", () => {
       const agents = agentsFor([connectedRow({ id: "agent_on", status: "online" })]);
 
-      render(
+      renderWithDesignSystem(
         <OfflineTargetsNotice agents={agents} targets={[{ type: "connected", id: "agent_on" }]} />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("run-dialog-offline-targets")).toBeNull();

@@ -1,9 +1,9 @@
+import type { DatasetColumns, InMemoryDataset } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetColumns, InMemoryDataset } from "@langwatch/dataset-contract";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,8 +24,17 @@ const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const getAllQuery = vi.fn();
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
+    licenseEnforcement: {
+      checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
+    },
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     datasetRecord: {
       getAll: {
         useQuery: (...args: unknown[]) => getAllQuery(...args),
@@ -55,10 +64,6 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
-    licenseEnforcement: {
-      checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
-    },
-    useUtils: () => ({}),
   },
 }));
 
@@ -78,19 +83,14 @@ const makeInMemoryDataset = (): InMemoryDataset => ({
   ],
 });
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderInMemory = (overrides: Partial<Parameters<typeof DatasetEditorTable>[0]> = {}) => {
   const onUpdateDataset = vi.fn();
-  const utils = render(
+  const utils = renderWithDesignSystem(
     <DatasetEditorTable
       inMemoryDataset={makeInMemoryDataset()}
       onUpdateDataset={onUpdateDataset}
       {...overrides}
     />,
-    { wrapper: Wrapper },
   );
   return { ...utils, onUpdateDataset };
 };
@@ -290,7 +290,7 @@ describe("given a saved dataset", () => {
         opts.onSuccess();
       });
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="ds-1" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds-1" />);
 
       await screen.findByText("hello");
       await user.dblClick(screen.getByTestId("cell-0-input_0"));
@@ -329,7 +329,7 @@ describe("given a saved dataset", () => {
         },
       );
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="ds-1" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds-1" />);
 
       await screen.findByText("hello");
       await user.dblClick(screen.getByTestId("cell-0-input_0"));
@@ -354,7 +354,7 @@ describe("given a saved dataset", () => {
         opts.onSuccess();
       });
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="ds-1" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds-1" />);
 
       await screen.findByText("hello");
       await user.click(screen.getByLabelText("Select row 1"));
@@ -398,7 +398,7 @@ describe("given the saved dataset's record count", () => {
         isLoading: false,
         refetch: vi.fn(),
       });
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("1,640 records"),
@@ -431,7 +431,7 @@ describe("given the saved dataset's record count", () => {
         requested.push(input?.page);
         return stable; // stable ref (like react-query) — avoids a reload loop
       });
-      render(<DatasetEditorTable datasetId="empty" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="empty" />);
 
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("0 records"),
@@ -484,9 +484,7 @@ describe("given a saved dataset larger than one page", () => {
       }
       return byPage.get(p);
     });
-    return render(<DatasetEditorTable datasetId="dataset_paged" />, {
-      wrapper: Wrapper,
-    });
+    return renderWithDesignSystem(<DatasetEditorTable datasetId="dataset_paged" />);
   };
 
   /** @scenario A dataset larger than one page shows the first page with a pager */
@@ -570,9 +568,7 @@ describe("given a saved dataset larger than one page", () => {
       });
 
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="dataset_paged" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="dataset_paged" />);
       await waitFor(() =>
         expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 1–50"),
       );
@@ -700,9 +696,7 @@ describe("given the editor is switched to a different dataset", () => {
       getAllQuery.mockReturnValue(datasetAResult(false));
 
       const user = userEvent.setup();
-      const { rerender } = render(<DatasetEditorTable datasetId="dataset_a" />, {
-        wrapper: Wrapper,
-      });
+      const { rerender } = renderWithDesignSystem(<DatasetEditorTable datasetId="dataset_a" />);
       await screen.findByText("alpha");
 
       // Point the editor at dataset B; keepPreviousData still serves A's rows
@@ -761,7 +755,7 @@ describe("given rows are deleted from a paginated dataset", () => {
       });
 
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="dp" />);
       await screen.findByText("a");
 
       await user.click(screen.getByLabelText("Select row 1"));
@@ -811,7 +805,7 @@ describe("given rows are deleted from a paginated dataset", () => {
       });
 
       const user = userEvent.setup();
-      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="dp" />);
       await screen.findByText("a");
 
       // Queue a delete (row 1) and an edit (row 2, now at index 0). The debounce

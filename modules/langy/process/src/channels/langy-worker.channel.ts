@@ -18,6 +18,7 @@ export type LangyWorkerProbeInput = {
   egressAllowlist?: string[];
   mirrorTier?: string;
   harness?: string;
+  disabledSkillIds?: string[];
 };
 
 export type LangyWorkerWarmInput = {

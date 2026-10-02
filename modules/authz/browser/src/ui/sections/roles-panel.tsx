@@ -1,9 +1,18 @@
 // What a role can do and who holds one (main's RolesPanel): the predefined ladder
 // first, then the organization's own roles; counts and holders fold out of the assignments.
 
-import { Alert, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import {
+  Alert,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -15,7 +24,7 @@ import {
   builtinRoleGrantedPermissions,
   peopleHoldingBuiltinRole,
 } from "../../model/builtin-roles.ts";
-import type { RoleBinding } from "../../model/role-binding-principals.ts";
+import type { ManagedGrant } from "../../model/managed-grant.ts";
 import {
   holdersOfCustomRole,
   peopleHoldingCustomRole,
@@ -35,7 +44,7 @@ type OpenDialog =
   | { kind: "edit"; role: Role }
   | ({ kind: "detail" } & RoleDetail);
 
-const NO_ASSIGNMENTS: RoleBinding[] = [];
+const NO_ASSIGNMENTS: ManagedGrant[] = [];
 
 export function RolesPanel({
   organizationId,
@@ -52,7 +61,7 @@ export function RolesPanel({
 
   const utils = authzApi.useUtils();
   const roles = authzApi.role.getAll.useQuery({ organizationId });
-  const assignments = authzApi.roleBinding.listForOrg.useQuery(
+  const assignments = authzApi.authz.listManagedGrants.useQuery(
     { organizationId },
     { enabled: !!organizationId },
   );
@@ -65,7 +74,7 @@ export function RolesPanel({
   const deleteRole = authzApi.role.delete.useMutation({
     onSuccess: () => {
       void utils.role.getAll.invalidate();
-      void utils.roleBinding.listForOrg.invalidate();
+      void utils.authz.listManagedGrants.invalidate();
       host.succeeded({ title: "Role deleted" });
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't delete this role" }),
@@ -213,7 +222,7 @@ function CustomRoleCards({
   onDelete,
 }: {
   roles: readonly Role[] | undefined;
-  assignments: readonly RoleBinding[] | null;
+  assignments: readonly ManagedGrant[] | null;
   canManage: boolean;
   onOpenDetail: (role: Role) => void;
   onEdit: (role: Role) => void;

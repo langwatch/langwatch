@@ -3,7 +3,7 @@
  * an answer and shows; a count still being read draws nothing, so no badge
  * reads 0 for a moment and then flips.
  */
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 
 export function TabCount({ value }: { value: number | undefined }) {
   if (value === void 0) return null;

@@ -51,6 +51,21 @@ Feature: Prompt service
     Then every read and write goes to the store the application handed it
     And Prompt Studio touches no browser storage of its own
 
+  @unit @integration
+  Scenario: Prompt tabs keep their layout and prompt ids, never their contents
+    Given a prompt tab holding span messages, form values and variables
+    When the tab layout is persisted
+    Then only the layout and each tab's prompt id, title, version and scope are kept
+    And a tab with no saved prompt is not kept
+    And on reload each kept tab reads its prompt again at the kept version
+
+  @integration
+  Scenario: Reloading with unsaved prompt changes asks first
+    Given a prompt tab with changes that are not saved
+    When the reader reloads or leaves the page
+    Then the browser asks before unloading
+    But a tab with nothing unsaved lets the page unload
+
   @unit
   Scenario: a prompt created without a model takes the project's default model
     Given the project's default model for prompts is "openai/gpt-5.6-terra"

@@ -1,6 +1,8 @@
 /** The Langy canary's verdict and answer, from main's `health-probes/langy-canary.service.ts`. */
 import type { LangyTurnSettlementWait } from "@langwatch/langy-contract";
 
+import { deriveProbeCause } from "./probe-cause.rules.ts";
+
 /** Wall-time budget for one check: under the 60s a plain HTTP monitor allows. */
 export const LANGY_CANARY_BUDGET_MS = 55_000;
 
@@ -9,7 +11,9 @@ export const LANGY_CANARY_GREETING = "Hi Langy.";
 
 export type LangyCanaryReason = "timeout" | "turn_failed" | "empty_reply";
 
-export type LangyCanaryVerdict = { healthy: true } | { healthy: false; reason: LangyCanaryReason };
+export type LangyCanaryVerdict =
+  | { healthy: true }
+  | { healthy: false; reason: LangyCanaryReason; cause?: string };
 
 export type LangyCanaryOutcome = LangyCanaryVerdict & {
   conversationId?: string;
@@ -30,8 +34,12 @@ export function classifyLangyCanaryOutcome(
   if (!wait || wait.kind === "stopped") return { healthy: false, reason: "timeout" };
   if (wait.kind === "awaiting_user") return { healthy: true };
   const { settlement } = wait;
-  if (!settlement.succeeded || settlement.outcome !== "completed") {
-    return { healthy: false, reason: "turn_failed" };
+  if (!settlement.succeeded) {
+    const cause = deriveProbeCause(settlement.error);
+    return { healthy: false, reason: "turn_failed", ...(cause && { cause }) };
+  }
+  if (settlement.outcome !== "completed") {
+    return { healthy: false, reason: "turn_failed", cause: "turn_stopped" };
   }
   if (settlement.text.trim().length === 0) return { healthy: false, reason: "empty_reply" };
   return { healthy: true };
@@ -45,6 +53,13 @@ export function langyCanaryAnswer(result: LangyCanaryResult): { status: number; 
     return { status: 200, body: { status: "ok", conversationId, turnId, durationMs } };
   return {
     status: 503,
-    body: { status: "unhealthy", reason: result.reason, conversationId, turnId, durationMs },
+    body: {
+      status: "unhealthy",
+      reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
+      conversationId,
+      turnId,
+      durationMs,
+    },
   };
 }

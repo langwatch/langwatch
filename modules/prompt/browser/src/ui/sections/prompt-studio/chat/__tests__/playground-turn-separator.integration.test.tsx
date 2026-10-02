@@ -4,8 +4,8 @@
  * trace affordance on it.
  * @see specs/prompts/playground-conversation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,12 +27,10 @@ function renderSeparator() {
   const host = new FakePromptHost();
   host.openPlatformDrawer = openPlatformDrawer;
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptHostProvider value={host}>
-        <PlaygroundTurnSeparator index={1} traceId="trace-1" live />
-      </PromptHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <PromptHostProvider value={host}>
+      <PlaygroundTurnSeparator index={1} traceId="trace-1" live />
+    </PromptHostProvider>,
   );
 }
 

@@ -6,10 +6,12 @@ import {
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+  type EvaluationApi,
   type EvaluationProcessingEvent,
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,12 +20,10 @@ import type {
   AutomationEvaluationTraceSummary,
   AutomationGraphActivity,
 } from "../../app/automation.members.ts";
-import {
-  AutomationEvaluationSubscriberService,
-  AutomationEvaluationTriggerFilterService,
-  type AutomationTriggerMatchRecorder,
-} from "../../index.ts";
+import { type AutomationTriggerMatchRecorder } from "../../index.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
+import { AutomationEvaluationSubscriberService } from "../../services/automation-evaluation-subscriber.service.ts";
+import { AutomationEvaluationTriggerFilterService } from "../../services/automation-evaluation-trigger-filter.service.ts";
 
 function trigger(): TriggerSummary {
   return {
@@ -220,6 +220,7 @@ describe("evaluation alert trigger-match subscriber redelivery", () => {
       evaluationFilters: AutomationEvaluationTriggerFilterService.create(new TestTraceService()),
       triggerMatches: recordTriggerMatch,
       matchRecordMetrics: { countRecorded: () => undefined },
+      runs: createApiFixture<EvaluationApi>(),
     });
     const context: TriggerContext<EvaluationRunData> = {
       tenantId: "project-1",

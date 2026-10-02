@@ -1,8 +1,4 @@
 import {
-  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-  graphTriggerActivityGroupKey,
-} from "@langwatch/automation-contract";
-import {
   defineEventingModule,
   throttledWindow,
   type EventSubscriberDefinition,
@@ -10,7 +6,6 @@ import {
   type TriggerContext,
 } from "@langwatch/eventing";
 import {
-  ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
@@ -18,7 +13,7 @@ import {
   originResolvedEventSchema,
 } from "@langwatch/trace-contract";
 
-import type { TraceApp } from "../app/trace.app.ts";
+import type { TraceModule } from "../app/trace.app.ts";
 import type { TraceProcessingPipelineDefinition } from "../app/trace.members.ts";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
@@ -76,12 +71,7 @@ export interface TraceProcessingReactions {
   projectMetadata: SummaryHandler;
   simulationMetricsSync: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
-  triggerMatch: SummaryHandler;
   codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
-  graphTriggerActivity: (
-    event: TraceProcessingEvent,
-    context: { tenantId: string },
-  ) => Promise<void>;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -159,26 +149,6 @@ export function buildTraceProcessingConsumer(
       ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
       handler: (event, context) => reactions.experimentMetricsSync(event, context),
     })
-    .withProjectionSubscriber("triggerMatch", {
-      fold: "traceSummary",
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: 30_000,
-      ttl: 30_000,
-      handler: (event, context) => reactions.triggerMatch(event, context),
-    })
-    .withEventSubscriber("graphTriggerActivity", {
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-      dedup: {
-        makeId: graphTriggerActivityGroupKey,
-        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-        extend: false,
-        replace: false,
-      },
-      // One lane per tenant, shared with evaluation_processing's registration.
-      groupKeyFn: graphTriggerActivityGroupKey,
-      handler: (event, context) => reactions.graphTriggerActivity(event, context),
-    })
     .withEventSubscriber(
       reactions.codingAgentSpanFactsDispatch.name,
       reactions.codingAgentSpanFactsDispatch,
@@ -196,7 +166,7 @@ export function buildTraceProcessingConsumer(
 /** trace_processing, built by the app in both roles; its senders carry every trace write. */
 export const traceProcessingEventing = defineEventingModule({
   pipeline: "trace_processing",
-  build: ({ app, participation }: EventingSetup<never, TraceApp>) =>
+  build: ({ app, participation }: EventingSetup<never, TraceModule>) =>
     app.traceProcessingPipeline({ participation }),
   connect: ({ app, commands }) => app.connectTraceProcessingCommands(commands),
 });

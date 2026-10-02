@@ -2,6 +2,7 @@ import { generate } from "@langwatch/ksuid";
 
 import { type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
+import { MemoryWebhookDispatchCapRepository } from "./memory.webhook-dispatch-cap.repository.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
 import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repository.ts";
 import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
@@ -33,6 +34,7 @@ export class MemoryWebhookRepositories {
     const database = MemoryWebhookDatabase.create();
 
     return {
+      dispatchCaps: MemoryWebhookDispatchCapRepository.create(),
       endpoints: MemoryWebhookEndpointRepository.create({
         database,
         options: { ids: new MemoryWebhookIds(), secrets: new MemoryWebhookSecrets() },

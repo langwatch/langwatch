@@ -174,6 +174,7 @@ export class FinishRunAdapter implements CommandHandler<
       ...(ecst.target !== undefined && { target: ecst.target }),
       ...(ecst.evaluators !== undefined && { evaluators: ecst.evaluators }),
       ...(organizationAdmin !== undefined && { organizationAdmin }),
+      occurredAt: data.occurredAt,
     };
 
     const event = EventUtils.createEvent<SimulationRunFinishedEvent>({

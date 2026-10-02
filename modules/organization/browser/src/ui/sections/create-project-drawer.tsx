@@ -1,8 +1,8 @@
 /** Create-project drawer: inline error (no toast), hard nav after create. */
 
-import { Heading } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Heading } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { api } from "../../behavior/organization-api.ts";
@@ -16,10 +16,10 @@ import { ProjectForm, type ProjectFormData } from "./project-form.tsx";
 /** Every list a freshly created project has to show up in right away. */
 function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): void {
   void utils.organization.getAll.invalidate();
+  void utils.organization.getScopeGraph.invalidate();
   void utils.limits.getUsage.invalidate();
-  void utils.team.getTeamsWithMembers.invalidate();
   void utils.team.getTeamWithMembers.invalidate();
-  void utils.team.getTeamsWithRoleBindings.invalidate();
+  void utils.team.getTeamsWithGrants.invalidate();
 }
 
 export function CreateProjectDrawer({

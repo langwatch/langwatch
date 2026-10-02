@@ -107,12 +107,13 @@ Feature: The platform's own browser telemetry reaches its collector through the 
   Rule: rum owns the browser tracing switch it hands the page
 
     `RUM_ENABLED` and `RUM_SAMPLE_RATIO` are rum's config, and rum projects
-    its slice of the page's browser config: tracing is on only when switched
-    on AND a collector would receive what the browser sends.
+    its slice of the page's browser config: tracing is on unless switched
+    off AND a collector would receive what the browser sends. See also
+    specs/ui/browser-errors.feature.
 
     @unit
     Scenario: Browser tracing stays off while the switch is off
-      Given a deployment that names a collector but does not set RUM_ENABLED to "true"
+      Given a deployment that names a collector and sets RUM_ENABLED to "false"
       When rum projects its browser config
       Then browser tracing is disabled
 

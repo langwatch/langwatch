@@ -1,14 +1,14 @@
 /** @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditableHeading } from "../editable-heading.tsx";
 
 const renderWithProviders = (ui: React.ReactElement) => {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithDesignSystem(ui);
 };
 
 describe("EditableHeading", () => {

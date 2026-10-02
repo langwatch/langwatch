@@ -1,6 +1,6 @@
-import { Badge, HStack, IconButton, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
+import { Badge, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 import type { RouterOutputs } from "../../behavior/organization-api.ts";

@@ -32,7 +32,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { GovernanceApp } from "../app/governance.app.ts";
+import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import {
   RecordIngestionPullAgentsListedCommand,
@@ -198,7 +198,7 @@ const RecordIngestionPullRunFailedCommand = defineCommand({
 /** The api only sends; the worker also hosts the pull process manager. */
 export const ingestionPullEventing = defineEventingModule({
   pipeline: INGESTION_PULL_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<GovernanceRepositories, GovernanceApp>) =>
+  build: ({ app, participation }: EventingSetup<GovernanceRepositories, GovernanceModule>) =>
     app.ingestionPullPipeline({ participation }),
   connect: ({ app, commands }) => app.connectIngestionPull(commands),
 });

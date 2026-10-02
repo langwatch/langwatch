@@ -1,4 +1,3 @@
-import { Box, Button, Heading, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
@@ -23,8 +22,17 @@ import {
   type TemplateContext,
 } from "@langwatch/automation-contract";
 import type { UiAutomationDrawerProps } from "@langwatch/browser-host/drawer";
-import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import { Mail, Send } from "lucide-react";
@@ -39,11 +47,13 @@ import {
 import {
   useAppBaseUrl,
   useCloseAddressedDrawer,
-  useFeatureFlag,
   useOrganizationTeamProject,
 } from "../../../../behavior/automation-session.ts";
+import { useAutomation } from "../../../../behavior/use-automation-reads.ts";
+import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";
 import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
+import type { NamedSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
 import {
   ALERT_TEMPLATE_VARIABLES,
   REPORT_TEMPLATE_VARIABLES,
@@ -52,13 +62,22 @@ import {
   consumeDraftKeptOnSubFlowReturn,
   isHandingOverToSubFlow,
 } from "../../behavior/sub-flow.ts";
+import { useDatasetName } from "../../behavior/use-dataset-name.ts";
+import { useDiscardGuard } from "../../behavior/use-discard-guard.ts";
+import { useSlackConnectionName } from "../../behavior/use-slack-connection-name.ts";
+import { withSlackConnectionName } from "../../model/slack-connection-name.ts";
+import { findNextStep, findPreviousStep, type WizardStep } from "../../model/wizard-steps.ts";
+import { DiscardChangesDialog } from "../blocks/discard-changes-dialog.tsx";
 import {
   useConditionsSet,
   useConfigComplete,
   useDraft,
+  useHasInvalidConditionRows,
   useSection,
+  useWizardStep,
 } from "./automation-selectors.ts";
 import { useAutomationStore } from "./automation-store.ts";
+import { AutomationWizard } from "./automation-wizard.tsx";
 import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers.ts";
 import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer.tsx";
 import {
@@ -98,34 +117,65 @@ function templateValidationTitle(error: unknown): string | undefined {
   return typeof field === "string" ? TEMPLATE_FIELD_TITLES[field] : undefined;
 }
 
-/** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
- *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
- *  to an automation), so it never contributes a message. */
+/** Facet-ordered "why can't I save yet" copy: Name → Subject → Cadence →
+ *  Severity → Delivery. An unset subject makes cadence advice premature, so
+ *  those two are mutually exclusive. */
 function saveDisabledReason({
   draft,
   nameSet,
   configComplete,
   actionPicked,
-  webhookReadOnly = false,
+  hasInvalidConditionRows,
+  isRowUnavailable,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
-  webhookReadOnly?: boolean;
+  hasInvalidConditionRows: boolean;
+  isRowUnavailable: boolean;
 }): string {
-  if (webhookReadOnly) {
-    return "Webhook delivery is unavailable for this project. Choose another delivery channel to save changes.";
-  }
+  if (isRowUnavailable) return "This automation can't be saved until it has loaded.";
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
+  if (hasInvalidConditionRows) missing.push("fix the attribute key marked in red");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
   else if (!cadenceIsSet(draft)) missing.push(cadenceTodo(draft));
   if (draft.source === "customGraph" && draft.alertType === null) missing.push("set a severity");
   if (!actionPicked) missing.push("pick a delivery channel");
-  else if (!configComplete) missing.push("complete the setup");
+  else if (!configComplete) missing.push(deliveryTodo(draft));
   if (missing.length === 0) return "";
   return `To save, ${missing.join(" and ")}.`;
+}
+
+/** What the chosen delivery still lacks, in its own words where they are known. */
+function deliveryTodo(draft: AutomationDraft): string {
+  switch (draft.action) {
+    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
+      return "choose at least one annotator";
+    case TriggerAction.SEND_EMAIL:
+      return "add at least one recipient";
+    case TriggerAction.ADD_TO_DATASET:
+      return draft.slices[TriggerAction.ADD_TO_DATASET].datasetId
+        ? "map the dataset's columns"
+        : "choose a dataset";
+    case TriggerAction.SEND_WEBHOOK:
+      return "enter a valid endpoint URL and content type";
+    case TriggerAction.SEND_SLACK_MESSAGE:
+      return draft.slices[TriggerAction.SEND_SLACK_MESSAGE].slackIntegrationId
+        ? "choose a Slack channel"
+        : "choose a Slack connection";
+    default:
+      return "complete the setup";
+  }
+}
+
+/** The draft as the close guard compares it. The Slack connection's and the
+ *  dataset's names fill in when their lists load: display, never edits. */
+function draftFingerprint(draft: AutomationDraft): string {
+  return JSON.stringify(draft, (key, value) =>
+    key === "connectionName" || key === "namedDataset" ? undefined : value,
+  );
 }
 
 function subjectTodo(draft: AutomationDraft): string {
@@ -142,7 +192,7 @@ function subjectTodo(draft: AutomationDraft): string {
 function cadenceTodo(draft: AutomationDraft): string {
   switch (draft.source) {
     case "customGraph":
-      return "set the alert threshold";
+      return "set the firing threshold";
     case "report":
       return "set a schedule";
     case "trace":
@@ -172,36 +222,32 @@ export function AutomationDrawer({
   initialFilters,
   initialFilterQuery,
   onClose,
-}: UiAutomationDrawerProps) {
+}: UiAutomationDrawerProps & { onClose: () => void }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const appBaseUrl = useAppBaseUrl();
   const projectId = project?.id ?? "";
-  // The host has already resolved every flag for the document against the
-  // reader's scope, so the targeting options the platform hook took — the
-  // project and organization the rule is evaluated for — are the host's job
-  // now and not an argument here. `isLoading` is kept, and it is load-bearing:
-  // a `SEND_WEBHOOK` prefill waits for the answer rather than being dropped.
-  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } = useFeatureFlag(
-    "release_webhook_automations",
-  );
+  const host = useAutomationHost();
 
   const draft = useDraft();
   const section = useSection();
+  const step = useWizardStep();
   const conditionsSet = useConditionsSet();
+  const hasInvalidConditionRows = useHasInvalidConditionRows();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
-  const isReport = draft.source === "report";
-  // Single source of truth for every heading / button / toast noun. Treat a
-  // graph-prefilled create as an alert from the first paint so the title
-  // doesn't flash "Add automation" before the prefill effect lands.
-  const labels = presetLabels(prefilledGraphId ? "customGraph" : draft.source, !!automationId);
-  // A saved graph alert or report can't become a trace automation mid-edit
-  // (the kind decides the row's whole shape — schedule, source, dispatcher),
-  // and a drawer opened from a specific chart is pinned to that alert — lock
-  // the Type cards visibly in all three cases.
-  const sourceLocked = (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
+  // A report keeps the single-pane composer (ADR-093 §1). Read off the prefill
+  // too, so a fresh one never paints a frame of the wizard or its heading.
+  const isReport = draft.source === "report" || initialSource === "report";
+  const labels = presetLabels({
+    source: isReport ? "report" : draft.source,
+    isEdit: !!automationId,
+  });
+  // What a saved automation watches never changes (ADR-093 §1); a drawer
+  // opened from a specific chart is pinned to that graph for the same reason.
+  const subjectLocked = !!automationId || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
+  const setStep = useAutomationStore((s) => s.setStep);
   const hydrate = useAutomationStore((s) => s.hydrate);
   const reset = useAutomationStore((s) => s.reset);
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
@@ -219,46 +265,75 @@ export function AutomationDrawer({
   // Serialized because drafts are plain JSON-able objects and we only care
   // about value equality, not reference identity.
   const baselineRef = useRef<string | null>(null);
-  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
-  // Pre-fill graph-alert mode from drawer params on a fresh create. Used
-  // by the dashboard "Add alert" entry (Phase 5.2). When set, the drawer
-  // opens with source = customGraph and the graph / series already
-  // selected and locked, so the author lands on the threshold rule.
-  usePrefillFromGraph({ automationId, prefilledGraphId, prefilledSeriesName, dispatch });
+  // Editing opens on the review overview, never on Watch (ADR-093 §4).
+  useEffect(() => {
+    if (automationId) setStep("review");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Pre-fill identity + kind from drawer params on a fresh create. Set by
-  // the Alerts & automations page ("New alert" opens straight into alert
-  // mode; use-case cards seed a name and action too). Ordering matters:
-  // SET_SOURCE runs first because switching to customGraph resets any
-  // action that alerts don't support.
+  // Reopening for a different automation or prefill does not remount the
+  // drawer, so the identity change does by hand what unmounting would. Declared
+  // above the prefill and hydration hooks: effects run in declaration order.
+  const drawerIdentity = drawerIdentityOf({
+    automationId,
+    prefill: [
+      prefilledGraphId,
+      prefilledSeriesName,
+      initialSource,
+      initialName,
+      initialAction,
+      initialFilters,
+      initialFilterQuery,
+    ],
+  });
+  useResetOnIdentityChange({ drawerIdentity, automationId, reset, setStep, baselineRef });
+
+  // Pre-fill graph mode from drawer params on a fresh create (the dashboard's
+  // "Add automation" entry): the graph and series arrive selected and locked,
+  // so the author lands on the threshold rule.
+  usePrefillFromGraph({
+    automationId,
+    drawerIdentity,
+    prefilledGraphId,
+    prefilledSeriesName,
+    dispatch,
+  });
+
+  // Pre-fill identity and kind from drawer params on a fresh create (a
+  // use-case card seeds a name and action too). SET_SOURCE runs first because
+  // switching to customGraph resets any action a graph watcher refuses.
   usePrefillFromParams({
     automationId,
+    drawerIdentity,
     initialSource,
     initialName,
     initialAction,
     initialFilters,
     initialFilterQuery,
-    webhookEnabled,
-    webhookFlagLoading,
     dispatch,
   });
 
   // Edit prefill from the saved trigger.
-  const triggerQuery = api.automation.getTriggerById.useQuery(
-    { triggerId: automationId ?? "", projectId },
-    { enabled: !!automationId && !!projectId },
-  );
+  const triggerQuery = useAutomation({ projectId, triggerId: automationId });
   // Gate hydration to the FIRST successful read per automationId. tRPC's
   // background refetch (window-focus, query invalidation) would otherwise
   // re-fire this effect mid-session and overwrite unsaved edits with the
   // last-saved row.
-  useHydrateFromServer({ automationId, row: triggerQuery.data, hydrate, baselineRef });
+  const slackConnections = useSlackConnectionName({ projectId, draft, dispatch });
+  useDatasetName({ projectId, draft, dispatch });
+  useHydrateFromServer({
+    automationId,
+    row: triggerQuery.data,
+    hydrate,
+    baselineRef,
+    slackConnections,
+  });
 
   // Capture the create-mode baseline once the prefill effects above have had a
   // chance to land (they run on mount before this commits). After this, any
   // change to the draft reads as unsaved and the close-guard kicks in.
-  useCreateBaseline({ automationId, baselineRef });
+  useCreateBaseline({ automationId, drawerIdentity, baselineRef });
 
   // Build the example TemplateContext the preview pane (and autocomplete)
   // render against. Static-ish — only depends on the project identity, so the
@@ -283,7 +358,7 @@ export function AutomationDrawer({
   // Seed the name from the watched graph once its row loads — "Latency
   // p95 alert" beats an empty field on the golden Add-alert path. Only
   // when the author hasn't typed anything, and only once.
-  useSeedNameFromGraph({ automationId, prefilledGraphId, graphName, dispatch });
+  useSeedNameFromGraph({ automationId, drawerIdentity, prefilledGraphId, graphName, dispatch });
   const previewContext = usePreviewContext({
     appBaseUrl,
     projectName: project?.name,
@@ -316,15 +391,25 @@ export function AutomationDrawer({
   // Show a skeleton until the row lands, and an error state if it never does.
   const editLoading = !!automationId && triggerQuery.isLoading;
   const editError = !!automationId && triggerQuery.isError;
-  const webhookReadOnly =
-    !!automationId && draft.action === TriggerAction.SEND_WEBHOOK && !webhookEnabled;
-
   const nameSet = draft.name.trim().length > 0;
-  // Cadence is an always-visible inline facet now (ADR-043), so there is no
-  // "confirm the cadence" detour to gate on — subject + cadence validity is
-  // folded into conditionsSet.
+  // Subject and cadence validity fold into conditionsSet (ADR-043). An invalid
+  // condition row is excluded from the emitted query, so it holds Save too:
+  // saving past it would persist a wider automation than the one on screen.
   const canSave =
-    nameSet && conditionsSet && configComplete && !editLoading && !editError && !webhookReadOnly;
+    nameSet &&
+    conditionsSet &&
+    !hasInvalidConditionRows &&
+    configComplete &&
+    !editLoading &&
+    !editError;
+  const saveBlockedReason = saveDisabledReason({
+    draft,
+    nameSet,
+    configComplete,
+    actionPicked: !!draft.action,
+    hasInvalidConditionRows,
+    isRowUnavailable: editLoading || editError,
+  });
 
   const { onTestFire, testFire } = useTestFire({
     channel,
@@ -339,6 +424,7 @@ export function AutomationDrawer({
   const { onSave, upsert } = useSaveAutomation({
     draft,
     canSave,
+    saveBlockedReason,
     projectId,
     automationId,
     labels,
@@ -417,15 +503,18 @@ export function AutomationDrawer({
   // hydrate/create time. Guards an accidental close from silently dropping an
   // in-progress multi-stage draft. Until the baseline lands we treat the
   // draft as clean so a close during the first paint never prompts.
-  const isDirty = baselineRef.current !== null && JSON.stringify(draft) !== baselineRef.current;
+  const isDirty = baselineRef.current !== null && draftFingerprint(draft) !== baselineRef.current;
 
-  const requestClose = useCallback(() => {
-    if (isDirty) {
-      setConfirmDiscardOpen(true);
-      return;
-    }
-    onClose();
-  }, [isDirty, onClose]);
+  // Save and test fire live on the review overview; every other wizard step
+  // gets navigation instead. A report keeps its single pane, so always Save.
+  const showStepNavigation = !isReport && step !== "review";
+
+  const discardGuard = useDiscardGuard({
+    isDirty,
+    onClose,
+    onCreateNew: () => host.openDrawer({ drawer: "automation", params: {} }),
+  });
+  const requestClose = () => discardGuard.request("close");
 
   return (
     <>
@@ -454,30 +543,35 @@ export function AutomationDrawer({
               editLoading={editLoading}
               noun={labels.noun}
               isEdit={!!automationId}
-              sourceLocked={sourceLocked}
+              isReport={isReport}
               prefilledGraphId={prefilledGraphId}
-              webhookEnabled={webhookEnabled}
+              projectId={projectId}
+              subjectLocked={subjectLocked}
+              graphName={graphName}
+              seriesLabel={seriesLabel}
+              onCreateNew={() => discardGuard.request("createNew")}
             />
           </Drawer.Body>
           <Drawer.Footer>
-            <DrawerFooterActions
-              showTestFire={!!channel && !editLoading && !editError && !webhookReadOnly}
-              configComplete={configComplete}
-              onTestFire={onTestFire}
-              testFiring={testFire.isPending}
-              saveBlockedReason={saveDisabledReason({
-                draft,
-                nameSet,
-                configComplete,
-                actionPicked: !!draft.action,
-                webhookReadOnly,
-              })}
-              canSave={canSave}
-              onSave={onSave}
-              saving={upsert.isPending}
-              saveLabel={labels.saveButton}
-              saveTestId={`automation-save-${labels.noun}`}
-            />
+            <HStack width="full">
+              <Spacer />
+              {showStepNavigation ? (
+                <StepNavigation step={step} isEdit={!!automationId} onStep={setStep} />
+              ) : (
+                <DrawerFooterActions
+                  showTestFire={!!channel && !editLoading && !editError}
+                  configComplete={configComplete}
+                  onTestFire={onTestFire}
+                  testFiring={testFire.isPending}
+                  saveBlockedReason={saveBlockedReason}
+                  canSave={canSave}
+                  onSave={onSave}
+                  saving={upsert.isPending}
+                  saveLabel={labels.saveButton}
+                  saveTestId={`automation-save-${labels.noun}`}
+                />
+              )}
+            </HStack>
           </Drawer.Footer>
         </Drawer.Content>
       </Drawer.Root>
@@ -489,13 +583,10 @@ export function AutomationDrawer({
       />
 
       <DiscardChangesDialog
-        open={confirmDiscardOpen}
+        pendingTarget={discardGuard.pendingTarget}
         noun={labels.noun}
-        onKeepEditing={() => setConfirmDiscardOpen(false)}
-        onDiscard={() => {
-          setConfirmDiscardOpen(false);
-          onClose();
-        }}
+        onKeepEditing={discardGuard.keepEditing}
+        onDiscard={discardGuard.discard}
       />
     </>
   );
@@ -522,7 +613,7 @@ function EmailLinkLandingBanner() {
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">
-          Opened from an email notification. You're editing the automation that produced that alert.
+          Opened from an email notification. You're editing the automation that sent it.
         </Text>
       </HStack>
     </Box>
@@ -534,19 +625,22 @@ type Dispatch = ReturnType<typeof useAutomationStore.getState>["dispatch"];
 /** Opens a fresh create in graph-alert mode on the dashboard's graph and series, locked. */
 function usePrefillFromGraph({
   automationId,
+  drawerIdentity,
   prefilledGraphId,
   prefilledSeriesName,
   dispatch,
 }: {
   automationId: string | undefined;
+  drawerIdentity: string;
   prefilledGraphId: string | undefined;
   prefilledSeriesName: string | undefined;
   dispatch: Dispatch;
 }) {
-  const prefilledFromGraph = useRef(false);
+  // Latched per drawer identity, so a new opening prefills again.
+  const prefilledFor = useRef<string | null>(null);
   useEffect(() => {
     if (automationId) return;
-    if (prefilledFromGraph.current) return;
+    if (prefilledFor.current === drawerIdentity) return;
     if (!prefilledGraphId) return;
     dispatch({ type: "SET_SOURCE", value: "customGraph" });
     dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: prefilledGraphId });
@@ -560,47 +654,39 @@ function usePrefillFromGraph({
     // Seed a severity so the prefilled create can save without a detour
     // through the When secondary — the author can still change it there.
     dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
-    prefilledFromGraph.current = true;
+    prefilledFor.current = drawerIdentity;
+    // Latch + identity: everything else read here is frozen per opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 }
 
-/** Seeds a fresh create's identity and kind from the drawer params once the webhook flag loads. */
+/** Seeds a fresh create's identity and kind from the drawer params, once per opening. */
 function usePrefillFromParams({
   automationId,
+  drawerIdentity,
   initialSource,
   initialName,
   initialAction,
   initialFilters,
   initialFilterQuery,
-  webhookEnabled,
-  webhookFlagLoading,
   dispatch,
 }: {
   automationId: string | undefined;
+  drawerIdentity: string;
   initialSource: string | undefined;
   initialName: string | undefined;
   initialAction: string | undefined;
   initialFilters: string | undefined;
   initialFilterQuery: string | undefined;
-  webhookEnabled: boolean;
-  webhookFlagLoading: boolean;
   dispatch: Dispatch;
 }) {
-  const prefilledFromParams = useRef(false);
+  const prefilledFor = useRef<string | null>(null);
   useEffect(() => {
     if (automationId) return;
-    if (prefilledFromParams.current) return;
+    if (prefilledFor.current === drawerIdentity) return;
     const nothingPrefilled =
       !initialSource && !initialName && !initialAction && !initialFilters && !initialFilterQuery;
     if (nothingPrefilled) return;
-    // The webhook feature flag can still be loading on mount (it defaults
-    // to false while in flight). Don't latch prefilledFromParams until it
-    // resolves, or a SEND_WEBHOOK prefill on a genuinely enabled project
-    // is silently dropped and never retried.
-    if (initialAction === TriggerAction.SEND_WEBHOOK && webhookFlagLoading) {
-      return;
-    }
     applyParamPrefill({
       dispatch,
       initialSource,
@@ -608,11 +694,85 @@ function usePrefillFromParams({
       initialAction,
       initialFilters,
       initialFilterQuery,
-      webhookEnabled,
     });
-    prefilledFromParams.current = true;
+    prefilledFor.current = drawerIdentity;
+    // Latch + identity: everything else read here is frozen per opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webhookFlagLoading]);
+  }, [drawerIdentity]);
+}
+
+/** Who this opening is for: the automation on edit, the whole prefill set on create. */
+function drawerIdentityOf({
+  automationId,
+  prefill,
+}: {
+  automationId: string | undefined;
+  prefill: (string | undefined)[];
+}): string {
+  if (automationId) return `edit:${automationId}`;
+  return `create:${prefill.map((value) => value ?? "").join("|")}`;
+}
+
+/**
+ * `openDrawer` replaces the params in place, so the instance and the singleton store
+ * survive a move to another automation or prefill. Blank the draft and the baseline;
+ * the create-baseline hook re-captures it once the new prefills have landed.
+ */
+function useResetOnIdentityChange({
+  drawerIdentity,
+  automationId,
+  reset,
+  setStep,
+  baselineRef,
+}: {
+  drawerIdentity: string;
+  automationId: string | undefined;
+  reset: () => void;
+  setStep: (step: WizardStep) => void;
+  baselineRef: BaselineRef;
+}) {
+  const openedFor = useRef(drawerIdentity);
+  useEffect(() => {
+    if (openedFor.current === drawerIdentity) return;
+    openedFor.current = drawerIdentity;
+    reset();
+    baselineRef.current = null;
+    setStep(automationId ? "review" : "watch");
+  }, [drawerIdentity, automationId, reset, setStep, baselineRef]);
+}
+
+/** Mid-wizard, the footer moves between steps: an edit returns to the overview,
+ *  a create walks forward. Saving belongs to the review overview. */
+function StepNavigation({
+  step,
+  isEdit,
+  onStep,
+}: {
+  step: WizardStep;
+  isEdit: boolean;
+  onStep: (step: WizardStep) => void;
+}) {
+  if (isEdit) {
+    return (
+      <Button colorPalette="orange" onClick={() => onStep("review")}>
+        Done
+      </Button>
+    );
+  }
+  return (
+    <>
+      {findPreviousStep(step).map((previous) => (
+        <Button key={previous} variant="ghost" onClick={() => onStep(previous)}>
+          Back
+        </Button>
+      ))}
+      {findNextStep(step).map((next) => (
+        <Button key={next} colorPalette="orange" onClick={() => onStep(next)}>
+          Continue
+        </Button>
+      ))}
+    </>
+  );
 }
 
 type SavedTriggerRow = NonNullable<RouterOutputs["automation"]["getTriggerById"]>;
@@ -729,16 +889,21 @@ async function renderNotifyPreview({
   const renderOptions = (() => {
     switch (draft.action) {
       case TriggerAction.SEND_EMAIL:
-        return CLIENT_PROVIDERS.SEND_EMAIL.client.previewOptions?.(draft.slices.SEND_EMAIL) ?? {};
+        return (
+          CLIENT_PROVIDERS.SEND_EMAIL.client.previewOptions?.({ slice: draft.slices.SEND_EMAIL }) ??
+          {}
+        );
       case TriggerAction.SEND_SLACK_MESSAGE:
         return (
-          CLIENT_PROVIDERS.SEND_SLACK_MESSAGE.client.previewOptions?.(
-            draft.slices.SEND_SLACK_MESSAGE,
-          ) ?? {}
+          CLIENT_PROVIDERS.SEND_SLACK_MESSAGE.client.previewOptions?.({
+            slice: draft.slices.SEND_SLACK_MESSAGE,
+          }) ?? {}
         );
       case TriggerAction.SEND_WEBHOOK:
         return (
-          CLIENT_PROVIDERS.SEND_WEBHOOK.client.previewOptions?.(draft.slices.SEND_WEBHOOK) ?? {}
+          CLIENT_PROVIDERS.SEND_WEBHOOK.client.previewOptions?.({
+            slice: draft.slices.SEND_WEBHOOK,
+          }) ?? {}
         );
       default:
         return {};
@@ -861,7 +1026,6 @@ function applyParamPrefill({
   initialAction,
   initialFilters,
   initialFilterQuery,
-  webhookEnabled,
 }: {
   dispatch: Dispatch;
   initialSource: string | undefined;
@@ -869,7 +1033,6 @@ function applyParamPrefill({
   initialAction: string | undefined;
   initialFilters: string | undefined;
   initialFilterQuery: string | undefined;
-  webhookEnabled: boolean;
 }): void {
   if (initialSource === "customGraph") {
     dispatch({ type: "SET_SOURCE", value: "customGraph" });
@@ -883,11 +1046,7 @@ function applyParamPrefill({
   if (initialName) {
     dispatch({ type: "SET_NAME", value: initialName });
   }
-  if (
-    initialAction &&
-    initialAction in CLIENT_PROVIDERS &&
-    (initialAction !== TriggerAction.SEND_WEBHOOK || webhookEnabled)
-  ) {
+  if (initialAction && initialAction in CLIENT_PROVIDERS) {
     dispatch({
       type: "SET_ACTION",
       value: initialAction as TriggerAction,
@@ -972,6 +1131,7 @@ function useTestFire({
         channel,
         webhook: target.webhook,
         botDestination: target.botDestination,
+        slackIntegrationId: target.slackIntegrationId,
         webhookDestination: target.webhookDestination,
         automationId,
         graphName,
@@ -1073,6 +1233,7 @@ function upsertInputFromDraft({
 function useSaveAutomation({
   draft,
   canSave,
+  saveBlockedReason,
   projectId,
   automationId,
   labels,
@@ -1080,25 +1241,40 @@ function useSaveAutomation({
 }: {
   draft: AutomationDraft;
   canSave: boolean;
+  /** Toasted when Save is pressed early; the button stays pressable. */
+  saveBlockedReason: string;
   projectId: string;
   automationId: string | undefined;
   labels: ReturnType<typeof presetLabels>;
   onClose: () => void;
 }) {
+  const host = useAutomationHost();
   const toaster = useAutomationToaster();
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
   const upsert = api.automation.upsert.useMutation();
 
   const onSave = useCallback(() => {
-    if (!canSave || !draft.action) return;
+    if (!canSave || !draft.action) {
+      toaster.create({ title: saveBlockedReason, type: "warning" });
+      return;
+    }
     upsert.mutate(upsertInputFromDraft({ draft, action: draft.action, projectId, automationId }), {
-      onSuccess: () => {
+      onSuccess: (saved) => {
+        const viewCreated = {
+          label: `View ${labels.noun}`,
+          run: () =>
+            host.openDrawer({ drawer: "viewAutomation", params: { automationId: saved.id } }),
+        };
         toaster.create({
           title: automationId ? labels.updatedToast : labels.createdToast,
           type: "success",
+          ...(automationId ? {} : { action: viewCreated }),
         });
         void queryClient.automation.getTriggers.invalidate();
+        // Edit hydration reads this query once per open, so without this the
+        // next open hydrates from the pre-save copy.
+        void queryClient.automation.getTriggerById.invalidate();
         // The dashboard chart card reads its alert state off the graph, not
         // off the trigger list: without these the card still offers "Add
         // alert" after one was just created, and clicking it re-enters CREATE
@@ -1126,9 +1302,11 @@ function useSaveAutomation({
     labels,
     projectId,
     queryClient,
+    saveBlockedReason,
     toaster,
     showErrorToast,
     upsert,
+    host,
   ]);
 
   return { onSave, upsert };
@@ -1140,17 +1318,26 @@ function DrawerBodyContent({
   editLoading,
   noun,
   isEdit,
-  sourceLocked,
+  isReport,
   prefilledGraphId,
-  webhookEnabled,
+  projectId,
+  subjectLocked,
+  graphName,
+  seriesLabel,
+  onCreateNew,
 }: {
   editError: boolean;
   editLoading: boolean;
   noun: string;
   isEdit: boolean;
-  sourceLocked: boolean;
+  /** A report keeps the single-pane composer; everything else is the wizard. */
+  isReport: boolean;
   prefilledGraphId: string | undefined;
-  webhookEnabled: boolean;
+  projectId: string;
+  subjectLocked: boolean;
+  graphName: string | null;
+  seriesLabel: string | null;
+  onCreateNew: () => void;
 }) {
   if (editError) {
     return (
@@ -1180,12 +1367,19 @@ function DrawerBodyContent({
   }
   return (
     <Box css={{ zoom: 0.9 }}>
-      <MainSectionList
-        isEdit={isEdit}
-        sourceLocked={sourceLocked}
-        prefilledGraphId={prefilledGraphId}
-        webhookEnabled={webhookEnabled}
-      />
+      {isReport ? (
+        <MainSectionList isEdit={isEdit} prefilledGraphId={prefilledGraphId} />
+      ) : (
+        <AutomationWizard
+          projectId={projectId}
+          isEdit={isEdit}
+          prefilledGraphId={prefilledGraphId}
+          subjectLocked={subjectLocked}
+          graphName={graphName}
+          seriesLabel={seriesLabel}
+          onCreateNew={onCreateNew}
+        />
+      )}
     </Box>
   );
 }
@@ -1215,10 +1409,7 @@ function DrawerFooterActions({
   saveTestId: string;
 }) {
   return (
-    <HStack width="full">
-      <Spacer />
-      {/* Send test sits next to Save (ADR-043 feedback): once a notify
-          channel is set up, fire the real message before committing. */}
+    <>
       {showTestFire ? (
         <Tooltip content="Finish the delivery setup to send a test." disabled={configComplete}>
           <Button
@@ -1237,55 +1428,13 @@ function DrawerFooterActions({
           data-testid={saveTestId}
           onClick={onSave}
           loading={saving}
-          disabled={!canSave}
+          // Pressable while incomplete: a click toasts what is still missing.
+          disabled={saving}
         >
           {saveLabel}
         </Button>
       </Tooltip>
-    </HStack>
-  );
-}
-
-function DiscardChangesDialog({
-  open,
-  noun,
-  onKeepEditing,
-  onDiscard,
-}: {
-  open: boolean;
-  noun: string;
-  onKeepEditing: () => void;
-  onDiscard: () => void;
-}) {
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open }) => {
-        if (!open) onKeepEditing();
-      }}
-      size="sm"
-    >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Discard unsaved changes?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text color="fg.muted" textStyle="sm">
-            This {noun} has changes you haven't saved yet. Close the drawer and discard them?
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={onKeepEditing}>
-              Keep editing
-            </Button>
-            <Button colorPalette="red" size="sm" onClick={onDiscard}>
-              Discard
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    </>
   );
 }
 
@@ -1398,7 +1547,7 @@ function previewContextOf({
         slug: projectSlug ?? "project",
       },
       trigger: {
-        name: name || "Example alert",
+        name: name || "Example automation",
         alertType: alertType,
       },
       graph: graphName ? { name: graphName } : undefined,
@@ -1453,11 +1602,13 @@ function useHydrateFromServer({
   row,
   hydrate,
   baselineRef,
+  slackConnections,
 }: {
   automationId: string | undefined;
   row: SavedTriggerRow | null | undefined;
   hydrate: (draft: AutomationDraft) => void;
   baselineRef: BaselineRef;
+  slackConnections: readonly NamedSlackConnection[] | undefined;
 }) {
   const hydratedFromServerFor = useRef<string | null>(null);
   useEffect(() => {
@@ -1472,51 +1623,59 @@ function useHydrateFromServer({
       hydratedFromServerFor.current = automationId;
       // Their in-flight edits are genuinely unsaved relative to a blank
       // draft, so baseline against INITIAL_DRAFT and keep guarding them.
-      baselineRef.current ??= JSON.stringify(INITIAL_DRAFT);
+      baselineRef.current ??= draftFingerprint(INITIAL_DRAFT);
       return;
     }
-    const next = draftFromTriggerRow(row);
+    const next = withSlackConnectionName({
+      draft: draftFromTriggerRow(row),
+      connections: slackConnections,
+    });
     hydrate(next);
     hydratedFromServerFor.current = automationId;
-    baselineRef.current = JSON.stringify(next);
-  }, [row, automationId, hydrate, baselineRef]);
+    baselineRef.current = draftFingerprint(next);
+  }, [row, automationId, hydrate, baselineRef, slackConnections]);
 }
 
-/** On create, baselines the close guard against the draft once the prefills have landed. */
+/** On create, baselines the close guard once the prefills have landed; declared
+ *  after them, so it runs after them on mount and on every identity change. */
 function useCreateBaseline({
   automationId,
+  drawerIdentity,
   baselineRef,
 }: {
   automationId: string | undefined;
+  drawerIdentity: string;
   baselineRef: BaselineRef;
 }) {
   useEffect(() => {
     if (automationId) return;
     if (baselineRef.current !== null) return;
-    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    baselineRef.current = draftFingerprint(useAutomationStore.getState().draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 }
 
-/** Names a fresh graph alert after its graph once the graph loads, if the author has not. */
+/** Names a fresh graph watcher after its graph once the graph loads, if the author has not. */
 function useSeedNameFromGraph({
   automationId,
+  drawerIdentity,
   prefilledGraphId,
   graphName,
   dispatch,
 }: {
   automationId: string | undefined;
+  drawerIdentity: string;
   prefilledGraphId: string | undefined;
   graphName: string | null;
   dispatch: Dispatch;
 }) {
-  const seededNameFromGraph = useRef(false);
+  const seededFor = useRef<string | null>(null);
   useEffect(() => {
-    if (automationId || seededNameFromGraph.current) return;
+    if (automationId || seededFor.current === drawerIdentity) return;
     if (!prefilledGraphId || !graphName) return;
     const draftName = useAutomationStore.getState().draft.name;
     if (draftName.trim() !== "") return;
-    dispatch({ type: "SET_NAME", value: `${graphName} alert` });
-    seededNameFromGraph.current = true;
-  }, [automationId, prefilledGraphId, graphName, dispatch]);
+    dispatch({ type: "SET_NAME", value: `${graphName} automation` });
+    seededFor.current = drawerIdentity;
+  }, [automationId, drawerIdentity, prefilledGraphId, graphName, dispatch]);
 }

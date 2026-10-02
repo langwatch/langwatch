@@ -15,6 +15,7 @@ import {
 } from "@opentelemetry/api";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 
+import { redactSharePaths } from "./browserErrors.ts";
 import {
   ATTR_NAVIGATION_FROM_PATH,
   ATTR_NAVIGATION_SUPERSEDED,
@@ -69,14 +70,17 @@ export function startNavigationSpan({
   try {
     if (inFlight) endInFlight();
 
+    const path = redactSharePaths({ value: toPath });
     const span = trace.getTracer(RUM_INSTRUMENTATION_NAME).startSpan(
-      navigationName(toPath),
+      navigationName(path),
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR_URL_PATH]: toPath,
+          [ATTR_URL_PATH]: path,
           [ATTR_NAVIGATION_TYPE]: navigationType,
-          ...(fromPath ? { [ATTR_NAVIGATION_FROM_PATH]: fromPath } : {}),
+          ...(fromPath
+            ? { [ATTR_NAVIGATION_FROM_PATH]: redactSharePaths({ value: fromPath }) }
+            : {}),
         },
       },
       // Explicitly rooted. A navigation is its own unit of work; inheriting
@@ -106,8 +110,9 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
       try {
         committedAt ??= nowInstant().epochMilliseconds;
         if (route) {
-          span.updateName(navigationName(route));
-          span.setAttribute(ATTR_HTTP_ROUTE, route);
+          const pattern = redactSharePaths({ value: route });
+          span.updateName(navigationName(pattern));
+          span.setAttribute(ATTR_HTTP_ROUTE, pattern);
         }
       } catch {
         // Best effort: the span keeps the name and duration it would have had.

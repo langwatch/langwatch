@@ -4,8 +4,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock useLatestPromptVersion to avoid needing SessionProvider
@@ -96,7 +96,7 @@ const createTestTarget = (
 });
 
 const renderWithProviders = (ui: React.ReactElement) => {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithDesignSystem(ui);
 };
 
 /**
@@ -114,12 +114,10 @@ const renderWithTemplateFields = (
   ui: React.ReactElement,
   usedFieldsByTargetId: Record<string, string[]>,
 ) => {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptTemplateFieldsContext.Provider value={templateFieldsLookup(usedFieldsByTargetId)}>
-        {ui}
-      </PromptTemplateFieldsContext.Provider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <PromptTemplateFieldsContext.Provider value={templateFieldsLookup(usedFieldsByTargetId)}>
+      {ui}
+    </PromptTemplateFieldsContext.Provider>,
   );
 };
 

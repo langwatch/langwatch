@@ -1,3 +1,7 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -12,11 +16,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";

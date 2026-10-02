@@ -37,7 +37,7 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
     createdAt: new Date(),
     updatedAt: new Date(),
     hashedSecret: "hashed",
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -77,7 +77,9 @@ function makeService({ children }: { children: { id: string }[] }) {
     tokens: {} as never,
   };
   const policy = ApiKeyGrantPolicyService.create(dependencies);
-  const service = ApiKeyLifecycleService.create({ ...dependencies, repository }, policy);
+  const service = ApiKeyLifecycleService.create({ ...dependencies, repository }, policy, {
+    forget: async () => void 0,
+  });
 
   return { service, repository, revoke, findLiveChildren };
 }

@@ -1,5 +1,13 @@
-import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo, useRef } from "react";
@@ -17,8 +25,8 @@ import {
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
-import type { VizTab } from "../../../../behavior/drawer.store.ts";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import type { VizTab } from "../../../../model/trace-drawer-params.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
@@ -377,10 +385,10 @@ export function VizPlaceholder({
   // When the detail pane is hidden, surface a "Show details" affordance
   // in the viz tab row so the user can bring it back without having to
   // click a span. The detail pane also auto-reopens whenever a span is
-  // selected (see `drawerStore.selectSpan`); this is the manual escape
+  // selected (see `getTraceDrawer().selectSpan`); this is the manual escape
   // for when the user wants to see the trace summary again.
-  const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
-  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
+  const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
+  const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
   const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);

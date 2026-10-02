@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, TagsInput, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, TagsInput, Text, VStack } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 import { useState } from "react";
 

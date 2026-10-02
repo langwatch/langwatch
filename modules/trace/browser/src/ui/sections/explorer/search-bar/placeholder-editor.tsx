@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import type React from "react";
 import { useEffect, useMemo } from "react";

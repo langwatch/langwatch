@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanDetail, TraceHeader, TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const header = vi.hoisted((): { current: TraceHeader } => ({
@@ -59,11 +59,7 @@ import type * as useSpansFullModule from "../../hooks/use-spans-full.ts";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
 
 function renderDialog(patch: TraceEditOverlayPatch) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceEditDiffDialog open onClose={vi.fn()} patch={patch} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TraceEditDiffDialog open onClose={vi.fn()} patch={patch} />);
 }
 
 const capturedSpan: SpanDetail = {

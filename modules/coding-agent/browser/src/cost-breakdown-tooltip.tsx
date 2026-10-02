@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost } from "@langwatch/design-system/display-formatters";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 /** Cost breakdown tooltip; package copy of trace explorer (lives in platform/app). */
 function TooltipRow({ label, value }: { label: string; value: string }) {

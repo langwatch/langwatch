@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,7 +32,7 @@ vi.mock("../../../../../behavior/use-prompt-tabs-browser-store.ts", () => ({
   useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
-vi.mock("../../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
+vi.mock("../../../../blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 
@@ -63,6 +63,20 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
         useQuery: mockGetResolvedDefault,
       },
     },
+    useUtils: () => ({
+      prompts: {
+        getAllPromptsForProject: { invalidate: mockInvalidatePromptList },
+      },
+    }),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      prompts: {
+        getAllPromptsForProject: { invalidate: mockInvalidatePromptList },
+      },
+    }),
     prompts: {
       checkModifyPermission: {
         useQuery: mockCheckModifyPermission,
@@ -70,15 +84,22 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
       syncFromSource: {
         useMutation: () => ({ mutateAsync: vi.fn() }),
       },
+      copy: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
+      pushToCopies: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
       duplicate: {
-        useMutation: () => ({ mutateAsync: mockDuplicate }),
+        useMutation: (options?: { onSuccess?: (result: unknown) => unknown }) => ({
+          mutateAsync: async (input: unknown) => {
+            const result = await mockDuplicate(input);
+            await options?.onSuccess?.(result);
+            return result;
+          },
+        }),
       },
     },
-    useUtils: () => ({
-      prompts: {
-        getAllPromptsForProject: { invalidate: mockInvalidatePromptList },
-      },
-    }),
   },
 }));
 
@@ -94,11 +115,7 @@ let currentHost: FakePromptHost;
 
 const renderWithChakra = (ui: React.ReactElement, host: FakePromptHost = new FakePromptHost()) => {
   currentHost = host;
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptHostProvider value={host}>{ui}</PromptHostProvider>
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<PromptHostProvider value={host}>{ui}</PromptHostProvider>);
 };
 
 /** Opens the row menu and clicks "Duplicate prompt". */

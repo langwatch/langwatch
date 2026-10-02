@@ -1,4 +1,4 @@
-import { Box, Button, Input } from "@chakra-ui/react";
+import { Box, Button, Input } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 export function PipelineTreeFilter({

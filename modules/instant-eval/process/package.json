@@ -32,11 +32,12 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
@@ -49,7 +50,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

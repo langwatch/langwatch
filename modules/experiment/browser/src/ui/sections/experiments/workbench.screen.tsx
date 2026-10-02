@@ -1,13 +1,7 @@
-import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  type ProposalHandlers,
-  useRegisterLangyActions,
-  useRegisterLangyHandlers,
-} from "@langwatch/langy-browser-kit";
-import { assertCrispChatHidden, HandledErrorAlert } from "@langwatch/workflow-browser-kit";
+import { Alert, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAutosaveEvaluationsV3 } from "../../../behavior/experiments-v3/use-autosave-evaluations-v3.ts";
@@ -26,6 +20,8 @@ import {
 } from "../../../behavior/experiments-v3/use-workbench-proposal-handlers.ts";
 import { useWorkbenchUiActionHandlers } from "../../../behavior/experiments-v3/use-workbench-ui-action-handlers.ts";
 import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
+import { assertCrispChatHidden } from "../../../behavior/workflow/crisp-bubble-policy.ts";
+import { type ProposalHandlers } from "../../../model/langy/langy-proposal-handlers.ts";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
 import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
@@ -37,6 +33,8 @@ import { SavedDatasetLoaders } from "../../../ui/sections/experiments-v3/saved-d
 import { TableSettingsMenu } from "../../../ui/sections/experiments-v3/table-settings-menu.tsx";
 import { UndoRedo } from "../../../ui/sections/experiments-v3/undo-redo.tsx";
 import { VersionHistoryButton } from "../../../ui/sections/experiments-v3/version-history-button.tsx";
+import { HandledErrorAlert } from "../../elements/workflow/studio-host/errors.tsx";
+import { useRegisterLangyActions, useRegisterLangyHandlers } from "../langy/langy-page-context.tsx";
 
 /**
  * Experiments Workbench Page

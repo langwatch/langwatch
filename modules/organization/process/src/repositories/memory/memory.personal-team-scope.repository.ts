@@ -1,4 +1,4 @@
-import { RoleBindingScopeType } from "@langwatch/organization-contract";
+import { GrantScopeTier } from "@langwatch/authz-contract";
 
 import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
@@ -14,13 +14,13 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
   }
 
   async findPersonalTeamsInScopes(input: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<{ name: string }[]> {
     return this.findMatching(input.scopes, () => true);
   }
 
   async findForeignPersonalTeamsInScopes(input: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
     ownerUserId: string | null;
   }): Promise<{ name: string }[]> {
     return this.findMatching(
@@ -30,7 +30,7 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
   }
 
   private findMatching(
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[],
     matchesOwner: (ownerUserId: string | null) => boolean,
   ): { name: string }[] {
     return scopes.flatMap((scope) =>
@@ -46,13 +46,13 @@ function personalTeamsReachedBy({
   scope,
 }: {
   memory: MemoryOrganizationDatabase;
-  scope: { scopeType: RoleBindingScopeType; scopeId: string };
+  scope: { scopeType: GrantScopeTier; scopeId: string };
 }): MemoryTeamRow[] {
-  if (scope.scopeType === RoleBindingScopeType.TEAM) {
+  if (scope.scopeType === GrantScopeTier.TEAM) {
     const team = memory.teams.get(scope.scopeId);
     return team?.isPersonal ? [team] : [];
   }
-  if (scope.scopeType === RoleBindingScopeType.PROJECT) {
+  if (scope.scopeType === GrantScopeTier.PROJECT) {
     const project = memory.projects.get(scope.scopeId);
     const team = project?.isPersonal ? memory.teams.get(project.teamId) : undefined;
     return team ? [team] : [];

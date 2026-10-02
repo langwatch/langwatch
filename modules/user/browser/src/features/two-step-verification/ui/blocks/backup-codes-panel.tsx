@@ -3,7 +3,7 @@
  * never held one: what they are FOR comes before how they behave, and no
  * word is shortened, because these are the last way back into an account.
  */
-import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { usePersonalWorkspaceHost } from "../../../../model/personal-workspace-host.ts";
 

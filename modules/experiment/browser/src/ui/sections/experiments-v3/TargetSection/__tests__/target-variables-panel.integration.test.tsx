@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -70,18 +70,16 @@ const otherTarget: TargetConfig = {
 } as TargetConfig;
 
 function renderPanel(props: Partial<Parameters<typeof TargetVariablesPanel>[0]> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TargetVariablesPanel
-        target={target}
-        activeDatasetId={ACTIVE_DATASET_ID}
-        datasets={datasets}
-        otherTargets={[]}
-        onInputsChange={vi.fn()}
-        onMappingChange={vi.fn()}
-        {...props}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TargetVariablesPanel
+      target={target}
+      activeDatasetId={ACTIVE_DATASET_ID}
+      datasets={datasets}
+      otherTargets={[]}
+      onInputsChange={vi.fn()}
+      onMappingChange={vi.fn()}
+      {...props}
+    />,
   );
 }
 

@@ -33,6 +33,13 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       suites: { getSummaries: { invalidate: invalidations.suiteSummaries } },
+    }),
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
       scenarios: {
         getExternalSetSummaries: {
           invalidate: invalidations.externalSetSummaries,

@@ -9,7 +9,7 @@ import {
  * monitors. Thread sources (THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
  * or sourceId "thread") are marked `type: "thread"`.
  */
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 
 export function serializeMappingsToMappingState(
   mappings: Record<string, UIFieldMapping>,

@@ -49,19 +49,12 @@ export {
   type SlackTemplateType,
 } from "./providers/slack.ts";
 export {
-  WEBHOOK_HEADER_VALUE_KEPT,
-  WEBHOOK_METHODS,
-  findWebhookUrlProblem,
-  isReservedWebhookHeader,
-  sanitizeWebhookHeaders,
-  findWebhookUrlProblemMessage,
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
+  isJsonWebhookContentType,
+  isWebhookContentType,
   webhookActionParamsSchema,
-  webhookMethodSchema,
   type WebhookActionParams,
-  type WebhookMethod,
   type WebhookPreview,
-  type WebhookUrlProblem,
-  type WebhookUrlProblemCode,
 } from "./providers/webhook.ts";
 
 export const providerActionValues = [
@@ -119,14 +112,16 @@ export const slackProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.SEND_SLACK_MESSAGE,
   category: "notify",
   label: "Slack",
-  description: "Post a message to a Slack webhook when a trace matches.",
-  alertDescription: "Post a message to a Slack webhook when the alert fires.",
+  description: "Post a message to Slack when a trace matches.",
+  alertDescription: "Post a message to Slack when it fires.",
+  reportDescription: "Post the report to Slack on its schedule.",
   actionParamsSchema: slackActionParamsSchema,
 };
 export const webhookProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.SEND_WEBHOOK,
   category: "notify",
   label: "Webhook",
-  description: "Send an HTTP request when an automation matches.",
+  description: "Send a request with a body you shape to your own endpoint when a trace matches.",
+  alertDescription: "Send a request with a body you shape to your own endpoint when it fires.",
   actionParamsSchema: webhookActionParamsSchema,
 };

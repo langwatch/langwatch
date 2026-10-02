@@ -1,17 +1,17 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Connect an AI provider on the way into the product: one row of marks, one
  * focused connect panel, and a quiet "Skip Guided Tour" link that asks once.
  */
-import { Box, chakra, Flex, HStack, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
-import { guidedProvidersFor } from "@langwatch/onboarding-browser-kit";
+import { Box, chakra, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
 import { LentEditModelProviderForm } from "../../../../behavior/lent-edit-model-provider-form.tsx";
 import { useGuidedProviderConnect } from "../../behavior/use-guided-provider-connect.ts";
 import { providerSegments, SKIP_TOUR_COPY } from "../../model/copy.ts";
+import { guidedProvidersFor } from "../../model/guided-providers.ts";
 import { TakeoverRow } from "./takeover-row.tsx";
 import { Typewriter } from "./typewriter.tsx";
 
@@ -82,15 +82,14 @@ export function ProviderScreen({
         aria-hidden={!typed}
         data-testid="provider-connect"
       >
-        <Flex wrap="wrap" gap={2} role="radiogroup" aria-label="AI provider">
+        <Flex as="fieldset" wrap="wrap" gap={2} aria-label="AI provider">
           {providers.map((provider) => {
             const isSelected = provider.id === selected.id;
             return (
               <chakra.button
                 key={provider.id}
                 type="button"
-                role="radio"
-                aria-checked={isSelected}
+                aria-pressed={isSelected}
                 aria-label={provider.name}
                 title={provider.name}
                 onClick={() => {

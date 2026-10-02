@@ -13,6 +13,10 @@ import type {
 import { useCallback } from "react";
 
 import type { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
+import {
+  type SuiteDraft,
+  useSuiteEditorStore,
+} from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,
@@ -20,7 +24,6 @@ import {
   opensOnAttach,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
-import { type SuiteDraft, useSuiteEditorStore } from "./suite-editor-store.ts";
 
 export type SuiteDraftUpdate = (change: (draft: SuiteDraft) => SuiteDraft) => void;
 

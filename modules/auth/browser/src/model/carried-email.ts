@@ -3,28 +3,22 @@
  */
 
 const KEY = "email";
-const PROOF_KEY = "proof";
 
 /**
  * /auth/signup with callback in query, address in fragment; URLSearchParams escapes both.
- * An unconfirmed address proof, minted where the installation sends no email, rides in the
- * fragment beside the address so the sign-up door opens on its password step.
  */
 export function signUpHref({
   callbackUrl,
   email,
-  addressProof,
 }: {
   callbackUrl?: string;
   email?: string | null;
-  addressProof?: string | null;
 }): string {
   const query = new URLSearchParams();
   if (callbackUrl) query.set("callbackUrl", callbackUrl);
 
   const fragment = new URLSearchParams();
   if (email) fragment.set(KEY, email);
-  if (email && addressProof) fragment.set(PROOF_KEY, addressProof);
 
   const queryPart = query.toString();
   const fragmentPart = fragment.toString();
@@ -45,14 +39,6 @@ export function readCarriedEmail(): string | undefined {
   const fragment = window.location.hash.replace(/^#/, "");
   if (!fragment) return void 0;
   return new URLSearchParams(fragment).get(KEY) ?? void 0;
-}
-
-/** The unconfirmed address proof the fragment carries beside the address, if any. */
-export function readCarriedAddressProof(): string | undefined {
-  if (typeof window === "undefined") return void 0;
-  const fragment = window.location.hash.replace(/^#/, "");
-  if (!fragment) return void 0;
-  return new URLSearchParams(fragment).get(PROOF_KEY) ?? void 0;
 }
 
 /**

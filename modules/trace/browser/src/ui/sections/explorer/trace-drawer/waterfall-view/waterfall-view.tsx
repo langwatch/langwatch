@@ -1,6 +1,6 @@
-import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { Box, chakra, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type React from "react";

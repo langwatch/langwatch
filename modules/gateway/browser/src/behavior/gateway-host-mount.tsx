@@ -223,20 +223,23 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const graph = gatewayApi.organization.getAll.useQuery({ isDemo: false });
+  const graph = gatewayApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const organizations = useMemo(
     () => organizationsOf(graph.data ?? NO_ORGANIZATIONS),
     [graph.data],
   );
 
-  // The same question, gate and cache entry as the navigation's plan reading.
-  const usage = gatewayApi.limits.getUsage.useQuery(
+  // The plan tier only: the session-cached read, not the monthly usage count.
+  const activePlan = gatewayApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
   const plan = useMemo(
-    () => planOf({ activePlan: usage.data?.activePlan, isLoading: usage.isLoading }),
-    [usage.data, usage.isLoading],
+    () => planOf({ activePlan: activePlan.data, isLoading: activePlan.isLoading }),
+    [activePlan.data, activePlan.isLoading],
   );
 
   const host = useMemo(

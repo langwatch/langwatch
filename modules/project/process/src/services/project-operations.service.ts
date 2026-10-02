@@ -1,34 +1,43 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { generate } from "@langwatch/ksuid";
 import {
   ProjectNotFoundError,
+  ProjectS3SecretRequiredError,
   type Project,
   type TopicClusteringRequest,
   type UpdateProjectInput,
+  type ProjectLegacyKeyStatus,
 } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 
+import {
+  isLegacyKeyRevoked,
+  REVOKED_LEGACY_KEY_PREFIX,
+} from "../rules/legacy-project-key.rules.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectService } from "./project.service.ts";
 
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<
   ProjectService,
-  "create" | "findWithTeam" | "update" | "archive"
+  "create" | "findWithTeam" | "update" | "archive" | "getById" | "rotateLegacyApiKey"
 >;
 
 type ProjectOperationsDependencies = Readonly<{
   readonly projects: ProjectOperationsDirectory;
-  readonly apiKeys: ApiKeyApi;
-  readonly share: ShareApi;
-  readonly topics: Pick<TopicApi, "getClusteringStatus" | "requestClustering">;
-  readonly now: () => number;
   readonly auditLog: AuditLogApi;
+  readonly lifecycle: Pick<ProjectCreatedNoticeService, "legacyKeyRevoked">;
   /** Where a best-effort failure is reported when nothing can be done about it. */
   readonly logger: Readonly<{
     error(payload: Readonly<Record<string, unknown>>, message: string): void;
   }>;
+  readonly share: ShareApi;
+  readonly topics: Pick<TopicApi, "getClusteringStatus" | "requestClustering">;
+  readonly now: () => number;
 }>;
+
+const REVOKED_KEY_KSUID_RESOURCE = "project";
 
 type ProjectCaller = Readonly<{ id: string }>;
 
@@ -68,6 +77,9 @@ export class ProjectOperationsService {
     if (!project) {
       throw new ProjectNotFoundError();
     }
+    if (input.s3Endpoint && input.s3SecretAccessKey === undefined && !project.s3SecretAccessKey) {
+      throw new ProjectS3SecretRequiredError();
+    }
 
     const data: UpdateProjectInput = {
       ...(input.name !== undefined && { name: input.name }),
@@ -81,7 +93,7 @@ export class ProjectOperationsService {
       presenceEnabled: input.presenceEnabled,
       s3Endpoint: input.s3Endpoint ?? null,
       s3AccessKeyId: input.s3AccessKeyId ?? null,
-      s3SecretAccessKey: input.s3SecretAccessKey ?? null,
+      ...(input.s3SecretAccessKey !== undefined && { s3SecretAccessKey: input.s3SecretAccessKey }),
       s3Bucket: input.s3Bucket,
     };
     const updated = await this.dependencies.projects.update({
@@ -119,24 +131,52 @@ export class ProjectOperationsService {
     }
   }
 
-  regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string> {
-    return this.dependencies.apiKeys.regenerateLegacyProjectKey(input);
+  async getLegacyKeyStatus(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<ProjectLegacyKeyStatus> {
+    const project = await this.dependencies.projects.getById(input.projectId);
+
+    return { present: !isLegacyKeyRevoked(project.apiKey) };
   }
 
-  /** Best effort: an audit failure must not stop the rotated key reaching its caller. */
-  async recordApiKeyRegenerated(
+  /** Idempotent: a project with no legacy key is left with a fresh unusable one. */
+  async revokeLegacyProjectKey(
+    input: Readonly<{ projectId: string }>,
+    by: ProjectCaller,
+  ): Promise<void> {
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
+    if (!project) {
+      throw new ProjectNotFoundError();
+    }
+    const revoked = await this.dependencies.projects.rotateLegacyApiKey({
+      projectId: input.projectId,
+      token: `${REVOKED_LEGACY_KEY_PREFIX}${generate(REVOKED_KEY_KSUID_RESOURCE).toString()}`,
+    });
+    if (!revoked) {
+      throw new ProjectNotFoundError();
+    }
+    await this.recordApiKeyRevoked({ userId: by.id, projectId: input.projectId });
+    await this.dependencies.lifecycle.legacyKeyRevoked({
+      projectId: input.projectId,
+      organizationId: project.team.organizationId,
+      revokedByUserId: by.id,
+    });
+  }
+
+  /** Best effort: an audit failure must not undo a revocation that has happened. */
+  private async recordApiKeyRevoked(
     entry: Readonly<{ userId: string; projectId: string }>,
   ): Promise<void> {
     try {
       await this.dependencies.auditLog.record({
-        action: "project.apiKey.regenerated",
+        action: "project.apiKey.revoked",
         userId: entry.userId,
         projectId: entry.projectId,
       });
     } catch (error) {
       this.dependencies.logger.error(
         { error, projectId: entry.projectId },
-        "Recording the API key rotation in the audit log failed.",
+        "Recording the project API key revocation in the audit log failed.",
       );
     }
   }

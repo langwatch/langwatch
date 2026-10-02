@@ -3,6 +3,7 @@
  * queries live behind AuthzReadRepository (the app's Prisma implementation); this service
  * owns what the rows MEAN: group expansion, the lenient custom-role parse, share-link
  */
+import type { ShareableResourceKind } from "@langwatch/authorization";
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
@@ -10,7 +11,6 @@ import type {
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
-  ShareableResourceKind,
 } from "@langwatch/authz-contract";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 

@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";

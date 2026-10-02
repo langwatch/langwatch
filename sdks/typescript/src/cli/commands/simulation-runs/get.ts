@@ -2,7 +2,7 @@ import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -82,7 +82,7 @@ export const getSimulationRunCommand = async (
       `${endpoint}/api/v1/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
+        headers: buildRequestHeaders({ apiKey }),
       },
     );
 

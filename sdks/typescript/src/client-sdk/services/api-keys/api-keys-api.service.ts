@@ -5,6 +5,7 @@ import type {
 } from "@/client-sdk/services/_shared/management-types";
 import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -111,6 +112,7 @@ export class ApiKeysApiService {
 
   private headers(): Record<string, string> {
     return {
+      ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
     };

@@ -1,21 +1,21 @@
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 /**
  * @vitest-environment node
  * The worker installed over memory stores delivers a gateway request end to end: the
  * delivery process manager, its endpoint stream, health, replay and the outbox all ride
  * the one process store the kernel supplies.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { spendSteps } from "../../__tests__/fixtures/spend-delivery.fixtures.ts";
-import { webhookServer } from "../../webhook.server.ts";
+import { webhookProcessModule } from "../../webhook.module.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const PROJECT_ID = "project-1";
@@ -55,7 +55,7 @@ function worker() {
   });
 
   return createApp({ role: "worker" })
-    .withModules([withMemoryRepositories(webhookServer)])
+    .withModules([withMemoryRepositories(webhookProcessModule)])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,

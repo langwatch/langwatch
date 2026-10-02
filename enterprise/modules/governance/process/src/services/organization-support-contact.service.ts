@@ -12,17 +12,24 @@
  * a budget refusal tells a person who to go to, and an organization that has
  * configured nobody gets no name rather than a guess.
  */
+import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+
 import type { OrganizationSupportContactRepository } from "../repositories/organization-support-contact.repository.ts";
 
 export class OrganizationSupportContactService {
-  private constructor(private readonly repository: OrganizationSupportContactRepository) {}
+  private constructor(
+    private readonly repository: OrganizationSupportContactRepository,
+    private readonly organizations: Pick<OrganizationApi, "getSettings">,
+  ) {}
 
   static create({
     repository,
+    organizations,
   }: {
     repository: OrganizationSupportContactRepository;
+    organizations: Pick<OrganizationApi, "getSettings">;
   }): OrganizationSupportContactService {
-    return new OrganizationSupportContactService(repository);
+    return new OrganizationSupportContactService(repository, organizations);
   }
 
   /**
@@ -71,12 +78,27 @@ export class OrganizationSupportContactService {
    * nowhere.
    */
   async findSupportContact({ organizationId }: { organizationId: string }): Promise<string | null> {
-    const configured = await this.repository.findConfiguredSupportContact({ organizationId });
+    const configured = await this.findConfiguredSupportContact({ organizationId });
     const trimmed = configured?.trim();
     if (trimmed) {
       return trimmed;
     }
 
     return this.findOrgAdminEmail({ organizationId });
+  }
+
+  private async findConfiguredSupportContact({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string | null> {
+    try {
+      return (await this.organizations.getSettings({ organizationId })).supportContact;
+    } catch (error) {
+      if (error instanceof OrganizationNotFoundError) {
+        return null;
+      }
+      throw error;
+    }
   }
 }

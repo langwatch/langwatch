@@ -1,9 +1,3 @@
-/**
- * The process's Better Auth transport, built from stand-ins for every port it
- * takes. Shared by the tests that read the instance's OPTIONS rather than call
- * it — the plugin list, the account-linking guard, the password verifier.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   IdentityVerificationExpiredError,
   type SsoArrivalApi,
@@ -11,6 +5,12 @@ import {
   type SsoAuthenticationActivityApi,
   type SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
+/**
+ * The process's Better Auth transport, built from stand-ins for every port it
+ * takes. Shared by the tests that read the instance's OPTIONS rather than call
+ * it — the plugin list, the account-linking guard, the password verifier.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
@@ -88,6 +88,7 @@ export function betterAuthTransportFor(
     }),
     ssoAssertions: createApiFixture<SsoAssertionApi>({
       decide: async () => ({ action: "continue" }),
+      resolveUser: async () => ({ action: "continue" }),
     }),
     /** Nothing registered: a test that needs an origin trusted says so. */
     ssoIssuers: { issuersForRequest: async () => [] },

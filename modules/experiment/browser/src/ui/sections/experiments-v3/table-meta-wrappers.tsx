@@ -2,7 +2,7 @@
  * Wrapper components that read from TanStack Table's meta object.
  * These keep column definitions stable by avoiding closures over dynamic data.
  */
-import { Checkbox } from "@chakra-ui/react";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";

@@ -1,11 +1,11 @@
+import { CopyButton } from "@langwatch/design-system/copy-button";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * One fact to publish elsewhere: what it is called, what it says, and a way
  * to take it without retyping it. Every value here is meant to be pasted
  * into somebody else's administration screen, so none of it is truncated.
  */
-import { HStack, Text, VStack } from "@chakra-ui/react";
-import { CopyButton } from "@langwatch/design-system/copy-button";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 export function CopyValueRow({
   label,

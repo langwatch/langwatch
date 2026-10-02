@@ -24,20 +24,21 @@ import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
+import { EventingAuthzPlatformGrantRepository } from "../repositories/eventing/eventing.authz-platform-grant.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import { AuthzMemoryStore } from "../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzSessionVersionRepository } from "../repositories/memory/memory.authz-session-version.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import {
-  type AuthzBindingDatabase,
-  PrismaAuthzBindingRepository,
-} from "../repositories/prisma/prisma.authz-binding.repository.ts";
-import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
 import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
+import {
+  type AuthzManagedGrantDatabase,
+  PrismaAuthzManagedGrantRepository,
+} from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import {
   type AuthzMembershipStampDatabase,
   PrismaAuthzMembershipStampRepository,
@@ -49,6 +50,10 @@ import {
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
+import {
+  PrismaAuthzUserStandingRepository,
+  type PrismaAuthzUserStandingDatabase,
+} from "../repositories/prisma/prisma.authz-user-standing.repository.ts";
 import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzSessionVersionRepository } from "../repositories/redis/redis.authz-session-version.repository.ts";
@@ -58,7 +63,9 @@ import type {
   AuthzGrantsCommandSenders,
 } from "../services/authz-grants-command-dispatcher.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
 import { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
+import { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
 import { AuthzService, type AuthzServiceOptions } from "../services/authz.service.ts";
 
 /**
@@ -66,13 +73,14 @@ import { AuthzService, type AuthzServiceOptions } from "../services/authz.servic
  * may adapt a generated client to this type once at its composition boundary;
  * no generated database type crosses into the feature.
  */
-export type PostgresAuthzDatabase = AuthzLedgerDatabase &
+export type PostgresAuthzDatabase = PrismaAuthzUserStandingDatabase &
+  AuthzLedgerDatabase &
   AuthzGrantWriteDatabase &
   PrismaAuthzGrantDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
-  AuthzBindingDatabase &
+  AuthzManagedGrantDatabase &
   AuthzMembershipStampDatabase &
   AuthzProjectionDatabase;
 
@@ -104,6 +112,10 @@ export type PostgresAuthzBuild = Readonly<{
   sessionVersions: AuthzSessionVersionService;
   pipeline: AuthzPipeline;
   migration: SystemMigration;
+  /** The platform tier's grant, revoke and list, behind AuthzApi's platform operations. */
+  platformOperators: AuthzPlatformOperatorsService;
+  /** Who is deactivated or erased, kept from user's and identity's facts. */
+  userStandings: AuthzUserStandingService;
 }>;
 
 /**
@@ -221,7 +233,18 @@ export class PostgresAuthzAdapter {
     const ledger = EventingAuthzLedgerAdapter.create(ledgerOptions);
     const grantRepository = EventingAuthzGrantRepository.create({ database, writer: ledger });
     const bindingRepository =
-      this.options.repositories?.bindings ?? PrismaAuthzBindingRepository.create({ database });
+      this.options.repositories?.bindings ?? PrismaAuthzManagedGrantRepository.create({ database });
+
+    const standings =
+      this.options.repositories?.userStandings ??
+      PrismaAuthzUserStandingRepository.create({ database });
+    const platformOperators = AuthzPlatformOperatorsService.create({
+      grants: EventingAuthzPlatformGrantRepository.create(database),
+      standings,
+      ledger,
+      newGrantId: this.options.newBindingId,
+    });
+    const userStandings = AuthzUserStandingService.create({ standings, platformOperators });
 
     const authzOptions: AuthzServiceOptions = {
       repository: EventingAuthzReadRepository.create(database),
@@ -230,6 +253,7 @@ export class PostgresAuthzAdapter {
       epoch,
       isOnEngine,
       findEngineCutoverAt: (organizationId) => cutover.findFinalizedAt({ organizationId }),
+      platformOperators,
     };
     if (this.options.cacheEnabled) {
       authzOptions.cacheEnabled = this.options.cacheEnabled;
@@ -262,6 +286,7 @@ export class PostgresAuthzAdapter {
       authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(database),
       authzAuditTrailStore: PrismaAuthzAuditRepository.create(database),
       sessionVersions,
+      userStandings,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: PrismaAuthzMigrationRepository.create(database),
@@ -269,7 +294,15 @@ export class PostgresAuthzAdapter {
       now: this.options.now ?? Date.now,
     });
 
-    return { authz, grants, sessionVersions, pipeline, migration };
+    return {
+      authz,
+      grants,
+      sessionVersions,
+      pipeline,
+      migration,
+      platformOperators,
+      userStandings,
+    };
   }
 }
 

@@ -1,9 +1,17 @@
-import { Badge, Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, HStack, Link, Text } from "@langwatch/design-system/primitives";
+import {
+  OverviewCard,
+  OverviewDetail,
+  type OverviewChip,
+} from "@langwatch/design-system/settings-card";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
+import { Building2, CalendarClock, Layers, Users } from "lucide-react";
 
 import {
   formatLicenseDate,
+  formatLimitOrUnlimited,
   hasLicenseMetadata,
   isCorruptedLicense,
   isLicenseExpired,
@@ -18,41 +26,27 @@ interface LicenseDetailsCardProps {
   isRefreshing?: boolean;
 }
 
-function licenseStateBadgeOf({
+/**
+ * Where the license stands, in one word. A lapsed license is a warning rather
+ * than a breakage: it still meters the seats it sold and every capability keeps
+ * working, so it asks for attention.
+ */
+function licenseChipOf({
   isValid,
   isExpired,
-  plan,
 }: {
   isValid: boolean;
   isExpired: boolean;
-  plan: string;
-}): { label: string; colorPalette: string } {
-  if (isValid) return { label: plan, colorPalette: "green" };
-  if (isExpired) return { label: "Expired", colorPalette: "orange" };
-  return { label: "Invalid", colorPalette: "red" };
+}): OverviewChip {
+  if (isValid) return { label: "Valid", tone: "good", title: "The signature checks out" };
+  if (isExpired) return { label: "Expired", tone: "warning", title: "The term has ended" };
+  return { label: "Invalid", tone: "bad", title: "The signature does not check out" };
 }
 
-/**
- * The one word that tells an admin where they stand. A lapsed license is orange
- * rather than red: it still meters the seats it sold and every capability keeps
- * working, so it asks for attention rather than reporting a breakage.
- */
-function LicenseStateBadge({
-  isValid,
-  isExpired,
-  plan,
-}: {
-  isValid: boolean;
-  isExpired: boolean;
-  plan: string;
-}) {
-  const { label, colorPalette } = licenseStateBadgeOf({ isValid, isExpired, plan });
-
-  return (
-    <Badge colorPalette={colorPalette} fontSize="sm" paddingX={2} paddingY={1}>
-      {label}
-    </Badge>
-  );
+function statusSentenceOf({ isValid, isExpired }: { isValid: boolean; isExpired: boolean }) {
+  if (isValid) return "Valid, the signature checks out";
+  if (isExpired) return "Term ended, the signature checks out";
+  return "The signature does not check out";
 }
 
 /**
@@ -62,30 +56,62 @@ function LicenseStateBadge({
  */
 function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
   return (
-    <Box
-      backgroundColor="orange.50"
-      padding={3}
-      borderRadius="md"
-      width="full"
-      _dark={{ backgroundColor: "orange.950" }}
-    >
-      <Text fontSize="sm" color="orange.700" _dark={{ color: "orange.200" }}>
-        Your license reached its end date. Nothing was switched off: everyone keeps their access and
-        your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay as
-        they are. Renew to add members again.
-      </Text>
-    </Box>
+    <Alert.Root status="warning">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          Your license reached its end date. Nothing was switched off: everyone keeps their access
+          and your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities
+          stay as they are. Renew to add members again.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
 /** A license whose signature does not check out. Its numbers mean nothing. */
 function InvalidLicenseNotice() {
   return (
-    <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
-      <Text fontSize="sm" color="red.600">
-        Your license is invalid. Please contact support or upload a valid license.
-      </Text>
-    </Box>
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          Your license is invalid. Please contact support or upload a valid license.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+function ContactSalesButton() {
+  return (
+    <Button asChild variant="outline" size="sm">
+      <Link href={CONTACT_SALES_URL} target="_blank">
+        Contact sales
+      </Link>
+    </Button>
+  );
+}
+
+function RemoveLicenseButton({
+  onRemove,
+  isRemoving,
+}: {
+  onRemove: () => void;
+  isRemoving: boolean;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      colorPalette="red"
+      onClick={onRemove}
+      data-testid="license-remove"
+      loading={isRemoving}
+      disabled={isRemoving}
+    >
+      Remove license
+    </Button>
   );
 }
 
@@ -96,47 +122,35 @@ export function LicenseDetailsCard({
   onRefresh,
   isRefreshing = false,
 }: LicenseDetailsCardProps) {
-  const isCorrupted = isCorruptedLicense(status);
   const isValid = status.valid;
   const isExpired = isLicenseExpired(status);
   const canRefresh = status.valid && status.connected && onRefresh !== void 0;
 
-  if (isCorrupted) {
+  if (isCorruptedLicense(status)) {
     return (
-      <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
-        <VStack align="start" gap={4}>
-          <HStack>
-            <Badge colorPalette="red" fontSize="sm" paddingX={2} paddingY={1}>
-              Corrupted
-            </Badge>
-          </HStack>
-
-          <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
-            <Text fontSize="sm" color="red.600">
+      <>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
               Your license file is corrupted and cannot be read. Please upload a valid license or
               contact support.
-            </Text>
-          </Box>
-
-          <HStack>
-            <Button
-              variant="outline"
-              size="sm"
-              colorPalette="red"
-              onClick={onRemove}
-              loading={isRemoving}
-              disabled={isRemoving}
-            >
-              Remove License
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={CONTACT_SALES_URL} target="_blank">
-                Contact Sales
-              </Link>
-            </Button>
-          </HStack>
-        </VStack>
-      </Box>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+        <OverviewCard
+          title="License"
+          chip={{ label: "Corrupted", tone: "bad", title: "The license file cannot be read" }}
+          actions={
+            <>
+              <RemoveLicenseButton onRemove={onRemove} isRemoving={isRemoving} />
+              <ContactSalesButton />
+            </>
+          }
+        >
+          <OverviewDetail label="Status">The file cannot be read</OverviewDetail>
+        </OverviewCard>
+      </>
     );
   }
 
@@ -144,86 +158,65 @@ export function LicenseDetailsCard({
     return null;
   }
 
+  const seatsAreCapped = Number.isFinite(status.maxMembers) && status.maxMembers < 1_000_000;
+
   return (
-    <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
-      <VStack align="start" gap={4}>
-        <HStack>
-          <LicenseStateBadge isValid={isValid} isExpired={isExpired} plan={status.plan} />
-        </HStack>
-
-        <VStack align="start" gap={2} width="full">
-          <HStack>
-            <Text fontSize="sm" color="fg.muted" width="120px">
-              Plan:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium">
-              {status.planName}
-            </Text>
-          </HStack>
-
-          <HStack>
-            <Text fontSize="sm" color="fg.muted" width="120px">
-              Licensed to:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium">
-              {status.organizationName}
-            </Text>
-          </HStack>
-
-          <HStack>
-            <Text fontSize="sm" color="fg.muted" width="120px">
-              Seats:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium">
-              {status.currentMembers} / {status.maxMembers}
-            </Text>
-          </HStack>
-
-          <HStack>
-            <Text fontSize="sm" color="fg.muted" width="120px">
-              Expires:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium" color={isExpired ? "orange.600" : undefined}>
+    <>
+      {isExpired && <LapsedLicenseNotice maxMembers={status.maxMembers} />}
+      {!isValid && !isExpired && <InvalidLicenseNotice />}
+      <StatTileGrid columns={4}>
+        <StatTile label="Plan" icon={<Layers size={14} />} data-testid="license-plan">
+          <StatTileFigure>{status.planName}</StatTileFigure>
+        </StatTile>
+        <StatTile
+          data-testid="license-seats"
+          label="Seats"
+          icon={<Users size={14} />}
+          meter={
+            seatsAreCapped ? { current: status.currentMembers, max: status.maxMembers } : void 0
+          }
+        >
+          <StatTileFigure>
+            {status.currentMembers.toLocaleString()} / {formatLimitOrUnlimited(status.maxMembers)}
+          </StatTileFigure>
+        </StatTile>
+        <StatTile label="Expires" icon={<CalendarClock size={14} />} data-testid="license-expires">
+          <StatTileFigure>
+            <Text as="span" color={isExpired ? "orange.fg" : void 0}>
               {formatLicenseDate(status.expiresAt)}
             </Text>
+          </StatTileFigure>
+        </StatTile>
+        <StatTile label="Licensed to" icon={<Building2 size={14} />} data-testid="license-holder">
+          <StatTileFigure title={status.organizationName}>{status.organizationName}</StatTileFigure>
+        </StatTile>
+      </StatTileGrid>
+      <OverviewCard
+        title="License"
+        chip={licenseChipOf({ isValid, isExpired })}
+        actions={
+          <HStack gap={2} flexWrap="wrap">
+            {canRefresh ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                loading={isRefreshing}
+                disabled={isRefreshing}
+                data-testid="refresh-license"
+              >
+                Refresh license
+              </Button>
+            ) : null}
+            <RemoveLicenseButton onRemove={onRemove} isRemoving={isRemoving} />
           </HStack>
-        </VStack>
-
-        {isExpired && <LapsedLicenseNotice maxMembers={status.maxMembers} />}
-
-        {!isValid && !isExpired && <InvalidLicenseNotice />}
-
-        <HStack>
-          {canRefresh ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              loading={isRefreshing}
-              disabled={isRefreshing}
-              data-testid="refresh-license"
-            >
-              Refresh license
-            </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            colorPalette="red"
-            onClick={onRemove}
-            data-testid="license-remove"
-            loading={isRemoving}
-            disabled={isRemoving}
-          >
-            Remove License
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={CONTACT_SALES_URL} target="_blank">
-              Contact Sales
-            </Link>
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+        }
+      >
+        <OverviewDetail label="Status">{statusSentenceOf({ isValid, isExpired })}</OverviewDetail>
+        {isValid && status.connected ? (
+          <OverviewDetail label="Sync">Connected to LangWatch</OverviewDetail>
+        ) : null}
+      </OverviewCard>
+    </>
   );
 }

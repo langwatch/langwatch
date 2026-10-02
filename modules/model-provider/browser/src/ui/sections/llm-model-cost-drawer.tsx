@@ -4,13 +4,13 @@
  * suggestion. Scope is a single organization's (ADR-021): editing keeps the
  */
 
-import { Button, Field, Heading, Input, Text } from "@chakra-ui/react";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { Button, Field, Heading, Input, Text } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { FormServerError } from "@langwatch/error-views";
 import { useState } from "react";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";

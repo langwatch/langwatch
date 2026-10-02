@@ -1,14 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import type {
-  EvaluationExecution,
-  EvaluationInputsResolution,
-} from "../../app/evaluation.members.ts";
 import { EvaluationRunRepository } from "../../repositories/evaluation.repository.ts";
 import {
   MonitorPerformanceRepository,
@@ -57,9 +53,6 @@ class FakeRepository extends EvaluationRunRepository {
   async findSummariesByTraceIds(): Promise<Record<string, never>> {
     return {};
   }
-  async countOrganizationRuns(): Promise<number> {
-    return this.value ? 1 : 0;
-  }
   async findTraceEvaluations(): Promise<Record<string, TraceEvaluationData[]>> {
     return {};
   }
@@ -68,11 +61,11 @@ class FakeRepository extends EvaluationRunRepository {
   }
 }
 
-class FakeExecution implements EvaluationExecution {
+class FakeExecution {
   execute = vi.fn(async () => ({ status: "processed" as const, score: 1 }));
 }
 
-class FakeInputsResolution implements EvaluationInputsResolution {
+class FakeInputsResolution {
   resolveInputs = vi.fn(
     async (input: { tenantId: string; inputs: Record<string, unknown> }) => input.inputs,
   );

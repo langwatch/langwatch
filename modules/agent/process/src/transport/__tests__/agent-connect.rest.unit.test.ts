@@ -3,14 +3,9 @@ import {
   type AgentApi,
   type AgentConnectRegisterOutput,
 } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestCaller,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -20,6 +15,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import type { RestCaller } from "@langwatch/api/hosting";
 
 const renderRefusal: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

@@ -1,4 +1,4 @@
-import { Button, Text } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { useEffect } from "react";
 

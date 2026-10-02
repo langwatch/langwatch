@@ -4,7 +4,7 @@
  * loading is a permission that leaked. Where they stand is scope's (§10.1).
  */
 
-import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
@@ -15,8 +15,9 @@ import type {
   UiSessionReading,
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
+import { setUiStorageReader } from "@langwatch/browser-host/storage";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 
 import {
   readUiActor,
@@ -31,6 +32,7 @@ import {
   type UiEffectivePermissionsRead,
   type UiFeatureApiTransport,
 } from "./ui-session-queries";
+import { useRefreshUiSession } from "./ui-session-refresh";
 
 /** The screen a visitor with no session is sent to. */
 export const UI_SIGN_IN_PATH = "/auth/signin";
@@ -91,6 +93,8 @@ export class UiFeatureFlagRequests {
 export type BrowserUiSessionState = {
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
+  /** Absent where nothing can re-read the session, as in a recorded test. */
+  readonly refresh?: () => Promise<void>;
 } & (
   | { readonly snapshot: UiSessionSnapshot }
   | {
@@ -140,6 +144,11 @@ export class BrowserUiSession extends UiSession {
     return this.state.snapshot;
   }
 
+  override refresh(): Promise<void> {
+    if (!this.state.refresh) return super.refresh();
+    return this.state.refresh();
+  }
+
   featureFlag(flag: string): boolean | undefined {
     // This browser's own `?ff_` answer wins and is never asked of the server.
     const override = readFeatureFlagOverride(flag);
@@ -181,6 +190,12 @@ export function useUiSessionReading({
   });
   const actor = session.data?.actor ?? null;
   const failure = session.data?.failure ?? null;
+  const isAnswered = session.isSuccess && session.data.unreachable !== true;
+
+  // Remembered preferences are the answered reader's own; before paint, so none flash.
+  useLayoutEffect(() => {
+    if (isAnswered) setUiStorageReader(actor?.id);
+  }, [isAnswered, actor?.id]);
 
   // Once, per failed read, rather than once per render: the query holds its
   // answer, so the effect only re-runs when a re-read failed again.
@@ -250,10 +265,11 @@ export function useBrowserUiSession({
     organizationId: organizationId ?? null,
     // A flag read that leaves out a scope it should have named cannot match
     // the rule that names it, so nothing is asked until the scope has settled.
-    enabled: scope.status !== "loading",
+    enabled: !!userId && scope.status !== "loading",
   });
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);
+  const refresh = useRefreshUiSession();
 
   const snapshot: UiSessionSnapshot = {
     session,
@@ -261,7 +277,7 @@ export function useBrowserUiSession({
     permissions: readPermissions(scope.status, permissions, organizationPermissions),
   };
 
-  return BrowserUiSession.create({ snapshot, flags, askFlag });
+  return BrowserUiSession.create({ snapshot, flags, askFlag, refresh });
 }
 
 function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading {

@@ -1,6 +1,6 @@
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { BackLink } from "@langwatch/design-system/back-link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import numeral from "numeral";

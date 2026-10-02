@@ -4,8 +4,8 @@
  * Results panel's top edge with showTopDivider. Ported from platform/app;
  * narrowed to this leaf presentational component.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NavigationHostProvider } from "../../../model/navigation-host.ts";
@@ -35,12 +35,10 @@ const baseProps = {
 };
 
 function renderResults(showTopDivider: boolean) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <NavigationHostProvider value={StubNavigationHost.create({})}>
-        <CommandBarResults {...baseProps} showTopDivider={showTopDivider} />
-      </NavigationHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <NavigationHostProvider value={StubNavigationHost.create({})}>
+      <CommandBarResults {...baseProps} showTopDivider={showTopDivider} />
+    </NavigationHostProvider>,
   );
 }
 

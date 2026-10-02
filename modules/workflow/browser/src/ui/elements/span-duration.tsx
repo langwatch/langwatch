@@ -1,5 +1,5 @@
-import { HStack, Text } from "@chakra-ui/react";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate } from "@langwatch/time";
 import { Clock } from "react-feather";

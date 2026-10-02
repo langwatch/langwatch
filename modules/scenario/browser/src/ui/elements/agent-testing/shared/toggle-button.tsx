@@ -2,7 +2,7 @@
  * An on and off control of the Agent Testing surface.
  */
 
-import { Button, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@langwatch/design-system/primitives";
 
 export type ToggleButtonProps = ButtonProps & {
   /** Whether what the button turns on is on. */

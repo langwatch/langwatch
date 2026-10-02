@@ -4,7 +4,7 @@
  * refused.
  */
 
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 

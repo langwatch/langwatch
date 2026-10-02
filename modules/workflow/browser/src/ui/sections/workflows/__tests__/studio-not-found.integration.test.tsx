@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { WorkflowHostProvider } from "@langwatch/workflow-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { workflowRef } = vi.hoisted(() => ({
@@ -41,26 +39,19 @@ vi.mock("../../optimization_studio/optimization-studio.tsx", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },
 }));
 
-import { FakeWorkflowHost } from "../../../../testing.tsx";
+import { renderWithWorkflowHost } from "../../../../testing.tsx";
 import Studio from "../studio-screen.tsx";
 
 // The screen binds the studio's two module-scope singletons (feedback and
 // error reporting) to the mounted host on render, so it needs a host above it
 // exactly as the application gives it one.
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WorkflowHostProvider value={new FakeWorkflowHost()}>
-        <Studio />
-      </WorkflowHostProvider>
-    </ChakraProvider>,
-  );
+const renderPage = () => renderWithWorkflowHost(<Studio />);
 
 /** The tRPC envelope a handled error arrives in on the client. */
 const handled = (code: string, httpStatus: number) => ({

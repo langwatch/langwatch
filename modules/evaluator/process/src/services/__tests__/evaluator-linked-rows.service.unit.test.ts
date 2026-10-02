@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate } from "@langwatch/time";
 import {
   studioWorkflowSchema,

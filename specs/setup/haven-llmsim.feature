@@ -7,8 +7,8 @@ Feature: llmsim, a local LLM provider stand-in run by haven
   It accepts any key and checks none: it is a dev shim.
 
   # Bound by Go tests in services/llmsim/llmsim_test.go and
-  # tools/thuishaven/domain/overlay_llm_test.go, by their `// @scenario`
-  # annotations. The last three scenarios wait on the llmsim model provider.
+  # tools/thuishaven/domain/overlay_llm_test.go and tools/thuishaven/app/plan_llm_test.go, by their `// @scenario`
+  # annotations. The playground scenario waits on a browser run against a stack.
 
   Scenario: The same prompt gets the same answer
     Given llmsim is running
@@ -88,16 +88,16 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     When the developer runs "haven up +llm"
     Then the overlay leaves the OpenAI provider alone and still routes Anthropic to llmsim
 
-  @unimplemented
+  @unit
   Scenario: The llmsim model provider is hidden when haven does not enable it
     Given the stack runs without "+llm"
     Then no llmsim provider is listed or seeded
 
-  @unimplemented
+  @unit
   Scenario: The llmsim model provider is listed and seeded when haven enables it
     Given the stack runs with "+llm"
-    Then the llmsim provider is listed with markov-small, markov-json and langy-echo
-    And the seed creates it pointing at llmsim's URL
+    Then llmsim's model list names markov-small, markov-json and langy-echo
+    And the api lane's environment points the seeded OpenAI provider at llmsim's URL with a dummy key
 
   @unimplemented
   Scenario: A playground call answers from llmsim

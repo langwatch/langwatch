@@ -2,7 +2,7 @@ import type { ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { GithubBranchMaintenance } from "../app/github.members.ts";
+import type { GithubBranchMaintenance } from "../services/github-branch-maintenance.service.ts";
 import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "./github-branch-recheck.process.ts";
 
 const logger = createLogger("langwatch:github:branch-recheck");

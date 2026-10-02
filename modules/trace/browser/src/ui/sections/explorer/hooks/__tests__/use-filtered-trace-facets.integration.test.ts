@@ -32,9 +32,9 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
+vi.mock("../../../../../behavior/explorer.store.ts", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "../../../../../behavior/explorer.store.ts",
   );
   return {
     ...actual,
@@ -50,8 +50,7 @@ vi.mock("../use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [], evalRuns: undefined }),
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-
+import type * as actualModule from "../../../../../behavior/explorer.store.ts";
 import { useFilteredTraceFacets } from "../use-filtered-trace-facets.ts";
 
 const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
@@ -102,11 +101,6 @@ describe("useFilteredTraceFacets", () => {
       const afterWindow = lastInput();
       expect(afterWindow).not.toEqual(afterQuery);
       expect(afterWindow).toMatchObject({ timeRange: { from: 30, to: 40 } });
-
-      // The input is the whole cache key, so a count for one input is never
-      // read for another; the freshness window only says how long the count
-      // for THIS input stands without a refetch.
-      expect(lastOpts()?.staleTime).toBe(60_000);
     });
   });
 

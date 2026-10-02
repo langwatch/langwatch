@@ -1,13 +1,14 @@
 /** Server-side organization procedures: permissions and handlers forward to application. */
 
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import {
   defineTrpcFact,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
-import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
+  assignsOrganizationCustomRole,
   OrganizationApi,
   organizationTrpc,
   type CustomRole,
@@ -16,6 +17,9 @@ import {
   type Organization,
   type OrganizationAuditLogPage,
   type OrganizationCaller,
+  type OrganizationMemberDirectory,
+  type OrganizationMemberRecord,
+  type OrganizationMemberUser,
   type OrganizationUser,
   type OrganizationWithMembersAndTheirTeams,
   type ProjectRow,
@@ -25,6 +29,9 @@ import {
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 import { z } from "zod";
+
+/** Assigning a custom team role is Enterprise; built-in roles grant on every plan. */
+export const customRoleGate = { feature: "RBAC", when: assignsOrganizationCustomRole };
 
 /** The signed-in person as the process's session carries them, beside their id. */
 export const organizationSessionPersonFact = defineTrpcFact(
@@ -125,17 +132,23 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
       .then((organizations) => organizations.map(fullyLoadedOrganizationOnWire)),
   )
 
+  /** The shell's scope skeleton: what every page resolves its scope against. */
+  .procedure("getScopeGraph")
+  .withFacts(organizationSessionPersonFact)
+  .noPermission(BEFORE_MEMBERSHIP)
+  .handle(({ app, actor }, person) => app.getScopeGraph(callerOf(actor, person)))
+
   .procedure("update")
   .withPermission("organization:manage")
   .handle(async ({ app, input }) => {
-    // The form round-trips every S3 field, so absent here means "clear it"  -
-    // though `updateSettings` treats absent as "leave alone" for `s3Bucket`.
+    // The stored secret is never sent to the form: a blank one beside an
+    // endpoint leaves it unchanged, and blank everywhere clears it.
     await app.updateSettings({
       organizationId: input.organizationId,
       name: input.name,
       s3Endpoint: input.s3Endpoint ?? null,
       s3AccessKeyId: input.s3AccessKeyId ?? null,
-      s3SecretAccessKey: input.s3SecretAccessKey ?? null,
+      s3SecretAccessKey: input.s3SecretAccessKey || (input.s3Endpoint ? void 0 : null),
       s3Bucket: input.s3Bucket,
       presenceEnabled: input.presenceEnabled,
       traceSharingEnabled: input.traceSharingEnabled,
@@ -163,8 +176,13 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
         },
         callerOf(actor, person),
       )
-      .then(organizationWithMembersOnWire),
+      .then(memberDirectoryOnWire),
   )
+
+  /** The Directory is an `organization:manage` page; so are its badges. */
+  .procedure("getDirectoryCounts")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getDirectoryCounts(input))
 
   /**
    * `organization:manage`, not `view`: one member's full record - role
@@ -174,7 +192,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
   .handle(({ app, input, actor }, person) =>
-    app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberWithUserOnWire),
+    app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberRecordOnWire),
   )
 
   /** Bounded by the organization's own membership, never a caller-supplied id list. */
@@ -183,6 +201,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) => app.getMemberProvenance(input))
 
   .procedure("updateTeamMemberRole")
+  .withEntitlement("enterprise", customRoleGate)
   .withFacts(organizationSessionPersonFact)
   .withPermission(MANAGE_VIA_TEAM)
   .handle(async ({ app, input, actor }, person) => {
@@ -201,17 +220,18 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) =>
     app
       .getAllMembers({ organizationId: input.organizationId })
-      .then((users) => users.map(userOnWire)),
+      .then((users) => users.map(memberUserOnWire)),
   )
 
   .procedure("updateMemberRole")
+  .withEntitlement("enterprise", customRoleGate)
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
     const caller = callerOf(actor, person);
     // The whole orchestration - personal-workspace assertion, shared-team
-    // scoping, seat classification, the Enterprise gate for custom roles  -
-    // lives in the service, so the REST surface runs the same rules.
+    // scoping, seat classification - lives in the service, so the REST
+    // surface runs the same rules; the custom-role plan is declared above.
     const { teamsLeftWithoutAdmin } = await app.changeMemberRole(
       {
         organizationId: input.organizationId,
@@ -230,6 +250,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("getAuditLogs")
+  .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
   .withFacts(organizationSessionPersonFact)
   .withPermission(AUDIT_LOG_VIEW)
   .handle(({ app, input, actor }, person) =>
@@ -237,16 +258,12 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   )
   .build();
 
-function userOnWire(user: User) {
+function memberUserOnWire(user: User): OrganizationMemberUser {
   return {
-    ...user,
-    createdAt: toDate(user.createdAt),
-    updatedAt: toDate(user.updatedAt),
-    lastLoginAt: user.lastLoginAt && toDate(user.lastLoginAt),
+    id: user.id,
+    name: user.name,
+    email: user.email,
     deactivatedAt: user.deactivatedAt && toDate(user.deactivatedAt),
-    tracesExplorerTourDismissedAt:
-      user.tracesExplorerTourDismissedAt && toDate(user.tracesExplorerTourDismissedAt),
-    passkeyNudgeDismissedAt: user.passkeyNudgeDismissedAt && toDate(user.passkeyNudgeDismissedAt),
   };
 }
 
@@ -303,7 +320,7 @@ function teamUserOnWire(membership: TeamUser & { assignedRole?: CustomRole | nul
   };
 }
 
-function projectOnWire(project: ProjectRow) {
+function projectOnWire({ apiKey: _withheld, ...project }: ProjectRow) {
   return {
     ...project,
     createdAt: toDate(project.createdAt),
@@ -328,22 +345,49 @@ function fullyLoadedOrganizationOnWire(organization: FullyLoadedOrganization) {
   };
 }
 
-function memberWithUserOnWire(member: OrganizationWithMembersAndTheirTeams["members"][number]) {
+function memberRecordOnWire(
+  member: OrganizationWithMembersAndTheirTeams["members"][number],
+): OrganizationMemberRecord {
   return {
-    ...organizationUserOnWire(member),
+    userId: member.userId,
+    organizationId: member.organizationId,
+    role: member.role,
+    createdAt: toDate(member.createdAt),
+    updatedAt: toDate(member.updatedAt),
+    departmentId: member.departmentId,
+    disabledAt: member.disabledAt && toDate(member.disabledAt),
     user: {
-      ...userOnWire(member.user),
-      teamMemberships: member.user.teamMemberships.map((membership) => ({
-        ...teamUserOnWire(membership),
-        team: teamOnWire(membership.team),
-      })),
+      id: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      image: member.user.image,
+      emailVerified: member.user.emailVerified,
+      deactivatedAt: member.user.deactivatedAt && toDate(member.user.deactivatedAt),
     },
   };
 }
 
-function organizationWithMembersOnWire(organization: OrganizationWithMembersAndTheirTeams) {
+function memberDirectoryOnWire(
+  organization: OrganizationWithMembersAndTheirTeams,
+): OrganizationMemberDirectory {
   return {
-    ...organizationOnWire(organization),
-    members: organization.members.map(memberWithUserOnWire),
+    id: organization.id,
+    name: organization.name,
+    members: organization.members.map((member) => ({
+      userId: member.userId,
+      organizationId: member.organizationId,
+      role: member.role,
+      createdAt: toDate(member.createdAt),
+      updatedAt: toDate(member.updatedAt),
+      departmentId: member.departmentId,
+      disabledAt: member.disabledAt && toDate(member.disabledAt),
+      user: {
+        id: member.user.id,
+        name: member.user.name,
+        email: member.user.email,
+        image: member.user.image,
+        deactivatedAt: member.user.deactivatedAt && toDate(member.user.deactivatedAt),
+      },
+    })),
   };
 }

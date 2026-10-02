@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
+import { keyframes } from "@langwatch/design-system/primitives";
 
 // Emitted through emotion's helper rather than an `"@keyframes …"` key:
 // `SystemStyleObject` has no such key, and a plain object never reaches the

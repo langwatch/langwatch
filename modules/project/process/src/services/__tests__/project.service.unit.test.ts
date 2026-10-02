@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationHasNoTeamError,
   OrganizationService as OrganizationServiceContract,
@@ -21,6 +20,7 @@ import {
   type ProjectWithTeam,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -161,6 +161,10 @@ class StubOrganizationService extends OrganizationServiceContract {
   >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+  readonly staffedTeams: {
+    input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
+    by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
+  }[] = [];
 
   getOrganizationMembers(): Promise<string[]> {
     return Promise.resolve([]);
@@ -291,6 +295,15 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
+  /** What `OrganizationApi.createTeamWithMembers` answers: the team, staffed as asked. */
+  staffNewTeam(
+    input: Parameters<OrganizationApi["createTeamWithMembers"]>[0],
+    by: Parameters<OrganizationApi["createTeamWithMembers"]>[1],
+  ): Promise<OrganizationTeam> {
+    this.staffedTeams.push({ input, by });
+    return this.createTeam({ organizationId: input.organizationId, name: input.name });
+  }
+
   updateTeamWithMembers(): Promise<never> {
     throw new Error("not used by this test");
   }
@@ -335,11 +348,11 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
-  addGroupBinding(): Promise<never> {
+  addGroupGrant(): Promise<never> {
     throw new Error("not used by this test");
   }
 
-  removeGroupBinding(): Promise<never> {
+  removeGroupGrant(): Promise<never> {
     throw new Error("not used by this test");
   }
 
@@ -361,7 +374,10 @@ class FixedCredentials extends ProjectCredentials {
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
-  created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
+  created = ProjectCreatedNoticeService.create({
+    logger: { error: () => void 0 },
+    projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+  }),
 ): ProjectService =>
   ProjectService.create({
     created,
@@ -371,6 +387,7 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
         if (!team) throw new TeamNotFoundError(input.teamId);
@@ -589,8 +606,14 @@ describe("ProjectService", () => {
     /** @scenario "A new project is recorded on project's own pipeline" */
     it("records it on project_lifecycle with its ids", async () => {
       const send = vi.fn(() => Promise.resolve());
-      const created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } });
-      created.connect({ recordProjectCreated: { send } });
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error: () => void 0 },
+        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      });
+      created.connect({
+        recordProjectCreated: { send },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
         input,
@@ -608,9 +631,13 @@ describe("ProjectService", () => {
     /** @scenario "A failure to record the new project does not block its creation" */
     it("still creates the project and logs the failure", async () => {
       const error = vi.fn();
-      const created = ProjectCreatedNoticeService.create({ logger: { error } });
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error },
+        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
       });
 
       await expect(
@@ -637,13 +664,15 @@ describe("ProjectService", () => {
     });
 
     expect(organizations.createdTeams).toEqual([{ organizationId: "org", name: "New Team" }]);
-    expect(organizations.addedTeamMembers).toEqual([
+    // The creator answers for it: Organization makes them the new team's ADMIN.
+    expect(organizations.staffedTeams).toEqual([
       {
-        organizationId: "org",
-        teamId: "team_new",
-        userId: "user",
-        role: "ADMIN",
-        actor: { type: "user", id: "user" },
+        input: {
+          organizationId: "org",
+          name: "New Team",
+          members: [{ userId: "user", role: "ADMIN" }],
+        },
+        by: { id: "user" },
       },
     ]);
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ teamId: "team_new" }));

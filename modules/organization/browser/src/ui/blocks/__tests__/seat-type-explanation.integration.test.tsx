@@ -6,17 +6,15 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { CORE_SEAT_TYPE_COPY } from "@langwatch/browser-host/slots";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { SEAT_TYPE_COPY } from "../../../model/seat-type-copy.ts";
 import { OrganizationUserRoleField } from "../../elements/organization-user-role-field.tsx";
 import { AddMembersForm } from "../../sections/add-members-form.tsx";
 
-// Rendered with no shell above it, so the forms read the core default the
-// `seatTypeCopy` slot degrades to. Spec: specs/ui/ui-slots.feature
-const LITE_MEMBER_EXPLANATION = CORE_SEAT_TYPE_COPY.liteMemberExplanation;
+const LITE_MEMBER_EXPLANATION = SEAT_TYPE_COPY.liteMemberExplanation;
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {

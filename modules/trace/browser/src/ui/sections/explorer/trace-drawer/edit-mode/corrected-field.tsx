@@ -1,4 +1,12 @@
-import { Box, Button, chakra, HoverCard, HStack, Portal, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  HoverCard,
+  HStack,
+  Portal,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useState } from "react";
 

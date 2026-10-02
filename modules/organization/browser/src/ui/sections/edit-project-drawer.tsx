@@ -1,5 +1,6 @@
 /** Edit-project drawer: sends only changed fields; filters personal workspaces. */
 
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   createListCollection,
@@ -10,8 +11,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
@@ -21,6 +21,7 @@ import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useOrganizationTeams } from "../../behavior/use-organization-teams.ts";
 
 interface EditProjectFormData {
   name: string;
@@ -44,10 +45,7 @@ export function EditProjectDrawer({
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
 
-  const teams = api.team.getTeamsWithMembers.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
-  );
+  const teams = useOrganizationTeams({ organizationId: organization?.id });
 
   const form = useForm<EditProjectFormData>({
     defaultValues: {
@@ -66,13 +64,13 @@ export function EditProjectDrawer({
 
   const teamOptions = useMemo(
     () =>
-      (teams.data ?? [])
+      (teams ?? [])
         .filter((t) => !t.isPersonal)
         .map((t) => ({
           label: t.name,
           value: t.id,
         })),
-    [teams.data],
+    [teams],
   );
   const teamCollection = useMemo(() => createListCollection({ items: teamOptions }), [teamOptions]);
 
@@ -88,9 +86,9 @@ export function EditProjectDrawer({
         },
         {
           onSuccess: () => {
-            void queryClient.team.getTeamsWithRoleBindings.invalidate();
-            void queryClient.team.getTeamsWithMembers.invalidate();
+            void queryClient.team.getTeamsWithGrants.invalidate();
             void queryClient.organization.getAll.invalidate();
+            void queryClient.organization.getScopeGraph.invalidate();
             toaster.create({
               title: "Project updated",
               type: "success",

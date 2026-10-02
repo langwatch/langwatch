@@ -1,3 +1,8 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { BackLink } from "@langwatch/design-system/back-link";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Badge,
@@ -13,12 +18,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { BackLink } from "@langwatch/design-system/back-link";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";

@@ -61,6 +61,8 @@ export abstract class OrganizationRepository {
     organizationIds: readonly string[];
   }): Promise<OrganizationUsageCount>;
   abstract findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null>;
+  /** Whether a storage secret is held; the ciphertext itself never leaves the repository. */
+  abstract hasStoredS3Secret(organizationId: string): Promise<boolean>;
   /**
    * Persists already-encrypted `s3Endpoint`/`s3AccessKeyId`/`s3SecretAccessKey`
    * values: encryption is the caller's decision, made with the settings

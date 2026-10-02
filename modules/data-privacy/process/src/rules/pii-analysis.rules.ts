@@ -9,6 +9,9 @@ import { z } from "zod";
 
 import type { GoogleDlpFinding } from "../channels/google-dlp.channel.ts";
 
+/** One text through an analysis service: its redacted form, or left as it was. */
+export type PiiClearing = { kind: "redacted"; text: string } | { kind: "unchanged" };
+
 /** How much of one text an analysis service reads; the remainder is carried through untouched. */
 export const PII_ANALYSIS_TEXT_BUDGET = 250_000;
 

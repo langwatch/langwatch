@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { ClickHouseGovernanceRepositories } from "./clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { LiveGovernanceRepositories } from "./live/live.governance.repositories.ts";

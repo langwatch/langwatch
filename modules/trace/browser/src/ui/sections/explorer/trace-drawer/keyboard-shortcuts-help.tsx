@@ -1,5 +1,13 @@
-import { Box, Heading, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  Box,
+  Heading,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { IconType } from "react-icons";
 import {
   LuActivity,

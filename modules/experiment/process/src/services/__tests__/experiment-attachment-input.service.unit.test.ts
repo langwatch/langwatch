@@ -1,11 +1,11 @@
-/** @see specs/experiments-v3/attachment-inputs.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
   type StoredObjectFileRead,
 } from "@langwatch/stored-object-contract";
+/** @see specs/experiments-v3/attachment-inputs.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryExperimentAttachmentLinkChannel } from "../../channels/memory/memory.experiment-attachment-link.channel.ts";

@@ -3,13 +3,13 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type {
   ResultGroup,
   ExternalSetSummary,
   SuiteRunSummary,
 } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -36,10 +36,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 vi.mock("@langwatch/browser-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const NOW = 1_700_000_000_000;
 
@@ -111,7 +107,7 @@ function renderRows(
     onArchivePlan: vi.fn(),
     ...overrides,
   };
-  const view = render(<PlanRowsTable {...props} />, { wrapper: Wrapper });
+  const view = renderWithDesignSystem(<PlanRowsTable {...props} />);
   return { props, view };
 }
 

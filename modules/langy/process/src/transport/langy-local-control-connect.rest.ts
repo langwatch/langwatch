@@ -60,7 +60,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     .withAddressing("literal", { v1Twin: true })
 
     .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
-    .withCredential("sessionKey")
+    .withCredential("session_key")
     .withAccess(anyAuthenticated({ reason: "the session-key door names the key's holder" }))
     .withInput(registerFrameSchema)
     .withHeaders(z.object({ authorization: z.string() }))

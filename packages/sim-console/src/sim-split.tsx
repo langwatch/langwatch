@@ -7,7 +7,7 @@ export type SimSplitProps = {
   emptyDetail?: ReactNode;
 };
 
-/** A list pane its reader can widen or narrow, beside the open item's detail. */
+/** A list pane beside the open item's detail; stacked on a narrow screen. */
 export const SimSplit = ({ list, detail, emptyDetail }: SimSplitProps) => (
   <div className="sim-split">
     <div className="sim-split-list">{list}</div>

@@ -36,7 +36,9 @@ export const subscriptionPlanInputSchema = z.object({
       id: z.string().optional(),
       email: z.string().nullable().optional(),
       name: z.string().nullable().optional(),
-      impersonator: z.object({ email: z.string().nullable().optional() }).optional(),
+      impersonator: z
+        .object({ id: z.string().optional(), email: z.string().nullable().optional() })
+        .optional(),
     })
     .optional(),
 });

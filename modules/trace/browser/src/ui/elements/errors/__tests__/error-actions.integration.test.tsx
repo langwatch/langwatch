@@ -3,8 +3,8 @@
  * share surface it is the only handle they have to quote to support.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -19,11 +19,7 @@ afterEach(() => {
 const TRACE_ID = "4bf92f3577b34da6";
 
 const renderActions = (props: Parameters<typeof ErrorActions>[0]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ErrorActions {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<ErrorActions {...props} />);
 
 const withClipboard = (writeText: () => Promise<void>) => {
   vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: { writeText } } }));

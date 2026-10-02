@@ -4,7 +4,7 @@
  * Tests controlled textarea: keystrokes reach draft state, updating matched-traces count.
  * Autocomplete pending suggestion surface (see dev/docs/plans/ui-family-move-manifests.md).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -21,7 +21,7 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <QueryFilterInput
         value={value}
         onChange={(next) => {
@@ -30,7 +30,7 @@ function Harness({
         }}
         placeholder="query"
       />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

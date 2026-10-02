@@ -1,12 +1,9 @@
-import { type LangyContextChip } from "@langwatch/langy-browser-kit";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useFilterStore,
-  useSelectionStore,
-} from "@langwatch/trace-browser-kit";
+import { SELECT_ALL_MATCHING_CAP } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
 import { ALL_MATCHING_PREFIX } from "../../../behavior/langy-chip-context.ts";
+import { type LangyContextChip } from "../../../behavior/langy.store.ts";
+import { useTraceExplorerScope } from "../../../behavior/trace-explorer-scope.ts";
 
 /**
  * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy context
@@ -14,11 +11,11 @@ import { ALL_MATCHING_PREFIX } from "../../../behavior/langy-chip-context.ts";
  * checked instead of guessing.
  */
 export function useLangySelectionContext(): LangyContextChip | null {
-  const mode = useSelectionStore((s) => s.selection.mode);
-  const traceIds = useSelectionStore((s) => s.selection.traceIds);
+  const mode = useTraceExplorerScope((s) => s.selectionMode);
+  const traceIds = useTraceExplorerScope((s) => s.selectedTraceIds);
   // "Select all matching" is defined BY the search it matched, so the chip has
   // to carry that search or it carries nothing usable (see below).
-  const queryText = useFilterStore((s) => s.queryText);
+  const queryText = useTraceExplorerScope((s) => s.queryText);
 
   return useMemo(
     () => selectionContextChip({ mode, traceIds, queryText }),

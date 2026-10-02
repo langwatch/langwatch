@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
 import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {

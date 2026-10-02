@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";

@@ -22,14 +22,17 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mcp-server": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
@@ -38,7 +41,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

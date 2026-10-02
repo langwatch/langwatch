@@ -3,24 +3,25 @@
  * with URL state managed via ?rule=new or ?rule=<tier>:<id>:<personal>.
  */
 
-import { Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
-import {
-  ScopeChipPicker,
-  ScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  type ScopeChipPickerScopeType,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
 import type {
   DataPrivacyConfig,
   DataPrivacyRule,
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerScopeType,
+} from "@langwatch/design-system/scope-chip-picker";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import {
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,

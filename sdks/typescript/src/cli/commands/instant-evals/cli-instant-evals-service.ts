@@ -1,7 +1,6 @@
 import { InstantEvalsApiService } from "@/client-sdk/services/instant-evals";
 import { createLangWatchApiClient } from "@/internal/api/client";
-
-import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../utils/governance/surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
 
 /**
  * The Instant Evals API service for CLI commands, declaring the CLI surface on every request so a

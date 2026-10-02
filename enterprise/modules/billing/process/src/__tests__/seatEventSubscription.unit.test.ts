@@ -1,4 +1,9 @@
-import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
+import {
+  Currency,
+  SubscriptionStatus,
+  type StripePriceMap,
+} from "@langwatch/enterprise-billing-contract";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
@@ -59,6 +64,7 @@ const createMockSubscriptions = (): {
 const createMockInvites = (): {
   [K in keyof SeatCheckoutInvites]: Mock<SeatCheckoutInvites[K]>;
 } => ({
+  checkInvitesWithinCaller: vi.fn(),
   createPaymentPendingInvites: vi.fn(),
   cancelPaymentPendingInvites: vi.fn(),
 });
@@ -854,6 +860,75 @@ describe("seatEventSubscription", () => {
           organizationId: "org_1",
           subscriptionIds: ["stale_sub_1", "stale_sub_2"],
         });
+      });
+    });
+
+    describe("when the checkout carries invitations", () => {
+      beforeEach(() => {
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      /** @scenario Inviting through a seat checkout is bounded by the inviter */
+      it("holds them as the person who invited, so organization bounds them by that person", async () => {
+        await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: Currency.USD,
+          billingInterval: "monthly",
+          membersToAdd: 1,
+          invitations: {
+            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+            by: { id: "user_1" },
+          },
+        });
+
+        expect(invites.createPaymentPendingInvites).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org_1",
+            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+          }),
+          { id: "user_1" },
+        );
+      });
+
+      /** @scenario A seat checkout inviting past the inviter writes nothing */
+      it("refuses invitations past the inviter before any checkout row is written", async () => {
+        invites.checkInvitesWithinCaller.mockRejectedValue(
+          new GrantExceedsCallerPermissionsError(["organization:manage"]),
+        );
+
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: Currency.USD,
+            billingInterval: "monthly",
+            membersToAdd: 1,
+            invitations: {
+              invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+              by: { id: "user_1" },
+            },
+          }),
+        ).rejects.toMatchObject({
+          code: "grant_exceeds_caller_permissions",
+          meta: { missingPermissions: ["organization:manage"] },
+        });
+
+        expect(invites.checkInvitesWithinCaller).toHaveBeenCalledWith(
+          {
+            organizationId: "org_1",
+            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+          },
+          { id: "user_1" },
+        );
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(invites.createPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
       });
     });
 

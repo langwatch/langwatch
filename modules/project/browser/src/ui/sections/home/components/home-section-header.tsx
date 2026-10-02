@@ -1,4 +1,4 @@
-import { Heading, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Heading, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /**

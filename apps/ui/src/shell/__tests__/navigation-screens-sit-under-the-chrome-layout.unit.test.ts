@@ -3,7 +3,7 @@
  * mounts it. The 404 and the `@project` forward sat at the top level, so
  * `/{slug}/not-found` threw "No NavigationHost in context".
  */
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";
@@ -30,7 +30,7 @@ function pageKeysUnderChrome(table: readonly UiRouteDescriptor[]): string[] {
 }
 
 const navigationScreenKeys = Object.keys(
-  webModules.find((module) => module.name === "navigation")?.installation.screens ?? {},
+  browserModules.find((module) => module.name === "navigation")?.installation.screens ?? {},
 );
 
 describe("given the screens the navigation module declares", () => {

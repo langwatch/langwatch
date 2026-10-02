@@ -1,4 +1,4 @@
-import { Field, Input, VStack } from "@chakra-ui/react";
+import { Field, Input, VStack } from "@langwatch/design-system/primitives";
 
 import { isValidPhoneNumber, type VoiceForm } from "../../model/voice-form.ts";
 import { ElevenLabsAgentIdField } from "./voice-agent-id-field.tsx";

@@ -47,8 +47,8 @@ const CONTROL_FLOW = new Set([
   "TryStatement",
 ]);
 const FUNCTIONS = new Set(["ArrowFunctionExpression", "FunctionDeclaration", "FunctionExpression"]);
-const SERVICE_OR_REPOSITORY = /(?:App|Service|Repository)$/;
-const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:App|Service|Repository)$/;
+const SERVICE_OR_REPOSITORY = /(?:Module|Service|Repository)$/;
+const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:Module|Service|Repository)$/;
 const HANDLER_STATEMENT_LIMIT = 6;
 const PRESENCE_OPERATORS = new Set(["===", "=="]);
 const EMPTY_LITERALS = new Set([null, "", 0]);

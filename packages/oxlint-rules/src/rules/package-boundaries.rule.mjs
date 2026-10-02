@@ -10,18 +10,16 @@ import { defineRule } from "../define-rule.mjs";
 const APPLICATION = /^apps\/[^/]+\//;
 const NODE_RUNTIME = /^node:/;
 const BROWSER_RUNTIME =
-  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|browser-trpc|design-system|ui-kernel)(?:\/|$))/;
+  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|browser)(?:\/|$))/;
 const SERVER_RUNTIME =
-  /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process-server|process-stores)(?:\/|$))/;
+  /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
 const MIGRATION_RUNNER =
   /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;
 /** The scenario child program and the one scenario-process subpath it may take. */
 const SCENARIO_CHILD_PROGRAM = "apps/scenario-child/src/main.ts";
 const SCENARIO_CHILD_SUBPATH = "./scenario-child";
-const KIT_FETCH = /^@langwatch\/browser-trpc(?:\/|$)/;
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
-const BROWSER_ROLES = new Set(["browser", "browser-kit"]);
 
 const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
   ["zod/v3", "zod"],
@@ -130,27 +128,34 @@ function runtimeFinding(file, specifier) {
   const server = SERVER_RUNTIME.test(specifier);
   const browser = BROWSER_RUNTIME.test(specifier);
   if (file.role === "contract" && (node || server || browser)) return "contractRuntime";
-  if (BROWSER_ROLES.has(file.role) && (node || server)) return "browserImportsProcess";
+  if (file.role === "browser" && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";
-  if (file.role === "browser-kit" && KIT_FETCH.test(specifier)) return "kitFetches";
+  const runtime = node || server || browser;
+  if (file.role === "library" && runtime && !isClientHook(file, specifier)) return "libraryRuntime";
 
   return undefined;
 }
 
-function directionFinding(file, target) {
-  if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
-  if (BROWSER_ROLES.has(file.role) && target.role === "process") return "browserImportsProcess";
-  if (file.role === "process" && BROWSER_ROLES.has(target.role)) return "processImportsBrowser";
-  const kitReachesABrowser =
-    file.role === "browser-kit" &&
-    BROWSER_ROLES.has(target.role) &&
-    target.root !== kitRootOf(file);
-
-  return kitReachesABrowser ? "kitLeaf" : undefined;
+/** A module client may take `react` for generic hooks, nothing else browser (Alex, 2026-10-01). */
+function isClientHook(file, specifier) {
+  return specifier === "react" && /(?:^|\/)modules\/[^/]+\/client\//.test(file.filename);
 }
 
-function kitRootOf(file) {
-  return `${file.moduleEnterprise ? "enterprise/" : ""}modules/${file.module}/browser-kit`;
+/** A library takes its own module's contract and other libraries, nothing else (§2). */
+function libraryDirectionFinding(file, target) {
+  if (target.role === "library") return undefined;
+  if (target.role === "contract" && target.module === file.module) return undefined;
+
+  return "libraryRuntime";
+}
+
+function directionFinding(file, target) {
+  if (file.role === "library") return libraryDirectionFinding(file, target);
+  if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
+  if (file.role === "browser" && target.role === "process") return "browserImportsProcess";
+  if (file.role === "process" && target.role === "browser") return "processImportsBrowser";
+
+  return undefined;
 }
 
 function pascalCase(kebab) {
@@ -198,14 +203,13 @@ function peerData(target) {
   return {
     api: `${pascalCase(target.module)}Api`,
     contract: `@langwatch/${prefix}${target.module}-contract`,
-    kit: `@langwatch/${prefix}${target.module}-browser-kit`,
     module: target.module,
   };
 }
 
 function crossModuleFinding({ file, target, subpath, node }) {
-  if (target.role === "contract" || target.module === file.module) return undefined;
-  if (target.role === "browser-kit" && BROWSER_ROLES.has(file.role)) return undefined;
+  const isPortable = target.role === "contract" || target.role === "library";
+  if (isPortable || target.module === file.module) return undefined;
   if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
     return undefined;
   }
@@ -320,23 +324,15 @@ export const boundaryRule = defineRule({
     },
     crossModuleBrowser: {
       what: "`{{specifier}}` is `{{module}}`'s browser package, which is closed to every other module.",
-      fix: "Move what this needs into `{{kit}}` and import it from there; where fewer than two modules share it, inline it here instead (the kit law, ARCHITECTURE.md §3.4).",
+      fix: "Move what this needs out of `{{module}}`'s browser package: pure domain logic into the owner's contract, shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`. Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
     },
     browserSideDoor: {
       what: "`{{specifier}}` reaches past `{{module}}`'s browser declaration, the only door a browser package has.",
-      fix: "Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `{{kit}}`.",
-    },
-    kitLeaf: {
-      what: "`{{specifier}}` is a browser package, and a browser kit is a leaf.",
-      fix: "Import only contracts, `@langwatch/design-system` and `@langwatch/browser-host` here; take what `{{specifier}}` provides as a prop from the consumer.",
-    },
-    kitFetches: {
-      what: "`{{specifier}}` fetches, and a browser kit fetches nothing.",
-      fix: "Take the data as a prop (`options`, `value`, `onChange`) and let each consumer run its own query.",
+      fix: "Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `@langwatch/design-system`.",
     },
     packageEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
-      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
+      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
     },
     unownedEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.",
@@ -362,6 +358,10 @@ export const boundaryRule = defineRule({
       what: "`{{specifier}}` is an enterprise module's implementation, and this is core code.",
       fix: "Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).",
     },
+    libraryRuntime: {
+      what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
+      fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
+    },
     retiredPackageRuntime: {
       what: "`{{specifier}}` is a retired runtime or package entry point.",
       fix: "Import {{replacement}} instead.",
@@ -372,7 +372,7 @@ export const boundaryRule = defineRule({
     },
     sealedExports: {
       what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",
-      fix: 'Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration` and a kit only `.`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.',
+      fix: 'Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.',
     },
   },
   create(context, file) {

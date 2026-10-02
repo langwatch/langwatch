@@ -1,4 +1,12 @@
-import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+  Wrap,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";

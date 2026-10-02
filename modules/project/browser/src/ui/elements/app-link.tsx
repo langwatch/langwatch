@@ -3,7 +3,7 @@
  * Host navigation handles plain clicks; browser handles modified clicks.
  */
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useProjectHomeHost } from "../../model/project-home-host.ts";

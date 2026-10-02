@@ -1,7 +1,9 @@
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { DarkMode, LightMode } from "../color-mode/index.tsx";
 import { FullLogo } from "./full-logo.tsx";
+import { LogoIcon } from "./logo-icon.tsx";
 
 const meta = {
   title: "Foundations/Full logo",
@@ -12,35 +14,54 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Every size on one surface, pinned to a mode by `LightMode` or `DarkMode`. */
+function Surface({ mode }: { mode: "light" | "dark" }) {
+  const Mode = mode === "light" ? LightMode : DarkMode;
+  return (
+    <Mode>
+      <Stack gap="4" align="start" padding="4" borderRadius="lg" bg="bg.panel">
+        <HStack gap="4" align="end">
+          {[16, 20, 24, 30, 52].map((height) => (
+            <LogoIcon key={height} height={height} />
+          ))}
+        </HStack>
+        <FullLogo width={112} height={27.5} />
+        <FullLogo />
+        <FullLogo width={240} height={59} />
+        <Text textStyle="xs" color="fg.muted">
+          {mode}
+        </Text>
+      </Stack>
+    </Mode>
+  );
+}
+
 /** Follows the colour mode of the surface it sits on. */
 export const Default: Story = {};
 
-export const Sizes: Story = {
+export const Light: Story = { render: () => <Surface mode="light" /> };
+
+export const Dark: Story = { render: () => <Surface mode="dark" /> };
+
+/** The rail, tab and caption sizes, where the lines thicken. */
+export const Small: Story = {
   render: () => (
-    <Stack gap="4" align="start">
+    <HStack gap="4" align="end">
+      <LogoIcon height={20} />
+      <LogoIcon height={24} />
+      <LogoIcon height={30} />
       <FullLogo width={100} height={25} />
-      <FullLogo />
-      <FullLogo width={240} height={59} />
-    </Stack>
+    </HStack>
   ),
 };
 
-/** Both cuts at once, for a surface that pins its own background. */
-export const BothColourModes: Story = {
+/** Standalone pages: sign-in, the loading screen, a shared trace. */
+export const Large: Story = {
   render: () => (
-    <HStack gap="6" align="center" wrap="wrap">
-      <Stack gap="2" bg="white" padding="4" borderRadius="lg">
-        <FullLogo forceColorMode="light" />
-        <Text textStyle="xs" color="black">
-          forceColorMode="light"
-        </Text>
-      </Stack>
-      <Stack gap="2" bg="zinc.900" padding="4" borderRadius="lg">
-        <FullLogo forceColorMode="dark" />
-        <Text textStyle="xs" color="white">
-          forceColorMode="dark"
-        </Text>
-      </Stack>
-    </HStack>
+    <Stack gap="4" align="start">
+      <FullLogo width={186} height={45.6} />
+      <FullLogo width={240} height={59} />
+      <LogoIcon height={64} />
+    </Stack>
   ),
 };

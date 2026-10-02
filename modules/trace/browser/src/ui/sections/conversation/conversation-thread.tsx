@@ -1,9 +1,9 @@
-import { Box, VStack } from "@chakra-ui/react";
 import type {
   UiConversationAudioPlayback,
   UiConversationThreadProps,
 } from "@langwatch/browser-host/declarations";
-import { groupIntoTurns } from "@langwatch/trace-browser-kit";
+import { Box, VStack } from "@langwatch/design-system/primitives";
+import { groupIntoTurns } from "@langwatch/trace-contract/conversation";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 

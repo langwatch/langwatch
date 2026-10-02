@@ -36,8 +36,7 @@ Feature: Every installed module boots in the process that installs it
     Given the worker's installed modules over memory stores
     When the worker process boots
     Then the trace pipeline hosts the coding-agent span dispatch
-    And the log pipeline hosts the coding-agent log dispatch
-    And the metric pipeline hosts the coding-agent metric dispatch
+    And coding-agent's pipeline hosts its peer lanes on log's and metric's received events
 
   @integration
   Scenario: The worker routes span recording to the trace pipeline

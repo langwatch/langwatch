@@ -10,7 +10,7 @@ export type {
   SlackRenderDefaults,
   RenderedSlack,
 } from "./templating/render-slack.ts";
-export { renderTriggerSlack } from "./templating/render-slack.ts";
+export { renderTriggerSlack, resolveSlackTemplateType } from "./templating/render-slack.ts";
 export * from "./templating/render-webhook-body.ts";
 export * from "./templating/render-with-fallback.ts";
 export * from "./templating/sandboxed-liquid.ts";

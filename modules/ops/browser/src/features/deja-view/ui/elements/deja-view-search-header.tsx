@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Button, HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
 export function SearchHeader({

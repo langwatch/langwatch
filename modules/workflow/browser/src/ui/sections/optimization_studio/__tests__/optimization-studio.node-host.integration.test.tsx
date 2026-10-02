@@ -4,8 +4,8 @@
  * The studio shell mounts the node host once, so the node panel, the drag
  * preview and the drawers all read it instead of throwing.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const storeState: Record<string, unknown> = {
@@ -103,25 +103,32 @@ vi.mock("@langwatch/browser-host/toaster", () => ({ toaster: { create: vi.fn() }
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), currentDrawer: undefined }),
 }));
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getVersions: { refetch: vi.fn() } } }),
     workflow: { autosave: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
     modelProvider: { getResolvedDefault: { useQuery: () => ({ data: undefined }) } },
     optimization: { getComponents: { useQuery: () => ({ data: [] }) } },
   },
 }));
-vi.mock("@langwatch/dataset-browser-kit", () => ({ DatasetImagePreviewTable: () => null }));
-vi.mock("@langwatch/experiment-browser-kit", () => ({ EvaluationProgressBar: () => null }));
+vi.mock("../../../blocks/dataset/dataset-image-preview-table.tsx", () => ({
+  DatasetImagePreviewTable: () => null,
+}));
+vi.mock("../../../elements/experiment/BatchEvaluationV2/evaluation-progress-bar.tsx", () => ({
+  EvaluationProgressBar: () => null,
+}));
 vi.mock("@langwatch/design-system/color-mode", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useColorMode: () => ({ colorMode: "light" }),
   useColorModeValue: (light: string) => light,
   useColorRawValue: (value: string) => value,
 }));
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../../elements/workflow-icons.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentIcon: () => null,
+}));
+vi.mock("../../../../behavior/crisp-bubble-policy.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   assertCrispChatHidden: () => undefined,
 }));
 vi.mock("react-dnd", async (importOriginal) => ({
@@ -165,11 +172,7 @@ afterEach(cleanup);
 describe("given the workflow studio shell", () => {
   describe("when it loads with the node panel, a node being dragged and a drawer button", () => {
     it("renders every node consumer inside the one node host without throwing", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <OptimizationStudio />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<OptimizationStudio />);
 
       expect(screen.getAllByText("Components").length).toBeGreaterThan(0);
       expect(screen.getByTestId("workflow-node-signature")).toBeTruthy();

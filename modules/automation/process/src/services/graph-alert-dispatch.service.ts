@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 
 import {
   ALERT_TRIGGER_DEFAULTS,
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   renderTriggerEmail,
   renderTriggerSlack,
   renderWebhookBody,
-  type SlackTemplateType,
+  resolveSlackTemplateType,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 
@@ -185,16 +186,13 @@ export class GraphAlertDispatchService {
   }
 
   private async sendSlack(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult> {
-    const templateType: SlackTemplateType =
-      input.trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
     if (input.botDestination) {
       const destination = `slack-bot:${input.botDestination.channel}`;
       if (await this.isSent(input, destination)) {
         return { ...emptyResult("slack"), didSend: true };
       }
 
-      const rendered = await this.renderSlack(input, templateType, true);
+      const rendered = await this.renderSlack(input, "bot");
       await this.delivery.sendSlackBot({
         token: input.botDestination.token,
         channel: input.botDestination.channel,
@@ -216,7 +214,7 @@ export class GraphAlertDispatchService {
       return { ...emptyResult("slack"), didSend: true };
     }
 
-    const rendered = await this.renderSlack(input, templateType, false);
+    const rendered = await this.renderSlack(input, "webhook");
     await this.delivery.sendSlackWebhook({
       webhook,
       triggerName: input.trigger.name,
@@ -227,17 +225,16 @@ export class GraphAlertDispatchService {
     return this.renderedResult("slack", rendered);
   }
 
-  private renderSlack(
-    input: GraphAlertDispatchInput,
-    templateType: SlackTemplateType,
-    allowGatedBlocks: boolean,
-  ) {
+  private renderSlack(input: GraphAlertDispatchInput, deliveryMethod: "bot" | "webhook") {
     return renderTriggerSlack({
-      templateType,
+      templateType: resolveSlackTemplateType({
+        configured: input.trigger.templates.slackTemplateType,
+        deliveryMethod,
+      }),
       template: input.trigger.templates.slackTemplate,
       context: input.context,
       defaults: ALERT_TRIGGER_DEFAULTS,
-      allowGatedBlocks,
+      allowGatedBlocks: deliveryMethod === "bot",
     });
   }
 
@@ -260,13 +257,14 @@ export class GraphAlertDispatchService {
       return { ...emptyResult("webhook"), didSend: true };
     }
 
+    const contentType = params.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
     const rendered = await renderWebhookBody({
       template: params.bodyTemplate,
       context: input.context,
+      contentType,
       defaultBody: ALERT_TRIGGER_DEFAULTS.webhookBody,
     });
     await this.delivery.sendWebhook({
-      recorder: (record) => this.persistence.recordWebhookDelivery(record),
       projectId: input.project.id,
       triggerId: input.trigger.id,
       eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
@@ -275,6 +273,7 @@ export class GraphAlertDispatchService {
       headers: this.webhooks.decryptHeaders(params),
       signingSecrets: this.webhooks.decryptSigningSecrets(params, this.clock.now()),
       body: rendered.body,
+      contentType,
       triggerName: input.trigger.name,
     });
     await this.recordSent(input, destination);

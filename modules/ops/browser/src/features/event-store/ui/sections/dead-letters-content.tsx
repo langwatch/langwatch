@@ -1,4 +1,13 @@
-import { Button, Center, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Center,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
@@ -30,10 +39,7 @@ export function DeadLettersContent() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const actions = useDeadLetterActions();
 
-  const query = api.ops.listDeadLetters.useQuery(
-    { processName, page, pageSize: PAGE_SIZE },
-    { refetchInterval: 30_000 },
-  );
+  const query = api.ops.listDeadLetters.useQuery({ processName, page, pageSize: PAGE_SIZE }, {});
 
   if (query.isPending) {
     return (

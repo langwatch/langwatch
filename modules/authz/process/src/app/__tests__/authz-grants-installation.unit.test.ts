@@ -6,18 +6,18 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { authzServer } from "../../authz.server.ts";
+import { authzProcessModule } from "../../authz.module.ts";
 import { authzGrantRest } from "../../transport/authz-grant.rest.ts";
 import { authzRoleBindingRest } from "../../transport/authz-role-binding.rest.ts";
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(authzServer)])
+    .withModules([withMemoryRepositories(authzProcessModule)])
     .withConfig({
       authz: {
         epochCacheEnabled: false,
@@ -36,8 +36,8 @@ function process() {
 
 describe("given a process that installed authz", () => {
   it("mounts /api/grants beside /api/role-bindings, which names it as its successor", () => {
-    expect(authzServer.transports).toContain(authzGrantRest);
-    expect(authzServer.transports).toContain(authzRoleBindingRest);
+    expect(authzProcessModule.transports).toContain(authzGrantRest);
+    expect(authzProcessModule.transports).toContain(authzRoleBindingRest);
     expect(authzGrantRest.router().deprecated).toBeUndefined();
     expect(authzRoleBindingRest.router().deprecated?.successor).toBe("/api/grants");
   });

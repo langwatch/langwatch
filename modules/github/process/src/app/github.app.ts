@@ -23,11 +23,11 @@ import {
   type GithubUsageCount,
   type GithubWebhookEnvelope,
 } from "@langwatch/github-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 
@@ -37,21 +37,18 @@ import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
-import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
+import {
+  GithubBranchMaintenanceService,
+  type GithubBranchMaintenance,
+} from "../services/github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
+import { GithubHostService, type GithubHost } from "../services/github-host.service.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
-import {
-  type GithubProjectActivity,
-  type GithubHost,
-  type GithubBranchDemand,
-  type GithubBranchMaintenance,
-} from "./github.members.ts";
 
 export type GithubInstallationToken = {
   token: string;
@@ -136,7 +133,7 @@ export interface GithubAppTokenCache {
 }
 
 type GithubSetup = FeatureSetup<
-  typeof GithubApp.dependencies,
+  typeof GithubModule.dependencies,
   never,
   GithubServerConfig,
   GithubRepositories
@@ -146,7 +143,7 @@ type GithubSetup = FeatureSetup<
 export type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   organization: OrganizationApiContract;
-  project: GithubProjectActivity;
+  project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
   config: {
     appId: string;
     privateKey: string;
@@ -169,7 +166,7 @@ export type GithubBranchDemandComposition = Readonly<{
   repositories: GithubRepositories;
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
-  project: GithubProjectActivity;
+  project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
 }>;
 
 /**
@@ -177,7 +174,7 @@ export type GithubBranchDemandComposition = Readonly<{
  * `GithubService` answers the host question from the same `GithubHostApi`
  * this composition resolved and routes into the same demand service.
  */
-class ComposedGithubBranchDemand implements GithubBranchDemand {
+class ComposedGithubBranchDemand {
   static create(parts: {
     demand: GithubBranchDemandService;
     host: GithubHost;
@@ -199,8 +196,13 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
   }
 }
 
+export type GithubBranchDemand = Pick<
+  ComposedGithubBranchDemand,
+  "canMapRepositoryHost" | "requestBranchMapping"
+>;
+
 /** The process-owned GitHub capability; provider and persistence stay private. */
-export class GithubApp implements GithubApiContract {
+export class GithubModule implements GithubApiContract {
   static readonly contract = GithubApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -319,7 +321,7 @@ export class GithubApp implements GithubApiContract {
   /**
    * The fleet-wide branch sweep alone: the pull-request rows, the
    * installation reads, an App token minter and the host — without composing
-   * the organization or project services {@link GithubApp.composeApi} needs.
+   * the organization or project services {@link GithubModule.composeApi} needs.
    */
   static composeBranchMaintenance(
     parts: GithubBranchMaintenanceComposition,
@@ -374,18 +376,18 @@ export class GithubApp implements GithubApiContract {
     secrets,
     config,
     dependencies,
-  }: GithubSetup): Promise<GithubApp> {
+  }: GithubSetup): Promise<GithubModule> {
     const branchConfig = {
       appId: config.appId ?? "",
-      privateKey: await secrets.into(GithubApp.secrets.privateKey, (value) => value ?? ""),
+      privateKey: await secrets.into(GithubModule.secrets.privateKey, (value) => value ?? ""),
     };
     const signingKey =
-      (await secrets.into(GithubApp.secrets.signingKey, (value) => value ?? "")) ||
-      (await secrets.into(GithubApp.secrets.signingKeyFallback, (value) => value ?? ""));
+      (await secrets.into(GithubModule.secrets.signingKey, (value) => value ?? "")) ||
+      (await secrets.into(GithubModule.secrets.signingKeyFallback, (value) => value ?? ""));
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
-    return new GithubApp({
-      service: GithubApp.composeApi({
+    return new GithubModule({
+      service: GithubModule.composeApi({
         repositories,
         organization: dependencies.organizations,
         project: dependencies.projects,
@@ -393,7 +395,7 @@ export class GithubApp implements GithubApiContract {
           ...branchConfig,
           appSlug: config.appSlug ?? "",
           webhookSecret: await secrets.into(
-            GithubApp.secrets.webhookSecret,
+            GithubModule.secrets.webhookSecret,
             (value) => value ?? "",
           ),
           signingKey,
@@ -403,7 +405,7 @@ export class GithubApp implements GithubApiContract {
       // `github_maintenance` (ADR-144), ported from the deleted
       // `GithubWorkerFeatureInstaller`: composed here, not received, so the
       // sweep runs over this same graph's rows.
-      branchMaintenance: GithubApp.composeBranchMaintenance({
+      branchMaintenance: GithubModule.composeBranchMaintenance({
         repositories,
         config: branchConfig,
         ...hostConfig,

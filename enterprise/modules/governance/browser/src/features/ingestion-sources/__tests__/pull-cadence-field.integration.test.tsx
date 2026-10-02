@@ -9,8 +9,8 @@
  * pullSchedule ("" = recommended default, resolved at create), edits come
  * back through `onChange` as a cron string.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -43,11 +43,7 @@ function Harness({
 }
 
 const renderField = (props: Parameters<typeof Harness>[0]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Harness {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<Harness {...props} />);
 
 /**
  * The frequency control, addressed the way a reader meets it.

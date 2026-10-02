@@ -28,7 +28,6 @@ export type PersonalWorkspaceContext = {
       id: string;
       name: string;
       slug: string;
-      apiKey: string;
       createdAtMs: number;
     };
     created: boolean;
@@ -94,7 +93,7 @@ export type PersonalOrganizationGraph = {
   id: string;
   name: string;
   slug: string;
-  members: { userId: string; role: string }[];
+  members: { role: string }[];
   ssoProvider?: string | null;
   teams: {
     id: string;
@@ -122,11 +121,11 @@ type BorrowedProcedures = {
       };
     };
   };
-  limits: {
-    getUsage: {
+  plan: {
+    getActivePlan: {
       query: {
         input: { organizationId: string };
-        output: { activePlan: { type: string } };
+        output: { type: string };
       };
     };
   };
@@ -176,18 +175,10 @@ type BorrowedProcedures = {
     };
   };
   organization: {
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: PersonalOrganizationGraph[];
-      };
-    };
-  };
-  apiKey: {
-    list: {
-      query: {
-        input: { organizationId: string };
-        output: PersonalApiKeyListEntry[];
       };
     };
   };

@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Flex, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, Shuffle } from "lucide-react";
 import { useState } from "react";
 

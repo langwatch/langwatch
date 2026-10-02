@@ -1,15 +1,19 @@
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   normalizeDomain,
   SSO_DNS_PROOF_TTL_MS,
   type SelfServeActor,
   type SelfServeIssuedDnsRecord,
+  SsoConnectionDomainTakenError,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
   SsoDomainClaimPendingError,
   SsoDomainLookupFailedError,
   SsoDomainProofNotFoundError,
+  SsoLicenseRequiredError,
   type SsoPublishedProofChannel,
+  type SsoVerificationCeremonyMethod,
   ssoDnsRecordName,
   ssoDomainRecordLocation,
   ssoVerificationFileUrl,
@@ -27,6 +31,8 @@ export interface SsoDomainCeremonyServiceDeps {
   reads: SsoConnectionReadRepository;
   proofs: SsoDomainProofChannel;
   files: SsoDomainProofFileChannel;
+  /** The installation licence's hash, recorded as the proof where the licence proves a domain. */
+  licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
   now?: () => number;
 }
 
@@ -38,10 +44,12 @@ export interface SsoDomainProofCommand {
   actor: SelfServeActor;
 }
 
-/** What a claim did: waiting for a person when somebody else proved it first. */
+/** What a claim did: verified at once by the licence, or waiting for a person when
+ *  somebody else proved it first. */
 export interface SsoDomainClaimOutcome {
   waitsForReview: boolean;
   disputed: boolean;
+  verified: boolean;
 }
 
 /** A ceremony already closed, or the record still to publish. */
@@ -65,47 +73,62 @@ export class SsoDomainCeremonyService {
     this.now = deps.now ?? Date.now;
   }
 
-  /** Records a claim; only published proof can verify it. */
+  /**
+   * Records a claim. Where the installation's licence is the proof the claim is
+   * approved and verified in the same request; everywhere else it waits for a
+   * published proof.
+   */
   async claimDomain({
     organizationId,
     connectionId,
     domain,
     actor,
-  }: {
-    organizationId: string;
-    connectionId: string;
-    domain: string;
-    actor: SelfServeActor;
+    proof,
+  }: SsoDomainProofCommand & {
+    proof: SsoVerificationCeremonyMethod;
   }): Promise<SsoDomainClaimOutcome> {
     // The surface refuses a foreign connection with the same words the
     // aggregate does, so neither can become an existence oracle.
     await this.requireOrganizationConnection({ organizationId, connectionId });
+    // One organization per domain on an installation. With the licence as the
+    // proof there is no reviewer to hand a dispute to, so it is refused first.
+    if (proof === "license-token" && (await this.isDisputed({ organizationId, domain }))) {
+      throw new SsoConnectionDomainTakenError(
+        `connection ${connectionId}: ${normalizeDomain(domain)} is already held by another organization on this installation`,
+      );
+    }
     await this.deps.connections().claimDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain,
     });
+    if (proof === "license-token") {
+      await this.proveWithLicense({ organizationId, connectionId, domain, actor });
+      return { waitsForReview: false, disputed: false, verified: true };
+    }
     const disputed = await this.isDisputed({ organizationId, domain });
 
-    return { waitsForReview: disputed, disputed };
+    return { waitsForReview: disputed, disputed, verified: false };
   }
 
   /**
-   * Issues the record to publish, and returns its value ONCE: the fact keeps
-   * only the hash, so a customer who loses the value asks for a fresh record
-   * rather than reading an old one back out of us.
+   * Issues the record to publish and returns its value ONCE (the fact keeps only
+   * the hash, so a lost value means a fresh record). Where the licence is the
+   * proof, this finishes the verification instead.
    */
   async proveDomain({
     organizationId,
     connectionId,
     domain,
     actor,
-  }: {
-    organizationId: string;
-    connectionId: string;
-    domain: string;
-    actor: SelfServeActor;
+    proof,
+  }: SsoDomainProofCommand & {
+    proof: SsoVerificationCeremonyMethod;
   }): Promise<SsoDomainProofIssue> {
     await this.requireClaimProvable({ organizationId, connectionId, domain });
+    if (proof === "license-token") {
+      await this.proveWithLicense({ organizationId, connectionId, domain, actor });
+      return { proved: true };
+    }
 
     const value = mintVerificationToken();
     const expiresAtMs = this.now() + SSO_DNS_PROOF_TTL_MS;
@@ -189,6 +212,42 @@ export class SsoDomainCeremonyService {
     });
 
     return { proved: true };
+  }
+
+  /**
+   * Verify the domain with the installation's licence as the proof, in the commit
+   * that decides the claim; a request that stopped part way finishes on the next
+   * press. The guards decide whether the licence may speak here at all.
+   */
+  private async proveWithLicense({
+    organizationId,
+    connectionId,
+    domain,
+    actor,
+  }: SsoDomainProofCommand): Promise<void> {
+    const normalized = normalizeDomain(domain);
+    const state = await this.requireOrganizationConnection({ organizationId, connectionId });
+    if (state.verifiedDomains.includes(normalized)) return;
+    const pending = state.pendingVerification;
+    if (pending?.domain !== normalized || pending.method !== "license-token") {
+      const [licenseDigest] = (await this.deps.licensing.getDomainClaimAuthority()).licenseDigests;
+      if (licenseDigest === undefined) {
+        throw new SsoLicenseRequiredError(
+          `organization ${organizationId}: the installation holds no genuine license`,
+        );
+      }
+      await this.deps.connections().requestVerification({
+        ...this.command({ organizationId, connectionId, actor }),
+        domain: normalized,
+        method: "license-token",
+        tokenHash: licenseDigest,
+        expiresAtMs: null,
+      });
+    }
+    await this.deps.connections().verifyDomain({
+      ...this.command({ organizationId, connectionId, actor }),
+      domain: normalized,
+    });
   }
 
   /** What the domain publishes, and the refusal that stands if none matches. */

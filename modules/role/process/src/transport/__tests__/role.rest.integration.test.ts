@@ -46,7 +46,11 @@ const catalogSchema = z.object({
   ),
 });
 
-function world({ bindings = [] as AuthzAccessBinding[], callerLacks = [] as string[] } = {}) {
+function world({
+  bindings = [] as AuthzAccessBinding[],
+  callerLacks = [] as string[],
+  enterprise = true,
+} = {}) {
   const roles = MemoryRoleRepository.create();
   const ledger = new Map<string, StoredRole>();
   const state = (role: StoredRole) => {
@@ -94,6 +98,7 @@ function world({ bindings = [] as AuthzAccessBinding[], callerLacks = [] as stri
       authenticate: ({ request }) => admit(request),
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
+    entitlements: { holds: async () => enterprise },
   });
   const hono = runtime.mount(roleRest.router(), {
     app: () => app,
@@ -128,6 +133,29 @@ const roleIdsOf = (body: unknown) =>
     .roles.map((role) => role.id);
 
 describe("given the /api/roles family", () => {
+  describe("when the organization is below Enterprise", () => {
+    /** @scenario The roles family answers 402 below Enterprise, naming RBAC */
+    it("refuses reading and defining roles with enterprise_plan_required naming RBAC", async () => {
+      const { send, ledger } = world({ enterprise: false });
+
+      const answers = await Promise.all([
+        send("/api/roles"),
+        send("/api/roles", {
+          method: "POST",
+          body: { name: "Ops", permissions: ["project:view"] },
+        }),
+      ]);
+
+      for (const answer of answers) {
+        expect(await answer.json()).toMatchObject({
+          code: "enterprise_plan_required",
+          meta: { feature: "RBAC" },
+        });
+      }
+      expect(ledger.size).toBe(0);
+    });
+  });
+
   describe("when the organization's roles are listed", () => {
     /** @scenario Listing custom roles returns the organization's roles */
     it("answers its own roles with their permissions and none from another organization", async () => {

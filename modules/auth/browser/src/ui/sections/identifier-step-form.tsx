@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
-import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

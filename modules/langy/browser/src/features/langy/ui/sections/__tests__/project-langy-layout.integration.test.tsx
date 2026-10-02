@@ -50,8 +50,7 @@ vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
   },
 }));
 
-import { useLangy, useLangyStore } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -60,6 +59,7 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import { useLangy } from "../../../../../ui/sections/langy-page-context.tsx";
 import ProjectLangyLayout from "../project-langy-layout.tsx";
 
 function LangySidecarStub() {

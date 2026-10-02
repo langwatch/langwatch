@@ -1,3 +1,4 @@
+import { type AuthzPermission } from "@langwatch/authorization";
 import {
   AuthzApi as AuthzApiToken,
   authzBrowserConfig,
@@ -12,7 +13,6 @@ import {
   type AuthzDeleteRoleInput,
   type AuthzGrantsService,
   type AuthzOffboardMemberInput,
-  type AuthzPermission,
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
   type AuthzRevokeBindingsWhereOutput,
@@ -22,17 +22,19 @@ import {
   type AuthzServerConfig,
   AuthzScopeNotFoundError,
   type AuthzScopeRef,
+  PLATFORM_OPERATOR_PERMISSIONS,
+  newAuthzGrantId,
 } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
-import { AuthzBindingIdService } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
+import type { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import {
   PostgresAuthzAdapter,
@@ -46,10 +48,12 @@ import {
  * behind AuthzGrantsService and is never exported from the package root.
  */
 export interface AuthzCompatibilityLedger {
-  attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
+  attachBindings(
+    args: Omit<AuthzAttachBindingsInput, "caller">,
+  ): Promise<AuthzAttachBindingsOutput>;
   attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
   revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void>;
-  changeBindingRole(args: AuthzChangeBindingRoleInput): Promise<void>;
+  changeBindingRole(args: Omit<AuthzChangeBindingRoleInput, "caller">): Promise<void>;
   revokeBindings(args: AuthzRevokeBindingsInput): Promise<void>;
   revokeBindingsWhere(args: AuthzRevokeBindingsWhereInput): Promise<AuthzRevokeBindingsWhereOutput>;
   offboardMember(args: AuthzOffboardMemberInput): Promise<void>;
@@ -60,18 +64,18 @@ export interface AuthzCompatibilityLedger {
 /**
  * The whole adapter surface, as a caller composing this graph BY HAND
  * supplies it. The installed module reads the two members it needs and
- * builds the rest itself (see {@link AuthzApp.create}); kept for hand composition.
+ * builds the rest itself (see {@link AuthzModule.create}); kept for hand composition.
  */
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
 export type AuthzSetup = FeatureSetup<
   Readonly<{}>,
-  MembersRead<typeof AuthzApp.reads>,
+  MembersRead<typeof AuthzModule.reads>,
   AuthzServerConfig,
   AuthzRepositories
 >;
 
 /** The composed callable authorization boundary. */
-export class AuthzApp implements AuthzApi {
+export class AuthzModule implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
@@ -81,13 +85,13 @@ export class AuthzApp implements AuthzApi {
    * counter lives on it, and every process installing AuthZ opens Redis
    * anyway - this states the dependency instead of hiding it behind a null.
    */
-  static readonly reads = reads("prisma", "redis");
+  static readonly reads = ["prisma", "redis"] as const;
 
   #permissions: AuthzService;
   #grantIdentity = AuthzGrantIdentityService.create();
   #grants: AuthzGrantsService;
   /**
-   * Both absent on an app built by {@link AuthzApp.fromServices}: a hand
+   * Both absent on an app built by {@link AuthzModule.fromServices}: a hand
    * composition registers the pipeline and connects the dispatcher itself, so
    * it has no use for either and this app never holds one.
    */
@@ -96,14 +100,16 @@ export class AuthzApp implements AuthzApi {
   #demoProjectId: string | undefined;
   #demoProjectUserId: string | undefined;
   /**
-   * Absent on an app built by {@link AuthzApp.fromServices}, which composes
+   * Absent on an app built by {@link AuthzModule.fromServices}, which composes
    * no repositories; the three admission verbs refuse by name there.
    */
   #admissions: AuthzAdmissionService | undefined;
-  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no migration. */
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
-  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no version store. */
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store. */
   #sessionVersions: AuthzSessionVersionService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier. */
+  #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(
     permissions: AuthzService,
@@ -114,6 +120,7 @@ export class AuthzApp implements AuthzApi {
       admissions?: AuthzAdmissionService;
       migration?: SystemMigration;
       sessionVersions?: AuthzSessionVersionService;
+      platformOperators?: AuthzPlatformOperatorsService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -129,6 +136,7 @@ export class AuthzApp implements AuthzApi {
     this.#admissions = options.admissions;
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
+    this.#platformOperators = options.platformOperators;
   }
 
   /**
@@ -139,7 +147,7 @@ export class AuthzApp implements AuthzApi {
   eventingPipeline(): AuthzPipeline {
     if (!this.#pipeline) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no pipeline: " +
+        "This AuthzModule was composed from already-built services, so it holds no pipeline: " +
           "the composition that built them registers its own.",
       );
     }
@@ -150,25 +158,25 @@ export class AuthzApp implements AuthzApi {
    * Build AuthZ graph; dispatcher constructed here, connected by eventing
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
-  static create(setup: AuthzSetup): AuthzApp {
+  static create(setup: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
-    const bindingIds = AuthzBindingIdService.create();
     const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,
       redis: setup.members.redis,
       dispatcher,
-      newBindingId: () => bindingIds.newBindingId(),
+      newBindingId: newAuthzGrantId,
       repositories: setup.repositories,
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,
     }).build();
-    return new AuthzApp(built.authz, built.grants, {
+    return new AuthzModule(built.authz, built.grants, {
       demoProjectId: config.demoProjectId(),
       demoProjectUserId: setup.config.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
       migration: built.migration,
       sessionVersions: built.sessionVersions,
+      platformOperators: built.platformOperators,
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -190,8 +198,8 @@ export class AuthzApp implements AuthzApi {
     permissions: AuthzService;
     grants: AuthzGrantsService;
     config?: AuthzServerConfig | undefined;
-  }): AuthzApp {
-    return new AuthzApp(input.permissions, input.grants, {
+  }): AuthzModule {
+    return new AuthzModule(input.permissions, input.grants, {
       demoProjectId: input.config?.demoProjectId,
       demoProjectUserId: input.config?.demoProjectUserId,
     });
@@ -213,16 +221,34 @@ export class AuthzApp implements AuthzApi {
         organizationId: input.projectId ? undefined : input.organizationId,
       });
     } catch (error) {
-      if (AuthzScopeNotFoundError.is(error)) return { scope: null, permissions: [] };
+      if (AuthzScopeNotFoundError.is(error)) {
+        return { scope: null, permissions: [...(await this.platformPermissionsOf(by))] };
+      }
       throw error;
     }
+    const [scoped, platform] = await Promise.all([
+      this.effectivePermissions({ principal: { type: "user", id: by.id }, scope }),
+      this.platformPermissionsOf(by),
+    ]);
     return {
       scope: { type: scope.type, id: scope.id },
-      permissions: await this.effectivePermissions({
-        principal: { type: "user", id: by.id },
-        scope,
-      }),
+      permissions: [...scoped, ...platform],
     };
+  }
+
+  /** The session's own ops permissions: only a platform grant confers them, at any scope. */
+  private async platformPermissionsOf(by: AuthzCaller): Promise<AuthzPermission[]> {
+    const held = await Promise.all(
+      PLATFORM_OPERATOR_PERMISSIONS.map((permission) =>
+        this.#permissions.can({
+          principal: { type: "user", id: by.id },
+          permission,
+          scope: { type: "platform" },
+        }),
+      ),
+    );
+
+    return PLATFORM_OPERATOR_PERMISSIONS.filter((_, index) => held[index]);
   }
   check: AuthzApi["check"] = (a) => this.#permissions.check(a);
   checkDetailed: AuthzApi["checkDetailed"] = (a) => this.#permissions.checkDetailed(a);
@@ -284,11 +310,17 @@ export class AuthzApp implements AuthzApi {
   clearPendingAdmission: AuthzApi["clearPendingAdmission"] = (a) =>
     this.admissions().clearPendingAdmission(a);
 
+  grantPlatformOperator: AuthzApi["grantPlatformOperator"] = (a) =>
+    this.platformOperators().grant(a);
+  revokePlatformOperator: AuthzApi["revokePlatformOperator"] = (a) =>
+    this.platformOperators().revoke(a);
+  listPlatformOperators: AuthzApi["listPlatformOperators"] = () => this.platformOperators().list();
+
   getSessionVersion: AuthzApi["getSessionVersion"] = (a) => {
     if (!this.#sessionVersions) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no session " +
-          "version store: compose it through AuthzApp.create to read one.",
+        "This AuthzModule was composed from already-built services, so it holds no session " +
+          "version store: compose it through AuthzModule.create to read one.",
       );
     }
     return this.#sessionVersions.getSessionVersion(a);
@@ -307,10 +339,7 @@ export class AuthzApp implements AuthzApi {
    * is a function of the grant's own content.
    */
   deriveGrantId: AuthzApi["deriveGrantId"] = (a) => this.#grantIdentity.deriveGrantId(a);
-  attach: AuthzApi["attach"] = (a) => this.#grants.attach(a);
-  update: AuthzApi["update"] = (a) => this.#grants.update(a);
   revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);
-  replace: AuthzApi["replace"] = (a) => this.#grants.replace(a);
   offboard: AuthzApi["offboard"] = (a) => this.#grants.offboard(a);
   invalidateOrganization: AuthzApi["invalidateOrganization"] = (a) =>
     this.#grants.invalidateOrganization(a);
@@ -355,18 +384,28 @@ export class AuthzApp implements AuthzApi {
   registeredMigrations(): readonly SystemMigration[] {
     if (!this.#migration) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no migration: " +
-          "compose it through AuthzApp.create to answer its registered migrations.",
+        "This AuthzModule was composed from already-built services, so it holds no migration: " +
+          "compose it through AuthzModule.create to answer its registered migrations.",
       );
     }
     return [this.#migration];
   }
 
+  private platformOperators(): AuthzPlatformOperatorsService {
+    if (!this.#platformOperators) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no platform " +
+          "tier: compose it through AuthzModule.create to grant, revoke or list operators.",
+      );
+    }
+    return this.#platformOperators;
+  }
+
   private admissions(): AuthzAdmissionService {
     if (!this.#admissions) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no admission " +
-          "repository: compose it through AuthzApp.create to read or clear an admission.",
+        "This AuthzModule was composed from already-built services, so it holds no admission " +
+          "repository: compose it through AuthzModule.create to read or clear an admission.",
       );
     }
     return this.#admissions;

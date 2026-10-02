@@ -14,9 +14,6 @@
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/gateway-contract": ["../contract/src/index.ts"],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
-      "@langwatch/authz-browser-kit/scope-picker": [
-        "../../authz/web-kit/src/scope-picker/index.ts"
-      ],
       "@langwatch/enterprise-billing-browser/surfaces/contact-sales": [
         "../../../enterprise/modules/billing/browser/src/ui/sections/contact-sales/index.ts"
       ]
@@ -31,10 +28,10 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/browser-kit/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
@@ -52,16 +49,10 @@
       "path": "../../../enterprise/modules/enterprise-gateway/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -70,13 +61,7 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../trace/process/tsconfig.build.json"

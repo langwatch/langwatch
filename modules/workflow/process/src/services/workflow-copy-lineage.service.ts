@@ -19,7 +19,11 @@ import {
 } from "@langwatch/workflow-contract";
 
 import type { WorkflowLineageReads, WorkflowPermissionProbe } from "../app/workflow.app.ts";
-import { cloneDsl, nextMajorVersion } from "../rules/workflow-copy-version.rules.ts";
+import {
+  cloneDsl,
+  cloneDslForCopy,
+  nextMajorVersion,
+} from "../rules/workflow-copy-version.rules.ts";
 import type { WorkflowStudioVersionService } from "./workflow-studio-version.service.ts";
 import type { WorkflowService } from "./workflow.service.ts";
 
@@ -159,7 +163,11 @@ export class WorkflowCopyLineageService {
       });
     }
 
-    const dsl = cloneDsl(sourceWorkflow.latestVersion.dsl);
+    const dsl = cloneDslForCopy({
+      dsl: sourceWorkflow.latestVersion.dsl,
+      sourceProjectId: sourceWorkflow.projectId,
+      targetProjectId: input.projectId,
+    });
 
     dsl.workflow_id = workflow.id;
 
@@ -220,7 +228,11 @@ export class WorkflowCopyLineageService {
 
       if (!copyLatest) continue;
 
-      const copyDsl = cloneDsl(dsl);
+      const copyDsl = cloneDslForCopy({
+        dsl,
+        sourceProjectId: input.projectId,
+        targetProjectId: copy.projectId,
+      });
 
       copyDsl.workflow_id = copy.id;
 

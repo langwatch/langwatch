@@ -22,7 +22,7 @@
     },
     "./scenario-child": {
       "types": "./dist/scenario-child.server.d.ts",
-      "default": "./src/scenario-child.server.ts"
+      "default": "./src/scenario-child.module.ts"
     },
     "./composition/scenario-failure-handler": {
       "types": "./dist/services/scenario-failure-handler.service.d.ts",
@@ -52,24 +52,25 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
-    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
@@ -96,8 +97,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/actor": "workspace:*",
-    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/model-provider-process": "workspace:*",

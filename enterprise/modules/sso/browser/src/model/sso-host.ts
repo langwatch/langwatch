@@ -101,6 +101,3 @@ export function useSsoHost(): SsoHostApi {
 
   return host;
 }
-
-/** Seeing the page is `sso:view`; its controls take `sso:manage` (ADR-122). */
-export const SSO_PAGE_PERMISSION = "sso:view";

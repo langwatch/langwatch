@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -63,7 +63,10 @@ async function seeded() {
   );
 
   return ProjectService.create({
-    created: ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
+    created: ProjectCreatedNoticeService.create({
+      logger: { error: () => void 0 },
+      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+    }),
     repository,
     credentials: ProjectCredentialsService.create(),
     organizations: createApiFixture<OrganizationApi>({}),

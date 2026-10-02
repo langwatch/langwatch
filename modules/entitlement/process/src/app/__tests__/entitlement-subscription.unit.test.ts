@@ -1,15 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { entitlementServer } from "../../entitlement.server.ts";
+import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const free: Plan = {
@@ -38,7 +38,7 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
   const { logger } = createTestLogger();
 
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(entitlementServer)])
+    .withModules([withMemoryRepositories(entitlementProcessModule)])
     .withConfig({ entitlement: { requestBounds: undefined } })
     .withMembers({ isSaas, processName: "test" })
     .withObservability((observability) => observability.withLogging(logger))

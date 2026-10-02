@@ -134,6 +134,9 @@
       "path": "modules/share/contract/tsconfig.build.json"
     },
     {
+      "path": "modules/slack/contract/tsconfig.build.json"
+    },
+    {
       "path": "modules/stored-object/contract/tsconfig.build.json"
     },
     {

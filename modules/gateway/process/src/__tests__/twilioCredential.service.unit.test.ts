@@ -1,14 +1,14 @@
-/**
- * @vitest-environment node
- * @see specs/features/agents/voice-phone.feature
- * `getCredential` reads a Twilio row's three keys, or refuses with `voice_key_missing`.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderCustomKeysMissingError,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
+/**
+ * @vitest-environment node
+ * @see specs/features/agents/voice-phone.feature
+ * `getCredential` reads a Twilio row's three keys, or refuses with `voice_key_missing`.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";

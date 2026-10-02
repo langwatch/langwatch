@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 
 import chalk from "chalk";
 
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { normalizeEndpoint } from "../../internal/endpoint.ts";
@@ -148,6 +149,7 @@ async function sendReport({
     response = await langwatchFetch(`${endpoint}/api/v1/bug-reports`, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },

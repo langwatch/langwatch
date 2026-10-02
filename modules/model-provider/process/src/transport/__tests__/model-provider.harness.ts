@@ -1,18 +1,19 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * What a mounted model-provider declaration runs on in a test: the runtime's
  * process members, and a real app over a gateway stub and a probe stub.
  */
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type {
-  ModelProviderApp,
+  ModelProviderModule,
   ModelProviderCodexDeviceFlow,
 } from "../../app/model-provider.app.ts";
 import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
@@ -160,7 +161,7 @@ export function mountableModelProviderApp(options: {
 }
 
 /** Every operation of the real app, bound to it so its private state travels. */
-function forwarded(app: ModelProviderApp): ModelProviderApi {
+function forwarded(app: ModelProviderModule): ModelProviderApi {
   return {
     estimateCost: (...args) => app.estimateCost(...args),
     countUsage: (...args) => app.countUsage(...args),

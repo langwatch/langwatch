@@ -1,4 +1,9 @@
-import type { TriggerFire, TriggerFireStats } from "@langwatch/automation-contract";
+import type {
+  AutomationApiFireHistoryInput,
+  TriggerFire,
+  TriggerFirePage,
+  TriggerFireStats,
+} from "@langwatch/automation-contract";
 import type * as automationContractModule from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -111,6 +116,35 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
       take: input.limit,
     });
     return rows.map(mapFire);
+  }
+  async listPageByTriggerId(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    const { projectId, triggerId, limit, cursor } = input;
+    const rows = await this.database.triggerSent.findMany({
+      where: {
+        projectId,
+        triggerId,
+        // `createdAt` alone is not unique (a burst shares a millisecond), so
+        // the tie breaks on the id or a page boundary inside a burst skips rows.
+        ...(cursor
+          ? {
+              OR: [
+                { createdAt: { lt: cursor.createdAt } },
+                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      // One extra row answers "is there more?" without a count query.
+      take: limit + 1,
+      select: { id: true, triggerId: true, customGraphId: true, createdAt: true, resolvedAt: true },
+    });
+    const fires = rows.slice(0, limit).map(mapFire);
+    const last = fires.at(-1);
+    return {
+      fires,
+      nextCursor: rows.length > limit && last ? { createdAt: last.createdAt, id: last.id } : null,
+    };
   }
   async findAllRecentForProject(input: {
     projectId: string;

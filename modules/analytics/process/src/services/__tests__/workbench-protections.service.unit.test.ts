@@ -1,7 +1,6 @@
 /** @vitest-environment node */
 
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -9,12 +8,19 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type * as dataPrivacyContractModule from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   WorkbenchProtectionsService,
   type WorkbenchProtectionsDependencies,
 } from "../workbench-protections.service.ts";
+import {
+  authzGranting,
+  EVERY_CATALOGUE_PERMISSION,
+  NO_CATALOGUE_PERMISSION,
+  PROJECT_SCOPE,
+} from "./lwql-catalogue-access.fixture.ts";
 
 function serviceOver(
   input: Partial<WorkbenchProtectionsDependencies>,
@@ -27,23 +33,27 @@ function serviceOver(
 }
 
 /** Every permission answers the same boolean, so a case only has to name one. */
-function authzAnswering(granted: boolean): {
-  authz: AuthzApi;
-  hasPermission: ReturnType<typeof vi.fn>;
-} {
-  const hasPermission = vi.fn(async () => granted);
-  return { authz: createApiFixture<AuthzApi>({ hasPermission }, "workbench authz"), hasPermission };
+function authzAnswering(granted: boolean, groupIds: readonly string[] = []) {
+  return authzGranting({ grants: () => granted, groupIds });
 }
 
-/** Every `cost:view` question the credential asks answers the same boolean. */
-function authzApiKeyAnswering(granted: boolean): {
-  authz: AuthzApi;
-  hasApiKeyPermission: ReturnType<typeof vi.fn>;
-} {
-  const hasApiKeyPermission = vi.fn(async () => granted);
+/** A policy restricting input to one group and output to admins only. */
+function inputRestrictedTo(groupId: string): dataPrivacyContractModule.ResolvedDataPrivacy {
+  const nobody = {
+    allMembers: false,
+    admins: false,
+    members: false,
+    viewers: false,
+    projectOwner: false,
+    groupIds: [],
+  };
   return {
-    authz: createApiFixture<AuthzApi>({ hasApiKeyPermission }, "workbench api-key authz"),
-    hasApiKeyPermission,
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: { disposition: "restrict", audience: { ...nobody, groupIds: [groupId] } },
+      output: { disposition: "restrict", audience: { ...nobody, admins: true } },
+    },
   };
 }
 
@@ -127,6 +137,7 @@ describe("resolveMemberProtections", () => {
         canSeeCosts: true,
         canSeeCapturedInput: true,
         canSeeCapturedOutput: true,
+        catalogue: EVERY_CATALOGUE_PERMISSION,
       });
     });
   });
@@ -146,11 +157,12 @@ describe("resolveMemberProtections", () => {
         canSeeCosts: false,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
+        catalogue: NO_CATALOGUE_PERMISSION,
       });
     });
 
-    it("still asks all three permissions for this one project", async () => {
-      const { authz, hasPermission } = authzAnswering(false);
+    it("still asks the catalogue and both membership checks for this one project", async () => {
+      const { authz, checks } = authzAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
       await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
@@ -158,21 +170,10 @@ describe("resolveMemberProtections", () => {
         projectId: "project-1",
       });
 
-      expect(hasPermission).toHaveBeenCalledWith({
-        userId: "user-1",
-        permission: "cost:view",
-        projectId: "project-1",
-      });
-      expect(hasPermission).toHaveBeenCalledWith({
-        userId: "user-1",
-        permission: "traces:view",
-        projectId: "project-1",
-      });
-      expect(hasPermission).toHaveBeenCalledWith({
-        userId: "user-1",
-        permission: "project:update",
-        projectId: "project-1",
-      });
+      const member = { type: "user", id: "user-1" };
+      for (const permission of ["cost:view", "traces:view", "project:update"]) {
+        expect(checks).toContainEqual({ principal: member, permission, scope: PROJECT_SCOPE });
+      }
     });
   });
 
@@ -194,8 +195,66 @@ describe("resolveMemberProtections", () => {
         canSeeCosts: true,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
+        catalogue: EVERY_CATALOGUE_PERMISSION,
       });
     });
+  });
+});
+
+describe("given a content audience that names a group", () => {
+  it("shows the content to a member of that group", async () => {
+    const { authz } = authzAnswering(true, ["group-a"]);
+    const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedTo("group-a"));
+
+    const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
+      userId: "user-1",
+      projectId: "project-1",
+    });
+
+    expect(resolved.canSeeCapturedInput).toBe(true);
+    expect(resolved.canSeeCapturedOutput).toBe(true);
+  });
+
+  it("hides it from a member of no such group", async () => {
+    const { authz } = authzAnswering(true, ["group-b"]);
+    const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedTo("group-a"));
+
+    const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
+      userId: "user-1",
+      projectId: "project-1",
+    });
+
+    expect(resolved.canSeeCapturedInput).toBe(false);
+  });
+
+  it("hides it when the group membership read throws", async () => {
+    const { authz } = authzGranting({
+      grants: () => true,
+      overrides: { getAccessBreakdown: () => Promise.reject(new Error("groups unreadable")) },
+    });
+    const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedTo("group-a"));
+
+    const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
+      userId: "user-1",
+      projectId: "project-1",
+    });
+
+    expect(resolved.canSeeCapturedInput).toBe(false);
+  });
+
+  it("does not read groups when no audience names one", async () => {
+    const { authz } = authzGranting({
+      grants: () => true,
+      overrides: { getAccessBreakdown: () => Promise.reject(new Error("groups were read")) },
+    });
+    const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
+
+    await expect(
+      serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
+        userId: "user-1",
+        projectId: "project-1",
+      }),
+    ).resolves.toMatchObject({ canSeeCapturedInput: true });
   });
 });
 
@@ -230,7 +289,12 @@ describe("resolveRunCaller", () => {
         }),
       ).resolves.toEqual({
         project: { id: "project-1", lwqlKey: "lwql-secret" },
-        protections: { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
+        protections: {
+          canSeeCosts: true,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+        },
       });
     });
   });
@@ -240,7 +304,7 @@ describe("resolveApiKeyProtections", () => {
   describe("given a legacy project key", () => {
     /** @scenario "A legacy project key still reads costs without a grant lookup" */
     it("sees costs without asking authz, by credential class alone", async () => {
-      const { authz, hasApiKeyPermission } = authzApiKeyAnswering(false);
+      const { authz, checks } = authzAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
       const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
@@ -249,14 +313,15 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCosts).toBe(true);
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+      expect(resolved.catalogue).toEqual(EVERY_CATALOGUE_PERMISSION);
+      expect(checks).toEqual([]);
     });
   });
 
   describe("given a scoped api key granted cost:view", () => {
     /** @scenario "A key carrying the cost grant reads the query surface with costs" */
     it("sees costs, asked through the credential's own scope", async () => {
-      const { authz, hasApiKeyPermission } = authzApiKeyAnswering(true);
+      const { authz, checks } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
       const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
@@ -265,12 +330,10 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCosts).toBe(true);
-      expect(hasApiKeyPermission).toHaveBeenCalledWith({
-        apiKeyId: "key-1",
-        userId: "user-1",
-        organizationId: "org-1",
-        scope: { type: "project", id: "project-1", teamId: "team-1" },
+      expect(checks).toContainEqual({
+        principal: { type: "apiKey", id: "key-1" },
         permission: "cost:view",
+        scope: PROJECT_SCOPE,
       });
     });
   });
@@ -278,7 +341,7 @@ describe("resolveApiKeyProtections", () => {
   describe("given a scoped api key denied cost:view", () => {
     /** @scenario "A key without the cost grant reads the query surface with costs redacted" */
     it("does not see costs", async () => {
-      const { authz } = authzApiKeyAnswering(false);
+      const { authz } = authzAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
       const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
@@ -293,7 +356,7 @@ describe("resolveApiKeyProtections", () => {
   describe("given the data-privacy policy read throws", () => {
     /** @scenario "A thrown data-privacy read hides captured content from an api key rather than defaulting it open" */
     it("hides captured content instead of letting the failure widen access", async () => {
-      const { authz } = authzApiKeyAnswering(true);
+      const { authz } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => {
         throw new Error("data-privacy resolver unavailable");
       });
@@ -308,6 +371,7 @@ describe("resolveApiKeyProtections", () => {
         canSeeCosts: true,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
+        catalogue: EVERY_CATALOGUE_PERMISSION,
       });
     });
   });
@@ -315,7 +379,7 @@ describe("resolveApiKeyProtections", () => {
   describe("given a policy visible to signed-in members but not to the public", () => {
     /** @scenario "A restrict policy visible to members answers false for an api key, which is never a member" */
     it("answers false — an api key resolves the PUBLIC cut, not the member cut", async () => {
-      const { authz } = authzApiKeyAnswering(true);
+      const { authz } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => ({
         ...PLATFORM_DEFAULT_DATA_PRIVACY,
         categories: {
@@ -349,7 +413,9 @@ describe("given a job judging a project's own rows", () => {
     it("reads the public cut of the content and the project's own costs", async () => {
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await serviceOver({ dataPrivacy }).resolveProjectProtections({
+      const { authz, checks } = authzAnswering(false);
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveProjectProtections({
         projectId: "project-1",
       });
 
@@ -357,7 +423,9 @@ describe("given a job judging a project's own rows", () => {
         canSeeCosts: true,
         canSeeCapturedInput: true,
         canSeeCapturedOutput: true,
+        catalogue: EVERY_CATALOGUE_PERMISSION,
       });
+      expect(checks).toEqual([]);
     });
 
     it("hides captured content when the policy cannot be read", async () => {
@@ -365,7 +433,9 @@ describe("given a job judging a project's own rows", () => {
         throw new Error("the policy store is away");
       });
 
-      const resolved = await serviceOver({ dataPrivacy }).resolveProjectProtections({
+      const { authz } = authzAnswering(false);
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveProjectProtections({
         projectId: "project-1",
       });
 
@@ -373,6 +443,7 @@ describe("given a job judging a project's own rows", () => {
         canSeeCosts: true,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
+        catalogue: EVERY_CATALOGUE_PERMISSION,
       });
     });
   });

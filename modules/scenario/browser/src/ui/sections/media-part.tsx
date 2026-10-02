@@ -1,9 +1,8 @@
 /**
  * MediaPart — renders a single AG-UI media content part inline.
  */
-import { Box, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
-import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import type { MediaPartData } from "@langwatch/trace-contract";
 import { ExternalLink, File, FileText } from "lucide-react";
 import {
@@ -15,6 +14,7 @@ import {
   type SetStateAction,
 } from "react";
 
+import { useStoredObjectUrl } from "../../behavior/stored-object/use-stored-object-url.ts";
 import { resolveMediaPart } from "../../model/media-part-source.ts";
 import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
 import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";

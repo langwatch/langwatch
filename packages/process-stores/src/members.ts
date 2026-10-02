@@ -220,16 +220,15 @@ export const MEMBER_NAMES = [
   "eventing",
 ] as const satisfies readonly MemberName[];
 
-/**
- * What a module says it reads: `static readonly reads = reads("clock", "logger")`.
- * The tuple is the type's source too, so a wrong name fails on the line
- * the author wrote.
- */
-export function reads<const Names extends readonly MemberName[]>(...names: Names): Names {
-  return names;
-}
-
-/** The record a module is handed for the names it declared with {@link reads}. */
+/** The record a module is handed for the names it declared in `static readonly reads`. */
 export type MembersRead<Names extends readonly MemberName[]> = {
   readonly [Name in Names[number]]: ProcessMembers[Name];
 };
+
+/** What a process's opened stores hand boot: names in build order, values on demand. */
+export interface StoresMemberSource {
+  /** Repository selection belongs to the whole supplied store tier. */
+  readonly tier?: "live" | "memory";
+  readonly order: readonly string[];
+  read(name: string): unknown;
+}

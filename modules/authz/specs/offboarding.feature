@@ -6,7 +6,7 @@ Feature: Offboarding removes access completely
 
   # authz-offboarding.service.ts, authz-grant-guards.service.ts,
   # authz-grant-snapshot.service.ts, authz-scope-lineage.service.ts,
-  # authz-binding-reader.service.ts, role-binding-read-back.rules.ts
+  # authz-grant-reader.service.ts, role-binding-read-back.rules.ts
 
   @unit @unimplemented
   Scenario: Offboarding removes every grant the user held in the organization

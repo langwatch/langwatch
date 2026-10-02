@@ -1,12 +1,12 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import { formatTable } from "../../utils/formatting.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
@@ -34,12 +34,11 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   }[];
   try {
     const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitors" });
+      await failSpinnerFromResponse({ spinner, response, action: "fetch monitors" });
       process.exit(1);
     }
 

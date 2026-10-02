@@ -124,9 +124,6 @@ class TakeoverTestHost extends OnboardingHostApi {
   async copyToClipboard() {
     return true;
   }
-  revealProjectApiKey() {
-    return undefined;
-  }
   prefersReducedMotion() {
     return true;
   }

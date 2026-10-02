@@ -3,8 +3,8 @@
  * editing one.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -102,14 +102,12 @@ const ANNOTATIONS: NonNullable<
 ];
 
 function renderBadges() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TurnAnnotationBadges
-        traceId="trace-1"
-        output="the original answer"
-        prefetchedItems={ANNOTATIONS}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TurnAnnotationBadges
+      traceId="trace-1"
+      output="the original answer"
+      prefetchedItems={ANNOTATIONS}
+    />,
   );
 }
 
@@ -217,11 +215,7 @@ describe("given a reviewer who may read annotations but not write them", () => {
  */
 describe("given a badge reading a turn's annotations for itself", () => {
   it("asks only for what was said about the turn", () => {
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <TurnAnnotationBadges traceId="trace-1" output="the original answer" />
-      </ChakraProvider>,
-    );
+    renderWithDesignSystem(<TurnAnnotationBadges traceId="trace-1" output="the original answer" />);
 
     expect(mocks.annotationsForTrace).toHaveBeenCalledWith(
       expect.objectContaining({ traceId: "trace-1", anchor: "trace" }),

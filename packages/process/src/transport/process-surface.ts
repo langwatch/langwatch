@@ -1,0 +1,63 @@
+import type { RawHttpHost, TransportPeers, WebSocketHost } from "@langwatch/api";
+import type { TransportSelection } from "@langwatch/api/hosting";
+import type { ProcessMemberSource } from "@langwatch/process-stores";
+import type { ScopedSecrets } from "@langwatch/secrets";
+
+import type { ExposedSurface } from "../process-supply.ts";
+import { apiSurface, bearerDoor, instanceAdminDoor } from "./api-surface.ts";
+import { resolveUiBundle } from "./bundle-config.ts";
+import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
+
+export async function processSurface({
+  config,
+  production,
+  isSaas,
+  executionProxyBaseUrl,
+  publicBaseUrl,
+  members,
+  secrets,
+  selection,
+  publicConfig,
+  sockets,
+  doors,
+}: {
+  config: ApiHostConfig;
+  production: boolean;
+  isSaas: boolean;
+  executionProxyBaseUrl: string | undefined;
+  publicBaseUrl: string | undefined;
+  members: ProcessMemberSource;
+  secrets: ScopedSecrets;
+  selection: TransportSelection;
+  publicConfig: Readonly<Record<string, unknown>>;
+  sockets: WebSocketHost;
+  doors: RawHttpHost;
+}): Promise<(peers: TransportPeers) => ExposedSurface<unknown, unknown>> {
+  const bundle = resolveUiBundle({
+    directory: config.bundleDirectory,
+    assetBase: config.assetBase,
+    publicConfig,
+  });
+  const cron = await secrets.into(apiOwner.secrets.cron, (token) =>
+    bearerDoor({ name: "cron", token }),
+  );
+  const instanceAdmin = await secrets.into(apiOwner.secrets.instanceAdmin, (token) =>
+    instanceAdminDoor({ token, isSaas }),
+  );
+  return apiSurface({
+    members,
+    logger: members.read("logger"),
+    stores: { database: true, redis: true },
+    bundle,
+    storage: {},
+    internalBearers: new Map([["cron", cron]]),
+    instanceAdmin,
+    trustedProxies: config.trustedProxies,
+    executionProxyBaseUrl,
+    publicBaseUrl,
+    production,
+    selection,
+    sockets,
+    doors,
+  });
+}

@@ -1,3 +1,8 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -10,13 +15,8 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";

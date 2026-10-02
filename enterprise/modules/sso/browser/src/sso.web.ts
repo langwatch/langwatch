@@ -4,9 +4,9 @@
  * entitlement refuses per organization, a route never does.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const ssoWeb = defineWebModule("sso")
+export const ssoWeb = defineBrowserModule("sso")
   .withHosts({
     requires: ["SsoHostApi"],
     mounts: { SsoHostApi: { load: () => import("./behavior/sso-host-mount.tsx") } },

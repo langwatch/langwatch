@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  Badge,
-  Box,
-  Button,
-  Code,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { BackLink } from "@langwatch/design-system/back-link";
 import {
@@ -27,6 +14,19 @@ import {
 import { ListTable } from "@langwatch/design-system/list-table";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
+import {
+  Badge,
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 import { Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
@@ -45,7 +45,6 @@ import {
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   runCompleteness,
-  SOURCE_HEALTH_REFRESH,
   sourceBadge,
 } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import {
@@ -465,14 +464,14 @@ function useIngestionSourceDetailPage() {
     { organizationId: orgId, id: sourceId ?? "" },
     {
       enabled: !!orgId && !!sourceId && canRead,
-      ...SOURCE_HEALTH_REFRESH,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
     },
   );
   const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "" },
     {
       enabled: !!orgId && !!sourceId && canRead && canReadActivity,
-      ...SOURCE_HEALTH_REFRESH,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
     },
   );
   // The events table walks the timestamp cursor itself (see

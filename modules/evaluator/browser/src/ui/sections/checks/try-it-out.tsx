@@ -1,3 +1,10 @@
+import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/period-selector";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Alert,
   Button,
@@ -11,23 +18,9 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-  useFilterParams,
-  FilterToggle,
-} from "@langwatch/analytics-browser-kit";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
-import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   evaluatorSettingsSchemaFor,
   type EvaluatorDefinition,
@@ -41,15 +34,19 @@ import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
+import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
+import { FilterToggle } from "../analytics/filters/filter-toggle.tsx";
+import { useFilterParams } from "../analytics/use-filter-params.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type RunRequestState = "idle" | "paused" | "running";
@@ -117,7 +114,7 @@ export function TryItOut({
     { preconditions: CheckPreconditions; evaluatorType: string } | undefined
   >(undefined);
 
-  const tracesPassingPreconditionsOnLoad = api.traces.getSampleTraces.useQuery(
+  const tracesPassingPreconditionsOnLoad = evaluatorApi.traces.getSampleTraces.useQuery(
     {
       ...filterParams,
       ...fetchingParams!,
@@ -128,7 +125,6 @@ export function TryItOut({
     {
       enabled: !!filterParams.projectId && !!fetchingParams,
       refetchOnMount: false,
-      refetchOnWindowFocus: false,
     },
   );
 
@@ -150,7 +146,7 @@ export function TryItOut({
   >({});
   const [runningState, setRunningState] = useState<RunningState>({ state: "idle" });
 
-  const runEvaluation = api.evaluations.runEvaluation.useMutation();
+  const runEvaluation = evaluatorApi.evaluations.runEvaluation.useMutation();
 
   useEffect(() => {
     setRunningResults({});

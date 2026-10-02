@@ -108,6 +108,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
   mapAuthzGrantRevoked(event: GrantRevokedEvent): GrantProjectionWrite {
     return {
       kind: "grant.revoke",
+      organizationId: event.tenantId,
       grantId: event.data.grantId,
       reason: event.data.reason ?? null,
       occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),

@@ -4,7 +4,14 @@
  * @see specs/suites/run-notes.feature
  */
 
-import { Box, HStack, Spinner, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Spinner,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { passRateColor } from "../shared/pass-rate-color.ts";

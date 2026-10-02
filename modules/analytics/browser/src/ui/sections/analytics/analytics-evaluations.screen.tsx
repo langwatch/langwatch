@@ -1,9 +1,19 @@
-import { Alert, Box, Card, GridItem, Heading, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Card,
+  GridItem,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
 
-import { analyticsApi, type AnalyticsMonitorSummary } from "../../../behavior/analytics-api.ts";
+import type { AnalyticsMonitorSummary } from "../../../behavior/analytics-api.ts";
+import { useProjectMonitors } from "../../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -392,12 +402,7 @@ function traceExplorerQuery(params: GraphClickParams): string {
 function EvaluationsContent() {
   const host = useAnalyticsHost();
   const project = host.project();
-  const checks = analyticsApi.monitors.getAllForProject.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    { enabled: !!project },
-  );
+  const checks = useProjectMonitors({ projectId: project?.id ?? "" });
   const selectedEvaluationId = host.route().query.evaluationId;
   const selectedEvaluation = checks.data?.find((check) => check.id === selectedEvaluationId);
   const visibleChecks = selectedEvaluation ? [selectedEvaluation] : (checks.data ?? []);

@@ -28,7 +28,7 @@ import {
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 
@@ -105,7 +105,7 @@ export const queryRest: Readonly<{
   .withNamespace("query")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("v1-only")
-  .withCredential("apiKey")
+  .withCredential("api_key")
 
   /** `POST /api/v1/query` — execute one statement. The body IS the query. */
   .post("/", "postApiV1Query")

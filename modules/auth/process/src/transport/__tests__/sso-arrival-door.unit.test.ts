@@ -1,10 +1,3 @@
-/**
- * A federated sign-in is asked of the connection it arrived through, on the
- * account hooks — the only two places a sign-in touches this process.
- *
- * @see specs/identity/sso-activation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type {
   SsoArrivalApi,
@@ -13,6 +6,13 @@ import type {
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+/**
+ * A federated sign-in is asked of the connection it arrived through, on the
+ * account hooks — the only two places a sign-in touches this process.
+ *
+ * @see specs/identity/sso-activation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 

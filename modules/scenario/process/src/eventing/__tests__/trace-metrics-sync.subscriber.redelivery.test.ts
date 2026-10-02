@@ -8,9 +8,14 @@ import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
  * @unit
  * traceMetricsSync redelivery: OccurredAt drifts across months on retry; fix is event.occurredAt.
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createTraceMetricsSyncSubscriber } from "../trace-metrics-sync.subscriber.ts";
+import {
+  createTraceMetricsSyncSubscriber,
+  createTraceSpanMetricsSyncHandler,
+} from "../trace-metrics-sync.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -159,6 +164,65 @@ describe("traceMetricsSync subscriber redelivery", () => {
       await subscriber.handler(finishedEvent(["trace-1", "trace-2"]), CONTEXT);
 
       expect(metrics.traceIdentities().size).toBe(2);
+    });
+  });
+});
+
+describe("traceSpanMetricsSync handler redelivery", () => {
+  const settled = { tenantId: "project-1", traceId: "trace-1", occurredAt: 5_000 };
+  const summary = createApiFixture<TraceSummaryData>({
+    spanCount: 3,
+    totalCost: 0.1,
+    attributes: { "scenario.run_id": "run-1" },
+  });
+
+  function handlerOver(metrics: ReturnType<typeof makeMetricsPipeline>) {
+    return createTraceSpanMetricsSyncHandler({
+      findSummary: async () => summary,
+      computeRunMetrics: metrics.deps.computeRunMetrics,
+    });
+  }
+
+  describe("given a settled trace handled twice", () => {
+    it("computes metrics for one trace identity across both dispatches", async () => {
+      const metrics = makeMetricsPipeline();
+      const handle = handlerOver(metrics);
+
+      await handle(settled);
+      await handle(settled);
+
+      expect(metrics.commands).toHaveLength(2);
+      expect(metrics.traceIdentities().size).toBe(1);
+    });
+
+    it("asks for a fresh derivation rather than carrying a figure to add up", async () => {
+      const metrics = makeMetricsPipeline();
+
+      await handlerOver(metrics)(settled);
+
+      expect(metrics.commands[0]).toEqual({
+        tenantId: "project-1",
+        scenarioRunId: "run-1",
+        traceId: "trace-1",
+        retryCount: 0,
+        occurredAt: 5_000,
+      });
+    });
+  });
+
+  describe("given a redelivery that crosses the fact table's month partition", () => {
+    it("retains one metrics row, because occurredAt rides on the span event and not the clock", async () => {
+      vi.useFakeTimers();
+      const metrics = makeMetricsPipeline();
+      const handle = handlerOver(metrics);
+
+      vi.setSystemTime(new Date("2026-01-31T23:59:30.000Z"));
+      await handle(settled);
+      vi.setSystemTime(new Date("2026-02-01T00:00:30.000Z"));
+      await handle(settled);
+
+      expect(metrics.retainedFactRows().size).toBe(1);
+      expect(metrics.traceIdentities().size).toBe(1);
     });
   });
 });

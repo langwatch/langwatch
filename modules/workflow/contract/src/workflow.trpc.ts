@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the Optimization Studio has always
  * called.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

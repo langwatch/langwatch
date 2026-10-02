@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 

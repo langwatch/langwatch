@@ -93,7 +93,7 @@ describe("given a read that failed", () => {
 });
 
 describe("given an organization that cannot set single sign-on up yet", () => {
-  /** @scenario "A licence activated while the installation is running takes effect at the next restart" */
+  /** @scenario "A licence activated while the installation is running reaches setup within a minute" */
   it("says why and what would change it, for each reason", () => {
     const { rerenderWithSsoHost } = renderWithSsoHost(
       <AvailabilityRefusalNotice refusal="not_opted_in" />,
@@ -102,9 +102,9 @@ describe("given an organization that cannot set single sign-on up yet", () => {
     expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/talk to us/i);
 
     rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_required" />);
-    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/active licence/);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/active license/);
 
-    rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_restart_required" />);
-    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/next restart/);
+    rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_activation_pending" />);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/within a minute/);
   });
 });

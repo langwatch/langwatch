@@ -1,12 +1,12 @@
+import { describe, expect, it } from "vitest";
+
 /**
  * @vitest-environment node
  * The one-off walk that encrypts model-provider keys already sitting in the
  * clear. Drives the walk itself: it writes only rows that need it, counts
  * what it did, and can run again without re-encrypting an encrypted row.
  */
-import type { ModelProviderCredentialCipher } from "@langwatch/model-provider-process";
-import { describe, expect, it } from "vitest";
-
+import type { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 import { runModelProviderKeysMigration } from "../model-provider-credentials-migrate.task.ts";
 

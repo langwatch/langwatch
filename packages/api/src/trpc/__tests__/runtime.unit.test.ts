@@ -5,13 +5,12 @@
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { publicRoute } from "../../access/access.ts";
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
 import {
   bindTrpcFact,
   bindTrpcHeader,
@@ -260,8 +259,8 @@ describe("a mounted contract procedure", () => {
   });
 
   describe("given the handler answers a shape its declaration refuses", () => {
-    /** @scenario "An output the declaration refuses is diagnosed without leaking the response" */
-    it("logs the procedure and the issue path, never the body, and still answers the caller", async () => {
+    /** @scenario "A procedure whose answer breaks its output schema refuses rather than answering" */
+    it("logs the procedure and the issue path, never the body, and refuses the caller", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
 
@@ -273,9 +272,12 @@ describe("a mounted contract procedure", () => {
         .mount(declaration, () => app)
         .createCaller({ actor: { id: "reviewer-1" } });
 
-      const answer = await caller.getById({ projectId: "project-1", id: "annotation-1" });
+      const refusal = await onTheWire(
+        caller.getById({ projectId: "project-1", id: "annotation-1" }),
+      );
 
-      expect(answer).toEqual({ id: "annotation-1", comment: 7 });
+      expect(refusal.data.error).toBeNull();
+      expect(JSON.stringify(refusal)).not.toContain("annotation-1");
       const record = logged[0] as { fields: Record<string, unknown>; message: string };
       expect(record.fields.endpoint).toBe("review.getById");
       expect(record.fields.protocol).toBe("trpc");
@@ -349,10 +351,10 @@ describe("a mounted contract procedure", () => {
 
       await expect(call).rejects.toMatchObject({
         code: "SERVICE_UNAVAILABLE",
-        cause: { code: "service_unavailable", httpStatus: 503, retryable: true },
+        cause: { code: "database_busy", httpStatus: 503, retryable: true },
       });
       expect((await onTheWire(call)).data.error).toMatchObject({
-        code: "service_unavailable",
+        code: "database_busy",
         meta: { retryAfterMs: 1000 },
       });
     });
@@ -494,6 +496,34 @@ describe("the tRPC error formatter", () => {
 
       expect(formatted.message).toBe("validation_error");
       expect(JSON.stringify(formatted)).not.toContain("prose no one reviewed");
+    });
+  });
+
+  describe("given a handled error that renders its own cause body", () => {
+    /** @scenario "A handled error that renders its own body carries it on data.cause" */
+    it("puts that body on data.cause without the process naming the error", () => {
+      class FeatureRefusal extends HandledError {
+        constructor() {
+          super("validation_error", "no model for this feature", { httpStatus: 400 });
+        }
+
+        toResponseBody() {
+          return { code: "MODEL_NOT_CONFIGURED", featureKey: "traces.ai_search" };
+        }
+      }
+
+      expect(format(new FeatureRefusal()).data.cause).toEqual({
+        code: "MODEL_NOT_CONFIGURED",
+        featureKey: "traces.ai_search",
+      });
+    });
+
+    it("leaves a handled error with no body of its own to the process's payload", () => {
+      const formatted = format(
+        new NotFoundError("evaluation_not_found", { resource: "Evaluation", id: "eval-1" }),
+      );
+
+      expect(formatted.data.cause).toBeNull();
     });
   });
 });
@@ -1000,6 +1030,43 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
   });
 
   /** @scenario "A procedure asks whether its tenant holds an entitlement" */
+  it("names the capability on the refusal, and skips an input the predicate excludes", async () => {
+    let asked = 0;
+    const runtime = createTrpcRuntime({
+      root: directoryRoot,
+      procedure: directoryRoot.procedure,
+      members: members({
+        holds: async () => {
+          asked += 1;
+
+          return false;
+        },
+      }),
+    });
+    const onlyOrgOne = z.object({ organizationId: z.literal("org-1") });
+    const directory = runtime
+      .mount(
+        defineTrpcRouter(DirectoryApi, directoryContract)
+          .procedure("listUsers")
+          .withEntitlement("enterprise", {
+            feature: "SCIM",
+            when: (input) => onlyOrgOne.validate(input),
+          })
+          .withPermission("organization:manage")
+          .handle(async () => ({ count: 1 }))
+          .build(),
+        () => ({ listUsers: async () => ({ count: 0 }) }),
+      )
+      .createCaller({ actor: { id: "admin-1" } });
+
+    await expect(directory.listUsers({ organizationId: "org-1" })).rejects.toMatchObject({
+      cause: { code: "enterprise_plan_required", meta: { feature: "SCIM" } },
+    });
+    expect(await directory.listUsers({ organizationId: "org-2" })).toEqual({ count: 1 });
+    expect(asked).toBe(1);
+  });
+
+  /** @scenario "A procedure asks whether its tenant holds an entitlement" */
   it("refuses a procedure that runs with no caller, and a mount that reads no entitlements", () => {
     expect(() =>
       defineTrpcRouter(DirectoryApi, directoryContract)
@@ -1011,5 +1078,97 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     expect(() => caller({ handle: () => ({ count: 0 }) })).toThrow(
       /supplied no entitlements port to ask/,
     );
+  });
+});
+
+describe("a procedure declared as minting a credential", () => {
+  interface KeysApi {
+    createKey(input: { organizationId: string }): Promise<{ ran: boolean }>;
+  }
+
+  const KeysApi = moduleApi<KeysApi>()("api-key");
+
+  const keysContract = defineTrpcContract("keys")
+    .mutation("createKey")
+    .withInput(z.object({ organizationId: z.string() }))
+    .withOutput(z.object({ ran: z.boolean() }))
+    .build();
+
+  type KeysContext = { actor: { id: string; impersonatorId?: string } };
+
+  const keysRoot = TrpcRootDefinition.forContext<KeysContext>().create({});
+
+  function caller({ actor, handle }: { actor: KeysContext["actor"]; handle: () => void }) {
+    const runtime = createTrpcRuntime({
+      root: keysRoot,
+      procedure: keysRoot.procedure,
+      members: {
+        identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
+        authorization: {
+          forRequest: () => ({
+            getDecision: async () => ({ permitted: true, organizationRole: null }),
+            getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+            checkScopeLineage: async () => ({ kind: "consistent" }),
+          }),
+        },
+        denials: {
+          membershipDisabled: () => new Error("membership disabled"),
+          liteMemberRestricted: () => new Error("lite member"),
+        },
+        audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+        errors: {
+          report: () => {},
+          asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+          translate: () => undefined,
+        },
+      },
+    });
+    const declaration = defineTrpcRouter(KeysApi, keysContract)
+      .procedure("createKey")
+      .mintsCredential("organization:view")
+      .withPermission("organization:view")
+      .handle(() => {
+        handle();
+
+        return { ran: true };
+      })
+      .build();
+
+    return runtime
+      .mount(declaration, () => ({ createKey: async () => ({ ran: true }) }))
+      .createCaller({ actor });
+  }
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses an impersonating actor before the handler runs", async () => {
+    let ran = false;
+    const call = caller({
+      actor: { id: "user-1", impersonatorId: "staff-1" },
+      handle: () => (ran = true),
+    }).createKey({ organizationId: "org-1" });
+
+    await expect(call).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("lets the user acting as themselves through", async () => {
+    let ran = false;
+    const answer = await caller({ actor: { id: "user-1" }, handle: () => (ran = true) }).createKey({
+      organizationId: "org-1",
+    });
+
+    expect(answer).toEqual({ ran: true });
+    expect(ran).toBe(true);
+  });
+
+  /** @scenario "An endpoint declared as minting a credential refuses an impersonating actor" */
+  it("refuses the declaration on a procedure that runs with no caller", () => {
+    expect(() =>
+      defineTrpcRouter(KeysApi, keysContract)
+        .procedure("createKey")
+        .mintsCredential("organization:view")
+        .withAccess(publicRoute({ reason: "no caller" })),
+    ).toThrow(/mints a credential, so it cannot run with no caller/);
   });
 });

@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/cases-table.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,47 +16,39 @@ import { LastResultLabel } from "../last-result-label.tsx";
 import { ResultMetricsInline } from "../result-metrics-inline.tsx";
 import { TestSuiteHeaderRow } from "../test-suite-header-row.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("<LastResultLabel/>", () => {
   afterEach(cleanup);
 
   it("says how many criteria a passed run met", () => {
-    render(
+    renderWithDesignSystem(
       <LastResultLabel
         status={ScenarioRunStatus.SUCCESS}
         results={{ metCriteria: ["a", "b", "c"], unmetCriteria: [] }}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Passed (3/3)")).toBeInTheDocument();
   });
 
   it("says how many criteria a failed run missed", () => {
-    render(
+    renderWithDesignSystem(
       <LastResultLabel
         status={ScenarioRunStatus.FAILED}
         results={{ metCriteria: ["a"], unmetCriteria: ["b", "c"] }}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Failed (1/3)")).toBeInTheDocument();
   });
 
   it("says a scenario never ran", () => {
-    render(<LastResultLabel />, { wrapper: Wrapper });
+    renderWithDesignSystem(<LastResultLabel />);
 
     expect(screen.getByText("Not run")).toBeInTheDocument();
   });
 
   it("says a run is still going", () => {
-    render(<LastResultLabel status={ScenarioRunStatus.IN_PROGRESS} />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(<LastResultLabel status={ScenarioRunStatus.IN_PROGRESS} />);
 
     expect(screen.getByText("Running")).toBeInTheDocument();
   });
@@ -66,23 +58,19 @@ describe("<ResultMetricsInline/>", () => {
   afterEach(cleanup);
 
   it("reads the time and the cost of a run", () => {
-    render(<ResultMetricsInline durationInMs={6300} totalCost={0.0042} />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(<ResultMetricsInline durationInMs={6300} totalCost={0.0042} />);
 
     expect(screen.getByText("6.3s · $0.004200")).toBeInTheDocument();
   });
 
   it("reads the time alone when there is no cost", () => {
-    render(<ResultMetricsInline durationInMs={6300} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ResultMetricsInline durationInMs={6300} />);
 
     expect(screen.getByText("6.3s")).toBeInTheDocument();
   });
 
   it("draws nothing when there is neither", () => {
-    const { container } = render(<ResultMetricsInline />, {
-      wrapper: Wrapper,
-    });
+    const { container } = renderWithDesignSystem(<ResultMetricsInline />);
 
     expect(container.textContent).toBe("");
   });
@@ -92,13 +80,13 @@ describe("<CaseVersionChip/>", () => {
   afterEach(cleanup);
 
   it("names the version", () => {
-    render(<CaseVersionChip version={3} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<CaseVersionChip version={3} />);
 
     expect(screen.getByText("v3")).toBeInTheDocument();
   });
 
   it("draws nothing while a scenario carries no version", () => {
-    const { container } = render(<CaseVersionChip />, { wrapper: Wrapper });
+    const { container } = renderWithDesignSystem(<CaseVersionChip />);
 
     expect(container.textContent).toBe("");
   });
@@ -108,14 +96,13 @@ describe("<TestSuiteHeaderRow/>", () => {
   afterEach(cleanup);
 
   const renderRow = (props: Partial<React.ComponentProps<typeof TestSuiteHeaderRow>> = {}) =>
-    render(
+    renderWithDesignSystem(
       <TestSuiteHeaderRow
         name="Checkout"
         caseCount={4}
         templateColumns="minmax(0,1fr) auto"
         {...props}
       />,
-      { wrapper: Wrapper },
     );
 
   it("names the test suite and how many scenarios it holds", () => {

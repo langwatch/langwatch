@@ -1,5 +1,5 @@
-import { Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 

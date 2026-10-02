@@ -1,8 +1,7 @@
 // Topic-clustering screen's test mount point: host port is an abstract class so a test
 // constructs one and records what the screen asked the application to say.
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -42,10 +41,6 @@ export function renderWithTopicHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <TopicHostProvider value={host}>{element}</TopicHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<TopicHostProvider value={host}>{element}</TopicHostProvider>),
   };
 }

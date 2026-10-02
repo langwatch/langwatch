@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import {
@@ -8,10 +7,11 @@ import {
   type FeatureFlagRegistry,
   type FeatureFlagServerConfig,
 } from "@langwatch/feature-flag-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Instant } from "@langwatch/time";
 
 import type { FeatureFlagRepositories } from "../../repositories/feature-flag.repositories.ts";
@@ -23,7 +23,7 @@ import { CachedFeatureFlagRowService } from "../../services/cached-feature-flag-
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
 import {
-  FeatureFlagApp,
+  FeatureFlagModule,
   type FeatureFlagCache,
   type FeatureFlagCacheSlot,
 } from "../feature-flag.app.ts";
@@ -167,8 +167,8 @@ export function createFeatureFlagTestApp(
       organizations: OrganizationApi;
     }>;
   }> = {},
-): FeatureFlagApp {
-  return FeatureFlagApp.create({
+): FeatureFlagModule {
+  return FeatureFlagModule.create({
     repositories: input.repositories ?? MemoryFeatureFlagRepositories.create(),
     dependencies: {
       permissions: input.dependencies?.permissions ?? createFeatureFlagTestAuthz(),

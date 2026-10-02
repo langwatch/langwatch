@@ -1,16 +1,22 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type EvaluationApi,
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { PiiAnalysisMetrics, PiiAnalysisOutcome } from "../../app/data-privacy.members.ts";
+import type {
+  PiiAnalysisMetricsOtelService,
+  PiiAnalysisOutcome,
+} from "../pii-analysis-metrics-otel.service.ts";
 import { PresidioRedactionService } from "../presidio-redaction.service.ts";
 
-class RecordingMetrics implements PiiAnalysisMetrics {
+class RecordingMetrics implements Pick<
+  PiiAnalysisMetricsOtelService,
+  "analysisCalled" | "analysisObserved" | "analysisFinished"
+> {
   readonly called: string[] = [];
   readonly finished: PiiAnalysisOutcome[] = [];
   observed = 0;

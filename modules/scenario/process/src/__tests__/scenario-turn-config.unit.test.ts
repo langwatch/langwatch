@@ -1,11 +1,11 @@
 import { ChildProcessJobDataSchema, ScenarioConfigSchema } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-process";
 /** @vitest-environment node
  * Unit tests for turn configuration (maxTurns/minTurns): schema parsing
  * and data-prefetcher mapping.
  */
 import { describe, expect, it } from "vitest";
 
+import type { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
 import {
   createTestScenarioExecutionPrefetcherService,
   type ScenarioPrefetchFixture,

@@ -24,19 +24,16 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/contract/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"

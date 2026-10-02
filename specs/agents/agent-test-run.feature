@@ -107,6 +107,12 @@ Feature: Test agent with one scripted run
       When "POST /api/v1/agents/:id/test" is called with a project key
       Then the answer carries the scenario run id and the batch run id
 
+    @integration
+    Scenario: The REST route starts the run as the caller's person and the key they called with
+      When "POST /api/v1/agents/:id/test" is called with a member's personal access token
+      Then the run is started as that member, naming the token's key, so the run's key holds no more
+      And a key that acts as nobody starts the run with no person
+
   Rule: A connected agent no process is holding cannot be tested
 
     # A test run against an offline connected agent would only fail on its

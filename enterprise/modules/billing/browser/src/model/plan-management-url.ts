@@ -50,9 +50,9 @@ export function getPlanActionLabel({
   hasValidLicense: boolean;
 }): string {
   if (!isSaaS) {
-    return hasValidLicense ? "Manage License" : "Upgrade License";
+    return hasValidLicense ? "Manage license" : "Upgrade license";
   }
-  if (isEnterprise) return "Manage Subscription";
-  if (isFree) return "Upgrade Plan";
-  return "Manage Subscription";
+  if (isEnterprise) return "Manage subscription";
+  if (isFree) return "Upgrade plan";
+  return "Manage subscription";
 }

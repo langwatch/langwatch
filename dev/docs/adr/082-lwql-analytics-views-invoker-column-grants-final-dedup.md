@@ -231,6 +231,22 @@ is the one number that genuinely differs — it counts a trace through its root
 span, so a trace whose root span never arrived contributes sums and no count,
 which the column description states.
 
+## Amendment: the catalogue names who may read (2026-09-30)
+
+The catalogue was a list of what exists; it now also says who may read each
+table and column. Every entry is `defineTableCatalogue({ sourceTable, access,
+columns })` in `LWQL_CATALOG`, every stored column is explicitly `"inherit"`,
+`"omit"` or `{ source?, access?, content? }`, and the compiler refuses a missing
+one. Analytics resolves the catalogue per principal and scope through authz before
+validating, so a table the caller lacks is refused with `TABLE_NOT_ALLOWED` and a
+column with `GATED_COLUMN`.
+
+The database side of this decision is unchanged. The restricted identity is still
+shared and its column grants still derive from the catalogue, now from its
+exposed sources, so per-user access is enforced in the application and the
+grants stay the tenant- and catalogue-scoped backstop. The shape and the rulings
+around it are in `dev/docs/ARCHITECTURE.md` §3.5.
+
 ## Alternatives considered
 
 **`DEFINER` view with a policed definer.** Would let the caller hold no grant on

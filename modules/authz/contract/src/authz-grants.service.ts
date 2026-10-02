@@ -9,20 +9,10 @@ import type {
   GrantRevoked,
 } from "./authz-grants-rest.schemas.ts";
 import type {
-  AuthzApplyMemberBindingsInput,
-  AuthzBindingMutationSuccess,
-  AuthzCreateBindingInput,
-  AuthzCreateBindingOutput,
-  AuthzDeleteBindingInput,
-  AuthzUpdateBindingInput,
-} from "./authz.binding-management.ts";
-import type {
   AuthzAttachBindingsInput,
   AuthzAttachBindingsOutput,
-  AuthzAttachGrantInput,
   AuthzAttachResourceGrantInput,
   AuthzAttachResourceGrantOutput,
-  AuthzBindingOutput,
   AuthzChangeBindingRoleInput,
   AuthzChangeBindingRoleOutput,
   AuthzDefineRoleInput,
@@ -33,7 +23,6 @@ import type {
   AuthzOffboardMemberOutput,
   AuthzOffboardInput,
   AuthzOffboardOutput,
-  AuthzReplaceGrantInput,
   AuthzRevokeBindingsInput,
   AuthzRevokeBindingsOutput,
   AuthzRevokeBindingsWhereInput,
@@ -45,18 +34,19 @@ import type {
   AuthzRevokeGrantInput,
   AuthzRevokeResourceGrantsInput,
   AuthzRevokeResourceGrantsOutput,
-  AuthzUpdateGrantInput,
 } from "./authz.commands.ts";
+import type {
+  AuthzApplyMemberBindingsInput,
+  AuthzBindingMutationSuccess,
+  AuthzCreateBindingInput,
+  AuthzCreateBindingOutput,
+  AuthzDeleteBindingInput,
+  AuthzUpdateBindingInput,
+} from "./authz.grant-management.ts";
 
 /** The one portable mutation and offboarding capability for authorization. */
 export abstract class AuthzGrantsService {
-  abstract attach(args: AuthzAttachGrantInput): Promise<AuthzBindingOutput>;
-
-  abstract update(args: AuthzUpdateGrantInput): Promise<void>;
-
   abstract revoke(args: AuthzRevokeGrantInput): Promise<void>;
-
-  abstract replace(args: AuthzReplaceGrantInput): Promise<AuthzBindingOutput>;
 
   abstract offboard(args: AuthzOffboardInput): Promise<AuthzOffboardOutput>;
 

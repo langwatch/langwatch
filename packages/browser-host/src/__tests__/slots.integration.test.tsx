@@ -9,13 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { UiCapabilityContextProvider } from "../capabilities.ts";
 import type { UiSlots } from "../slots.tsx";
-import {
-  CORE_SEAT_TYPE_COPY,
-  UiSlot,
-  UNFILLED_UI_SLOTS,
-  uiSlots,
-  useUiSeatTypeCopy,
-} from "../slots.tsx";
+import { UiSlot, UNFILLED_UI_SLOTS, uiSlots } from "../slots.tsx";
 import { createUiCapabilitiesFromHost } from "../testing.ts";
 
 function EnterpriseWall() {
@@ -54,16 +48,6 @@ describe("a slot a core screen leaves open", () => {
       expect(() => render(<Screen />)).not.toThrow();
       expect(screen.getByText("Nothing more to add")).toBeDefined();
     });
-
-    /** @scenario An unfilled slot renders the core fallback */
-    it("reads the core seat-type words", () => {
-      function Words() {
-        return <p>{useUiSeatTypeCopy().liteMemberExplanation}</p>;
-      }
-      render(<Words />);
-
-      expect(screen.getByText(CORE_SEAT_TYPE_COPY.liteMemberExplanation)).toBeDefined();
-    });
   });
 
   describe("when the composition filled it", () => {
@@ -77,35 +61,24 @@ describe("a slot a core screen leaves open", () => {
 
     /** @scenario The application fills the slot with the enterprise component */
     it("hands the screen's props to the block it filled with", () => {
-      function Row({ label, current, max }: { label: string; current: number; max?: number }) {
+      function Alert({ provider, error }: { provider: string; error?: string }) {
         return (
           <p>
-            {label}: {current} of {max}
+            {provider}: {error}
           </p>
         );
       }
       render(
         withSlots(
-          uiSlots({ components: { resourceLimits: Row } }),
-          <UiSlot name="resourceLimits" props={{ label: "Team Members", current: 3, max: 10 }} />,
+          uiSlots({ components: { managedModelProviderAlert: Alert } }),
+          <UiSlot
+            name="managedModelProviderAlert"
+            props={{ provider: "openai", error: "no key" }}
+          />,
         ),
       );
 
-      expect(screen.getByText("Team Members: 3 of 10")).toBeDefined();
-    });
-  });
-});
-
-describe("the core seat-type words", () => {
-  describe("when a composition installs none of its own", () => {
-    /** @scenario An unfilled slot renders the core fallback */
-    it("still says what a lite member reaches and what it hides", () => {
-      const explanation = CORE_SEAT_TYPE_COPY.liteMemberExplanation;
-
-      expect(explanation).toMatch(/traces/i);
-      expect(explanation).toMatch(/analytics/i);
-      expect(explanation).toMatch(/scenario runs/i);
-      expect(explanation).toMatch(/cannot see costs/i);
+      expect(screen.getByText("openai: no key")).toBeDefined();
     });
   });
 });

@@ -1,6 +1,5 @@
 import { Readable } from "node:stream";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   datasetNormalizePayloadSchema,
   type DatasetNormalizePayload,
@@ -9,6 +8,7 @@ import {
   storedObjectMetadataSchema,
   type StoredObjectApi,
 } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";

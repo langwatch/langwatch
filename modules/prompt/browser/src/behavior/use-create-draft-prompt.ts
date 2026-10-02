@@ -1,9 +1,10 @@
-import { getMaxTokenLimit } from "@langwatch/prompt-browser-kit";
 import { useCallback } from "react";
 
+import { getMaxTokenLimit } from "../model/max-token-limit.ts";
 import { buildDefaultFormValues } from "../model/prompt-form/index.ts";
 import { promptApi } from "./prompt-api.ts";
 import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
+import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
@@ -30,15 +31,30 @@ export function useCreateDraftPrompt() {
     projectId: project?.id,
   });
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
+  const utils = promptApi.useUtils();
 
   // Cascade-resolved model for "new prompt" surfaces. Returns null when
-  // nothing is configured at any scope (post system-tier removal) — the
-  // form falls back to an empty string and the MissingModelToast picks
-  // it up at the first send. No client-side system fallback.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
+  // nothing is configured at any scope; the form then starts with no model.
+  const resolvedDefault = usePromptDefaultModel();
+  const projectId = project?.id;
+
+  // A click can land before the query above answers, so a missing answer is
+  // fetched here rather than read as "nothing configured": an empty model
+  // would otherwise be replaced by the platform fallback when the form
+  // parses it, silently ignoring the configured default.
+  const readDefaultModel = useCallback(async (): Promise<string> => {
+    if (resolvedDefault.data) return resolvedDefault.data.model;
+    if (!projectId) return "";
+    try {
+      const fetched = await utils.modelProvider.getResolvedDefault.fetch({
+        projectId,
+        featureKey: "prompt.create_default",
+      });
+      return fetched?.model ?? "";
+    } catch {
+      return "";
+    }
+  }, [projectId, resolvedDefault.data, utils.modelProvider.getResolvedDefault]);
 
   /**
    * createDraftPrompt Single Responsibility: Creates a new draft prompt tab with default
@@ -46,7 +62,7 @@ export function useCreateDraftPrompt() {
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {
-    const defaultModel = resolvedDefault.data?.model ?? "";
+    const defaultModel = await readDefaultModel();
     const defaultModelMetadata = defaultModel ? modelMetadata?.[defaultModel] : undefined;
     const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
@@ -87,7 +103,7 @@ export function useCreateDraftPrompt() {
     }, 100);
 
     return { defaultValues };
-  }, [addTab, modelMetadata, resolvedDefault.data?.model]);
+  }, [addTab, modelMetadata, readDefaultModel]);
 
   return { createDraftPrompt };
 }

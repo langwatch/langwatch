@@ -13,8 +13,12 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useQuery } from "@tanstack/react-query";
 
-export const UI_ACTIVE_PLAN_PROCEDURE = "limits.getUsage";
-export const UI_ORGANIZATIONS_PROCEDURE = "organization.getAll";
+import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-scope-queries.ts";
+
+/** Re-exported for the shell's `organizationFacts` declaration readers. */
+export { UI_ORGANIZATIONS_PROCEDURE };
+
+export const UI_ACTIVE_PLAN_PROCEDURE = "plan.getActivePlan";
 export const UI_PLATFORM_ADMIN_PROCEDURE = "user.isAdmin";
 
 /** The organization role that reads every settings page and writes none of them. */
@@ -23,7 +27,7 @@ export const UI_LITE_MEMBER_ROLE = "EXTERNAL";
 /** A plan does not change while a reader is on a settings page. */
 const PLAN_STALE_TIME_MS = 5 * 60_000;
 
-type ActivePlanRead = { activePlan?: { type?: string } };
+type ActivePlanRead = { type?: string };
 type OrganizationsRead = readonly {
   id: string;
   members?: readonly { role?: string }[];
@@ -39,7 +43,7 @@ export type UiOrganizationFacts = {
 };
 
 /**
- * The plan tier and membership role — `limits.getUsage` is asked only
+ * The plan tier and membership role — `plan.getActivePlan` is asked only
  * with an organization in scope and `organization:view` held; otherwise
  * the plan reads as not-enterprise and not-loading.
  */
@@ -59,7 +63,7 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
     staleTime: PLAN_STALE_TIME_MS,
   });
 
-  const organizationsInput = { isDemo: false };
+  const organizationsInput = {};
   const organizations = useQuery({
     queryKey: trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, {
       input: organizationsInput,
@@ -68,16 +72,15 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
     queryFn: () =>
       rpc.query(UI_ORGANIZATIONS_PROCEDURE, organizationsInput) as Promise<OrganizationsRead>,
     enabled: organizationId !== null,
-    staleTime: PLAN_STALE_TIME_MS,
   });
 
-  // `organization.getAll` narrows `members` to the caller's own row, so the
+  // `organization.getScopeGraph` narrows `members` to the caller's own row, so the
   // first member of the organization in scope IS the reader's membership.
   const role = (organizations.data ?? []).find((organization) => organization.id === organizationId)
     ?.members?.[0]?.role;
 
   return {
-    isEnterprise: plan.data?.activePlan?.type === "ENTERPRISE",
+    isEnterprise: plan.data?.type === "ENTERPRISE",
     isPlanLoading: mayReadPlan && plan.isLoading,
     isLiteMember: role === UI_LITE_MEMBER_ROLE,
     isSaaS,

@@ -16,9 +16,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import { AuthzGrantProjection } from "../eventing/authz-grant.projection.ts";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import {
   AuthzGrantProjectionRepository,
@@ -35,7 +35,7 @@ import {
   permissiveGrantGuards,
   TEST_CALLER,
 } from "../services/__tests__/support/grant-guards.stub.ts";
-import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
+import { AuthzGrantWriterService } from "../services/authz-grant-writer.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
@@ -69,7 +69,7 @@ function authzFor(bindings: CollectedBinding[], { cached = false } = {}) {
   const authz = AuthzService.create({
     repository: reader,
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
     isOnEngine: async () => true,
     ...(cached ? { epoch, cacheEnabled: () => true } : {}),
   });
@@ -103,7 +103,7 @@ function grantsService() {
     ledger,
     epoch,
     newBindingId: () => "rb_new",
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
   return { service, repository, epoch, ledger };
 }
@@ -125,13 +125,13 @@ function compatibilityLedger() {
 }
 
 function bindingWriter() {
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockResolvedValue([
     { type: "TEAM", id: TEAM, name: "Shared", personalWorkspaceName: null },
   ]);
   bindings.findOrganizationRole.mockResolvedValue("MEMBER");
   const ledger = compatibilityLedger();
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     permissions: permissiveGrantGuards,
     bindings,
     ledger,
@@ -266,6 +266,7 @@ describe("when an end date is not in the future", () => {
       service.attachBindings({
         organizationId: ORG,
         bindings: [binding],
+        caller: { type: "system" },
         actor: { type: "user", id: "admin_1" },
         onDuplicate: "attach",
       }),

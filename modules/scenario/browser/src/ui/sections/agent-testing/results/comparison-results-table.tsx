@@ -4,12 +4,12 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { RunMetricsSummary } from "@langwatch/suite-browser-kit";
 
 import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
+import { RunMetricsSummary } from "../../../elements/suite/runs/run-metrics-summary.tsx";
 import { comparisonColumns } from "./comparison-columns.ts";
 import { MatrixRow, type RunLineHandlers, type ScenarioLine } from "./comparison-results-row.tsx";
 import { type BatchTarget, summaryOfTarget } from "./use-batch-targets.ts";

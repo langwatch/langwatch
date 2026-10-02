@@ -1,5 +1,6 @@
 import { type EventStore, createTenantId } from "@langwatch/eventing";
 import {
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
   type SsoConnectionSource,
   ssoConnectionSourceSchema,
@@ -19,6 +20,7 @@ interface SsoConnectionPayloadShape {
   route?: unknown;
   policy?: unknown;
   name?: unknown;
+  idp?: { issuer?: unknown };
   note?: unknown;
   reason?: unknown;
   replacesConnectionId?: unknown;
@@ -83,13 +85,19 @@ function toHistoryEntry(event: SsoConnectionEvent): SsoConnectionHistoryEntry {
     type: event.type,
     occurredAtMs: event.occurredAt,
     source: sourceOf(data.source),
-    ...textFieldsOf(data),
+    ...textFieldsOf({ data, type: event.type }),
   };
 }
 
 /** The prose fields, read off one payload. Every one is optional on the
  *  wire, so an absent or empty string is the same answer: nothing said. */
-function textFieldsOf(data: SsoConnectionPayloadShape): SsoConnectionHistoryTextFields {
+function textFieldsOf({
+  data,
+  type,
+}: {
+  data: SsoConnectionPayloadShape;
+  type: string;
+}): SsoConnectionHistoryTextFields {
   const read = (value: unknown): string | null =>
     typeof value === "string" && value.length > 0 ? value : null;
   return {
@@ -98,6 +106,8 @@ function textFieldsOf(data: SsoConnectionPayloadShape): SsoConnectionHistoryText
     route: read(data.route),
     policy: read(data.policy),
     name: read(data.name),
+    // Only an identity provider change names the issuer in its line.
+    issuer: type === CONNECTION_IDP_UPDATED_EVENT_TYPE ? read(data.idp?.issuer) : null,
     note: read(data.note) ?? read(data.reason),
     replacesConnectionId: read(data.replacesConnectionId),
   };

@@ -70,6 +70,7 @@ function plan(
     pending: input.pending,
     outstanding: input.outstanding ?? 0,
     now: input.now ?? NOW,
+    traceCarrier: {},
   });
 }
 
@@ -200,23 +201,48 @@ describe("WebhookBatchPlannerService.findNextWakeAt", () => {
 
   describe("given nothing left buffered", () => {
     it("arms no wake", () => {
-      expect(planner().findNextWakeAt({ remaining: [], inFlight: 0, now: NOW })).toBeNull();
+      expect(
+        planner().findNextWakeAt({ remaining: [], inFlight: 0, outstandingDueAt: null, now: NOW }),
+      ).toBeNull();
     });
   });
 
   describe("given the in-flight cap is what is holding the buffer", () => {
     it("rechecks shortly, rather than waiting out a delay that is not the reason", () => {
-      expect(planner().findNextWakeAt({ remaining: pending(1), inFlight: 2, now: NOW })).toBe(
-        NOW + WEBHOOK_FLUSH_RECHECK_MS,
-      );
+      expect(
+        planner().findNextWakeAt({
+          remaining: pending(1),
+          inFlight: 2,
+          outstandingDueAt: null,
+          now: NOW,
+        }),
+      ).toBe(NOW + WEBHOOK_FLUSH_RECHECK_MS);
+    });
+
+    it("sleeps until the laddered send is due again instead of polling", () => {
+      const dueAt = NOW + 60_000;
+
+      expect(
+        planner().findNextWakeAt({
+          remaining: pending(1),
+          inFlight: 2,
+          outstandingDueAt: dueAt,
+          now: NOW,
+        }),
+      ).toBe(dueAt);
     });
   });
 
   describe("given the coalescing delay is what is holding it", () => {
     it("wakes when the oldest envelope's wait is up", () => {
-      expect(planner().findNextWakeAt({ remaining: pending(1), inFlight: 0, now: NOW })).toBe(
-        NOW + 1_000,
-      );
+      expect(
+        planner().findNextWakeAt({
+          remaining: pending(1),
+          inFlight: 0,
+          outstandingDueAt: null,
+          now: NOW,
+        }),
+      ).toBe(NOW + 1_000);
     });
 
     it("never wakes sooner than the recheck floor", () => {
@@ -224,9 +250,9 @@ describe("WebhookBatchPlannerService.findNextWakeAt", () => {
       // and a stream that wakes itself immediately is a spin.
       const remaining = pending(1, NOW - 10_000);
 
-      expect(planner().findNextWakeAt({ remaining, inFlight: 0, now: NOW })).toBe(
-        NOW + WEBHOOK_FLUSH_RECHECK_MS,
-      );
+      expect(
+        planner().findNextWakeAt({ remaining, inFlight: 0, outstandingDueAt: null, now: NOW }),
+      ).toBe(NOW + WEBHOOK_FLUSH_RECHECK_MS);
     });
   });
 });

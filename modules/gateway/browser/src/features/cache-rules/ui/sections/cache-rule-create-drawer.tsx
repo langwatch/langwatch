@@ -1,5 +1,5 @@
-import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";

@@ -1,5 +1,4 @@
-import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { TerminalOutput } from "@langwatch/coding-agent-browser-kit";
+import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
@@ -17,6 +16,7 @@ import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import { panelChatMessages } from "../../../../model/transcript/panel-messages.ts";
 import { groupMessagesIntoTurns } from "../../../../model/transcript/turns.ts";
+import { TerminalOutput } from "../../../elements/coding-agent/trace/terminal-output.tsx";
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../traces/trace-media-part.tsx";

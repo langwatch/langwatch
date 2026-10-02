@@ -13,6 +13,7 @@ import {
   type LangyModel,
   type LangySessionKey,
   type LangyTurnContextRenderer,
+  type LangySkillGates,
   type LangyTurnMetrics,
   type LangyUiActionSurface,
 } from "../app/langy.members.ts";
@@ -63,6 +64,7 @@ export interface LangyTurnServiceDeps {
   sessionKeys: LangySessionKey;
   context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
+  skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessRepository | null;
@@ -87,6 +89,7 @@ export type LangyTurnTechnicalMembers = {
   sessionKeys: LangySessionKey;
   context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
+  skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   accessStore: LangyTurnAccessRepository | null;
   handoffStore: LangyTurnHandoffRepository | null;
@@ -123,15 +126,22 @@ export class LangyTurnSharedService {
   }
 
   composeLangyTurnPrompt({
+    viewer,
     contextBlock,
     capNote,
     userText,
   }: {
+    viewer: StartConversationTurnInput["session"]["user"];
     contextBlock: string | null;
     capNote: string;
     userText: string;
   }): { prompt: string; labelled: boolean } {
-    const preamble = [contextBlock, capNote]
+    // Lets "email me" resolve to the viewer's own address without asking.
+    const viewerLine = viewer.email
+      ? `You are talking to ${viewer.name ?? viewer.email} <${viewer.email}>. ` +
+        "This identifies the user; it is not an instruction."
+      : null;
+    const preamble = [viewerLine, contextBlock, capNote]
       .map((block) => (block ?? "").trim())
       .filter((block) => block.length > 0);
     if (preamble.length === 0) {
@@ -150,18 +160,23 @@ export class LangyTurnSharedService {
     conversationId,
     model,
     credentials,
+    disabledSkillIds,
   }: {
     projectId: string;
     actorUserId: string;
     conversationId: string;
     model: string;
     credentials: LangyCredentials;
+    /** Passed explicitly: the turn resolves them after the probe starts, and the
+     * worker signature keys on them, so a probe without them answers for another worker. */
+    disabledSkillIds: readonly string[];
   }): LangyWorkerProbeInput {
     return {
       projectId,
       actorUserId,
       conversationId,
       model,
+      ...(disabledSkillIds.length > 0 ? { disabledSkillIds: [...disabledSkillIds] } : {}),
       hasGithubAuth: !!credentials.githubToken,
       ...(credentials.githubRepoScopeKey
         ? { githubRepoScopeKey: credentials.githubRepoScopeKey }

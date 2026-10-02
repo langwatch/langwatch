@@ -1,13 +1,13 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
@@ -71,7 +71,7 @@ export const createMonitorCommand = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify({
         name,
@@ -86,8 +86,7 @@ export const createMonitorCommand = async (
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create monitor" });
+      await failSpinnerFromResponse({ spinner, response, action: "create monitor" });
       process.exit(1);
     }
 

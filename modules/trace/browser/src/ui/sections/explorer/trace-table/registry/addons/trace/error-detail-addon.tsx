@@ -1,4 +1,4 @@
-import { Flex, Text } from "@chakra-ui/react";
+import { Flex, Text } from "@langwatch/design-system/primitives";
 
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

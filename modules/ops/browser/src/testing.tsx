@@ -26,7 +26,7 @@ export type OpsHostRecording = {
 };
 
 /** The project an operator is standing in, unless a test says otherwise. */
-export const FAKE_OPS_PROJECT: OpsProject = { id: "proj-1", apiKey: "sk-lw-test" };
+export const FAKE_OPS_PROJECT: OpsProject = { id: "proj-1" };
 
 export type FakeOpsHostOptions = {
   /**

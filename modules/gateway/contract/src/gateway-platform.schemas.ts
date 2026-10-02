@@ -338,10 +338,12 @@ export const gatewayRevokeVirtualKeyBodySchema = z.object({});
 export const gatewayRetiredProviderBindingBodySchema = z.object({});
 
 /**
- * The REST credential a project door presented: a scoped API key acts as its
- * owning user, a legacy project key carries none and acts as a machine principal.
+ * The REST credential a project door presented, by its principal: a scoped API key acts as
+ * its owning user, a project-bound access token is its user (no key row), and a legacy project
+ * key carries none and acts as a machine principal.
  */
 export const gatewayRequestCredentialSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("user"), userId: z.string(), organizationId: z.string() }),
   z.object({
     kind: z.literal("apiKey"),
     apiKeyId: z.string(),

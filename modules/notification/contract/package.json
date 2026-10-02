@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

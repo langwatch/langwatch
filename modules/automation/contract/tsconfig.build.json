@@ -22,22 +22,25 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../webhook/contract/tsconfig.build.json"
     }
   ]
 }

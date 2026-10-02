@@ -83,7 +83,6 @@ export {
   type TrpcAuditEntry,
   type TrpcAudit,
   type TrpcAuthenticatedMiddlewareContext,
-  type TrpcAuthorizationDecisions,
   type TrpcAuthorizationDenial,
   type TrpcAuthorization,
   type TrpcCauseTranslation,
@@ -111,11 +110,10 @@ export type { ApiHandlerArguments } from "../handler-arguments.ts";
 // Where every declared namespace mounts, and the subscription lane over the
 // same composed router.
 export {
-  MembershipDisabledError,
   TrpcHost,
-  type TrpcAuditSink,
   type TrpcNamespace,
   type TrpcRequestContext,
   type TrpcSession,
   type TrpcSessionUser,
 } from "./host.ts";
+export { SseLane } from "./sse.ts";

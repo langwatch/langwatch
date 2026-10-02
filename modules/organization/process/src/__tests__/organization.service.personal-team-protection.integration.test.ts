@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Personal workspaces cannot be archived without locking the owner's slot
@@ -14,6 +13,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -177,6 +177,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
         teamId: personalTeamId,
         userId: colleagueUserId,
         role: "MEMBER",
+        caller: { type: "user", id: ownerUserId },
         actor: { type: "user", id: ownerUserId },
       });
 

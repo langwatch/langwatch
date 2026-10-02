@@ -1,6 +1,6 @@
-import { Button, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LocalPromptConfig,
@@ -14,9 +14,10 @@ import type { Field } from "@langwatch/workflow-contract";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { useCreateExperimentFromPlayground } from "../../../../behavior/use-create-experiment-from-playground.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useSavedPromptVersions } from "../../../../behavior/use-saved-prompt-versions.ts";
 import { generateHumanReadableId } from "../../../../model/human-readable-id.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { inferAllTargetMappings } from "../../../../model/target-mapping-inference.ts";
@@ -183,7 +184,6 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
   const host = usePromptHost();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const utils = promptApi.useUtils();
 
   // Get all tabs from all windows. `windows` and `activeWindowId` are the
   // store's own references, so selecting them directly is stable; the
@@ -209,25 +209,14 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
 
   // Fetch saved prompts to compare against current form values
   // This allows us to detect if there are unsaved changes
-  const savedPromptsQueries = promptApi.useQueries((t) =>
-    savedPromptIds.map((configId) => {
-      const tab = allTabs.find((tab) => tab.data.form.currentValues.configId === configId);
-      const versionId = tab?.data.form.currentValues.versionMetadata?.versionId;
-
-      return t.prompts.getByIdOrHandle(
-        {
-          idOrHandle: configId,
-          projectId: project?.id ?? "",
-          versionId: versionId,
-        },
-        {
-          enabled: !!project?.id && isDialogOpen,
-          // Keep stale data to avoid flickering
-          staleTime: 60_000,
-        },
-      );
-    }),
-  );
+  const savedPromptsQueries = useSavedPromptVersions({
+    references: savedPromptIds.map((configId) => ({
+      configId,
+      versionId: allTabs.find((tab) => tab.data.form.currentValues.configId === configId)?.data.form
+        .currentValues.versionMetadata?.versionId,
+    })),
+    enabled: isDialogOpen,
+  });
 
   // Check if all queries are loading
   const isLoadingSavedPrompts = savedPromptsQueries.some((q) => q.isLoading);
@@ -245,9 +234,8 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
     return map;
   }, [savedPromptIds, savedPromptsQueries]);
 
-  const createExperiment = promptApi.experiments.saveEvaluationsV3.useMutation({
+  const createExperiment = useCreateExperimentFromPlayground({
     onSuccess: (data) => {
-      void utils.experiments.getAllForEvaluationsList.invalidate();
       host.navigate(`/${project?.slug}/experiments/workbench/${data.slug}`);
       setIsCreating(false);
       setIsDialogOpen(false);

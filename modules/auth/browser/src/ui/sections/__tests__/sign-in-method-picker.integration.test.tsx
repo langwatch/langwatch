@@ -3,9 +3,9 @@
  * The other ways in must not stay live once a passkey ceremony has handed
  * the screen to the browser — a second click would open a competing prompt.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SignInMethod } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -43,26 +43,22 @@ function pendingCeremony(): { promise: Promise<unknown>; resolve: (value: unknow
 }
 
 const renderPicker = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SignInMethodPicker
-        methodSet={METHOD_SET}
-        reasonCode="no_domain_match"
-        onFederatedMethodChosen={vi.fn()}
-        onPasskeyError={vi.fn()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <SignInMethodPicker
+      methodSet={METHOD_SET}
+      reasonCode="no_domain_match"
+      onFederatedMethodChosen={vi.fn()}
+      onPasskeyError={vi.fn()}
+    />,
   );
 
 const renderAlternatives = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AlternativeMethods
-        methodSet={METHOD_SET}
-        onFederatedMethodChosen={vi.fn()}
-        onPasskeyError={vi.fn()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AlternativeMethods
+      methodSet={METHOD_SET}
+      onFederatedMethodChosen={vi.fn()}
+      onPasskeyError={vi.fn()}
+    />,
   );
 
 afterEach(() => {
@@ -141,16 +137,14 @@ describe("given the alternative methods rail", () => {
 
 describe("given a development deployment offering only google", () => {
   it("offers only google", () => {
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <WithTestAuthHost publicEnvironment={{ NODE_ENV: "development" }}>
-          <AlternativeMethods
-            methodSet={METHOD_SET}
-            onFederatedMethodChosen={vi.fn()}
-            onPasskeyError={vi.fn()}
-          />
-        </WithTestAuthHost>
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <WithTestAuthHost publicEnvironment={{ NODE_ENV: "development" }}>
+        <AlternativeMethods
+          methodSet={METHOD_SET}
+          onFederatedMethodChosen={vi.fn()}
+          onPasskeyError={vi.fn()}
+        />
+      </WithTestAuthHost>,
     );
 
     expect(screen.getByRole("button", { name: /Google/i })).toBeTruthy();

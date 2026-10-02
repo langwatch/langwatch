@@ -1,7 +1,7 @@
-import { useDisclosure } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useDisclosure } from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect } from "react";
 

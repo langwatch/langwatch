@@ -1,7 +1,7 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 const BASE_TITLE = "LangWatch";
@@ -44,8 +44,8 @@ function buildTitle({
  */
 export function useTracesPageTitle(): void {
   const { project } = useOrganizationTeamProject();
-  const drawerOpen = useDrawerStore((s) => s.isOpen);
-  const drawerTraceId = useDrawerStore((s) => s.traceId);
+  const drawerOpen = useTraceDrawer((s) => s.isOpen);
+  const drawerTraceId = useTraceDrawer((s) => s.traceId);
   const queryText = useFilterStore((s) => s.queryText);
   const timeRangeLabel = useFilterStore((s) => s.timeRange.label);
 

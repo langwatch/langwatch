@@ -1,15 +1,18 @@
-import { Box, Button, Field, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { ALL_DEFAULT_JUDGE_PROMPTS, pickDefaultJudgePrompt } from "@langwatch/evaluator-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  VariableMappingInput,
-} from "@langwatch/prompt-browser-kit";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -24,6 +27,8 @@ import type {
   ComparisonEvaluatorConfig,
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
+import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
+import { VariableMappingInput } from "../../prompt/variables/variable-mapping-input.tsx";
 
 type Metric = "cost" | "duration";
 type VariantOutputOption = {
@@ -61,9 +66,11 @@ export function ComparisonConfigForm({
   // prop don't stomp each other. Parent-pushed value changes still resync
   // `draft`.
   const [draft, setDraft] = useState<ComparisonEvaluatorConfig>(value);
-  useEffect(() => {
+  const [valueFrom, setValueFrom] = useState(value);
+  if (valueFrom !== value) {
+    setValueFrom(value);
     setDraft(value);
-  }, [value]);
+  }
 
   const draftRef = useRef(draft);
   useEffect(() => {

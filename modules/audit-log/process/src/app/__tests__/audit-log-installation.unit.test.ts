@@ -1,20 +1,20 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { auditLogServer } from "../../audit-log.server.ts";
+import { auditLogProcessModule } from "../../audit-log.module.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(auditLogServer)])
+    .withModules([withMemoryRepositories(auditLogProcessModule)])
     .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
     .provide({
       project: createApiFixture<ProjectApi>({}),
@@ -42,7 +42,7 @@ describe("given a process that installed the audit log", () => {
 
       try {
         const app = runtime.service(AuditLogApi);
-        expect(runtime.module(auditLogServer).provided).toBe(app);
+        expect(runtime.module(auditLogProcessModule).provided).toBe(app);
 
         await app.record(command);
 

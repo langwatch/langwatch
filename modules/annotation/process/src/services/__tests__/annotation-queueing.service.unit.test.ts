@@ -38,7 +38,7 @@ function appWithExistingTraces(traceIds: readonly string[] = []) {
   return { app, findExistingTraceIds };
 }
 
-describe("AnnotationApp queue workflow", () => {
+describe("AnnotationModule queue workflow", () => {
   /** @scenario "Queueing keeps only distinct traces held by the project" */
   it("queues each existing trace once when it is sent twice", async () => {
     const { app, findExistingTraceIds } = appWithExistingTraces(["trace-1"]);

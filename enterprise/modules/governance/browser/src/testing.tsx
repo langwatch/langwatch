@@ -26,9 +26,9 @@
  * importing the real `hasPermissionWithHierarchy`, kept across the move.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { permissionSatisfiedBy } from "@langwatch/authz-contract";
-import { render, type RenderResult } from "@testing-library/react";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback.ts";
@@ -36,12 +36,10 @@ import {
   type GovernanceActor,
   GovernanceHostApi,
   GovernanceHostProvider,
-  type GovernanceDeployment,
   type GovernanceFailureNotice,
   type GovernanceOrganization,
   type GovernancePlan,
   type GovernanceRouteReading,
-  type GovernanceScope,
   type GovernanceSuccessNotice,
 } from "./model/governance-host.ts";
 
@@ -85,7 +83,6 @@ export type FakeGovernanceHostOptions = {
   organization?: GovernanceOrganization | null;
   organizations?: readonly GovernanceOrganization[];
   plan?: GovernancePlan;
-  deployment?: GovernanceDeployment;
   /** Path parameters the screen was opened with, for example `{ id: "src-1" }`. */
   params?: Readonly<Record<string, string | undefined>>;
   /** The query string the screen opens on. */
@@ -93,10 +90,6 @@ export type FakeGovernanceHostOptions = {
 };
 
 const DEFAULT_PLAN: GovernancePlan = { isEnterprise: true, isLoading: false };
-const DEFAULT_DEPLOYMENT: GovernanceDeployment = {
-  isSaas: true,
-  appBaseUrl: "https://app.langwatch.ai",
-};
 
 export class FakeGovernanceHost extends GovernanceHostApi {
   static create(options: FakeGovernanceHostOptions = {}): FakeGovernanceHost {
@@ -157,10 +150,6 @@ export class FakeGovernanceHost extends GovernanceHostApi {
     });
   }
 
-  scope(): GovernanceScope {
-    return { organizationId: this.organization()?.id ?? null, projectId: null };
-  }
-
   organizations(): readonly GovernanceOrganization[] {
     return this.options.organizations ?? [];
   }
@@ -197,10 +186,6 @@ export class FakeGovernanceHost extends GovernanceHostApi {
 
   plan(): GovernancePlan {
     return this.options.plan ?? DEFAULT_PLAN;
-  }
-
-  deployment(): GovernanceDeployment {
-    return this.options.deployment ?? DEFAULT_DEPLOYMENT;
   }
 
   route(): GovernanceRouteReading {
@@ -329,10 +314,8 @@ export function renderWithGovernanceHost(
   { host }: { host: FakeGovernanceHost },
 ): RenderResult {
   installBrowserApisJsdomLacks();
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostHarness host={host}>{element}</GovernanceHostHarness>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <GovernanceHostHarness host={host}>{element}</GovernanceHostHarness>,
   );
 }
 

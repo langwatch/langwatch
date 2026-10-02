@@ -86,16 +86,3 @@ export function closedQueueEditorAddress(
 ): AnnotationQueryWrite {
   return { ...current, [QUEUE_EDITOR_PARAM]: void 0 };
 }
-
-/** Where a queue item that is still waiting takes the reviewer. */
-export function queueItemHref({
-  projectSlug,
-  queueItemId,
-  traceId,
-}: {
-  projectSlug: string | undefined;
-  queueItemId: string;
-  traceId: string;
-}): string {
-  return `/${projectSlug}/annotations/my-queue?queue-item=${queueItemId}&trace=${traceId}`;
-}

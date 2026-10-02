@@ -1,3 +1,14 @@
+/**
+ * The mapping half of the "Add to Dataset" drawer: which trace field fills which
+ * dataset column, and what the rows will look like once it does.
+ */
+import type { WireOf } from "@langwatch/api/web";
+import type {
+  Dataset,
+  DatasetColumns,
+  DatasetRecordEntry,
+  MappingState,
+} from "@langwatch/dataset-contract";
 import {
   Badge,
   Box,
@@ -9,27 +20,17 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-/**
- * The mapping half of the "Add to Dataset" drawer: which trace field fills which
- * dataset column, and what the rows will look like once it does.
- */
-import type { WireOf } from "@langwatch/api/web";
-import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
-import type {
-  Dataset,
-  DatasetColumns,
-  DatasetRecordEntry,
-  MappingState,
-} from "@langwatch/dataset-contract";
+} from "@langwatch/design-system/primitives";
 import type { Trace } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useTracesWithSpansByThreadIds } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useDebouncedCallback } from "../../../behavior/use-debounced-callback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useUpdateDatasetMapping } from "../../../behavior/writes/use-trace-writes.ts";
+import { DatasetImagePreviewTable } from "../../blocks/dataset/dataset-image-preview-table.tsx";
 import { ThreadMapping, type ThreadMappingState } from "../traces/thread-mapping.tsx";
 import { TracesMapping } from "../traces/traces-mapping.tsx";
 
@@ -193,17 +194,12 @@ export function DatasetMappingPreview({
 
   // Fetch all traces with matching thread_ids when thread mapping is enabled.
   // Corrections apply here too, so thread mode maps the corrected traces.
-  const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
-    {
-      projectId: project?.id ?? "",
-      threadIds: threadIds,
-      withEditOverlay: true,
-    },
-    {
-      enabled: !!project && isThreadMapping && threadIds.length > 0,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const threadTraces = useTracesWithSpansByThreadIds({
+    projectId: project?.id,
+    threadIds,
+    withEditOverlay: true,
+    enabled: isThreadMapping,
+  });
 
   // Use thread traces when thread mapping is enabled, otherwise use provided traces
   const tracesToUse = useMemo(() => {
@@ -213,47 +209,32 @@ export function DatasetMappingPreview({
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
 
-  const trpc = api.useUtils();
-  const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
+  const updateStoredMapping_ = useUpdateDatasetMapping();
   const updateStoredMapping = useCallback(
     (mappingState: MappingState) => {
-      updateStoredMapping_.mutate(
-        {
-          projectId: project?.id ?? "",
-          datasetId: selectedDataset.id,
-          mapping: {
-            mapping: mappingState.mapping,
-            expansions: Array.from(mappingState.expansions),
-          },
+      updateStoredMapping_.mutate({
+        projectId: project?.id ?? "",
+        datasetId: selectedDataset.id,
+        mapping: {
+          mapping: mappingState.mapping,
+          expansions: Array.from(mappingState.expansions),
         },
-        {
-          onSuccess: () => {
-            void trpc.dataset.getAll.invalidate();
-          },
-        },
-      );
+      });
     },
-    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_],
+    [selectedDataset.id, project?.id, updateStoredMapping_],
   );
 
   const updateStoredThreadMapping = useCallback(
     (threadMapping: ThreadMappingState) => {
-      updateStoredMapping_.mutate(
-        {
-          projectId: project?.id ?? "",
-          datasetId: selectedDataset.id,
-          threadMapping: {
-            mapping: threadMapping.mapping,
-          },
+      updateStoredMapping_.mutate({
+        projectId: project?.id ?? "",
+        datasetId: selectedDataset.id,
+        threadMapping: {
+          mapping: threadMapping.mapping,
         },
-        {
-          onSuccess: () => {
-            void trpc.dataset.getAll.invalidate();
-          },
-        },
-      );
+      });
     },
-    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_],
+    [selectedDataset.id, project?.id, updateStoredMapping_],
   );
 
   const debouncedUpdateThreadMapping = useDebouncedCallback(

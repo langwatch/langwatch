@@ -1,5 +1,5 @@
-import { Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 
 import { api } from "../../../behavior/ops-api.ts";
@@ -24,9 +24,7 @@ function describeSnapshotConnection({
 /** Ops landing page; always polls (subscriptions routed at host level). */
 export default function OpsDashboardScreen() {
   const payloadStore = useOpsOverlay("payloadStore");
-  const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    refetchInterval: 5000,
-  });
+  const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {});
 
   const data = snapshot.data ?? null;
 

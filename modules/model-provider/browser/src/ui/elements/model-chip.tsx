@@ -4,9 +4,9 @@
  * (`~/components/llmPromptConfigs/constants`) still keeps eleven non-family callers.
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import {
   isLatestAlias,
   modelDisplayLabel,

@@ -3,17 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/features/tag-management.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TagList } from "../tag-list.tsx";
 import { TagPill, pastelHueForLabel } from "../tag-pill.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const pillFor = (label: string) => screen.getByTestId(`tag-pill-${label}`);
 
@@ -22,24 +17,21 @@ describe("<TagPill/> tone", () => {
 
   describe("given no tone", () => {
     it("draws what an explicitly neutral pill draws", () => {
-      const { unmount } = render(<TagPill label="billing" />, {
-        wrapper: Wrapper,
-      });
+      const { unmount } = renderWithDesignSystem(<TagPill label="billing" />);
       const untoned = pillFor("billing").className;
       unmount();
 
-      render(<TagPill label="billing" tone="neutral" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagPill label="billing" tone="neutral" />);
 
       expect(pillFor("billing").className).toBe(untoned);
     });
 
     it("keeps every label on the same colour", () => {
-      render(
+      renderWithDesignSystem(
         <>
           <TagPill label="billing" />
           <TagPill label="refunds" />
         </>,
-        { wrapper: Wrapper },
       );
 
       expect(pillFor("billing").className).toBe(pillFor("refunds").className);
@@ -48,19 +40,17 @@ describe("<TagPill/> tone", () => {
 
   describe("given the pastel tone", () => {
     it("colours a pill differently from the neutral one", () => {
-      const { unmount } = render(<TagPill label="billing" />, {
-        wrapper: Wrapper,
-      });
+      const { unmount } = renderWithDesignSystem(<TagPill label="billing" />);
       const neutral = pillFor("billing").className;
       unmount();
 
-      render(<TagPill label="billing" tone="pastel" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagPill label="billing" tone="pastel" />);
 
       expect(pillFor("billing").className).not.toBe(neutral);
     });
 
     it("draws the label in the monospace face", () => {
-      render(<TagPill label="billing" tone="pastel" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagPill label="billing" tone="pastel" />);
 
       const rules = Array.from(document.styleSheets)
         .flatMap((sheet) => {
@@ -93,13 +83,11 @@ describe("<TagPill/> tone", () => {
 
   describe("given a list of tags", () => {
     it("passes the tone to every pill", () => {
-      const { unmount } = render(<TagList labels={["billing"]} tone="pastel" />, {
-        wrapper: Wrapper,
-      });
+      const { unmount } = renderWithDesignSystem(<TagList labels={["billing"]} tone="pastel" />);
       const pastel = pillFor("billing").className;
       unmount();
 
-      render(<TagList labels={["billing"]} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagList labels={["billing"]} />);
 
       expect(pillFor("billing").className).not.toBe(pastel);
     });

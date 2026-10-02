@@ -7,6 +7,7 @@ import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { personalWorkspaceFeaturesTrpc } from "@langwatch/organization-contract";
 
+import type { AnnotationScopeGraph } from "../model/annotation-personal-workspace.ts";
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
 /** The project every borrowed procedure is scoped to. */
@@ -37,22 +38,9 @@ type BorrowedProcedures = {
   };
 
   organization: {
-    /** The organization graph, narrowed to what this family reads; shares the shell's cache. */
-    getAll: {
-      query: {
-        input: { isDemo?: boolean };
-        output: {
-          id: string;
-          name: string;
-          teams: {
-            id: string;
-            name: string;
-            isPersonal?: boolean;
-            ownerUserId?: string | null;
-            projects: { id: string; name: string; slug: string }[];
-          }[];
-        }[];
-      };
+    /** The shell's scope skeleton, narrowed to what this family reads; shares its cache. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: AnnotationScopeGraph };
     };
 
     /** Who can be sent an annotation, for the participants picker. */

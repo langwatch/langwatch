@@ -58,6 +58,7 @@ func seedCatalogue(ctx context.Context, request catalogueRequest) []string {
 	var group sync.WaitGroup
 	group.Go(func() { warn("dashboards", seedDashboards(ctx, request)) })
 	group.Go(func() { warn("connected agents", seedConnectedAgents(ctx, request)) })
+	group.Go(func() { warn("langy model", seedLangyModel(ctx, request)) })
 	group.Go(func() {
 		session, err := signInSession(ctx, request)
 		if err != nil {
@@ -66,9 +67,43 @@ func seedCatalogue(ctx context.Context, request catalogueRequest) []string {
 		}
 		warn("workflows", seedNamedWorkflows(ctx, request, session))
 		warn("department", seedDepartment(ctx, session))
+		warn("annotation scores", seedAnnotationScores(ctx, session))
 	})
 	group.Wait()
 	return warnings
+}
+
+// SeedLangyModel is the custom chat model the project offers beside the registry's, the one
+// llmsim answers in its Langy echo mode, so the Langy flows can pick it in the model picker.
+const SeedLangyModel = "langy-echo"
+
+// SeedAnnotationScoreName is the score metric a fresh project lists, so a queue has a score
+// type to pick; the flows that make queues need one and a new project holds none.
+const SeedAnnotationScoreName = "Answer quality"
+
+// seedLangyModel adds the echo model to the project's OpenAI provider. The keys are left out
+// of the write, so the provider keeps answering with the process's own (llmsim's) credentials.
+func seedLangyModel(ctx context.Context, request catalogueRequest) error {
+	return post(ctx, request.client, postSpec{
+		url: request.apiURL + "/api/model-providers/openai", key: request.key, method: http.MethodPut,
+		body: map[string]any{"enabled": true, "customModels": []string{SeedLangyModel}},
+	})
+}
+
+// seedAnnotationScores makes the project's one score metric if it is not listed yet.
+func seedAnnotationScores(ctx context.Context, session *trpcSession) error {
+	listed, err := session.call(ctx, "annotationScore.getAll", map[string]any{"projectId": seededProjectID}, true)
+	if err != nil {
+		return err
+	}
+	if namedIDs(listed)[SeedAnnotationScoreName] != "" {
+		return nil
+	}
+	_, err = session.call(ctx, "annotationScore.upsert", map[string]any{
+		"projectId": seededProjectID, "name": SeedAnnotationScoreName, "dataType": "OPTION",
+		"description": "How good the answer was", "radioCheckboxOptions": []string{"Good", "Bad"},
+	}, false)
+	return err
 }
 
 // seedDashboards creates the named dashboards the project does not list yet, in order.

@@ -3,6 +3,8 @@ export {
   type AuthUsageCount,
   type BrowserSessionApi,
   type CliAccessSession,
+  cliAccessSessionSchema,
+  type CliSessionTokens,
   type CliTokenRecordEntry,
   type LegacySsoAccessQuery,
 } from "./auth.api.ts";
@@ -21,4 +23,6 @@ export { signInSecurityTrpc } from "./sign-in-security.trpc.ts";
 export * from "./session-bound.ts";
 export * from "./sso-matching.ts";
 export * from "./sso-path-gate.ts";
+export * from "./sso-test-sign-in.ts";
 export * from "./auth.config.ts";
+export * from "./auth-lifecycle.events.ts";

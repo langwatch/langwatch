@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LangyWorkerCredentials } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
 import type { ConversationDetail } from "../../rules/langy-conversation-shape.rules.ts";
@@ -39,6 +39,10 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     sessionKeys: createApiFixture(over.sessionKeys, "sessionKeys"),
     context: createApiFixture(over.context, "context"),
     uiActionSurface: createApiFixture(over.uiActionSurface, "uiActionSurface"),
+    skillGates: createApiFixture(
+      over.skillGates ?? { resolveDisabled: async () => [] },
+      "skillGates",
+    ),
     metrics: createApiFixture(over.metrics, "metrics"),
     admission: createApiFixture(over.admission, "admission"),
     accessStore: nullable(over.accessStore, "accessStore"),

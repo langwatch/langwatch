@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), capabilities vs components (browser-host vs design-system/kits), the kit law for sharing across modules, building a new browser module end to end (defineBrowserModule, screens, drawers, publications, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads session/navigation without importing the router or browser-host directly; publishing a component or hook for another module; deciding whether a browser-kit package is warranted; or writing/reviewing a component test."
+description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), capabilities vs components (browser-host vs design-system), where shared code goes now that kits are gone (record §3.4), building a new browser module end to end (defineBrowserModule, screens, drawers, publications, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads session/navigation without importing the router or browser-host directly; sharing a component, hook or data with another module (design system, contract, `<name>-client`); or writing/reviewing a component test."
 user-invocable: true
 argument-hint: "<question or frontend task>"
 ---
@@ -74,56 +74,37 @@ keep the caller's draft in a store that survives its own unmount. Full detail:
 
 `browser-host` is capabilities only — session, navigation, storage, feature
 flags, toasts, slots, drawers — the browser analogue of a process's closed
-members; it carries no component. Components live in `design-system` or in a
-kit. Read the `design-system` skill and the relevant
+members; it carries no component. Components live in `design-system`. Read the
+`design-system` skill and the relevant
 `dev/docs/best_practices/*.md` pattern doc before building any non-trivial
 screen, list, drawer or settings page — extend the existing pattern rather
 than inventing a new one.
 
-That is the shell-to-module direction. The reverse — a module's own
-capability implementation (fetching or not) that the **composition root**
-needs, e.g. `apps/ui/src/main.tsx` — is neither a kit (rule 3: a kit fetches
-nothing) nor a side-door export (§3.4 shuts that): it travels through the
-declaration's capability slot instead. The test is the consumer, not
-purity — many consumers means a kit; the composition root means the slot.
+The reverse direction — a module's own capability implementation that the
+**composition root** needs, e.g. `apps/ui/src/main.tsx` — is not a side-door
+export (§3.4 shuts that): it travels through the declaration's capability slot.
 
-## The kit law (record §3.4) — when a different module needs a piece of yours
+## No kits (record §3.4) — when a different module needs a piece of yours
 
-A module's `*-browser` package is **closed**: nothing else ever imports it,
-ever. The moment a _different_ module needs a hook, store or component this
-module owns, that thing **moves** (never copies) to a new package,
-`<name>-browser-kit` — sharing is declared by moving code, never observed by
-reaching in.
+A module's `*-browser` package is **closed**: nothing else imports it, ever.
+There are no kits and no shared browser packages. Where the piece goes:
 
-1. **A kit exists only where sharing is real — three consumers by default.**
-   One consumer is bilateral coupling, not an API: inline or duplicate it
-   instead. Two consumers mint a kit where the alternative is duplicating a
-   large shared surface (the `suite` case: 56 import lines across two
-   consumers) — the floor stops premature kits, not sharing that is plainly
-   already real.
-2. **A kit is a leaf.** It may import contracts (any module's),
-   `design-system`, `browser-host`. It may not import its own module's
-   `*-browser`, any other `*-browser`, or another kit.
-3. **A kit fetches nothing.** No project-scoped queries, no `browser-trpc`.
-   Presentational components and pure hooks/stores only; each consumer wires
-   its own data (the model-selector ruling: the kit takes
-   `options/value/onChange`, each consumer runs its own query).
-4. **A kit is a package, not a subpath** — a subpath is invisible to the
-   dependency graph and cannot be budgeted or break a cycle.
-5. **The published tier is shrink-only.** Don't publish speculatively hoping
-   for a second consumer; if unsure three consumers are real, leave the piece
-   private and say so.
+| The piece is                        | It goes to                                                      |
+| ----------------------------------- | --------------------------------------------------------------- |
+| repeated inside one module          | stays in that module                                            |
+| a component repeated across modules | `design-system`, taking props or a query result, never fetching |
+| pure domain logic                   | the owner's contract                                            |
+| a framework hook                    | `browser-host`                                                  |
+| another module's data               | that module's `<name>-client` (`modules/<name>/client`)         |
+| client state                        | the one global UI store, namespaced per module (§10.2)          |
 
-To publish: create `modules/<owner>/browser-kit/` as a normal workspace
-package (`@langwatch/<owner>-browser-kit`), move the piece in (delete the
-original, repoint the owner's own importers to the kit too — exactly one
-copy), give it a single `"."` entry in `package.json` `exports` (no
-subpaths — a kit is closed the same way an owner is; `surfaces/` was the
-deleted mechanism), and have the consumer add the workspace dependency and
-import it directly — no catalogue registration step.
-`architecture-enforcer lint` is what checks the kit law itself (closed
-`*-browser`, leaf-only imports, no fetching) — a violation there is the
-finding, not a judgement call.
+A `<name>-client` holds the hooks `createModuleApi` derives from its own
+contract and at most a few thin convenience hooks, never a component. It
+imports only its contract and `@langwatch/api/web`, never another client; a hook
+combining two modules lives in the screen that needs it. A component that
+fetches a peer's data or reads a `*HostApi` is lent by its owner's token and the
+consumer renders what it is handed. `architecture-enforcer lint` checks the
+boundaries; a violation there is the finding, not a judgement call.
 
 ## Creating a new browser module, end to end
 

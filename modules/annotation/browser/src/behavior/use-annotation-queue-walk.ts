@@ -19,7 +19,6 @@ export function useAnnotationQueueWalk({
     { projectId: project?.id ?? "", ...(queueItemId ? { queueItemId } : {}) },
     {
       enabled: !!project,
-      refetchOnWindowFocus: false,
       // The bar and the conversation keep the item they are on until the next
       // one arrives; anything acting on it waits for `stepIsStale` to clear.
       placeholderData: (previous) => previous,

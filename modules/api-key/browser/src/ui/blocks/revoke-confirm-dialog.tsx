@@ -1,8 +1,8 @@
 // Revoke key confirmation. Uses Design System Dialog (not platform ui/dialog wrapper).
 // Error boundary, trapFocus, preventScroll are platform-only differences.
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 /**
  * Confirmation modal for revoking an API key. Open when `apiKeyId` is non-null;

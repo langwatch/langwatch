@@ -1,7 +1,8 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 
 import { useLoadSpanIntoPromptPlayground } from "../../../behavior/use-load-span-into-prompt-studio.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useRestorePromptTabs } from "../../../behavior/use-restore-prompt-tabs.ts";
 import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser.tsx";
 import { MainContentEmptyState } from "./sidebar/main-content-empty-state.tsx";
 
@@ -16,6 +17,7 @@ export function PromptPlaygroundMainContent() {
    * doesn't mount and it won't load the span.
    */
   useLoadSpanIntoPromptPlayground();
+  useRestorePromptTabs();
   const hasNoTabs = useDraggableTabsBrowserStore(({ windows }) =>
     windows.every((w) => w.tabs.length === 0),
   );

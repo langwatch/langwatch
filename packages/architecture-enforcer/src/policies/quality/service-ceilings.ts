@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
@@ -45,8 +46,10 @@ const COMPLEXITY_SHORT_CIRCUIT = new Set([
   ts.SyntaxKind.QuestionQuestionToken,
 ]);
 
+const STRICT_SERVICE = new RegExp(`/process/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`);
+
 function isStrictService(path: string): boolean {
-  return /\/process\/src\/services\/.+\.service\.ts$/.test(path);
+  return STRICT_SERVICE.test(path);
 }
 
 const FUNCTION_LIKE_KINDS = new Set([

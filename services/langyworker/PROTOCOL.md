@@ -107,7 +107,8 @@ provider, a dropped stream, a network error, a 5xx or a 429) and is made again
 after `delayMs` (`model-retry.ts`). `attempt` counts retries from 1 up to
 `maxAttempts`. The failed assistant message is dropped and the same call is made
 against the conversation as it stands, so a tool call that already ran is never
-run again. `retry_settled` follows once a retried call answers. The manager shows
+run again. `retry_settled` follows once the retries end: a retried call answers,
+the last retry fails, or the turn is stopped during a wait. The manager shows
 the pair as the panel's status line ("Retrying (2 of 5)", then cleared). When the
 last retry fails, the turn ends with `turn_done` `error` as before.
 

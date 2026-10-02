@@ -5,14 +5,17 @@
  */
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +24,7 @@ import { NLP_LAMBDA_CLEANUP_PROCESS_NAME } from "../../eventing/workflow-nlp-lam
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type NlpLambdaArnCache, type NlpLambdaFleet } from "../workflow.app.ts";
+import { WorkflowModule, type NlpLambdaArnCache, type NlpLambdaFleet } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 /** Decrypts nothing a test named - the sweep never reaches it. */
@@ -39,10 +42,10 @@ class NoopTestEncryption {
  * The App reads nothing off a setup but its members, so a test builds the one
  * it cares about rather than booting a process to reach one method.
  */
-async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
+async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -56,10 +59,13 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
-      nurturing: createApiFixture<NurturingApi>({}, "NurturingApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       stagingThresholdBytes: undefined,
@@ -82,7 +88,7 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
 }
 
 /** Runs the sweep intent the daily wake asks for, as the worker's outbox would. */
-async function runSweep(app: WorkflowApp): Promise<void> {
+async function runSweep(app: WorkflowModule): Promise<void> {
   const process = app
     .nlpLambdaCleanupPipeline({ deleteDispatchedBefore: async () => 0 })
     .processManagers.get(NLP_LAMBDA_CLEANUP_PROCESS_NAME);

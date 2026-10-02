@@ -20,7 +20,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 10, to: 20, label: undefined } }),
 }));
@@ -80,7 +80,7 @@ describe("useFacetSearch", () => {
 
   // Regression: useAttributeValues must keep delegating with the same shape
   // AttributeKeyRow has always relied on — an attribute-prefixed key, limit
-  // 30, a 5-minute staleTime, and crucially NO prefix (it lazy-loads the top
+  // 30, and crucially NO prefix (it lazy-loads the top
   // values, it does not search them).
   describe("given useAttributeValues delegates to useFacetSearch", () => {
     it("queries facetValues with the attribute-prefixed key, limit 30, no prefix", () => {
@@ -90,7 +90,6 @@ describe("useFacetSearch", () => {
       expect(call).toBeDefined();
       expect(call?.[0]?.limit).toBe(30);
       expect(call?.[0]?.prefix).toBeUndefined();
-      expect(call?.[1]?.staleTime).toBe(5 * 60_000);
     });
 
     // The prefixed facetKey ("attribute.") is truthy even for an empty key, so

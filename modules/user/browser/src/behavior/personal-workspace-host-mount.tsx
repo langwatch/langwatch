@@ -184,9 +184,9 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     this.navigationCapability.navigate(to);
   }
 
-  /** No session-refresh capability exists; the honest reading does nothing. */
-  async refreshSession(): Promise<void> {
-    return void 0;
+  /** Re-reads the signed-in reader, so the chrome shows a new name or photo. */
+  refreshSession(): Promise<void> {
+    return this.session.refresh();
   }
 
   /** Where auth lent no passkey ceremonies, empty is the honest reading. */
@@ -275,7 +275,10 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = personalWorkspaceApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const graph = organizations.data ?? NO_ORGANIZATIONS;
 
   const organization = useMemo(
@@ -303,8 +306,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
           appBaseUrl: deployment.appBaseUrl,
           passkeysEnabled: deployment.passkeysEnabled ?? false,
           authProvider: deployment.authProvider,
-          // No capability carries this yet: main's EMAIL_PASSWORD_ENABLED is not ported.
-          emailPasswordEnabled: false,
+          emailPasswordEnabled: deployment.emailPasswordEnabled ?? false,
         },
         organization,
         project,
@@ -322,6 +324,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       deployment.appBaseUrl,
       deployment.passkeysEnabled,
       deployment.authProvider,
+      deployment.emailPasswordEnabled,
       organization,
       project,
       lent,

@@ -3,8 +3,8 @@
  * room it takes around the turn costs the layout nothing.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -72,20 +72,18 @@ function renderRow({
   railLayout = SIDE_LAYOUT,
   layout = "thread" as TurnLayout,
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotatedTurnRow
-        parsed={parsedTurn()}
-        index={1}
-        layout={layout}
-        isCurrent={false}
-        isFocused={isFocused}
-        isBlinking={isBlinking}
-        onSelectTurn={vi.fn()}
-        isRailActive={isRailActive}
-        railLayout={railLayout}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotatedTurnRow
+      parsed={parsedTurn()}
+      index={1}
+      layout={layout}
+      isCurrent={false}
+      isFocused={isFocused}
+      isBlinking={isBlinking}
+      onSelectTurn={vi.fn()}
+      isRailActive={isRailActive}
+      railLayout={railLayout}
+    />,
   );
 }
 

@@ -40,7 +40,7 @@ cat > "$TMPDIR/one-rule.json" <<EOF
   "rules": { "langwatch/<rule>": "error" }
 }
 EOF
-pnpm -s exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" \
+pnpm --silent exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" \
   apps packages sdks/typescript/src mcp/typescript/src | grep -c '<rule>'
 ```
 
@@ -136,9 +136,9 @@ threshold cannot yet be met honestly.
   # cold import of the whole plugin graph
   node -e "const t=performance.now();import('./packages/architecture-enforcer/oxlint-plugin.mjs').then(()=>console.log(\`\${(performance.now()-t).toFixed(0)} ms\`))"
   # one rule over the governed paths, before and after
-  time pnpm -s exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" apps packages
+  time pnpm --silent exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" apps packages
   # the whole config, one file (the fast edit loop, ~1 s)
-  time pnpm -s exec oxlint --disable-nested-config -c .oxlintrc.jsonc <file>
+  time pnpm --silent exec oxlint --disable-nested-config -c .oxlintrc.jsonc <file>
   ```
 
 `pnpm lint` takes a machine-wide slot, so run it once and never beside a typecheck.

@@ -12,9 +12,11 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationRetentionLookup } from "../../app/evaluation.members.ts";
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
-import type { EvaluationRunFloorLookup } from "../evaluation.repository.ts";
+import type {
+  EvaluationRunFloorLookup,
+  EvaluationRetentionLookup,
+} from "../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,
@@ -215,32 +217,6 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
-  }
-
-  /**
-   * One read for the whole organization, routed by its first project
-   * (gateway-spend-events precedent).
-   */
-  async countOrganizationRuns(input: { tenantIds: readonly string[] }): Promise<number> {
-    const tenantIds = [...new Set(input.tenantIds)];
-    const [routingTenant] = tenantIds;
-    if (routingTenant === undefined) return 0;
-    validateTenant(routingTenant, "EvaluationRunClickHouseReadRepository.countOrganizationRuns");
-    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
-    const client = await this.options.resolveClient(routingTenant);
-    const result = await client.query({
-      query: `
-        SELECT uniqExact(TenantId, EvaluationId) AS Total
-        FROM ${TABLE_NAME}
-        WHERE TenantId IN (${placeholders})
-      `,
-      query_params: Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
-      format: "JSONEachRow",
-      tenantIds,
-    });
-    const [row] = await result.json<{ Total: number | string }>();
-
-    return row ? Number(row.Total) : 0;
   }
 
   async findSummariesByTraceIds(input: {

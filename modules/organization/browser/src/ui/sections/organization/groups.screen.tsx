@@ -4,6 +4,9 @@
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
 
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Alert,
   Badge,
@@ -18,10 +21,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -34,12 +34,12 @@ import {
 import { useActivePlan } from "../../../behavior/use-active-plan.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { CreateGroupDialog } from "../../../ui/sections/create-group-dialog.tsx";
+import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
 import {
   roleBadgeColor,
   SourceBadge,
   scopeTypeLabel,
-} from "../../../ui/sections/group-binding-input-row.tsx";
-import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
+} from "../../../ui/sections/group-grant-input-row.tsx";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 
@@ -57,6 +57,7 @@ export default function GroupsScreen() {
     onSuccess: () => {
       toaster.create({ title: "Group deleted", type: "success" });
       void queryClient.group.listAll.invalidate();
+      void queryClient.organization.getDirectoryCounts.invalidate();
       setGroupToDelete(null);
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),
@@ -141,7 +142,7 @@ export default function GroupsScreen() {
                       </Table.Cell>
                       <Table.Cell>
                         <VStack gap={1} align="end">
-                          {g.bindings.map((b, i) => (
+                          {g.grants.map((b, i) => (
                             <HStack key={i} gap={1} fontSize="xs">
                               <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                                 {b.customRoleName ?? b.role}
@@ -152,7 +153,7 @@ export default function GroupsScreen() {
                               </Badge>
                             </HStack>
                           ))}
-                          {g.bindings.length === 0 && (
+                          {g.grants.length === 0 && (
                             <Text fontSize="xs" color="fg.subtle" textAlign="right">
                               No access configured
                             </Text>

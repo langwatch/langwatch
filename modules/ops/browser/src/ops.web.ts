@@ -4,9 +4,9 @@
  * (`?drawer.open=<name>`), under the names the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const opsWeb = defineWebModule("ops")
+export const opsWeb = defineBrowserModule("ops")
   .withHosts({
     requires: ["OpsHostApi", "CheckupHostApi"],
     mounts: {
@@ -75,6 +75,10 @@ export const opsWeb = defineWebModule("ops")
     "pages/ops/projections/[runId]": {
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-replay-progress.screen.tsx"),
+    },
+    "pages/ops/operators": {
+      requires: "ops:manage",
+      load: () => import("./ui/sections/ops/ops-operators.screen.tsx"),
     },
     "pages/ops/users": {
       requires: "ops:manage",
@@ -163,9 +167,14 @@ export const opsWeb = defineWebModule("ops")
           .OpsReplayDrawer,
       }),
     },
-    foundry: {
+    foundry: { load: () => import("./ui/sections/ops/ops-foundry-drawer.tsx") },
+  })
+  /** The header's impersonation banner, which the shell hands to navigation's headerBanner. */
+  .withCapabilities({
+    impersonationBanner: {
       load: async () => ({
-        default: (await import("./features/foundry/ui/sections/foundry-drawer.tsx")).FoundryDrawer,
+        default: (await import("./ui/sections/impersonation/impersonation-header-banner.tsx"))
+          .ImpersonationHeaderBanner,
       }),
     },
   });

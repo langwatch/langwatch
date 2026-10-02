@@ -3,13 +3,13 @@
  * application-owned AuthZ composition adapter); validation, failure
  * naming, and the offboarding proof stay in GrantsService.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   BindingMissingError,
   DuplicateBindingError,
   type GrantEventSource,
   type OffboardCounts,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
 
@@ -29,10 +29,10 @@ export type BindingPrincipalWhere =
 /** The row shape for a binding INSERT. The adapter spreads `principal` onto
  *  its three nullable columns; the union is the only place that mapping is
  *  allowed to reintroduce nulls. */
-export type RoleBindingWrite = {
+export type GrantWrite = {
   bindingId: string;
   organizationId: string;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   role: TeamUserRole;
   customRoleId: string | null;
@@ -52,7 +52,7 @@ export type { OffboardCounts };
 
 export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract createBinding(args: {
-    row: RoleBindingWrite;
+    row: GrantWrite;
     actor: LedgerActor;
     source?: GrantEventSource;
   }): Promise<void>;
@@ -60,7 +60,7 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract updateBindingRole(args: {
     bindingId: string;
     organizationId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void>;
@@ -88,11 +88,11 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract replaceBinding(args: {
     deleteWhere: {
       organizationId: string;
-      scopeType: RoleBindingWrite["scopeType"];
+      scopeType: GrantWrite["scopeType"];
       scopeId: string;
       principal: BindingPrincipalWhere;
     };
-    create: RoleBindingWrite;
+    create: GrantWrite;
     actor: LedgerActor;
   }): Promise<void>;
   /**

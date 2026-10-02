@@ -1,6 +1,6 @@
-import { Box, Flex, IconButton, Input } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, Flex, IconButton, Input, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
@@ -10,7 +10,6 @@ import {
   DEFAULT_THINKING_VERBS,
   useCyclingVerb,
 } from "../../../../behavior/explorer/ai/use-cycling-verb.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 
 const ICON_GRADIENT_ID = "ai-icon-gradient";

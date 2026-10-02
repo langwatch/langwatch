@@ -2,12 +2,11 @@ import type {
   AutomationPersistCapBreach,
   AutomationPersistCapDecision,
   TriggerSummary,
-  WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 
 // Port for trigger settlement; extracts the ten methods it needs from the full
-// AutomationService into three concerns: triggers + send claims, persist ceiling, webhook log.
+// AutomationService into two concerns: triggers + send claims, and the persist ceiling.
 export abstract class AutomationSettlementLedgerRepository {
   /** The project's active trace automations, as the settled digest re-reads them. */
   abstract findActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
@@ -46,9 +45,6 @@ export abstract class AutomationSettlementLedgerRepository {
     triggerId: string;
     emails: string[];
   }): Promise<string[]>;
-
-  /** One line in the delivery log a customer reads their webhook failures from. */
-  abstract recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void>;
 
   /** How many persist-class matches this project may write today. */
   abstract resolvePersistDailyCap(projectId: string): Promise<number>;

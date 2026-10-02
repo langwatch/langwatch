@@ -1,9 +1,9 @@
-import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
 
 import { useMermaidRenderer } from "../../../behavior/sequence/use-mermaid-renderer.ts";
@@ -294,13 +294,15 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
   } = useViewportZoom();
 
   // Auto-include "span" bucket on first load if default filter would be sparse.
-  useEffect(() => {
+  const [typesFrom, setTypesFrom] = useState<typeof spans | null>(null);
+  if (typesFrom !== spans) {
+    setTypesFrom(spans);
     setSelectedTypes((prev) => {
       if (prev.includes("span")) return prev;
       if (countParticipants(spans, new Set<string>(prev)) > 1) return prev;
       return [...prev, "span"];
     });
-  }, [spans]);
+  }
 
   const result = useMemo(
     () => diagramResult({ spans, selectedTypes, subMode, colorMode }),

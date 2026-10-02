@@ -4,9 +4,31 @@
  * has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { agentTrpc } from "@langwatch/agent-contract";
+import { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
+import { evaluationTrpc } from "@langwatch/evaluation-contract";
+import { evaluatorTrpc } from "@langwatch/evaluator-contract";
+import { experimentsTrpc } from "@langwatch/experiment-contract";
+import { opsDashboardTrpc } from "@langwatch/ops-contract";
+import { promptTrpc } from "@langwatch/prompt-contract";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const experimentWeb = defineWebModule("experiment")
+import { experimentApi } from "./behavior/experiment-api.ts";
+
+export const experimentWeb = defineBrowserModule("experiment")
+  .withApi(experimentApi, {
+    contracts: [
+      experimentsTrpc,
+      agentTrpc,
+      promptTrpc,
+      evaluatorTrpc,
+      evaluationTrpc,
+      datasetTrpc,
+      datasetRecordTrpc,
+      batchRecordTrpc,
+      opsDashboardTrpc,
+    ],
+  })
   // The replicate dialog reads workflow's port; workflow mounts it.
   .withHosts({ requires: ["WorkflowHostApi"] })
   .withScreens({

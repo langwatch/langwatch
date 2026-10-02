@@ -1,7 +1,7 @@
 /**
  * SpotlightOverlay — the Phase 2 contextual tour popover system.
  */
-import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";

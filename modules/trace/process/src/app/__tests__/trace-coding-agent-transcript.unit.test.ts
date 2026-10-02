@@ -1,5 +1,5 @@
 /**
- * TraceApp's transcript read for one viewer: protections first, then the shared read.
+ * TraceModule's transcript read for one viewer: protections first, then the shared read.
  * @see modules/trace/specs/trace-drawer-coding-agent-reads.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const CUTOFF_MS = 1_699_000_000_000;
 
-describe("TraceApp.readCodingAgentTranscript", () => {
+describe("TraceModule.readCodingAgentTranscript", () => {
   describe("given a viewer whose protections carry a plan visibility window", () => {
     /** @scenario "The transcript is redacted by the viewer's own protections" */
     it("resolves that viewer's protections and reads spans inside the window", async () => {

@@ -24,7 +24,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import type { WorkflowApi, WorkflowRunPrincipal } from "@langwatch/workflow-contract";
 
 import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
@@ -59,6 +59,7 @@ export type ConnectedCellExecutionInput = {
   loadedEvaluators?: LoadedEvaluators;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
+  principal?: WorkflowRunPrincipal | undefined;
 };
 
 export class ExperimentConnectedCellService {
@@ -351,6 +352,7 @@ export class ExperimentConnectedCellService {
       loadedEvaluators,
       resultMapperConfig,
       isAborted,
+      principal,
     } = input;
     if (cell.evaluatorConfigs.length === 0) {
       return;
@@ -372,6 +374,7 @@ export class ExperimentConnectedCellService {
       targetNodes: new Set([cell.targetId]),
       config: resultMapperConfig ?? {},
       isAborted,
+      principal,
     });
   }
 

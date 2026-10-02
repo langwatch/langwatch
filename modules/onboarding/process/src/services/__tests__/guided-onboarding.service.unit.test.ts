@@ -1,12 +1,12 @@
-/**
- * @see specs/features/onboarding/guided-onboarding-variant.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   GuidedOnboardingPathUnknownError,
   type GuidedOnboardingRecord,
 } from "@langwatch/onboarding-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+/**
+ * @see specs/features/onboarding/guided-onboarding-variant.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryPostHogEventsChannel } from "../../channels/memory/memory.posthog-events.channel.ts";

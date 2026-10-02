@@ -1,10 +1,10 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-contract/mapping-validation";
-import type { AvailableSource, FieldMapping } from "@langwatch/prompt-browser-kit";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
-import type { LlmConfigInputType } from "@langwatch/workflow-browser-kit";
+import type { AvailableSource, FieldMapping } from "@langwatch/workflow-contract";
 
 import { areFormValuesEqual } from "../../prompt-form.ts";
+import type { LlmConfigInputType } from "../workflow/types.ts";
 
 /** The unpublished changes an editor persists, read from its form values. */
 export const extractLocalConfig = (formValues: PromptConfigFormValues): LocalPromptConfig => ({

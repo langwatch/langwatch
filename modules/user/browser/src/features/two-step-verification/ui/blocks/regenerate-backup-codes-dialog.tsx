@@ -1,9 +1,9 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Asking for a fresh set of backup codes. The old ones stop working the moment
  * the new ones are issued, and the dialog says so: a printed list is now waste paper.
  */
-import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 export function RegenerateBackupCodesDialog({

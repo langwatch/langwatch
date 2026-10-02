@@ -1,4 +1,3 @@
-import { CONVERSATION_TURN_CAP } from "@langwatch/coding-agent-browser-kit";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment jsdom
@@ -6,6 +5,7 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CONVERSATION_TURN_CAP } from "../../../../../../model/coding-agent/trace/terminal-session-scrollback.ts";
 import { useSessionScrollback } from "../use-session-scrollback.ts";
 
 const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(() => {
@@ -128,10 +128,11 @@ describe("useSessionScrollback", () => {
           result.current.loadEarlier();
         });
 
-        expect(fetchTranscript).toHaveBeenCalledWith(
-          { projectId: "project-1", traceId: "turn-2", occurredAtMs: 2_000 },
-          { staleTime: 60_000 },
-        );
+        expect(fetchTranscript).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "turn-2",
+          occurredAtMs: 2_000,
+        });
       });
 
       it("prepends its entries above the opened turn, with a boundary between", async () => {
@@ -165,7 +166,6 @@ describe("useSessionScrollback", () => {
 
         expect(fetchTranscript).toHaveBeenLastCalledWith(
           expect.objectContaining({ traceId: "turn-1" }),
-          expect.anything(),
         );
         expect(result.current.status).toBe("start");
         expect(result.current.earlierCount).toBe(0);

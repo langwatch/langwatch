@@ -1,6 +1,6 @@
 /** Permission required notice with muted tone; not an error state. */
 
-import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 
 const TITLE = "You do not have access to this";

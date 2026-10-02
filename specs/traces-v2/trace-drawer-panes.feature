@@ -3,7 +3,7 @@
 # Implementation:
 #   modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-drawer-shell.tsx
 #   [gone] src/features/traces-v2/components/TraceDrawer/panes/*
-#   modules/trace/browser/src/drawer.store.ts (widthPx, paneState, layoutMode)
+#   modules/trace/browser/src/behavior/drawer-chrome.store.ts (widthPx, paneState, layoutMode)
 #
 # Motivation: the drawer was previously a single scroll container with a
 # fixed 45% / "maximized" toggle. Operators on laptops reported having to
@@ -28,12 +28,12 @@ Rule: Drawer width is fully draggable, not a binary toggle
 
   Scenario: Default width matches the previous overlay width
     When the drawer first opens with no persisted width
-    Then `drawerStore.widthPx` is `null`
+    Then `drawerChrome.widthPx` is `null`
     And `Drawer.Content` renders at approximately 45% of the viewport width
 
   Scenario: Drag the left-edge grip to resize the drawer
     When the user presses and drags the left-edge grip leftward by N pixels
-    Then `drawerStore.widthPx` updates to `currentWidth + N` on each pointermove
+    Then `drawerChrome.widthPx` updates to `currentWidth + N` on each pointermove
     And the drawer width follows the cursor
 
   Scenario: Width is clamped to a minimum

@@ -1,5 +1,5 @@
-import { Box, HStack, HoverCard, Portal, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { Box, HStack, HoverCard, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import type { TimeInput } from "@langwatch/time";
 import { toDate, toZonedDateTime } from "@langwatch/time";
 import type { ReactNode } from "react";

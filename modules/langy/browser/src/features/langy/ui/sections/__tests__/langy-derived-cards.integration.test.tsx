@@ -11,16 +11,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));

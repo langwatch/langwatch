@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@langwatch/design-system/primitives";
 
 /**
  * The border, the panel background and the quiet hover of the outlined button.

@@ -3,8 +3,8 @@
  * The lent panel mints and finishes through scenario's own tRPC procedures and reads a
  * refusal by its handled code. @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mintVoiceSession, finishVoiceSession, openCall } = vi.hoisted(() => ({
@@ -13,7 +13,11 @@ const { mintVoiceSession, finishVoiceSession, openCall } = vi.hoisted(() => ({
   openCall: vi.fn(),
 }));
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
-  api: {
+  api: {},
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     scenarios: {
       mintVoiceSession: { useMutation: () => ({ mutateAsync: mintVoiceSession }) },
       finishVoiceSession: { useMutation: () => ({ mutateAsync: finishVoiceSession }) },
@@ -31,10 +35,8 @@ import { LentTalkToItPanel } from "../wired-talk-to-it-panel.tsx";
 const KEY_MISSING = { code: "voice_key_missing", httpStatus: 422, fault: "customer" };
 
 function renderLent(transport: string) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <LentTalkToItPanel projectId="p1" projectSlug="proj" transport={transport} agentId="el_1" />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <LentTalkToItPanel projectId="p1" projectSlug="proj" transport={transport} agentId="el_1" />,
   );
 }
 

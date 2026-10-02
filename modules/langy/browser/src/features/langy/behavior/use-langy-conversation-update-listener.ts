@@ -1,9 +1,9 @@
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import {
   type LangyConversationUpdateSignal,
   langyConversationUpdateSignalSchema,
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/langy-api.ts";

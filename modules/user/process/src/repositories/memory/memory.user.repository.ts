@@ -29,6 +29,7 @@ import type {
   CreateCredentialUserRow,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
+  UserDeactivationOutcome,
   UserRepository,
 } from "../user.repository.ts";
 import { type MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.ts";
@@ -79,10 +80,10 @@ export class MemoryUserRepository implements UserRepository {
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
-  async findByEmail(email: string): Promise<UserProfile | null> {
-    const [row] = this.#database.usersWithEmail(email);
-
-    return row ? userProfileSchema.parse(profileOf(row)) : null;
+  async findByEmail(email: string): Promise<UserProfile[]> {
+    return this.#database
+      .usersWithEmail(email)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
@@ -255,6 +256,24 @@ export class MemoryUserRepository implements UserRepository {
   async setLastHomePath(input: { id: string; path: string | null }): Promise<void> {
     const row = this.#require(input.id);
     this.#database.writeUser({ ...row, lastHomePath: input.path });
+  }
+
+  async readClock(): Promise<Instant> {
+    return nowInstant();
+  }
+
+  async deactivateWhileOthersActive(input: {
+    id: string;
+    deactivatedAt: Instant;
+    others: readonly string[];
+  }): Promise<UserDeactivationOutcome> {
+    const active = this.#database.usersById(input.others).filter((row) => !row.deactivatedAt);
+    if (active.length === 0) return { outcome: "none_active" };
+
+    return {
+      outcome: "deactivated",
+      user: await this.setDeactivatedAt({ id: input.id, deactivatedAt: input.deactivatedAt }),
+    };
   }
 
   async setDeactivatedAt(input: {

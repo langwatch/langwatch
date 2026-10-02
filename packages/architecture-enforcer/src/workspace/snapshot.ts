@@ -18,12 +18,13 @@ import {
   type WorkspaceModuleResolver,
 } from "./module-graph.ts";
 
-const FEATURE_ROLES = new Set<FeaturePackageRole>([
+const FEATURE_ROLES: ReadonlySet<string> = new Set<FeaturePackageRole>([
   "contract",
   "process",
   "browser",
-  "browser-kit",
 ]);
+
+const isFeatureRole = (name: string): name is FeaturePackageRole => FEATURE_ROLES.has(name);
 
 const APPLICATION_PACKAGES: readonly {
   role: ApplicationPackageRole;
@@ -150,7 +151,7 @@ function checkFeatureRoot({
       policy: "feature-layout",
       file: featureManifest,
       message: "A feature ownership directory cannot itself be a package.",
-      allowed: "Put package.json inside contract, process, browser, or browser-kit.",
+      allowed: "Put package.json inside contract, process, browser, or a named library folder.",
     });
   }
 }
@@ -172,22 +173,11 @@ function discoverFeatureRoles({
     const manifestPath = join(featureRoot, roleName, "package.json");
     if (!existsSync(manifestPath)) continue;
 
-    if (!FEATURE_ROLES.has(roleName as FeaturePackageRole)) {
-      violations.push({
-        policy: "feature-layout",
-        file: manifestPath,
-        message: `Unknown feature package role "${roleName}".`,
-        allowed:
-          "Use contract, process, browser, or browser-kit; documentation belongs at the feature root.",
-      });
-
-      continue;
-    }
-
-    const role = roleName as FeaturePackageRole;
+    // Any other package folder is the module's portable library (ARCHITECTURE.md §3).
+    const role = isFeatureRole(roleName) ? roleName : "library";
     const manifest = readManifest(manifestPath);
 
-    const expectedName = featurePackageName({ feature, role, enterprise });
+    const expectedName = featurePackageName({ feature, role: roleName, enterprise });
 
     if (manifest.name !== expectedName) {
       violations.push({
@@ -199,7 +189,7 @@ function discoverFeatureRoles({
 
     packages.push({
       name: manifest.name ?? expectedName,
-      root: join(featureRoot, role),
+      root: join(featureRoot, roleName),
       manifestPath,
       manifest,
       kind: role,

@@ -1,4 +1,3 @@
-import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * The `project.*` procedures over the real runtime, one `ProjectApi` fake
@@ -66,8 +65,6 @@ function mount({
    */
   permits?: (permission: string) => boolean;
 } = {}) {
-  const provisionLangyVirtualKey = vi.fn(async () => {});
-  const recordApiKeyRegenerated = vi.fn(async () => {});
   const reportTopicClusteringFailure = vi.fn();
   const encryptProjectSecret = vi.fn((value: string) => `encrypted(${value})`);
   const probe = vi.fn(probePermission);
@@ -78,14 +75,17 @@ function mount({
     reportTopicClusteringFailure,
   });
 
+  const revokeProjectApiKey = vi.fn(
+    async (_input: { projectId: string; by: { id: string } }) => {},
+  );
+  const getLegacyKeyStatus = vi.fn(async (_input: { projectId: string }) => ({ present: true }));
   const browser: ProjectBrowserApi = {
     projects: () => application,
+    revokeProjectApiKey,
+    getLegacyKeyStatus,
     encryptProjectSecret,
     probePermission: probe,
     getFieldProtections: async () => fieldProtections,
-    provisionLangyVirtualKey,
-    recordApiKeyRegenerated,
-    getProject: (input) => requests.getProject(input),
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
     triggerTopicClustering: (input) => requests.triggerTopicClustering(input),
   };
@@ -99,10 +99,10 @@ function mount({
 
   return {
     router,
-    provisionLangyVirtualKey,
-    recordApiKeyRegenerated,
     reportTopicClusteringFailure,
     encryptProjectSecret,
+    revokeProjectApiKey,
+    getLegacyKeyStatus,
     probePermission: probe,
     caller: router.createCaller({ actor: { id: ACTOR_ID } }),
   };
@@ -118,8 +118,8 @@ describe("the project tRPC namespace", () => {
         "create",
         "getFieldRedactionStatus",
         "getHasFirstMessage",
-        "getProjectAPIKey",
-        "regenerateApiKey",
+        "getLegacyKeyStatus",
+        "revokeProjectApiKey",
         "triggerTopicClustering",
         "update",
       ]);
@@ -160,109 +160,50 @@ describe("the project tRPC namespace", () => {
     });
   });
 
-  describe("when the base key is read", () => {
-    it("refuses a project that does not exist as not found", async () => {
-      const { caller } = mount({ projects: { findById: async () => null } });
+  describe("when the legacy project key is revoked", () => {
+    /** @scenario A project manager revokes the legacy project key and is shown no key */
+    it("answers that it is revoked, carrying no key, and names the caller", async () => {
+      const { caller, revokeProjectApiKey } = mount();
 
-      await expectRefusal(caller.getProjectAPIKey({ projectId: "nope" }), {
-        code: "project_not_found",
-        httpStatus: 404,
+      await expect(caller.revokeProjectApiKey({ projectId: "project_123" })).resolves.toEqual({
+        revoked: true,
+      });
+      expect(revokeProjectApiKey).toHaveBeenCalledWith({
+        projectId: "project_123",
+        by: expect.objectContaining({ id: ACTOR_ID }),
       });
     });
 
-    /**
-     * The base key authenticates every ingestion call the project accepts, so
-     * revealing it is gated the same as rotating it. `project:update` is the
-     * contributor's permission, and it used to be enough.
-     *
-     * `@scenario "Permission is checked against the requested project"` — the
-     * project the answer is resolved AT is pinned by
-     * `project.trpc.declaration.unit.test.ts`; what these two pin is which
-     * permission that resolution asks for.
-     */
-    /** @scenario "Permission is checked against the requested project" */
-    it("refuses a caller who may update the project but not manage it", async () => {
-      const findById = vi.fn(async () => ({ apiKey: "sk-lw-base" }) as never);
-      const { caller } = mount({
-        projects: { findById },
+    /** @scenario A member who is not an admin cannot revoke the project key */
+    it("refuses a caller who may not manage the project, before anything is revoked", async () => {
+      const { caller, revokeProjectApiKey } = mount({
         permits: (permission) => permission !== "project:manage",
       });
 
-      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).rejects.toMatchObject({
+      await expect(caller.revokeProjectApiKey({ projectId: "project_123" })).rejects.toMatchObject({
         code: "FORBIDDEN",
       });
-      expect(findById).not.toHaveBeenCalled();
+      expect(revokeProjectApiKey).not.toHaveBeenCalled();
     });
 
-    it("answers the caller who may manage it", async () => {
-      const { caller } = mount({
-        projects: { findById: async () => ({ id: "project_123", apiKey: "sk-lw-base" }) as never },
-        permits: (permission) => permission === "project:manage",
+    /** @scenario A member who is not an admin cannot read the legacy key status */
+    it("refuses the status read to a caller who may not manage the project", async () => {
+      const { caller, getLegacyKeyStatus } = mount({
+        permits: (permission) => permission !== "project:manage",
       });
 
-      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).resolves.toMatchObject({
-        apiKey: "sk-lw-base",
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_123" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
       });
-    });
-  });
-
-  describe("when the project write key is rotated", () => {
-    /** @scenario "Rotation is recorded for audit" */
-    it("returns the new key and records the rotation", async () => {
-      const { caller, recordApiKeyRegenerated } = mount({
-        projects: { regenerateLegacyProjectKey: async () => "sk-lw-new" },
-      });
-
-      await expect(caller.regenerateApiKey({ projectId: "project_123" })).resolves.toEqual({
-        apiKey: "sk-lw-new",
-      });
-      expect(recordApiKeyRegenerated).toHaveBeenCalledWith({
-        userId: ACTOR_ID,
-        projectId: "project_123",
-      });
+      expect(getLegacyKeyStatus).not.toHaveBeenCalled();
     });
 
-    it("lets the credential's own not-found refusal through", async () => {
-      const { caller } = mount({
-        projects: {
-          regenerateLegacyProjectKey: async () => {
-            throw new ApiKeyNotFoundError("nonexistent_project");
-          },
-        },
-      });
+    it("answers whether a legacy key is present, and no key", async () => {
+      const { caller } = mount();
 
-      await expectRefusal(caller.regenerateApiKey({ projectId: "nonexistent_project" }), {
-        code: "api_key_not_found",
-        httpStatus: 404,
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_123" })).resolves.toEqual({
+        present: true,
       });
-    });
-
-    it("re-throws any other service failure", async () => {
-      const { caller } = mount({
-        projects: {
-          regenerateLegacyProjectKey: async () => {
-            throw new Error("Connection error");
-          },
-        },
-      });
-
-      await expect(caller.regenerateApiKey({ projectId: "project_123" })).rejects.toMatchObject({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Connection error",
-      });
-    });
-
-    it("does not record a rotation that never happened", async () => {
-      const { caller, recordApiKeyRegenerated } = mount({
-        projects: {
-          regenerateLegacyProjectKey: async () => {
-            throw new Error("Database connection failed");
-          },
-        },
-      });
-
-      await expect(caller.regenerateApiKey({ projectId: "project_123" })).rejects.toBeDefined();
-      expect(recordApiKeyRegenerated).not.toHaveBeenCalled();
     });
   });
 
@@ -290,6 +231,40 @@ describe("the project tRPC namespace", () => {
           s3Bucket: "bucket",
         }),
       );
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("leaves the stored secret alone when the form sends it blank beside an endpoint", async () => {
+      const update = vi.fn(async (_input: unknown) => ({ slug: "my-project" }) as never);
+      const { caller } = mount({ projects: { updateSettings: update } });
+
+      await caller.update({
+        projectId: "project_123",
+        s3Endpoint: "https://s3.example",
+        s3AccessKeyId: "AKIA",
+        s3SecretAccessKey: "",
+      });
+
+      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("s3SecretAccessKey");
+    });
+
+    /** @scenario Clearing the storage settings clears the stored secret */
+    it("clears the stored secret when the whole storage block is blank", async () => {
+      const update = vi.fn(async (_input: unknown) => ({ slug: "my-project" }) as never);
+      const { caller } = mount({ projects: { updateSettings: update } });
+
+      await caller.update({ projectId: "project_123", s3SecretAccessKey: "" });
+
+      expect(update.mock.calls[0]?.[0]).toHaveProperty("s3SecretAccessKey", null);
+    });
+
+    /** @scenario A storage secret needs an endpoint and a key id */
+    it("refuses a secret with no endpoint or key id", async () => {
+      const { caller } = mount();
+
+      await expect(
+        caller.update({ projectId: "project_123", s3SecretAccessKey: "shh" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
     it("refuses a half-filled stored-object credential set", async () => {
@@ -446,9 +421,9 @@ describe("the project tRPC namespace", () => {
   });
 
   describe("when a project is created", () => {
-    it("mints Langy's virtual key alongside it and returns the slug", async () => {
+    it("returns the slug", async () => {
       const create = vi.fn(async () => ({ id: "project_new", slug: "new-project" }) as never);
-      const { caller, provisionLangyVirtualKey } = mount({ projects: { create } });
+      const { caller } = mount({ projects: { create } });
 
       await expect(
         caller.create({
@@ -466,11 +441,6 @@ describe("the project tRPC namespace", () => {
         expect.objectContaining({ organizationId: "org-1" }),
         expect.objectContaining({ id: ACTOR_ID }),
       );
-      expect(provisionLangyVirtualKey).toHaveBeenCalledWith({
-        projectId: "project_new",
-        organizationId: "org-1",
-        actorUserId: ACTOR_ID,
-      });
     });
 
     /**

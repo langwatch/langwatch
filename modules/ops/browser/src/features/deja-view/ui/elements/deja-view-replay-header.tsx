@@ -1,4 +1,4 @@
-import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 export function ReplayHeader({

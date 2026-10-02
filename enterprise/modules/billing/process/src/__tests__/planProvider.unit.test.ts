@@ -14,16 +14,12 @@ import {
   SaaSPlanProviderService,
 } from "../services/plan-provider.service.ts";
 
-const mockEnv: {
-  IS_SAAS: boolean | undefined;
-  ADMIN_EMAILS: string | undefined;
-} = { IS_SAAS: false, ADMIN_EMAILS: undefined };
+const mockEnv: { IS_SAAS: boolean | undefined } = { IS_SAAS: false };
 
 const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProviderService =>
   SaaSPlanProviderService.create({
     subscriptions: PrismaBillingSubscriptionRepository.create(db),
     isSaas: mockEnv.IS_SAAS ?? false,
-    adminEmails: mockEnv.ADMIN_EMAILS,
   });
 
 const EPOCH = new Date(0);
@@ -111,7 +107,6 @@ describe("getFreePlanLimits", () => {
 describe("createSaaSPlanProvider", () => {
   beforeEach(() => {
     mockEnv.IS_SAAS = false;
-    mockEnv.ADMIN_EMAILS = undefined;
   });
 
   describe("when IS_SAAS is false", () => {
@@ -496,68 +491,11 @@ describe("createSaaSPlanProvider", () => {
       });
     });
   });
-
-  describe("when impersonator is admin", () => {
-    it("sets overrideAddingLimitations to true", async () => {
-      mockEnv.IS_SAAS = false;
-      mockEnv.ADMIN_EMAILS = "admin@example.com, other@example.com";
-
-      const { db } = createMockDb();
-      const provider = createSaaSPlanProvider(db);
-      const plan = await provider.getActivePlan("org_1", {
-        id: "user_1",
-        email: "user@example.com",
-        name: "User",
-        impersonator: {
-          email: "admin@example.com",
-        },
-      });
-
-      expect(plan.overrideAddingLimitations).toBe(true);
-    });
-
-    it("trims whitespace in admin email list", async () => {
-      mockEnv.IS_SAAS = false;
-      mockEnv.ADMIN_EMAILS = "  admin@example.com , other@example.com  ";
-
-      const { db } = createMockDb();
-      const provider = createSaaSPlanProvider(db);
-      const plan = await provider.getActivePlan("org_1", {
-        id: "user_1",
-        email: "user@example.com",
-        name: "User",
-        impersonator: {
-          email: "admin@example.com",
-        },
-      });
-
-      expect(plan.overrideAddingLimitations).toBe(true);
-    });
-
-    it("does not set overrideAddingLimitations when impersonator is not admin", async () => {
-      mockEnv.IS_SAAS = false;
-      mockEnv.ADMIN_EMAILS = "admin@example.com";
-
-      const { db } = createMockDb();
-      const provider = createSaaSPlanProvider(db);
-      const plan = await provider.getActivePlan("org_1", {
-        id: "user_1",
-        email: "user@example.com",
-        name: "User",
-        impersonator: {
-          email: "notadmin@example.com",
-        },
-      });
-
-      expect(plan.overrideAddingLimitations).toBe(false);
-    });
-  });
 });
 
 describe("createSaaSPlanProvider subscription selection", () => {
   beforeEach(() => {
     mockEnv.IS_SAAS = true;
-    mockEnv.ADMIN_EMAILS = undefined;
   });
 
   describe("given an organization holding more than one active subscription", () => {

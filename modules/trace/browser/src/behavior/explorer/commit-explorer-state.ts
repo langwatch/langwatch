@@ -1,5 +1,6 @@
-import { type ExplorerStore, useExplorerStore } from "@langwatch/trace-browser-kit";
 import type { ExplorerState } from "@langwatch/trace-contract";
+
+import { type ExplorerStore, useExplorerStore } from "../explorer.store.ts";
 
 /** The page state a transform reads, picked out of the store. */
 export function readExplorerState(

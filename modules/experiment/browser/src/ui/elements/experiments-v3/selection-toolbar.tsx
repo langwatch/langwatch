@@ -1,4 +1,4 @@
-import { Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import {
   DialogBody,
   DialogCloseTrigger,

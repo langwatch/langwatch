@@ -32,10 +32,6 @@ export class ApiKeyTokenService {
     };
   }
 
-  generateLegacyProjectKey(): string {
-    return `${API_KEY_PREFIX}${this.randomText(48)}`;
-  }
-
   verify(secret: string, hashedSecret: string): ApiKeySecretVerdict {
     return verifyApiKeySecret({ secret, hashedSecret, pepper: this.pepper });
   }

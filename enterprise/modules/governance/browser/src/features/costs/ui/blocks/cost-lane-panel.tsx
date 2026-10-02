@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type GovernanceSeatLane,
   type GovernanceSeatPool,
@@ -198,7 +198,7 @@ export function CostLanePanel({
  *
  * With nothing read yet the lane says so rather than showing a zero, and a
  * read that failed says THAT instead — the two are different sentences, and a
- * lane that offered only the first would send an admin looking for a licence
+ * lane that offered only the first would send an admin looking for a license
  * collection that already ran. Both copies must stay free of digits — no
  * counts, no dates, no wave numbers — or the digit-free assertion on the
  * non-reported states breaks, and that break is the point.
@@ -263,7 +263,7 @@ function SeatLaneWithoutCounts({ status }: { status: "awaiting_data" | "read_fai
           Seat data could not be read.
         </Text>
         <Text fontSize="sm" color="fg.muted">
-          The read of your seat licences failed, so the counts are missing rather than empty. They
+          The read of your seat licenses failed, so the counts are missing rather than empty. They
           appear here as soon as a read succeeds.
         </Text>
       </>
@@ -276,7 +276,7 @@ function SeatLaneWithoutCounts({ status }: { status: "awaiting_data" | "read_fai
       </Text>
       <Text fontSize="sm" color="fg.muted">
         How many seats are bought, and how many are assigned to someone, will appear here once seat
-        licences are collected.
+        licenses are collected.
       </Text>
     </>
   );

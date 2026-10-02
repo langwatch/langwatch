@@ -18,18 +18,9 @@ import {
   isCodeEvaluatorCheckType,
 } from "@langwatch/evaluator-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
-import type { Trace, TraceApi } from "@langwatch/trace-contract";
+import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import {
-  type EvaluationExecution,
-  type EvaluationExecutionTelemetry,
-  type EvaluationLangevals,
-  type EvaluationModelEnv,
-  type EvaluationSpanDigest,
-  type EvaluationTraceProtections,
-  type EvaluationWorkflowExecutor,
-} from "../app/evaluation.members.ts";
 import {
   maxCausalityDepthOfSpans,
   extractParentTraceForNlpgo,
@@ -39,9 +30,20 @@ import { evaluationRenderBudget } from "../rules/evaluation-render-budget.rules.
 import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
 import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";
+import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
+import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
+import type { EvaluatorModelEnvService } from "./evaluator-model-env.service.ts";
+import type { LangevalsEvaluatorService } from "./langevals-evaluator.service.ts";
+import type { WorkflowEvaluationService } from "./workflow-evaluation.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
-const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
+/** The three redactions a trace read honours. */
+type ReadProtections = Pick<
+  Protections,
+  "canSeeCosts" | "canSeeCapturedInput" | "canSeeCapturedOutput"
+>;
+
+const INTERNAL_PROTECTIONS: ReadProtections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
@@ -53,12 +55,12 @@ const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
 
 export interface EvaluationExecutionDeps {
   traces: Pick<TraceApi, "readTracesWithSpans" | "readEvaluations" | "readThreadsTraces">;
-  spanDigest: EvaluationSpanDigest;
-  modelEnvResolver: EvaluationModelEnv;
-  langevalsClient: EvaluationLangevals;
+  spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread">;
+  modelEnvResolver: Pick<EvaluatorModelEnvService, "resolveForEvaluator">;
+  langevalsClient: Pick<LangevalsEvaluatorService, "evaluate">;
   workflows: WorkflowApi;
   evaluators: EvaluatorApi;
-  workflowExecutor: EvaluationWorkflowExecutor;
+  workflowExecutor: Pick<WorkflowEvaluationService, "run">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -66,7 +68,7 @@ export interface EvaluationExecutionDeps {
    */
   installEnvironment: EvaluatorInstallEnvironment;
   /** Absent on a process that composes no metrics registry. */
-  telemetry?: EvaluationExecutionTelemetry;
+  telemetry?: Pick<EvaluationExecutionMetricsService, "record">;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +92,7 @@ type TraceEvaluationParams = {
   workflowId?: string | null;
   idempotencyKey?: string;
   /** The reader's redactions; a monitor or queued run reads with full access. */
-  protections?: EvaluationTraceProtections;
+  protections?: ReadProtections;
 };
 
 /** One trace scored, or the reason it was not, before either caller shapes it. */
@@ -107,7 +109,7 @@ type ScoredTrace =
 // Service
 // ---------------------------------------------------------------------------
 
-export class EvaluationExecutionService implements EvaluationExecution {
+export class EvaluationExecutionService {
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
     return new EvaluationExecutionService(deps);
   }
@@ -139,7 +141,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
     protections,
   }: {
     input: RunTraceEvaluationInput;
-    protections: EvaluationTraceProtections;
+    protections: ReadProtections;
   }): Promise<EvaluationRunOutcome> {
     const scored = await this.scoreTrace({
       ...input,
@@ -236,7 +238,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
     projectId: string;
     traceId: string;
     mappings: MappingState | null;
-    protections: EvaluationTraceProtections;
+    protections: ReadProtections;
   }): Promise<Trace> {
     const traces = await this.deps.traces.readTracesWithSpans({
       projectId,
@@ -270,6 +272,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
     settings?: Record<string, unknown>;
     workflowId?: string | null;
     idempotencyKey?: string;
+    signal?: AbortSignal | undefined;
   }): Promise<SingleEvaluationResult> {
     return this.runEvaluation(params);
   }
@@ -287,6 +290,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
     workflowId?: string | null;
     parentCausalityDepth?: number;
     idempotencyKey?: string;
+    signal?: AbortSignal | undefined;
   }): Promise<SingleEvaluationResult> {
     const {
       projectId,
@@ -297,6 +301,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
       workflowId,
       parentCausalityDepth,
       idempotencyKey,
+      signal,
     } = params;
 
     if (data.type === "custom") {
@@ -343,6 +348,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
       settings: settings ?? {},
       env: evaluatorEnv,
       idempotencyKey,
+      signal,
     });
 
     return this.deps.evaluators.augmentResult({

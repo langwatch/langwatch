@@ -1,6 +1,6 @@
 /** Audit pagination: page navigation showing count, position, and movement controls. */
 
-import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
+import { Button, Field, HStack, NativeSelect, Text } from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const AUDIT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250] as const;

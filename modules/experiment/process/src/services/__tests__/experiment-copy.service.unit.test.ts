@@ -67,7 +67,7 @@ class Datasets implements DatasetCopies {
 
 class Probe implements Permissions {
   constructor(private readonly allowed: boolean) {}
-  mayManageEvaluations(): Promise<boolean> {
+  hasPermission(): Promise<boolean> {
     return Promise.resolve(this.allowed);
   }
 }

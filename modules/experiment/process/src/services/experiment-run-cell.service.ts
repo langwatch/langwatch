@@ -176,6 +176,7 @@ export class ExperimentRunCellService {
     const executionCell = targetCellOf({ plan, cell });
     const loaded = await this.load({
       projectId: request.projectId,
+      userId: plan.actor?.userId ?? null,
       targets: [executionCell.targetConfig],
       evaluators: executionCell.evaluatorConfigs,
     });
@@ -220,6 +221,7 @@ export class ExperimentRunCellService {
     const progress = await this.getPhaseOneProgress(request);
     const loaded = await this.load({
       projectId: request.projectId,
+      userId: plan.actor?.userId ?? null,
       targets,
       evaluators: plan.evaluators,
     });
@@ -349,6 +351,7 @@ export class ExperimentRunCellService {
       loadedEvaluators: loaded.loadedEvaluators,
       resultMapperConfig,
       isAborted: () => this.isAborted(request),
+      ...(plan.actor?.userId ? { principal: { userId: plan.actor.userId } } : {}),
     };
 
     if (cell.targetConfig.type === "agent" && loadedData.agent?.type === "connected") {
@@ -477,10 +480,13 @@ export class ExperimentRunCellService {
   /** The run's targets a cell needs, as the run pinned them, and the key it lends their code. */
   private async load({
     projectId,
+    userId,
     targets,
     evaluators,
   }: {
     projectId: string;
+    /** Who started the run; the key lent to its code acts as them, or as the system. */
+    userId: string | null;
     targets: TargetConfig[];
     evaluators: { dbEvaluatorId?: string }[];
   }): Promise<LoadedCellRun | LoadFailure> {
@@ -510,6 +516,7 @@ export class ExperimentRunCellService {
     const sandboxApiKey = await sandboxKey.findRunSandboxApiKey({
       sandboxCredentials: this.collaborators.sandboxCredentials,
       projectId,
+      userId,
       loadedAgents,
       loadedWorkflows,
     });

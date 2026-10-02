@@ -6,27 +6,25 @@ import { describe, expect, it } from "vitest";
 
 import { redisRateLimiter } from "../src/redis-members.ts";
 
-/** The three commands the limiter issues, over a memory counter. */
+/** The script and the read the limiter issues, over a memory counter that keeps each expiry. */
 function memoryRedis() {
   const counters = new Map<string, number>();
   const expiries = new Map<string, number>();
+  const commands: string[] = [];
 
   const redis = {
-    incr: async (key: string): Promise<number> => {
+    eval: async (_script: string, _keys: number, key: string, seconds: number) => {
+      commands.push("eval");
       const used = (counters.get(key) ?? 0) + 1;
       counters.set(key, used);
+      if (!expiries.has(key)) expiries.set(key, seconds);
 
       return used;
-    },
-    expire: async (key: string, seconds: number): Promise<number> => {
-      expiries.set(key, seconds);
-
-      return 1;
     },
     ttl: async (key: string): Promise<number> => expiries.get(key) ?? -1,
   };
 
-  return { redis: redis as never, expiries };
+  return { redis: redis as never, counters, expiries, commands };
 }
 
 describe("given a limiter constructed with a window", () => {
@@ -82,6 +80,21 @@ describe("given a limiter constructed with a window", () => {
       const refused = await limiter.check("other");
 
       expect(refused.allowed).toBe(false);
+    });
+  });
+});
+
+describe("given a counter Redis holds", () => {
+  describe("when it is counted", () => {
+    /** @scenario "A rate-limit counter is never left without its expiry" */
+    it("counts and expires it in one command", async () => {
+      const { redis, commands, expiries } = memoryRedis();
+      const limiter = redisRateLimiter(redis, { requests: 2, seconds: 60 });
+
+      await limiter.check("caller-1");
+
+      expect(commands).toEqual(["eval"]);
+      expect(expiries.get("member:rate-limit:caller-1")).toBe(60);
     });
   });
 });

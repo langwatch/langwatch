@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type {
   ConnectStatus,
   LicenseStatus,
@@ -33,6 +34,7 @@ import type {
   RedisHealthRepository,
 } from "../repositories/datastore-health.repository.ts";
 import { checkupVerdictsOnly } from "../rules/checkup-audience.rules.ts";
+import { CANARY_KEY_PERMISSIONS } from "../rules/checkup-canary-key.rules.ts";
 import {
   type CheckupConnectView,
   type CheckupFacts,
@@ -75,6 +77,8 @@ export type OpsCheckupPeers = UsageReportPeers &
     storage: Pick<StoredObjectApi, "getStorageDestination" | "probeStorage">;
     lwql: Pick<AnalyticsApi, "findAppFunctionsProvisionable">;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
+    /** Mints the minimal system key each canary runs with. */
+    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   }>;
 
 export interface OpsCheckupDependencies {
@@ -248,6 +252,7 @@ export class OpsCheckupService {
         return {
           provider: view.provider,
           smtpConfigured: view.smtpConfigured,
+          smtpSendsCredentials: view.smtpSendsCredentials,
           verifySmtp: () => peers.mail.verifySmtp(),
         };
       },
@@ -270,10 +275,16 @@ export class OpsCheckupService {
           organizationId,
         });
         if (!project) return { status: 412, body: { message: "no project" } };
+        // A minimal key of the checkup's own, acting as the system: never the project's legacy key.
+        const token = await peers.apiKeys.mintRunKey({
+          userId: null,
+          projectId: project.id,
+          permissions: [...CANARY_KEY_PERMISSIONS[name]],
+        });
         const query = new URLSearchParams(params).toString();
         return channels.probes.get({
           url: `${members.publicBaseUrl ?? ""}/api/health/${name}${query ? `?${query}` : ""}`,
-          headers: { "X-Auth-Token": project.apiKey, "X-Project-Id": project.id },
+          headers: { "X-Auth-Token": token, "X-Project-Id": project.id },
           timeoutMs: CANARY_TIMEOUT_MS,
         });
       },
@@ -396,7 +407,7 @@ async function findOldestProjects({
 }: {
   projects: Pick<ProjectApi, "listByOrganization">;
   organizationId: string;
-}): Promise<{ id: string; apiKey: string }[]> {
+}): Promise<{ id: string }[]> {
   const page = await projects.listByOrganization({
     organizationId,
     page: 1,
@@ -406,7 +417,7 @@ async function findOldestProjects({
   return page.data
     .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
     .slice(0, 1)
-    .map((project) => ({ id: project.id, apiKey: project.apiKey }));
+    .map((project) => ({ id: project.id }));
 }
 
 function licenseView(status: LicenseStatus): CheckupLicenseView {

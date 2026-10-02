@@ -1,39 +1,48 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_PERMISSIONS, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import { ExperimentSandboxCredential } from "./experiment-run-sandbox-key.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-sandbox-credential");
 
 /**
- * The key a run lends the code it executes: the project's organization, then the shared or
- * freshly minted sandbox key. A run that cannot get one still runs, without the agent cache.
+ * The engine key's dispatch floor (workflow-run-key.rules.ts): a Lambda invocation's 900 s plus
+ * a minute back. It is the longer of the two floors, so a self-hosted engine's 15 minutes is
+ * covered too; this module cannot see which engine runs the cell.
+ */
+const SANDBOX_KEY_FLOOR_MS = 900 * 1000 + 60 * 1000;
+
+/**
+ * The key a run lends the code it executes: a per-run key for its starter (or the system)
+ * holding only the agent cache. A run that cannot get one still runs, without the agent cache.
  */
 export class ExperimentRunSandboxCredentialService extends ExperimentSandboxCredential {
   static create({
-    projects,
     apiKeys,
   }: {
-    projects: Pick<ProjectApi, "findOrganizationId">;
-    apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   }): ExperimentRunSandboxCredentialService {
-    return new ExperimentRunSandboxCredentialService(projects, apiKeys);
+    return new ExperimentRunSandboxCredentialService(apiKeys);
   }
 
-  private constructor(
-    private readonly projects: Pick<ProjectApi, "findOrganizationId">,
-    private readonly apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">,
-  ) {
+  private constructor(private readonly apiKeys: Pick<ApiKeyApi, "mintRunKey">) {
     super();
   }
 
-  async findRunKey({ projectId }: { projectId: string }): Promise<string | undefined> {
-    const organizationId = await this.projects.findOrganizationId(projectId);
-    if (!organizationId) return undefined;
-
+  async findRunKey({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId: string | null;
+  }): Promise<string | undefined> {
     try {
-      return await this.apiKeys.getOrMintAgentSandboxKey({ projectId, organizationId });
+      return await this.apiKeys.mintRunKey({
+        userId,
+        projectId,
+        permissions: [...AGENT_SANDBOX_PERMISSIONS],
+        minRemainingMs: SANDBOX_KEY_FLOOR_MS,
+      });
     } catch (error) {
       logger.warn(
         { projectId, error },

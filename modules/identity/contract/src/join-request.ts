@@ -1,6 +1,5 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
-
-import { identityActorSchema } from "./vocabulary.ts";
 
 /** Join-request vocabulary: states, events, and reducer for the request lifecycle. Isomorphic and
  * domain-only: requester address never appears, only domain and the admin/policy/invite decision.
@@ -84,14 +83,14 @@ export const joinRequestedPayloadSchema = z.object({
    *  request derives it from this event, so the handoff cannot be lost
    *  between the command and a service-side callback. */
   notifyAdmins: z.boolean().default(true),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;
 
 export const joinApprovedPayloadSchema = z.object({
   joinRequestId: z.string().min(1),
   resolvedBy: joinResolverSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type JoinApprovedPayload = z.infer<typeof joinApprovedPayloadSchema>;
 
@@ -100,20 +99,20 @@ export type JoinApprovedPayload = z.infer<typeof joinApprovedPayloadSchema>;
 export const joinRejectedPayloadSchema = z.object({
   joinRequestId: z.string().min(1),
   resolvedBy: joinResolverSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type JoinRejectedPayload = z.infer<typeof joinRejectedPayloadSchema>;
 
 export const joinExpiredPayloadSchema = z.object({
   joinRequestId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type JoinExpiredPayload = z.infer<typeof joinExpiredPayloadSchema>;
 
 export const joinWithdrawnPayloadSchema = z.object({
   joinRequestId: z.string().min(1),
   cause: joinWithdrawalCauseSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type JoinWithdrawnPayload = z.infer<typeof joinWithdrawnPayloadSchema>;
 

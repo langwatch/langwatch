@@ -1,4 +1,4 @@
-import { Button, Circle, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Button, Circle, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export const REMOVE_EVALUATOR_LABEL = "Remove evaluator";
@@ -37,6 +37,8 @@ export type EvaluatorEditorActionsProps = {
   hasUnsavedChanges: boolean;
   isSaving: boolean;
   isValid: boolean;
+  /** The form is still waiting on what it edits: nothing is saved or applied yet. */
+  isLoading?: boolean;
   isComparisonEditor?: boolean;
   saveButtonText?: string;
   onSave: () => void;
@@ -54,6 +56,7 @@ export function EvaluatorEditorActions({
   hasUnsavedChanges,
   isSaving,
   isValid,
+  isLoading = false,
   isComparisonEditor = false,
   saveButtonText,
   onSave,
@@ -81,7 +84,7 @@ export function EvaluatorEditorActions({
           variant="outline"
           size="sm"
           onClick={onSave}
-          disabled={!isValid || isSaving}
+          disabled={isLoading || !isValid || isSaving}
           loading={isSaving}
           data-testid="evaluator-save-button"
         >
@@ -91,7 +94,7 @@ export function EvaluatorEditorActions({
           colorPalette="blue"
           size="sm"
           onClick={onApply}
-          disabled={isComparisonEditor && (!isValid || isSaving)}
+          disabled={isLoading || (isComparisonEditor && (!isValid || isSaving))}
           data-testid="evaluator-apply-button"
         >
           Apply
@@ -109,7 +112,7 @@ export function EvaluatorEditorActions({
       <Button
         colorPalette="green"
         onClick={onSave}
-        disabled={!isValid || isSaving}
+        disabled={isLoading || !isValid || isSaving}
         loading={isSaving}
         data-testid="save-evaluator-button"
       >

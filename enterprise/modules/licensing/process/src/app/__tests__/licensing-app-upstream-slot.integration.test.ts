@@ -1,17 +1,17 @@
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
 /**
  * @vitest-environment node
  * @see specs/self-hosting/connected-services/managed-models-provider.feature
  * The production composition writes the install's hosted provider slot through the gateway peer.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
@@ -19,7 +19,7 @@ import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const RUN = `slot-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -38,7 +38,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
         data: { name: "Acme", slug: `${RUN}-acme`, license: VALID_LICENSE_KEY },
       });
       const cleared: string[] = [];
-      const app = await LicensingApp.create({
+      const app = await LicensingModule.create({
         dependencies: {
           instantEval: createApiFixture<InstantEvalApi>(),
           projects: createApiFixture<ProjectApi>(),

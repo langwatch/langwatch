@@ -12,7 +12,10 @@ export function downloadInBrowser(file: OrganizationDownload): void {
   anchor.href = url;
   anchor.download = file.fileName;
   document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  try {
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
 }

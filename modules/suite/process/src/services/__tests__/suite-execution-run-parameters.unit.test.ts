@@ -1,13 +1,13 @@
-/**
- * @vitest-environment node
- * @see specs/scenarios/scenario-run-parameters.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   resolveRunParameters,
   type QueueSimulationRunInput,
   type ScenarioApi,
 } from "@langwatch/scenario-contract";
+/**
+ * @vitest-environment node
+ * @see specs/scenarios/scenario-run-parameters.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { SuiteExecutionService } from "../suite-execution.service.ts";

@@ -1,4 +1,11 @@
-import { Box, Collapsible, HStack, IconButton, Table, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Collapsible,
+  HStack,
+  IconButton,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { ParkedTenant } from "@langwatch/ops-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";

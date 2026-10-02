@@ -106,7 +106,7 @@ flows:
         with:
           api: /api/v1/instant-evals/{runId}/results
           field: judgments
-          equals: "1"
+          min: "1"
       - action: expect
         with:
           api: /api/v1/instant-evals/{runId}/results

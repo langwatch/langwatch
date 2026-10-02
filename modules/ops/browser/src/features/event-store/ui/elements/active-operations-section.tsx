@@ -1,4 +1,12 @@
-import { Badge, Card, HStack, Spacer, Status, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Card,
+  HStack,
+  Spacer,
+  Status,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export interface OpsReplayStatus {

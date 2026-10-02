@@ -21,12 +21,10 @@ import type {
 } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
-import type {
-  EvaluationAzureSafetyCredentialsResolution,
-  EvaluationCostRecorder,
-  EvaluationExecutionReceipt,
-  ExecuteEvaluationCommandDeps,
-} from "../../app/evaluation.members.ts";
+import type { EvaluationAzureSafetyCredentialsResolution } from "../../services/azure-safety-credentials.service.ts";
+import type { EvaluationCostService } from "../../services/evaluation-cost.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "../../services/evaluation-execution-intent.service.ts";
+import type { EvaluationExecutionReceiptService } from "../../services/evaluation-execution-receipt.service.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},
@@ -169,7 +167,7 @@ export class TestEvaluationService {
   }
 }
 
-export class TestCostRecorder implements EvaluationCostRecorder {
+export class TestCostRecorder implements Pick<EvaluationCostService, "recordCost"> {
   readonly created = vi.fn();
   private readonly costs = new Map<string, string>();
 
@@ -196,7 +194,10 @@ export class TestCostRecorder implements EvaluationCostRecorder {
 }
 
 /** In-memory receipt boundary used to make redelivery observable in unit tests. */
-export class TestEvaluationExecutionReceipt implements EvaluationExecutionReceipt {
+export class TestEvaluationExecutionReceipt implements Pick<
+  EvaluationExecutionReceiptService,
+  "execute"
+> {
   readonly calls = vi.fn();
 
   async execute(input: {

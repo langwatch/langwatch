@@ -1,7 +1,7 @@
 import "../../model/ambient.d.ts";
-import { Alert, Box, Button, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
+import { Alert, Box, Button, Input, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

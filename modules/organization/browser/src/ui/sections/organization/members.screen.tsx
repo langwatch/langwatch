@@ -3,10 +3,19 @@
  * D12): three cuts of one list (specs/identity/directory-administration.feature).
  */
 
-import { Badge, Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
@@ -42,7 +51,7 @@ import { JoinRequestRow } from "../../../ui/blocks/join-requests-table.tsx";
 import { AutomaticJoinsNotice } from "../../../ui/elements/automatic-joins-notice.tsx";
 import { CopyInput } from "../../../ui/elements/copy-input.tsx";
 import { FilterChips } from "../../../ui/elements/filter-chips.tsx";
-import { IdentityChip, IdentityRow, IdentityRowList } from "../../../ui/elements/identity-row.tsx";
+import { IdentityChip, IdentityRowList } from "../../../ui/elements/identity-row.tsx";
 import { ProvenanceChip } from "../../../ui/elements/member-provenance.tsx";
 import { orgRoleOptions } from "../../../ui/elements/organization-user-role-field.tsx";
 import { SecondFactorCell } from "../../../ui/elements/second-factor-cell.tsx";
@@ -51,6 +60,7 @@ import { SettingsRowsSkeleton } from "../../../ui/elements/settings-rows-skeleto
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
 import { InviteRow } from "../../../ui/sections/invites-table.tsx";
 import { MemberSeatUsage } from "../../../ui/sections/member-seat-usage.tsx";
+import { PersonIdentityRow } from "../person-identity-row.tsx";
 
 /** The organization graph as the browser receives it: instants are ISO strings. */
 type OrganizationWithMembersAndTheirTeams =
@@ -412,7 +422,7 @@ function MemberListRow({
   onRequestRemoval: (target: RemovalTarget) => void;
 }) {
   return (
-    <IdentityRow
+    <PersonIdentityRow
       name={member.user.name}
       address={member.user.email}
       image={member.user.image}
@@ -780,6 +790,7 @@ function useMemberRemoval(organizationId: string) {
       .catch((error) => {
         reportUnexpected(error, tags);
       });
+    void queryClient.organization.getDirectoryCounts.invalidate();
     void queryClient.limits.getUsage.invalidate();
     void queryClient.licenseEnforcement.checkLimit.invalidate();
   };

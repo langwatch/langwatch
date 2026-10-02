@@ -1,11 +1,11 @@
-import { Button, chakra, HStack, Input, Stack, Text } from "@chakra-ui/react";
+import { Button, chakra, HStack, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   EVAL_COLUMN_FIELDS,
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";

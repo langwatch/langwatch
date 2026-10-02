@@ -34,7 +34,7 @@ touching git.
 apps/           ui (Vite SPA :5560) · api (tRPC+REST+SSE :6560) · worker (queues, projections,
                 subscribers) · tasks (migrations/backfills, run before serve) · server (npx CLI)
                 · scenario-child. An app is main.ts + config.ts; no product code.
-modules/<name>/ one feature: contract/ · process/ · browser/ · browser-kit/ (+ specs/, adrs/)
+modules/<name>/ one feature: contract/ · process/ · browser/ · client/ (+ specs/, adrs/)
 modules/catalogue.json   the one map of subject -> owning module
 enterprise/modules/      same shape, entitlement-gated at runtime
 packages/       framework only; feature code here is a defect
@@ -46,7 +46,7 @@ specs/  tools/ (thuishaven = haven)  mcp/typescript/  docs/ (public docs site)
 ui, api and worker always run together: a stack missing the worker serves pages
 and silently processes no jobs.
 
-Inside a module: `process/src/` holds `<name>.server.ts`, `app/`, `services/`,
+Inside a module: `process/src/` holds `<name>.module.ts`, `app/`, `services/`,
 `repositories/`, `channels/`, `eventing/`, `transport/`, `rules/`, `tasks/`,
 `migrations/`; `browser/src/` holds `model/` → `behavior/` → `ui/elements|blocks|sections`.
 The filename grammar is `packages/oxlint-rules/grammar/feature-layout-policy.mjs`.
@@ -120,7 +120,7 @@ Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the
 `haven logs api|ui|go -t`; add `--agent` when driving haven as an agent. Plain
 `pnpm dev` also works (ports derive from `PORT`, default 5560). Full reference,
 including the no-container setup: `dev/docs/LOCAL_STACK.md`; when it won't come
-up, the `haven-setup` skill.
+up, the `haven` skill (`troubleshooting.md`).
 
 `.env` lives at the workspace root. **Never read `.env` or print a secret**;
 values resolve through `@langwatch/secrets` (ADR-132) and `haven env` masks

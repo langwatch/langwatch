@@ -4,29 +4,14 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { create } from "zustand";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
+import { useRunPlanDialogStore } from "../../../../behavior/run-plan-dialog.store.ts";
+import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { storedPlanSubject } from "./plan-scope.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";
 import { RunDialog } from "./run-dialog.tsx";
-
-type RunPlanDialogStore = {
-  /** The stored plan the dialog is open on, "new" for one being written. */
-  openOn: { kind: "new" } | { kind: "plan"; suiteId: string } | null;
-  openNew: () => void;
-  openPlan: (suiteId: string) => void;
-  close: () => void;
-};
-
-const useRunPlanDialogStore = create<RunPlanDialogStore>((set) => ({
-  openOn: null,
-  openNew: () => set({ openOn: { kind: "new" } }),
-  openPlan: (suiteId) => set({ openOn: { kind: "plan", suiteId } }),
-  close: () => set({ openOn: null }),
-}));
 
 /** Opens the run dialog with the scope still to be chosen. */
 export function useOpenNewRunPlan(): () => void {
@@ -46,10 +31,7 @@ export function RunPlanDialogHost() {
   const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   const suiteId = openOn?.kind === "plan" ? openOn.suiteId : "";
-  const { data: suite } = api.suites.getById.useQuery(
-    { projectId, id: suiteId },
-    { enabled: !!projectId && !!suiteId },
-  );
+  const { data: suite } = useSuite({ projectId, id: suiteId });
 
   const subject = ((): RunDialogSubject | null => {
     if (!openOn) return null;

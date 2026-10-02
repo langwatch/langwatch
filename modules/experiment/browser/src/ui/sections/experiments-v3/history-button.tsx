@@ -1,13 +1,13 @@
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 /**
  * HistoryButton - Navigate to evaluation results
  */
-import { Button } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2 } from "react-feather";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 type HistoryButtonProps = {
@@ -25,7 +25,7 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
   }));
 
   // Check if there are any runs from previous sessions (only on page load)
-  const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+  const runsQuery = experimentApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
     {
       projectId: project?.id ?? "",
       experimentId: experimentId ?? "",

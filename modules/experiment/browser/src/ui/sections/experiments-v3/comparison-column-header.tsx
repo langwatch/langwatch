@@ -1,5 +1,12 @@
-import { Box, Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   computeComparisonAggregate,

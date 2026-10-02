@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 const fixture = (contract: string, router: string, body: string) => `import { z } from "zod";
 import { defineTrpcContract } from ${JSON.stringify(contract)};
 import { defineTrpcRouter } from ${JSON.stringify(router)};
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 
 interface AnnotationApi { read(input: { id: string }): Promise<{ id: string }> }
 const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
@@ -37,7 +37,7 @@ describe("binding a server to a contract", () => {
   /** @scenario "A hand-rolled procedure middleware cannot claim a permission check" */
   it("refuses an unknown name, a repeat, an omission, a missing or doubled decision, a hand-rolled check and a wrong answer", () => {
     const directory = mkdtempSync(join(process.cwd(), ".tmp-trpc-router-"));
-    const contract = join(process.cwd(), "src/contract/index.ts");
+    const contract = join(process.cwd(), "../module/src/index.ts");
     const router = join(process.cwd(), "src/trpc/runtime.ts");
     const path = join(directory, "refusals.ts");
 

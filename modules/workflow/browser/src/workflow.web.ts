@@ -3,9 +3,13 @@
  * Optimization Studio, and the workflow chat.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
+import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 
-export const workflowWeb = defineWebModule("workflow")
+import { workflowApi } from "./behavior/workflow-api.ts";
+
+export const workflowWeb = defineBrowserModule("workflow")
+  .withApi(workflowApi, { contracts: [workflowTrpc, workflowOptimizationTrpc] })
   .withHosts({
     requires: ["WorkflowHostApi"],
     mounts: { WorkflowHostApi: { load: () => import("./behavior/workflow-host-mount.tsx") } },

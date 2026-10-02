@@ -3,7 +3,7 @@
  * needs `annotations:update`. A correction quotes its trace, so the read
  * applies the same content gates the trace itself would.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";

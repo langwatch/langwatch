@@ -1,6 +1,6 @@
-import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   AVAILABLE_EVALUATORS,
   evaluatorDisplayName,

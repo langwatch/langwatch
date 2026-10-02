@@ -4,7 +4,6 @@
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import {
   PopoverAnchor,
@@ -13,6 +12,7 @@ import {
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 import type React from "react";
 

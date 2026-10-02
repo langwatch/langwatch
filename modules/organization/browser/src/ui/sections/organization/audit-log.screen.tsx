@@ -2,6 +2,10 @@
  * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
 
+import type { WireOf } from "@langwatch/api/web";
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Badge,
@@ -14,11 +18,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { WireOf } from "@langwatch/api/web";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
@@ -58,9 +58,6 @@ import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-foo
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
 
-/** The grant the plan read is gated on, matching what every plan reader asks. */
-const ORGANIZATION_VIEW_PERMISSION = "organization:view";
-
 function auditLogsView({
   isLoading,
   rowCount,
@@ -92,17 +89,10 @@ export default function AuditLogScreen() {
   );
   const [isExporting, setIsExporting] = useState(false);
 
-  const usage = organizationApi.limits.getUsage.useQuery(
-    { organizationId },
-    {
-      enabled: !!organizationId && host.hasPermission(ORGANIZATION_VIEW_PERMISSION),
-      retry: false,
-    },
-  );
-  const isEnterprise = usage.data?.activePlan.type === "ENTERPRISE";
+  const isEnterprise = host.isEnterprise();
 
   const members = organizationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: !!organizationId },
   );
   const searchUserId = matchMemberId(members.data?.members ?? [], userSearch);
@@ -125,7 +115,7 @@ export default function AuditLogScreen() {
 
   const utils = organizationApi.useUtils();
 
-  if (!organizationId || usage.isLoading) {
+  if (!organizationId || host.isPlanLoading()) {
     return <Skeleton width="full" height="200px" />;
   }
 

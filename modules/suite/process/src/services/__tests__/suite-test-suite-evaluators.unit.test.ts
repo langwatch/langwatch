@@ -2,7 +2,6 @@
  * @vitest-environment node
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
@@ -11,6 +10,7 @@ import type {
   ScenarioTestSuite,
   ScenarioTestSuiteUpdateInput,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";
@@ -111,6 +111,7 @@ beforeEach(() => {
 describe("a test suite's evaluators", () => {
   describe("when an edit attaches an evaluator the project does not hold", () => {
     /** @scenario "A test suite write refuses an evaluator the project does not hold" */
+    /** @scenario "An attachment naming an evaluator the project does not have is refused" */
     it("refuses with suite_evaluator_not_found and writes nothing", async () => {
       await expect(
         service.updateTestSuite({
@@ -138,7 +139,8 @@ describe("a test suite's evaluators", () => {
   });
 
   describe("when an edit attaches an evaluator the project holds", () => {
-    it("writes the edit", async () => {
+    /** @scenario "An evaluator is attached to a test suite with its mappings" */
+    it("writes the edit with the attachment and its mappings", async () => {
       await service.updateTestSuite({
         testSuiteId: "suite-1",
         projectId,
@@ -146,11 +148,13 @@ describe("a test suite's evaluators", () => {
       });
 
       expect(writes).toHaveLength(1);
+      expect(writes[0]?.evaluators).toEqual([attachment("evaluator-1")]);
     });
   });
 
   describe("when an edit drops a field an attached evaluator still reads", () => {
     /** @scenario "A test suite edit refuses dropping a field an attached evaluator still reads" */
+    /** @scenario "A field an evaluator reads cannot be removed" */
     it("refuses with suite_field_in_use", async () => {
       stored = testSuite({
         fields: [{ identifier: "golden", type: "text" }],

@@ -1,25 +1,27 @@
-import { Box, Button, Center, Flex, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-
-import "@xyflow/react/dist/style.css";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 import {
   useColorMode,
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
+
+import "@xyflow/react/dist/style.css";
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import {
-  ComponentIcon,
-  assertCrispChatHidden,
-  EmojiPickerModal,
-} from "@langwatch/workflow-browser-kit";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -48,6 +50,7 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
+import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
@@ -58,11 +61,14 @@ import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-p
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { isConnectionAllowed } from "../../../model/control-flow.ts";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
+import { DatasetImagePreviewTable } from "../../blocks/dataset/dataset-image-preview-table.tsx";
 import Head from "../../elements/compat/next-head.tsx";
-import { LogoIcon } from "../../elements/logo-icon.tsx";
+import { EvaluationProgressBar } from "../../elements/experiment/BatchEvaluationV2/evaluation-progress-bar.tsx";
+import { ComponentIcon } from "../../elements/workflow-icons.tsx";
 import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { WorkflowAutosave } from "../workflow-autosave.tsx";
@@ -88,6 +94,7 @@ import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
 import { Evaluate } from "./evaluate.tsx";
 import { History } from "./history.tsx";
 import { Optimize } from "./optimize.tsx";
+import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { useComponentExecution } from "./use-component-execution.ts";
@@ -515,15 +522,14 @@ function StudioWorkflowNodeSelectionPanel({
   const { handlePromptDragEnd } = usePromptPickerFlow();
   const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
   const { handleAgentDragEnd } = useAgentPickerFlow();
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefault = workflowApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
     { enabled: !!project?.id },
   );
-  const components = api.optimization.getComponents.useQuery(
+  const components = workflowApi.optimization.getComponents.useQuery(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id && !!workflowId,
-      refetchOnWindowFocus: true,
     },
   );
 
@@ -577,8 +583,8 @@ function StudioWorkflowNodeSelectionPanel({
 function StudioWorkflowAutosave() {
   const { project } = useOrganizationTeamProject();
   const { workflow } = useLoadWorkflow();
-  const autosave = api.workflow.autosave.useMutation();
-  const trpc = api.useUtils();
+  const autosave = workflowApi.workflow.autosave.useMutation();
+  const trpc = workflowApi.useUtils();
   const onSave = useCallback(
     ({ dsl, setAsLatestVersion }: { dsl: StudioWorkflow; setAsLatestVersion: boolean }) => {
       if (!project || !workflow.data) {

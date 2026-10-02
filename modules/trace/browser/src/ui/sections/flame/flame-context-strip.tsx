@@ -1,5 +1,5 @@
-import { Flex, HStack, Text } from "@chakra-ui/react";
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { Flex, HStack, Text } from "@langwatch/design-system/primitives";
 
 import { formatPercent } from "../../../behavior/flame/tree.ts";
 import type { FlameNode, SpanContext } from "../../../behavior/flame/types.ts";

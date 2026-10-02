@@ -1,7 +1,11 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -162,5 +166,70 @@ func TestStagedPayloadTestOnlyOrigin(t *testing.T) {
 				t.Errorf("expected %q rejected, got nil error", tc.url)
 			}
 		})
+	}
+}
+
+// sealForTest mirrors the control plane's layout: nonce, then ciphertext and tag.
+func sealForTest(t *testing.T, key, nonce, plain []byte) []byte {
+	t.Helper()
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(append([]byte{}, nonce...), gcm.Seal(nil, nonce, plain, nil)...)
+}
+
+// given a staged body sealed under a per-run key
+// when the engine reads it with the key from the invoke header
+// then the secret in the body round-trips, while the stored bytes never hold it.
+func TestReadStudioRequestBody_OpensASealedStagedBody(t *testing.T) {
+	const want = `{"workflow":{"secrets":{"PARTNER_TOKEN":"tok_live_123"}}}`
+	key := bytes.Repeat([]byte{7}, 32)
+	sealed := sealForTest(t, key, bytes.Repeat([]byte{1}, 12), []byte(want))
+	if bytes.Contains(sealed, []byte("tok_live_123")) {
+		t.Fatal("the sealed bytes still hold the secret")
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(sealed)
+	}))
+	defer srv.Close()
+	t.Setenv("ENVIRONMENT", "test")
+	t.Setenv(StagedPayloadTestOnlyOriginEnv, srv.URL)
+
+	r := httptest.NewRequest(http.MethodPost, "/go/studio/execute", nil)
+	r.Header.Set(StagedPayloadHeader, srv.URL+"/object")
+	r.Header.Set(StagedPayloadKeyHeader, base64.StdEncoding.EncodeToString(key))
+
+	got, err := readStudioRequestBody(r, srv.Client())
+	if err != nil {
+		t.Fatalf("expected the body to open, got %v", err)
+	}
+	if string(got) != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// given a sealed body, a wrong key and a tampered object
+// when the engine opens them
+// then each is refused rather than executed.
+func TestOpenStagedPayload_RefusesWrongKeyAndTampering(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	sealed := sealForTest(t, key, bytes.Repeat([]byte{1}, 12), []byte(`{"a":1}`))
+
+	other := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{9}, 32))
+	if _, err := openStagedPayload(sealed, other); err == nil {
+		t.Error("a wrong key must not open the body")
+	}
+	tampered := append([]byte{}, sealed...)
+	tampered[len(tampered)-1] ^= 0xff
+	if _, err := openStagedPayload(tampered, base64.StdEncoding.EncodeToString(key)); err == nil {
+		t.Error("a tampered body must not open")
+	}
+	if _, err := openStagedPayload(sealed, "not-a-key"); err == nil {
+		t.Error("a malformed key must be refused")
 	}
 }

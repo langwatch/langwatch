@@ -1,15 +1,17 @@
-import { Box } from "@chakra-ui/react";
-import { useProjectBySlugOrLatest, ActiveProjectProvider } from "@langwatch/onboarding-browser-kit";
+import { PROJECT_READ_PERMISSIONS, useMintPersonalToken } from "@langwatch/api-key-client";
+import { Box } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useProductFlow } from "../../behavior/use-product-flow.ts";
+import { useProjectBySlugOrLatest } from "../../behavior/use-project-by-slug-or-latest.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { LoadingScreen } from "../blocks/loading-screen.tsx";
 import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 import { ScreenLifecycle } from "../elements/screen-lifecycle.tsx";
+import { ActiveProjectProvider } from "./active-project-context.tsx";
 import { useCreateProductScreens } from "./create-product-screens.tsx";
 
 const PRODUCT_BOUNDARY = "onboarding_product";
@@ -20,14 +22,7 @@ export const ProductScreen: React.FC = () => {
     redirectToOnboarding: true,
   });
   const { project: resolvedProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
-  // The scope graph carries no credentials, so the key the setup screens print
-  // is asked of the host for the project this screen resolved.
   const host = useOnboardingHost();
-  const apiKey = resolvedProject ? host.revealProjectApiKey(resolvedProject.id) : void 0;
-  const activeProject = useMemo(
-    () => (resolvedProject && apiKey ? { ...resolvedProject, apiKey } : resolvedProject),
-    [resolvedProject, apiKey],
-  );
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -54,6 +49,18 @@ export const ProductScreen: React.FC = () => {
     [flow.visibleScreens, currentScreenIndex],
   );
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
+  const tokenScope = {
+    organizationId: organization?.id,
+    projectId: resolvedProject?.id,
+    userId: host.currentUser()?.id,
+  };
+  // Two tokens, each minted only on its own click: ingestion for `.env`, project reads for MCP.
+  const minting = useMintPersonalToken({ ...tokenScope, name: "Personal access token" });
+  const mcpMinting = useMintPersonalToken({
+    ...tokenScope,
+    name: "MCP access token",
+    permissions: PROJECT_READ_PERMISSIONS,
+  });
   if (!currentScreen) {
     return null;
   }
@@ -76,13 +83,21 @@ export const ProductScreen: React.FC = () => {
         skipHref={skipSlug ? `/${skipSlug}` : undefined}
       >
         <Box w="full">
-          <ActiveProjectProvider value={{ project: activeProject, organization }}>
+          <ActiveProjectProvider
+            value={{
+              project: resolvedProject,
+              organization,
+              freshToken: minting.token,
+              minting,
+              mcpMinting,
+            }}
+          >
             {!isLoading && currentScreen.component ? (
               <>
                 <ScreenLifecycle key={currentScreen.id} boundary={currentScreen.id} />
                 {/*
-                 * Kept ambient: `currentScreen.component` can be `ViaClaudeCodeScreen`,
-                 * reused by other modules through this context, not a `surface` prop.
+                 * Kept ambient: screens such as `ViaClaudeCodeScreen` read the project and
+                 * both mints from ActiveProjectContext, not from a `surface` prop.
                  */}
                 <AnalyticsBoundary name={currentScreen.id}>
                   <currentScreen.component surface={{ boundary: currentScreen.id }} />

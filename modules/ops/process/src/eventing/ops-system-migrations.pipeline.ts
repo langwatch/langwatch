@@ -10,7 +10,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { RequestSystemMigrationPassCommand } from "./ops-system-migrations.commands.ts";
 import {
@@ -52,7 +52,7 @@ export function buildSystemMigrations({
   processStore,
 }: EventingSetup<
   unknown,
-  Pick<OpsApp, "executeSystemMigrationPass">
+  Pick<OpsModule, "executeSystemMigrationPass">
 >): SystemMigrationsPipelineDefinition {
   return definePipeline({
     name: SYSTEM_MIGRATIONS_PIPELINE_NAME,
@@ -89,6 +89,6 @@ export function buildSystemMigrations({
 /** Passive in the api, which only sends the kick; the worker wakes and runs the passes. */
 export const systemMigrationsEventing = defineEventingModule({
   pipeline: SYSTEM_MIGRATIONS_PIPELINE_NAME,
-  build: (setup: EventingSetup<OpsRepositories, OpsApp>) => buildSystemMigrations(setup),
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildSystemMigrations(setup),
   connect: ({ app, commands }) => app.connectSystemMigrationCommands(commands),
 });

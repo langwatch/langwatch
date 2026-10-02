@@ -1,3 +1,5 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -12,9 +14,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

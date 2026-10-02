@@ -139,6 +139,8 @@ export const simulationRunFinishedEventDataSchema = z.object({
   organizationAdmin: z
     .object({ userId: z.string(), onboardingVariant: onboardingVariantSchema.nullish() })
     .optional(),
+  /** When the run finished, for peers that read only the data (§9); absent on older events. */
+  occurredAt: z.number().int().nonnegative().optional(),
 });
 export type SimulationRunFinishedEventData = z.infer<typeof simulationRunFinishedEventDataSchema>;
 

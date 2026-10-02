@@ -1,3 +1,5 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -11,9 +13,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
 import { MoreVertical, Pencil } from "lucide-react";
@@ -34,7 +34,6 @@ interface AdminProject {
   id: string;
   name: string;
   slug: string;
-  apiKey: string;
   teamId: string;
   language: string | null;
   framework: string | null;
@@ -381,9 +380,6 @@ function ProjectEditDrawer({
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
                   Team: {project.teamId}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  API key: {project.apiKey}
                 </Text>
                 {project.archivedAt && (
                   <Text fontSize="xs" color="fg.muted">

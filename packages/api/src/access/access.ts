@@ -4,19 +4,14 @@
  * guard, the blank-scope-id refusal and the project-id mismatch refusal.
  */
 
-// The permission and declaration vocabularies are `@langwatch/authz-contract`'s;
-// nothing here mirrors them.
-import type { Actor } from "@langwatch/actor";
+// The permission vocabulary is `@langwatch/authorization`'s; nothing here mirrors it.
+import type { Actor } from "@langwatch/authorization";
 import {
-  AUTHZ_DECLARATION,
   BlankScopeIdError,
-  declareAuthzMiddleware,
   permissionGrantTiers,
   PermissionDeniedError,
-  resolveDeclaredScope,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
-  type AuthzDeclaration,
   type AuthzDeclaredScopeId,
   type AuthzDenialReason,
   type AuthzGetDecisionInput,
@@ -24,14 +19,19 @@ import {
   type AuthzPermission,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
-  type BindingScopeTier,
-  type DeclaredScopeId,
+  type DeclaredScopeTier,
   type PermissionDecision,
   type ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 
 import { EnterprisePlanRequiredError, ScopeInputMismatchError } from "../errors.ts";
+import { resolveDeclaredScope } from "./declaration.ts";
+import {
+  AUTHZ_DECLARATION,
+  declareAuthzMiddleware,
+  type AuthzDeclaration,
+} from "./declared-middleware.ts";
 
 const logger = createLogger("langwatch:authz");
 
@@ -69,8 +69,8 @@ export function declareAccessMiddleware<M extends (params: never) => Promise<unk
  */
 export function sharedGrantTiers(
   permissions: readonly AuthzPermission[],
-): readonly BindingScopeTier[] {
-  return permissions.reduce<readonly BindingScopeTier[]>(
+): readonly DeclaredScopeTier[] {
+  return permissions.reduce<readonly DeclaredScopeTier[]>(
     (shared, permission) =>
       shared.filter((tier) => permissionGrantTiers(permission).includes(tier)),
     permissions[0] ? permissionGrantTiers(permissions[0]) : [],
@@ -82,12 +82,12 @@ export type Credential =
   | "browser"
   | "project"
   | "organization"
-  | "apiKey"
-  | "scimToken"
-  | "internalSecret"
-  | "instance-admin"
-  | "sessionKey"
-  | "cliToken"
+  | "api_key"
+  | "scim_token"
+  | "internal_secret"
+  | "instance_admin"
+  | "session_key"
+  | "cli_token"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -204,7 +204,7 @@ export function routeScopeOf({
 }: {
   param: ScopeTierField;
   input: unknown;
-}): DeclaredScopeId {
+}): AuthzDeclaredScopeId {
   const named =
     typeof input === "object" && input !== null
       ? (input as Record<string, unknown>)[param]
@@ -235,7 +235,7 @@ export function assertRouteScopePermission({
   denials,
 }: {
   permission: AuthzGetDecisionInput["permission"];
-  target: DeclaredScopeId;
+  target: AuthzDeclaredScopeId;
   decision: PermissionDecision;
   denials?: AccessDenial;
 }): void {
@@ -317,22 +317,22 @@ export async function decide({
 export function securityRequirement(credential: Credential): readonly Record<string, never[]>[] {
   switch (credential) {
     case "project":
-    case "apiKey":
-    case "sessionKey":
+    case "api_key":
+    case "session_key":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];
-    case "scimToken":
+    case "scim_token":
       return [{ scim_bearer: [] }];
-    case "cliToken":
+    case "cli_token":
       return [{ cli_access_token: [] }];
     // A deployment secret is held by an operator's own monitor rather than by
     // us, so it has a scheme for the same reason the SCIM token does.
-    case "internalSecret":
+    case "internal_secret":
       return [{ internal_secret: [] }];
     // The self-hosted operator's own key. It creates the first organization,
     // before any organization key exists to be presented instead.
-    case "instance-admin":
+    case "instance_admin":
       return [{ instance_admin_key: [] }];
     case "public":
       return [];
@@ -455,22 +455,40 @@ async function decidePermissionAll({
  */
 export type ApiEntitlement = "enterprise";
 
+/** One declared plan question: the entitlement, the capability a refusal names, and when to ask. */
+export type EntitlementGate = Readonly<{
+  entitlement: ApiEntitlement;
+  /** Named on the refusal's `meta.feature`, as main names the capability. */
+  feature?: string;
+  /** Asked only for an input this holds for; absent, every call asks. */
+  when?: (input: unknown) => boolean;
+}>;
+
+export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;
+
 /** Whether one tenant holds one entitlement, as the process reads its plans. */
 export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
+  /** The process's own refusal for the capability; the framework's when absent. */
+  refusal?(input: { feature: string | undefined }): Error;
 }
 
 export async function decideEntitlement({
-  entitlement,
+  gate,
   scope,
+  input,
   entitlements,
   address,
 }: {
-  entitlement: ApiEntitlement;
+  gate: EntitlementGate;
   scope: AuthzDeclaredScopeId | null;
+  input: unknown;
   entitlements: Entitlements;
   address: string;
 }): Promise<void> {
+  if (gate.when && !gate.when(input)) return;
+
+  const { entitlement, feature } = gate;
   if (!scope) {
     throw new Error(
       `${address} asks whether its tenant holds "${entitlement}", and access resolved no scope ` +
@@ -480,7 +498,7 @@ export async function decideEntitlement({
 
   if (await entitlements.holds({ entitlement, scope })) return;
 
-  throw new EnterprisePlanRequiredError();
+  throw entitlements.refusal?.({ feature }) ?? new EnterprisePlanRequiredError(feature);
 }
 
 /**
@@ -583,7 +601,7 @@ function requireDeclaredScope({
   permission: AuthzGetDecisionInput["permission"];
   input: unknown;
   via?: ScopeTierField;
-}): DeclaredScopeId {
+}): AuthzDeclaredScopeId {
   const resolution = resolveDeclaredScope({
     permission,
     input: (typeof input === "object" && input !== null ? input : {}) as Partial<
@@ -617,7 +635,7 @@ function denied({
   denials,
 }: {
   permission: AuthzGetDecisionInput["permission"];
-  scope: DeclaredScopeId;
+  scope: AuthzDeclaredScopeId;
   decision: PermissionDecision;
   denials?: AccessDenial;
 }): Error {
@@ -656,4 +674,29 @@ function declaredPermissionOf(declaration: AccessDeclaration): string {
     case "no-permission":
       return "";
   }
+}
+
+/**
+ * A credential minted while an operator acts as the user would outlive the session it came
+ * from, so an endpoint declared as minting one is refused for such an actor. With no resolved
+ * scope the refusal names the endpoint as the resource.
+ */
+export function refuseImpersonatedMint({
+  permission,
+  actor,
+  scope,
+  address,
+}: {
+  permission: AuthzPermission;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  address: string;
+}): void {
+  if (actor?.type !== "user" || !actor.impersonatorId) return;
+
+  throw new PermissionDeniedError({
+    permission,
+    scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: address },
+    denialReason: "no-binding",
+  });
 }

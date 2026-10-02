@@ -1,3 +1,9 @@
+import type {
+  BillingUsageLimitOrganization,
+  ResourceLimitNotificationContext,
+  ResourceLimitNotifierInput,
+} from "@langwatch/enterprise-billing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 /**
  * @vitest-environment node
  *
@@ -5,13 +11,7 @@
  * and limit a day, on LangWatch Cloud only, never thrown.
  * @see specs/licensing/resource-limit-notifications.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  BillingUsageLimitOrganization,
-  ResourceLimitNotificationContext,
-  ResourceLimitNotifierInput,
-} from "@langwatch/enterprise-billing-contract";
-import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BillingAlertCooldownService } from "../billing-alert-cooldown.service.ts";

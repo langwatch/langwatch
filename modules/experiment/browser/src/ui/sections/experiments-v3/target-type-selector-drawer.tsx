@@ -2,9 +2,9 @@
  * `targetTypeSelector`: the picker that adds a column to an evaluation.
  */
 
-import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 

@@ -1,4 +1,13 @@
-import { Badge, Box, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Card,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import type { ReactNode } from "react";

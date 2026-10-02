@@ -1,5 +1,4 @@
-import { Box } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import { Box, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import React from "react";
 

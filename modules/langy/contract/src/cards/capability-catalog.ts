@@ -217,10 +217,17 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dashboard widget", plural: "dashboard widgets" },
   },
+  // `langwatch trigger` is the CLI's word; the product's is automation.
   trigger: {
     surface: "automations",
     digestStrategy: "id-ref",
-    noun: { singular: "trigger", plural: "triggers" },
+    noun: { singular: "automation", plural: "automations" },
+  },
+  // Read-only for Langy; the list never carries a secret.
+  "slack-connection": {
+    surface: "automations",
+    digestStrategy: "reduced",
+    noun: { singular: "Slack connection", plural: "Slack connections" },
   },
   projects: {
     surface: "projects",
@@ -346,6 +353,12 @@ export const CAPABILITY_CATALOG = {
     surface: "organization",
     digestStrategy: "id-ref",
     noun: { singular: "role binding", plural: "role bindings" },
+    icon: "shieldCheck",
+  },
+  grants: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "grant", plural: "grants" },
     icon: "shieldCheck",
   },
   "scim-tokens": {

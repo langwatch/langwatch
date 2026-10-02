@@ -1,3 +1,4 @@
+import { ProjectInvalidCredentialsError } from "@langwatch/api";
 import {
   ApiKeyScopeViolationError,
   cliKeyManagementPermissions,
@@ -26,7 +27,8 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 import type * as zodModule from "zod";
 
-import type { AuthDirectory } from "../app/auth.members.ts";
+import type { AuthDirectory, AuthDirectoryProject } from "../app/auth.members.ts";
+import type { CliAccessProject } from "./api-rest-credentials.service.ts";
 import {
   type CliDeviceApprovalFrame,
   CliDeviceApprovalService,
@@ -37,6 +39,8 @@ import {
   type CliClientInfo,
   type CliDeviceCodeRecord,
   type CliDeviceSessionService,
+  type CliRefreshTokenRecord,
+  type CliMintedSession,
 } from "./cli-device-session.service.ts";
 
 /** The CLI device grant (RFC 8628). @see specs/ai-governance/cli-onboarding/ */
@@ -47,10 +51,10 @@ const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 /** The flag that gates the device-session journey. */
 const GOVERNANCE_RELEASE_FLAG: FeatureFlagKey = "release_ui_ai_governance_enabled";
 
-/** The personal workspace a device session ships the key of. */
+/** The personal workspace a device session names. */
 export type CliPersonalWorkspace = Readonly<{
   team: Readonly<{ id: string }>;
-  project: Readonly<{ id: string; slug: string; name: string; apiKey: string }>;
+  project: Readonly<{ id: string; slug: string; name: string }>;
 }>;
 
 /** Who is signed in, as this process resolves a browser session. */
@@ -100,8 +104,8 @@ export interface CliDeviceFlowCollaborators {
     displayName?: string | null;
     displayEmail?: string | null;
   }) => Promise<CliPersonalWorkspace>;
-  /** Checks the `project:manage` gate for a shared project's base key. */
-  canManageProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
+  /** Whether the person holds `project:view` there: the bar a project session is bound at. */
+  canViewProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
   /** This deployment's flag store, for the device journey's rollout gate. */
   featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
   /** The deployment's public origin, or none. */
@@ -136,6 +140,23 @@ export class CliDeviceFlowService {
 
   refreshSession({ raw }: { raw: string }): Promise<CliDeviceFlowAnswer> {
     return refresh({ flow: this.#flow, raw });
+  }
+
+  rotateSession({ refreshToken }: { refreshToken: string }): Promise<CliRotatedSession> {
+    return rotateRefreshToken({ flow: this.#flow, refreshToken });
+  }
+
+  issueProjectSession(input: {
+    userId: string;
+    organizationId: string;
+    projectId: string;
+    clientLabel: string;
+  }): Promise<CliMintedSession> {
+    return issueLockedProjectSession({ flow: this.#flow, ...input });
+  }
+
+  getAccessProject({ authorization }: { authorization: string }): Promise<CliAccessProject> {
+    return accessProjectOf({ flow: this.#flow, authorization });
   }
 
   lookupDeviceCode(input: CliDeviceCodeLookup): Promise<CliDeviceFlowAnswer> {
@@ -265,7 +286,14 @@ async function exchange({
   const endpoint = controlPlaneBaseUrlOf(flow);
 
   if ((record.credential_type ?? "device_session") === "project_api_key") {
-    return projectKeyAnswer({ flow, record, user, organization, endpoint });
+    return projectSessionAnswer({
+      flow,
+      record,
+      user,
+      organization,
+      endpoint,
+      clientInfo: parsed.data.client_info,
+    });
   }
 
   const personalProject = await personalProjectFieldsOf({ flow, user, organization });
@@ -359,70 +387,77 @@ async function assertExchangeable({
   throw refused("server_error", "Unknown device code state", 500);
 }
 
-/** Returns the picked project's existing key after re-reading access and state. */
-async function projectKeyAnswer({
+/** Binds a session to the picked project after re-reading access and state. Hands out no key. */
+async function projectSessionAnswer({
   flow,
   record,
   user,
   organization,
   endpoint,
+  clientInfo,
 }: {
   flow: CliDeviceFlowCollaborators;
   record: CliDeviceCodeRecord;
   user: Readonly<{ id: string; email: string | null; name: string | null }>;
   organization: Readonly<{ id: string; name: string; slug: string }>;
   endpoint: string;
+  clientInfo: z.output<typeof clientInfoSchema>;
 }): Promise<CliDeviceFlowAnswer> {
-  if (!record.project_api_key) {
+  if (!record.project) {
     logger.warn(
-      `[auth-cli] approved project_api_key device_code ${record.device_code} missing project payload — returning pending`,
+      `[auth-cli] approved project device_code ${record.device_code} missing project payload — returning pending`,
     );
     // Transient, and nothing was consumed: the claim goes back so the CLI's
     // next poll is not told to slow down for half a minute.
     await flow.sessions().releaseExchangeClaim(record.device_code);
 
-    throw refused("authorization_pending", "Approval received but project key not ready yet", 428);
+    throw refused("authorization_pending", "Approval received but project not ready yet", 428);
   }
 
   const project = await flow
     .directory()
-    .getLiveProject({
-      projectId: record.project_api_key.project_id,
-      organizationId: organization.id,
-    })
+    .getLiveProject({ projectId: record.project.project_id, organizationId: organization.id })
     .catch((error: unknown) => {
       if (isProjectGone(error)) return null;
       throw error;
     });
-  const stillAdministers =
-    project !== null && (await flow.canManageProject({ userId: user.id, projectId: project.id }));
+  const stillReaches =
+    project !== null && (await flow.canViewProject({ userId: user.id, projectId: project.id }));
   const ownsItIfPersonal =
     project !== null && (!project.isPersonal || project.ownerUserId === user.id);
 
-  if (!project || !stillAdministers || !ownsItIfPersonal) {
+  if (!project || !stillReaches || !ownsItIfPersonal) {
     // One answer for all three, because they are one fact to the caller: this
-    // exchange is not entitled to that key. Which of the three it was is a
+    // exchange is not entitled to that project. Which of the three it was is a
     // detail about somebody else's project, and 410 stops the CLI polling for
-    // a key it will never get.
+    // a session it will never get.
     await flow.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
     await flow.sessions().releaseExchangeClaim(record.device_code);
 
-    throw refused(
-      "access_denied",
-      "You no longer have administrator access to the selected project",
-      410,
-    );
+    throw refused("access_denied", "You no longer have access to the selected project", 410);
   }
+
+  const sessionStartedAtMs = nowInstant().epochMilliseconds;
+  // Locked: the approver consented to this one project, so no refresh re-scopes it.
+  const session = await flow.sessions().mintSession({
+    userId: user.id,
+    organizationId: organization.id,
+    projectId: project.id,
+    projectLocked: true,
+    clientInfo: clientInfo ? { ...clientInfo, session_started_at: sessionStartedAtMs } : undefined,
+  });
 
   // Single-use device code, poll window included; the claim is deliberately
   // left to expire — see `releaseExchangeClaim`.
   await flow.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
 
   return answer({
-    kind: "api_key" as const,
-    // The key as it stands NOW, not as the approval saw it: a rotation between
-    // the two would otherwise write a dead key into the caller's .env.
-    api_key: project.apiKey,
+    kind: "project_session" as const,
+    access_token: session.accessToken,
+    token_type: "Bearer" as const,
+    expires_in: session.accessTtlSeconds,
+    refresh_token: session.refreshToken,
+    refresh_expires_in: session.refreshTtlSeconds,
     project: { id: project.id, slug: project.slug, name: project.name },
     user: { id: user.id, email: user.email, name: user.name },
     organization: { id: organization.id, name: organization.name, slug: organization.slug },
@@ -445,9 +480,65 @@ async function refresh({
 
   if (!parsed.success) throw refused("invalid_request", "refresh_token is required", 400);
 
-  const { refresh_token } = parsed.data;
+  const rotated = await rotateRefreshToken({
+    flow,
+    refreshToken: parsed.data.refresh_token,
+    projectRef: parsed.data.project_id ?? parsed.data.project_slug,
+  });
+
+  return answer({
+    access_token: rotated.accessToken,
+    token_type: "Bearer",
+    expires_in: rotated.accessTtlSeconds,
+    refresh_token: rotated.refreshToken,
+    refresh_expires_in: rotated.refreshTtlSeconds,
+    ...(rotated.project ? { project: rotated.project } : {}),
+  });
+}
+
+/** A rotated or forked pair, and the project it is capped at where it is capped at one. */
+type CliRotatedSession = CliMintedSession &
+  Readonly<{ project?: Readonly<{ id: string; slug: string; name: string }> }>;
+
+/** One rotation of a refresh token, for the CLI's `/refresh` and for any peer holding a pair. */
+export async function rotateRefreshToken({
+  flow,
+  refreshToken: refresh_token,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  refreshToken: string;
+  /** A project id or slug to re-scope the rotated pair to; the person's access is checked. */
+  projectRef?: string | undefined;
+}): Promise<CliRotatedSession> {
   const record = await flow.sessions().getRefreshToken(refresh_token);
 
+  // One rotation per token: a concurrent second presentation is refused as spent.
+  if (!(await flow.sessions().claimRotation(refresh_token))) {
+    throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
+  }
+
+  try {
+    return await rotateClaimed({ flow, refreshToken: refresh_token, record, projectRef });
+  } catch (error) {
+    // Any failure hands the claim back: a dropped token stays dropped, a live one stays usable.
+    await flow.sessions().releaseRotationClaim(refresh_token);
+    throw error;
+  }
+}
+
+/** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
+async function rotateClaimed({
+  flow,
+  refreshToken: refresh_token,
+  record,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  refreshToken: string;
+  record: CliRefreshTokenRecord;
+  projectRef: string | undefined;
+}): Promise<CliRotatedSession> {
   if (nowInstant().epochMilliseconds > record.expires_at) {
     await flow.sessions().dropRefreshToken(refresh_token);
 
@@ -508,13 +599,42 @@ async function refresh({
     );
   }
 
+  // Checked before anything is dropped: a refusal leaves the refresh token valid. A bound
+  // project is re-proved on every rotation; a locked one never moves.
+  const targetRef = projectRef ?? record.project_id;
+  const scoped =
+    targetRef === undefined
+      ? undefined
+      : await reScopedProjectOf({ flow, record, projectRef: targetRef });
+
+  // A re-scope forks a locked child filed under the parent's family, so the parent's end is
+  // the child's; the parent pair stays valid.
+  const project = scoped && { id: scoped.id, slug: scoped.slug, name: scoped.name };
+  if (project !== undefined && project.id !== record.project_id) {
+    const child = await flow.sessions().mintSession({
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      projectId: project.id,
+      projectLocked: true,
+      clientInfo: record.client_info,
+      parentFamilyId: await flow.sessions().familyOf({ refreshToken: refresh_token, record }),
+    });
+    await flow.sessions().releaseRotationClaim(refresh_token);
+
+    return { ...child, project };
+  }
+
   // `session_started_at` and the CLI key id are carried across so the devices
   // inventory keeps its anchor and logout can still revoke the key.
   const rotated = await flow.sessions().mintSession({
     userId: record.user_id,
     organizationId: record.organization_id,
+    projectId: project?.id,
+    projectLocked: record.project_locked,
     clientInfo: record.client_info,
     cliApiKeyId: record.cli_api_key_id,
+    familyId: record.family_id,
+    parentFamilyId: record.parent_family_id,
   });
 
   // Main `auth-cli.ts:1549-1568`: the key's expiry slides with the refresh window, best effort.
@@ -538,13 +658,127 @@ async function refresh({
 
   await flow.sessions().dropRefreshToken(refresh_token);
 
-  return answer({
-    access_token: rotated.accessToken,
-    token_type: "Bearer",
-    expires_in: rotated.accessTtlSeconds,
-    refresh_token: rotated.refreshToken,
-    refresh_expires_in: rotated.refreshTtlSeconds,
+  return project ? { ...rotated, project } : rotated;
+}
+
+/** The project a rotation re-scopes to, refused unless the person can view it. */
+async function reScopedProjectOf({
+  flow,
+  record,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  record: CliRefreshTokenRecord;
+  projectRef: string;
+}): Promise<AuthDirectoryProject> {
+  const project = await flow
+    .directory()
+    .getLiveProjectByRef({ projectRef, organizationId: record.organization_id })
+    .catch((error: unknown) => {
+      if (isProjectGone(error)) return null;
+      throw error;
+    });
+  const reaches =
+    project !== null &&
+    (!record.project_locked || project.id === record.project_id) &&
+    (await personReachesProject({ flow, userId: record.user_id, project }));
+
+  // One answer for a missing project, a locked session and one the person cannot reach.
+  if (!project || !reaches) {
+    throw refused("forbidden", "Project not found or you do not have access to it", 403);
+  }
+
+  return project;
+}
+
+/** `project:view`, and another person's personal workspace never, whatever the grant says. */
+async function personReachesProject({
+  flow,
+  userId,
+  project,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  userId: string;
+  project: Readonly<{ id: string; isPersonal: boolean; ownerUserId: string | null }>;
+}): Promise<boolean> {
+  if (project.isPersonal && project.ownerUserId !== userId) return false;
+
+  return flow.canViewProject({ userId, projectId: project.id });
+}
+
+/**
+ * A session a sign-in outside the device grant approved (hosted MCP): capped at one project the
+ * person still reaches as an active member, and locked there, so no rotation re-scopes it.
+ */
+async function issueLockedProjectSession({
+  flow,
+  userId,
+  organizationId,
+  projectId,
+  clientLabel,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  userId: string;
+  organizationId: string;
+  projectId: string;
+  clientLabel: string;
+}): Promise<CliMintedSession> {
+  const project = await flow
+    .directory()
+    .getLiveProject({ projectId, organizationId })
+    .catch((error: unknown) => {
+      if (isProjectGone(error)) return null;
+      throw error;
+    });
+  const reaches =
+    project !== null &&
+    (await flow.directory().hasActiveMembership({ userId, organizationId })) &&
+    (await personReachesProject({ flow, userId, project }));
+  if (!project || !reaches) {
+    throw refused("access_denied", "You no longer have access to the selected project", 403);
+  }
+
+  return flow.sessions().mintSession({
+    userId,
+    organizationId,
+    projectId: project.id,
+    projectLocked: true,
+    clientInfo: { device_label: clientLabel, session_started_at: nowInstant().epochMilliseconds },
   });
+}
+
+/** The person and live project behind a bound access bearer; anything else is `invalid_credentials`. */
+async function accessProjectOf({
+  flow,
+  authorization,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  authorization: string;
+}): Promise<CliAccessProject> {
+  const record = await flow
+    .sessions()
+    .getAccessToken(authorization)
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "cli_session_record_not_found") {
+        throw new ProjectInvalidCredentialsError();
+      }
+      throw error;
+    });
+  if (!record.project_id) throw new ProjectInvalidCredentialsError();
+
+  const project = await flow
+    .directory()
+    .getLiveProject({ projectId: record.project_id, organizationId: record.organization_id })
+    .catch((error: unknown) => {
+      if (isProjectGone(error)) throw new ProjectInvalidCredentialsError();
+      throw error;
+    });
+
+  return {
+    userId: record.user_id,
+    organizationId: record.organization_id,
+    project: { ...project, organizationId: record.organization_id },
+  };
 }
 
 /**
@@ -601,10 +835,9 @@ async function approve({
   }
 
   // Branch on the credential type the CLI requested at /device-code time.
-  // `project_api_key` returns the picked project's EXISTING key, so other
-  // consumers keep working unchanged.
+  // `project_api_key` binds the session to the picked project; it mints no key.
   if ((record.credential_type ?? "device_session") === "project_api_key") {
-    return approveProjectKey({ flow, record, person, organizationId: organization_id, project_id });
+    return approveProject({ flow, record, person, organizationId: organization_id, project_id });
   }
 
   // Governance gate: provisioning a personal workspace/virtual key is a
@@ -653,11 +886,11 @@ async function approve({
 }
 
 /**
- * The picked project's EXISTING key, stamped onto the record for `/exchange`.
- * The picker labels personal clearly, so an explicit self-pick is honoured;
- * everything else the shared handout rule refuses.
+ * The picked project, stamped onto the record for `/exchange` to bind the
+ * session to. The picker labels personal clearly, so an explicit self-pick is
+ * honoured; another person's personal project is refused.
  */
-async function approveProjectKey({
+async function approveProject({
   flow,
   record,
   person,
@@ -679,10 +912,9 @@ async function approveProjectKey({
   }
 
   // Resolve the picked project: it must live in the chosen organization and not
-  // be archived. Authorization is NOT decided by this lookup — the write
-  // permission check below is, and it inspects project-, team- and org-scoped
-  // bindings. The org-scoping predicate here plus that check together stop a
-  // spoofed `project_id` from leaking another org's key.
+  // be archived. Authorization is the `project:view` check below, which inspects
+  // project-, team- and org-scoped bindings; a spoofed `project_id` from another
+  // organization finds nothing here.
   const project = await flow
     .directory()
     .getLiveProject({ projectId: project_id, organizationId })
@@ -696,28 +928,23 @@ async function approveProjectKey({
   if (project.isPersonal && project.ownerUserId !== person.id) {
     throw refused(
       "personal_project_not_allowed",
-      "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
+      "Another user's personal project can't back your session. Pick a shared team project, or your own personal workspace.",
       400,
     );
   }
 
-  if (!(await flow.canManageProject({ userId: person.id, projectId: project.id }))) {
-    throw refused(
-      "forbidden",
-      "You need to be an administrator of this project to retrieve its API key.",
-      403,
-    );
+  if (!(await flow.canViewProject({ userId: person.id, projectId: project.id }))) {
+    throw refused("forbidden", "You do not have access to this project.", 403);
   }
 
   await flow.sessions().approveDeviceCode({
     deviceCode: record.device_code,
     userId: person.id,
     organizationId,
-    projectApiKey: {
+    project: {
       project_id: project.id,
       project_slug: project.slug,
       project_name: project.name,
-      api_key: project.apiKey,
     },
   });
 
@@ -866,8 +1093,8 @@ async function mintCliKey({
 }
 
 /**
- * The personal project a device session ships the key of: a normal project
- * with a normal key, ensured here (idempotent). Best-effort — a workspace
+ * The personal project a device session names: a normal project, ensured here
+ * (idempotent), never its key. Best-effort — a workspace
  * failure must not fail the login, and older CLIs ignore the field.
  */
 async function personalProjectFieldsOf({
@@ -880,7 +1107,7 @@ async function personalProjectFieldsOf({
   organization: Readonly<{ id: string }>;
 }): Promise<
   Readonly<{
-    personal_project?: Readonly<{ id: string; slug: string; name: string; api_key: string }>;
+    personal_project?: Readonly<{ id: string; slug: string; name: string }>;
   }>
 > {
   try {
@@ -896,7 +1123,6 @@ async function personalProjectFieldsOf({
         id: workspace.project.id,
         slug: workspace.project.slug,
         name: workspace.project.name,
-        api_key: workspace.project.apiKey,
       },
     };
   } catch (err) {
@@ -1192,7 +1418,7 @@ async function lookupDeviceFlow({
     expires_at: record.expires_at,
     // The approval page branches its journey on this: `device_session` shows
     // the approve-only flow, `project_api_key` shows a project picker whose
-    // key is sent to the CLI. Defaults for records minted before the field.
+    // choice binds the CLI's session. Defaults for records minted before the field.
     credential_type: record.credential_type ?? "device_session",
     // The approval screen adds management access to the key's default
     // permissions when the CLI asked for it with `--management`.

@@ -3,7 +3,7 @@
  * `platform/app/src/features/navigation/shell/useNavigationV2ShellState.ts`.
  */
 
-import { useBreakpointValue } from "@chakra-ui/react";
+import { useBreakpointValue } from "@langwatch/design-system/primitives";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import {

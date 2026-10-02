@@ -4,9 +4,9 @@
  * @see specs/scenarios/scenario-deferred-persistence.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +90,36 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () =>
+          mocks.mockPromptsCatalogIsLoading
+            ? { data: undefined, isLoading: true }
+            : { data: [], isLoading: false },
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
+      },
+    }),
     scenarios: {
       create: {
         useMutation: ({
@@ -143,25 +173,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         }),
       },
     },
-    agents: {
-      getAll: {
-        useQuery: () => ({ data: [] }),
-      },
-    },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: () =>
-          mocks.mockPromptsCatalogIsLoading
-            ? { data: undefined, isLoading: true }
-            : { data: [], isLoading: false },
-      },
-    },
-    useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
-      },
-    }),
   },
 }));
 
@@ -179,7 +190,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: mocks.mockClearFlowCallbacks,
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: mocks.mockProject,
     organization: { id: "org-123" },
@@ -226,10 +237,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("<ScenarioFormDrawer/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -267,13 +274,13 @@ describe("<ScenarioFormDrawer/>", () => {
 
   describe("when opened without a scenarioId (create mode)", () => {
     it("displays 'Create Scenario' heading", () => {
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
       expect(screen.getByText("Create Scenario")).toBeInTheDocument();
     });
 
     it("does not call create mutation on open", () => {
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
       expect(mocks.mockCreateMutateAsync).not.toHaveBeenCalled();
     });
@@ -291,14 +298,14 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       it("pre-populates the form with initial data", () => {
-        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
         expect(screen.getByDisplayValue("Generated Scenario")).toBeInTheDocument();
         expect(screen.getByDisplayValue("A generated situation")).toBeInTheDocument();
       });
 
       it("does not create a DB record", () => {
-        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
         expect(mocks.mockCreateMutateAsync).not.toHaveBeenCalled();
       });
@@ -320,9 +327,7 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} onClose={onClose} />);
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -339,9 +344,7 @@ describe("<ScenarioFormDrawer/>", () => {
       it("does not transition to edit mode when save-without-running", async () => {
         const user = userEvent.setup();
 
-        render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} onClose={vi.fn()} />);
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -356,9 +359,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     describe("when drawer is closed without saving", () => {
       it("does not create a DB record", () => {
-        const { unmount } = render(<ScenarioFormDrawer open={true} />, {
-          wrapper: Wrapper,
-        });
+        const { unmount } = renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
         // Close the drawer without saving
         unmount();
@@ -388,9 +389,7 @@ describe("<ScenarioFormDrawer/>", () => {
     });
 
     it("displays 'Edit Scenario' heading", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />);
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
     });
@@ -400,11 +399,8 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(
+        renderWithDesignSystem(
           <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
-          {
-            wrapper: Wrapper,
-          },
         );
 
         const saveButton = screen.getByTestId("save-button");
@@ -438,11 +434,8 @@ describe("<ScenarioFormDrawer/>", () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
-        {
-          wrapper: Wrapper,
-        },
       );
 
       const saveButton = screen.getByTestId("save-button");
@@ -459,11 +452,8 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays an error message", async () => {
       const user = userEvent.setup();
 
-      render(
+      renderWithDesignSystem(
         <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={vi.fn()} />,
-        {
-          wrapper: Wrapper,
-        },
       );
 
       const saveButton = screen.getByTestId("save-button");
@@ -510,11 +500,8 @@ describe("<ScenarioFormDrawer/>", () => {
       beforeEach(() => {
         user = userEvent.setup();
         onClose = vi.fn();
-        render(
+        renderWithDesignSystem(
           <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
-          {
-            wrapper: Wrapper,
-          },
         );
       });
 
@@ -584,7 +571,7 @@ describe("<ScenarioFormDrawer/>", () => {
       it("navigates to /simulations with the new pendingBatch query param", async () => {
         const user = userEvent.setup();
 
-        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -604,7 +591,7 @@ describe("<ScenarioFormDrawer/>", () => {
       it("does NOT transition the URL to /scenarios/<id> mid-save (lw#3586 F11 — would race the redirect)", async () => {
         const user = userEvent.setup();
 
-        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
         await user.click(screen.getByTestId("save-and-run-button"));
 
@@ -623,7 +610,7 @@ describe("<ScenarioFormDrawer/>", () => {
   describe("when clicking Add New Agent", () => {
     async function clickCreateAgentButton() {
       const user = userEvent.setup();
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
       const button = screen.getByTestId("create-agent-button");
       await user.click(button);
     }
@@ -682,9 +669,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "An unloaded scenario shows that it is loading" */
     it("shows a placeholder instead of an empty form", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
       expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
@@ -692,9 +677,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "An unloaded scenario is still titled as an edit" */
     it("titles itself Edit Scenario rather than Create Scenario", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
       expect(screen.queryByText("Create Scenario")).toBe(null);
@@ -702,9 +685,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "Saving is not offered until the scenario has loaded" */
     it("keeps the save actions busy so a save cannot create a duplicate", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute("data-loading", "true");
     });
@@ -725,9 +706,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "A loaded scenario shows its fields" */
     it("replaces the placeholder with the populated form", async () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
@@ -753,9 +732,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "The editor does not wait for the prompt catalog" */
     it("shows the scenario fields without waiting for it", async () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
@@ -777,9 +754,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "A failed read says so instead of showing empty fields" */
     it("says it could not load the scenario instead of offering the fields", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByTestId("scenario-read-error")).toBeInTheDocument();
       expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
@@ -789,9 +764,7 @@ describe("<ScenarioFormDrawer/>", () => {
     /** @scenario "A failed read offers the read again" */
     it("reads the scenario again when asked to try again", async () => {
       const user = userEvent.setup();
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       await user.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -800,9 +773,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
     /** @scenario "A failed read does not offer to save" */
     it("does not offer the save actions over a scenario it never read", () => {
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.queryByTestId("save-and-run-menu")).toBe(null);
     });
@@ -819,9 +790,7 @@ describe("<ScenarioFormDrawer/>", () => {
       mocks.mockGetByIdData = null;
       mocks.mockGetByIdIsLoading = false;
 
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
       expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
@@ -845,9 +814,7 @@ describe("<ScenarioFormDrawer/>", () => {
       mocks.mockGetByIdIsLoading = false;
       mocks.mockGetByIdHasError = true;
 
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       expect(screen.queryByTestId("scenario-read-error")).toBe(null);
@@ -867,9 +834,7 @@ describe("<ScenarioFormDrawer/>", () => {
       mocks.mockGetByIdData = null;
       mocks.mockGetByIdIsLoading = false;
 
-      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
       await user.click(screen.getByTestId("save-button"));
 
@@ -887,7 +852,7 @@ describe("<ScenarioFormDrawer/>", () => {
       // scenarioId too, so a stale true here must still not blank the form.
       mocks.mockGetByIdIsLoading = true;
 
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       expect(screen.getByPlaceholderText("e.g., Angry refund request")).toBeInTheDocument();

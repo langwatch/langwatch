@@ -1,12 +1,7 @@
 /**
  * ComparisonLeaderboardChart - compact Bradley-Terry ranking card (#5103).
  */
-import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
-import {
-  type BatchComparisonColumn,
-  type BatchResultRow,
-  disambiguateNames,
-} from "@langwatch/experiment-browser-kit";
+import { Box, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 import { LuMaximize2 } from "react-icons/lu";
 import {
@@ -28,11 +23,16 @@ import {
 } from "../../../model/batch-evaluation-results.chart-axis.ts";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
 import {
+  type BatchComparisonColumn,
+  type BatchResultRow,
+} from "../batch-evaluation-results.types.ts";
+import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "../batch-evaluation-results.verdict.ts";
 import { useBTLeaderboard } from "../use-bt-leaderboard.ts";
 import { useVariantMetrics } from "../use-variant-metrics.ts";
+import { disambiguateNames } from "./presentation.tsx";
 import { VARIANT_COLORS } from "./win-rate-chart.tsx";
 
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */

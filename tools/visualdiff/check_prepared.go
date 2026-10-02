@@ -28,6 +28,13 @@ var checkoutPrepares = []checkoutPrepare{
 	{output: "mcp/typescript/dist/index.js", inputs: []string{"mcp/typescript/src"}, command: "pnpm ensure:built"},
 	{output: "packages/ksuid/dist/index.d.ts", inputs: []string{"packages/ksuid/src"}, command: "pnpm ensure:built"},
 	{output: "packages/mail/dist/index.js", inputs: []string{"packages/mail/src"}, command: "pnpm ensure:built"},
+	// A stale bundle makes the worker spawn `pnpm exec tsx`, which the scenario child does not
+	// install: every simulation then dies at once with ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL.
+	{
+		output:  "apps/scenario-child/dist/server/scenario-child-process.mjs",
+		inputs:  []string{"apps/scenario-child/src", "modules/scenario/contract/src", "modules/scenario/process/src/channels"},
+		command: "pnpm --filter @langwatch/scenario-child build",
+	},
 }
 
 // checkoutUnprepared refuses a checkout whose install, generated files or built

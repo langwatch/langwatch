@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -14,7 +13,6 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -23,16 +21,18 @@ import {
   type PersonalWorkspace,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -84,7 +84,7 @@ async function buildApp(options: {
     return options.workspace;
   });
 
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
@@ -121,7 +121,7 @@ async function buildApp(options: {
   return { app, findByEmail, isOrganizationMember, getPersonalWorkspace };
 }
 
-describe("GovernanceApp.tryResolveActorWorkspace", () => {
+describe("GovernanceModule.tryResolveActorWorkspace", () => {
   describe("given an actor token that names a member with a personal workspace", () => {
     it("answers where that workspace lives", async () => {
       const { app, findByEmail } = await buildApp({

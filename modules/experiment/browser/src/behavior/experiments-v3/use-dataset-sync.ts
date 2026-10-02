@@ -1,8 +1,8 @@
 import type { UiDatasetRecordSyncProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { AutosaveState } from "@langwatch/dataset-browser-kit";
 import { useCallback } from "react";
 
+import type { AutosaveState } from "../../model/dataset/dataset-table-context.tsx";
 import type { DatasetReference } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 

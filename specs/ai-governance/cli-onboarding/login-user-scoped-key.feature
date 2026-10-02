@@ -124,6 +124,12 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       And an approve request carrying zero bindings is refused with a handled
         error naming the bindings field
 
+    @integration
+    Scenario: approval is blocked when the user's own access cannot be read
+      Given the user's role bindings fail to load on the authorize screen
+      Then the approve action is unavailable
+      And the screen says the access could not be read and asks the user to reload
+
   # ─────────────────────────────────────────────────────────────────────
   # Minting mechanics
   # ─────────────────────────────────────────────────────────────────────

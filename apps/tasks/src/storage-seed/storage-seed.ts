@@ -7,18 +7,22 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { parseProcessConfig } from "@langwatch/config";
+import { allowLoopbackVoiceProviders, Config, parseProcessConfig } from "@langwatch/config";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   licensingConfig,
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
-import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
+import {
+  elevenLabsLoopbackKeysSchema,
+  getSchemaShape,
+  modelProviders,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { aesEncryption, type Encryption } from "@langwatch/process-stores";
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { SecretsResolver } from "@langwatch/secrets";
 import { hash as hashPassword } from "bcrypt";
 
 import type { TaskInput } from "../config.ts";
@@ -87,7 +91,7 @@ const DEFAULT_PROMPT_TAG = "production";
 const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
 /** The idempotent local-dev / CI seed: fixed ids and tokens, written straight to the database. */
-export async function storageSeed({ connections, environment }: TaskInput): Promise<void> {
+export async function storageSeed({ connections, chain, environment }: TaskInput): Promise<void> {
   const database = connections.database;
   if (!database) throw new Error("This task needs DATABASE_URL");
   const prisma = database.client;
@@ -101,7 +105,7 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
 
   // Absent, the seed names the pepper it looked for, once, and seeds everything that does not
   // need one — never a stack trace, and never a failed `haven up`.
-  const { pepper: apiKeyPepper, absent } = await resolveApiKeyPepper({ source: environment });
+  const { pepper: apiKeyPepper, absent } = await resolveApiKeyPepper({ chain });
   if (apiKeyPepper === undefined) {
     logger.warn(
       { absent },
@@ -138,12 +142,9 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     owners: [{ name: "licensing", config: licensingConfig }],
     environment,
   });
-  const secrets = SecretsResolver.over(
-    SecretsChain.start({ environment })
-      .withEnv()
-      .withFile()
-      .withOnePassword(environment.LANGWATCH_OP_ACCOUNT),
-  ).scopeTo("storage-seed", [licensingSecrets.licensePrivateKey]);
+  const secrets = SecretsResolver.over(chain).scopeTo("storage-seed", [
+    licensingSecrets.licensePrivateKey,
+  ]);
   const licenseChoice = await secrets.into(licensingSecrets.licensePrivateKey, (privateKey) =>
     chooseSeedLicense({
       stored: existingOrganization?.license ?? null,
@@ -283,56 +284,13 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     await seedGrantBinding({ prisma, binding });
   }
 
-  for (const toolUser of TOOL_USERS) {
-    const seeded = await prisma.user.upsert(
-      buildAdminUserUpsertArgs({
-        adminUserId: toolUser.id,
-        email: seedEmailAddress({
-          localPart: toolUser.localPart,
-          domainOverride: resolveSeedEmailDomain({ environment }),
-        }),
-        name: toolUser.name,
-      }),
-    );
-    await prisma.account.upsert({
-      where: {
-        provider_providerAccountId: { provider: "credential", providerAccountId: seeded.id },
-      },
-      create: {
-        userId: seeded.id,
-        provider: "credential",
-        issuer: "local:credential",
-        providerAccountId: seeded.id,
-        type: "credentials",
-        password: hashedPassword,
-      },
-      update: { issuer: "local:credential", password: hashedPassword },
-    });
-    await prisma.organizationUser.upsert({
-      where: { userId_organizationId: { userId: seeded.id, organizationId: organization.id } },
-      create: { userId: seeded.id, organizationId: organization.id, role: "ADMIN" },
-      update: { role: "ADMIN" },
-    });
-    await prisma.teamUser.upsert({
-      where: { userId_teamId: { userId: seeded.id, teamId: team.id } },
-      create: { userId: seeded.id, teamId: team.id, role: "ADMIN" },
-      update: { role: "ADMIN" },
-    });
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId: organization.id, userId: seeded.id },
-    });
-    for (const binding of adminGrantBindings({
-      organizationId: organization.id,
-      teamId: team.id,
-      userId: seeded.id,
-      ids: {
-        organization: `${toolUser.id}-organization-binding`,
-        team: `${toolUser.id}-team-binding`,
-      },
-    })) {
-      await seedGrantBinding({ prisma, binding });
-    }
-  }
+  await seedToolUsers({
+    prisma,
+    environment,
+    hashedPassword,
+    organizationId: organization.id,
+    teamId: team.id,
+  });
 
   // The two ApiKey rows are the only seeded state that needs the pepper, so a
   // checkout without one still gets its organization, team, project and admin
@@ -433,6 +391,72 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
  * An organization-wide SCIM token under the pepper-free sha256 digest main's
  * older rows use, so it verifies whichever pepper the stack resolves.
  */
+/** Seeds each tool's own login, membership and admin grants beside the admin's. */
+async function seedToolUsers({
+  prisma,
+  environment,
+  hashedPassword,
+  organizationId,
+  teamId,
+}: {
+  prisma: PrismaClient;
+  environment: TaskInput["environment"];
+  hashedPassword: string;
+  organizationId: string;
+  teamId: string;
+}): Promise<void> {
+  for (const toolUser of TOOL_USERS) {
+    const seeded = await prisma.user.upsert(
+      buildAdminUserUpsertArgs({
+        adminUserId: toolUser.id,
+        email: seedEmailAddress({
+          localPart: toolUser.localPart,
+          domainOverride: resolveSeedEmailDomain({ environment }),
+        }),
+        name: toolUser.name,
+      }),
+    );
+    await prisma.account.upsert({
+      where: {
+        provider_providerAccountId: { provider: "credential", providerAccountId: seeded.id },
+      },
+      create: {
+        userId: seeded.id,
+        provider: "credential",
+        issuer: "local:credential",
+        providerAccountId: seeded.id,
+        type: "credentials",
+        password: hashedPassword,
+      },
+      update: { issuer: "local:credential", password: hashedPassword },
+    });
+    await prisma.organizationUser.upsert({
+      where: { userId_organizationId: { userId: seeded.id, organizationId } },
+      create: { userId: seeded.id, organizationId, role: "ADMIN" },
+      update: { role: "ADMIN" },
+    });
+    await prisma.teamUser.upsert({
+      where: { userId_teamId: { userId: seeded.id, teamId } },
+      create: { userId: seeded.id, teamId, role: "ADMIN" },
+      update: { role: "ADMIN" },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: seeded.id },
+    });
+    for (const binding of adminGrantBindings({
+      organizationId,
+      teamId,
+      userId: seeded.id,
+      ids: {
+        organization: `${toolUser.id}-organization-binding`,
+        team: `${toolUser.id}-team-binding`,
+      },
+    })) {
+      await seedGrantBinding({ prisma, binding });
+    }
+  }
+}
+
 async function seedScimToken({
   prisma,
   organizationId,
@@ -637,6 +661,7 @@ async function seedModelProviderFromEnv({
   envMap,
   organizationId,
   encryption,
+  allowLoopback,
 }: {
   prisma: PrismaClient;
   provider: string;
@@ -644,6 +669,7 @@ async function seedModelProviderFromEnv({
   envMap: Readonly<Record<string, string | undefined>>;
   organizationId: string;
   encryption: Encryption;
+  allowLoopback: boolean;
 }): Promise<void> {
   const names = providerKeyNames(def);
   const keys: Record<string, string> = {};
@@ -652,7 +678,10 @@ async function seedModelProviderFromEnv({
     if (name && value) keys[name] = value;
   }
   const missing = missingProviderKeys({ provider, def, names, keys });
-  const parsed = def.keysSchema.safeParse(keys);
+  // haven +voice seeds ElevenLabs at voicesim; only the dev switch lets its loopback URL through.
+  const keysSchema =
+    provider === "elevenlabs" && allowLoopback ? elevenLabsLoopbackKeysSchema : def.keysSchema;
+  const parsed = keysSchema.safeParse(keys);
   if (!parsed.success || missing.length > 0) {
     logger.info(
       { provider, apiKeyEnvVar: def.apiKey, missing },
@@ -710,6 +739,10 @@ async function seedModelProvidersFromEnv({
     logger.info("model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
     return;
   }
+  const { voice } = parseProcessConfig({
+    owners: [{ name: "voice", config: Config.define(() => ({ allowLoopbackVoiceProviders })) }],
+    environment,
+  });
   for (const [provider, def] of Object.entries(modelProviders)) {
     // "custom" has no inferable identity from the environment; skip it.
     if (provider === "custom") continue;
@@ -721,6 +754,7 @@ async function seedModelProvidersFromEnv({
       envMap: environment,
       organizationId,
       encryption,
+      allowLoopback: voice.allowLoopbackVoiceProviders,
     });
   }
 }

@@ -1,12 +1,22 @@
-import { Box, Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   CONTACT_SALES_URL,
   DEFAULT_LICENSE_PURCHASE_URL,
 } from "@langwatch/enterprise-licensing-contract";
-import { Upload, X } from "lucide-react";
+import { ArrowUpRight, KeyRound, Upload, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { formatFileSize } from "../../model/license-status.ts";
@@ -111,173 +121,170 @@ export function NoLicenseCard({
   const isActivateDisabled = isActivating || !hasInput[activationMethod];
 
   return (
-    <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
-      <VStack align="start" gap={4}>
-        <VStack align="start" gap={1}>
-          <Text fontWeight="medium" fontSize="md">
-            No license installed
-          </Text>
-          <Text color="fg.muted" fontSize="sm">
-            Running without a license. Some features may be limited.
-          </Text>
-        </VStack>
-
-        <VStack align="start" gap={3} width="full">
-          <Text fontWeight="medium">Activate a license:</Text>
-
-          <RadioGroup
-            value={activationMethod}
-            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
-            disabled={isActivating}
+    <SettingsCard
+      title="No license installed"
+      hint="Running without a license. Some features may be limited."
+      tone="neutral"
+      leading={<KeyRound size={16} />}
+      badge={<StatusChip label="Open source" tone="neutral" />}
+      actions={
+        <>
+          <Button
+            variant="outline"
+            colorPalette="orange"
+            size="sm"
+            onClick={handleActivate}
+            data-testid="license-activate"
+            loading={isActivating}
+            disabled={isActivateDisabled}
           >
-            <HStack gap={4}>
-              <Radio value="code">Enter activation code</Radio>
-              <Radio value="file">Upload license file</Radio>
-              <Radio value="key">Enter license key</Radio>
-            </HStack>
-          </RadioGroup>
+            Activate license
+          </Button>
+          {purchaseLinkUrl && (
+            <Tooltip content="After purchase, your license will be generated and delivered to your email.">
+              <Button asChild variant="outline" size="sm">
+                <Link href={purchaseLinkUrl} isExternal>
+                  Purchase license
+                  <ArrowUpRight size={14} />
+                </Link>
+              </Button>
+            </Tooltip>
+          )}
+          <Link
+            href={CONTACT_SALES_URL}
+            isExternal
+            color="orange.fg"
+            fontSize="sm"
+            _hover={{ textDecoration: "underline" }}
+          >
+            Contact sales →
+          </Link>
+        </>
+      }
+    >
+      <VStack align="start" gap={3} width="full">
+        <SegmentedControl
+          size="sm"
+          value={activationMethod}
+          onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
+          disabled={isActivating}
+          items={[
+            { value: "code", label: "Activation code" },
+            { value: "file", label: "License file" },
+            { value: "key", label: "License key" },
+          ]}
+        />
 
-          {activationMethod === "file" && (
-            <Box width="full">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".langwatch-license"
-                style={{ display: "none" }}
-                onChange={handleFileInputChange}
-              />
-              {uploadedFile ? (
-                <Box
-                  borderWidth="1px"
-                  borderRadius="lg"
-                  padding={4}
-                  width="full"
-                  backgroundColor="bg.subtle"
-                >
-                  <HStack justify="space-between" width="full">
-                    <HStack gap={3}>
-                      <Upload size={20} />
-                      <VStack align="start" gap={0}>
-                        <Text fontSize="sm" fontWeight="medium">
-                          {uploadedFile.name}
-                        </Text>
-                        <Text fontSize="xs" color="fg.muted">
-                          {formatFileSize(uploadedFile.size)}
-                        </Text>
-                      </VStack>
-                    </HStack>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveFile}
-                      disabled={isActivating}
-                      aria-label="Remove file"
-                    >
-                      <X size={16} />
-                    </Button>
+        {activationMethod === "file" && (
+          <Box width="full">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".langwatch-license"
+              style={{ display: "none" }}
+              onChange={handleFileInputChange}
+            />
+            {uploadedFile ? (
+              <Box
+                borderWidth="1px"
+                borderRadius="lg"
+                padding={4}
+                width="full"
+                backgroundColor="bg.subtle"
+              >
+                <HStack justify="space-between" width="full">
+                  <HStack gap={3}>
+                    <Upload size={20} />
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="sm" fontWeight="medium">
+                        {uploadedFile.name}
+                      </Text>
+                      <Text fontSize="xs" color="fg.muted">
+                        {formatFileSize(uploadedFile.size)}
+                      </Text>
+                    </VStack>
                   </HStack>
-                </Box>
-              ) : (
-                <Box
-                  borderWidth="2px"
-                  borderStyle="dashed"
-                  borderRadius="lg"
-                  padding={6}
-                  width="full"
-                  cursor="pointer"
-                  onClick={handleDropzoneClick}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  borderColor={isDragging ? "blue.500" : "border"}
-                  backgroundColor={isDragging ? "blue.50" : "transparent"}
-                  transition="all 0.2s"
-                  _hover={{ borderColor: "blue.300" }}
-                >
-                  <VStack gap={2}>
-                    <Upload size={24} color="#666" />
-                    <Text fontSize="sm" color="fg.muted" textAlign="center">
-                      Drop your license here
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Click to browse
-                    </Text>
-                  </VStack>
-                </Box>
-              )}
-            </Box>
-          )}
-
-          {activationMethod === "code" && (
-            <Field.Root width="full">
-              <Field.Label srOnly>Activation code</Field.Label>
-              <Input
-                value={activationCode}
-                onChange={(e) => onActivationCodeChange(e.target.value)}
-                placeholder="LW-XXXX-XXXX-XXXX-XXXX"
-                data-testid="license-activation-code"
-                fontFamily="mono"
-                maxWidth="360px"
-                disabled={isActivating}
-              />
-              <Field.HelperText>
-                Your code was sent with your order. This install asks LangWatch for the license it
-                covers, so it needs to reach the internet. If it cannot, upload the license file
-                instead.
-              </Field.HelperText>
-            </Field.Root>
-          )}
-
-          {activationMethod === "key" && (
-            <Field.Root width="full">
-              <Field.Label srOnly>License key</Field.Label>
-              <Textarea
-                value={licenseKey}
-                onChange={(e) => onLicenseKeyChange(e.target.value)}
-                placeholder="Paste your license key"
-                data-testid="license-key-input"
-                rows={4}
-                fontFamily="mono"
-                fontSize="xs"
-                disabled={isActivating}
-              />
-            </Field.Root>
-          )}
-
-          <HStack gap={3}>
-            <Button
-              colorPalette="blue"
-              variant="solid"
-              size="sm"
-              onClick={handleActivate}
-              data-testid="license-activate"
-              loading={isActivating}
-              disabled={isActivateDisabled}
-            >
-              Activate License
-            </Button>
-            {purchaseLinkUrl && (
-              <Tooltip content="After purchase, your license will be generated and delivered to your email.">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={purchaseLinkUrl} isExternal>
-                    Purchase license
-                  </Link>
-                </Button>
-              </Tooltip>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveFile}
+                    disabled={isActivating}
+                    aria-label="Remove file"
+                  >
+                    <X size={16} />
+                  </Button>
+                </HStack>
+              </Box>
+            ) : (
+              <Box
+                borderWidth="2px"
+                borderStyle="dashed"
+                borderRadius="lg"
+                padding={6}
+                width="full"
+                cursor="pointer"
+                onClick={handleDropzoneClick}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                borderColor={isDragging ? "orange.500" : "border"}
+                backgroundColor={isDragging ? "orange.subtle" : "transparent"}
+                transition="all 0.2s"
+                _hover={{ borderColor: "orange.300" }}
+              >
+                <VStack gap={2}>
+                  <Box color="fg.muted">
+                    <Upload size={24} />
+                  </Box>
+                  <Text fontSize="sm" color="fg.muted" textAlign="center">
+                    Drop your license here
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Click to browse
+                  </Text>
+                </VStack>
+              </Box>
             )}
-            <Link
-              href={CONTACT_SALES_URL}
-              isExternal
-              color="blue.fg"
-              fontSize="sm"
-              _hover={{ textDecoration: "underline" }}
-            >
-              Contact sales
-            </Link>
-          </HStack>
-        </VStack>
+          </Box>
+        )}
+
+        {activationMethod === "code" && (
+          <Field.Root width="full">
+            <Field.Label srOnly>Activation code</Field.Label>
+            <Input
+              value={activationCode}
+              onChange={(e) => onActivationCodeChange(e.target.value)}
+              placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+              data-testid="license-activation-code"
+              fontFamily="mono"
+              maxWidth="360px"
+              disabled={isActivating}
+            />
+            <Field.HelperText>
+              Your code was sent with your order. This install asks LangWatch for the license it
+              covers, so it needs to reach the internet. If it cannot, upload the license file
+              instead.
+            </Field.HelperText>
+          </Field.Root>
+        )}
+
+        {activationMethod === "key" && (
+          <Field.Root width="full">
+            <Field.Label srOnly>License key</Field.Label>
+            <Textarea
+              value={licenseKey}
+              onChange={(e) => onLicenseKeyChange(e.target.value)}
+              placeholder="Paste your license key"
+              data-testid="license-key-input"
+              rows={4}
+              fontFamily="mono"
+              fontSize="xs"
+              disabled={isActivating}
+            />
+          </Field.Root>
+        )}
       </VStack>
-    </Box>
+    </SettingsCard>
   );
 }
 

@@ -3,26 +3,24 @@ Feature: The background worker resolves a plan the way the interactive one does
   Three things this process decides about a customer come from the plan their
   organization is on: whether a webhook batch may leave, how many confirmed
   matches an automation may keep in a day, and how far back a trace's captured
-  content stays unteased. All three used to be refused or assumed here, because
-  no plan source was composed.
+  content stays unteased.
 
-  Both processes now resolve from the deployment's own subscription rows over
-  the same baseline, and they must not drift: a background process reading the
-  free baseline where the screen reads a paid plan stops delivering a feature
-  the customer is being billed for, and one reading unlimited where the screen
-  reads free gives away what was sold. The scenarios below are deliberately the
-  ones the interactive process's own suite asserts.
+  Both processes install the same entitlement module and ask its EntitlementApi,
+  which resolves over the same billing and licensing peers. They must not
+  drift: a background process reading the free baseline where the screen reads
+  a paid plan stops delivering a feature the customer is being billed for, and
+  one reading unlimited where the screen reads free gives away what was sold.
 
   Background:
-    Given a background worker that opened its own database client
+    Given a background worker that installs the entitlement module
 
   @unit
   Scenario: A paying organization resolves onto its own plan in this process
-    Given a hosted deployment holding the subscription rows
+    Given a hosted deployment whose billing peer holds a subscription
     When the plan for a paying organization is resolved
     Then it is the plan their subscription names rather than the free baseline
+    And it is the same plan the interactive process resolves
     And an organization holding no subscription still resolves the free baseline
-    And no missing subscription source is reported
 
   @unit
   Scenario: A self-hosted deployment resolves the unlimited baseline here too
@@ -30,25 +28,23 @@ Feature: The background worker resolves a plan the way the interactive one does
     When the plan for any organization is resolved
     Then it is the unlimited baseline, with no visibility window and no member
       ceiling
-    And it stays the unlimited baseline even where a subscription row exists
-    And no missing subscription source is reported, because a self-hosted plan
-      never comes from one
+    And billing is never asked, because a self-hosted plan never comes from a
+      subscription
 
   @unit
-  Scenario: A process that cannot read a plan says which source it is missing
-    Given a hosted deployment holding no subscription rows
-    When the plan provider is composed
-    Then it reports the missing subscription source by name, so a paying
-      organization reading as free is visible at boot
+  Scenario: A worker without a plan source never boots
+    Given a hosted deployment that supplies no billing peer
+    When the worker boots
+    Then the boot is refused, naming the entitlement module and the billing
+      dependency, so a paying organization can never read as free in silence
 
   @unit
   Scenario: An enterprise organization's webhook entitlement is answered here
     Given an organization on a plan whose tier carries the webhook entitlement
     When their plan is resolved
-    Then the entitlement comes back set, carried by the plan their subscription
-      names rather than added afterwards
+    Then the entitlement comes back set
     And a plan whose tier does not carry it leaves it unset
-    And so does the same organization when the subscription rows cannot be read
+    And a plan that withholds it explicitly keeps withholding it
 
   @unit
   Scenario: A licensed self-hosted deployment resolves the plan its licence names here too
@@ -58,7 +54,6 @@ Feature: The background worker resolves a plan the way the interactive one does
     Then it is the plan the licence names, with the seats the licence sold
     And the message ceiling stays unlimited, because self-hosted volume is never
       metered
-    And no missing licence source is reported, because this process composed one
 
   @unit
   Scenario: A licence predating a tier entitlement still carries it here
@@ -72,5 +67,5 @@ Feature: The background worker resolves a plan the way the interactive one does
   Scenario: A worker composes the licence source over the one client it opened
     Given a background worker that booted its module graph
     When its plan application resolves a tier
-    Then it reports no missing licence source, because the licence row rides the
-      same client every other read does
+    Then it asks the installed licensing peer, the same one every other read
+      uses

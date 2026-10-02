@@ -1,0 +1,114 @@
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
+import { Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import type React from "react";
+import { useState } from "react";
+
+import { useActiveProject } from "../active-project-context.tsx";
+import { CodePreview } from "./code-preview.tsx";
+import { parseSnippet } from "./codegen/snippets.ts";
+
+export function OpenTelemetrySetup(): React.ReactElement {
+  const { freshToken } = useActiveProject();
+  const { appBaseUrl } = useUiDeployment();
+  const [isVisible, setIsVisible] = useState(false);
+
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
+  const effectiveEndpoint = appBaseUrl;
+
+  function toggleVisibility(): void {
+    setIsVisible((prev) => !prev);
+  }
+
+  const envVarsCode = `# Set these environment variables in your application
+export OTEL_EXPORTER_OTLP_ENDPOINT="${effectiveEndpoint}/api/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${effectiveApiKey}"
+
+# Or for the trace-specific endpoint:
+# export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${effectiveEndpoint}/api/otel/v1/traces"`;
+
+  const { code: collectorCode, highlightLines } = parseSnippet(`receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+
+exporters:
+  otlp_http:
+    endpoint: ${effectiveEndpoint}/api/otel # +
+    headers:
+      Authorization: Bearer ${effectiveApiKey} # +
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http]
+`);
+
+  return (
+    <VStack align="stretch" gap={6} minW={0} w="full">
+      <VStack align="stretch" gap={0}>
+        <Text fontSize="md" fontWeight="semibold">
+          OpenTelemetry Integration
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          Choose your preferred setup method below
+        </Text>
+      </VStack>
+
+      <VStack align="stretch" gap={3}>
+        <Text textStyle="md" fontWeight="semibold">
+          Environment Variables
+        </Text>
+        <Text textStyle="sm">
+          Configure your application to send traces directly to LangWatch by setting these
+          environment variables. This approach works with any OpenTelemetry SDK or library that
+          supports OTLP HTTP export.
+        </Text>
+        <CodePreview
+          code={envVarsCode}
+          filename=".env"
+          codeLanguage="bash"
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
+          isVisible={isVisible}
+          onToggleVisibility={toggleVisibility}
+        />
+        <Text textStyle="xs" color="fg.muted">
+          Note: LangWatch supports all HTTP/protobuf, HTTP/JSON and gRPC protocols.
+        </Text>
+      </VStack>
+
+      <Separator />
+
+      <VStack align="stretch" gap={3}>
+        <Text textStyle="md" fontWeight="semibold">
+          OpenTelemetry Collector
+        </Text>
+        <Text textStyle="sm">
+          Use the OpenTelemetry Collector as an intermediary to receive traces from your application
+          and forward them to LangWatch. This is useful for complex deployments or when you need
+          additional processing.
+        </Text>
+        <CodePreview
+          code={collectorCode}
+          filename="collector-config.yaml"
+          languageIconUrl="/images/external-icons/otel.svg"
+          codeLanguage="yaml"
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
+          isVisible={isVisible}
+          highlightLines={highlightLines}
+          onToggleVisibility={toggleVisibility}
+        />
+      </VStack>
+    </VStack>
+  );
+}

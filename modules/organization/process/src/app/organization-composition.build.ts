@@ -1,10 +1,8 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
-import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { OrganizationUserRole } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
-  ENTERPRISE_FEATURE_ERRORS,
-  assertEnterprisePlanType,
   getRoleChangeType,
   isViewOnlyCustomRole,
   type EntitlementApi,
@@ -33,7 +31,6 @@ import type { OrganizationSeatRepository } from "../repositories/organization-se
 import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../repositories/prisma/prisma.organization-seat.repository.ts";
 import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
-import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
@@ -64,7 +61,6 @@ import type {
   OrganizationInvitesCreated,
   OrganizationInviteWithOrganization,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationPromptSeed,
   OrganizationSignals,
@@ -109,12 +105,11 @@ class EntitlementOrganizationSeatLicense {
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
     const plan = await this.activePlan(input.organizationId, input.user);
     // The NEW role's permissions are deliberately not read: a built-in role
-    // carries none, and a custom one is gated below on the plan rather than on
+    // carries none, and a custom one is gated on the plan by the door, not on
     // a seat. That is the platform's own call, kept.
     const change = getRoleChangeType({
       oldRole: input.currentRole as OrganizationUserRole,
@@ -123,16 +118,6 @@ class EntitlementOrganizationSeatLicense {
       newPermissions: undefined,
     });
     await this.assertSeatForChange({ change, organizationId: input.organizationId, plan });
-
-    const assignsCustomRole = (input.teamRoleUpdates ?? []).some(
-      (update) => Boolean(update.customRoleId) || isCustomRole(update.role),
-    );
-    if (assignsCustomRole) {
-      assertEnterprisePlanType({
-        planType: plan.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-      });
-    }
   }
 
   private async assertSeatForChange(input: {
@@ -424,28 +409,6 @@ class LoggedOrganizationPromptSeed implements OrganizationPromptSeed {
 }
 
 /**
- * The Enterprise plan gates, over the ONE plan application this process
- * resolves every allowance through.
- */
-function organizationPlanGate(options: {
-  plans: Pick<EntitlementApi, "getActivePlan">;
-}): OrganizationPlanGate {
-  const assertPlan = async (organizationId: string, errorMessage: string) => {
-    const plan = await options.plans.getActivePlan({ organizationId });
-    assertEnterprisePlanType({ planType: plan.type, errorMessage });
-  };
-
-  return {
-    assertCustomRolesAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.RBAC),
-    assertAuditLogsAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
-    assertScimAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.SCIM),
-  };
-}
-
-/**
  * The trail a sign-up, an invitation and a chosen integration leave outside
  * this feature. The sign-up announcement posts to our own Slack; no
  * product-analytics sink or marketing gateway is composed, so those say so at debug.
@@ -478,15 +441,8 @@ function organizationSignals({
  * project goes through the project application rather than a second creation
  * path, so it writes the same rows the project surface writes.
  */
-function organizationCeremony(options: {
-  projects: ProjectApi;
-  governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
-}): OrganizationCeremony {
+function organizationCeremony(options: { projects: ProjectApi }): OrganizationCeremony {
   return {
-    /** Main's onboarding seeded it; non-fatal at the call site. */
-    ensureDefaultAiToolCatalog: async ({ organizationId }) => {
-      await options.governance.aiToolEnsureDefaultCatalog({ organizationId });
-    },
     createProject: async (input) => {
       const project = await options.projects.create(
         {
@@ -554,7 +510,7 @@ function organizationDirectory(options: {
 
 /**
  * `InviteService` composed from this process's own reads plus the peers
- * `ServerOrganizationApp` depends on. The workspace-size census stays
+ * `OrganizationModule` depends on. The workspace-size census stays
  * uncomposed: its absence is supported, the invitation mail just says less.
  */
 function organizationInvitations(input: {
@@ -596,7 +552,7 @@ function organizationInvitations(input: {
   });
 }
 
-/** What this process hands `ServerOrganizationApp` at boot. */
+/** What this process hands `OrganizationModule` at boot. */
 export function buildOrganizationInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   encryption: { encrypt(value: string): string; decrypt(value: string): string };
@@ -616,7 +572,6 @@ export function buildOrganizationInfrastructure(input: {
     entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
-    governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
     notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   };
 }): OrganizationInfrastructure {
@@ -663,14 +618,10 @@ export function buildOrganizationInfrastructure(input: {
     }),
     // Identity owns the join-request ledger; this feature serves its door.
     joinRequests: identityJoinRequests(dependencies.identity),
-    plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals,
     seatLimits,
     lifecycle,
-    ceremony: organizationCeremony({
-      projects: dependencies.projects,
-      governance: dependencies.governance,
-    }),
+    ceremony: organizationCeremony({ projects: dependencies.projects }),
     directory: organizationDirectory({
       identity: dependencies.identity,
       userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),

@@ -3,7 +3,7 @@
  */
 
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   batchRecordTrpc,
   DatasetNotReadyError,
@@ -89,7 +89,7 @@ describe("the dataset tRPC declaration", () => {
         ["updateMapping", "mutation", "datasets:update"],
         ["findNextName", "query", "datasets:view"],
         ["copy", "mutation", "datasets:create"],
-        ["createFromStoredObject", "mutation", "datasets:create"],
+        ["createFromStoredObject", "mutation", "datasets:manage"],
         ["appendStoredObject", "mutation", "datasets:update"],
         ["retryNormalize", "mutation", "datasets:manage"],
       ]);
@@ -131,8 +131,8 @@ describe("the dataset tRPC declaration", () => {
       ]);
 
       expect(table).toEqual([
-        ["getAllByexperimentIdGroup", "query", "datasets:view"],
-        ["getAllByexperimentSlug", "query", "datasets:view"],
+        ["getAllByexperimentIdGroup", "query", "workflows:view"],
+        ["getAllByexperimentSlug", "query", "workflows:view"],
       ]);
     });
   });

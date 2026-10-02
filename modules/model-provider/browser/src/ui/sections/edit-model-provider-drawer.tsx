@@ -1,7 +1,7 @@
-import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { Box, Heading, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { modelProviders } from "@langwatch/model-provider-contract";
 
 import {

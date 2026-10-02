@@ -1,8 +1,9 @@
 /** "Run via API" for an evaluations-v3 experiment, lent to the experiment workbench. */
 
 import type { UiRunExperimentViaApiDialogProps } from "@langwatch/browser-host/declarations";
-import { buildRunSnippet, DataSourcePicker } from "@langwatch/workflow-browser-kit";
 
+import { buildRunSnippet } from "../../../model/run-via-api/run-snippets.ts";
+import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";
 import { GenerateApiSnippetDialog } from "../generate-api-snippet-dialog.tsx";
 import { useRunViaApiTabs } from "./use-run-via-api-tabs.ts";
 

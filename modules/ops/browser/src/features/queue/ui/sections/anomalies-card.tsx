@@ -1,4 +1,13 @@
-import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
 
@@ -7,9 +16,7 @@ import { api } from "../../../../behavior/ops-api.ts";
 /** Anomalous tenants: spiked enqueue rate or trace dominance (rate breaker, fingerprint
  * loop). Post-incident: surface tenant volume anomalies early. */
 export function AnomaliesCard() {
-  const query = api.ops.listAnomalies.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
+  const query = api.ops.listAnomalies.useQuery(undefined, {});
   const dismiss = api.ops.dismissAnomaly.useMutation({
     onSuccess: () => query.refetch(),
   });

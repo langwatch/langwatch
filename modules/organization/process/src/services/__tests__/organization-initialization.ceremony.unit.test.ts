@@ -31,7 +31,6 @@ function harness(
   createAndAssign = vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM })),
 ) {
   const ceremony = {
-    ensureDefaultAiToolCatalog: vi.fn(async () => undefined),
     createProject: vi.fn(async () => ({ success: true, projectSlug: "acme-project" })),
     ...overrides,
   };
@@ -75,17 +74,6 @@ describe("given a customer who declared no intent", () => {
       expect(ceremony.createProject).toHaveBeenCalledWith(
         expect.objectContaining({ name: TEAM.name, language: "other", framework: "other" }),
       );
-    });
-
-    /** @scenario A fresh organization gets the full standard catalog with no admin action */
-    it("gives the new organization the standard tool catalogue", async () => {
-      const { onboarding, ceremony } = harness();
-
-      await onboarding.initialize(request(), CALLER);
-
-      expect(ceremony.ensureDefaultAiToolCatalog).toHaveBeenCalledWith({
-        organizationId: ORGANIZATION.id,
-      });
     });
 
     it("provisions no personal workspace", async () => {
@@ -165,28 +153,6 @@ describe("given a customer who declared the coding-agent intent", () => {
       expect(signals.reportError).toHaveBeenCalledWith(failure, {
         extra: {
           origin: "onboarding.initializeOrganization",
-          organizationId: ORGANIZATION.id,
-        },
-      });
-    });
-
-    it("completes the ceremony when the tool catalogue cannot be seeded", async () => {
-      const failure = new Error("governance unavailable");
-      const { onboarding, signals } = harness({
-        ensureDefaultAiToolCatalog: vi.fn(async () => {
-          throw failure;
-        }),
-      });
-
-      const result = await onboarding.initialize(
-        request({ primaryIntent: "AGENT_GOVERNANCE" }),
-        CALLER,
-      );
-
-      expect(result).toMatchObject({ success: true });
-      expect(signals.reportError).toHaveBeenCalledWith(failure, {
-        extra: {
-          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
           organizationId: ORGANIZATION.id,
         },
       });

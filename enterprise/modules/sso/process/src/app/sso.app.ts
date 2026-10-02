@@ -3,13 +3,14 @@
  * Single sign-on, as both of its callers reach it: the licence gate a sign-in
  * page asks which provider to offer, and the operator's connection ledger.
  *
- * Every read and every command on the ledger is gated on the ADMIN_EMAILS
- * staff list — deliberately not `ops:*`, because who may attest a customer's
- * domain must not widen with a broader operator population — and recorded
+ * Every read and every command on the ledger is gated on the platform-operator
+ * grant at the platform tier, never an org-scoped permission, because who may
+ * attest a customer's domain must not widen with an org role — and recorded
  * AFTER the ledger answers, so the row says what happened rather than what was
  * attempted: a refusal and a failure both leave no row behind.
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   ssoConfig,
@@ -55,7 +56,10 @@ import {
   type SsoSetupRegistered,
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
+  type SsoSetupIdentityProviderView,
   type SsoSetupRenameInput,
+  type SsoSetupUpdateIdentityProviderInput,
+  type SsoSelfServeAvailability,
   type SsoSelfServeContext,
   type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
@@ -64,23 +68,20 @@ import {
   isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
-import {
-  EntitlementApi,
-  EnterprisePlanRequiredError,
-  isEnterpriseTier,
-} from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { signInProviderSecrets } from "@langwatch/secrets";
-import { UserApi } from "@langwatch/user-contract";
 
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/sign-in-providers.rules.ts";
-import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
+import {
+  findDeploymentSignIns,
+  ssoServiceProviderAddresses,
+} from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import {
@@ -126,7 +127,7 @@ export type SsoInfrastructure = Readonly<{
   isSaas: boolean;
 }>;
 
-type SsoSetup = FeatureSetup<typeof SsoApp.dependencies, SsoInfrastructure, SsoConfig>;
+type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, SsoInfrastructure, SsoConfig>;
 
 /** Every credential this module resolves, alongside the deployment facts. */
 async function resolveConfiguration(
@@ -160,25 +161,31 @@ async function resolveConfiguration(
  */
 const TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Whether the user holds the platform-operator grant. */
+function isPlatformOperator({
+  authorization,
+  userId,
+}: {
+  authorization: Pick<AuthzApi, "can">;
+  userId: string;
+}): Promise<boolean> {
+  return authorization.can({
+    principal: { type: "user", id: userId },
+    permission: "ops:manage",
+    scope: { type: "platform" },
+  });
+}
+
 /** The audit row's target, so a connection's history is one query. */
 const AUDIT_TARGET_KIND = "ssoConnection";
 
-/**
- * What an organization whose plan does not carry single sign-on is told. The
- * words are upstream's, carried as a literal because entitlement's feature
- * registry has no `SSO` key yet (handoff §10).
- */
-const SSO_ENTERPRISE_REFUSAL = "Single sign-on requires an Enterprise plan";
-
-export class SsoApp implements SsoApiContract {
+export class SsoModule implements SsoApiContract {
   static readonly contract = SsoApi;
   static readonly dependencies = {
     licensing: LicensingApi,
-    operators: OpsApi,
-    users: UserApi,
+    authorization: AuthzApi,
     auditLog: AuditLogApi,
     identity: IdentityApi,
-    entitlements: EntitlementApi,
     featureFlags: FeatureFlagApi,
   };
   static readonly config = ssoConfig;
@@ -199,10 +206,8 @@ export class SsoApp implements SsoApiContract {
   readonly #configuration: SsoConfiguration;
   readonly #historyActivity: SsoHistoryActivityService;
   readonly #selfServeContext: SsoSelfServeContextService;
-  readonly #operators: OpsApi;
-  readonly #users: UserApi;
+  readonly #authorization: AuthzApi;
   readonly #auditLog: AuditLogApi;
-  readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
 
   private constructor({
     gate,
@@ -241,8 +246,14 @@ export class SsoApp implements SsoApiContract {
     this.#selfServeContext = SsoSelfServeContextService.create({
       authority: LicenseDomainClaimAuthority.create({
         isHosted,
-        licensedAtStartup: () => gate.platformAllowed(),
+        licenseGate: () => gate.platformAllowed(),
+        licensing: dependencies.licensing,
       }),
+      // The same platform-operator grant the back office gates on.
+      platformOperators: {
+        isPlatformOperator: ({ actorId }) =>
+          isPlatformOperator({ authorization: dependencies.authorization, userId: actorId }),
+      },
       licenseProof: InstanceLicenseProof.create({ licensing: dependencies.licensing }),
       // Hosted self-serve (tier 3) is opted into per organization (D05).
       optIn: {
@@ -254,13 +265,11 @@ export class SsoApp implements SsoApiContract {
       },
       isHosted,
     });
-    this.#operators = dependencies.operators;
-    this.#users = dependencies.users;
+    this.#authorization = dependencies.authorization;
     this.#auditLog = dependencies.auditLog;
-    this.#entitlements = dependencies.entitlements;
   }
 
-  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoApp> {
+  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoModule> {
     // A peer may not be invoked while the process constructs, so the ledger
     // forwards to identity per call rather than being fetched here.
     const backoffice = () => dependencies.identity.ssoBackoffice();
@@ -293,6 +302,8 @@ export class SsoApp implements SsoApiContract {
       finalizeLegacyMigration: (input, actor) =>
         setup().finalizeLegacyMigration({ ...input, actor }),
       rename: (input, actor) => setup().rename({ ...input, actor }),
+      getIdentityProvider: (input) => setup().getIdentityProvider(input),
+      updateIdentityProvider: (input, actor) => setup().updateIdentityProvider({ ...input, actor }),
       setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
       activate: (input, actor) => setup().activate({ ...input, actor }),
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
@@ -307,7 +318,7 @@ export class SsoApp implements SsoApiContract {
       revoke: (input) => ways().revoke(input),
     };
     const configuration = await resolveConfiguration(config, members, secrets);
-    return new SsoApp({
+    return new SsoModule({
       gate: SsoGateService.create({
         configuration,
         licensing: dependencies.licensing,
@@ -337,16 +348,26 @@ export class SsoApp implements SsoApiContract {
    * addresses an identity provider is pointed at are this module's, because
    * this module is what answers them.
    */
-  async getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView> {
+  async getSetup(
+    input: SsoSetupOrganizationInput,
+    by: SsoAdministrator,
+  ): Promise<SsoSetupPageView> {
     const journey = await this.#setup.getSetup(input);
 
     return {
       ...journey,
-      availability: await this.#selfServeContext.availability(input),
-      serviceProvider: ssoServiceProviderAddresses({
-        baseUrl: this.#baseUrl,
-        connectionId: journey.connection?.connectionId ?? null,
-      }),
+      availability: await this.#selfServeContext.availability({ ...input, actorId: by.id }),
+      serviceProvider: {
+        ...ssoServiceProviderAddresses({
+          baseUrl: this.#baseUrl,
+          connectionId: journey.connection?.connectionId ?? null,
+        }),
+        deploymentSignIn:
+          findDeploymentSignIns({
+            provider: await this.resolveProvider(),
+            baseUrl: this.#baseUrl,
+          })[0] ?? null,
+      },
     };
   }
 
@@ -399,7 +420,7 @@ export class SsoApp implements SsoApiContract {
   }): Promise<SignInProviderMounts> {
     return Promise.resolve({
       socialProviders: buildSocialProviders(
-        this.#configuration,
+        { ...this.#configuration, baseUrl: input.baseUrl },
         input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
       ),
       genericOAuthConfigs:
@@ -597,13 +618,13 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainClaimOutcome> {
-    await this.#assertSelfServeAvailable(input.organizationId);
+    const { proof } = await this.#assertSelfServeAvailable(input.organizationId, by);
 
     return this.#attempted({
       by,
       action: "claimDomain",
       args: input,
-      ceremony: (actor) => this.#ceremony.claimDomain(input, actor),
+      ceremony: (actor) => this.#ceremony.claimDomain({ ...input, proof }, actor),
     });
   }
 
@@ -611,13 +632,13 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainProof> {
-    await this.#assertSelfServeAvailable(input.organizationId);
+    const { proof } = await this.#assertSelfServeAvailable(input.organizationId, by);
 
     return this.#attempted({
       by,
       action: "proveDomain",
       args: input,
-      ceremony: (actor) => this.#ceremony.proveDomain(input, actor),
+      ceremony: (actor) => this.#ceremony.proveDomain({ ...input, proof }, actor),
     });
   }
 
@@ -659,16 +680,15 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
-   * Registering is the purchase, so it is the press the plan gate stands in
-   * front of. The audit row records who asked for what and NOT this input: it
-   * carries a client secret, so the recorded args name the protocol instead.
+   * Registering is the purchase, so the plan gate is declared on its door.
+   * The audit row records who asked for what and NOT this input: it carries
+   * a client secret, so the recorded args name the protocol instead.
    */
   async setupRegister(
     input: SsoSetupRegisterInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
       by,
@@ -690,13 +710,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  /** Registering a replacement is registering, so it is gated like one. */
+  /** Registering a replacement is registering, so its door declares the same plan gate. */
   async setupStartLegacyMigration(
     input: SsoSetupStartMigrationInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
       by,
@@ -729,8 +748,6 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupMigrationRouteInput,
     by: SsoAdministrator,
   ): Promise<void> {
-    if (input.route === "direct") await this.#requireEnterprisePlan(input.organizationId);
-
     await this.#attempted({
       by,
       action: "selectMigrationRoute",
@@ -740,17 +757,16 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
-   * Finishing the cutover is part of the rollout that was bought, so it is
-   * gated like the registration that started it. What finalizing takes with
-   * it — and whether the evidence still allows it — is identity's, re-read
-   * there at the moment of the press.
+   * Finishing the cutover is part of the rollout that was bought, so its door
+   * gates it like the registration that started it. What finalizing takes
+   * with it — and whether the evidence still allows it — is identity's,
+   * re-read there at the moment of the press.
    */
   async setupFinalizeLegacyMigration(
     input: SsoSetupConnectionInput,
     by: SsoAdministrator,
   ): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -775,13 +791,42 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
+  async findIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | null> {
+    const view = await this.#selfServe.getIdentityProvider(input);
+    return view.protocol === "grandfathered" ? null : view;
+  }
+
+  /**
+   * Gated like registering, because these settings decide where sign-ins go.
+   * The audit row names the protocol and leaves the settings out: they can
+   * carry a client secret.
+   */
+  async setupUpdateIdentityProvider(
+    input: SsoSetupUpdateIdentityProviderInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
+    await this.#attempted({
+      by,
+      action: "updateIdentityProvider",
+      args: {
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        protocol: input.idp.protocol,
+      },
+      ceremony: (actor) => this.#selfServe.updateIdentityProvider(input, actor),
+    });
+  }
+
   /**
    * Which answer an organization is on is the whole fact somebody asking why a
    * stranger turned up in the member list needs, so the row carries it.
    */
   async setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -806,7 +851,6 @@ export class SsoApp implements SsoApiContract {
    */
   async setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -901,14 +945,13 @@ export class SsoApp implements SsoApiContract {
    * READS are deliberately never gated: a page that refuses to render cannot
    * say what it is refusing.
    */
-  /** D05's tier gate: a licence decides self-hosted, the opt-in decides hosted. */
-  #assertSelfServeAvailable(organizationId: string): Promise<void> {
-    return this.#selfServeContext.assertAvailable({ organizationId });
-  }
-
-  async #requireEnterprisePlan(organizationId: string): Promise<void> {
-    const plan = await this.#entitlements.getActivePlan({ organizationId });
-    if (!isEnterpriseTier(plan.type)) throw new EnterprisePlanRequiredError(SSO_ENTERPRISE_REFUSAL);
+  /** D05's tier gate: a licence decides self-hosted, the opt-in decides hosted; the
+   *  answer names how the administrator asking proves a domain. */
+  #assertSelfServeAvailable(
+    organizationId: string,
+    by?: SsoAdministrator,
+  ): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
+    return this.#selfServeContext.assertAvailable({ organizationId, actorId: by?.id });
   }
 
   /**
@@ -990,12 +1033,12 @@ export class SsoApp implements SsoApiContract {
    * The operator, or a 404 that says nothing about why: the surface does not
    * confirm its own existence to whoever is probing it. An operator debugging
    * a customer account is still the operator, so the impersonator is who the
-   * staff list is checked against.
+   * platform-operator grant is checked against.
    */
   async #requireOperator(by: SsoOperator): Promise<SsoConnectionLedgerOperator> {
     const userId = by.impersonatorId ?? by.id;
-    const profile = await this.#users.findById({ id: userId });
-    if (!this.#operators.isAdmin({ email: profile?.email })) throw new AdminSurfaceHiddenError();
+    if (!(await isPlatformOperator({ authorization: this.#authorization, userId })))
+      throw new AdminSurfaceHiddenError();
 
     return { userId };
   }

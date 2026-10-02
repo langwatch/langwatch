@@ -1,6 +1,6 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";

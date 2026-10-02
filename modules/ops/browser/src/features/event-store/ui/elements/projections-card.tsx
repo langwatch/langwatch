@@ -1,4 +1,4 @@
-import { Badge, Box, Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Badge, Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 
 import type { ProjectionHealthRow } from "../../model/projection-health.ts";
 

@@ -3,7 +3,15 @@
  * account, and the one way to end one of them without ending them all.
  */
 
-import { Badge, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Monitor } from "lucide-react";
 

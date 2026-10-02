@@ -1,9 +1,9 @@
-import { Button, Icon } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Button, Icon } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { getCurrentFilterText } from "@langwatch/trace-browser-kit";
 import { Zap } from "lucide-react";
 
+import { getCurrentFilterText } from "../../../../behavior/explorer.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 /**

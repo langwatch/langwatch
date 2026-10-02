@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   type OrganizationApi,
@@ -6,6 +5,7 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";

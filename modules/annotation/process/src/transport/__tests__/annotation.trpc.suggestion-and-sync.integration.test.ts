@@ -144,7 +144,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
   });
 
   describe("given a comment on a span's output carrying a suggestion", () => {
-    /** @scenario "A span output suggestion becomes that span's correction" */
+    /** @scenario A suggestion left with a comment on a span output becomes that span's correction */
     it("carries the suggestion into the trace correction for that span before saving", async () => {
       const caller = harness();
       mockWriteTraceSuggestion.mockClear();

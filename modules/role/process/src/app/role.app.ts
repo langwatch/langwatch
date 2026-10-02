@@ -3,39 +3,26 @@
  * this one object. Three operations name a ROLE rather than the organization
  * their check runs against, so those checks run here, where the row is.
  */
-import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
+import { ledgerActorFor, type LedgerActor, PermissionDeniedError } from "@langwatch/authorization";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,
   builtInRoleIdSchema,
   builtinRolePermissions,
-  newAuthzBindingId,
-  PermissionDeniedError,
-  type AuthzAccessBreakdownOutput,
-  type AuthzApplyMemberBindingsInput,
-  type AuthzBindingMutationSuccess,
-  type AuthzCreateBindingInput,
-  type AuthzCreateBindingOutput,
-  type AuthzDeleteBindingInput,
-  type AuthzListManagedBindingsForOrganizationOutput,
-  type AuthzListManagedBindingsForUserOutput,
+  newAuthzGrantId,
   type AuthzPrincipalRef,
-  type AuthzUpdateBindingInput,
   type BuiltInRoleId,
+  type GrantScopeTier,
 } from "@langwatch/authz-contract";
-import {
-  assertEnterprisePlanType,
-  ENTERPRISE_FEATURE_ERRORS,
-  EntitlementApi,
-} from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationApi,
   PersonalWorkspaceNotManagedHereError,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,
   RoleApi,
@@ -52,7 +39,6 @@ import {
   ROLE_PERMISSION_RESOURCES,
   roleResourceIsOrganizationExclusive,
   type Role,
-  type RoleBindingScopeType,
   type RoleCaller,
   type RoleCreate,
   type RolePermissionCatalog,
@@ -61,35 +47,31 @@ import {
   type RoleWriteAcknowledged,
 } from "@langwatch/role-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
 
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
 type RoleSetup = FeatureSetup<
-  typeof RoleApp.dependencies,
-  MembersRead<typeof RoleApp.reads>,
+  typeof RoleModule.dependencies,
+  MembersRead<typeof RoleModule.reads>,
   undefined,
   RoleRepositories
 >;
 
 const WRITE_ACKNOWLEDGED: RoleWriteAcknowledged = { success: true };
 
-export class RoleApp implements RoleApi {
+export class RoleModule implements RoleApi {
   static readonly contract = RoleApi;
   static readonly dependencies = {
     permissions: AuthzApi,
     organizations: OrganizationApi,
-    users: UserApi,
     entitlement: EntitlementApi,
   };
-  static readonly reads = reads("prisma");
+  static readonly reads = ["prisma"] as const;
 
   #roles: RoleService;
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
-  #users: UserApi;
-  #entitlement: EntitlementApi;
   #prisma: RoleSetup["members"]["prisma"];
 
   private constructor(
@@ -97,16 +79,17 @@ export class RoleApp implements RoleApi {
     dependencies: RoleSetup["dependencies"],
     members: RoleSetup["members"],
   ) {
-    this.#roles = RoleService.create({ repository: repositories.roles });
+    this.#roles = RoleService.create({
+      repository: repositories.roles,
+      entitlement: dependencies.entitlement,
+    });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
-    this.#users = dependencies.users;
-    this.#entitlement = dependencies.entitlement;
     this.#prisma = members.prisma;
   }
 
-  static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, members);
+  static create({ repositories, dependencies, members }: RoleSetup): RoleModule {
+    return new RoleModule(repositories, dependencies, members);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────
@@ -163,7 +146,6 @@ export class RoleApp implements RoleApi {
   /** Defines a custom role, attributed to the caller who asked for it. */
   async createRole(input: { role: RoleCreate }, by: RoleCaller): Promise<Role> {
     this.#roles.assertNameAllowed(input.role.name);
-    await this.#assertCustomRolesAllowed({ organizationId: input.role.organizationId });
     await this.#assertWithinCaller({
       organizationId: input.role.organizationId,
       added: input.role.permissions,
@@ -208,7 +190,7 @@ export class RoleApp implements RoleApi {
   ): Promise<Role> {
     const role = await this.#roles.getById({ roleId: input.roleId });
     await this.#assertMayReach(by, role.organizationId, "organization:manage");
-    await this.#assertCustomRolesAllowed({ organizationId: role.organizationId });
+    await this.#roles.assertCustomRolesAllowed({ organizationId: role.organizationId });
 
     return this.#write(role, input.changes, by);
   }
@@ -251,16 +233,16 @@ export class RoleApp implements RoleApi {
     input: { userId: string; teamId: string; customRoleId: string },
     by: RoleCaller,
   ): Promise<RoleWriteAcknowledged> {
-    // The team's organization first, so a team nobody can name reads as a
-    // not-found rather than as a plan refusal.
     const organizationId = await this.getAssignmentOrganization({ teamId: input.teamId });
-    await this.#assertCustomRolesAllowed({ organizationId });
 
     const role = await this.#roles.getById({ roleId: input.customRoleId });
     if (role.organizationId !== organizationId) throw new RoleNotAssignableError();
 
+    // A legacy `ops:*` entry is inert at every tier (the platform fence), so it refuses nothing.
     const exclusive = role.permissions.find(
-      (permission) => !bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }),
+      (permission) =>
+        bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
+        !bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }),
     );
     if (exclusive) throw new OrgExclusivePermissionScopeError(exclusive, "TEAM");
 
@@ -274,6 +256,7 @@ export class RoleApp implements RoleApi {
       teamId: input.teamId,
       organizationId,
       customRoleId: input.customRoleId,
+      caller: callerOf(by),
       actor: actorOf(by),
     });
 
@@ -292,6 +275,7 @@ export class RoleApp implements RoleApi {
       teamId: input.teamId,
       organizationId,
       customRoleId: null,
+      caller: callerOf(by),
       actor: actorOf(by),
     });
 
@@ -328,86 +312,11 @@ export class RoleApp implements RoleApi {
     };
   }
 
-  // ── role bindings ──────────────────────────────────────────────────────────
-
-  /** Every role binding in the organization, for the members administration screen. */
-  listBindingsForOrganization(input: {
-    organizationId: string;
-  }): Promise<AuthzListManagedBindingsForOrganizationOutput> {
-    return this.#permissions.listManagedBindingsForOrganization(input);
-  }
-
-  /** One user's role bindings, for the member detail dialog. */
-  listBindingsForUser(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<AuthzListManagedBindingsForUserOutput> {
-    return this.#permissions.listManagedBindingsForUser(input);
-  }
-
-  /**
-   * The caller's own standing. The display identity is read through the user
-   * directory rather than off a session, because a handler is handed a caller
-   * id and nothing else.
-   */
-  async getCallerAccessBreakdown(
-    input: { organizationId: string },
-    by: RoleUserCaller,
-  ): Promise<AuthzAccessBreakdownOutput> {
-    const profile = await this.#users.findById({ id: by.id });
-
-    return this.#permissions.getAccessBreakdown({
-      organizationId: input.organizationId,
-      userId: by.id,
-      userName: profile?.name ?? null,
-      userEmail: profile?.email ?? null,
-    });
-  }
-
-  /** Binds a user or a group to a role at one scope. */
-  createBinding(
-    input: Omit<AuthzCreateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.createBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
-  }
-
-  /** Changes the role an existing binding grants. */
-  updateBinding(
-    input: Omit<AuthzUpdateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.updateBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
-  }
-
-  /** Removes one binding by id. */
-  deleteBinding(
-    input: Omit<AuthzDeleteBindingInput, "actor">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess> {
-    return this.#permissions.deleteBinding({ ...input, actor: actorOf(by) });
-  }
-
-  /**
-   * Applies one member's deletes and creates together, so a partial failure
-   * cannot leave them holding some of the old bindings and none of the new.
-   */
-  applyMemberBindings(
-    input: Omit<AuthzApplyMemberBindingsInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess> {
-    return this.#permissions.applyMemberBindings({
-      ...input,
-      actor: actorOf(by),
-      caller: callerOf(by),
-    });
-  }
-
   // ── the checks and writes the operations above share ───────────────────────
 
   /** The personal-workspace fence a team or project binding is refused at. */
   async #assertNoPersonalTeamScope(
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[],
   ): Promise<void> {
     const teamIds = scopes
       .filter((scope) => scope.scopeType === "TEAM")
@@ -451,15 +360,6 @@ export class RoleApp implements RoleApi {
       permissions: [...added],
     });
     if (missing.length > 0) throw new RoleExceedsCallerPermissionsError(missing);
-  }
-
-  /** Whether the organization's plan carries custom roles. */
-  async #assertCustomRolesAllowed({ organizationId }: { organizationId: string }): Promise<void> {
-    const plan = await this.#entitlement.getActivePlan({ organizationId });
-    assertEnterprisePlanType({
-      planType: plan.type,
-      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-    });
   }
 
   /** The organization decision an input could not name, run where the row is. */
@@ -576,6 +476,7 @@ export class RoleApp implements RoleApi {
     teamId: string;
     organizationId: string;
     customRoleId: string | null;
+    caller: AuthzPrincipalRef;
     actor: LedgerActor;
   }): Promise<void> {
     const role = input.customRoleId ? "CUSTOM" : "VIEWER";
@@ -596,6 +497,7 @@ export class RoleApp implements RoleApi {
         bindingId: existing.id,
         role,
         customRoleId: input.customRoleId,
+        caller: input.caller,
         actor: input.actor,
       });
 
@@ -606,7 +508,7 @@ export class RoleApp implements RoleApi {
       organizationId: input.organizationId,
       bindings: [
         {
-          bindingId: newAuthzBindingId(),
+          bindingId: newAuthzGrantId(),
           principal: { userId: input.userId },
           role,
           customRoleId: input.customRoleId,
@@ -614,6 +516,7 @@ export class RoleApp implements RoleApi {
           scopeId: input.teamId,
         },
       ],
+      caller: input.caller,
       actor: input.actor,
       onDuplicate: "skip",
     });

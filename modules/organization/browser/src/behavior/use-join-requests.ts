@@ -77,6 +77,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
             void queryClient.joinRequests.pending.invalidate();
             // An approval adds a member, so the members list is stale too.
             void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+            void queryClient.organization.getDirectoryCounts.invalidate();
           },
           // Never `error.message`: the code-keyed registry owns the words.
           onError: (error) =>

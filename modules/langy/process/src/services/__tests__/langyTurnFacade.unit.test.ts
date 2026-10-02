@@ -48,6 +48,7 @@ function makeFixture() {
     },
     context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
+    skillGates: { resolveDisabled: vi.fn(async () => []) },
     metrics: { count: vi.fn() },
     admission: {
       claim: vi.fn(async () => ({

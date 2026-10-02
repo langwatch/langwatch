@@ -1,15 +1,17 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
+import { promptClient } from "@langwatch/prompt-client";
 import { useMemo } from "react";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 /** Picks the value matching a target's type, defaulting to the evaluator branch. */
-function selectByTargetType<T>(
+function selectByTargetType<Prompt, Agent, Evaluator>(
   type: TargetConfig["type"] | undefined,
-  values: { prompt: T; agent: T; evaluator: T },
-): T {
+  values: { prompt: Prompt; agent: Agent; evaluator: Evaluator },
+): Prompt | Agent | Evaluator {
   if (type === "prompt") return values.prompt;
   if (type === "agent") return values.agent;
   return values.evaluator;
@@ -24,7 +26,7 @@ export const useTargetName = (target: TargetConfig): string => {
   const { project } = useOrganizationTeamProject();
 
   // Fetch prompt name for prompt targets
-  const { data: prompt, isLoading: promptLoading } = api.prompts.getByIdOrHandle.useQuery(
+  const { data: prompt, isLoading: promptLoading } = promptClient.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: target.promptId ?? "",
       projectId: project?.id ?? "",
@@ -35,7 +37,7 @@ export const useTargetName = (target: TargetConfig): string => {
   );
 
   // Fetch agent name for agent targets
-  const { data: agent, isLoading: agentLoading } = api.agents.getById.useQuery(
+  const { data: agent, isLoading: agentLoading } = experimentApi.agents.getById.useQuery(
     {
       id: target.dbAgentId ?? "",
       projectId: project?.id ?? "",
@@ -46,15 +48,16 @@ export const useTargetName = (target: TargetConfig): string => {
   );
 
   // Fetch evaluator name for evaluator targets
-  const { data: evaluator, isLoading: evaluatorLoading } = api.evaluators.getById.useQuery(
-    {
-      id: target.targetEvaluatorId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: target.type === "evaluator" && !!target.targetEvaluatorId && !!project?.id,
-    },
-  );
+  const { data: evaluator, isLoading: evaluatorLoading } =
+    evaluatorClient.evaluators.getById.useQuery(
+      {
+        id: target.targetEvaluatorId ?? "",
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: target.type === "evaluator" && !!target.targetEvaluatorId && !!project?.id,
+      },
+    );
 
   const entity: NamedEntity | undefined =
     selectByTargetType(target.type, { prompt, agent, evaluator }) ?? undefined;
@@ -74,7 +77,7 @@ export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] 
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const promptQueries = api.useQueries((t) =>
+  const promptQueries = experimentApi.useQueries((t) =>
     targets.map((target) =>
       t.prompts.getByIdOrHandle(
         { idOrHandle: target?.promptId ?? "", projectId },
@@ -86,7 +89,7 @@ export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] 
     ),
   );
 
-  const agentQueries = api.useQueries((t) =>
+  const agentQueries = experimentApi.useQueries((t) =>
     targets.map((target) =>
       t.agents.getById(
         { id: target?.dbAgentId ?? "", projectId },
@@ -98,7 +101,7 @@ export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] 
     ),
   );
 
-  const evaluatorQueries = api.useQueries((t) =>
+  const evaluatorQueries = experimentApi.useQueries((t) =>
     targets.map((target) =>
       t.evaluators.getById(
         { id: target?.targetEvaluatorId ?? "", projectId },
@@ -118,12 +121,12 @@ export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] 
     });
     return pickTargetName({
       target,
-      entity: (query?.data as NamedEntity | null | undefined) ?? undefined,
+      entity: query?.data ?? undefined,
       isLoading: query?.isLoading ?? false,
     });
   });
 
-  // api.useQueries returns a new array every render, so key the memo on the
+  // experimentApi.useQueries returns a new array every render, so key the memo on the
   // resolved names themselves rather than on the query objects. JSON.stringify
   // (not join) so distinct lists can't alias to the same key — ["a|b"] and
   // ["a","b"] both join to "a|b" but stringify differently.

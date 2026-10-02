@@ -1,5 +1,5 @@
-import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { TriggerKind } from "@langwatch/automation-contract";
+import { Badge, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type Instant,
   Temporal,
@@ -172,8 +172,8 @@ export function AutomationHistory({
         textAlign="center"
       >
         <Text textStyle="sm" color="fg.muted">
-          Nothing has fired yet. When your automations, alerts, and reports run, you'll see what
-          they did here.
+          Nothing has fired yet. When your automations and reports run, you'll see what they did
+          here.
         </Text>
       </Box>
     );

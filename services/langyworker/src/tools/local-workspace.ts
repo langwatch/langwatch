@@ -11,11 +11,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-import {
-  MODEL_RETRY_MAX_ATTEMPTS,
-  MODEL_RETRY_MAX_NAMED_WAIT_MS,
-  retryDelayMs,
-} from "../model-retry.js";
 import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
@@ -104,8 +99,20 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** Wait this long after a failed poll before the next one. */
 const POLL_RETRY_DELAY_MS = 1_000;
 
-/** Give up on the folder after this many failed polls in a row. */
+/** Give up on a call the app says it lost after this many polls in a row. */
 const MAX_POLL_FAILURES = 3;
+
+/** Retries of a request the app failed for a transient reason, after the first. */
+const APP_RETRY_MAX_ATTEMPTS = 5;
+
+/** The first wait before asking the app again. Each retry doubles it: 1 to 16 s. */
+const APP_RETRY_BASE_DELAY_MS = 1_000;
+
+/** How far a wait is shifted at random, as a share of it, either way. */
+const APP_RETRY_JITTER = 0.2;
+
+/** A wait the app names past this is not waited out: the call fails. */
+const APP_RETRY_MAX_NAMED_WAIT_MS = 60_000;
 
 /** The longest a single local call may wait for its answer. */
 const CALL_MAX_WAIT_MS = 20 * 60 * 1000;
@@ -226,6 +233,19 @@ function retryAfterHeaderMs(response: Response): number | undefined {
 }
 
 /**
+ * The wait before retry `attempt` of a request to the app, or null when a busy
+ * app named a wait too long to take. A named wait is taken as named; otherwise
+ * the backoff doubles from APP_RETRY_BASE_DELAY_MS with jitter either way.
+ */
+function appRetryWaitMs({ error, attempt }: { error: unknown; attempt: number }): number | null {
+  const named = error instanceof AppBusyError ? error.retryAfterMs : undefined;
+  if (named !== undefined) return named > APP_RETRY_MAX_NAMED_WAIT_MS ? null : named;
+  const backoff = APP_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+  const shift = backoff * APP_RETRY_JITTER * (2 * Math.random() - 1);
+  return Math.max(0, Math.round(backoff + shift));
+}
+
+/**
  * The app answered, and it does not hold this call any more. A subclass of
  * the one above, so every catch still reads it as a call that did not run.
  */
@@ -259,6 +279,18 @@ function rejectionText(body: ApiErrorBody): string {
   return `LangWatch refused this call before it reached the machine: ${detail}. Fix the parameters and call the tool again.`;
 }
 
+/** The code the app answers with when no folder is connected (a 503). */
+const WORKSPACE_OFFLINE_CODE = "langy_local_workspace_offline";
+
+/** The handled error code of a refused response, if its body names one. */
+async function errorCode(response: Response): Promise<string | undefined> {
+  try {
+    return ((await response.json()) as ApiErrorBody).error?.code;
+  } catch {
+    return undefined;
+  }
+}
+
 function endpoint(): string {
   return (process.env.LANGWATCH_ENDPOINT ?? "").replace(/\/+$/, "");
 }
@@ -266,6 +298,28 @@ function endpoint(): string {
 function combineSignals(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
   const timeout = AbortSignal.timeout(timeoutMs);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+async function throwForBadRequest(response: Response): Promise<never> {
+  let body: ApiErrorBody = {};
+  try {
+    body = (await response.json()) as ApiErrorBody;
+  } catch {
+    body = {};
+  }
+  if (body.error?.code === "langy_api_request_invalid") {
+    throw new CallRejectedError(rejectionText(body));
+  }
+  throw new AppUnreachableError("the LangWatch app did not answer");
+}
+
+async function throwForBusy(response: Response): Promise<never> {
+  // A 503 is also how the app says no folder is connected, after it waited
+  // for one: asking again would only wait again.
+  if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
+    throw new AppUnreachableError("no local folder is connected to this conversation");
+  }
+  throw new AppBusyError(retryAfterHeaderMs(response));
 }
 
 /**
@@ -304,21 +358,8 @@ export async function callApp<T>({
   if (response.status === 404) {
     throw new CallLostError("the LangWatch app does not hold this call any more");
   }
-  if (response.status === 400) {
-    let body: ApiErrorBody = {};
-    try {
-      body = (await response.json()) as ApiErrorBody;
-    } catch {
-      body = {};
-    }
-    if (body.error?.code === "langy_api_request_invalid") {
-      throw new CallRejectedError(rejectionText(body));
-    }
-    throw new AppUnreachableError("the LangWatch app did not answer");
-  }
-  if (response.status === 429 || response.status === 503) {
-    throw new AppBusyError(retryAfterHeaderMs(response));
-  }
+  if (response.status === 400) return throwForBadRequest(response);
+  if (response.status === 429 || response.status === 503) return throwForBusy(response);
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
     return (await response.json()) as T;
@@ -470,6 +511,37 @@ export async function localCallPushback({ signal }: { signal?: AbortSignal }): P
 }
 
 /**
+ * Posts the call. The app does not deduplicate a start, so it is resent only
+ * when the app said it did not take it (429, 503), never after an error that
+ * may have reached it: running a command twice is worse than a failed call.
+ */
+async function startLocalCall({
+  body,
+  signal,
+}: {
+  body: unknown;
+  signal: AbortSignal | undefined;
+}): Promise<{ callId: string }> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await callApp<{ callId: string }>({
+        path: "/api/langy/local/calls",
+        method: "POST",
+        body,
+        signal,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    } catch (error) {
+      if (!(error instanceof AppBusyError) || attempt > APP_RETRY_MAX_ATTEMPTS) throw error;
+      if (signal?.aborted) throw new CallCancelledError(CANCELLED_PUSHBACK);
+      const waitMs = appRetryWaitMs({ error, attempt });
+      if (waitMs === null) throw error;
+      await sleep(waitMs, signal);
+    }
+  }
+}
+
+/**
  * Post one call, then long-poll until the machine answers. A refusal from the
  * machine is thrown with its code and its message unchanged, so the model can
  * act on the words the CLI chose.
@@ -497,53 +569,9 @@ export async function runLocalCall({
   return pollLocalCall({ callId: started.callId, startedAt, signal, now });
 }
 
-/**
- * Posts the call. The app does not deduplicate a start, so it is re-sent only on 429 or 503, never
- * after a network error or another 5xx that may have reached it: running a command twice on the
- * developer's machine is worse than a failed tool call.
- */
-async function startLocalCall({
-  body,
-  signal,
-}: {
-  body: unknown;
-  signal: AbortSignal | undefined;
-}): Promise<{ callId: string }> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await callApp<{ callId: string }>({
-        path: "/api/langy/local/calls",
-        method: "POST",
-        body,
-        signal,
-        timeoutMs: REQUEST_TIMEOUT_MS,
-      });
-    } catch (error) {
-      if (!(error instanceof AppBusyError) || attempt > MODEL_RETRY_MAX_ATTEMPTS) throw error;
-      if (signal?.aborted) throw new CallCancelledError(CANCELLED_PUSHBACK);
-      const wait =
-        error.retryAfterMs !== undefined && error.retryAfterMs <= MODEL_RETRY_MAX_NAMED_WAIT_MS
-          ? error.retryAfterMs
-          : retryDelayMs({ attempt, errorMessage: "" });
-      await sleep(wait ?? 0, signal);
-    }
-  }
-}
+type PollFailures = { transient: number; lost: number };
 
-/** The wait before re-polling after a transient failure: the app's own wait, else the model's. */
-function transientPollWaitMs({
-  error,
-  attempt,
-}: {
-  error: AppUnreachableError;
-  attempt: number;
-}): number {
-  const named = error instanceof AppBusyError ? error.retryAfterMs : undefined;
-  if (named !== undefined && named <= MODEL_RETRY_MAX_NAMED_WAIT_MS) return named;
-  return retryDelayMs({ attempt, errorMessage: "" }) ?? 0;
-}
-
-/** One poll of a local call, retried on failure, until it settles or its budget runs out. */
+/** One poll of a local call; a failed one waits, and throws once its retry budget runs out. */
 async function pollOneLocalCall({
   callId,
   signal,
@@ -551,8 +579,8 @@ async function pollOneLocalCall({
 }: {
   callId: string;
   signal: AbortSignal | undefined;
-  failures: number;
-}): Promise<{ poll?: PollCallResponse; failures: number }> {
+  failures: PollFailures;
+}): Promise<{ poll?: PollCallResponse; failures: PollFailures }> {
   try {
     const poll = await callApp<PollCallResponse>({
       path: `/api/langy/local/calls/${encodeURIComponent(callId)}`,
@@ -560,24 +588,26 @@ async function pollOneLocalCall({
       signal,
       timeoutMs: POLL_REQUEST_TIMEOUT_MS,
     });
-    return { poll, failures: 0 };
+    return { poll, failures: { transient: 0, lost: 0 } };
   } catch (error) {
     if (error instanceof CallCancelledError || signal?.aborted) {
       await cancelCall(callId);
       throw new CallCancelledError(CANCELLED_PUSHBACK);
     }
-    const nextFailures = failures + 1;
-    // A read repeats nothing, so an app that did not answer, failed or was busy
-    // is asked again on the model retry's schedule. A call the app says it lost
-    // keeps the short count: waiting longer does not bring it back.
+    // A read repeats nothing, so an app that did not answer, failed or was
+    // busy is asked again with a growing wait. A call the app says it lost
+    // keeps its own short count: waiting longer does not bring it back.
     if (error instanceof AppUnreachableError && !(error instanceof CallLostError)) {
-      if (nextFailures > MODEL_RETRY_MAX_ATTEMPTS) throw error;
-      await sleep(transientPollWaitMs({ error, attempt: nextFailures }), signal);
-      return { failures: nextFailures };
+      const transient = failures.transient + 1;
+      const waitMs = appRetryWaitMs({ error, attempt: transient });
+      if (transient > APP_RETRY_MAX_ATTEMPTS || waitMs === null) throw error;
+      await sleep(waitMs, signal);
+      return { failures: { ...failures, transient } };
     }
-    if (nextFailures >= MAX_POLL_FAILURES) throw error;
+    const lost = failures.lost + 1;
+    if (lost >= MAX_POLL_FAILURES) throw error;
     await sleep(POLL_RETRY_DELAY_MS, signal);
-    return { failures: nextFailures };
+    return { failures: { ...failures, lost } };
   }
 }
 
@@ -604,7 +634,7 @@ async function pollLocalCall({
   signal: AbortSignal | undefined;
   now: () => number;
 }): Promise<string> {
-  let failures = 0;
+  let failures: PollFailures = { transient: 0, lost: 0 };
   for (;;) {
     if (signal?.aborted) {
       await cancelCall(callId);

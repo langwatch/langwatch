@@ -4,12 +4,12 @@
  * budget request) and the account's Profile and Security settings screens.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 import { userTrpc } from "@langwatch/user-contract";
 
 import { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
 
-export const userWeb = defineWebModule("user")
+export const userWeb = defineBrowserModule("user")
   .withApi(personalWorkspaceApi, { contracts: [userTrpc] })
   .withHosts({
     requires: ["PersonalWorkspaceHostApi"],
@@ -77,8 +77,4 @@ export const userWeb = defineWebModule("user")
     organizationMfaGate: {
       load: () => import("./features/two-step-verification/ui/sections/organization-mfa-gate.tsx"),
     },
-  })
-  /** What another module may mount. governance reads the tile icon for its tool cards. */
-  .publishSurfaces({
-    "surfaces/tile-icon": { load: () => import("./ui/elements/tile-icon.tsx") },
   });

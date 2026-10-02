@@ -5,10 +5,9 @@
  * and unsigned licenses display nothing.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
@@ -42,10 +41,6 @@ vi.mock("../use-license-actions.ts", () => ({
     isRefreshing: false,
   }),
 }));
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const resourceCounts = {
   currentMembers: 8,
@@ -86,7 +81,7 @@ const validStatus = ({ connected }: { connected: boolean }): LicenseStatusPayloa
 
 const renderWith = (status: LicenseStatusPayload) => {
   statusResult.current = status;
-  render(<LicenseStatusPanel organizationId="org-123" />, { wrapper: Wrapper });
+  renderWithDesignSystem(<LicenseStatusPanel organizationId="org-123" />);
 };
 
 describe("LicenseStatusPanel", () => {

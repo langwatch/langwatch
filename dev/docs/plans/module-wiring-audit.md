@@ -143,6 +143,8 @@ Lower severity than #4 — the backend capability works, only its UI is dead.
 
 ### 6. `langy-browser` and `suite-browser` shared outside the kit law (new, structural)
 
+**Superseded:** `suite-browser` and `langy-browser` now export only `./declaration`; no subpath reach remains.
+
 Neither package declares a `defineBrowserModule`/`defineWebModule` (correctly
 absent from `modules/web-modules.generated.ts` — they own no screen), but both
 are imported directly by other modules' private browser code via ad hoc

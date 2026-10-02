@@ -5,7 +5,7 @@ import type {
   UiLlmConfigPopoverProps,
   UiOutputsSectionProps,
 } from "@langwatch/browser-host/declarations";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 
 import { useModelSelectionOptions } from "../../../behavior/use-model-selection-options.ts";
 import { LLMConfigField } from "../../elements/llmPromptConfigs/llm-config-field.tsx";

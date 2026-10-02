@@ -3,8 +3,8 @@
  *
  * Unit tests for SpotlightOverlay rendering and navigation.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -72,11 +72,7 @@ function addAnchor(anchor: string): HTMLElement {
 }
 
 function renderOverlay() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SpotlightOverlay />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SpotlightOverlay />);
 }
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────

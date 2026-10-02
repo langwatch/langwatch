@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   AuthzGrantsService,
   type AuthzApi,
@@ -23,6 +22,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -98,6 +98,12 @@ class StubRepository extends OrganizationRepository {
 
   findStoredSettings(): Promise<StoredOrganizationSettings | null> {
     return Promise.resolve(this.storedSettings);
+  }
+
+  hasS3Secret = false;
+
+  async hasStoredS3Secret(): Promise<boolean> {
+    return this.hasS3Secret;
   }
 
   updateSettings(input: Record<string, unknown>): Promise<void> {
@@ -232,10 +238,7 @@ class RecordingGrants extends AuthzGrantsService {
   readonly revokedInputs: AuthzRevokeBindingsWhereInput[] = [];
   readonly revokedBindingInputs: AuthzRevokeBindingsInput[] = [];
   removed = 1;
-  readonly attach = unsupported<AuthzGrantsService["attach"]>();
-  readonly update = unsupported<AuthzGrantsService["update"]>();
   readonly revoke = unsupported<AuthzGrantsService["revoke"]>();
-  readonly replace = unsupported<AuthzGrantsService["replace"]>();
   readonly offboard = unsupported<AuthzGrantsService["offboard"]>();
   readonly attachResourceGrant = unsupported<AuthzGrantsService["attachResourceGrant"]>();
   readonly revokeResourceGrants = unsupported<AuthzGrantsService["revokeResourceGrants"]>();
@@ -521,6 +524,35 @@ describe("OrganizationService", () => {
     });
   });
 
+  describe("when the settings carry an endpoint and a key id but no secret", () => {
+    const storage = {
+      organizationId: "org",
+      s3Endpoint: "https://s3.example",
+      s3AccessKeyId: "AKIA",
+    };
+
+    /** @scenario A first-time storage setup with a blank secret is refused */
+    it("refuses it when no secret is stored yet", async () => {
+      const repository = new StubRepository("team");
+
+      await expect(createService(repository).updateSettings(storage)).rejects.toMatchObject({
+        code: "validation_error",
+        httpStatus: 400,
+      });
+      expect(repository.settingsUpdate).toBeNull();
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("keeps the stored secret when one is held", async () => {
+      const repository = new StubRepository("team");
+      repository.hasS3Secret = true;
+
+      await createService(repository).updateSettings(storage);
+
+      expect(repository.settingsUpdate).not.toHaveProperty("s3SecretAccessKey");
+    });
+  });
+
   it("does not request trace-share revocation for settings updates without a sharing transition", async () => {
     const repository = new StubRepository("team");
 
@@ -609,6 +641,7 @@ describe("OrganizationService", () => {
         teamId: "team",
         userId: "user",
         role: "MEMBER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).rejects.toBeInstanceOf(PersonalTeamProtectedError);
@@ -623,11 +656,14 @@ describe("OrganizationService", () => {
       teamId: "team",
       userId: "user",
       role: "MEMBER",
+      caller: { type: "user", id: "actor" },
       actor: { type: "user", id: "actor" },
     });
+    // The door forwards its caller: authz bounds the write by what that caller holds.
     expect(grants.attachedInputs[0]).toMatchObject({
       organizationId: "org",
       bindings: [{ principal: { userId: "user" }, scopeId: "team" }],
+      caller: { type: "user", id: "actor" },
     });
     await service.removeTeamMember({
       organizationId: "org",
@@ -650,6 +686,7 @@ describe("OrganizationService", () => {
         teamId: "team",
         userId: "stranger",
         role: "VIEWER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).rejects.toBeInstanceOf(UserNotInOrganizationError);
@@ -713,6 +750,7 @@ describe("OrganizationService", () => {
             scopeId: "team",
           },
         ],
+        caller: { type: "system" },
         actor: { type: "system", id: "system:personal-workspace" },
         source: "grants-service",
         onDuplicate: "skip",

@@ -2,31 +2,44 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { SlackBlockKitTemplatePicker } from "../ui/blocks/template-picker.tsx";
-import { templateOptionsFor } from "../ui/elements/registry.ts";
+import {
+  pickDefaultSlackBlockKitTemplateId,
+  type SlackBlockKitTemplateOption,
+  templateOptionsFor,
+} from "../ui/elements/registry.ts";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+const pickerElement = (props: Partial<Parameters<typeof SlackBlockKitTemplatePicker>[0]> = {}) => (
+  <SlackBlockKitTemplatePicker
+    cadence="immediate"
+    kind="trace"
+    deliveryMethod="webhook"
+    hasEvaluationFilter={false}
+    currentSource=""
+    onSelect={vi.fn()}
+    {...props}
+  />
 );
 
 const renderPicker = (props: Partial<Parameters<typeof SlackBlockKitTemplatePicker>[0]> = {}) =>
-  render(
-    <SlackBlockKitTemplatePicker
-      cadence="immediate"
-      kind="trace"
-      deliveryMethod="webhook"
-      hasEvaluationFilter={false}
-      currentSource=""
-      onSelect={vi.fn()}
-      onSelectOtherCadence={vi.fn()}
-      {...props}
-    />,
-    { wrapper: Wrapper },
-  );
+  renderWithDesignSystem(pickerElement(props));
+
+/** The layouts in the order the list renders them, by registry id. */
+const layouts = () => within(screen.getByRole("group", { name: "Message layout" }));
+
+const layoutOrder = () =>
+  layouts()
+    .getAllByRole("button")
+    .map((el) => el.getAttribute("data-layout-id"));
+
+const layout = (name: RegExp) => layouts().getByRole("button", { name });
+
+const preview = () => within(screen.getByTestId("layout-preview"));
 
 describe("SlackBlockKitTemplatePicker", () => {
   afterEach(() => {
@@ -34,23 +47,93 @@ describe("SlackBlockKitTemplatePicker", () => {
   });
 
   describe("given a trace draft on the immediate cadence", () => {
-    it("shows the trace layouts and none of the graph-alert ones", () => {
+    it("lists the trace layouts and none of the graph-alert ones", () => {
       renderPicker();
 
-      expect(
-        screen.getByRole("button", { name: /use compact alert template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", {
-          name: /use alert — compact template/i,
-        }),
-      ).not.toBeInTheDocument();
+      expect(layout(/compact notice/i)).toBeInTheDocument();
+      expect(layouts().queryByRole("button", { name: /metric: compact/i })).not.toBeInTheDocument();
     });
 
-    it("offers the digest layouts behind the other-cadence disclosure", () => {
+    // The receive chooser above the picker is the one cadence control: the
+    // list carries only the layouts for the draft's cadence, so a pick here
+    // can never switch the cadence behind the author's back.
+    it("lists only the layouts for the draft's cadence, and re-filters when it changes", () => {
+      const { rerender } = renderPicker();
+
+      expect(layoutOrder()).toEqual([
+        "trace_alert_compact",
+        "trace_alert_one_liner",
+        "eval_failure_detailed",
+        "trace_card_rich",
+        "eval_failure_rich",
+      ]);
+
+      rerender(pickerElement({ cadence: "digest" }));
+
+      expect(layoutOrder()).toEqual([
+        "digest_compact",
+        "digest_evaluator_rollup",
+        "digest_inline_rich",
+        "digest_table",
+      ]);
+    });
+
+    /** @scenario "The layout list previews the layout the author lands on" */
+    it("previews the layout the automation already uses, not the default one", () => {
+      // Deliberately NOT the default (that is "Compact notice"): a preview
+      // that only ever opened on the default would pass a test written
+      // against a pristine draft while showing an editing author the wrong
+      // layout.
+      const oneLiner = templateOptionsFor({
+        cadence: "immediate",
+        kind: "trace",
+      }).find((option) => option.id === "trace_alert_one_liner");
+      renderPicker({ currentSource: oneLiner!.source });
+
+      expect(preview().getByText("One-liner")).toBeInTheDocument();
+      expect(preview().queryByText("Compact notice")).not.toBeInTheDocument();
+      // What one message contains, what the layout is for, and its structure.
+      expect(preview().getByText(oneLiner!.deliveryNote)).toBeInTheDocument();
+      expect(preview().getByText(oneLiner!.tagline)).toBeInTheDocument();
+      expect(preview().getByText(/capital of France/i)).toBeInTheDocument();
+    });
+
+    it("falls back to the default layout while the draft is pristine", () => {
       renderPicker();
 
-      expect(screen.getByText(/more layouts for digest cadences/i)).toBeInTheDocument();
+      expect(preview().getByText("Compact notice")).toBeInTheDocument();
+      expect(preview().getByText("Default")).toBeInTheDocument();
+      expect(preview().getByText("1 message per trace")).toBeInTheDocument();
+    });
+
+    it("lands the preview back on an offered layout after a cadence switch drops the highlighted one", async () => {
+      const user = userEvent.setup();
+      const { rerender } = renderPicker();
+
+      // Land on a per-trace layout...
+      await user.tab();
+      await user.keyboard("{ArrowDown}");
+      expect(preview().getByText("One-liner")).toBeInTheDocument();
+
+      // ...then the chooser above moves the draft to batches: the layout the
+      // author was looking at is no longer offered, so the preview must fall
+      // back to something that is.
+      rerender(pickerElement({ cadence: "digest" }));
+
+      expect(preview().queryByText("One-liner")).not.toBeInTheDocument();
+      const digestDefault = templateOptionsFor({
+        cadence: "digest",
+        kind: "trace",
+      }).find(
+        (option) =>
+          option.id ===
+          pickDefaultSlackBlockKitTemplateId({
+            cadence: "digest",
+            hasEvaluationFilter: false,
+            kind: "trace",
+          }),
+      );
+      expect(preview().getByText(digestDefault!.displayName)).toBeInTheDocument();
     });
   });
 
@@ -63,11 +146,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       });
       renderPicker({ onSelect });
 
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: new RegExp(`use ${firstOption!.displayName} template`, "i"),
-        }),
-      );
+      fireEvent.click(layout(new RegExp(firstOption!.displayName.toLowerCase(), "i")));
 
       expect(onSelect).toHaveBeenCalledTimes(1);
       expect(onSelect.mock.calls[0]![0]).toMatchObject({
@@ -75,79 +154,117 @@ describe("SlackBlockKitTemplatePicker", () => {
         source: firstOption!.source,
       });
     });
+
+    it("marks the layout the automation uses as selected", () => {
+      const [, secondOption] = templateOptionsFor({
+        cadence: "immediate",
+        kind: "trace",
+      });
+      renderPicker({ currentSource: secondOption!.source });
+
+      expect(layout(/one-liner/i)).toHaveAttribute("aria-pressed", "true");
+      expect(layout(/compact notice/i)).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("marks nothing as selected once the message is customised", () => {
+      renderPicker({ currentSource: "{{ hand written }}" });
+
+      for (const option of layouts().getAllByRole("button")) {
+        expect(option).toHaveAttribute("aria-pressed", "false");
+      }
+    });
+  });
+
+  describe("when the author moves through the list with the keyboard", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+    let onSelect: Mock<(option: SlackBlockKitTemplateOption) => void>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      onSelect = vi.fn();
+      renderPicker({ onSelect });
+      await user.tab();
+    });
+
+    it("previews the next layout without applying it", async () => {
+      await user.keyboard("{ArrowDown}");
+
+      expect(preview().getByText("One-liner")).toBeInTheDocument();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("applies the previewed layout on Enter", async () => {
+      await user.keyboard("{ArrowDown}{Enter}");
+
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect.mock.calls[0]![0]).toMatchObject({
+        id: "trace_alert_one_liner",
+      });
+    });
   });
 
   describe("given a webhook connection", () => {
+    /** @scenario "A layout that needs a Slack app connection is previewed but cannot be picked" */
     /** @scenario "The richer templates are offered only for a bot connection" */
-    it("renders a template that needs a Slack app but blocks selecting it", () => {
+    it("previews a layout that needs a Slack app but refuses to apply it", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "webhook", onSelect });
 
       // "Eval failure banner" leads with a gated `alert` block.
-      const gatedCard = screen.getByRole("button", {
-        name: /use eval failure banner template/i,
-      });
-      expect(gatedCard).toBeDisabled();
-      expect(gatedCard.textContent).toContain("Needs a Slack app connection");
+      const gated = layout(/eval failure banner/i);
+      expect(gated).toHaveAttribute("aria-disabled", "true");
 
-      fireEvent.click(gatedCard);
+      fireEvent.click(gated);
+
+      expect(preview().getByText("Eval failure banner")).toBeInTheDocument();
+      expect(preview().getByText("Needs a Slack app connection")).toBeInTheDocument();
       expect(onSelect).not.toHaveBeenCalled();
     });
 
-    /** @scenario "The richer templates are offered only for a bot connection" */
-    it("keeps a non-gated template selectable", () => {
+    it("keeps a layout that needs no Slack app applicable", () => {
       renderPicker({ deliveryMethod: "webhook" });
 
-      expect(screen.getByRole("button", { name: /use compact alert template/i })).toBeEnabled();
+      expect(layout(/compact notice/i)).not.toHaveAttribute("aria-disabled");
     });
   });
 
   describe("given a bot connection", () => {
-    /** @scenario "The richer templates are offered only for a bot connection" */
-    it("lets the author select a template that needs a Slack app", () => {
+    it("lets the author apply a layout that needs a Slack app", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "bot", onSelect });
 
-      const gatedCard = screen.getByRole("button", {
-        name: /use eval failure banner template/i,
-      });
-      expect(gatedCard).toBeEnabled();
+      const gated = layout(/eval failure banner/i);
+      expect(gated).not.toHaveAttribute("aria-disabled");
 
-      fireEvent.click(gatedCard);
+      fireEvent.click(gated);
+
       expect(onSelect).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("given a graph-alert draft", () => {
-    it("shows only the graph-alert layouts", () => {
+    it("lists only the graph-alert layouts", () => {
       renderPicker({ kind: "graphAlert" });
 
-      expect(
-        screen.getByRole("button", { name: /use alert — compact template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /use alert — detailed template/i }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /use one-liner template/i })).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /use compact alert template/i }),
-      ).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /use digest/i })).not.toBeInTheDocument();
+      expect(layout(/metric: compact/i)).toBeInTheDocument();
+      expect(layout(/metric: detailed/i)).toBeInTheDocument();
+      expect(layout(/one-liner/i)).toBeInTheDocument();
+      expect(layouts().queryByRole("button", { name: /compact notice/i })).not.toBeInTheDocument();
+      expect(layouts().queryByRole("button", { name: /digest/i })).not.toBeInTheDocument();
     });
 
-    it("marks the compact alert as the default", () => {
+    it("marks the compact metric layout as the default", () => {
       renderPicker({ kind: "graphAlert" });
 
-      const compactCard = screen.getByRole("button", {
-        name: /use alert — compact template/i,
-      });
-      expect(compactCard.textContent).toContain("Default");
+      expect(within(layout(/metric: compact/i)).getByText("Default")).toBeInTheDocument();
     });
+  });
 
-    it("hides the other-cadence disclosure because alerts have no digest layouts", () => {
-      renderPicker({ kind: "graphAlert" });
+  describe("given a report draft", () => {
+    it("lists every layout its source can fill once", () => {
+      renderPicker({ kind: "report", reportSource: "traceQuery" });
 
-      expect(screen.queryByText(/more layouts for/i)).not.toBeInTheDocument();
+      expect(layoutOrder()).toEqual(["report_table", "report_digest", "report_summary_card"]);
     });
   });
 });

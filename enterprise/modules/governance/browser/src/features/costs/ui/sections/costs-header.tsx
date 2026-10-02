@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Spacer, Text } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Spacer, Text } from "@langwatch/design-system/primitives";
 import { Temporal } from "@langwatch/time";
 
 import { SampleDataToggle } from "../../../../ui/elements/sample-data-controls.tsx";

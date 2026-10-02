@@ -1,11 +1,13 @@
-import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, Text, useDisclosure } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUp, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
 import { LuClock, LuCopyPlus, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { useCanModifyPrompt } from "../../../../behavior/use-can-modify-prompt.ts";
+import { usePromptCopyActions } from "../../../../behavior/use-prompt-copy-actions.ts";
+import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePrompts } from "../../../../behavior/use-prompts.ts";
@@ -14,7 +16,7 @@ import { type PromptHostApi, usePromptHost } from "../../../../model/prompt-host
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { getDisplayHandle } from "../../../../prompt-reference.ts";
-import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
+import { DeleteConfirmationDialog } from "../../../blocks/delete-confirmation-dialog.tsx";
 import { CopyPromptDialog } from "../dialogs/copy-prompt-dialog.tsx";
 import { PushToCopiesDialog } from "../dialogs/push-to-copies-dialog.tsx";
 
@@ -60,15 +62,10 @@ export function PublishedPromptActions({
     permissionReason: renamePermissionReason,
   } = useRenamePromptHandle({ promptId });
 
-  const syncFromSource = promptApi.prompts.syncFromSource.useMutation();
-  const duplicatePrompt = promptApi.prompts.duplicate.useMutation();
-  const utils = promptApi.useUtils();
+  const { syncFromSource, duplicatePrompt } = usePromptCopyActions();
 
   // Cascade-resolved model for new-tab "view history" prompts.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: open && !!project?.id },
-  );
+  const resolvedDefault = usePromptDefaultModel({ enabled: open });
 
   const isCopiedPrompt = !!prompt?.copiedFromPromptId;
   const hasCopies = (prompt?._count?.copiedPrompts ?? 0) > 0;
@@ -81,7 +78,6 @@ export function PublishedPromptActions({
         idOrHandle: promptId,
         projectId: project.id,
       });
-      await utils.prompts.getAllPromptsForProject.invalidate();
       host.succeeded({
         title: "Prompt updated",
         description: `Prompt "${getDisplayHandle(promptHandle)}" has been updated from source.`,
@@ -93,7 +89,7 @@ export function PublishedPromptActions({
         fallbackTitle: "Couldn't update the prompt from its source",
       });
     }
-  }, [syncFromSource, project, utils, promptId, promptHandle, host]);
+  }, [syncFromSource, project, promptId, promptHandle, host]);
 
   const onDuplicate = useCallback(async () => {
     if (!project) return;
@@ -103,7 +99,6 @@ export function PublishedPromptActions({
         idOrHandle: promptId,
         projectId: project.id,
       });
-      await utils.prompts.getAllPromptsForProject.invalidate();
       host.succeeded({
         title: "Prompt duplicated",
         description: `"${getDisplayHandle(
@@ -115,17 +110,9 @@ export function PublishedPromptActions({
       // first is what keeps a reader from being told the same thing twice.
       reportUnlessGlobal({ host, error, fallbackTitle: "Couldn't duplicate the prompt" });
     }
-  }, [duplicatePrompt, project, utils, promptId, promptHandle, host]);
+  }, [duplicatePrompt, project, promptId, promptHandle, host]);
 
-  const { data: permission } = promptApi.prompts.checkModifyPermission.useQuery(
-    {
-      idOrHandle: promptId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: open && !!project?.id,
-    },
-  );
+  const { data: permission } = useCanModifyPrompt({ promptId, enabled: open });
 
   // Default to NOT deletable until the permission query resolves. The query is
   // gated on the menu being open, so there is a brief loading window on first
@@ -270,7 +257,6 @@ export function PublishedPromptActions({
       <CopyPromptDialog
         open={isCopyDialogOpen}
         onClose={() => setIsCopyDialogOpen(false)}
-        onSuccess={() => void utils.prompts.getAllPromptsForProject.invalidate()}
         promptId={promptId}
         promptName={getDisplayHandle(promptHandle)}
       />

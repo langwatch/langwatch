@@ -1,55 +1,21 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
-import type React from "react";
-import { useEffect, useRef } from "react";
+import {
+  PresenceSection as ObservedSection,
+  type PresenceSectionProps as ObservedSectionProps,
+} from "@langwatch/design-system/presence";
+import { useCallback } from "react";
 
 import { useSectionTrackerStore } from "../../../behavior/presence/section-tracker-store.ts";
 
-export interface PresenceSectionProps extends BoxProps {
-  /** Stable identifier for this section ("input", "output", "evals"…). */
-  id: string;
-  /** Scroll container the IntersectionObserver should observe within. */
-  rootRef?: React.RefObject<HTMLElement | null>;
-  children: React.ReactNode;
-}
+export type PresenceSectionProps = Omit<ObservedSectionProps, "onVisibility" | "onLeave">;
 
-const OBSERVER_THRESHOLDS = [0, 0.1, 0.25, 0.5, 0.75, 1];
-
-/**
- * Wraps a region of the drawer body to broadcast which section the current
- * user is reading, via a shared store's "most visible" section, shipped as
- * `view.section` — rendered only on a peer's screen.
- */
-export function PresenceSection({ id, rootRef, children, ...boxProps }: PresenceSectionProps) {
-  const ref = useRef<HTMLDivElement | null>(null);
+/** Wraps a region of the drawer body and tells the section tracker how much of it is in view. */
+export function PresenceSection(props: PresenceSectionProps) {
   const setVisibility = useSectionTrackerStore((s) => s.setVisibility);
   const unregister = useSectionTrackerStore((s) => s.unregister);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          setVisibility(id, entry.isIntersecting ? entry.intersectionRatio : 0);
-        }
-      },
-      {
-        root: rootRef?.current ?? null,
-        threshold: OBSERVER_THRESHOLDS,
-      },
-    );
-
-    observer.observe(node);
-    return () => {
-      observer.disconnect();
-      unregister(id);
-    };
-  }, [id, rootRef, setVisibility, unregister]);
-
-  return (
-    <Box ref={ref} data-presence-section={id} {...boxProps}>
-      {children}
-    </Box>
+  const onVisibility = useCallback(
+    ({ id, ratio }: { id: string; ratio: number }) => setVisibility(id, ratio),
+    [setVisibility],
   );
+  const onLeave = useCallback(({ id }: { id: string }) => unregister(id), [unregister]);
+  return <ObservedSection {...props} onVisibility={onVisibility} onLeave={onLeave} />;
 }

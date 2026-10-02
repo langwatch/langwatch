@@ -1,4 +1,4 @@
-import { NativeSelect } from "@chakra-ui/react";
+import { NativeSelect } from "@langwatch/design-system/primitives";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";

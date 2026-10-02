@@ -1,6 +1,6 @@
 import type { TRACE_MAPPINGS } from "@langwatch/dataset-contract";
 import { isLlmJudgeEvaluator } from "@langwatch/evaluator-contract";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 
 /** What auto-inference reads of an evaluator: its type and its field identifiers. */
 export interface AutoInferEvaluator {

@@ -7,7 +7,6 @@
 import { createServer, type Server } from "node:http";
 
 import { WebSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -21,6 +20,7 @@ import {
   SessionStateStoreFactory,
 } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";

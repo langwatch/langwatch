@@ -1,6 +1,8 @@
 import type { Instant } from "@langwatch/time";
 import type { WebhookDeliveryOutcome, WebhookDestinationKind } from "@langwatch/webhook-contract";
 
+import type { WebhookRequestAttemptRow } from "../webhook-endpoint.repository.ts";
+
 export type MemoryWebhookEndpointRow = {
   id: string;
   organizationId: string;
@@ -51,6 +53,7 @@ export type MemoryWebhookDeliveryRow = {
 export class MemoryWebhookDatabase {
   readonly #endpoints = new Map<string, MemoryWebhookEndpointRow>();
   readonly #deliveries: MemoryWebhookDeliveryRow[] = [];
+  readonly #requestDeliveries: WebhookRequestAttemptRow[] = [];
   #deliverySequence = 0;
 
   private constructor() {}
@@ -89,8 +92,22 @@ export class MemoryWebhookDatabase {
     return row;
   }
 
+  requestDeliveries(): WebhookRequestAttemptRow[] {
+    return [...this.#requestDeliveries];
+  }
+
+  addRequestDelivery(row: WebhookRequestAttemptRow): void {
+    this.#requestDeliveries.push(row);
+  }
+
   /** Drops delivery rows fired before the cutoff; answers the count removed. */
   pruneDeliveriesBefore(before: Instant): number {
+    const keptRequests = this.#requestDeliveries.filter(
+      (row) => row.firedAt.epochMilliseconds >= before.epochMilliseconds,
+    );
+    const removedRequests = this.#requestDeliveries.length - keptRequests.length;
+    this.#requestDeliveries.length = 0;
+    this.#requestDeliveries.push(...keptRequests);
     const kept = this.#deliveries.filter(
       (row) => row.firedAt.epochMilliseconds >= before.epochMilliseconds,
     );
@@ -98,6 +115,6 @@ export class MemoryWebhookDatabase {
     this.#deliveries.length = 0;
     this.#deliveries.push(...kept);
 
-    return removed;
+    return removed + removedRequests;
   }
 }

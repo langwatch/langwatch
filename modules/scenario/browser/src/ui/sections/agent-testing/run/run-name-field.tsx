@@ -3,8 +3,8 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Box, chakra, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";

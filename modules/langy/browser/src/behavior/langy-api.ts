@@ -3,6 +3,7 @@
  */
 
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { automationTrpc } from "@langwatch/automation-contract";
 import type { dashboardTrpc, dashboardWidgetTrpc, graphTrpc } from "@langwatch/dashboard-contract";
 import type { datasetTrpc } from "@langwatch/dataset-contract";
 import type { experimentsTrpc } from "@langwatch/experiment-contract";
@@ -29,7 +30,8 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof promptTrpc> &
   ContractApiMap<typeof experimentsTrpc> &
   ContractApiMap<typeof secretTrpc> &
-  ContractApiMap<typeof userTrpc>;
+  ContractApiMap<typeof userTrpc> &
+  ContractApiMap<typeof automationTrpc>;
 
 /** What each procedure in the map answers, as the browser receives it. */
 export type RouterOutputs = OutputsFromMap<LangyApiMap>;

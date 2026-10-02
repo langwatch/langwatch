@@ -1,4 +1,4 @@
-import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
+import { Badge, Card, HStack, Status, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
 import { ArrowRight } from "lucide-react";
 
@@ -9,9 +9,7 @@ import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export function ReplayHistoryTable() {
   const router = useRouter();
-  const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {
-    refetchInterval: 10000,
-  });
+  const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {});
 
   const history = historyQuery.data;
   if (!history || history.length === 0) return null;

@@ -1,6 +1,4 @@
-import { Box } from "@chakra-ui/react";
-import { traceContextChip } from "@langwatch/langy-browser-kit";
-import { useFilterStore, type LensConfig, useViewStore } from "@langwatch/trace-browser-kit";
+import { Box } from "@langwatch/design-system/primitives";
 import {
   type ColumnSizingState,
   getCoreRowModel,
@@ -17,6 +15,9 @@ import {
   getColumnSizingKey,
   useColumnSizingStore,
 } from "../../../../behavior/column-sizing.store.ts";
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
+import { traceContextChip } from "../../../../behavior/langy/langy-context-chips.ts";
+import { type LensConfig } from "../../../../behavior/view.slice.ts";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { ADD_COLUMN_ID } from "./add-column-header.tsx";

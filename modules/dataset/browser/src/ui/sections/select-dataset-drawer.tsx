@@ -2,16 +2,13 @@
  * System, query cached under tRPC path-plus-input key.
  */
 
-import { Button, HStack, Text } from "@chakra-ui/react";
-import {
-  getComplexProps,
-  type UiSelectDatasetDrawerProps,
-  useDrawer,
-} from "@langwatch/browser-host/drawer";
+import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import { datasetClient } from "@langwatch/dataset-client";
+import type { UiSelectDatasetDrawerProps } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetPickerList } from "../blocks/dataset-picker-list.tsx";
 
@@ -31,7 +28,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
   // component. Anything defined and not `false` means open.
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const datasets = datasetApi.dataset.getAll.useQuery(
+  const datasets = datasetClient.dataset.getAll.useQuery(
     { projectId: projectId ?? "" },
     { enabled: isOpen && !!projectId },
   );

@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LookupPerson, LookupPersonDetail } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";

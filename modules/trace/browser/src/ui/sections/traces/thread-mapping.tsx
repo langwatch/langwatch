@@ -1,10 +1,18 @@
-import { Box, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
+import {
+  Box,
+  Grid,
+  GridItem,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import type { Trace } from "@langwatch/trace-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
@@ -12,7 +20,7 @@ import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useFormattedSpansDigest } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /**
@@ -211,17 +219,11 @@ export const ThreadMapping = ({
   );
 
   // Fetch formatted span digests from server when needed
-  const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceIds: traces.map((t) => t.trace_id),
-    },
-    {
-      enabled: !!project?.id && needsFormattedDigest && traces.length > 0,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
-    },
-  );
+  const formattedDigests = useFormattedSpansDigest({
+    projectId: project?.id,
+    traceIds: traces.map((t) => t.trace_id),
+    enabled: needsFormattedDigest,
+  });
 
   // Initialize mapping with defaults
   useEffect(() => {

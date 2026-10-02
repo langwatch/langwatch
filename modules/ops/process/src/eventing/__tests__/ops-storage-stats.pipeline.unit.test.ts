@@ -4,7 +4,7 @@ import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
-import { opsServer } from "../../ops.server.ts";
+import { opsProcessModule } from "../../ops.module.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
 import {
@@ -69,7 +69,7 @@ describe("given ops's storage-stats declaration", () => {
     const { definition, process } = built(async () => undefined);
 
     expect(storageStatsEventing.pipeline).toBe(STORAGE_STATS_PIPELINE_NAME);
-    expect(opsServer.eventing?.pipeline.split(", ")).toContain(STORAGE_STATS_PIPELINE_NAME);
+    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(STORAGE_STATS_PIPELINE_NAME);
     expect(definition.metadata.name).toBe(STORAGE_STATS_PIPELINE_NAME);
     expect(process.config.schedule?.everyMs).toBe(15_000);
   });

@@ -3,8 +3,8 @@
  * Rules from identity-contract; field errors on fields.
  */
 
-import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Field, HStack, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useEffect, useState } from "react";
 

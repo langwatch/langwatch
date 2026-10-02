@@ -1,5 +1,5 @@
 /**
- * What this process still hands `UserApp` by hand. Every entry that refuses
+ * What this process still hands `UserModule` by hand. Every entry that refuses
  * names what it would need; `user.members.ts` names the module each
  * unanswered capability belongs to.
  */
@@ -27,7 +27,7 @@ import { hash, compare } from "bcrypt";
 import { PrismaUserOrganizationDirectoryRepository } from "../repositories/prisma/prisma.user-organization-directory.repository.ts";
 import type { UserBudgetRequestMailer, UserInfrastructure } from "./user.members.ts";
 
-/** What this process hands `UserApp` at boot. */
+/** What this process hands `UserModule` at boot. */
 export function buildUserInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;

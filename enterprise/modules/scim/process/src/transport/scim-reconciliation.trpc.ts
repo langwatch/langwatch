@@ -9,7 +9,7 @@
  *
  * The request log takes no Enterprise plan gate: its headline case is a plan
  * that lapsed, and gating it would withhold "why did my push stop" on the
- * grounds that the push stopped. The overview asks the plan, in the app.
+ * grounds that the push stopped. The other three declare the plan, asked after access.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { ScimApi, scimReconciliationTrpc } from "@langwatch/enterprise-scim-contract";
@@ -19,10 +19,12 @@ export const scimReconciliationTrpcTransport: TrpcRouterDeclaration<
   typeof scimReconciliationTrpc
 > = defineTrpcRouter(ScimApi, scimReconciliationTrpc)
   .procedure("getAll")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withPermission("sso:view")
   .handle(({ app, input }) => app.getDirectoryReconciliation(input))
 
   .procedure("getActivity")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withPermission("sso:view")
   .handle(({ app, input }) => app.findDirectoryActivity(input))
 
@@ -31,6 +33,7 @@ export const scimReconciliationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) => app.findDirectoryRequests(input))
 
   .procedure("getById")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withPermission("sso:view")
   .handle(async ({ app, input }) => (await app.findConnectionReconciliation(input))[0] ?? null)
   .build();

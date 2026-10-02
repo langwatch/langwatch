@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a rule write answers when it cannot be carried out. Every refusal here
  * is handled: the process maps the status to its door's code and the browser
@@ -9,6 +8,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";

@@ -1,10 +1,10 @@
-import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import { Box, Button, Flex, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Switch } from "@langwatch/design-system/switch";
 import { Sparkles } from "lucide-react";

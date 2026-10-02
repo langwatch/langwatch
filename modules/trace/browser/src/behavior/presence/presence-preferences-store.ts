@@ -1,27 +1,12 @@
-import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { readSlice } from "@langwatch/browser-host/global-store";
+import {
+  PRESENCE_PREFERENCES_ABSENT,
+  PRESENCE_PREFERENCES_SLICE,
+  type PresencePreferencesState,
+} from "@langwatch/presence-contract";
 
-interface PresencePreferencesState {
-  /**
-   * When true, the local user opts out of broadcasting their presence and
-   * cursor to peers. They can still *see* peer presence — this only gates
-   * the write side ("ghost mode").
-   */
-  hidden: boolean;
-  setHidden: (hidden: boolean) => void;
-  toggleHidden: () => void;
-}
-
-export const usePresencePreferencesStore = create<PresencePreferencesState>()(
-  persist(
-    (set) => ({
-      hidden: false,
-      setHidden: (hidden) => set({ hidden }),
-      toggleHidden: () => set((state) => ({ hidden: !state.hidden })),
-    }),
-    {
-      name: "langwatch:presence:preferences",
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
-);
+/** The reader's presence choices (ghost mode), read from `presence:preferences`. */
+export const usePresencePreferencesStore = readSlice<PresencePreferencesState>({
+  name: PRESENCE_PREFERENCES_SLICE,
+  absent: PRESENCE_PREFERENCES_ABSENT,
+});

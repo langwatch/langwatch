@@ -4,7 +4,7 @@
  * its pushes are attributed to it, and every membership a push causes is
  * explained by a fact (specs/identity/scim-connection-sync.feature).
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,

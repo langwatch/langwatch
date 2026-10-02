@@ -59,6 +59,12 @@ vi.mock("../../../behavior/automation-api.ts", () => {
   return { api, automationApi: api };
 });
 
+vi.mock("../../../behavior/slack-api.ts", () => ({
+  slackApi: {
+    slackIntegration: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+  },
+}));
+
 /**
  * Both editors, as anything the screen mounted would print. Stubbed
  * rather than left real, so "the screen renders neither" is an
@@ -252,7 +258,7 @@ describe("AutomationsPage sections", () => {
       };
     };
 
-    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+    for (const section of ["overview", "reports", "automations"] as const) {
       it(`prints the ${section} section`, () => {
         withData();
         expect(renderSection(section)).toMatchSnapshot();
@@ -261,7 +267,7 @@ describe("AutomationsPage sections", () => {
   });
 
   describe("given a project with no automations", () => {
-    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+    for (const section of ["overview", "reports", "automations"] as const) {
       it(`prints the empty ${section} section`, () => {
         triggers.rows = [];
         expect(renderSection(section)).toMatchSnapshot();

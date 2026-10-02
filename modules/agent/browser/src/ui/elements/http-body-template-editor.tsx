@@ -1,4 +1,4 @@
-import { Box, Code, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Box, Code, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 
 /**
  * Standard variables available for HTTP agent body templates.

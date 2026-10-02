@@ -2,8 +2,7 @@
  * The declarative capability card — one component that draws every result the catalog
  * describes, from the body widget its descriptor names.
  */
-import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { type LangyTurnMetric } from "@langwatch/langy-browser-kit";
+import { Box, Grid, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type CliResultDigest,
   parseCardResult,
@@ -13,6 +12,7 @@ import {
 import { Play } from "lucide-react";
 
 import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
+import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
 import { LangyCardActionChip } from "../../../../../ui/elements/langy-card-action-chip.tsx";
 import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";

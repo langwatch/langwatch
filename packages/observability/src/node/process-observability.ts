@@ -1,3 +1,4 @@
+import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
   setupObservability,
@@ -161,6 +162,10 @@ async function shutdownObservability(
   } catch (error) {
     firstError = error;
   }
+  // A shut-down SDK still holds the globals; free them so a successor's setup registers.
+  trace.disable();
+  context.disable();
+  propagation.disable();
 
   for (const flusher of flushers) {
     try {

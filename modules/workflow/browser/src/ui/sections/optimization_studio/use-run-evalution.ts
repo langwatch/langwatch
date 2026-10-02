@@ -1,5 +1,4 @@
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
 import type { StudioClientEvent, StudioWorkflow } from "@langwatch/workflow-contract";
@@ -14,6 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { serializeWorkflow, type WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useVersionState } from "./use-version-state.ts";
@@ -37,7 +37,7 @@ export const useRunEvalution = () => {
 
   const { project } = useOrganizationTeamProject();
 
-  const commitVersion = api.workflow.commitVersion.useMutation();
+  const commitVersion = workflowApi.workflow.commitVersion.useMutation();
 
   const form = useForm({
     defaultValues: {
@@ -52,13 +52,13 @@ export const useRunEvalution = () => {
     allowSaveIfAutoSaveIsCurrentButNotLatest: true,
   });
 
-  const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
+  const generateCommitMessage = workflowApi.workflow.generateCommitMessage.useMutation();
 
   // Cascade-resolved Fast model for commit-message autogen: null when
   // nothing is configured at any scope. Gates the generation call so a
   // missing model never auto-fires a doomed request (and its
   // missing-model toast) from a background autosave.
-  const resolvedCommitMessageModel = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedCommitMessageModel = workflowApi.modelProvider.getResolvedDefault.useQuery(
     {
       projectId: project?.id ?? "",
       featureKey: "workflows.commit_message",
@@ -66,7 +66,7 @@ export const useRunEvalution = () => {
     { enabled: !!project?.id },
   );
 
-  const trpc = api.useUtils();
+  const trpc = workflowApi.useUtils();
 
   const [triggerTimeout, setTriggerTimeout] = useState<EvaluationTimeoutTrigger | null>(null);
 

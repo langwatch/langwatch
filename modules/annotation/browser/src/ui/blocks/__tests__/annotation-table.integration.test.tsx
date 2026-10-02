@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { Table } from "@langwatch/design-system/primitives";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
 import { Temporal } from "@langwatch/time";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -52,28 +53,26 @@ function renderTable(overrides: Partial<Parameters<typeof AnnotationTable>[0]> =
   const onAddToDataset = vi.fn();
   const onRemoveFromQueue = vi.fn();
 
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Table.Root>
-        <AnnotationTable
-          rows={[row]}
-          activeScoreTypes={[{ id: "helpful", name: "Helpful" }]}
-          dateColumnLabel="Date queued"
-          selectedRowIds={new Set()}
-          allRowsSelected={false}
-          someRowsSelected={false}
-          onToggleAll={vi.fn()}
-          onToggleRow={onToggleRow}
-          onRowClick={vi.fn()}
-          onViewTrace={onViewTrace}
-          onAddToDataset={onAddToDataset}
-          onRemoveFromQueue={onRemoveFromQueue}
-          renderAvatar={(user) => <span>{user.name}</span>}
-          renderTraceField={({ value }) => <span>{value}</span>}
-          {...overrides}
-        />
-      </Table.Root>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <Table.Root>
+      <AnnotationTable
+        rows={[row]}
+        activeScoreTypes={[{ id: "helpful", name: "Helpful" }]}
+        dateColumnLabel="Date queued"
+        selectedRowIds={new Set()}
+        allRowsSelected={false}
+        someRowsSelected={false}
+        onToggleAll={vi.fn()}
+        onToggleRow={onToggleRow}
+        onRowClick={vi.fn()}
+        onViewTrace={onViewTrace}
+        onAddToDataset={onAddToDataset}
+        onRemoveFromQueue={onRemoveFromQueue}
+        renderAvatar={(user) => <span>{user.name}</span>}
+        renderTraceField={({ value }) => <span>{value}</span>}
+        {...overrides}
+      />
+    </Table.Root>,
   );
 
   return { onToggleRow, onViewTrace, onAddToDataset, onRemoveFromQueue };

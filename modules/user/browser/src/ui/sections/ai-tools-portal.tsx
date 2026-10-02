@@ -1,4 +1,11 @@
-import { Box, Heading, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Heading,
+  SimpleGrid,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";

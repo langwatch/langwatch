@@ -1,9 +1,6 @@
 import type { Dataset } from "@langwatch/dataset-contract";
-import type {
-  Experiment,
-  ExperimentPublishedMonitor,
-  SaveExperimentInput,
-} from "@langwatch/experiment-contract";
+import type { Experiment, SaveExperimentInput } from "@langwatch/experiment-contract";
+import type { Monitor } from "@langwatch/monitor-contract";
 import {
   parseStudioWorkflow,
   WorkflowNotFoundError,
@@ -51,7 +48,7 @@ const draftGraph = parseStudioWorkflow({
   state: {},
 });
 
-const MONITOR: ExperimentPublishedMonitor = {
+const MONITOR: Monitor = {
   id: "monitor-1",
   projectId: "project-1",
   experimentId: "experiment-1",
@@ -177,7 +174,7 @@ class Datasets implements DatasetWrites {
 
 class Monitors implements MonitorWrites {
   written: MonitorInput[] = [];
-  upsertForExperiment(input: MonitorInput): Promise<ExperimentPublishedMonitor> {
+  upsertForExperiment(input: MonitorInput): Promise<Monitor> {
     this.written.push(input);
     return Promise.resolve(MONITOR);
   }
@@ -318,7 +315,7 @@ describe("ExperimentWorkflowLinkService", () => {
 
       await links.saveAsMonitor({ projectId: "project-1", experimentId: "experiment-1" });
 
-      expect(monitors.written[0]?.monitor).toMatchObject({
+      expect(monitors.written[0]).toMatchObject({
         checkType: "langevals/llm_boolean",
         parameters: { model: "openai/gpt-5-mini" },
         sample: 0.5,

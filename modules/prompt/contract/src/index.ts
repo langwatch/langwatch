@@ -16,6 +16,7 @@ export {
   messageSchema,
   inputsSchema,
   outputsSchema,
+  promptingTechniqueSchema,
   nameSchema,
   scopeSchema,
   commitMessageSchema,
@@ -44,3 +45,4 @@ export * from "./prompt.version-metadata.ts";
 export * from "./prompt-rest.schemas.ts";
 export * from "./prompt.llm-error.ts";
 export * from "./prompt.playground-execute.ts";
+export * from "./prompt-lifecycle.events.ts";

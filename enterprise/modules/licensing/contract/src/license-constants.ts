@@ -57,10 +57,10 @@ export const FREE_PLAN: PlanInfo = {
 };
 
 /**
- * * Embedded production public key used when no env var is configured. * Enables license
- * verification out-of-the-box; override via env for rotation.
+ * Embedded production public key used when no env var is configured.
+ * Enables license verification out of the box; override via env for rotation.
  */
-// gitleaks:allow — public keys
+// gitleaks:allow (public keys)
 
 export const DEFAULT_LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu
@@ -71,3 +71,10 @@ GCNz8mT/4tEM8v/NaoTFngsRwNJTuRlro+MZF7eArdBmtIU1fNLchZEH2kojMHKj
 2qLWpbVP63RSjxphslVvXk1RycL3esr2cj0Pe8loWxeKoxWjnXdLJYWygQh8aUbZ
 iQIDAQAB
 -----END PUBLIC KEY-----`;
+
+/**
+ * How long the SSO license gate trusts a deny before it reads the store again
+ * (ADR-027 v9): an activation on any replica turns SSO on everywhere within a
+ * minute, and an unlicensed install reads the store about once a minute.
+ */
+export const DENIED_SSO_GATE_TTL_MS = 60_000;

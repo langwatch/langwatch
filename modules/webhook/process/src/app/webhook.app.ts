@@ -1,8 +1,11 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  ProcessStore,
+} from "@langwatch/eventing";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -10,7 +13,8 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
  */
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   WebhookApi,
@@ -21,7 +25,7 @@ import {
   WebhookEventNotFoundError,
 } from "@langwatch/webhook-contract";
 
-import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
+import { HttpDestinationChannel } from "../channels/http/http.destination.channel.ts";
 import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
 import {
   SqsWebhookDestinationChannel,
@@ -41,11 +45,15 @@ import {
   type WebhookDeliveryProcessDeps,
 } from "../services/webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../services/webhook-destination-dispatch.service.ts";
+import { WebhookDispatchCapService } from "../services/webhook-dispatch-cap.service.ts";
+import { WebhookEgressService } from "../services/webhook-egress.service.ts";
+import { WebhookEndpointRequeueService } from "../services/webhook-endpoint-requeue.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
+import { WebhookRequestService } from "../services/webhook-request.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
@@ -113,7 +121,7 @@ export interface WebhookAppDependencies {
   health?: Pick<WebhookHealthService, "health">;
   /**
    * The emitted-events log. Undefined on a deployment without ClickHouse —
-   * the log has no fallback store — which {@link WebhookApp.getEventsService}
+   * the log has no fallback store — which {@link WebhookModule.getEventsService}
    * reports as a plain "not configured" failure.
    */
   events: WebhookEventsService | undefined;
@@ -132,12 +140,14 @@ export interface WebhookAppDependencies {
   testFireBounds: Pick<WebhookTestBoundsService, "assertTestFireWithinBounds">;
   /** The live-delivery endpoint stream a replay appends to, over the kernel's process store. */
   endpointStream?: WebhookEndpointStreamService;
+  /** One attempt to a customer URL for another module's outbox (ADR-167 step 1). */
+  requests?: WebhookRequestService;
 }
 
-const storeReads = reads("rateLimiter", "redis");
+const storeReads = ["rateLimiter"] as const;
 
 type WebhookSetup = FeatureSetup<
-  typeof WebhookApp.dependencies,
+  typeof WebhookModule.dependencies,
   MembersRead<typeof storeReads> &
     Readonly<{
       isSaas: boolean;
@@ -156,28 +166,31 @@ type WebhookDeliveryParts = Readonly<{
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
 }>;
 
-export class WebhookApp implements WebhookApiContract {
+export class WebhookModule implements WebhookApiContract {
   static readonly contract = WebhookApi;
   /** The entitlement peer this app's own plan gate reads, composed in
-   *  {@link WebhookApp.create} (`WebhookAccessService`). */
+   *  {@link WebhookModule.create} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
-  static readonly reads = ["rateLimiter", "redis", "isSaas", "outboundProxy"] as const;
+  static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
 
-  static create(input: WebhookSetup): WebhookApp {
+  static create(input: WebhookSetup): WebhookModule {
     const { entitlement } = input.dependencies;
     const access = WebhookAccessService.create(entitlement);
-    const http = HttpWebhookDispatchChannel.create({
-      redis: input.members.redis,
-      rejectUnauthorized: input.members.isSaas,
+    const caps = WebhookDispatchCapService.create({ caps: input.repositories.dispatchCaps });
+    const egress = WebhookEgressService.create({
+      caps,
+      http: HttpDestinationChannel.create({
+        tls: { rejectUnauthorized: input.members.isSaas },
+      }),
     });
     const aws = AwsClientConfiguration.create({
       outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.members.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({
-        egress: http,
+        egress,
         allowInsecureLocal: input.config.allowInsecureLocalUrls,
         sqs:
           input.tier === "memory"
@@ -185,11 +198,11 @@ export class WebhookApp implements WebhookApiContract {
             : SqsWebhookDestinationChannel.create({
                 awsClientConfig: (config) => aws.build(config),
               }),
-        rateLimiter: http.rateLimiter,
+        caps,
       }),
     });
 
-    const app = new WebhookApp({
+    const app = new WebhookModule({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
         tenants: input.repositories.tenants,
@@ -201,6 +214,10 @@ export class WebhookApp implements WebhookApiContract {
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
         rateLimiter: input.members.rateLimiter,
+      }),
+      requests: WebhookRequestService.create({
+        egress,
+        deliveries: input.repositories.endpoints,
       }),
     });
     app.#delivery = {
@@ -265,8 +282,8 @@ export class WebhookApp implements WebhookApiContract {
   /** Compatibility construction used by process roots and tests not yet on
    *  FeatureSetup — kept off the `create` property itself, since the
    *  installer requires `create` to carry exactly one call signature. */
-  static fromDependencies(dependencies: WebhookAppDependencies): WebhookApp {
-    return new WebhookApp(dependencies);
+  static fromDependencies(dependencies: WebhookAppDependencies): WebhookModule {
+    return new WebhookModule(dependencies);
   }
 
   #dependencies: WebhookAppDependencies;
@@ -300,13 +317,16 @@ export class WebhookApp implements WebhookApiContract {
   };
   rollSecret: WebhookApiContract["rollSecret"] = (input) =>
     this.#dependencies.endpoints.rollSecret(input);
-  enable: WebhookApiContract["enable"] = (input) => this.#dependencies.endpoints.enable(input);
+  enable: WebhookApiContract["enable"] = (input) => this.#requeue.enable(input);
   disable: WebhookApiContract["disable"] = (input) => this.#dependencies.endpoints.disable(input);
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
   findDeliverable: WebhookApiContract["findDeliverable"] = (input) =>
     this.#dependencies.endpoints.findDeliverable(input);
   getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
+  sendRequest: WebhookApiContract["sendRequest"] = (input) => this.requests.send(input);
+  findDeliveriesBySource: WebhookApiContract["findDeliveriesBySource"] = (input) =>
+    this.requests.findBySource(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.health.health(input);
   testFire: WebhookApiContract["testFire"] = async ({ organizationId, endpointId }) => {
     const { endpoints, dispatch, testFireBounds } = this.#dependencies;
@@ -383,35 +403,16 @@ export class WebhookApp implements WebhookApiContract {
     if (!event) throw new WebhookEventNotFoundError();
     return event;
   };
-  appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = async ({
-    organizationId,
-    endpoint,
-    envelope,
-    replayId,
-  }) => {
-    // The caller (the gateway's replay route) names the endpoint by id only;
-    // the stream needs its live delivery controls (batch size, delay,
-    // in-flight cap), so this re-resolves the full deliverable view rather
-    // than trusting the caller's reduced projection.
-    const deliverable = await this.#dependencies.endpoints.findDeliverable({
-      organizationId,
-      endpointId: endpoint.id,
-    });
-    if (!deliverable) {
-      throw new Error(`webhook endpoint ${endpoint.id} is not deliverable for replay`);
-    }
+  appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
+    this.#requeue.appendReplay(input);
 
-    const { endpointStream } = this.#dependencies;
+  get #requeue(): WebhookEndpointRequeueService {
+    const { endpoints, endpointStream } = this.#dependencies;
     if (!endpointStream) {
-      throw new Error("webhook replay needs the process store its eventing build supplies");
+      throw new Error("webhook enable and replay need the process store eventing supplies");
     }
-    await endpointStream.appendReplay({
-      organizationId,
-      endpoint: deliverable,
-      envelope,
-      replayId,
-    });
-  };
+    return WebhookEndpointRequeueService.create({ endpoints, endpointStream });
+  }
 
   /**
    * Reuses this process's endpoint, event and delivery graph with its
@@ -420,8 +421,8 @@ export class WebhookApp implements WebhookApiContract {
    */
   withEntitlement(
     assertEndpointsEntitled: WebhookAppDependencies["assertEndpointsEntitled"],
-  ): WebhookApp {
-    return WebhookApp.fromDependencies({ ...this.#dependencies, assertEndpointsEntitled });
+  ): WebhookModule {
+    return WebhookModule.fromDependencies({ ...this.#dependencies, assertEndpointsEntitled });
   }
 
   /** Endpoint mutation and read. */
@@ -430,6 +431,12 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   /** One endpoint's delivery health. */
+  get requests(): WebhookRequestService {
+    const { requests } = this.#dependencies;
+    if (!requests) throw new Error("webhook requests need the sender its create composes");
+    return requests;
+  }
+
   get health(): Pick<WebhookHealthService, "health"> {
     const { health } = this.#dependencies;
     if (!health) {

@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Alert, Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 
 import { fmtMoney } from "../../model/cost-figure-format.ts";

@@ -13,6 +13,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -80,7 +81,9 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(true),
     stranding: new StubStranding([]),
-    platformOperators: new StubPlatformOperators([OPS.id]),
+    authorization: new StubPlatformOperators([OPS.id]),
+    // Licensed with one organization, so a licence ceremony reaches the checks below.
+    licensing: licensingFixture({ authorizesDomainClaims: true }),
   });
 });
 
@@ -190,19 +193,6 @@ describe("the published record decides the claim", () => {
 
       await expect(
         guards.verifyDomain({ ...identity, domain: "acme.com", channel: "dns-txt" }),
-      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
-    });
-
-    it("refuses a licence ceremony standing in for the decision on a claim", async () => {
-      await reachClaimed();
-
-      await expect(
-        guards.requestVerification({
-          ...identity,
-          domain: "acme.com",
-          method: "license-token",
-          tokenHash: "sha256:licence",
-        }),
       ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
     });
   });

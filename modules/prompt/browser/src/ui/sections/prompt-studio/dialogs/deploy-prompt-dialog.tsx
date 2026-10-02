@@ -1,14 +1,4 @@
 import {
-  Box,
-  Button,
-  createListCollection,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   DialogBody,
   DialogCloseTrigger,
   DialogContent,
@@ -17,16 +7,25 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import {
+  Box,
+  Button,
+  createListCollection,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Trash2, UnplugIcon, Info } from "lucide-react";
 import { useMemo } from "react";
 
 import { useDeployTags } from "../../../../behavior/use-deploy-tags.ts";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
-import { CopyButton } from "../../../../ui/elements/copy-button.tsx";
+import { DeleteConfirmationDialog } from "../../../blocks/delete-confirmation-dialog.tsx";
+import { CopyButton } from "../../../elements/copy-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {
@@ -136,7 +135,6 @@ function TagVersionRow({
   onSelect,
   onDelete,
   handle,
-  apiKey,
 }: {
   tagName: string;
   selectedVersionId: string | undefined;
@@ -144,7 +142,6 @@ function TagVersionRow({
   onSelect: (versionId: string) => void;
   onDelete: () => void;
   handle: string;
-  apiKey: string | undefined;
 }) {
   const versionCollection = useMemo(
     () => createListCollection({ items: versionItems }),
@@ -194,7 +191,7 @@ function TagVersionRow({
               ))}
             </Select.Content>
           </Select.Root>
-          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={apiKey} label={tagName}>
+          <GeneratePromptApiSnippetDialog promptHandle={handle} label={tagName}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <IconButton
                 variant="ghost"
@@ -272,7 +269,6 @@ export function DeployPromptDialog({
   handle,
   projectId,
 }: DeployPromptDialogProps) {
-  const { project } = usePromptProject();
   const tags = useDeployTags({ isOpen, onClose, configId, projectId });
   const { tagToDelete, setTagToDelete } = tags;
 
@@ -304,7 +300,6 @@ export function DeployPromptDialog({
                   onSelect={(versionId) => tags.setTagVersionId(tagDef.name, versionId)}
                   onDelete={() => setTagToDelete({ name: tagDef.name })}
                   handle={handle}
-                  apiKey={project?.apiKey}
                 />
               ))}
 

@@ -1,8 +1,8 @@
 // Minted-token card: full visibility (not masked), copy button, highlighted
 // env block.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -15,22 +15,12 @@ let capturedCodePreviewProps: Record<string, unknown> | null = null;
 
 // ─── Dependency mocks (true boundaries) ─────────────────────────────────────────
 
-vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: {
-    apiKey: {
-      create: {
-        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUiDeployment: () => ({ appBaseUrl: mockBaseHost }),
 }));
 
-vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
+vi.mock("../../../onboarding/observability/code-preview.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   CodePreview: (props: Record<string, unknown>) => {
     capturedCodePreviewProps = props;
@@ -44,6 +34,8 @@ import { ApiKeyIntegrationInfoCard } from "../api-key-integration-info-card.tsx"
 
 const TOKEN = "sk-lw-realtoken1234567890";
 const PROJECT_ID = "project_test123";
+const SCOPE_NOTE =
+  "This token can only send data to this project. It can't read or change anything.";
 
 afterEach(() => {
   cleanup();
@@ -65,15 +57,11 @@ beforeEach(() => {
 });
 
 function renderCard() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ApiKeyIntegrationInfoCard
-        organizationId="org-1"
-        projectId={PROJECT_ID}
-        token={TOKEN}
-        onTokenGenerated={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ApiKeyIntegrationInfoCard
+      projectId={PROJECT_ID}
+      minting={{ token: TOKEN, isMinting: false, scopeNote: SCOPE_NOTE, mint: vi.fn() }}
+    />,
   );
 }
 
@@ -81,7 +69,13 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
   describe("when the token has been generated", () => {
     it("shows the shown-once warning", () => {
       renderCard();
-      expect(screen.getByText(/Copy this token before you move on\./i)).toBeInTheDocument();
+      expect(screen.getByText(/Copy this token now\./i)).toBeInTheDocument();
+    });
+
+    /** @scenario Integrating a project offers a personal access token, shown once */
+    it("says what the token can do", () => {
+      renderCard();
+      expect(screen.getByText(SCOPE_NOTE)).toBeInTheDocument();
     });
 
     it("reveals the token in full by default rather than masking it", () => {
@@ -94,8 +88,8 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
 
     it("renders a copy button right after the warning", () => {
       renderCard();
-      const warning = screen.getByText(/Copy this token before you move on\./i);
-      const copyButton = screen.getByRole("button", { name: /copy token/i });
+      const warning = screen.getByText(/Copy this token now\./i);
+      const copyButton = screen.getByRole("button", { name: /copy personal access token/i });
       // The copy button follows the warning sentence in document order.
       expect(
         warning.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -104,7 +98,7 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
 
     it("copies the raw token when the copy button is clicked", async () => {
       renderCard();
-      fireEvent.click(screen.getByRole("button", { name: /copy token/i }));
+      fireEvent.click(screen.getByRole("button", { name: /copy personal access token/i }));
       await waitFor(() => expect(clipboardWriteText).toHaveBeenCalledWith(TOKEN));
     });
 

@@ -15,8 +15,10 @@
 > from `@langwatch/api`: no service ever registered a dotted operation, so
 > every catalogue answered empty. `rpc-endpoints.feature` went with them. The
 > fluent contract, the version namespaces and the definition chain this ADR
-> also decided are unchanged and still in force for `registerRoute` and
-> `registerSse`.
+> also decided are unchanged and still in force for `registerRoute`.
+> `registerSse` and `specs/sse-streaming.feature` are withdrawn too: a stream
+> is a route that declares `.withResponse("sse", {})` and answers
+> `response.events(...)`, specified in `../specs/declared-response-kinds.feature`.
 
 **Related:**
 [the API framework boundary](./20260820-api-framework-boundary.md),
@@ -181,8 +183,8 @@ with the same chain:
   It derives query or JSON input from the method and follows
   [004](./004-public-rest-v1-and-date-negotiation.md).
 - `service.registerSse(name, version, handler, define?)` with
-  `.withEvents(...)` / `.withQuery(...)`: a dotted name mounted as a GET, per
-  [../specs/sse-streaming.feature](../specs/sse-streaming.feature).
+  `.withEvents(...)` / `.withQuery(...)`: a dotted name mounted as a GET
+  (withdrawn, see the banner above).
 
 ### 7. Version blocks are gone
 

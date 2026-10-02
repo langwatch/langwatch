@@ -1,5 +1,13 @@
-import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type {
   ProcessInstanceDetail as StoredProcessInstanceDetail,
   ProcessOutboxMessageView as StoredProcessOutboxMessageView,

@@ -3,9 +3,9 @@
  * schedule screen.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const topicWeb = defineWebModule("topic")
+export const topicWeb = defineBrowserModule("topic")
   .withHosts({
     requires: ["TopicHostApi"],
     mounts: { TopicHostApi: { load: () => import("./behavior/topic-host-mount.tsx") } },

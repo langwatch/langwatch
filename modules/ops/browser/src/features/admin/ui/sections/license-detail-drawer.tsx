@@ -1,5 +1,13 @@
-import { Button, Field, HStack, Input, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Suspense, useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -232,9 +240,11 @@ function TermsSection({ license }: { license: License }) {
   const commands = useLicenseCommands();
   const [terms, setTerms] = useState<TermsForm>(() => termsFormFrom(license));
 
-  useEffect(() => {
+  const [termsFrom, setTermsFrom] = useState(license);
+  if (termsFrom !== license) {
+    setTermsFrom(license);
     setTerms(termsFormFrom(license));
-  }, [license]);
+  }
 
   return (
     <Section title="Entitlements and terms">
@@ -255,9 +265,11 @@ function ChangeSeatsSection({ license, onChanged }: { license: License; onChange
   const [seats, setSeats] = useState(() => license.maxMembers.toString());
   const [changed, setChanged] = useState<{ licenseKey: string; summary: string } | null>(null);
 
-  useEffect(() => {
+  const [seatsFrom, setSeatsFrom] = useState(license);
+  if (seatsFrom !== license) {
+    setSeatsFrom(license);
     setSeats(license.maxMembers.toString());
-  }, [license]);
+  }
 
   // Only another license clears what is shown: the signed license is not
   // stored anywhere, and refetching this one must not take it off the screen.
@@ -326,9 +338,11 @@ function ReissueSection({ license }: { license: License }) {
   const [expires, setExpires] = useState("");
   const [issuedKey, setIssuedKey] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [seatsFrom, setSeatsFrom] = useState(license);
+  if (seatsFrom !== license) {
+    setSeatsFrom(license);
     setSeats(license.maxMembers.toString());
-  }, [license]);
+  }
 
   // Only another license clears the key shown. Reissuing refetches this one,
   // and the license is not stored anywhere, so a reset on every refetch would

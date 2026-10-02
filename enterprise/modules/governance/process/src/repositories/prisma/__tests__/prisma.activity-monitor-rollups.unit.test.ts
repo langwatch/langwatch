@@ -1,16 +1,16 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
 } from "../../../app/governance.members.ts";
-import {
-  PrismaActivityMonitorRepository,
-  type SortDir,
-  type SpendOverTimeGroupBy,
-  type SpendSortField,
+import type {
+  SortDir,
+  SpendOverTimeGroupBy,
+  SpendSortField,
 } from "../prisma.ingestion-source-activity.repository.ts";
 
 type ClickHouseQuery = {
@@ -48,7 +48,7 @@ function activityMonitor(options: {
 }) {
   const clickhouse = new RecordedClickHouseClient(options.rowsForQuery);
   const resolver = new RecordedClickHouseResolver(clickhouse);
-  const service = PrismaActivityMonitorRepository.create({
+  const service = createActivityMonitorTestService({
     prisma: prismaDouble(options.prisma),
     clickhouse: resolver,
   });

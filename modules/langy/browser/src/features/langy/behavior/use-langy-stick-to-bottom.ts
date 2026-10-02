@@ -1,4 +1,4 @@
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { nowInstant } from "@langwatch/time";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 

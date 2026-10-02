@@ -13,24 +13,50 @@ import {
   type UpdateApiKeyInput,
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
-  HIDDEN_SYSTEM_KEY_NAMES,
+  RESERVED_SYSTEM_KEY_NAMES,
+  isSystemApiKey,
 } from "@langwatch/api-key-contract";
+import type { AuthzGrantCaller, AuthzPrincipalRef } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
+import type { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const logger = createLogger("langwatch:api-key:lifecycle");
 
-const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
+const RESERVED_NAMES = new Set(RESERVED_SYSTEM_KEY_NAMES);
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
 
   return key;
+}
+
+type Requester = { userId?: string | null | undefined; apiKeyId?: string | null | undefined };
+
+/** Who answers for a key's grants: the requesting key, else the person, else the system act. */
+function grantCaller({ userId, apiKeyId }: Requester): AuthzGrantCaller {
+  if (apiKeyId) return { type: "apiKey", id: apiKeyId };
+
+  return userId ? { type: "user", id: userId } : { type: "system" };
+}
+
+/** Whose holdings bound a key's bindings: its owner, else the person; and any requesting key. */
+function ceilingPrincipals({
+  ownerUserId,
+  userId,
+  apiKeyId,
+}: Requester & { ownerUserId: string | null }): AuthzPrincipalRef[] {
+  const person = ownerUserId ?? (apiKeyId ? null : userId);
+
+  return [
+    ...(person ? [{ type: "user" as const, id: person }] : []),
+    ...(apiKeyId ? [{ type: "apiKey" as const, id: apiKeyId }] : []),
+  ];
 }
 
 function actor(userId: string | null | undefined): {
@@ -44,23 +70,25 @@ export class ApiKeyLifecycleService {
   static create(
     options: ApiKeyDependencies & { repository: ApiKeyRepository },
     grants: ApiKeyGrantPolicyService,
+    answers: Pick<ApiKeyTokenResolutionService, "forget">,
   ): ApiKeyLifecycleService {
-    return new ApiKeyLifecycleService(options.repository, options, grants);
+    return new ApiKeyLifecycleService(options.repository, options, grants, answers);
   }
 
-  private readonly bindings: ApiKeyBindingsService;
+  private readonly bindings: ApiKeyGrantsService;
 
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
     private readonly grants: ApiKeyGrantPolicyService,
+    private readonly answers: Pick<ApiKeyTokenResolutionService, "forget">,
   ) {
-    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     const parsed = createApiKeyInputSchema.parse(input);
-    if (!parsed.isSystemManaged && SYSTEM_NAMES.has(parsed.name)) {
+    if (!parsed.isSystemManaged && RESERVED_NAMES.has(parsed.name)) {
       throw new ApiKeyReservedNameError(parsed.name);
     }
 
@@ -71,7 +99,10 @@ export class ApiKeyLifecycleService {
       permissions: parsed.permissions,
     });
     await this.validateCreateBindings({
+      isSystemManaged: parsed.isSystemManaged ?? false,
       userId: parsed.userId ?? null,
+      createdByUserId: parsed.createdByUserId ?? null,
+      callerApiKeyId: parsed.callerApiKeyId ?? null,
       organizationId: parsed.organizationId,
       bindings,
       permissions,
@@ -107,8 +138,9 @@ export class ApiKeyLifecycleService {
       expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
       ingestSourceType: parsed.ingestSourceType ?? null,
       ingestionTemplateId: parsed.ingestionTemplateId ?? null,
+      isSystemManaged: parsed.isSystemManaged ?? false,
       startsDisabled: true,
-      roleBindings: effectiveBindings,
+      grants: effectiveBindings,
     });
     await this.grants.writeBindings({
       apiKeyId: row.id,
@@ -116,6 +148,10 @@ export class ApiKeyLifecycleService {
       bindings: effectiveBindings,
       permissions,
       actor: actor(parsed.createdByUserId ?? parsed.userId),
+      caller: grantCaller({
+        userId: parsed.createdByUserId ?? parsed.userId,
+        apiKeyId: parsed.callerApiKeyId,
+      }),
       roleId: `apikey:${row.id}`,
     });
 
@@ -127,12 +163,13 @@ export class ApiKeyLifecycleService {
     };
   }
 
+  /** Every pod reads the changed key afresh: its shared answer is deleted right after the write. */
   async update(input: UpdateApiKeyInput): Promise<ApiKey> {
     const existing = await this.getInOrganization(input.id, input.organizationId);
-    if (
-      SYSTEM_NAMES.has(existing.name) ||
-      (input.name !== void 0 && SYSTEM_NAMES.has(input.name))
-    ) {
+    // A customer key already under a reserved name keeps it; no key may move into one.
+    const movesIntoReservedName =
+      input.name !== void 0 && input.name !== existing.name && RESERVED_NAMES.has(input.name);
+    if (isSystemApiKey(existing) || movesIntoReservedName) {
       throw new ApiKeyNotFoundError(input.id);
     }
 
@@ -165,10 +202,16 @@ export class ApiKeyLifecycleService {
         scopes: input.bindings,
         organizationId: input.organizationId,
         ownerUserId: existing.userId,
+        isSystemManaged: false,
       });
-      if (existing.userId) {
+      const principals = ceilingPrincipals({
+        ownerUserId: existing.userId,
+        userId: input.callerUserId,
+        apiKeyId: input.callerApiKeyId,
+      });
+      for (const principal of principals) {
         await this.grants.assertCeiling({
-          userId: existing.userId,
+          principal,
           organizationId: input.organizationId,
           bindings: input.bindings,
           permissions: permissions ?? [],
@@ -185,25 +228,26 @@ export class ApiKeyLifecycleService {
             bindings: input.bindings,
             permissions,
             actor: actor(input.callerUserId),
+            caller: grantCaller({ userId: input.callerUserId, apiKeyId: input.callerApiKeyId }),
             replace: true,
           });
 
-    return publicApiKey(
-      await this.bindings.attachOne(
-        await this.repository.update({
-          id: input.id,
-          name: input.name,
-          description: input.description,
-          permissionMode: input.permissionMode,
-          roleBindings: effectiveBindings,
-        }),
-      ),
-    );
+    const updated = await this.repository.update({
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      permissionMode: input.permissionMode,
+      grants: effectiveBindings,
+    });
+    await this.answers.forget({ lookupId: existing.lookupId, revoked: false });
+
+    return publicApiKey(await this.bindings.attachOne(updated));
   }
 
+  /** Sets revokedAt, then a refusal as the key's shared answer: dead on every pod at once. */
   async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {
     const existing = await this.getInOrganization(input.id, input.organizationId);
-    if (SYSTEM_NAMES.has(existing.name)) {
+    if (isSystemApiKey(existing)) {
       throw new ApiKeyNotFoundError(input.id);
     }
 
@@ -226,9 +270,7 @@ export class ApiKeyLifecycleService {
     });
     const customRoleIds = [
       ...new Set(
-        existing.roleBindings.flatMap((binding) =>
-          binding.customRoleId ? [binding.customRoleId] : [],
-        ),
+        existing.grants.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
       ),
     ];
     for (const roleId of customRoleIds) {
@@ -243,8 +285,9 @@ export class ApiKeyLifecycleService {
     const cause = input.cause ?? "user";
     const revoked = publicApiKey({
       ...(await this.repository.revoke({ id: input.id, cause })),
-      roleBindings: existing.roleBindings,
+      grants: existing.grants,
     });
+    await this.answers.forget({ lookupId: existing.lookupId, revoked: true });
 
     if (input.cascadeToChildren ?? true) {
       await this.revokeChildrenOf({
@@ -337,7 +380,10 @@ export class ApiKeyLifecycleService {
   }
 
   private async validateCreateBindings(input: {
+    isSystemManaged: boolean;
     userId: string | null;
+    createdByUserId: string | null;
+    callerApiKeyId: string | null;
     organizationId: string;
     bindings: ApiKeyScope[];
     permissions: string[] | undefined;
@@ -357,10 +403,16 @@ export class ApiKeyLifecycleService {
       scopes: input.bindings,
       organizationId: input.organizationId,
       ownerUserId: input.userId,
+      isSystemManaged: input.isSystemManaged,
     });
-    if (input.userId) {
+    const principals = ceilingPrincipals({
+      ownerUserId: input.userId,
+      userId: input.createdByUserId,
+      apiKeyId: input.callerApiKeyId,
+    });
+    for (const principal of principals) {
       await this.grants.assertCeiling({
-        userId: input.userId,
+        principal,
         organizationId: input.organizationId,
         bindings: input.bindings,
         permissions: input.permissions ?? [],

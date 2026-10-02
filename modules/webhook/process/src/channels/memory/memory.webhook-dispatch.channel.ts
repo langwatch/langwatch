@@ -1,5 +1,5 @@
-import type { WebhookSendInput, WebhookSendResult } from "@langwatch/egress";
-
+import type { WebhookSendResult } from "../../rules/webhook-delivery-classification.rules.ts";
+import type { WebhookSendInput } from "../../services/webhook-egress.service.ts";
 import type { WebhookDispatchChannel } from "../webhook-dispatch.channel.ts";
 
 /** The dispatch channel's memory twin: keeps every send it was handed and answers 200. */

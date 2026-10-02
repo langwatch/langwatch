@@ -1,8 +1,8 @@
+import type { SsoMigrationAuthenticationDecision } from "@langwatch/identity-contract";
 /**
  * @vitest-environment node
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { SsoMigrationAuthenticationDecision } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

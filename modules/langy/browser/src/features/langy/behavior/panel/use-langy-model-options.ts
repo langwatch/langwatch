@@ -1,6 +1,6 @@
 /** The models Langy's picker offers: the project's stored providers, gated by Langy's feature. */
 
-import { modelSelectionFrom } from "@langwatch/model-provider-browser-kit";
+import { modelSelectionFrom } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";

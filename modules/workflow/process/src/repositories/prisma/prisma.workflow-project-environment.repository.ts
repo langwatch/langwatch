@@ -6,14 +6,8 @@ import {
   type StoredProjectEnvironment,
 } from "../workflow-project-environment.repository.ts";
 
-/** The two tables this repository reads, named structurally. */
+/** The table this repository reads, named structurally. */
 export type WorkflowProjectEnvironmentDatabase = {
-  project: {
-    findUniqueOrThrow(input: {
-      where: { id: string };
-      select: { apiKey: true };
-    }): Promise<{ apiKey: string }>;
-  };
   projectSecret: {
     findMany(input: {
       where: { projectId: string };
@@ -34,17 +28,11 @@ export class WorkflowProjectEnvironmentPrismaRepository extends WorkflowProjectE
   }
 
   async findEnvironment(input: { projectId: string }): Promise<StoredProjectEnvironment> {
-    const [project, projectSecrets] = await Promise.all([
-      this.database.project.findUniqueOrThrow({
-        where: { id: input.projectId },
-        select: { apiKey: true },
-      }),
-      this.database.projectSecret.findMany({
-        where: { projectId: input.projectId },
-        select: { name: true, encryptedValue: true },
-      }),
-    ]);
+    const projectSecrets = await this.database.projectSecret.findMany({
+      where: { projectId: input.projectId },
+      select: { name: true, encryptedValue: true },
+    });
 
-    return { apiKey: project.apiKey, secrets: projectSecrets };
+    return { secrets: projectSecrets };
   }
 }

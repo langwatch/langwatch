@@ -4,7 +4,7 @@
  * outermost wrapper. Which entry is selected ARRIVES AS A PROP, never read.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationGroup,

@@ -35,7 +35,7 @@ export function isTeamRoleAllowedForOrganizationRole(params: {
 }
 
 /** Check if access row role is allowed for organization role (lite seat constraint). */
-export function isBindingRoleAllowedForOrganizationRole(params: {
+export function isGrantRoleAllowedForOrganizationRole(params: {
   organizationRole: OrganizationUserRole;
   role: TeamRoleValue;
 }): boolean {

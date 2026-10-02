@@ -25,6 +25,9 @@ package httpapi
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,6 +41,11 @@ import (
 // body when the TS side offloaded an oversized Studio invoke payload. Must
 // match STAGED_HEADER in langwatch/src/server/s3/stagePayload.ts.
 const StagedPayloadHeader = "X-Payload-S3-URL"
+
+// StagedPayloadKeyHeader carries the run's AES-256-GCM key (base64) when the
+// staged object is sealed, so a secret in the body is never readable at rest.
+// Matches STAGED_PAYLOAD_KEY_HEADER in modules/workflow/process.
+const StagedPayloadKeyHeader = "X-Payload-Key"
 
 // stagedPayloadClient fetches offloaded bodies. The 60s timeout covers a
 // large (up to maxStagedPayloadBytes) same-region S3 download with margin.
@@ -161,7 +169,40 @@ func readStudioRequestBody(r *http.Request, client *http.Client) ([]byte, error)
 		if err := validateStagedPayloadURL(staged); err != nil {
 			return nil, err
 		}
-		return fetchStagedPayload(r.Context(), client, staged, maxStagedPayloadBytes)
+		body, err := fetchStagedPayload(r.Context(), client, staged, maxStagedPayloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		if key := r.Header.Get(StagedPayloadKeyHeader); key != "" {
+			return openStagedPayload(body, key)
+		}
+		return body, nil
 	}
 	return io.ReadAll(r.Body)
+}
+
+// openStagedPayload decrypts a sealed staged body: nonce (12 bytes), then the
+// AES-256-GCM ciphertext and tag, under the base64 key the invoke carried.
+func openStagedPayload(sealed []byte, keyB64 string) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || len(key) != 32 {
+		return nil, fmt.Errorf("staged payload key is not a base64 256-bit key")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload cipher: %w", err)
+	}
+	if len(sealed) < gcm.NonceSize()+gcm.Overhead() {
+		return nil, fmt.Errorf("staged payload is too short to be sealed")
+	}
+	nonce, ciphertext := sealed[:gcm.NonceSize()], sealed[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload does not open under the run key")
+	}
+	return plain, nil
 }

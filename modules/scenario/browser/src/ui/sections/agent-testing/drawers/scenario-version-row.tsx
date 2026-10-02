@@ -4,13 +4,20 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 
 import type { VersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useScenarioVersion } from "../../../../behavior/scenarios/use-scenario-versions.ts";
 import {
   authorOf,
   changeLineOf,
@@ -69,11 +76,7 @@ function VersionCriteria({ criteria }: { criteria: string[] }) {
 
 /** What one version held, read-only. */
 function VersionContent({ scenarioId, version }: { scenarioId: string; version: number }) {
-  const { project } = useOrganizationTeamProject();
-  const { data, isLoading } = api.scenarios.getVersion.useQuery(
-    { projectId: project?.id ?? "", scenarioId, version },
-    { enabled: !!project?.id && !!scenarioId },
-  );
+  const { data, isLoading } = useScenarioVersion({ scenarioId, version });
 
   if (isLoading) {
     return (

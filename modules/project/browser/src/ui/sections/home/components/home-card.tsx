@@ -1,4 +1,4 @@
-import { Card } from "@chakra-ui/react";
+import { Card } from "@langwatch/design-system/primitives";
 import type { ComponentProps } from "react";
 
 /**

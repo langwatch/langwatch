@@ -4,11 +4,14 @@
  * Behaviour is main's my-queue page; see modules/annotation/specs.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
-import { sessionTraceIds, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
+import {
+  sessionTraceIds,
+  useAnnotationQueueSessionStore,
+} from "../../behavior/annotation-queue-session.store.ts";
 import { AnnotationQueueConversation } from "../../behavior/lent-trace.tsx";
 import { useAnnotationQueueWalk } from "../../behavior/use-annotation-queue-walk.ts";
 import { useShowErrorToast } from "../../behavior/use-error-toast.ts";

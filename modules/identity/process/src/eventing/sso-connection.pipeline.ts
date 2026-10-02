@@ -19,7 +19,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ZodType } from "zod";
 
-import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityModule } from "../app/identity.app.ts";
 import type { SsoDomainProofMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
@@ -27,6 +27,7 @@ import type { SsoEngineProviderProjection } from "../repositories/sso-engine-pro
 import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
 import { RequiresLocalDoorAndBinding } from "../services/sso-break-glass.service.ts";
 import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
+import type { SsoConnectionGuardsDeps } from "../services/sso-connection-guard-checks.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import {
   SsoConnectionTeardownCompletionService,
@@ -75,6 +76,7 @@ import {
   connectionTornDownEventSchema,
   connectionArrivalPolicySetEventSchema,
   connectionRenamedEventSchema,
+  connectionIdpUpdatedEventSchema,
   replacementConnectionRegisteredEventSchema,
   migrationRouteSelectedEventSchema,
   migrationFinalizationStartedEventSchema,
@@ -92,6 +94,7 @@ import {
   RegisterConnectionCommand,
   RegisterReplacementConnectionCommand,
   RenameConnectionCommand,
+  UpdateConnectionIdpCommand,
   SelectMigrationRouteCommand,
   BeginMigrationFinalizationCommand,
   FinalizeMigrationCommand,
@@ -142,6 +145,7 @@ const CONNECTION_COMMANDS = [
   "completeTeardown",
   "grandfatherConnection",
   "renameConnection",
+  "updateConnectionIdp",
   "registerReplacementConnection",
   "selectMigrationRoute",
   "beginMigrationFinalization",
@@ -208,6 +212,7 @@ export function defineSsoConnectionPipeline(
       connectionTornDownEventSchema,
       connectionArrivalPolicySetEventSchema,
       connectionRenamedEventSchema,
+      connectionIdpUpdatedEventSchema,
       replacementConnectionRegisteredEventSchema,
       migrationRouteSelectedEventSchema,
       migrationFinalizationStartedEventSchema,
@@ -297,6 +302,11 @@ export function defineSsoConnectionPipeline(
       name: "renameConnection",
       handlerClass: RenameConnectionCommand,
       instance: new RenameConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "updateConnectionIdp",
+      handlerClass: UpdateConnectionIdpCommand,
+      instance: new UpdateConnectionIdpCommand(deps.connectionGuards),
     })
     .withCommandInstance({
       name: "registerReplacementConnection",
@@ -425,7 +435,6 @@ export function composeSsoConnectionGraph(options: {
     | "ssoRegistrationSlots"
     | "ssoBreakGlass"
     | "ssoStranding"
-    | "ssoPlatformOperators"
     | "joinRequestAudience"
   >;
   eventSourcing: EventSourcing;
@@ -433,6 +442,10 @@ export function composeSsoConnectionGraph(options: {
   directory?: SsoConnectionDirectoryRevocation;
   mail?: SsoDomainProofMail;
   engineProvider?: SsoEngineProviderProjection;
+  /** What the installation's licence may decide, for the licence ceremony. */
+  licensing: SsoConnectionGuardsDeps["licensing"];
+  /** The platform-operator grant the operator-only acts are asked against. */
+  authorization: SsoConnectionGuardsDeps["authorization"];
 }): SsoConnectionGraph {
   const { repositories, eventSourcing } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
@@ -447,7 +460,8 @@ export function composeSsoConnectionGraph(options: {
       bindings: SsoBreakGlassRecoveryService.create({ bindings: repositories.ssoBreakGlass }),
     }),
     stranding: repositories.ssoStranding,
-    platformOperators: repositories.ssoPlatformOperators,
+    authorization: options.authorization,
+    licensing: options.licensing,
   });
   const connections = SsoConnectionService.create(
     guards,
@@ -475,7 +489,8 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.ssoConnectionPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
+    app.ssoConnectionPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

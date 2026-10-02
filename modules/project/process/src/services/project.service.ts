@@ -47,6 +47,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
+import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
 import { mintProjectSlug, projectIdSlugToken } from "../rules/project-slug-service.rules.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
@@ -302,19 +303,20 @@ export class ProjectService {
       });
     } else {
       const teamName = input.newTeamName as string;
-      const team = await this.organizations.createTeam({
-        organizationId: input.organizationId,
-        name: teamName,
-      });
-      if (input.userId) {
-        await this.organizations.addTeamMember({
-          teamId: team.id,
-          organizationId: input.organizationId,
-          userId: input.userId,
-          role: "ADMIN",
-          actor: { type: "user", id: input.userId },
-        });
-      }
+      // Organization makes the creator the new team's ADMIN, answering as the creator.
+      const team = input.userId
+        ? await this.organizations.createTeamWithMembers(
+            {
+              organizationId: input.organizationId,
+              name: teamName,
+              members: [{ userId: input.userId, role: "ADMIN" }],
+            },
+            { id: input.userId },
+          )
+        : await this.organizations.createTeam({
+            organizationId: input.organizationId,
+            name: teamName,
+          });
 
       teamId = team.id;
     }
@@ -339,7 +341,11 @@ export class ProjectService {
         apiKey: this.credentials.generateApiKey(),
       }),
     );
-    await this.created.created({ projectId: project.id, organizationId: input.organizationId });
+    await this.created.created({
+      projectId: project.id,
+      organizationId: input.organizationId,
+      createdByUserId: input.userId ?? null,
+    });
 
     return project;
   }
@@ -537,6 +543,8 @@ export class ProjectService {
    * them itself would be a second owner of the same tables.
    */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    if (isLegacyKeyRevoked(input.token)) return Promise.resolve(null);
+
     return this.repository.findIdByLegacyApiKey(input);
   }
 

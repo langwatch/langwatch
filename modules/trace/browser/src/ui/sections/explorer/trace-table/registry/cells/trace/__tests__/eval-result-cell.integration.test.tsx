@@ -1,9 +1,9 @@
 // Evaluator column cell: renders chosen field (Score/Verdict/Label) of
 // latest run, or em-dash.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { EvalColumnField } from "@langwatch/trace-browser-kit";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { EvalColumnField } from "@langwatch/trace-contract";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -89,11 +89,7 @@ function renderCell({
   // Each test renders a fresh cell into document.body; without cleanup the
   // bound `getByText` (which searches the whole body) would see em-dashes
   // from previous renders and fail with "multiple elements".
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {cell.render(cellContext(traceWith(evaluations)))}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(cell.render(cellContext(traceWith(evaluations))));
 }
 
 afterEach(cleanup);

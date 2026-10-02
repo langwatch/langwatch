@@ -1,10 +1,9 @@
 /**
- * The rail's trigger and its count — the RENDERING half of
- * `platform/app`'s `FilterToggle.tsx` (reading/writing is
- * `behavior/use-filter-toggle.ts`). The platform module stays: `TryItOut` renders it too.
+ * The rail's trigger and its count: the rendering half; reading and writing
+ * is `behavior/use-filter-toggle.ts`.
  */
 
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { X } from "react-feather";
 

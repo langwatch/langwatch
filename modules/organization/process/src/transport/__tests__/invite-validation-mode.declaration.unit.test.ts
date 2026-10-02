@@ -1,9 +1,10 @@
+import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * Which validation mode each door asks for - a choice no request schema carries.
  * @see specs/organizations/organization-members-rest-api.feature
  */
-import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { TeamNotInOrganizationError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -32,12 +33,24 @@ function recordingApp() {
   };
 }
 
-/** Runs the management family's create-invites route over the given application. */
-function answerRest(app: object, input: unknown): Promise<unknown> {
+const KEY_ID = "key-1";
+
+/**
+ * Runs one management route over the given application, as the runtime hands it over:
+ * the key's owner as actor (null for a service key) and the key as organizationKeyFacts.
+ */
+function answerRest(
+  app: object,
+  input: unknown,
+  {
+    operation = "createOrganizationInvites",
+    actor = { type: "user", id: "user-1" },
+  }: { operation?: string; actor?: { type: "user"; id: string } | null } = {},
+): Promise<unknown> {
   const route = organizationManagementRest
     .router()
-    .routes.find((candidate) => candidate.operation === "createOrganizationInvites");
-  if (!route) throw new Error("the management family declares no createOrganizationInvites route");
+    .routes.find((candidate) => candidate.operation === operation);
+  if (!route) throw new Error(`the management family declares no ${operation} route`);
 
   return Promise.resolve(
     route.handler(
@@ -45,10 +58,10 @@ function answerRest(app: object, input: unknown): Promise<unknown> {
         app,
         input,
         scope: { tier: "organization", id: ORGANIZATION_ID },
-        actor: { type: "user", id: "user-1" },
+        actor,
         signal: undefined,
       } as never,
-      {} as never,
+      { apiKeyId: KEY_ID },
     ),
   );
 }
@@ -109,6 +122,51 @@ describe("given the management REST door", () => {
         code: "team_not_in_organization",
         httpStatus: 422,
       });
+    });
+  });
+});
+
+/** @see specs/rbac/grants-rest-api.feature */
+describe("given an organization key on the management REST door", () => {
+  /** @scenario A service key grants through the organization doors, bounded by its own grants */
+  it("invites for a service key, answering as the key itself", async () => {
+    const app = recordingApp();
+
+    await answerRest(app, REST_INPUT, { actor: null });
+
+    expect(app.createInvitations.mock.calls[0]?.[1]).toEqual({
+      id: SYSTEM_ACTORS.organizationService,
+      apiKeyId: KEY_ID,
+    });
+  });
+
+  /** @scenario A personal key is bounded by the key, not by its owner */
+  it("invites for a personal key as its owner, bounded by the key", async () => {
+    const app = recordingApp();
+
+    await answerRest(app, REST_INPUT);
+
+    expect(app.createInvitations.mock.calls[0]?.[1]).toEqual({ id: "user-1", apiKeyId: KEY_ID });
+  });
+
+  /** @scenario A service key grants through the organization doors, bounded by its own grants */
+  it("changes a member's role for a service key, answering as the key itself", async () => {
+    // Refuses after recording who asked: only the caller handed over is under test here.
+    const updateMember = vi.fn<(input: unknown, by: unknown) => Promise<never>>(async () => {
+      throw new Error("recorded");
+    });
+
+    await expect(
+      answerRest(
+        { updateMember },
+        { userId: "user-2", role: "MEMBER" },
+        { operation: "updateOrganizationMember", actor: null },
+      ),
+    ).rejects.toThrow("recorded");
+
+    expect(updateMember.mock.calls[0]?.[1]).toEqual({
+      id: SYSTEM_ACTORS.managementApi,
+      apiKeyId: KEY_ID,
     });
   });
 });

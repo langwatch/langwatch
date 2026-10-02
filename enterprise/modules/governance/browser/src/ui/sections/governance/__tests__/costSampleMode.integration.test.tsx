@@ -1,12 +1,12 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * Tests sample panels visibility; fill empty screens, vanish when real data arrives.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,14 +70,12 @@ const costsHost = () =>
 const A_SAMPLE_FIGURE = "support-copilot";
 
 const screenTree = () => (
-  <ChakraProvider value={defaultSystem}>
-    <GovernanceHostProvider value={costsHost()}>
-      <CostsPage />
-    </GovernanceHostProvider>
-  </ChakraProvider>
+  <GovernanceHostProvider value={costsHost()}>
+    <CostsPage />
+  </GovernanceHostProvider>
 );
 
-const renderScreen = () => render(screenTree());
+const renderScreen = () => renderWithDesignSystem(screenTree());
 
 /**
  * Every activity read goes back to unanswered, which is what react-query hands
@@ -302,5 +300,41 @@ describe("the sample panels on the cost screen", () => {
 
       expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
+  });
+});
+
+describe("given a deployment with no cost store", () => {
+  beforeEach(() => {
+    withNothingMeasured();
+    harness.costSummary = {
+      ...costSummary({ billedUsd: null }),
+      unavailableReason: "no_cost_store",
+    };
+  });
+
+  /** @scenario "A deployment without a cost store shows unavailable, not zero" */
+  it("states cost data is unavailable and draws no lane amount", () => {
+    renderScreen();
+
+    expect(screen.getByTestId("cost-lanes-unavailable")).toHaveTextContent(
+      "Cost data is unavailable",
+    );
+    expect(document.querySelector('[data-testid^="cost-lane-"]')).toBeNull();
+    expect(screen.queryByText(/\$0/)).toBeNull();
+  });
+});
+
+describe("given sample mode is on with nothing measured", () => {
+  beforeEach(() => {
+    withNothingMeasured();
+    window.sessionStorage.setItem("governance.sample", "true");
+  });
+
+  /** @scenario "The screen says figures are invented once, not once per panel" */
+  it("says so in one banner and repeats it in no panel badge", () => {
+    renderScreen();
+
+    expect(screen.getAllByText(/nothing here is real/i)).toHaveLength(1);
+    expect(screen.queryAllByText(/^sample$/i)).toHaveLength(0);
   });
 });

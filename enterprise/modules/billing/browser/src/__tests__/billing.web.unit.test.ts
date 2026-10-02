@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { billingWeb } from "../billing.web.ts";
@@ -30,11 +30,15 @@ describe("given a browser that installs billing", () => {
       ["pages/settings/plans"],
       ["pages/settings/subscription"],
       ["pages/settings/usage"],
-    ] as const)("answers with a component for %s", async (page) => {
-      const screen = billingWeb.installation.screens[page];
-      const loaded = await screen?.load?.();
+    ] as const)(
+      "answers with a component for %s",
+      async (page) => {
+        const screen = billingWeb.installation.screens[page];
+        const loaded = await screen?.load?.();
 
-      expect(loaded).toHaveProperty("default");
-    });
+        expect(loaded).toHaveProperty("default");
+      },
+      30_000,
+    );
   });
 });

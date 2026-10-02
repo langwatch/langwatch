@@ -1,4 +1,7 @@
+import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import { createLogger } from "@langwatch/observability/browser";
+import { scenarioClient } from "@langwatch/scenario-client";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
@@ -9,11 +12,8 @@ import {
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
-import { usePageVisibility, useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
-
-import { api } from "./scenario-api.ts";
 
 const logger = createLogger("useSimulationUpdateListener");
 
@@ -161,7 +161,7 @@ function useSimulationRefresh(refetch: (() => unknown) | undefined) {
    */
   const missedWhileHiddenRef = useRef(false);
   const isVisible = usePageVisibility();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = scenarioClient.useUtils();
 
   const fireUpdate = useCallback(() => {
     // Hidden tabs defer rather than drop. A dropped update is never retried —
@@ -197,7 +197,7 @@ function useSimulationRefresh(refetch: (() => unknown) | undefined) {
 }
 
 function useRunUpdate(projectId: string) {
-  const trpcUtils = api.useUtils();
+  const trpcUtils = scenarioClient.useUtils();
   /**
    * Refetch the run, then apply the status the event carried.
    */
@@ -279,7 +279,7 @@ export function useSimulationUpdateListener({
   const subscription = useSSESubscription<
     { event?: unknown; timestamp?: number },
     { projectId: string; tabKey?: string; tabId?: string }
-  >(api.scenarios.onSimulationUpdate, subscriptionInput, {
+  >(scenarioClient.scenarios.onSimulationUpdate, subscriptionInput, {
     enabled: Boolean(enabled && projectId),
     onData: (data) =>
       handleSimulationEvent(data.event, {

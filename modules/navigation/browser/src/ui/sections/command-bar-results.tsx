@@ -1,4 +1,4 @@
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { forwardRef, useMemo } from "react";
 
 import { useTopLevelNavigationCommands } from "../../behavior/use-command-feature-flags.ts";

@@ -1,9 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import type { OpsApi } from "@langwatch/ops-contract";
 import {
   type OrganizationApi,
   OrganizationNotFoundForTeamError,
@@ -11,11 +9,15 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import { vi } from "vitest";
 
+import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecycle.events.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
-import { UserApp, type UserFacts } from "../user.app.ts";
+import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
+import { UserModule, type UserFacts } from "../user.app.ts";
 import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 
 /** The issuer this deployment stores its credential account rows under. */
@@ -44,6 +46,7 @@ export function createUserTestAuth(
     revokeAllBrowserSessions: vi.fn(async () => undefined),
     resolveAuthProvider: vi.fn(async () => provider),
     issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
+    assertSignUpOrigin: vi.fn(async () => undefined),
     claimSignUpAddressProof: vi.fn(
       async ({ token }: { token: string; email: string }) =>
         token !== REFUSED_ADDRESS_PROOF && token !== UNCONFIRMED_ADDRESS_PROOF,
@@ -68,8 +71,41 @@ export function createUserTestAuth(
   });
 }
 
-export function createUserTestOps(isAdmin = false) {
-  return createApiFixture<OpsApi>({ isAdmin: () => isAdmin });
+/** Authz as the platform scope asks it: yes for the users named, no for everyone else. */
+export function createUserTestAuthorization(operators: ReadonlySet<string> = new Set()) {
+  return createApiFixture<AuthzApi>({
+    can: async ({ principal, permission, scope }) =>
+      scope.type === "platform" &&
+      permission.startsWith("ops:") &&
+      principal.type === "user" &&
+      operators.has(principal.id),
+    listPlatformOperators: async () =>
+      [...operators].map((userId) => ({
+        grantId: `grant-${userId}`,
+        userId,
+        grantedAt: nowInstant(),
+      })),
+  });
+}
+
+/** user_lifecycle's senders, recording each fact rather than appending it. */
+export function createUserTestLifecycle() {
+  const recorded: { type: "deactivated" | "reactivated"; data: RecordUserLifecycleCommandData }[] =
+    [];
+  const senders: UserLifecycleSenders = {
+    recordUserDeactivated: {
+      send: async (data) => {
+        recorded.push({ type: "deactivated", data });
+      },
+    },
+    recordUserReactivated: {
+      send: async (data) => {
+        recorded.push({ type: "reactivated", data });
+      },
+    },
+  };
+
+  return { senders, recorded };
 }
 
 export function createUserTestProjects() {
@@ -181,23 +217,25 @@ export function createUserTestApp(
       authz: AuthzApi;
       governance: GovernanceRestApi;
       organizations: OrganizationApi;
-      ops: OpsApi;
       projects: ProjectApi;
     }>;
     facts?: UserFacts;
+    lifecycle?: UserLifecycleSenders;
   }> = {},
-): UserApp {
-  return UserApp.createForTesting({
+): UserModule {
+  const app = UserModule.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
     members: createUserTestInfrastructure(input.members ?? {}),
     facts: input.facts ?? TEST_USER_CONFIG,
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
-      authz: input.dependencies?.authz ?? createApiFixture<AuthzApi>(),
+      authz: input.dependencies?.authz ?? createUserTestAuthorization(),
       governance: input.dependencies?.governance ?? createApiFixture<GovernanceRestApi>(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
-      ops: input.dependencies?.ops ?? createUserTestOps(),
       projects: input.dependencies?.projects ?? createUserTestProjects(),
     },
   });
+  app.connectLifecycle(input.lifecycle ?? createUserTestLifecycle().senders);
+
+  return app;
 }

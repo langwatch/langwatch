@@ -7,8 +7,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/annotations.ts",
-  "types": "./dist/annotations.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/annotation.web.ts",
@@ -24,16 +22,14 @@
     "@chakra-ui/react": "catalog:",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "diff": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",

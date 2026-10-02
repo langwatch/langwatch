@@ -25,6 +25,7 @@ import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-con
 import { z } from "zod";
 
 import type { ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
+import { ScenarioWorkflowAgentSecretsService } from "./scenario-workflow-agent-secrets.service.ts";
 import type { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service.ts";
 
@@ -50,7 +51,11 @@ export class ScenarioTargetPrefetchService {
     langwatchEndpoint: string;
     voiceTargets: VoiceTargetReader | null;
   }): ScenarioTargetPrefetchService {
-    return new ScenarioTargetPrefetchService(options, ScenarioWorkflowMappingService.create());
+    return new ScenarioTargetPrefetchService(
+      options,
+      ScenarioWorkflowMappingService.create(),
+      ScenarioWorkflowAgentSecretsService.create(options.agents),
+    );
   }
 
   private constructor(
@@ -65,6 +70,7 @@ export class ScenarioTargetPrefetchService {
       voiceTargets: VoiceTargetReader | null;
     },
     private readonly workflowMappings: ScenarioWorkflowMappingService,
+    private readonly workflowAgentSecrets: ScenarioWorkflowAgentSecretsService,
   ) {}
 
   async getTargetAdapter(input: {
@@ -345,7 +351,8 @@ export class ScenarioTargetPrefetchService {
       };
     }
 
-    const { inputs, outputs } = this.options.workflowHydrator.extractWorkflowIO(hydrateResult.dsl);
+    const dsl = await this.workflowAgentSecrets.fill({ dsl: hydrateResult.dsl, projectId });
+    const { inputs, outputs } = this.options.workflowHydrator.extractWorkflowIO(dsl);
 
     const secretValues = await this.executionSecrets(projectId, runSecretValues);
 
@@ -353,7 +360,7 @@ export class ScenarioTargetPrefetchService {
       type: "workflow",
       agentId: agent.id,
       workflowId: latest.workflowId,
-      workflow: hydrateResult.dsl,
+      workflow: dsl,
       inputs,
       outputs,
       scenarioMappings: config.scenarioMappings,

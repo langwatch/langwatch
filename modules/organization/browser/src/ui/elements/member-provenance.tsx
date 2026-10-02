@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import type { OrganizationMemberProvenance } from "@langwatch/organization-contract";
 
 import { IdentityChip } from "./identity-row.tsx";

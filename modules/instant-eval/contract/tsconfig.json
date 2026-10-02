@@ -5,7 +5,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-    "lib": ["es2023"],
+    "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
 
@@ -24,13 +24,16 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"

@@ -30,6 +30,7 @@ describe("given a filtered revoke", () => {
           organizationId: ORG_ID,
           principalType: "API_KEY",
           principalId: "key_1",
+          scopeType: { not: "PLATFORM" },
           revokedAt: null,
         },
         select: { id: true },
@@ -101,6 +102,7 @@ describe("given a filtered revoke", () => {
           organizationId: ORG_ID,
           principalType: "API_KEY",
           principalId: "key_1",
+          scopeType: { not: "PLATFORM" },
           roleKey: { in: ["custom:role_1", "custom:role_2"] },
           id: { notIn: ["grant_kept"] },
           revokedAt: null,
@@ -116,6 +118,46 @@ describe("given a filtered revoke", () => {
         },
         data: expect.objectContaining({ revokedAt: expect.any(Date) }),
       });
+    });
+  });
+});
+
+describe("given an organization's filtered revoke", () => {
+  describe("when the filter names no scope tier", () => {
+    /** @scenario An organization's filtered revoke never reaches a platform grant */
+    it("pins the Grant predicate away from the PLATFORM tier", async () => {
+      const { writer, db } = harness({});
+      db.grant.findMany.mockResolvedValue([]);
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { userId: "user_1" },
+        actor: ACTOR,
+      });
+
+      expect(db.grant.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ scopeType: { not: "PLATFORM" } }),
+        select: { id: true },
+      });
+    });
+  });
+
+  describe("when it names the platform tenant as its organization", () => {
+    /** @scenario An organization's filtered revoke never reaches a platform grant */
+    it("is refused before any read", async () => {
+      const { writer, db } = harness({});
+
+      await expect(
+        writer.revokeBindingsWhere({
+          organizationId: "platform",
+          where: { userId: "user_1" },
+          actor: ACTOR,
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        meta: { organizationId: "platform" },
+      });
+      expect(db.grant.findMany).not.toHaveBeenCalled();
     });
   });
 });
@@ -136,6 +178,81 @@ describe("given a caller that only needs the role retired", () => {
       expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
       expect(db.role.findFirst).not.toHaveBeenCalled();
       expect(epoch.bump).toHaveBeenCalledWith({ organizationId: ORG_ID });
+    });
+  });
+});
+
+describe("given a custom role definition", () => {
+  describe("when it adds a platform permission", () => {
+    /** @scenario A custom role cannot gain ops permissions */
+    it("is refused with platform_permission_not_assignable naming what it added", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst.mockResolvedValue({
+        name: "Ops",
+        description: null,
+        permissions: ["project:view"],
+      });
+
+      await expect(
+        writer.defineRole({
+          organizationId: ORG_ID,
+          roleId: "role_ops",
+          name: "Ops",
+          permissions: ["project:view", "ops:view"],
+          kind: "custom",
+          actor: ACTOR,
+        }),
+      ).rejects.toMatchObject({
+        code: "platform_permission_not_assignable",
+        meta: { permissions: ["ops:view"] },
+      });
+      expect(sent).toEqual([]);
+    });
+  });
+
+  describe("when a legacy role that already lists ops is renamed", () => {
+    /** @scenario A legacy custom role listing ops permissions can still be renamed */
+    it("writes the definition, keeping the inert ops entries", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst.mockResolvedValue({
+        name: "Ops renamed",
+        description: null,
+        permissions: ["project:view", "ops:view"],
+      });
+
+      await writer.defineRole({
+        organizationId: ORG_ID,
+        roleId: "role_ops",
+        name: "Ops renamed",
+        permissions: ["project:view", "ops:view"],
+        kind: "custom",
+        actor: ACTOR,
+      });
+
+      expect(sent).toHaveLength(1);
+    });
+  });
+
+  describe("when an API key's private role lists a platform permission", () => {
+    /** @scenario A custom role cannot gain ops permissions */
+    it("is written, since the fence leaves it inert", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst.mockResolvedValue({
+        name: "apikey:key_1",
+        description: null,
+        permissions: ["ops:view"],
+      });
+
+      await writer.defineRole({
+        organizationId: ORG_ID,
+        roleId: "apikey:key_1",
+        name: "apikey:key_1",
+        permissions: ["ops:view"],
+        kind: "system_api_key",
+        actor: ACTOR,
+      });
+
+      expect(sent).toHaveLength(1);
     });
   });
 });

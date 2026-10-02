@@ -9,7 +9,7 @@ import type {
   AuthzRoleBindingFilter,
   LedgerBindingAttach,
 } from "../../eventing/authz-grant.store.ts";
-import type { BindingPrincipalWhere, RoleBindingWrite } from "../authz-grant.repository.ts";
+import type { BindingPrincipalWhere, GrantWrite } from "../authz-grant.repository.ts";
 import { PRINCIPAL_TO_DB } from "./prisma.authz-grant.mapper.ts";
 
 const storedIdSchema = z.object({ id: z.string() });
@@ -105,7 +105,7 @@ export function roleKeyFor({
   role,
   customRoleId,
 }: {
-  role: RoleBindingWrite["role"];
+  role: GrantWrite["role"];
   customRoleId: string | null;
 }): string {
   return customRoleId === null
@@ -129,7 +129,7 @@ export function principalForWhere(principal: BindingPrincipalWhere): {
 /**
  * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head predicate, so a
  * filtered revoke reaches Grant rows the compat head never represented (a `roleKey`-only
- * import, a PLATFORM-tier row). The three compat tiers spell identically in `GrantScopeType`.
+ * import). It never reaches a PLATFORM-tier row: an organization's filter cannot name one.
  */
 export function grantWhereFromBindingWhere(
   where: AuthzRoleBindingFilter,
@@ -156,6 +156,8 @@ export function grantWhereFromBindingWhere(
     if (typeof value !== "string") return UNTRANSLATABLE;
     grantWhere[field] = value;
   }
+  if (grantWhere.scopeType === "PLATFORM") return UNTRANSLATABLE;
+  grantWhere.scopeType ??= { not: "PLATFORM" };
 
   const principal = (
     [

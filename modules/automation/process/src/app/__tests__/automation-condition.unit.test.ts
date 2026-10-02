@@ -6,12 +6,12 @@
 import type { vi } from "vitest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AutomationApp } from "../automation.app.ts";
+import type { AutomationModule } from "../automation.app.ts";
 import { createCanonicalAutomationApp } from "./automation-app.fixture.ts";
 
 const CREATED = { id: "trigger_new", triggerKind: "AUTOMATION" };
 
-function app(): { app: AutomationApp; create: ReturnType<typeof vi.fn> } {
+function app(): { app: AutomationModule; create: ReturnType<typeof vi.fn> } {
   const fixture = createCanonicalAutomationApp();
   resources.push(fixture.resources);
   return { app: fixture.app, create: fixture.triggerCreate };
@@ -115,8 +115,8 @@ describe("given a graph alert or a scheduled report", () => {
         automation.create({
           id: "trigger_new",
           name: "Latency alert",
-          action: "SEND_SLACK_MESSAGE",
-          actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
+          action: "SEND_EMAIL",
+          actionParams: { members: ["ops@acme.test"] },
           filters: {},
           projectId: "project_1",
           message: null,

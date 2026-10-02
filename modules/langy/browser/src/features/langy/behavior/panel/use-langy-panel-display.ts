@@ -1,8 +1,8 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { isLangyHiddenLocalNotice } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { useMemo, useRef } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
 import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership.ts";
 import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline.ts";

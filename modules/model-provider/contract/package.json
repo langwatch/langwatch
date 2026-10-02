@@ -21,16 +21,15 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/time": "workspace:*",
     "safe-regex2": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

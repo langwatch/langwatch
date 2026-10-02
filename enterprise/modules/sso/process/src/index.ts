@@ -1,4 +1,4 @@
-export { ssoServer } from "./sso.server.ts";
+export { ssoProcessModule } from "./sso.module.ts";
 export { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";
 export type { SsoInfrastructure } from "./app/sso.app.ts";
 export type {

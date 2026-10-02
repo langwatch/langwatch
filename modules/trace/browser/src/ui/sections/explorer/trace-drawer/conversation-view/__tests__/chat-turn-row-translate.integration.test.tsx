@@ -3,20 +3,22 @@
  * (specs/traces-v2/message-translation.feature).
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../scenario-roles.tsx", async () => {
-  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
+vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+  const actual = await vi.importActual<typeof scenarioRolesModule>(
+    "../../../../../../behavior/scenario-role.store.tsx",
+  );
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
+vi.mock("@langwatch/design-system/conversation-expand-context", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "@langwatch/design-system/conversation-expand-context",
   );
   return {
     ...actual,
@@ -80,11 +82,11 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
+import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
 import type { TraceListItem } from "../../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
-import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 function turn(over: Partial<TraceListItem>): TraceListItem {
@@ -112,21 +114,19 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
 }
 
 function renderRow(texts: { user: string; assistant: string }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ChatTurnRow
-        layout="thread"
-        turn={turn({})}
-        userText={texts.user}
-        assistantText={texts.assistant}
-        assistantReasoning=""
-        gapSecs={0}
-        shouldShowGap={false}
-        index={1}
-        isCurrent={false}
-        onSelect={() => undefined}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ChatTurnRow
+      layout="thread"
+      turn={turn({})}
+      userText={texts.user}
+      assistantText={texts.assistant}
+      assistantReasoning=""
+      gapSecs={0}
+      shouldShowGap={false}
+      index={1}
+      isCurrent={false}
+      onSelect={() => undefined}
+    />,
   );
 }
 

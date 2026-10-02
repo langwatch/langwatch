@@ -9,16 +9,11 @@ import { toDate, type Instant } from "@langwatch/time";
 
 import { SpendSpikeAnomalyRepository } from "../spend-spike-anomaly.repository.ts";
 
-const GOVERNANCE_PROJECT_KIND = "internal_governance";
-
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type SpendSpikeAnomalyDatabase = Pick<
-  PrismaClient,
-  "anomalyAlert" | "anomalyRule" | "project"
->;
+export type SpendSpikeAnomalyDatabase = Pick<PrismaClient, "anomalyAlert" | "anomalyRule">;
 
 export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyRepository {
   private constructor(private readonly prisma: SpendSpikeAnomalyDatabase) {
@@ -38,18 +33,6 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
       },
     });
     return rows.map((row) => anomalyRuleSchema.parse(row));
-  }
-
-  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: GOVERNANCE_PROJECT_KIND,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
   }
 
   async hasOpenAlert(input: { ruleId: string; since: Instant }): Promise<boolean> {

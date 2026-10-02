@@ -7,12 +7,14 @@ import {
   type NurturingSignal,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
 import { postHogChannels } from "../channels/posthog-channels.registry.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
+import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
+import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingMembers = Readonly<{
@@ -20,13 +22,14 @@ type NurturingMembers = Readonly<{
 }>;
 
 type NurturingSetup = FeatureSetup<
-  typeof NurturingApp.dependencies,
+  typeof NurturingModule.dependencies,
   NurturingMembers,
-  NurturingServerConfig
+  NurturingServerConfig,
+  NurturingRepositories
 >;
 
 /** Owners tell nurturing; it names no peer, so it can never close a cycle (§9). */
-export class NurturingApp implements NurturingApi {
+export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
   static readonly dependencies = { users: UserApi };
   static readonly reads = ["idempotency"] as const;
@@ -44,9 +47,10 @@ export class NurturingApp implements NurturingApi {
     config,
     dependencies,
     members,
+    repositories,
     resources,
     secrets,
-  }: NurturingSetup): Promise<NurturingApp> {
+  }: NurturingSetup): Promise<NurturingModule> {
     const customerIo = await secrets.into(nurturingSecrets.customerIoApiKey, (key) =>
       key
         ? NurturingService.create({
@@ -70,8 +74,17 @@ export class NurturingApp implements NurturingApi {
       posthog,
       users: dependencies.users,
     });
-    return new NurturingApp(
-      buildNurturingPipeline({ deliver: (input) => delivery.deliver(input) }),
+    const milestones = NurturingMilestonesService.create({
+      milestones: repositories.milestones,
+      claims: members.idempotency,
+    });
+    return new NurturingModule(
+      buildNurturingPipeline({
+        deliver: (input) => delivery.deliver(input),
+        projectCreated: (data) => milestones.projectCreated(data),
+        evaluationCompleted: (input) => milestones.evaluationCompleted(input),
+        simulationRunFinished: (input) => milestones.simulationRunFinished(input),
+      }),
     );
   }
 

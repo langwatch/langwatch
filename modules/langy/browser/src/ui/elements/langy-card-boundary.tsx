@@ -1,7 +1,7 @@
 /**
  * Per-card error boundary for the Langy transcript.
  */
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 

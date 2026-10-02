@@ -1,6 +1,7 @@
 /**
  * The raw-fetch request path the management API services share.
  */
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -95,6 +96,7 @@ export const createManagementRequest = ({
     const response = await langwatchFetch(`${endpoint}${path}${buildQueryString(query)}`, {
       ...(method ? { method } : {}),
       headers: {
+        ...buildSdkIdentityHeaders(),
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         ...headers,

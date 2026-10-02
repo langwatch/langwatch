@@ -1,10 +1,19 @@
 // Writing a role with the answer beside it: what it should reach on the left, what
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
-import { Box, Button, Field, Grid, Input, Text, Textarea, VStack } from "@chakra-ui/react";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
-import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Box,
+  Button,
+  Field,
+  Grid,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useState } from "react";
 import { type FieldErrors, type UseFormRegister, useForm, useWatch } from "react-hook-form";
 
@@ -120,7 +129,7 @@ function useRoleMutations({
   const utils = authzApi.useUtils();
   const onSaved = (title: string) => {
     void utils.role.getAll.invalidate();
-    void utils.roleBinding.listForOrg.invalidate();
+    void utils.authz.listManagedGrants.invalidate();
     host.succeeded({ title });
     onClose();
   };

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { aesEncryption } from "../config-members.ts";
 import { storesOwner, type StoresConfig } from "../config-owner.ts";
-import { openProcessStores } from "../open-stores.ts";
+import { openStores } from "../open-stores.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
 
 /** main's platform/app/src/utils/encryption.ts `encrypt`, line for line. */
@@ -72,7 +72,7 @@ const storesConfig: StoresConfig = {
 
 async function encryptionFrom(environment: Record<string, string>) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
-  const { members } = await openProcessStores({
+  const { members } = await openStores({
     name: "encryption-member-test",
     config: storesConfig,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

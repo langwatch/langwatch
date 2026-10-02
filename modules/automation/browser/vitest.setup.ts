@@ -5,7 +5,13 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
+
+// The dataset list is the dataset client's own tRPC read; a jsdom suite has no provider, so the
+// overview and drawers see no datasets unless a suite mocks the client itself.
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: { dataset: { getAll: { useQuery: () => ({ data: [], isLoading: false }) } } },
+}));
 
 // Auto-cleanup only registers itself when a global afterEach exists at import
 // time; this package runs without vitest globals, so an explicit hook is what

@@ -47,11 +47,7 @@ export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem
       // Backed by the same project-protected read as the turns themselves, so
       // a share grant never opens it.
       enabled,
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      placeholderData: keepPreviousData,
-      trpc: { context: { skipBatch: true } },
-    },
+      placeholderData: keepPreviousData,    },
   );
 
   // `placeholderData: keepPreviousData` hands back the previous thread's

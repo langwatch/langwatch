@@ -1,6 +1,6 @@
-import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 

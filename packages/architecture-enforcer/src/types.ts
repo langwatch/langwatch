@@ -1,4 +1,4 @@
-export type FeaturePackageRole = "contract" | "process" | "browser" | "browser-kit";
+export type FeaturePackageRole = "contract" | "process" | "browser";
 
 export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks";
 
@@ -15,6 +15,7 @@ export type FeatureCatalogueEntry = {
 
 export type PackageKind =
   | FeaturePackageRole
+  | "library"
   | "application"
   | "dev-runtime"
   | "enterprise-root"

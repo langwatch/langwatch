@@ -1,14 +1,14 @@
-import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Box, Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
-import { WorkflowCardDisplay, WorkflowCardLink } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
 
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
+import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
 

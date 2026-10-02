@@ -1,5 +1,5 @@
 /**
- * The server half of `traces.*`, delegating to `TraceApp`. Anonymous shared
+ * The server half of `traces.*`, delegating to `TraceModule`. Anonymous shared
  * reads are NOT here (`sharedTrace.get`, ADR-057). `aiQuery`/`aiAction`
  * throw `service_unavailable` — see the merge-traces-v2 handoff.
  */

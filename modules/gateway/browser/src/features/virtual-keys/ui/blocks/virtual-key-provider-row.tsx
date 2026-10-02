@@ -1,7 +1,7 @@
-import { Box, Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { Box, Button, HStack, Text, VStack, Wrap } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 

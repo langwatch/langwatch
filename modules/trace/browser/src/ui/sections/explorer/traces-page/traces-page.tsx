@@ -1,17 +1,14 @@
-import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
-import {
-  useFilterStore,
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-  useUIStore,
-} from "@langwatch/trace-browser-kit";
+import { Box, Flex, HStack, useBreakpointValue, VStack } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useFilterStore, useSelectionStore } from "../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
+import { useDismissTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { ExportProgress } from "../../../elements/explorer/export-progress.tsx";
 import { SidebarResizeHandle } from "../../../elements/explorer/filter-sidebar/sidebar-resize-handle.tsx";
@@ -142,7 +139,7 @@ export const TracesPage: React.FC = () => {
   // project can't load, and filter facet values may not exist across projects — both would
   // render as confusing empty/error states if left in place.
   const prevProjectIdRef = useRef<string | null>(null);
-  const closeDrawerOnSwitch = useDrawerStore((s) => s.closeDrawer);
+  const closeDrawerOnSwitch = useDismissTraceDrawer();
   const clearFilters = useFilterStore((s) => s.clearAll);
   useEffect(() => {
     const projectId = project?.id ?? null;
@@ -256,7 +253,7 @@ const PaneFader: React.FC<{
  * store-update → render lands in the same frame.
  */
 const TraceDrawerMount: React.FC = () => {
-  const hasTrace = useDrawerStore((s) => !!s.traceId);
+  const hasTrace = useTraceDrawer((s) => !!s.traceId);
   if (!hasTrace) return null;
   return <TraceV2DrawerShell />;
 };

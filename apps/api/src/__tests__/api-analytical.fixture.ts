@@ -1,19 +1,14 @@
-/**
- * The api installed as `main.ts` installs it, with evaluation on its live repositories over a real
- * ClickHouse and every other module over memory stores (ARCHITECTURE.md §13).
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
   storesBackedMembers,
   withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -28,6 +23,11 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The api installed as `main.ts` installs it, with evaluation on its live repositories over a real
+ * ClickHouse and every other module over memory stores (ARCHITECTURE.md §13).
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 
 const ROLE = "api";
@@ -52,7 +52,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickHouseQueryClient }) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -85,7 +85,7 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -105,7 +105,6 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,

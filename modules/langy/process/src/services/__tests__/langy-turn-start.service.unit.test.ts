@@ -67,6 +67,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
     sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
     context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
+    skillGates: { resolveDisabled: vi.fn(async () => []) },
     metrics: { count: vi.fn() },
     admission: { claim, commit, abort, release: vi.fn(async () => undefined) },
     accessStore: {

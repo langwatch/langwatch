@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import {
   PrismaConfigService,
@@ -153,7 +154,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     const saved = await savedCharts.create({
       id: `saved-${randomUUID()}`,
       projectId,
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       name: "Saved",
       definition: { version: 1, sql: "SELECT 1", parameters: {} },
     });
@@ -179,7 +180,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     const saved = await savedCharts.create({
       id: `saved-${randomUUID()}`,
       projectId,
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       name: "Saved",
       definition: { version: 1, sql: "SELECT 1", parameters: {} },
     });
@@ -209,7 +210,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     const input = {
       id: `saved-${randomUUID()}`,
       projectId,
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       name: "Saved",
       definition: { version: 1 as const, sql: "SELECT 1", parameters: {} },
     };

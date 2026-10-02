@@ -1,3 +1,5 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { Kbd } from "@langwatch/design-system/kbd";
 import {
   Box,
   chakra,
@@ -8,11 +10,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+} from "@langwatch/design-system/primitives";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
@@ -21,10 +19,12 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { editorStyles } from "../../../../behavior/editor-styles.ts";
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
 import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";

@@ -1,5 +1,5 @@
-import { Button, VStack } from "@chakra-ui/react";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
+import { Button, VStack } from "@langwatch/design-system/primitives";
 
 import { isNavigatingAway } from "../../behavior/hard-redirect.ts";
 import { useJoinBeforeCreate } from "../../behavior/use-join-before-create.ts";

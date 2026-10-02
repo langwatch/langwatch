@@ -1,6 +1,6 @@
 /** Navigation menu entry (moved from platform/app; uses this package's NavigationLink). */
 
-import { Badge, Box, chakra, HStack, Link, Text } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Link, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef } from "react";

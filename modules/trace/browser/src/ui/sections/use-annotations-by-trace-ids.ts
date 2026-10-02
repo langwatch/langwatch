@@ -57,8 +57,6 @@ export function useAnnotationsByTraceIds({
         {
           enabled: enabled && !!projectId && ids.length > 0,
           placeholderData: keepPreviousData ? holdPreviousData : undefined,
-          staleTime: 5 * 60_000,
-          refetchOnWindowFocus: false,
         },
       ),
     ),

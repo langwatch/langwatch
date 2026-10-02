@@ -1,4 +1,12 @@
-import { chakra, Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  chakra,
+  Box,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRACE_NAME_MAX_LENGTH } from "@langwatch/trace-contract";
 import { useEffect, useId, useRef, useState } from "react";

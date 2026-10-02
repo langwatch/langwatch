@@ -4,12 +4,12 @@
  * already carries the scopes and confirmations that go with them.
  */
 
-import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { apiKeyClient } from "@langwatch/api-key-client";
 import { Link } from "@langwatch/browser-host/link";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { useEffect } from "react";
 
-import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
 
@@ -25,7 +25,7 @@ export function PersonalApiKeysSummary() {
   const organizationId = host.organization()?.id ?? null;
   const userId = host.currentUser()?.id ?? null;
 
-  const keys = api.apiKey.list.useQuery(
+  const keys = apiKeyClient.apiKey.list.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId },
   );

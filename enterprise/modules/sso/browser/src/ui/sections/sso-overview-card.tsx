@@ -1,11 +1,11 @@
+import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How everyone signs in, on the Authentication overview: the live connection
  * read, or what a connection would do before there is one. Declared through
  * `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";

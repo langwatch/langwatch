@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 // MCP governance toolset: mirrors the REST shape, dispatches in-process through the app.
 // RBAC at the tool layer; OAuth for writes, a project apiKey is enough for reads.
+// A person's MCP session is capped at its project: template tools are refused to it.
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   type GovernanceRestApi,
   TemplateNotFoundError,
@@ -62,7 +64,7 @@ type GovernanceMcpOperations = Pick<
 /** Registers the governance MCP tools on one session-scoped McpServer. */
 export class GovernanceMcpToolsService {
   private constructor(
-    private readonly projects: Pick<ProjectApi, "findIdByLegacyApiKey" | "getOrganizationId">,
+    private readonly projects: Pick<ProjectApi, "getOrganizationId">,
     private readonly governance: GovernanceMcpOperations,
     private readonly permissions: GovernanceMcpPermissionProbe,
   ) {}
@@ -72,30 +74,40 @@ export class GovernanceMcpToolsService {
     governance,
     permissions,
   }: {
-    projects: Pick<ProjectApi, "findIdByLegacyApiKey" | "getOrganizationId">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
     governance: GovernanceMcpOperations;
     permissions: GovernanceMcpPermissionProbe;
   }): GovernanceMcpToolsService {
     return new GovernanceMcpToolsService(projects, governance, permissions);
   }
 
-  /** The caller's organization resolves from the apiKey on first use and is cached per session. */
+  /** The caller's organization resolves from the session's project on first use, cached per session. */
   register({
     server,
-    apiKey,
+    projectId,
     callerUserId,
   }: {
     server: GovernanceMcpServer;
-    apiKey: string;
+    projectId: string;
     callerUserId: string | undefined;
   }): void {
     let resolved: Promise<McpSession> | undefined;
     const session: SessionReader = () => {
-      resolved ??= this.resolveSession({ apiKey, callerUserId });
+      resolved ??= this.resolveSession({ projectId, callerUserId });
       return resolved;
     };
-    this.registerTemplateReads(server, session);
-    this.registerTemplateWrites(server, session);
+    // Templates are organization config (OTTL rules included); a person's own keys are not.
+    const organizationTier: SessionReader = async () => {
+      const current = await session();
+      if (current.callerUserId) {
+        throw new ApiKeyScopeViolationError(
+          "An MCP session is capped at its project and cannot reach the organization's ingestion templates",
+        );
+      }
+      return current;
+    };
+    this.registerTemplateReads(server, organizationTier);
+    this.registerTemplateWrites(server, organizationTier);
     this.registerIngestionKeys(server, session);
   }
 
@@ -110,18 +122,12 @@ export class GovernanceMcpToolsService {
   }
 
   private async resolveSession({
-    apiKey,
+    projectId,
     callerUserId,
   }: {
-    apiKey: string;
+    projectId: string;
     callerUserId: string | undefined;
   }): Promise<McpSession> {
-    const projectId = await this.projects.findIdByLegacyApiKey({ token: apiKey });
-    if (projectId === null) {
-      throw new Error(
-        "MCP session apiKey did not resolve to a project — cannot derive organization context for governance tools.",
-      );
-    }
     const organizationId = await this.projects.getOrganizationId(projectId);
     return { organizationId, callerUserId };
   }

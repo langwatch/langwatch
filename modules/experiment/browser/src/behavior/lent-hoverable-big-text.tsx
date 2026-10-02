@@ -1,8 +1,8 @@
 /** Workflow's clamped text, as workflow lends it (ARCHITECTURE.md §3.4, rule 7). */
 
-import { Box, type BoxProps } from "@chakra-ui/react";
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type { UiHoverableBigTextProps } from "@langwatch/browser-host/declarations";
+import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import { lazy, Suspense, useMemo } from "react";
 
 /** The lent text in a box carrying this screen's type and width; plain text until it loads. */

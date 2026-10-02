@@ -10,6 +10,7 @@ import {
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { Temporal, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -332,6 +333,70 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     ]);
 
     expect(leases.flat().map((row) => row.messageKey)).toEqual(["message-1"]);
+  });
+
+  describe("given many writers racing on one process", () => {
+    /** @scenario Concurrent envelopes for one endpoint all land */
+    it("transact lands every concurrent append with no conflict outcome", async () => {
+      const target = ref("hot-stream");
+      const writers = 8;
+
+      const results = await Promise.all(
+        Array.from({ length: writers }, (_, index) =>
+          store.transact<{ appended: string[] }>({
+            ref: target,
+            tenantId: "tenant-1",
+            sourceEventId: `event-${index}`,
+            now: 1_000 + index,
+            apply: (current) => ({
+              state: {
+                appended: [...(current?.state.appended ?? []), `envelope-${index}`],
+              },
+              nextWakeAt: null,
+              messages: [message(`append-${index}`)],
+            }),
+          }),
+        ),
+      );
+
+      // The lock serialised them, and because each read happened inside it,
+      // every writer landed: no revisionConflict outcome exists to return.
+      for (const result of results) expect(result.outcome).toBe("committed");
+      const instance = await store.findByRef<{ appended: string[] }>({
+        ref: target,
+      });
+      expect(instance?.revision).toBe(writers);
+      expect(instance?.state.appended).toHaveLength(writers);
+      expect(new Set(instance?.state.appended).size).toBe(writers);
+      const { count } = await store.countPendingMessages({
+        ref: target,
+        intentType: "langy.test.intent",
+      });
+      expect(count).toBe(writers);
+    });
+
+    it("transact still absorbs a duplicate source event", async () => {
+      const target = ref("dedup-stream");
+      const first = await store.transact<{ n: number }>({
+        ref: target,
+        tenantId: "tenant-1",
+        sourceEventId: "same-event",
+        now: 1_000,
+        apply: () => ({ state: { n: 1 }, nextWakeAt: null, messages: [] }),
+      });
+      const replay = await store.transact<{ n: number }>({
+        ref: target,
+        tenantId: "tenant-1",
+        sourceEventId: "same-event",
+        now: 2_000,
+        apply: () => ({ state: { n: 2 }, nextWakeAt: null, messages: [] }),
+      });
+
+      expect(first.outcome).toBe("committed");
+      expect(replay.outcome).toBe("duplicateEvent");
+      const instance = await store.findByRef<{ n: number }>({ ref: target });
+      expect(instance?.state.n).toBe(1);
+    });
   });
 
   describe("given a leased outbox message", () => {
@@ -1157,8 +1222,8 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
         expect(leased.map((row) => row.messageKey)).toEqual(["pending-msg"]);
       });
 
-      /** @scenario "Dead outbox rows are kept far longer than dispatched ones" */
-      it("keeps a dead row until its own longer window elapses", async () => {
+      /** @scenario "Dead messages are retained until delivered or discarded" */
+      it("keeps a dead row past every cutoff and reaps it only once discarded", async () => {
         const deadAt = 200_000;
         await store.commit(
           commit({
@@ -1186,21 +1251,28 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           dead: true,
         });
 
-        // The dispatched family must not touch it, and neither must a dead sweep
-        // whose cutoff it still predates.
+        // Undelivered work is retained: no cutoff reaps a DEAD row, however
+        // far it predates one. Only the operator's discard starts its clock.
         expect(
           await store.deleteDispatchedOutboxBatch({
             before: cutoff,
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 })).toBe(0);
+        expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(0);
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
           }),
         ).toBe(1);
 
+        await prisma.processManagerOutbox.updateMany({
+          where: { processName, projectId: "project-1" },
+          data: {
+            status: "discarded",
+            updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(deadAt)),
+          },
+        });
         expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(1);
         expect(
           await prisma.processManagerOutbox.count({

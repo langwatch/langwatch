@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { EvaluationInputStorage } from "../app/evaluation.members.ts";
+import type { EvaluationInputRepository } from "../repositories/evaluation-input.repository.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 
@@ -44,7 +44,7 @@ export const EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY = STORED_OBJECT_MARKER_K
 
 export class EvaluationInputsOffloadService {
   static create(input: {
-    storage: EvaluationInputStorage;
+    storage: EvaluationInputRepository;
     config: EvaluationInputOffloadConfig;
   }): EvaluationInputsOffloadService {
     return new EvaluationInputsOffloadService(input.storage, input.config);
@@ -56,7 +56,7 @@ export class EvaluationInputsOffloadService {
   }
 
   private constructor(
-    private readonly storage: EvaluationInputStorage,
+    private readonly storage: EvaluationInputRepository,
     private readonly config: EvaluationInputOffloadConfig,
   ) {}
 
@@ -233,4 +233,13 @@ export class EvaluationInputsOffloadService {
 
     return bytes;
   }
+}
+
+/** Offloads an Evaluation result's inputs before the event is created. */
+export interface EvaluationInputsOffload {
+  offload(input: {
+    tenantId: string;
+    evaluationId: string;
+    inputs: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
 }

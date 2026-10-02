@@ -1,7 +1,16 @@
+import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
+
+import { cataloguePermissions } from "../../rules/lwql-catalogue.rules.ts";
+import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
 } from "../../services/langwatch-ql.service.ts";
+
+/** A caller reading every catalogue table and column, for a suite that runs the real policy. */
+export const EVERY_CATALOGUE_PERMISSION: LangWatchQLCatalogueAccess = {
+  permissions: cataloguePermissions({ catalog: LWQL_CATALOG }),
+};
 
 /**
  * The real LangWatchQL service, for a suite that measures a real refusal —

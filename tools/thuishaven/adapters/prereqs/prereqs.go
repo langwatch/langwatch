@@ -85,3 +85,9 @@ func (t *Tools) Install(ctx context.Context, command string) error {
 	t.once, t.formulae = sync.Once{}, nil
 	return err
 }
+
+// Sysctl reads one kernel setting with `sysctl -n`, trimmed.
+func (t *Tools) Sysctl(ctx context.Context, name string) (string, error) {
+	out, err := exec.CommandContext(ctx, "sysctl", "-n", name).Output()
+	return strings.TrimSpace(string(out)), err
+}

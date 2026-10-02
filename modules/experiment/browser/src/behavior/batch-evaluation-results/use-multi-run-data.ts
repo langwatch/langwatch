@@ -1,9 +1,10 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * useMultiRunData - Hook for fetching multiple run data in compare mode
  */
 import { useMemo } from "react";
+
+import { experimentApi } from "../experiment-api.ts";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
@@ -30,8 +31,6 @@ type UseMultiRunDataOptions = {
   experimentId: string;
   runIds: string[];
   enabled?: boolean;
-  /** Refetch interval in ms (set to false for finished runs) */
-  refetchInterval?: number | false;
   /** Stable color map for runs (key: runId, value: color) */
   runColorMap?: Record<string, string>;
 };
@@ -51,42 +50,41 @@ export const useMultiRunData = ({
   experimentId,
   runIds,
   enabled = true,
-  refetchInterval = false,
   runColorMap = {},
 }: UseMultiRunDataOptions): UseMultiRunDataReturn => {
   // We need to call hooks unconditionally, so we set up the max number
   // and enable/disable based on whether we have that many runs
-  const run0 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run0 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[0] ?? "" },
-    { enabled: enabled && !!runIds[0], refetchInterval },
+    { enabled: enabled && !!runIds[0]},
   );
-  const run1 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run1 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[1] ?? "" },
-    { enabled: enabled && !!runIds[1], refetchInterval },
+    { enabled: enabled && !!runIds[1]},
   );
-  const run2 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run2 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[2] ?? "" },
-    { enabled: enabled && !!runIds[2], refetchInterval },
+    { enabled: enabled && !!runIds[2]},
   );
-  const run3 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run3 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[3] ?? "" },
-    { enabled: enabled && !!runIds[3], refetchInterval },
+    { enabled: enabled && !!runIds[3]},
   );
-  const run4 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run4 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[4] ?? "" },
-    { enabled: enabled && !!runIds[4], refetchInterval },
+    { enabled: enabled && !!runIds[4]},
   );
-  const run5 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run5 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[5] ?? "" },
-    { enabled: enabled && !!runIds[5], refetchInterval },
+    { enabled: enabled && !!runIds[5]},
   );
-  const run6 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run6 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[6] ?? "" },
-    { enabled: enabled && !!runIds[6], refetchInterval },
+    { enabled: enabled && !!runIds[6]},
   );
-  const run7 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run7 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[7] ?? "" },
-    { enabled: enabled && !!runIds[7], refetchInterval },
+    { enabled: enabled && !!runIds[7]},
   );
 
   const runs: RunWithColor[] = useMemo(() => {

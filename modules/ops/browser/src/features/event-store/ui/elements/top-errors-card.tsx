@@ -1,4 +1,4 @@
-import { Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 /**

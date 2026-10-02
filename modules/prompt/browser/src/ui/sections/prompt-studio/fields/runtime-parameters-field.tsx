@@ -1,5 +1,5 @@
-import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { displayValue, serializeValue } from "@langwatch/design-system/json-value-text";
+import { Button, HStack, Input, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { Plus, X } from "lucide-react";

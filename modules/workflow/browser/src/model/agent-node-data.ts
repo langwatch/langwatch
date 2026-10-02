@@ -1,4 +1,4 @@
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import { type AgentWithFields, secretReferenceOf } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import type {
   AgentComponent,
@@ -215,6 +215,46 @@ export type HttpNodeSnapshot = {
   headers?: HttpHeader[];
   auth?: HttpAuth;
 };
+
+/** Names, the auth kind and any project-secret reference: values change on the agent itself. */
+export function withoutCredentialValues({
+  headers,
+  auth,
+}: {
+  headers: HttpHeader[];
+  auth: HttpAuth | undefined;
+}): { headers: HttpHeader[]; auth: HttpAuth | undefined } {
+  return {
+    headers: headers.map(({ key, value }) => ({ key, value: keepReference(value) })),
+    auth: blankAuth(auth),
+  };
+}
+
+/** A saved agent's draft settings without the credential keys: those never persist on the node. */
+export function draftSettingsWithoutCredentials(
+  settings: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!settings) return void 0;
+  const { headers: _headers, auth: _auth, ...rest } = settings;
+  return rest;
+}
+
+function keepReference(value: string): string {
+  return secretReferenceOf(value) === void 0 ? "" : value;
+}
+
+function blankAuth(auth: HttpAuth | undefined): HttpAuth | undefined {
+  switch (auth?.type) {
+    case "bearer":
+      return { ...auth, token: keepReference(auth.token) };
+    case "api_key":
+      return { ...auth, value: keepReference(auth.value) };
+    case "basic":
+      return { ...auth, password: keepReference(auth.password) };
+    default:
+      return auth;
+  }
+}
 
 /**
  * Reverse of the http branch of buildAgentParameters: the editor-shaped

@@ -1,16 +1,16 @@
-/**
- * @vitest-environment node
- * Finishing a cutover: the durable gate lands before anything is removed,
- * every step re-reads its evidence, and an interrupted attempt resumes.
- * @see specs/identity/sso-connection-lifecycle.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   SsoConnectionInvalidTransitionError,
   type SsoConnectionLifecycleState,
   type SsoMigrationBlockerView,
   type SsoMigrationPhase,
 } from "@langwatch/identity-contract";
+/**
+ * @vitest-environment node
+ * Finishing a cutover: the durable gate lands before anything is removed,
+ * every step re-reads its evidence, and an interrupted attempt resumes.
+ * @see specs/identity/sso-connection-lifecycle.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { SsoConnectionService } from "../sso-connection.service.ts";

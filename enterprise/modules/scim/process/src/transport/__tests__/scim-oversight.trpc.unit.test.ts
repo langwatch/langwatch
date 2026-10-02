@@ -59,7 +59,7 @@ function mount(userId: string) {
   });
   const { app, audited } = scimTestApp({
     oversight,
-    operators: async (id) => id === OPERATOR,
+    platformOperators: [OPERATOR],
   });
   const trpc = initTRPC.context<TestContext>().create();
   const router = createTrpcRuntime<TestContext>({

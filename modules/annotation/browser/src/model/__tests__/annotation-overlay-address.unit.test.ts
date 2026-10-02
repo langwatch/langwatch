@@ -10,7 +10,6 @@ import {
   closedQueueEditorAddress,
   QUEUE_EDITOR_PARAM,
   queueEditorAddress,
-  queueItemHref,
   readQueueEditor,
   traceDetailsAddress,
 } from "../annotation-overlay-address.ts";
@@ -112,25 +111,6 @@ describe("given the queue editor, which is this family's own overlay", () => {
     it("reads as closed", () => {
       expect(readQueueEditor({})).toBeNull();
       expect(readQueueEditor({ [QUEUE_EDITOR_PARAM]: "" })).toBeNull();
-    });
-  });
-});
-
-describe("given a queue item that is still waiting", () => {
-  describe("when the reviewer opens it", () => {
-    /**
-     * The walker is still served by `platform/app`, so this is a plain
-     * address across the seam. The shape is the one `AnnotationsTable`
-     * wrote, unchanged — a link minted before the move has to keep working.
-     */
-    it("goes to the queue walker naming the item and its trace", () => {
-      expect(
-        queueItemHref({
-          projectSlug: "acme",
-          queueItemId: "item-1",
-          traceId: "trace-1",
-        }),
-      ).toBe("/acme/annotations/my-queue?queue-item=item-1&trace=trace-1");
     });
   });
 });

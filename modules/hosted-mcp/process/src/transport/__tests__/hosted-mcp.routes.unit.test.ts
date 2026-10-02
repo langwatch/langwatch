@@ -1,33 +1,33 @@
 /**
  * @vitest-environment node
  */
-import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
-import {
-  HeaderMcpClientAddressService,
-  hostedMcpRoutePolicies,
-  HOSTED_MCP_FAMILY,
-  McpApiKeyCipher,
-  McpProjectLookup,
-  McpSessionGrant,
-} from "../../index.ts";
+import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
+import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
+import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
+import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
+import { getRoutePolicy } from "@langwatch/api";
 
-class NoProjects extends McpProjectLookup {
+class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
   resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {
     return Promise.resolve({ kind: "unknown" });
   }
 }
 
-class NoGrants extends McpSessionGrant {
+class NoGrants implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(false);
   }
 }
 
-class PlainCipher extends McpApiKeyCipher {
+class PlainCipher implements McpApiKeyCipher {
   encrypt(value: string): string {
     return value;
   }
@@ -37,10 +37,11 @@ class PlainCipher extends McpApiKeyCipher {
 }
 
 function handler() {
-  return HostedMcpApp.fromDependencies({
+  return HostedMcpModule.fromDependencies({
     redis: null,
     projects: new NoProjects(),
     grants: new NoGrants(),
+    cliSessions: new FakeCliSessions(),
     cipher: new PlainCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",

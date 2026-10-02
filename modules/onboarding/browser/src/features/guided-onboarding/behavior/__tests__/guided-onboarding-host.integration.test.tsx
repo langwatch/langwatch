@@ -107,9 +107,6 @@ class TestOnboardingHost extends OnboardingHostApi {
   async copyToClipboard() {
     return true;
   }
-  revealProjectApiKey() {
-    return undefined;
-  }
   prefersReducedMotion() {
     return false;
   }

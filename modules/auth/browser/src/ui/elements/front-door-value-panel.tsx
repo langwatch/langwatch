@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
-import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 import { FullLogo } from "@langwatch/design-system/full-logo";
+import { Box, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import "./auth-front-door.css";

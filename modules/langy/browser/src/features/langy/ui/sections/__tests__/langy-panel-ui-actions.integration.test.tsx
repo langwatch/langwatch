@@ -5,16 +5,15 @@
  * @see specs/langy/langy-ui-actions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type LangyUiActionHandlers,
-  useLangyStore,
-  LangyProvider,
-} from "@langwatch/langy-browser-kit";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { type LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -29,16 +28,6 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
     },
   });
 }
-
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({

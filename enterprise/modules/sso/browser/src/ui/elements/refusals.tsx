@@ -1,3 +1,4 @@
+import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How single sign-on setup reports a failure, in one place. Every word comes
@@ -5,8 +6,7 @@
  * wire message for a handled error IS the code, so rendering it would show an
  * administrator `sso_activation_break_glass_missing`.
  */
-import { Alert, Text } from "@chakra-ui/react";
-import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
+import { Alert, Text } from "@langwatch/design-system/primitives";
 
 /**
  * A refusal from a change, ON THE PAGE, beside the control that caused it.
@@ -70,12 +70,12 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
 /** What the reader is told when setting single sign-on up is not theirs yet. */
 const AVAILABILITY_REFUSAL_COPY = {
   license_required: {
-    title: "Single sign-on needs an active licence",
-    body: "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+    title: "Single sign-on needs an active license",
+    body: "Activate an enterprise license on this installation, and you can set single sign-on up here.",
   },
-  license_restart_required: {
-    title: "Restart to finish activating single sign-on",
-    body: "The licence is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
+  license_activation_pending: {
+    title: "Single sign-on is turning on",
+    body: "The license is active. Every server in this installation picks it up within a minute. Reload this page then.",
   },
   not_opted_in: {
     title: "Setting single sign-on up yourself isn't switched on yet",

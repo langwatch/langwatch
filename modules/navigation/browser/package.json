@@ -17,10 +17,6 @@
       "types": "./dist/ui/index.d.ts",
       "default": "./src/ui/index.ts"
     },
-    "./surfaces/command-bar": {
-      "types": "./dist/command-bar.d.ts",
-      "default": "./src/command-bar.ts"
-    },
     "./navigation": {
       "types": "./dist/navigation.d.ts",
       "default": "./src/navigation.ts"
@@ -33,16 +29,19 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/dataset-client": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/prompt-client": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/user-browser-kit": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "lucide-react": "catalog:",
     "next-themes": "catalog:",
     "react-error-boundary": "catalog:",

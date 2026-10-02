@@ -34,7 +34,6 @@ export function usePersonalFeatureGate(feature: PersonalFeatureKey): {
     { projectId: project?.id ?? "" },
     {
       enabled: isOnOwnPersonalProject && !!project?.id,
-      refetchOnWindowFocus: false,
     },
   );
   const featureEnabled = !!featuresQuery.data?.[feature];

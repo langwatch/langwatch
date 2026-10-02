@@ -7,11 +7,8 @@ export {
   SidebarContent,
   type SidebarSurface,
 } from "./sections/product-sidebar.tsx";
-export {
-  MainMenuSections,
-  MENU_WIDTH_COMPACT,
-  MENU_WIDTH_EXPANDED,
-} from "./sections/main-menu.tsx";
+export { MainMenuSections } from "./sections/main-menu.tsx";
+export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../model/menu-widths.ts";
 export { PersonalSidebarLinks } from "./sections/personal-sidebar.tsx";
 export { AppHeaderUserMenu } from "./sections/app-header-user-menu.tsx";
 export { NavigationLink } from "./elements/navigation-link.tsx";
@@ -19,7 +16,6 @@ export { SideMenuDensityProvider, useSideMenuDensity } from "./elements/side-men
 export { ProductSwitcherMenu } from "./sections/product-switcher-menu.tsx";
 export { ProjectSwitcherCombobox } from "./blocks/project-switcher-combobox.tsx";
 export { ProjectAvatar } from "./elements/project-avatar.tsx";
-export { LogoIcon } from "./elements/logo-icon.tsx";
 export {
   resolvePickOutcome,
   useProjectPickItems,

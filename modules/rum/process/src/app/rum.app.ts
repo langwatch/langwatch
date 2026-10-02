@@ -1,5 +1,5 @@
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
+import type { FeatureSetup } from "@langwatch/process";
 import {
   type BrowserTraceReport,
   RumApi,
@@ -37,10 +37,10 @@ type RumMembers = Readonly<{
   }>;
 }>;
 
-type RumSetup = FeatureSetup<typeof RumApp.dependencies, RumMembers, RumConfig, RumRepositories>;
+type RumSetup = FeatureSetup<typeof RumModule.dependencies, RumMembers, RumConfig, RumRepositories>;
 
 /** The process-owned browser telemetry ingest capability (ADR-058). */
-export class RumApp implements RumApiContract {
+export class RumModule implements RumApiContract {
   static readonly contract = RumApi;
   static readonly dependencies = {};
   static readonly config = rumConfig;
@@ -54,8 +54,8 @@ export class RumApp implements RumApiContract {
     this.#ingest = ingest;
   }
 
-  static async create({ config, secrets, members, repositories }: RumSetup): Promise<RumApp> {
-    const target = await secrets.into(RumApp.secrets.collectorHeaders, (rawHeaders) =>
+  static async create({ config, secrets, members, repositories }: RumSetup): Promise<RumModule> {
+    const target = await secrets.into(RumModule.secrets.collectorHeaders, (rawHeaders) =>
       members.telemetryExporter.withHeaders((telemetryHeaders) =>
         collectorTargetOf({
           own: { endpoint: config.collectorEndpoint, headers: collectorHeaders(rawHeaders) },
@@ -81,7 +81,7 @@ export class RumApp implements RumApiContract {
           }),
         }
       : { configured: false };
-    return new RumApp(
+    return new RumModule(
       BrowserTraceIngestService.create({ rateLimits: repositories.rateLimits, collector }),
     );
   }

@@ -23,7 +23,7 @@
   "dependencies": {
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "zod": "catalog:"
   },

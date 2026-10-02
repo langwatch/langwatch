@@ -1,5 +1,3 @@
-/** @see specs/langy/langy-health-canary.feature (Route — GET /api/health/langy) */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -7,6 +5,8 @@ import {
   LangyApiIdentityDeniedError,
   type LangyRestCaller,
 } from "@langwatch/langy-contract";
+/** @see specs/langy/langy-health-canary.feature (Route — GET /api/health/langy) */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangyCanaryService } from "../../services/langy-canary.service.ts";

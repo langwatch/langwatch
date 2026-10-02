@@ -8,7 +8,8 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
 
   # Bound by Go tests in services/voicesim/voicesim_test.go and
   # tools/thuishaven/domain/overlay_voice_test.go, by their `// @scenario`
-  # annotations, and by apps/voicesim-web/src/__tests__/calls-console.integration.test.tsx.
+  # annotations, by apps/voicesim-web/src/__tests__/calls-console.integration.test.tsx,
+  # and by the product's loopback-rule tests in model-provider, gateway and scenario.
   # The Twilio phone transport is not faked: the scenario SDK dials api.twilio.com
   # with no way to point it elsewhere.
 
@@ -42,19 +43,46 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
     And a provider path voicesim does not fake answers 404, never the console page
 
   Scenario: The call log is bounded
-    Given more than 200 calls have been made
-    Then the console keeps only the 200 most recent
+    Given more calls than VOICESIM_MAX_CALLS (default 200) have been made
+    Then the console keeps only that many of the most recent
+    And one call keeps at most VOICESIM_MAX_EVENTS_PER_CALL (default 500) protocol events, counting the rest
+
+  Scenario: A seeded voicesim starts with a sample call
+    Given voicesim starts with VOICESIM_SEED=1
+    Then the console lists one finished two-turn sample call
+    And without the seed it starts empty
 
   Scenario: haven runs voicesim only when the worktree asks for it
     Given a worktree that has never been up
     When the developer runs "haven up"
     Then no voice lane runs
     When the developer runs "haven up +voice"
-    Then a voice lane runs voicesim on a port haven allocated, routed at voice.<slug>.langwatch.localhost
+    Then voicesim runs on a port haven allocated, routed at voice.<slug>.langwatch.localhost
     And the overlay sets ELEVENLABS_BASE_URL to it for every lane
+    And the overlay sets the product's dev switch VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1
     And the overlay leaves OPENAI_BASE_URL alone, since every OpenAI model call falls back to it
+
+  Scenario: haven seeds the ElevenLabs provider at voicesim
+    Given the worktree's environment names no ElevenLabs key
+    When the developer runs "haven up +voice"
+    Then the overlay adds a dummy ELEVENLABS_API_KEY
+    And the storage seed stores an ElevenLabs provider row whose base URL is voicesim
+
+  Scenario: The product reaches a loopback voice host only under the dev switch
+    Given the dev switch VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS is off
+    Then an ElevenLabs base URL on 127.0.0.1 or localhost is refused by the provider registry
+    And the gateway swaps it for api.elevenlabs.io
+    And a ws:// signed URL on a loopback host is rejected
+    When the switch is on
+    Then an http or ws URL on 127.0.0.1 or localhost with an explicit port is accepted at all three points
+
+  Scenario: The dev switch never opens anything but loopback
+    Given the dev switch is on
+    Then a private address such as 10.0.0.5, the metadata address 169.254.169.254, plain http to a remote host, a loopback name without a port and a hostname that only looks local are all still refused
+    And the provider registry itself never carries the switch: only the dev storage seed builds the switched-on form
 
   Scenario: A developer's own ElevenLabs host wins
     Given the worktree's environment already names ELEVENLABS_BASE_URL
     When the developer runs "haven up +voice"
     Then the overlay does not set ELEVENLABS_BASE_URL
+    And it does not set the dev switch either

@@ -1,3 +1,7 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import {
   Alert,
   Box,
@@ -15,16 +19,9 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import type { WorkflowApiRouter } from "@langwatch/browser-trpc/workflow-api";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { formatMoney } from "@langwatch/design-system/format-money";
+} from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -34,8 +31,6 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { FormatMoney } from "@langwatch/workflow-browser-kit";
-import type { Experiment } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
@@ -58,23 +53,28 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { FormatMoney } from "../workflow/format-money.tsx";
+
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
   DSPyRunsSummary[] | undefined,
-  TRPCClientErrorLike<WorkflowApiRouter>
+  TRPCClientErrorLike<ExperimentApiRouter>
 >;
 
 /** One optimizer step, likewise. */
 type DSPyStepQuery = UseTRPCQueryResult<
   DSPyStep | undefined,
-  TRPCClientErrorLike<WorkflowApiRouter>
+  TRPCClientErrorLike<ExperimentApiRouter>
 >;
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
 import { VersionBox } from "../../../behavior/lent-workflow.tsx";
+import type { ExperimentApiRouter, ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
@@ -132,7 +132,7 @@ export function DSPyExperiment({
   experiment,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
 }) {
   const {
     dspyRuns,
@@ -292,20 +292,20 @@ export const useDSPyExperimentState = ({
   incomingRunIds = [],
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
   selectedRuns?: string[];
   setSelectedRuns?: (runs: string[]) => void;
   incomingRunIds?: string[];
 }) => {
   /** The optimizer's runs, typed by `@langwatch/experiment-contract`'s own `DSPyRunsSummary`. */
-  const dspyRuns = api.experiments.getExperimentDSPyRuns.useQuery(
+  const dspyRuns = experimentApi.experiments.getExperimentDSPyRuns.useQuery(
     {
       projectId: project.id,
       experimentSlug: experiment.slug,
     },
     {
-      refetchInterval: 3000,
       refetchOnMount: false,
+      // needs a read hint: dspy optimisation step recorded
     },
   ) as DSPyRunsQuery;
 
@@ -864,12 +864,12 @@ export const RunDetails = React.memo(
     size = "md",
   }: {
     project: UiHostProject;
-    experiment: Experiment;
+    experiment: ExperimentRow;
     dspyStepSummary: DSPyStepSummary;
     workflowVersion?: ExperimentRunWorkflowVersion;
     size?: "md" | "sm";
   }) {
-    const dspyStep = api.experiments.getExperimentDSPyStep.useQuery(
+    const dspyStep = experimentApi.experiments.getExperimentDSPyStep.useQuery(
       {
         projectId: project.id,
         experimentSlug: experiment.slug,
@@ -1410,7 +1410,7 @@ export function DSPyExperimentSummary({
   onViewLogs,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
   run: DSPyRunsSummary | undefined;
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
   onViewLogs?: () => void;
@@ -1433,7 +1433,7 @@ export function DSPyExperimentSummary({
     return { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel };
   }, [run]);
 
-  const bestScoreStep = api.experiments.getExperimentDSPyStep.useQuery(
+  const bestScoreStep = experimentApi.experiments.getExperimentDSPyStep.useQuery(
     {
       projectId: project.id,
       experimentSlug: experiment.slug,
@@ -1445,7 +1445,7 @@ export function DSPyExperimentSummary({
     },
   );
 
-  const selectedPointStep = api.experiments.getExperimentDSPyStep.useQuery(
+  const selectedPointStep = experimentApi.experiments.getExperimentDSPyStep.useQuery(
     {
       projectId: project.id,
       experimentSlug: experiment.slug,

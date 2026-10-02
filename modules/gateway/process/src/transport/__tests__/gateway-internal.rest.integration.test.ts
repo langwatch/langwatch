@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The Go data plane's door: HMAC gate, change feed, spend batch, guardrail verdict, real HTTP.
@@ -11,10 +10,11 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
-import { gatewayServer } from "../../gateway.server.ts";
+import { gatewayProcessModule } from "../../gateway.module.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -116,9 +116,12 @@ function testGuardrails(options?: {
       listEnabledGuardrailMonitors: vi.fn(async () => options?.monitors ?? []),
     }),
     evaluations: {
-      runEvaluator:
-        options?.runEvaluator ??
-        vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true })),
+      checkGuardrail: async () => ({
+        status: "evaluated",
+        result: options?.runEvaluator
+          ? await options.runEvaluator()
+          : { status: "processed", passed: true },
+      }),
     },
   });
 }
@@ -145,7 +148,7 @@ const drainedOutcome = {
 
 describe("the gateway internal control plane", () => {
   it("publishes the signed control-plane family from the installed gateway module", () => {
-    expect(gatewayServer.transports).toContain(gatewayInternalRest);
+    expect(gatewayProcessModule.transports).toContain(gatewayInternalRest);
   });
 
   describe("given a request signed with the shared internal secret", () => {
@@ -450,6 +453,7 @@ describe("the gateway internal control plane", () => {
   });
 
   describe("given a deployment that configured no gateway secret", () => {
+    /** @scenario An unset internal secret denies all callers */
     it("refuses every call rather than letting an unset secret admit everyone", async () => {
       const unset = mountGatewayInternalRest({ changes: testChangeEvents() }, { secret: "" });
 

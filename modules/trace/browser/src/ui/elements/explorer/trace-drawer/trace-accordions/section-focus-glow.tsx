@@ -1,4 +1,4 @@
-import { Box, Portal } from "@chakra-ui/react";
+import { Box, Portal } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 /**

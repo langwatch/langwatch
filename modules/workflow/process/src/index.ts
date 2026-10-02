@@ -1,7 +1,3 @@
-export {
-  workflowRepositories,
-  type WorkflowRepositories,
-} from "./repositories/workflow-repositories.registry.ts";
 export type {
   PersistWorkflowInput,
   PersistWorkflowVersionInput,
@@ -16,12 +12,6 @@ export type {
 } from "./repositories/workflow-project-environment.repository.ts";
 export type { WorkflowPrismaDatabase } from "./repositories/prisma/prisma.workflow.repositories.ts";
 
-export {
-  WorkflowProjectEnvironmentService,
-  type WorkflowEnvironmentDecryptor,
-} from "./services/workflow-project-environment.service.ts";
-export { WorkflowAgentMappingService } from "./services/workflow-agent-mapping.service.ts";
-export { ContractWorkflowDslMigrationService } from "./services/workflow-dsl-migration.service.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
@@ -47,28 +37,12 @@ export type {
   NlpLambdaFunctionReader,
   NlpLambdaArnEntry,
 } from "./channels/nlp-lambda.channel.ts";
-export { ModelProviderWorkflowStudioDslService } from "./services/workflow-studio-dsl.service.ts";
 export {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "./channels/http/http.workflow-studio-stream.channel.ts";
 export type { WorkflowStudioDispatchInput } from "./services/workflow-studio-dispatch.service.ts";
-export {
-  WorkflowApp,
-  type WorkflowCodeCompletions,
-  type WorkflowCommitMessageWriter,
-  type WorkflowEvaluationTrigger,
-  type WorkflowInfrastructure,
-  type WorkflowLineageReads,
-  type WorkflowPermissionProbe,
-  type WorkflowPublicationReads,
-  type WorkflowSignals,
-  type WorkflowStudioRuns,
-  type NlpLambdaFleet,
-  type NlpLambdaFunction,
-  type NlpLambdaArnCache,
-} from "./app/workflow.app.ts";
-export { workflowServer } from "./workflow.server.ts";
+export { workflowProcessModule } from "./workflow.module.ts";
 
 /** The five declarations the installer carries, and the sixth the process builds. */
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
@@ -95,13 +69,6 @@ export type {
   WorkflowNlpDispatchResponse,
 } from "./app/workflow.app.ts";
 export type { WorkflowStudioStream } from "./channels/nlp-lambda.channel.ts";
-export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
-export {
-  StudioEventPreparerService,
-  type StudioEventPreparer,
-  type StudioEventPreparationInput,
-} from "./services/studio-event-preparer.service.ts";
-export { WorkflowNlpExecutionService } from "./services/workflow-nlp-execution.service.ts";
 export type { WorkflowStudioCopyServiceOptions } from "./services/workflow-studio-copy.service.ts";
 export type {
   SaveStudioWorkflowVersionInput,
@@ -109,11 +76,6 @@ export type {
 } from "./services/workflow-studio-version.service.ts";
 export { AwsNlpLambdaFleetChannel } from "./channels/aws.nlp-lambda-fleet.channel.ts";
 export type { NlpLambdaCleanupReport } from "./services/nlp-lambda-cleanup.service.ts";
-export {
-  buildStudioLambdaConfig,
-  type StudioLambdaConfig,
-  type StudioLambdaFleetFields,
-} from "./rules/nlp-lambda-config.rules.ts";
 export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./channels/nlp-lambda.channel.ts";
 export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws.nlp-lambda-stream-invoke.channel.ts";
 export { AwsNlpLambdaArnResolverChannel } from "./channels/aws.nlp-lambda-arn-resolver.channel.ts";

@@ -1,14 +1,14 @@
-import { Box, Button, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { Box, Button, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RenderCode } from "../../sections/workflow/code/render-code.tsx";
 import { EvaluatorSelectionBox } from "./evaluator-selection-box.tsx";
 
 export type GuardrailsDrawerProps = {

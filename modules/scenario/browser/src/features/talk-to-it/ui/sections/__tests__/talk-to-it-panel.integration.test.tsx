@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { VoiceSessionFinishInput } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -69,17 +69,15 @@ function renderPanel(
   transport: "elevenlabs_convai" | "phone" = "elevenlabs_convai",
 ) {
   const ui: ReactNode = (
-    <ChakraProvider value={defaultSystem}>
-      <TalkToItPanel
-        sessionClient={client}
-        projectId="p1"
-        projectSlug="proj"
-        transport={transport}
-        agentId="agent_1"
-      />
-    </ChakraProvider>
+    <TalkToItPanel
+      sessionClient={client}
+      projectId="p1"
+      projectSlug="proj"
+      transport={transport}
+      agentId="agent_1"
+    />
   );
-  return render(ui);
+  return renderWithDesignSystem(ui);
 }
 
 function connectWith(extra: (handlers: VoiceCallHandlers) => void = () => {}) {

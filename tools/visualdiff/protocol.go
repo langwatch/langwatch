@@ -134,14 +134,16 @@ func (line runnerLine) applyTo(stream *RunnerStream, hooks runnerStreamHooks) er
 // than passed as flags: the flow list is the whole configuration, and a
 // command line is the wrong place for it.
 type RunnerPlan struct {
-	Viewport   Viewport     `json:"viewport"`
-	Settle     Settle       `json:"settle"`
-	Sides      []RunnerSide `json:"sides"`
-	OutDir     string       `json:"outDir"`
-	Slug       string       `json:"slug"`
-	Routes     []string     `json:"routes"`
-	Flows      []Flow       `json:"flows"`
-	Credential SeedIdentity `json:"credential"`
+	Viewport Viewport `json:"viewport"`
+	// ColorScheme is light, dark or both; the runner reads absent as light.
+	ColorScheme ColorScheme  `json:"colorScheme,omitempty"`
+	Settle      Settle       `json:"settle"`
+	Sides       []RunnerSide `json:"sides"`
+	OutDir      string       `json:"outDir"`
+	Slug        string       `json:"slug"`
+	Routes      []string     `json:"routes"`
+	Flows       []Flow       `json:"flows"`
+	Credential  SeedIdentity `json:"credential"`
 	// FailFast stops the runner once the candidate's first routes show its
 	// shell does not render (runner/src/shell.ts).
 	FailFast bool `json:"failFast,omitempty"`

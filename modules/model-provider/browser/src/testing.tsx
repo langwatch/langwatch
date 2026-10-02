@@ -4,8 +4,7 @@
  * since only this package's tests should construct one.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -110,10 +109,8 @@ export function renderWithModelProviderHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <ModelProviderHostProvider value={host}>{element}</ModelProviderHostProvider>
-      </ChakraProvider>,
+    ...renderWithDesignSystem(
+      <ModelProviderHostProvider value={host}>{element}</ModelProviderHostProvider>,
     ),
   };
 }

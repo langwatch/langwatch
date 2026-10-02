@@ -1,7 +1,8 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
-  RoleBindingScopeType,
+  GrantScopeTier,
+  newAuthzGrantId,
   TeamUserRole,
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
@@ -15,7 +16,6 @@ import {
   type SsoMigrationAccountLinkDecision,
   type SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { BetterAuthOptions } from "better-auth";
@@ -23,11 +23,6 @@ import { APIError } from "better-auth/api";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
-
-/**
- * The KSUID resource prefix a role-binding row is minted under.
- */
-const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
 /**
  * The collaborators every hook in this file reaches, handed in together.
@@ -84,16 +79,17 @@ const grantDefaultOrgMembership = ({
     organizationId,
     bindings: [
       {
-        bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+        bindingId: newAuthzGrantId(),
         principal: { userId },
         role: TeamUserRole.MEMBER,
         customRoleId: null,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeType: GrantScopeTier.ORGANIZATION,
         scopeId: organizationId,
       },
     ],
     // The signup is the product acting on a domain rule, not an
     // administrator granting access.
+    caller: { type: "system" },
     actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
     onDuplicate: "skip",
   });

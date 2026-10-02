@@ -1,5 +1,5 @@
-import { Flex, HStack, Icon } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Flex, HStack, Icon } from "@langwatch/design-system/primitives";
 import { forwardRef } from "react";
 import type { IconType } from "react-icons";
 import { LuChevronDown } from "react-icons/lu";

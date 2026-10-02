@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 import type { ObjectStorage } from "@langwatch/process-stores/members";
 
 import type { NlpLambdaArnCache } from "../app/workflow.app.ts";

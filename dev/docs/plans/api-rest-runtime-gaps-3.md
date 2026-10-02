@@ -65,9 +65,8 @@ parallel mechanism.
     `withCredential("session")` resolving the person and their project scope through the identity port.
 15. **Two success statuses on one route.** `PATCH /api/dataset/:slugOrId/records/:recordId` answers 201 when it created and
     200 when it replaced; `responds` allows exactly one 2xx. Allow two when both carry the same schema.
-16. **A streamed answer.** `POST /api/dataset/generate` streamed a UI-message response; its rules are kept in
-    `modules/dataset/process/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
-    what is missing is the session door (14).
+16. **A streamed answer.** RETIRED 2026-09-27: `POST /api/dataset/generate` had no caller on main, so it is not
+    ported and its rules file is deleted (`tools/apidiff/parity-rest.go` retiredServedRoutes).
 
 ## Part C: tRPC — LANDED `913e0feaec` (09-09 15:1x)
 

@@ -1,6 +1,6 @@
-import { Text } from "@chakra-ui/react";
+import { formatTokens } from "@langwatch/design-system/display-formatters";
+import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTokens } from "@langwatch/trace-browser-kit";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

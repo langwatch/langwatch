@@ -10,14 +10,25 @@
  * adapter shape, rather than hand-duplicating the row markup.
  */
 
-import { Badge, Box, Button, chakra, HStack, Input, Stack, Text, VStack } from "@chakra-ui/react";
-import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Input,
+  Stack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "../../model/dashboard-widget-definition.ts";
+import { FieldTypeSelect } from "./prompt/variables/variable-type/field-type-select.tsx";
+import { VariableTypeIcon } from "./prompt/variables/variable-type/variable-type-icon.tsx";
 
 /** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
 type FieldTypeOption = { value: string; label: string };

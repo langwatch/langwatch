@@ -22,10 +22,6 @@
       "types": "./dist/access/index.d.ts",
       "default": "./src/access/index.ts"
     },
-    "./contract": {
-      "types": "./dist/contract/index.d.ts",
-      "default": "./src/contract/index.ts"
-    },
     "./dates": {
       "types": "./dist/dates.d.ts",
       "default": "./src/dates.ts"
@@ -69,10 +65,9 @@
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
-    "@langwatch/actor": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
@@ -88,7 +83,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",

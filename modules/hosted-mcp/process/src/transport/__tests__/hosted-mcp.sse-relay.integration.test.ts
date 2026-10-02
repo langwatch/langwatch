@@ -5,9 +5,9 @@
 // /sse` opens a stream that lives only on the replica that answered it, while
 // every `POST /messages?sessionId=…` is a fresh connection to any replica.
 
+import type { Cluster, Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { HostedMcpRedis } from "../../index.ts";
 import {
   connectTestRedis,
   handshake,
@@ -24,7 +24,7 @@ const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";
 
 /** Opened in `beforeAll`, so the arrange steps below reach it through here. */
-let redis: HostedMcpRedis | null = null;
+let redis: Redis | Cluster | null = null;
 
 describe("Feature: MCP SSE transport across replicas", () => {
   let replicas: ReplicaPair;

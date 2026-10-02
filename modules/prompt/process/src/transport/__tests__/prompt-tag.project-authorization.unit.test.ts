@@ -1,19 +1,18 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * A prompt tag write needs `prompts:manage` on the caller's project only, as on
  * main: no sibling project in the organization is probed.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PromptApp } from "#app/prompt.app";
+import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
@@ -26,7 +25,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
     options.manageable.includes(check.projectId ?? ""),
   );
 
-  const prompts = PromptApp.createWithPrompts(
+  const prompts = PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>({
@@ -40,7 +39,6 @@ function buildCaller(options: { manageable: readonly string[] }) {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
-        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createLogger("prompt-tag-authorization-test"),

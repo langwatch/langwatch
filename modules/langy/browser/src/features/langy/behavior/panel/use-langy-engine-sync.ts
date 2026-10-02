@@ -1,9 +1,9 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyEventCursor } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { type RefObject, useEffect, useRef } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration.ts";
 import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts";
 import {

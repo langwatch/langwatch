@@ -5,7 +5,6 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import {
   withNote,
@@ -18,10 +17,11 @@ import {
   targetKeyOf,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { QueueRunCommand } from "../../../eventing/simulation-processing.commands.ts";
+import { QueueRunCommand } from "../../../eventing/queue-run.commands.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,

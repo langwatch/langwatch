@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { RateLimitDecision } from "@langwatch/process-stores/members";
 import type { ResolveShareInput, ShareApi, ShareWithProject } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   baseSpanSchema,
   SHARE_MAX_FULL_SPANS,

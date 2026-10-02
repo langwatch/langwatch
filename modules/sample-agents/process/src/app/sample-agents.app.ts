@@ -1,4 +1,4 @@
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import type { MembersRead } from "@langwatch/process-stores/members";
 import {
   SampleAgentsApi,
@@ -17,13 +17,13 @@ type SampleAgentsMembers = MembersRead<readonly ["logger"]> &
   Readonly<{ publicBaseUrl: string | undefined }>;
 
 type SampleAgentsSetup = FeatureSetup<
-  typeof SampleAgentsApp.dependencies,
+  typeof SampleAgentsModule.dependencies,
   SampleAgentsMembers,
   undefined
 >;
 
 /** The demo agents behind the sample project; each run lands as traces in the caller's project. */
-export class SampleAgentsApp implements SampleAgentsApiContract {
+export class SampleAgentsModule implements SampleAgentsApiContract {
   static readonly contract = SampleAgentsApi;
   static readonly dependencies = {};
   static readonly reads = ["logger", "publicBaseUrl"] as const;
@@ -36,11 +36,11 @@ export class SampleAgentsApp implements SampleAgentsApiContract {
     this.#hotelBot = hotelBot;
   }
 
-  static async create({ members, secrets }: SampleAgentsSetup): Promise<SampleAgentsApp> {
-    const chat = await secrets.into(SampleAgentsApp.secrets.openAi, (apiKey) =>
+  static async create({ members, secrets }: SampleAgentsSetup): Promise<SampleAgentsModule> {
+    const chat = await secrets.into(SampleAgentsModule.secrets.openAi, (apiKey) =>
       openAiChatChannels.live.create({ apiKey }),
     );
-    return new SampleAgentsApp(
+    return new SampleAgentsModule(
       HotelBotService.create({
         chat,
         collector: traceCollectorChannels.live.create({ baseUrl: members.publicBaseUrl }),

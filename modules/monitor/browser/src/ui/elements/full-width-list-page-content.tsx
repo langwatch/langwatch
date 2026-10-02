@@ -3,7 +3,7 @@
  * platform/app's experiments list.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren } from "react";
 
 export function FullWidthListPageContent({ children }: PropsWithChildren) {

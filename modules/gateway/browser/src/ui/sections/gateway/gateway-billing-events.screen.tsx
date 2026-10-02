@@ -1,3 +1,5 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -10,9 +12,7 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
@@ -24,6 +24,7 @@ import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts
 import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
 import { keepPreviousData } from "../../../model/keep-previous-data.ts";
 import { readableDate } from "../../../model/readable-date.ts";
+import { spendKeyLabel } from "../../../model/spend-key-label.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
@@ -338,7 +339,7 @@ function BillingEventRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{virtualKeyName ?? row.virtualKeyId}</Table.Cell>
+      <Table.Cell>{spendKeyLabel({ row, virtualKeyName })}</Table.Cell>
       <Table.Cell>{row.endUserId || ""}</Table.Cell>
       <Table.Cell>
         <HStack gap={1}>

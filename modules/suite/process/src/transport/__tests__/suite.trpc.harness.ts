@@ -3,7 +3,7 @@ import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
  * The process members a mounted suite declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 
 export type SuiteTrpcTestContext = { actor: { id: string } };
 

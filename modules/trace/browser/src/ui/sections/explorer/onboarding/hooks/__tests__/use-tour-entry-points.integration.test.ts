@@ -50,7 +50,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 // Stub store getState calls made in onLaunchTour
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../../../../../behavior/explorer.store.ts", () => ({
   useViewStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -75,6 +75,8 @@ vi.mock("@langwatch/trace-browser-kit", () => ({
       }),
     },
   ),
+}));
+vi.mock("../../../../../../behavior/query.slice.ts", () => ({
   INITIAL_TIME_RANGE: { from: 0, to: 1, label: "Last 24h" },
 }));
 

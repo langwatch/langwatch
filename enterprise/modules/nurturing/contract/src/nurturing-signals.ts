@@ -9,6 +9,10 @@ import {
   guidedPathSchema,
   onboardingVariantSchema,
 } from "@langwatch/onboarding-contract";
+import {
+  integrationMethodSelectionSchema,
+  nurturingSignUpDataSchema,
+} from "@langwatch/organization-contract";
 import { z } from "zod";
 
 /** The owner's event a signal was raised from: it is sent once per kind and source event. */
@@ -24,33 +28,6 @@ const optionalText = z.string().nullish();
 
 /** Where the organization's onboarding experiment put it; absent for older or self-hosted ones. */
 const variant = onboardingVariantSchema.nullish();
-
-/** The onboarding answers a new person gave, as main's signup hook read them. */
-export const nurturingSignUpDataSchema = z
-  .object({
-    yourRole: optionalText,
-    companySize: optionalText,
-    usage: optionalText,
-    solution: optionalText,
-    featureUsage: optionalText,
-    howDidYouHearAboutUs: optionalText,
-    leadSource: optionalText,
-    referrer: optionalText,
-    utmCampaign: optionalText,
-    utmSource: optionalText,
-    utmMedium: optionalText,
-    utmTerm: optionalText,
-    utmContent: optionalText,
-  })
-  .passthrough();
-
-/** The product selection main's onboarding router mapped to an integration method. */
-export const integrationMethodSelectionSchema = z.enum([
-  "via-claude-code",
-  "via-platform",
-  "via-claude-desktop",
-  "manually",
-]);
 
 /** The CRM events a self-hosted install's lead signals are tracked as. */
 export const selfHostedSignalEventSchema = z.enum([
@@ -129,7 +106,10 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     /** The organization's admin. */
     userId: id,
     projectId: id,
+    /** Counted by nurturing since the cutover, including this one. */
     organizationRunCount: countIncludingThis,
+    /** The organization's first: never for one learned from project's backfill. */
+    first: z.boolean(),
   }),
   z.object({
     kind: z.literal("evaluation_completed"),
@@ -141,7 +121,10 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
+    /** Counted by nurturing since the cutover, including this one. */
     organizationEvaluationCount: countIncludingThis,
+    /** The organization's first: never for one learned from project's backfill. */
+    first: z.boolean(),
   }),
   z.object({
     kind: z.literal("experiment_ran"),

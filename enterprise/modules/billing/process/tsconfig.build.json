@@ -66,13 +66,13 @@
       "path": "../../../../packages/internal-slack/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/notification/contract/tsconfig.build.json"
@@ -94,6 +94,9 @@
     },
     {
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"

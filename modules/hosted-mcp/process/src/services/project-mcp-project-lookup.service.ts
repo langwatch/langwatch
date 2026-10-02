@@ -1,16 +1,18 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { type McpLiveProjectLookup, McpProjectLookup } from "../app/hosted-mcp.members.ts";
+/** A key read: the live project it belongs to, or an unknown key the caller refuses. */
+export type McpLiveProjectLookup =
+  | { kind: "live"; project: { id: string; teamId: string } }
+  | { kind: "unknown" };
 
 /**
  * The project an MCP bearer token belongs to, read through the project
  * module's own peer capability rather than this module's tables.
  */
-export class ProjectMcpProjectLookupService extends McpProjectLookup {
+export class ProjectMcpProjectLookupService {
   readonly #projects: ProjectApi;
 
   private constructor(projects: ProjectApi) {
-    super();
     this.#projects = projects;
   }
 

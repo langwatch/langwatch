@@ -1,5 +1,5 @@
-import { Badge, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { BellPlus, Plus } from "lucide-react";
 
 import {

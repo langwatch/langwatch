@@ -1,5 +1,5 @@
-import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type LlmConfigOutputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { ChevronDown } from "lucide-react";
@@ -115,7 +115,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             open={popoverOpen}
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >
-            <ChakraPopover.Anchor asChild>
+            <Popover.Anchor asChild>
               <HStack
                 paddingY={2}
                 paddingX={3}
@@ -127,13 +127,14 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 transition="background 0.15s"
                 justify="space-between"
                 onClick={() => setPopoverOpen((prev) => !prev)}
+                data-testid="prompt-model-popover-trigger"
               >
                 <LLMModelDisplay model={field.value?.model ?? ""} />
                 <Box color="fg.muted">
                   <ChevronDown size={16} />
                 </Box>
               </HStack>
-            </ChakraPopover.Anchor>
+            </Popover.Anchor>
             <LLMConfigPopover
               values={field.value}
               onChange={(values) => {

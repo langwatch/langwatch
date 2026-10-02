@@ -1,7 +1,7 @@
 import { agentSchema, type Agent, type AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {

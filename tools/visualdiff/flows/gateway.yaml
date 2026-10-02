@@ -8,7 +8,6 @@
 flows:
   - id: gateway-virtual-key-create-reveal-revoke
     title: Create a virtual key, reveal its secret once, revoke it and see the API read it back revoked
-    isolated: true
     steps:
       - action: go
         with:
@@ -307,6 +306,10 @@ flows:
         with:
           field: e.g. Engineering monthly $1k cap
           value: "budget-{uid}"
+      - action: select
+        with:
+          testId: budget-target
+          option: /^(?!Pick a|Loading).+/
       - action: fill
         with:
           field: "1000.00"
@@ -614,6 +617,9 @@ flows:
           value: https://example.com/vd-{uid}
       - action: click
         with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
           testId: webhook-save
       - action: go
         with:
@@ -636,6 +642,10 @@ flows:
         with:
           field: Developer default
           value: "policy-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
       - action: click
         with:
           text: Create policy
@@ -660,6 +670,10 @@ flows:
         with:
           field: Developer default
           value: "policy-edit-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
       - action: click
         with:
           text: Create policy
@@ -723,6 +737,10 @@ flows:
         with:
           field: Developer default
           value: "policy-default-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
       - action: click
         with:
           text: Create policy
@@ -915,7 +933,7 @@ flows:
           contains: '"data":['
       - action: expect
         with:
-          api: /api/gateway/v1/spend-summaries?group_by=model&from=1&to=9007199254740991
+          api: /api/gateway/v1/spend-summaries?group_by=model&from=1&to=9007199254740991&allow_unstable=true
           auth: "{orgKey}"
           status: "200"
           contains: '"data":['
@@ -958,7 +976,6 @@ flows:
 
   - id: gateway-cache-rule-edit-toggle-archive
     title: Switch a cache rule's mode from its row, turn it off, then archive it and see it gone after a reload
-    isolated: true
     setup:
       - post: /api/gateway/v1/cache-rules
         body:

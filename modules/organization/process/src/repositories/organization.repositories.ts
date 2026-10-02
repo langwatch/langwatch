@@ -1,5 +1,6 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 
+import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
@@ -8,7 +9,7 @@ import type { TeamRepository } from "./team.repository.ts";
 
 /**
  * The rows the organization module owns and constructs through
- * `ServerOrganizationApp.create`, chosen once at boot. Invitations are still
+ * `OrganizationModule.create`, chosen once at boot. Invitations are still
  * composed on a separate path outside this module's boot (follow-up work).
  */
 export interface OrganizationRepositories {
@@ -22,4 +23,5 @@ export interface OrganizationRepositories {
    */
   readonly membership: (grants: AuthzGrantsService) => OrganizationMembershipRepository;
   readonly personalTeamScope: PersonalTeamScopeReader;
+  readonly scopeGraph: OrganizationScopeGraphReader;
 }

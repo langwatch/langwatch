@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { ORIGIN_DISPLAY } from "@langwatch/trace-browser-kit";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

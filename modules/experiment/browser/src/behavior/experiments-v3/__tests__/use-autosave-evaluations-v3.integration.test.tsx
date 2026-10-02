@@ -4,8 +4,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
@@ -24,8 +24,8 @@ const mockMutateAsync = vi.hoisted(() =>
 
 const mockStateFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       experiments: {
         getEvaluationsV3BySlug: {
@@ -97,9 +97,7 @@ const queryClient = new QueryClient({
 });
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-  </QueryClientProvider>
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 );
 
 // Test component that uses the autosave hook
@@ -136,9 +134,11 @@ describe("Autosave evaluation state", () => {
   });
 
   it("triggers save when cell value changes", async () => {
-    const { rerender } = render(<TestAutosaveComponent />, {
-      wrapper: Wrapper,
-    });
+    const { rerender } = renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Wait for initial render - should not have called save yet
     expect(mockMutateAsync).not.toHaveBeenCalled();
@@ -156,7 +156,11 @@ describe("Autosave evaluation state", () => {
     });
 
     // Force re-render to pick up store changes
-    rerender(<TestAutosaveComponent />);
+    rerender(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Advance past debounce delay
     await act(async () => {
@@ -172,7 +176,11 @@ describe("Autosave evaluation state", () => {
   });
 
   it("updates autosave status to saving then saved then idle", async () => {
-    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Make a change
     act(() => {
@@ -198,7 +206,11 @@ describe("Autosave evaluation state", () => {
   });
 
   it("sets autosave status to error when save fails", async () => {
-    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Wait for initial render
     await act(async () => {
@@ -229,7 +241,11 @@ describe("Autosave evaluation state", () => {
   // travel to telemetry.
   it("reports a failed save with identifiers and counts, never workbench content", async () => {
     const customerContent = "patient record 4711, contact jane@example.com";
-    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     await act(async () => {
       vi.advanceTimersByTime(50);
@@ -265,7 +281,11 @@ describe("Autosave evaluation state", () => {
   });
 
   it("saves when a new dataset is added", async () => {
-    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Wait for initial render
     await act(async () => {
@@ -295,7 +315,11 @@ describe("Autosave evaluation state", () => {
   });
 
   it("saves when active dataset changes", async () => {
-    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <Wrapper>
+        <TestAutosaveComponent />
+      </Wrapper>,
+    );
 
     // Wait for initial render
     await act(async () => {
@@ -353,7 +377,11 @@ describe("Autosave evaluation state", () => {
       });
       useEvaluationsV3Store.getState().setWorkbenchVersion(4);
 
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
       await act(async () => {
         vi.advanceTimersByTime(50);
       });
@@ -406,7 +434,11 @@ describe("Autosave evaluation state", () => {
       });
       useEvaluationsV3Store.getState().setWorkbenchVersion(4);
 
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
       await act(async () => {
         vi.advanceTimersByTime(50);
       });
@@ -458,7 +490,11 @@ describe("Autosave evaluation state", () => {
       useEvaluationsV3Store.getState().setWorkbenchVersion(4);
       useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
 
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
       await act(async () => {
         vi.advanceTimersByTime(50);
       });
@@ -501,7 +537,11 @@ describe("Autosave evaluation state", () => {
       useEvaluationsV3Store.getState().setWorkbenchVersion(4);
       useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
 
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
       await act(async () => {
         vi.advanceTimersByTime(50);
       });
@@ -533,7 +573,11 @@ describe("Autosave evaluation state", () => {
   describe("when a reload finds the server state unchanged", () => {
     it("saves the next edit", async () => {
       useEvaluationsV3Store.getState().setWorkbenchVersion(3);
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
       await act(async () => {
         vi.advanceTimersByTime(50);
       });

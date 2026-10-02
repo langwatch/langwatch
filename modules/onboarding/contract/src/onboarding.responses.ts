@@ -48,7 +48,6 @@ export const integrationsCheckStatusSchema = z
     customGraphs: z.number(),
     datasets: z.number(),
     onlineEvaluations: z.number(),
-    triggers: z.number(),
     simulations: z.number(),
     modelProviders: z.number(),
     prompts: z.number(),

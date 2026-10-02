@@ -6,13 +6,12 @@
 
 import { createHmac } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { anyAuthenticated } from "../../access/access.ts";
+import { createApiDouble } from "../../__tests__/api-double.ts";
+import { anyAuthenticated, type Authorize } from "../../access/access.ts";
 import {
   createErrorHandler,
   PayloadTooLargeError,
@@ -20,9 +19,10 @@ import {
   ProjectMissingCredentialsError,
 } from "../../errors.ts";
 import { BrowserSessionIdentity } from "../browser-session.ts";
-import { SessionReader } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
-import { createRestRuntime, type RestCaller } from "../runtime.ts";
+import { createRestRuntime } from "../runtime.ts";
+import { SessionReader } from "../../hosting/session-reader.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
 
 const VERSION = "2026-09-08";
 const KEY = "Bearer the-key";
@@ -49,7 +49,7 @@ function application() {
     record: vi.fn(async ({ id, raw }: { id: string; raw: string }) => ({ id, raw })),
   };
 
-  return { api: createApiFixture<NoteApi>(calls), calls };
+  return { api: createApiDouble<NoteApi>(calls), calls };
 }
 
 /** A key door: nothing presented is missing, anything but the key is invalid. */
@@ -270,7 +270,7 @@ describe("a request authenticated before its body is parsed", () => {
         sessions: SessionReader.create({
           verify: async (request) => (request.headers.has("cookie") ? { userId: "user-1" } : null),
         }),
-        authz: createApiFixture<AuthzApi>(),
+        authz: createApiDouble<Authorize>(),
         publicBaseUrl: "https://app.example",
       });
 

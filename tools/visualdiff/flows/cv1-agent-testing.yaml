@@ -13,7 +13,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/simulations
+          path: /{slug}/agent-testing
       - action: expect
         with:
           text: "{suiteName}"
@@ -43,7 +43,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/simulations
+          path: /{slug}/agent-testing
       - action: expect
         with:
           text: "{suiteName}"
@@ -52,9 +52,10 @@ flows:
         with:
           path: /api/v1/test-suites/{suiteId}
           method: DELETE
+          auth: project
       - action: go
         with:
-          path: /{slug}/simulations
+          path: /{slug}/agent-testing
       - action: expect
         with:
           text: New Test Suite

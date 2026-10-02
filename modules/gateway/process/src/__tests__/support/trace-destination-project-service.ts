@@ -15,7 +15,6 @@ import { TestProjectApi } from "./test-project-api.ts";
 const DESTINATION_SELECT = {
   id: true,
   teamId: true,
-  apiKey: true,
   archivedAt: true,
 } as const;
 
@@ -92,6 +91,34 @@ export class TraceDestinationProjectService extends TestProjectApi {
       const project = byId.get(projectId);
       return project ? [project] : [];
     });
+  }
+
+  override async listIdsByOrganization(
+    input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+  ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+    const rows = await this.prisma.project.findMany({
+      where: { team: { organizationId: input.organizationId } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
   }
 
   private async findLive(

@@ -1,9 +1,10 @@
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { absorbContextTarget, useLangyStore } from "@langwatch/langy-browser-kit";
 import { useCallback } from "react";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { absorbContextTarget } from "../langy/langy-context-target.store.ts";
+import { useLangyStore } from "../langy/langy.store.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**

@@ -8,13 +8,20 @@ import {
   UNAVAILABLE_UI_SCOPE,
   useOptionalUiCapabilities,
 } from "@langwatch/browser-host/capabilities";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
 import type { UiRootCapabilities } from "./ui-root-capabilities";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
-export default function UiAppChrome({ capabilities: root }: { capabilities: UiRootCapabilities }) {
+export default function UiAppChrome({
+  capabilities: root,
+  fullScreen = false,
+}: {
+  capabilities: UiRootCapabilities;
+  /** Draws the page with no top bar or sidebar, behind the same gates. */
+  fullScreen?: boolean;
+}) {
   const capabilities = useOptionalUiCapabilities();
   // Mounted outside an application shell, or inside one that declared no
   // scope — a route-table test, never the product, where the composition
@@ -25,7 +32,11 @@ export default function UiAppChrome({ capabilities: root }: { capabilities: UiRo
 
   return (
     <UiNavigationHost commandBar capabilities={root}>
-      <UiAppChromeFrame scope={root.scope} navigationChrome={root.navigationChrome} />
+      <UiAppChromeFrame
+        scope={root.scope}
+        navigationChrome={root.navigationChrome}
+        fullScreen={fullScreen}
+      />
     </UiNavigationHost>
   );
 }
@@ -34,12 +45,13 @@ export default function UiAppChrome({ capabilities: root }: { capabilities: UiRo
 function UiAppChromeFrame({
   scope,
   navigationChrome: { NavigationShell, useNavigationTracking },
-}: Pick<UiRootCapabilities, "scope" | "navigationChrome">) {
+  fullScreen,
+}: Pick<UiRootCapabilities, "scope" | "navigationChrome"> & { fullScreen: boolean }) {
   useAnalyticsIdentity();
   useNavigationTracking();
   scope.useUiOrgQueryParamSelection();
   return (
-    <NavigationShell>
+    <NavigationShell fullScreen={fullScreen}>
       <UiRouteOutlet />
     </NavigationShell>
   );

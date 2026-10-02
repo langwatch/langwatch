@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { useEffect, useReducer } from "react";
@@ -70,13 +70,7 @@ const atomState = vi.hoisted(() => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-        getScenarioSetBatchHistory: { invalidate: vi.fn() },
-        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
-      },
-    }),
+    useUtils: () => ({}),
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -94,6 +88,39 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         },
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({
+          data: [
+            {
+              id: "agent_dev",
+              name: "dev-agent",
+              type: "connected",
+              environment: "development",
+            },
+            { id: "agent_prod", name: "prod-agent", type: "http" },
+          ],
+        }),
+      },
+    },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+      },
+    }),
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
       getRunConfigurations: {
@@ -136,26 +163,10 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         useQuery: () => ({ data: { batches: [] } }),
       },
     },
-    agents: {
-      getAll: {
-        useQuery: () => ({
-          data: [
-            {
-              id: "agent_dev",
-              name: "dev-agent",
-              type: "connected",
-              environment: "development",
-            },
-            { id: "agent_prod", name: "prod-agent", type: "http" },
-          ],
-        }),
-      },
-    },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: PROJECT_ID, slug: "test-project" },
   }),
@@ -294,27 +305,25 @@ function renderList({
     externalSets,
   });
 
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Harness
-        routingState={ROUTING_STATE}
-        plans={plans}
-        hasAnyPlans={true}
-        isPlansLoading={false}
-        period={{
-          startDate: Temporal.Instant.fromEpochMilliseconds(NOW - 30 * 86_400_000),
-          endDate: Temporal.Instant.fromEpochMilliseconds(NOW),
-        }}
-        periodMode="relative"
-        setPeriod={vi.fn()}
-        setRelativePeriod={vi.fn()}
-        onSelectPlan={vi.fn()}
-        onSelectRun={onSelectRun}
-        onEditPlan={vi.fn()}
-        onNewRunPlan={onNewRunPlan}
-        isSseConnected={true}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <Harness
+      routingState={ROUTING_STATE}
+      plans={plans}
+      hasAnyPlans={true}
+      isPlansLoading={false}
+      period={{
+        startDate: Temporal.Instant.fromEpochMilliseconds(NOW - 30 * 86_400_000),
+        endDate: Temporal.Instant.fromEpochMilliseconds(NOW),
+      }}
+      periodMode="relative"
+      setPeriod={vi.fn()}
+      setRelativePeriod={vi.fn()}
+      onSelectPlan={vi.fn()}
+      onSelectRun={onSelectRun}
+      onEditPlan={vi.fn()}
+      onNewRunPlan={onNewRunPlan}
+      isSseConnected={true}
+    />,
   );
 }
 

@@ -28,8 +28,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { ApiKeyAnswerCacheRepository } from "../repositories/api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import type { ApiKeyBindingId } from "./api-key-binding-id.service.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
@@ -40,17 +40,22 @@ import type { ApiKeyTokenService } from "./api-key-token.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
 import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts";
 
+/** Mints the AuthZ binding id an API-key grant is written under. */
+export interface ApiKeyGrantId {
+  generateBindingId(): string;
+}
+
 export type ApiKeyDependencies = {
   authz: AuthzApi;
   grants: AuthzApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
-  bindingIds: ApiKeyBindingId;
+  bindingIds: ApiKeyGrantId;
   legacyGrants: Pick<LegacyApiKeyGrantService, "mint">;
   tokens: ApiKeyTokenService;
 };
 
-/** The only public capability for API credentials; ApiKeyApp adapts it to the contract API. */
+/** The only public capability for API credentials; ApiKeyModule adapts it to the contract API. */
 export class ApiKeyService {
   private readonly policy: ApiKeyGrantPolicyService;
   private readonly catalog: ApiKeyCatalogService;
@@ -60,19 +65,24 @@ export class ApiKeyService {
   private readonly cli: ApiKeyCliService;
   private readonly enrichment: ApiKeyEnrichmentService;
 
-  static create(options: ApiKeyDependencies & { repository: ApiKeyRepository }): ApiKeyService {
+  static create(
+    options: ApiKeyDependencies & {
+      repository: ApiKeyRepository;
+      answers: ApiKeyAnswerCacheRepository;
+    },
+  ): ApiKeyService {
     return new ApiKeyService(options.repository, options);
   }
 
   private constructor(
     private readonly repository: ApiKeyRepository,
-    options: ApiKeyDependencies,
+    options: ApiKeyDependencies & { answers: ApiKeyAnswerCacheRepository },
   ) {
     const dependencies = { repository, ...options };
     this.policy = ApiKeyGrantPolicyService.create(dependencies);
     this.catalog = ApiKeyCatalogService.create(dependencies);
-    this.lifecycle = ApiKeyLifecycleService.create(dependencies, this.policy);
     this.tokens = ApiKeyTokenResolutionService.create(dependencies);
+    this.lifecycle = ApiKeyLifecycleService.create(dependencies, this.policy, this.tokens);
     this.visibility = ApiKeyVisibilityService.create(dependencies);
     this.cli = ApiKeyCliService.create(dependencies, this.policy, this.lifecycle);
     this.enrichment = ApiKeyEnrichmentService.create(dependencies, this.catalog);
@@ -106,10 +116,6 @@ export class ApiKeyService {
     projectId?: string | null;
   }): Promise<ResolvedApiKeyCredential | null> {
     return this.tokens.findResolvedToken(input);
-  }
-
-  async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
-    return this.tokens.regenerateLegacyProjectKey(input);
   }
 
   async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {

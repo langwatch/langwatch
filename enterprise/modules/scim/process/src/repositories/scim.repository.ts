@@ -64,7 +64,7 @@ export interface ScimGroupRecord {
   createdAt: Instant;
   updatedAt: Instant;
 }
-export interface ScimRoleBindingRecord {
+export interface ScimGrantRecord {
   id: string;
   userId: string | null;
   groupId: string | null;
@@ -107,7 +107,7 @@ export interface ScimDirectoryIdentityRecord {
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
 export abstract class ScimGrantRepository {
-  abstract findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]>;
+  abstract findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]>;
 }
 
 export abstract class ScimRepository extends ScimGrantRepository {

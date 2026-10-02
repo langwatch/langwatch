@@ -4,8 +4,8 @@
  * deployment flag changes nothing about the shell — these tests hold both
  * flag values to the same rendering.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { publicEnvRef } = vi.hoisted(() => ({
@@ -20,19 +20,17 @@ import { AuthCard } from "../../elements/auth-card.tsx";
 import { FrontDoorShell } from "../front-door-shell.tsx";
 
 const renderShell = (props: Record<string, unknown> = {}) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FrontDoorShell
-        headline="See what your agents are actually doing."
-        headlineAccent="actually"
-        tagline="traces · evaluations · online monitoring"
-        {...props}
-      >
-        <AuthCard title="Log in to LangWatch">
-          <p>the card</p>
-        </AuthCard>
-      </FrontDoorShell>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FrontDoorShell
+      headline="See what your agents are actually doing."
+      headlineAccent="actually"
+      tagline="traces · evaluations · online monitoring"
+      {...props}
+    >
+      <AuthCard title="Log in to LangWatch">
+        <p>the card</p>
+      </AuthCard>
+    </FrontDoorShell>,
   );
 
 describe("given a hosted deployment", () => {

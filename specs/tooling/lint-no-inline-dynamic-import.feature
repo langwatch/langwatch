@@ -33,8 +33,8 @@ Feature: The no-inline-dynamic-import lint rule
     Then it reports nothing, while a sibling channel is still reported
 
   @unit
-  Scenario: The dev runtime's backend entry is exempt
-    Given tools/dev-runtime/src/backend.entrypoint.ts with an inline import()
+  Scenario: The dev runtime's entries are exempt
+    Given tools/dev-runtime/src/backend.entrypoint.ts or app.entrypoint.ts with an inline import()
     When the no-inline-dynamic-import rule runs over it
     Then it reports nothing, while a sibling dev-runtime file is still reported
 

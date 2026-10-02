@@ -1,0 +1,362 @@
+/**
+ * The policy in front of a routed page, and the order it is applied in.
+ * @vitest-environment jsdom
+ */
+
+import {
+  BrowserUiDocumentTitle,
+  UiCapabilityContextProvider,
+  UiNavigation,
+  UiRoute,
+  UiSession,
+  type UiActiveScope,
+  type UiActor,
+  type UiCapabilities,
+  UiFeedback,
+} from "@langwatch/browser-host/capabilities";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { installedModuleScreens } from "../ui-module-screens.ts";
+import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
+import { defineBrowserModule } from "../web-module.ts";
+
+class SilentNavigation extends UiNavigation {
+  navigate(): void {}
+  replace(): void {}
+  back(): void {}
+}
+
+class SilentRoute extends UiRoute {
+  reading() {
+    return { params: {}, query: {} };
+  }
+  setQuery(): void {}
+}
+
+class SilentFeedback extends UiFeedback {
+  succeeded(): void {}
+  failed(): void {}
+}
+
+class AnsweringSession extends UiSession {
+  constructor(
+    private readonly answers: {
+      flags: Record<string, boolean | undefined>;
+      permissions: readonly string[];
+      settled: boolean;
+    },
+  ) {
+    super();
+  }
+
+  currentUser(): UiActor | null {
+    return null;
+  }
+
+  activeScope(): UiActiveScope {
+    return { organizationId: "org_1", projectId: null };
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.answers.permissions.includes(permission);
+  }
+
+  isSettled(): boolean {
+    return this.answers.settled;
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    return this.answers.flags[flag];
+  }
+}
+
+function capabilities(session: UiSession): UiCapabilities {
+  return {
+    documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+    feedback: new SilentFeedback(),
+    navigation: new SilentNavigation(),
+    route: new SilentRoute(),
+    session,
+  };
+}
+
+const Page = () => <div>the page</div>;
+
+function renderGuarded(session: UiSession) {
+  const Guarded = withUiPageGuard({
+    flags: ["release_ui_ai_governance_enabled"],
+    permission: "governance:view",
+    fallbacks: {
+      loading: () => <div>still asking</div>,
+      notFound: () => <div>not here</div>,
+      forbidden: ({ permission }) => <div>missing {permission}</div>,
+    },
+  })(Page);
+
+  render(
+    <UiCapabilityContextProvider value={capabilities(session)}>
+      <Guarded />
+    </UiCapabilityContextProvider>,
+  );
+}
+
+afterEach(cleanup);
+
+describe("given a page behind a flag and a permission", () => {
+  describe("when the flag has not answered yet", () => {
+    it("waits rather than reading the silence as off", () => {
+      const access = resolveUiPageAccess({
+        flags: ["release_ui_ai_governance_enabled"],
+        permission: "governance:view",
+        featureFlag: () => void 0,
+        hasPermission: () => true,
+        isSettled: () => true,
+      });
+
+      expect(access).toEqual({ kind: "loading" });
+    });
+
+    it("shows the loading fallback and never the page", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: {},
+          permissions: ["governance:view"],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("still asking")).toBeDefined();
+      expect(screen.queryByText("the page")).toBeNull();
+    });
+  });
+
+  describe("when the flag is off", () => {
+    it("answers not-found before it considers the permission at all", () => {
+      const access = resolveUiPageAccess({
+        flags: ["release_ui_ai_governance_enabled"],
+        permission: "governance:view",
+        featureFlag: () => false,
+        // Holding the grant must not turn the 404 into a page.
+        hasPermission: () => true,
+        isSettled: () => true,
+      });
+
+      expect(access).toEqual({ kind: "not-found" });
+    });
+
+    it("answers not-found rather than forbidden to a viewer without the grant", () => {
+      // The one case where the ORDER decides the answer. With the grant held,
+      // both orderings agree and the assertion proves nothing; without it, a
+      // permission-first guard would tell an outsider that a page they cannot
+      // see exists and they merely lack access to it.
+      const access = resolveUiPageAccess({
+        flags: ["release_ui_ai_governance_enabled"],
+        permission: "governance:view",
+        featureFlag: () => false,
+        hasPermission: () => false,
+        isSettled: () => true,
+      });
+
+      expect(access).toEqual({ kind: "not-found" });
+    });
+
+    it("renders the not-found fallback to a viewer without the grant", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: false },
+          permissions: [],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("not here")).toBeDefined();
+      expect(screen.queryByText("missing governance:view")).toBeNull();
+    });
+
+    it("renders the not-found fallback for a viewer who holds the grant", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: false },
+          permissions: ["governance:view"],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("not here")).toBeDefined();
+      expect(screen.queryByText("the page")).toBeNull();
+    });
+  });
+
+  describe("when the flag is on and the viewer lacks the grant", () => {
+    /**
+     * Org manager without governance:view grant is refused by router (not page).
+     *
+     * @scenario "A principal who manages the organization but cannot read governance is refused"
+     */
+    /** @scenario "A principal who manages the organization but cannot read governance is refused" */
+    it("refuses a principal who manages the organization but cannot read governance", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: true },
+          permissions: ["organization:manage"],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("missing governance:view")).toBeDefined();
+      expect(screen.queryByText("the page")).toBeNull();
+    });
+
+    it("names the missing permission back to them", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: true },
+          permissions: [],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("missing governance:view")).toBeDefined();
+      expect(screen.queryByText("the page")).toBeNull();
+    });
+  });
+
+  describe("when the flag is on and the permission set has not arrived", () => {
+    it("renders the page, so a page with its own loading state keeps it", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: true },
+          permissions: [],
+          settled: false,
+        }),
+      );
+
+      expect(screen.getByText("the page")).toBeDefined();
+    });
+  });
+
+  describe("when the flag is on and the viewer holds the grant", () => {
+    it("opens the page", () => {
+      renderGuarded(
+        new AnsweringSession({
+          flags: { release_ui_ai_governance_enabled: true },
+          permissions: ["governance:view"],
+          settled: true,
+        }),
+      );
+
+      expect(screen.getByText("the page")).toBeDefined();
+    });
+  });
+
+  describe("when a page names several flags", () => {
+    it("asks every one of them rather than stopping at the first unanswered", () => {
+      const asked: string[] = [];
+
+      resolveUiPageAccess({
+        flags: ["release_ui_ai_governance_enabled", "release_ui_governance_billed_cost_enabled"],
+        featureFlag: (flag) => {
+          asked.push(flag);
+          return void 0;
+        },
+        hasPermission: () => true,
+        isSettled: () => true,
+      });
+
+      expect(asked).toEqual([
+        "release_ui_ai_governance_enabled",
+        "release_ui_governance_billed_cost_enabled",
+      ]);
+    });
+  });
+});
+
+describe("given a module declaring a screen that requires a grant", () => {
+  const probeWeb = defineBrowserModule("probe").withScreens({
+    "pages/[project]/probe": {
+      load: async () => ({ default: Page }),
+      requires: "workflows:view",
+    },
+    "pages/[project]/open": { load: async () => ({ default: Page }) },
+    "pages/[project]/flagged": {
+      load: async () => ({ default: Page }),
+      flags: ["release_ui_ai_governance_enabled"],
+    },
+  });
+
+  async function renderDeclared({
+    page,
+    permissions,
+    flags = {},
+  }: {
+    page: string;
+    permissions: readonly string[];
+    flags?: Record<string, boolean | undefined>;
+  }) {
+    const load = installedModuleScreens([probeWeb]).loaders[page];
+    if (!load) throw new Error(`no loader for ${page}`);
+    const { default: Screen } = await load();
+
+    renderWithDesignSystem(
+      <UiCapabilityContextProvider
+        value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
+      >
+        <Screen />
+      </UiCapabilityContextProvider>,
+    );
+  }
+
+  /** @scenario "A declared screen that requires a grant refuses a viewer without it" */
+  it("shows the missing grant instead of the screen to a viewer without it", async () => {
+    await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
+
+    expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
+    expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen that requires a grant opens for a viewer holding it" */
+  it("opens the screen for a viewer holding the grant", async () => {
+    await renderDeclared({ page: "pages/[project]/probe", permissions: ["workflows:view"] });
+
+    expect(screen.getByText("the page")).toBeDefined();
+  });
+
+  /** @scenario "A refused viewer reads main's Access Restricted notice" */
+  it("titles the refusal Access Restricted, as main's PermissionAlert did", async () => {
+    await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
+
+    expect(screen.getByText("Access Restricted")).toBeDefined();
+  });
+
+  /** @scenario "A declared screen behind a release flag that is off answers not found" */
+  it("answers not-found for a declared screen whose flag is off", async () => {
+    await renderDeclared({
+      page: "pages/[project]/flagged",
+      permissions: [],
+      flags: { release_ui_ai_governance_enabled: false },
+    });
+
+    expect(screen.getByText("This page is not here")).toBeDefined();
+    expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen behind a release flag that is on opens" */
+  it("opens a declared screen whose flag is on", async () => {
+    await renderDeclared({
+      page: "pages/[project]/flagged",
+      permissions: [],
+      flags: { release_ui_ai_governance_enabled: true },
+    });
+
+    expect(screen.getByText("the page")).toBeDefined();
+  });
+
+  /** @scenario "A declared screen that requires nothing mounts no guard" */
+  it("mounts no guard around a screen that requires nothing", async () => {
+    const load = installedModuleScreens([probeWeb]).loaders["pages/[project]/open"];
+
+    await expect(load?.()).resolves.toEqual({ default: Page });
+  });
+});

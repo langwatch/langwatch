@@ -19,6 +19,5 @@ export function useTraceSpanTree(traceId: string, occurredAtMs?: number) {
     queryKey: spanTreeQueryKey(input),
     queryFn: spanTreeQueryFn({ utils, queryClient, input }),
     enabled: !!project?.id && !!traceId && !isPreviewTraceId(traceId),
-    staleTime: 300_000,
   });
 }

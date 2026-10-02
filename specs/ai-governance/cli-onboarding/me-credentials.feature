@@ -181,20 +181,16 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   Scenario: GET /api/auth/cli/personal-project returns the caller's personal project
     Given a valid device-session bearer token whose personal workspace already exists
     And the user is an active member of the token's organization
-    And the user has permission to manage the personal project
     When the CLI calls GET /api/auth/cli/personal-project
-    Then the response carries the personal project's id, slug, name and api_key
+    Then the response carries the personal project's id, slug and name, never a key
     And it is the same project the login exchange delivered
 
   @bdd @cli-onboarding @credentials @integration
-  Scenario: GET /api/auth/cli/personal-project withholds the key without breaking the session
-    Given a valid device-session bearer token whose personal workspace already exists
-    And the user is an active member of the token's organization
-    But the user does not have permission to manage the personal project
-    When the CLI calls GET /api/auth/cli/personal-project
-    Then the response is successful and carries the personal project's identity
-    But the response carries no api_key
-    And the device session remains valid
+  Scenario: An old CLI asking for a project key is told to upgrade
+    Given a valid device-session bearer token
+    When a CLI built before project sessions calls POST /api/auth/cli/project-key
+    Then it is answered 410 "gone" with a hint to upgrade the CLI
+    And no key is returned
 
   # ─────────────────────────────────────────────────────────────────────
   # Tenancy boundary: current membership is proven before minting a key
@@ -232,13 +228,6 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Given a device-session token for a user whose account is deactivated
     When the CLI calls GET /api/auth/cli/personal-project with that token
     Then the response is 403
-    And the presented access token is revoked
-
-  @bdd @cli-onboarding @credentials @tenancy @integration
-  Scenario: POST /api/auth/cli/project-key applies the same membership boundary
-    Given a device-session token whose user is not an active member of the token's org
-    When the CLI calls POST /api/auth/cli/project-key
-    Then the response is 403 and no project key is returned
     And the presented access token is revoked
 
   @bdd @cli-onboarding @credentials @integration

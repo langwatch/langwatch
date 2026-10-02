@@ -4,7 +4,7 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
-import { Box, Button, HStack, Progress, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Progress, Text } from "@langwatch/design-system/primitives";
 import { Square } from "lucide-react";
 
 import type { InstantEvalRunPhase } from "../../../behavior/instant-eval-run.store.ts";

@@ -3,7 +3,16 @@
  * here can fail; sample mode swaps in invented rows from
  * `../../model/sample-home-rows.ts`. Ported from `.../GovernanceHomeSections.tsx` (main).
  */
-import { Badge, Box, Button, Grid, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Grid,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { Link } from "../../../../ui/elements/governance-link.tsx";

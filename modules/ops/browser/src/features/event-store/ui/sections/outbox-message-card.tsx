@@ -1,5 +1,13 @@
-import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { useState } from "react";
 

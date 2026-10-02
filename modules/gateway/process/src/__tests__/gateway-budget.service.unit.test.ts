@@ -1,5 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -77,6 +78,7 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
 function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetSpend) {
   return PrismaGatewayAdapter.create({
     database: prisma,
+    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
     projects: {
       listIdsByOrganization: async () => ["project_01"],
       listNamesByIds: async () => [{ id: "project_01", name: "Proj", slug: "proj" }],

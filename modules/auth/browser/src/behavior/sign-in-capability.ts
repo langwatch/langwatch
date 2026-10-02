@@ -4,28 +4,18 @@
  * imports this closed package (ARCHITECTURE.md §10.1).
  */
 
-import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { normalizeSignInErrorCode, type SsoTestSignInOperations } from "@langwatch/auth-contract";
 
 import {
   signInRefusalOf,
   signInStartFailureOf,
   ssoSignInAddressOf,
-  type SignInStartFailure,
 } from "../model/sso-sign-in-answer.ts";
 import { testSignInCallbackUrl } from "../model/test-sign-in-callback-url.ts";
 import { hardNavigate } from "./browser-navigation.ts";
 
 /** Better Auth's single sign-on entry, mounted under the auth base path. */
 const SSO_SIGN_IN_PATH = "/api/auth/sign-in/sso";
-
-export interface AuthSignInCapability {
-  /** Resolves once the browser is leaving, or with what refused it. */
-  testSignIn(options: {
-    connectionId: string;
-    callbackQuery: Readonly<Record<string, string | undefined>>;
-  }): Promise<{ error?: SignInStartFailure | null }>;
-  normalizeSignInErrorCode(code: string): string;
-}
 
 /** The two seams a test takes over: the request, and leaving the page. */
 export interface SignInCapabilityDeps {
@@ -37,7 +27,7 @@ export interface SignInCapabilityDeps {
   currentHref: () => string;
 }
 
-export function createSignInCapability(deps: SignInCapabilityDeps): AuthSignInCapability {
+export function createSignInCapability(deps: SignInCapabilityDeps): SsoTestSignInOperations {
   return {
     async testSignIn({ connectionId, callbackQuery }) {
       const { data, error } = await deps.startSsoSignIn({
@@ -59,7 +49,7 @@ export function createSignInCapability(deps: SignInCapabilityDeps): AuthSignInCa
   };
 }
 
-export const signInCapability: AuthSignInCapability = createSignInCapability({
+export const signInCapability: SsoTestSignInOperations = createSignInCapability({
   startSsoSignIn: async (body) => {
     const response = await fetch(SSO_SIGN_IN_PATH, {
       method: "POST",

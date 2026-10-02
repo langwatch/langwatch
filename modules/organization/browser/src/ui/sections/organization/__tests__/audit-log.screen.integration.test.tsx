@@ -57,16 +57,17 @@ vi.mock("../../../../behavior/organization-api.ts", () => ({
         useQuery: () => ({ data: { members: state.members }, isLoading: false }),
       },
     },
-    limits: {
-      getUsage: {
-        useQuery: () => ({
-          data: state.planLoading ? void 0 : { activePlan: { type: state.planType } },
-          isLoading: state.planLoading,
-        }),
-      },
-    },
   },
 }));
+
+/** The host answers the plan facts the screen gates on, from this file's state. */
+function planHost(options: ConstructorParameters<typeof FakeOrganizationHost>[0] = {}) {
+  return new FakeOrganizationHost({
+    isEnterprise: state.planType === "ENTERPRISE",
+    isPlanLoading: state.planLoading,
+    ...options,
+  });
+}
 
 function auditRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -112,7 +113,7 @@ describe("given an organization below the Enterprise plan", () => {
     /** @scenario A deployment below the plan is told what the audit trail would show */
     it("says what the capability covers instead of hiding it", () => {
       state.planType = "LAUNCH";
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
       expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
@@ -122,7 +123,7 @@ describe("given an organization below the Enterprise plan", () => {
     it("renders no table at all", () => {
       state.planType = "LAUNCH";
       state.auditLogs = [auditRow()];
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.queryByText("Timestamp")).not.toBeInTheDocument();
     });
@@ -145,7 +146,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
         }),
       ];
       state.totalCount = 2;
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("Gateway")).toBeInTheDocument();
       expect(screen.getByText("Platform")).toBeInTheDocument();
@@ -157,7 +158,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
     it("shows the gateway row's target kind and a truncated id", () => {
       state.auditLogs = [auditRow()];
       state.totalCount = 1;
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("virtual_key")).toBeInTheDocument();
       // Sixteen characters and an ellipsis. The full id is 29 long, so a cell
@@ -170,7 +171,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
     it("names the project a scoped row belongs to", () => {
       state.auditLogs = [auditRow()];
       state.totalCount = 1;
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       const table = screen.getByRole("table");
       expect(within(table).getByText("Web App")).toBeInTheDocument();
@@ -180,7 +181,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
     it("says the actor is unknown rather than rendering an empty cell", () => {
       state.auditLogs = [auditRow({ userId: null, user: null })];
       state.totalCount = 1;
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("User not found")).toBeInTheDocument();
     });
@@ -189,7 +190,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
   describe("when the history is empty", () => {
     /** @scenario An empty audit history says so */
     it("says so rather than rendering a headerless table", () => {
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("No audit logs found")).toBeInTheDocument();
     });
@@ -198,7 +199,7 @@ describe("given an Enterprise organization with a mixed audit history", () => {
 
 describe("given a reader who arrived from a Virtual Key detail page", () => {
   const deepLinked = () =>
-    new FakeOrganizationHost({
+    planHost({
       query: { targetKind: "virtual_key", targetId: "vk_abcdefghijklmnopqrstuvwxyz" },
     });
 
@@ -252,7 +253,7 @@ describe("given a reader exporting the audit trail", () => {
      */
     /** @scenario An export is taken over exactly the filters on screen */
     it("asks for exactly the filters the table is reading with", async () => {
-      const host = new FakeOrganizationHost({
+      const host = planHost({
         query: { targetKind: "budget", targetId: "b_1", actionFilter: "gateway." },
       });
       state.auditLogs = [auditRow()];
@@ -279,7 +280,7 @@ describe("given a reader exporting the audit trail", () => {
       state.auditLogs = [auditRow()];
       state.totalCount = 1;
       state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
-      const { host } = renderWithOrganizationHost(<AuditLogScreen />);
+      const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
@@ -301,7 +302,7 @@ describe("given a reader exporting the audit trail", () => {
         { auditLogs: [auditRow({ id: "a-1" })], totalCount: 7000 },
         { auditLogs: [auditRow({ id: "a-2" })], totalCount: 7000 },
       ];
-      const { host } = renderWithOrganizationHost(<AuditLogScreen />);
+      const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
@@ -323,7 +324,7 @@ describe("given a reader exporting the audit trail", () => {
       state.auditLogs = [auditRow()];
       state.totalCount = 1;
       state.fetchRejectsWith = new Error("boom");
-      const { host } = renderWithOrganizationHost(<AuditLogScreen />);
+      const { host } = renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       await userEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
@@ -341,7 +342,7 @@ describe("given a reader narrowing the table", () => {
       state.members = [
         { userId: "u-9", user: { id: "u-9", name: "Alice Doe", email: "alice@example.com" } },
       ];
-      renderWithOrganizationHost(<AuditLogScreen />);
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       await userEvent.type(screen.getByLabelText("Search by User"), "alice");
 
@@ -356,7 +357,7 @@ describe("given a reader narrowing the table", () => {
   describe("when a project is picked", () => {
     /** @scenario Changing a filter returns the table to its first page */
     it("writes the project into the address and returns to the first page", async () => {
-      const host = new FakeOrganizationHost({ query: { pageOffset: "50" } });
+      const host = planHost({ query: { pageOffset: "50" } });
       renderWithOrganizationHost(<AuditLogScreen />, host);
 
       await userEvent.selectOptions(screen.getByLabelText("Project"), "proj-2");
@@ -372,7 +373,7 @@ describe("given more rows than one page holds", () => {
     it("writes the next offset into the address", async () => {
       state.auditLogs = [auditRow()];
       state.totalCount = 120;
-      const host = new FakeOrganizationHost();
+      const host = planHost();
       renderWithOrganizationHost(<AuditLogScreen />, host);
 
       await userEvent.click(screen.getByRole("button", { name: "Go to next page" }));

@@ -1,19 +1,19 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
-  DataRetentionApp,
+  DataRetentionModule,
   type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
@@ -181,8 +181,12 @@ export function createDataRetentionTestOrganizations(
 }
 
 /** Every permission answers `permitted`, so a gate test states one thing. */
-export function createDataRetentionTestAuthz(permitted = true): AuthzApi {
+export function createDataRetentionTestAuthz(permitted = true, platformOperator = false): AuthzApi {
   return createApiFixture<AuthzApi>({
+    can: vi.fn(
+      async ({ permission, scope }) =>
+        platformOperator && permission === "ops:manage" && scope.type === "platform",
+    ),
     hasPermission: vi.fn(async () => permitted),
     canBatchByIds: vi.fn(async (input: AuthzCanBatchByIdsInput) => ({
       teams: new Map(input.teams.map((team) => [team.teamId, permitted])),
@@ -193,7 +197,7 @@ export function createDataRetentionTestAuthz(permitted = true): AuthzApi {
 }
 
 export function createDataRetentionTestUsers(
-  input: Readonly<{ email?: string | null; platformAdministrator?: boolean }> = {},
+  input: Readonly<{ email?: string | null }> = {},
 ): UserApi {
   const profile: UserProfile = {
     id: "user-1",
@@ -210,7 +214,6 @@ export function createDataRetentionTestUsers(
 
   return createApiFixture<UserApi>({
     findById: vi.fn(async ({ id }: { id: string }) => ({ ...profile, id })),
-    isAdmin: vi.fn(() => input.platformAdministrator === true),
   });
 }
 
@@ -268,14 +271,14 @@ export function createDataRetentionTestApp(
     }>;
     platformDefaultRetentionDays?: number;
   }> = {},
-): DataRetentionApp {
+): DataRetentionModule {
   const members: DataRetentionTestMembers = {
     clickhouse: input.clickhouse ?? noopClickHouse(),
     nodeEnvironment: "test",
     redis: null,
   };
 
-  return DataRetentionApp.create({
+  return DataRetentionModule.create({
     repositories: input.repositories ?? {
       ...MemoryDataRetentionRepositories.create(),
       directory: input.directory ?? MemoryRetentionDirectory.create(),

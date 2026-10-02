@@ -19,11 +19,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

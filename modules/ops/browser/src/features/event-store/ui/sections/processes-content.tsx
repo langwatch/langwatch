@@ -1,4 +1,4 @@
-import { Center, Spinner, VStack } from "@chakra-ui/react";
+import { Center, Spinner, VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
@@ -14,9 +14,7 @@ export function ProcessesContent() {
   const instances = useOpsOverlay("processes");
   const instance = useOpsOverlay("processInstance");
   const instanceParts = readOverlayParts(instance.value, 3);
-  const fleet = api.ops.listProcessFleet.useQuery(undefined, {
-    refetchInterval: 15_000,
-  });
+  const fleet = api.ops.listProcessFleet.useQuery(undefined, {});
 
   if (fleet.isPending) {
     return (

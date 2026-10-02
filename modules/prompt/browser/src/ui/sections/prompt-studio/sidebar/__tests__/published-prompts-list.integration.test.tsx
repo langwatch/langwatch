@@ -3,12 +3,15 @@
  * @see specs/prompts/prompt-studio-page.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  clearStoreInstances,
+  getStoreForTesting,
+} from "../../../../../behavior/prompt-tabs-store.ts";
 import type { PromptBrowserStorage } from "../../../../../model/browser-capabilities.ts";
-import { clearStoreInstances, getStoreForTesting } from "../../../../../model/prompt-tabs-store.ts";
 import { PublishedPromptsList } from "../published-prompts-list.tsx";
 
 const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));
@@ -31,8 +34,12 @@ const { mockGetAllPrompts, mockGetResolvedDefault } = vi.hoisted(() => ({
 
 vi.mock("../../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
-    prompts: { getAllPromptsForProject: { useQuery: mockGetAllPrompts } },
     modelProvider: { getResolvedDefault: { useQuery: mockGetResolvedDefault } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    prompts: { getAllPromptsForProject: { useQuery: mockGetAllPrompts } },
   },
 }));
 
@@ -76,11 +83,7 @@ describe("PublishedPromptsList", () => {
   describe("when the list reads the tab store", () => {
     /** @scenario "The prompts sidebar lists published prompts without the studio failing" */
     it("renders each published prompt once and stays put when a tab opens", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <PublishedPromptsList />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<PublishedPromptsList />);
 
       expect(screen.getByText("greeting")).toBeInTheDocument();
       expect(renderCount.value).toBe(1);

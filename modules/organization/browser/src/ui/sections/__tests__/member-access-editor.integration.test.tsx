@@ -5,44 +5,45 @@
  * Spec: specs/members/member-access-editing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as reactModule from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
-import type { PendingBinding } from "../group-binding-input-row.tsx";
-import type * as groupBindingInputRowModule from "../group-binding-input-row.tsx";
+import { OrganizationUserRole } from "../../../model/prisma-types.ts";
+import type { PendingGrant } from "../group-grant-input-row.tsx";
+import type * as groupGrantInputRowModule from "../group-grant-input-row.tsx";
 
 const {
   mockUpdateMemberRole,
-  mockApplyMemberBindings,
-  mockInvalidateListForUser,
-  mockInvalidateListForOrg,
+  mockApplyMemberGrants,
+  mockInvalidateListMemberGrants,
+  mockInvalidateListManagedGrants,
   mockInvalidateOrgWithMembers,
   mockInvalidateGetAll,
   mockInvalidateGetMemberById,
   mockInvalidateGetUsage,
   mockToasterCreate,
-  mockListForUserData,
+  mockMemberGrantsData,
   mockListForMemberData,
 } = vi.hoisted(() => ({
   mockUpdateMemberRole: vi.fn(),
-  mockApplyMemberBindings: vi.fn(),
-  mockInvalidateListForUser: vi.fn().mockResolvedValue(undefined),
-  mockInvalidateListForOrg: vi.fn().mockResolvedValue(undefined),
+  mockApplyMemberGrants: vi.fn(),
+  mockInvalidateListMemberGrants: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateListManagedGrants: vi.fn().mockResolvedValue(undefined),
   mockInvalidateOrgWithMembers: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetAll: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetMemberById: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
   mockToasterCreate: vi.fn(),
-  mockListForUserData: {
+  mockMemberGrantsData: {
     current: [] as {
       id: string;
       role: string;
       customRoleId: string | null;
       customRoleName: string | null;
-      scopeType: RoleBindingScopeType;
+      scopeType: GrantScopeTier;
       scopeId: string;
       scopeName: string | null;
     }[],
@@ -55,30 +56,31 @@ const {
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
-      roleBinding: {
-        listForUser: { invalidate: mockInvalidateListForUser },
-        listForOrg: { invalidate: mockInvalidateListForOrg },
+      authz: {
+        listMemberGrants: { invalidate: mockInvalidateListMemberGrants },
+        listManagedGrants: { invalidate: mockInvalidateListManagedGrants },
       },
       organization: {
         getOrganizationWithMembersAndTheirTeams: {
           invalidate: mockInvalidateOrgWithMembers,
         },
         getAll: { invalidate: mockInvalidateGetAll },
+        getScopeGraph: { invalidate: () => Promise.resolve() },
         getMemberById: { invalidate: mockInvalidateGetMemberById },
       },
       limits: { getUsage: { invalidate: mockInvalidateGetUsage } },
     }),
-    roleBinding: {
-      listForUser: {
+    authz: {
+      listMemberGrants: {
         useQuery: () => ({
-          data: mockListForUserData.current,
+          data: mockMemberGrantsData.current,
           isLoading: false,
           isError: false,
           error: null,
         }),
       },
-      applyMemberBindings: {
-        useMutation: () => ({ mutateAsync: mockApplyMemberBindings }),
+      applyMemberGrants: {
+        useMutation: () => ({ mutateAsync: mockApplyMemberGrants }),
       },
     },
     group: {
@@ -131,28 +133,26 @@ vi.mock("../../elements/organization-user-role-field.tsx", () => ({
   ),
 }));
 
-vi.mock("../group-binding-input-row.tsx", async () => {
-  const actual = await vi.importActual<typeof groupBindingInputRowModule>(
-    "../group-binding-input-row",
-  );
+vi.mock("../group-grant-input-row.tsx", async () => {
+  const actual = await vi.importActual<typeof groupGrantInputRowModule>("../group-grant-input-row");
   const React = await vi.importActual<typeof reactModule>("react");
 
-  const STUB_BINDING: PendingBinding = {
+  const STUB_GRANT: PendingGrant = {
     roleValue: "MEMBER",
     role: "MEMBER",
     customRoleId: undefined,
     customRoleName: undefined,
-    scopeType: RoleBindingScopeType.TEAM,
+    scopeType: GrantScopeTier.TEAM,
     scopeId: "team-1",
     scopeName: "Team One",
   };
 
-  const STUB_CUSTOM_BINDING: PendingBinding = {
+  const STUB_CUSTOM_GRANT: PendingGrant = {
     roleValue: "CUSTOM:role-1",
     role: "CUSTOM",
     customRoleId: "role-1",
     customRoleName: "Data Scientist",
-    scopeType: RoleBindingScopeType.TEAM,
+    scopeType: GrantScopeTier.TEAM,
     scopeId: "team-2",
     scopeName: "Team Two",
   };
@@ -161,39 +161,39 @@ vi.mock("../group-binding-input-row.tsx", async () => {
   // but never-added draft reports readiness and hands itself over on flush.
   // The seat prop is surfaced as text so tests can prove the editor passes
   // the live pending seat, not the member's stored one.
-  const BindingInputRow = React.forwardRef(function StubBindingInputRow(
+  const GrantInputRow = React.forwardRef(function StubGrantInputRow(
     {
       onAdd,
       onReadyChange,
       organizationRole,
     }: {
       organizationId: string;
-      onAdd: (binding: PendingBinding) => void;
+      onAdd: (grant: PendingGrant) => void;
       onReadyChange?: (isReady: boolean) => void;
       organizationRole?: OrganizationUserRole;
     },
-    ref: React.Ref<{ flush: () => PendingBinding | null }>,
+    ref: React.Ref<{ flush: () => PendingGrant | null }>,
   ) {
     const isFilled = React.useRef(false);
     React.useImperativeHandle(ref, () => ({
       flush: () => {
         if (!isFilled.current) return null;
         isFilled.current = false;
-        return STUB_BINDING;
+        return STUB_GRANT;
       },
     }));
     return (
       <>
         <span data-testid="stub-organization-role">{organizationRole}</span>
-        <button type="button" data-testid="stub-add-binding" onClick={() => onAdd(STUB_BINDING)}>
-          Stage binding
+        <button type="button" data-testid="stub-add-binding" onClick={() => onAdd(STUB_GRANT)}>
+          Stage grant
         </button>
         <button
           type="button"
           data-testid="stub-add-custom-binding"
-          onClick={() => onAdd(STUB_CUSTOM_BINDING)}
+          onClick={() => onAdd(STUB_CUSTOM_GRANT)}
         >
-          Stage custom binding
+          Stage custom grant
         </button>
         <button
           type="button"
@@ -211,7 +211,7 @@ vi.mock("../group-binding-input-row.tsx", async () => {
 
   return {
     ...actual,
-    BindingInputRow,
+    GrantInputRow,
   };
 });
 
@@ -238,13 +238,13 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof MemberAcces
 describe("<MemberAccessEditor/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockListForUserData.current = [];
+    mockMemberGrantsData.current = [];
     mockListForMemberData.current = [];
     mockUpdateMemberRole.mockResolvedValue({
       success: true,
       teamsLeftWithoutAdmin: [],
     });
-    mockApplyMemberBindings.mockResolvedValue(undefined);
+    mockApplyMemberGrants.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -285,7 +285,7 @@ describe("<MemberAccessEditor/>", () => {
   });
 
   describe("when saving after only the organization role changed", () => {
-    it("calls updateMemberRole with the new role and does not call applyMemberBindings", async () => {
+    it("calls updateMemberRole with the new role and does not call applyMemberGrants", async () => {
       renderEditor();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
@@ -299,7 +299,7 @@ describe("<MemberAccessEditor/>", () => {
         userId: "user-1",
         role: OrganizationUserRole.EXTERNAL,
       });
-      expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+      expect(mockApplyMemberGrants).not.toHaveBeenCalled();
     });
   });
 
@@ -333,17 +333,17 @@ describe("<MemberAccessEditor/>", () => {
     });
   });
 
-  describe("when saving after only bindings changed", () => {
-    it("calls applyMemberBindings with the staged additions and does not call updateMemberRole", async () => {
+  describe("when saving after only grants changed", () => {
+    it("calls applyMemberGrants with the staged additions and does not call updateMemberRole", async () => {
       renderEditor();
 
       fireEvent.click(screen.getByTestId("stub-add-binding"));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
-        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
       });
-      expect(mockApplyMemberBindings).toHaveBeenCalledWith({
+      expect(mockApplyMemberGrants).toHaveBeenCalledWith({
         organizationId: "org-1",
         userId: "user-1",
         bindingIdsToDelete: [],
@@ -351,7 +351,7 @@ describe("<MemberAccessEditor/>", () => {
           {
             role: "MEMBER",
             customRoleId: undefined,
-            scopeType: RoleBindingScopeType.TEAM,
+            scopeType: GrantScopeTier.TEAM,
             scopeId: "team-1",
           },
         ],
@@ -359,14 +359,14 @@ describe("<MemberAccessEditor/>", () => {
       expect(mockUpdateMemberRole).not.toHaveBeenCalled();
     });
 
-    it("sends the existing binding id as a deletion when the user marks it for removal", async () => {
-      mockListForUserData.current = [
+    it("sends the existing grant id as a deletion when the user marks it for removal", async () => {
+      mockMemberGrantsData.current = [
         {
-          id: "binding-1",
+          id: "grant-1",
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
-          scopeType: RoleBindingScopeType.TEAM,
+          scopeType: GrantScopeTier.TEAM,
           scopeId: "team-1",
           scopeName: "Team One",
         },
@@ -378,24 +378,24 @@ describe("<MemberAccessEditor/>", () => {
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
-        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
       });
-      const firstCall = mockApplyMemberBindings.mock.calls[0];
+      const firstCall = mockApplyMemberGrants.mock.calls[0];
       expect(firstCall?.[0]).toMatchObject({
-        bindingIdsToDelete: ["binding-1"],
+        bindingIdsToDelete: ["grant-1"],
         bindingsToCreate: [],
       });
     });
   });
 
-  describe("when saving after both the role and bindings changed", () => {
-    it("calls updateMemberRole first, then applyMemberBindings", async () => {
+  describe("when saving after both the role and grants changed", () => {
+    it("calls updateMemberRole first, then applyMemberGrants", async () => {
       const callOrder: string[] = [];
       mockUpdateMemberRole.mockImplementation(async () => {
         callOrder.push("role");
       });
-      mockApplyMemberBindings.mockImplementation(async () => {
-        callOrder.push("bindings");
+      mockApplyMemberGrants.mockImplementation(async () => {
+        callOrder.push("grants");
       });
 
       renderEditor();
@@ -405,12 +405,12 @@ describe("<MemberAccessEditor/>", () => {
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
-        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
       });
-      expect(callOrder).toEqual(["role", "bindings"]);
+      expect(callOrder).toEqual(["role", "grants"]);
     });
 
-    it("does not run the binding batch when the role update fails", async () => {
+    it("does not run the grant batch when the role update fails", async () => {
       mockUpdateMemberRole.mockRejectedValueOnce(new Error("plan limit"));
 
       renderEditor();
@@ -431,19 +431,19 @@ describe("<MemberAccessEditor/>", () => {
           }),
         );
       });
-      expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+      expect(mockApplyMemberGrants).not.toHaveBeenCalled();
     });
   });
 
   describe("given the member already holds the staged access row", () => {
     beforeEach(() => {
-      mockListForUserData.current = [
+      mockMemberGrantsData.current = [
         {
-          id: "binding-1",
+          id: "grant-1",
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
-          scopeType: RoleBindingScopeType.TEAM,
+          scopeType: GrantScopeTier.TEAM,
           scopeId: "team-1",
           scopeName: "Team One",
         },
@@ -476,13 +476,13 @@ describe("<MemberAccessEditor/>", () => {
 
   describe("given the member holds the organization row their seat grants", () => {
     beforeEach(() => {
-      mockListForUserData.current = [
+      mockMemberGrantsData.current = [
         {
           id: "mirror-1",
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeType: GrantScopeTier.ORGANIZATION,
           scopeId: "org-1",
           scopeName: "Acme",
         },
@@ -491,7 +491,7 @@ describe("<MemberAccessEditor/>", () => {
           role: "VIEWER",
           customRoleId: null,
           customRoleName: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeType: GrantScopeTier.ORGANIZATION,
           scopeId: "org-1",
           scopeName: "Acme",
         },
@@ -536,13 +536,13 @@ describe("<MemberAccessEditor/>", () => {
       fireEvent.click(save);
 
       await vi.waitFor(() => {
-        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
       });
-      expect(mockApplyMemberBindings.mock.calls[0]?.[0]).toMatchObject({
+      expect(mockApplyMemberGrants.mock.calls[0]?.[0]).toMatchObject({
         bindingsToCreate: [
           {
             role: "MEMBER",
-            scopeType: RoleBindingScopeType.TEAM,
+            scopeType: GrantScopeTier.TEAM,
             scopeId: "team-1",
           },
         ],
@@ -552,7 +552,7 @@ describe("<MemberAccessEditor/>", () => {
 
   describe("given the access batch fails after the seat change landed", () => {
     beforeEach(() => {
-      mockApplyMemberBindings.mockRejectedValue(new Error("boom"));
+      mockApplyMemberGrants.mockRejectedValue(new Error("boom"));
     });
 
     describe("when the admin saves both changes", () => {
@@ -575,7 +575,7 @@ describe("<MemberAccessEditor/>", () => {
         // The seat change landed before the failure, so what the editor shows
         // must come from the server, not from the staged rows.
         expect(mockUpdateMemberRole).toHaveBeenCalledTimes(1);
-        expect(mockInvalidateListForUser).toHaveBeenCalled();
+        expect(mockInvalidateListMemberGrants).toHaveBeenCalled();
         expect(mockInvalidateOrgWithMembers).toHaveBeenCalled();
         expect(mockInvalidateGetUsage).toHaveBeenCalled();
       });
@@ -611,9 +611,9 @@ describe("<MemberAccessEditor/>", () => {
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
         await vi.waitFor(() => {
-          expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+          expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
         });
-        expect(mockApplyMemberBindings).toHaveBeenCalledWith({
+        expect(mockApplyMemberGrants).toHaveBeenCalledWith({
           organizationId: "org-1",
           userId: "user-1",
           bindingIdsToDelete: [],
@@ -621,13 +621,13 @@ describe("<MemberAccessEditor/>", () => {
             {
               role: "VIEWER",
               customRoleId: undefined,
-              scopeType: RoleBindingScopeType.TEAM,
+              scopeType: GrantScopeTier.TEAM,
               scopeId: "team-1",
             },
             {
               role: "VIEWER",
               customRoleId: undefined,
-              scopeType: RoleBindingScopeType.TEAM,
+              scopeType: GrantScopeTier.TEAM,
               scopeId: "team-2",
             },
           ],
@@ -655,13 +655,13 @@ describe("<MemberAccessEditor/>", () => {
         {
           id: "group-1",
           name: "Platform",
-          bindings: [
+          grants: [
             {
               id: "gb-1",
               role: "ADMIN",
               customRoleId: null,
               customRoleName: null,
-              scopeType: RoleBindingScopeType.TEAM,
+              scopeType: GrantScopeTier.TEAM,
               scopeId: "team-1",
               scopeName: "Team One",
             },
@@ -695,13 +695,13 @@ describe("<MemberAccessEditor/>", () => {
         {
           id: "group-1",
           name: "Platform",
-          bindings: [
+          grants: [
             {
               id: "gb-2",
               role: "CUSTOM",
               customRoleId: "role-1",
               customRoleName: "Data Scientist",
-              scopeType: RoleBindingScopeType.TEAM,
+              scopeType: GrantScopeTier.TEAM,
               scopeId: "team-1",
               scopeName: "Team One",
             },
@@ -728,7 +728,7 @@ describe("<MemberAccessEditor/>", () => {
 
       expect(save.hasAttribute("disabled")).toBe(true);
       expect(mockUpdateMemberRole).not.toHaveBeenCalled();
-      expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+      expect(mockApplyMemberGrants).not.toHaveBeenCalled();
     });
   });
 

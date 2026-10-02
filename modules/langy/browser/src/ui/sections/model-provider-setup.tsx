@@ -3,8 +3,8 @@
  * provider, paste a key, save, and the panel re-resolves the model in place.
  * Spec: specs/langy/langy-inline-model-setup.feature
  */
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useCallback, useRef, useState } from "react";
 
 import { LentEditModelProviderForm } from "../../behavior/lent-edit-model-provider-form.tsx";

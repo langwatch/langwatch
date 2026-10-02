@@ -1,4 +1,4 @@
-import { Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { LatencyWindowPercentiles, LatencyWindows } from "@langwatch/ops-contract";
 
 import { formatCount, formatMs } from "../../../../model/ops-formatters.ts";

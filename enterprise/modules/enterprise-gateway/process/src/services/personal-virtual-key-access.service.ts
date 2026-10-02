@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { type AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { type AuthzApi } from "@langwatch/authz-contract";
 import {
   type IssuedPersonalVirtualKeyAnswer,
   NoEligibleModelProvidersError,

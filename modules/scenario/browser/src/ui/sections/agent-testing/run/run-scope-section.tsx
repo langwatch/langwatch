@@ -4,13 +4,13 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-browser-kit";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Folder } from "lucide-react";
 
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { PICKER_UNFILED_GROUP_NAME } from "../../../elements/suite/pickers/scenario-picker.tsx";
 import { TagPill } from "../../../elements/tag-pill.tsx";
 import type { RunScope } from "./run-configuration.ts";
 

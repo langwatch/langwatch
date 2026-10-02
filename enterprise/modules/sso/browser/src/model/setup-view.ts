@@ -35,21 +35,17 @@ export function domainClaimsOf(claims: SsoSetupPageView["claims"]): DomainClaimV
 }
 
 /**
- * Whether this installation proves a domain with its licence, which leaves
- * nothing to publish. Read from the evidence rather than declared: the ceremony
- * says which method it is running, and a screen that guesses DNS at a licensed
- * installation sends an administrator to publish a record nobody will check.
+ * Whether the person looking proves a domain with the installation's licence,
+ * which leaves nothing to publish. The server's answer rather than a guess: a
+ * screen that guesses DNS at a licensed installation sends an administrator to
+ * publish a record nobody will check.
  */
 export function provesWithLicense({
-  connection,
-  record,
+  availability,
 }: {
-  connection: SetupConnection | null;
-  record: SsoSetupPageView["record"];
+  availability: SsoSetupPageView["availability"];
 }): boolean {
-  if (record?.method === "license-token") return true;
-
-  return connection?.domainProofs.some((proof) => proof.method === "license-token") ?? false;
+  return availability.available && availability.proof === "license-token";
 }
 
 /**

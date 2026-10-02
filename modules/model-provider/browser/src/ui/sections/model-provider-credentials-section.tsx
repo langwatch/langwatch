@@ -1,5 +1,5 @@
-import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
+import { Box, Field, Input, VStack } from "@langwatch/design-system/primitives";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useEffect } from "react";

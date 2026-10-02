@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";

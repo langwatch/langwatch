@@ -3,9 +3,14 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
+  bindingScopeCanGrantPermission,
+  GrantValidationError,
+  PlatformPermissionNotAssignableError,
+  PLATFORM_OPERATOR_ROLE_ID,
+  PLATFORM_TENANT_ID,
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
@@ -16,10 +21,7 @@ import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
-import {
-  BindingMissingError,
-  type RoleBindingWrite,
-} from "../repositories/authz-grant.repository.ts";
+import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
@@ -50,6 +52,7 @@ import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-comm
 
 const logger = createLogger("langwatch:authz:ledger");
 
+const storedPermissionsSchema = z.object({ permissions: z.array(z.string()) });
 const storedRoleRowSchema = z.object({
   name: z.string(),
   description: z.string().nullish(),
@@ -69,7 +72,7 @@ export type LedgerWriteSource = GrantEventSource;
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that
    *  create the membership before emitting leave this unset; the writer reads
    *  and locks the live row itself. */
@@ -148,6 +151,13 @@ export type AuthzRoleBindingFilter = Record<string, unknown> & {
   organizationId?: unknown;
 };
 
+/** The organization-scoped writes never address the platform tier's tenant. */
+function refusePlatformTenant(organizationId: string): void {
+  if (organizationId === PLATFORM_TENANT_ID) {
+    throw new GrantValidationError("The platform tier is not an organization", { organizationId });
+  }
+}
+
 /**
  * The injected ledger adapter. Every verb bumps the organization's authz
  * epoch after its write lands (decision 19: the epoch stays until contract;
@@ -217,6 +227,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     requireProjection?: boolean;
   }): Promise<AttachOutcome> => {
+    refusePlatformTenant(organizationId);
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
     for (const binding of bindings) {
@@ -424,6 +435,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     commandId?: string;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     await (
       await this.commands()
     ).commands.attachGrant.send({
@@ -469,6 +481,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     reason?: string;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     if (grantIds.length === 0) return;
     const revocation: {
       organizationId: string;
@@ -542,10 +555,11 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }: {
     organizationId: string;
     bindingId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     const stored = await liveGrants(this.options.database).findFirst({
       where: { id: bindingId, organizationId },
       select: GRANT_ROW_COLUMNS,
@@ -602,6 +616,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     reason?: string;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     if (bindingIds.length === 0) return;
     const revocation: {
       organizationId: string;
@@ -633,6 +648,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     reason?: string;
   }): Promise<number> => {
+    refusePlatformTenant(organizationId);
     if (!organizationId) {
       throw new Error(
         "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
@@ -680,6 +696,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     revokedGrantIds: string[];
     actor: LedgerActor;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     // Offboarding is N revocations sharing one reason, not an event of its
     // own: a person is not an aggregate here, and an event that named one
     // would have to straddle every grant they hold.
@@ -738,6 +755,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     requireProjection?: boolean;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (kind === "custom") {
+      await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
+    }
     const occurredAtMs = this.now();
     const role: DefineRoleCommandData["role"] = {
       roleId,
@@ -808,6 +829,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     awaitProjection?: boolean;
   }): Promise<void> {
+    refusePlatformTenant(organizationId);
     await (
       await this.commands()
     ).commands.deleteRole.send({
@@ -832,6 +854,98 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       });
     }
     await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * A custom role may not gain a platform permission; one it already lists stays, inert under the
+   * fence, so a legacy role can still be renamed. A key's private role is never refused here.
+   */
+  private async refuseAddedPlatformPermissions({
+    organizationId,
+    roleId,
+    permissions,
+  }: {
+    organizationId: string;
+    roleId: string;
+    permissions: readonly string[];
+  }): Promise<void> {
+    const platformOnly = permissions.filter(
+      (permission) => !bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }),
+    );
+    if (platformOnly.length === 0) return;
+
+    const found = await liveRoles(this.options.database).findFirst({
+      where: { id: roleId, organizationId },
+      select: { permissions: true },
+    });
+    const kept = new Set(storedPermissionsSchema.safeParse(found).data?.permissions ?? []);
+    const added = platformOnly.filter((permission) => !kept.has(permission));
+    if (added.length > 0) throw new PlatformPermissionNotAssignableError({ permissions: added });
+  }
+
+  /**
+   * Attach one platform-operator grant to a user at the PLATFORM tier. The rules (who may,
+   * never to yourself) are the platform-operator service's; this only writes and waits.
+   */
+  async attachPlatformGrant({
+    grantId,
+    userId,
+    actor,
+    source,
+    commandId,
+  }: {
+    grantId: string;
+    userId: string;
+    actor: LedgerActor;
+    source: LedgerWriteSource;
+    commandId?: string;
+  }): Promise<void> {
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: PLATFORM_TENANT_ID,
+      organizationId: PLATFORM_TENANT_ID,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal: { type: "user", id: userId },
+        roleKey: PLATFORM_OPERATOR_ROLE_ID,
+        scope: { type: "PLATFORM", id: PLATFORM_TENANT_ID },
+        source,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    await this.awaitProjection({
+      what: `attach of platform grant ${grantId}`,
+      organizationId: PLATFORM_TENANT_ID,
+      check: async () => {
+        const row = await liveGrants(this.options.database).findFirst({
+          where: { id: grantId, organizationId: PLATFORM_TENANT_ID, scopeType: "PLATFORM" },
+          select: { id: true },
+        });
+        return row !== null;
+      },
+    });
+  }
+
+  /** Revoke platform-tier grants by id; the deny lands synchronously, as every revoke's does. */
+  async revokePlatformGrants({
+    grantIds,
+    actor,
+    reason,
+  }: {
+    grantIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.appendGrantRevocation({
+      organizationId: PLATFORM_TENANT_ID,
+      bindingIds: grantIds,
+      actor,
+      ...(reason ? { reason } : {}),
+    });
   }
 
   /**

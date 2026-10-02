@@ -4,6 +4,7 @@
  * only the credential material is absent from the log, and may never be in it.
  */
 import {
+  canonicalEntraIssuer,
   parseSamlIdpConfig,
   type SsoConnectionState,
   type SsoProviderConfigCipher,
@@ -94,7 +95,8 @@ export class SsoEngineProviderService implements SsoEngineProviderProjection {
 
     return {
       ...base,
-      issuer,
+      // Compared to the token's `iss` exactly: an Entra ID issuer stored with a slash refused all.
+      issuer: canonicalEntraIssuer(issuer),
       oidcConfig: this.deps.providerConfig.seal(
         oidcProviderDocument({
           clientId: clientId.value,

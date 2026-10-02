@@ -1,5 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import {
+  GrantExceedsCallerPermissionsError,
+  permissionsConferred,
+  type AuthzApi,
+} from "@langwatch/authz-contract";
 import {
   GroupRoleNotAssignableError,
   GroupRoleScopeError,
@@ -7,6 +10,7 @@ import {
   type OrganizationGroup,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -44,6 +48,8 @@ const team: OrganizationTeam = {
 
 function buildService(options?: {
   customRolePermissions?: string[];
+  /** Permissions the caller lacks at every scope it grants at. */
+  beyondCaller?: string[];
   grantsFailure?: Error;
   organizationMembersFailure?: Error;
   /** The stored group every read resolves to; a `scimSource` makes it directory-managed. */
@@ -107,6 +113,15 @@ function buildService(options?: {
     ]),
     listGroupBindings: vi.fn().mockResolvedValue([]),
     listOrganizationBindings: vi.fn().mockResolvedValue([]),
+    // The caller's ceiling: what it lacks at a scope (none, unless a test says so).
+    findPermissionsBeyondCaller: vi.fn().mockResolvedValue(options?.beyondCaller ?? []),
+    findRolePermissions: vi.fn().mockResolvedValue([
+      {
+        id: "role_1",
+        name: "Role",
+        permissions: options?.customRolePermissions ?? ["project:view"],
+      },
+    ]),
   };
 
   const grants = {
@@ -150,6 +165,7 @@ describe("OrganizationService groups", () => {
         organizationId: "org_1",
         name: "Reviewers",
         memberIds: ["member_1", "foreign_user", "member_1"],
+        caller: { type: "user", id: "actor_1" },
         actor: { type: "user", id: "actor_1" },
       }),
     ).rejects.toBe(failure);
@@ -170,7 +186,7 @@ describe("OrganizationService groups", () => {
       service.createGroup({
         organizationId: "org_1",
         name: "Reviewers",
-        bindings: [
+        grants: [
           {
             role: "CUSTOM",
             customRoleId: "role_1",
@@ -178,6 +194,7 @@ describe("OrganizationService groups", () => {
             scopeId: "team_1",
           },
         ],
+        caller: { type: "user", id: "actor_1" },
         actor: { type: "user", id: "actor_1" },
       }),
     ).rejects.toBeInstanceOf(GroupRoleScopeError);
@@ -218,7 +235,7 @@ describe("OrganizationService groups", () => {
       await expect(
         service.listGroupsForMember({ organizationId: "org_1", userId: "user_1" }),
       ).resolves.toMatchObject([
-        { id: "group_1", name: "Reviewers", bindings: [{ role: "VIEWER" }] },
+        { id: "group_1", name: "Reviewers", grants: [{ role: "VIEWER" }] },
       ]);
     });
   });
@@ -234,15 +251,16 @@ describe("OrganizationService groups", () => {
       const { service, authz, grants } = buildService();
 
       await expect(
-        service.addGroupBinding({
+        service.addGroupGrant({
           organizationId: "org_1",
           groupId: "group_1",
-          binding: {
+          grant: {
             role: "CUSTOM",
             customRoleId: "role_from_another_org",
             scopeType: "TEAM",
             scopeId: "team_1",
           },
+          caller: { type: "user", id: "user_1" },
           actor: { type: "user", id: "user_1" },
         }),
       ).rejects.toBeInstanceOf(GroupRoleNotAssignableError);
@@ -259,15 +277,16 @@ describe("OrganizationService groups", () => {
       vi.mocked(authz.listUserCreatedRoles).mockResolvedValue([]);
 
       await expect(
-        service.addGroupBinding({
+        service.addGroupGrant({
           organizationId: "org_1",
           groupId: "group_1",
-          binding: {
+          grant: {
             role: "CUSTOM",
             customRoleId: "api_key_system_role",
             scopeType: "TEAM",
             scopeId: "team_1",
           },
+          caller: { type: "user", id: "user_1" },
           actor: { type: "user", id: "user_1" },
         }),
       ).rejects.toBeInstanceOf(GroupRoleNotAssignableError);
@@ -280,14 +299,15 @@ describe("OrganizationService groups", () => {
   it("writes an identical group binding rather than refusing it", async () => {
     const { service, grants } = buildService();
 
-    await service.addGroupBinding({
+    await service.addGroupGrant({
       organizationId: "org_1",
       groupId: "group_1",
-      binding: {
+      grant: {
         role: "MEMBER",
         scopeType: "TEAM",
         scopeId: "team_1",
       },
+      caller: { type: "user", id: "actor_1" },
       actor: { type: "user", id: "actor_1" },
     });
 
@@ -321,7 +341,7 @@ describe("OrganizationService groups", () => {
       service.getGroup({ organizationId: "org_1", groupId: "group_1" }),
     ).resolves.toMatchObject({
       id: "group_1",
-      bindings: [{ id: "binding_1", scopeId: "team_1" }],
+      grants: [{ id: "binding_1", scopeId: "team_1" }],
     });
   });
 
@@ -385,6 +405,7 @@ describe("OrganizationService groups", () => {
 
       await expect(
         service.addGroupMember({
+          caller: { type: "user", id: "actor_1" },
           organizationId: "org_1",
           groupId: "group_1",
           userId: "member_1",
@@ -420,6 +441,7 @@ describe("OrganizationService groups", () => {
 
       await expect(
         service.addGroupMember({
+          caller: { type: "user", id: "actor_1" },
           organizationId: "org_1",
           groupId: "group_1",
           userId: "outsider",
@@ -446,7 +468,12 @@ describe("OrganizationService groups", () => {
         order.push("invalidate");
       });
 
-      await service.addGroupMember({ organizationId: "org_1", groupId: "group_1", userId: "u_1" });
+      await service.addGroupMember({
+        organizationId: "org_1",
+        groupId: "group_1",
+        userId: "u_1",
+        caller: { type: "user", id: "actor_1" },
+      });
 
       expect(grants.invalidateOrganization).toHaveBeenCalledWith({ organizationId: "org_1" });
       expect(order).toEqual(["addMember", "invalidate"]);
@@ -470,10 +497,11 @@ describe("OrganizationService groups", () => {
         organizationId: "org_1",
         groupId: "group_1",
         rename: null,
-        bindingIdsToDelete: [],
-        bindingsToCreate: [],
+        grantIdsToRevoke: [],
+        grantsToCreate: [],
         memberUserIdsToAdd: [],
         memberUserIdsToRemove: [],
+        caller: { type: "user" as const, id: "actor_1" },
         actor: { type: "user" as const, id: "actor_1" },
       };
 
@@ -512,10 +540,11 @@ describe("OrganizationService groups", () => {
         organizationId: "org_1",
         groupId: "group_1",
         rename: null,
-        bindingIdsToDelete: ["binding_1"],
-        bindingsToCreate: [],
+        grantIdsToRevoke: ["binding_1"],
+        grantsToCreate: [],
         memberUserIdsToAdd: [],
         memberUserIdsToRemove: ["user_removed"],
+        caller: { type: "user", id: "actor_1" },
         actor: { type: "user", id: "actor_1" },
       });
 
@@ -527,5 +556,125 @@ describe("OrganizationService groups", () => {
       );
       expect(order).toEqual(["revoke", "applyEdits"]);
     });
+  });
+});
+
+describe("given a caller who lacks part of what a group write would confer", () => {
+  const CALLER = { type: "user" as const, id: "manager_1" };
+  const ACTOR = { type: "user" as const, id: "manager_1" };
+  const TEAM_ADMIN = { role: "ADMIN" as const, scopeType: "TEAM" as const, scopeId: "team_1" };
+  /** What authz is asked about a team ADMIN grant: the caller, that team, what the role confers. */
+  const TEAM_ADMIN_ASK = {
+    organizationId: "org_1",
+    caller: CALLER,
+    scope: { type: "team", id: "team_1" },
+    permissions: [
+      ...permissionsConferred({ role: "ADMIN", scopeType: "TEAM", customPermissions: [] }),
+    ],
+  };
+
+  /** @scenario "Creating a group with a grant above the caller is refused" */
+  it("refuses the group before creating it", async () => {
+    const { service, groupRepository, grants, authz } = buildService({
+      beyondCaller: ["team:manage"],
+    });
+
+    await expect(
+      service.createGroup({
+        organizationId: "org_1",
+        name: "Escalators",
+        memberIds: ["manager_1"],
+        grants: [TEAM_ADMIN],
+        caller: CALLER,
+        actor: ACTOR,
+      }),
+    ).rejects.toMatchObject({
+      code: "grant_exceeds_caller_permissions",
+      meta: { missingPermissions: ["team:manage"] },
+    });
+    expect(authz.findPermissionsBeyondCaller).toHaveBeenCalledWith(TEAM_ADMIN_ASK);
+    expect(groupRepository.create).not.toHaveBeenCalled();
+    expect(grants.attachBindings).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Adding a grant to a group above the caller is refused" */
+  it("forwards its caller, and authz's refusal stands", async () => {
+    // No write of its own precedes the grant, so the door leaves the check to authz's central one.
+    const { service, grants } = buildService({
+      grantsFailure: new GrantExceedsCallerPermissionsError(["team:manage"]),
+    });
+
+    await expect(
+      service.addGroupGrant({
+        organizationId: "org_1",
+        groupId: "group_1",
+        grant: TEAM_ADMIN,
+        caller: CALLER,
+        actor: ACTOR,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(grants.attachBindings).toHaveBeenCalledWith(expect.objectContaining({ caller: CALLER }));
+  });
+
+  /** @scenario "Editing a group to add a grant above the caller is refused before any edit" */
+  it("refuses the edit before revoking or editing anything", async () => {
+    const { service, groupRepository, grants } = buildService({ beyondCaller: ["team:manage"] });
+
+    await expect(
+      service.applyGroupEdits({
+        organizationId: "org_1",
+        groupId: "group_1",
+        rename: { name: "Renamed" },
+        grantIdsToRevoke: [],
+        grantsToCreate: [TEAM_ADMIN],
+        memberUserIdsToAdd: [],
+        memberUserIdsToRemove: [],
+        caller: CALLER,
+        actor: ACTOR,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(grants.revokeBindings).not.toHaveBeenCalled();
+    expect(groupRepository.applyEdits).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Adding a member to a group whose grants exceed the caller is refused" */
+  it("refuses a new member of a group holding more than the caller", async () => {
+    const { service, groupRepository, authz } = buildService({ beyondCaller: ["team:manage"] });
+    authz.listGroupBindings.mockResolvedValue([
+      {
+        id: "binding_admin",
+        groupId: "group_1",
+        role: "ADMIN",
+        customRoleId: null,
+        customRole: null,
+        scopeType: "TEAM",
+        scopeId: "team_1",
+      },
+    ]);
+
+    await expect(
+      service.addGroupMember({
+        organizationId: "org_1",
+        groupId: "group_1",
+        userId: "manager_1",
+        caller: CALLER,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    await expect(
+      service.applyGroupEdits({
+        organizationId: "org_1",
+        groupId: "group_1",
+        rename: null,
+        grantIdsToRevoke: [],
+        grantsToCreate: [],
+        memberUserIdsToAdd: ["manager_1"],
+        memberUserIdsToRemove: [],
+        caller: CALLER,
+        actor: ACTOR,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(authz.findPermissionsBeyondCaller).toHaveBeenCalledWith(TEAM_ADMIN_ASK);
+    expect(groupRepository.addMember).not.toHaveBeenCalled();
+    expect(groupRepository.applyEdits).not.toHaveBeenCalled();
   });
 });

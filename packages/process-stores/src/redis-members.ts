@@ -52,6 +52,12 @@ export function redisIdempotency(redis: RedisConnection): IdempotencyStore {
   };
 }
 
+/** One script, so no counter is ever left without its window's expiry (a lockout that never lifts). */
+const COUNT_IN_WINDOW = `
+local used = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return used`;
+
 /**
  * A fixed window per key: the first request sets the expiry, the one crossing
  * the allowance reads the remaining seconds as its retry-after, and a caller
@@ -65,8 +71,7 @@ export function redisRateLimiter(
     async check(key, limit) {
       const allowance = limit ?? window;
       const counter = `${RATE_LIMIT_PREFIX}${key}`;
-      const used = await redis.incr(counter);
-      if (used === 1) await redis.expire(counter, allowance.seconds);
+      const used = Number(await redis.eval(COUNT_IN_WINDOW, 1, counter, allowance.seconds));
       if (used <= allowance.requests) return { allowed: true };
 
       const remaining = await redis.ttl(counter);

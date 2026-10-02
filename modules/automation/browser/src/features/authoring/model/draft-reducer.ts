@@ -18,6 +18,7 @@ import {
   type ProviderClients,
   type SliceFor,
 } from "../../../model/provider-registry.ts";
+import { queryIsValid } from "./condition-query.ts";
 import { describeCron, isValidCron } from "./report-schedule.ts";
 
 export type { AutomationFilterValue, AutomationFilters };
@@ -176,6 +177,13 @@ function createInitialDraft<C extends ProviderClients>(
   };
 }
 
+/** The deliveries a graph alert can dispatch; the rest are trace-only. */
+const GRAPH_ALERT_ACTIONS: ReadonlySet<TriggerAction | null> = new Set<TriggerAction | null>([
+  TriggerAction.SEND_EMAIL,
+  TriggerAction.SEND_SLACK_MESSAGE,
+  TriggerAction.SEND_WEBHOOK,
+]);
+
 function reduceDraft<C extends ProviderClients>(
   state: AutomationDraft<C>,
   action: DraftAction<C>,
@@ -193,7 +201,7 @@ function reduceDraft<C extends ProviderClients>(
     case "SET_SOURCE":
       // Switching source clears the conditions tied to the other source so
       // we never persist stale filters next to a customGraphId or vice versa.
-      // Graph alerts only support notify actions (email / Slack) — a
+      // Graph alerts only support notify actions (email, Slack, webhook): a
       // previously picked persist action would be rejected at save time, so
       // switching to customGraph resets it and the user re-picks.
       if (action.value === "customGraph") {
@@ -202,10 +210,7 @@ function reduceDraft<C extends ProviderClients>(
           source: "customGraph",
           filters: {},
           filterQuery: null,
-          action:
-            state.action === "SEND_EMAIL" || state.action === "SEND_SLACK_MESSAGE"
-              ? state.action
-              : null,
+          action: GRAPH_ALERT_ACTIONS.has(state.action) ? state.action : null,
         };
       }
       if (action.value === "report") {
@@ -266,7 +271,7 @@ function reduceDraft<C extends ProviderClients>(
   }
 }
 
-/** The Automation / Alert / Schedule noun set for one preset. */
+/** The Automation / Report noun set for one preset. */
 export interface PresetLabels {
   /** Drawer heading. */
   title: string;
@@ -281,28 +286,27 @@ export interface PresetLabels {
 }
 
 /**
- * The single source of truth for the Automation / Alert / Schedule nouns,
- * keyed on the preset (`draft.source`) so every heading, button, and toast
- * stays in step with the chosen type.
+ * The customer-facing nouns, keyed on the preset (`draft.source`). Two nouns,
+ * not three (ADR-093 §1): watching a graph is still an automation, and the
+ * third concept is a report, not a schedule. Storage and wire are untouched.
  */
-export function presetLabels(source: ConditionSource, isEdit: boolean): PresetLabels {
+export function presetLabels({
+  source,
+  isEdit,
+}: {
+  source: ConditionSource;
+  isEdit: boolean;
+}): PresetLabels {
   switch (source) {
-    case "customGraph":
-      return {
-        title: isEdit ? "Edit alert" : "New alert",
-        saveButton: isEdit ? "Save alert" : "Create alert",
-        createdToast: "Alert created",
-        updatedToast: "Alert updated",
-        noun: "alert",
-      };
     case "report":
       return {
-        title: isEdit ? "Edit schedule" : "New schedule",
-        saveButton: isEdit ? "Save schedule" : "Create schedule",
-        createdToast: "Schedule created",
-        updatedToast: "Schedule updated",
-        noun: "schedule",
+        title: isEdit ? "Edit report" : "New report",
+        saveButton: isEdit ? "Save report" : "Create report",
+        createdToast: "Report created",
+        updatedToast: "Report updated",
+        noun: "report",
       };
+    case "customGraph":
     case "trace":
       return {
         title: isEdit ? "Edit automation" : "Add automation",
@@ -365,6 +369,8 @@ export interface BuildTestFirePayloadInput<C extends ProviderClients> {
   webhook: string | null;
   /** Slack bot connection: test-fires via the Web API to this channel. */
   botDestination?: { channelId: string; botToken: string | null } | null;
+  /** The Slack connection a Slack test fire delivers through (ADR-093 §5a). */
+  slackIntegrationId?: string | null;
   /** ADR-040 generic HTTP destination: the full request the test fire sends. */
   webhookDestination?: {
     url: string;
@@ -388,6 +394,7 @@ function buildTestFirePayload<C extends ProviderClients>(
     channel,
     webhook,
     botDestination,
+    slackIntegrationId,
     webhookDestination,
     automationId,
     graphName,
@@ -405,6 +412,7 @@ function buildTestFirePayload<C extends ProviderClients>(
     draft: templatesFromDraft(registry, draft),
     webhook,
     botDestination: botDestination ?? null,
+    ...(slackIntegrationId ? { slackIntegrationId } : {}),
     webhookDestination: webhookDestination ?? null,
     ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert
@@ -475,6 +483,16 @@ export function subjectIsSet<C extends ProviderClients>(draft: AutomationDraft<C
   return filterQueryIsSet(draft.filterQuery) || filtersAreSet(draft.filters);
 }
 
+/**
+ * `subjectIsSet`, and for a trace query also that it parses and names nothing
+ * suspicious: the green check means "this will match", not "this is filled".
+ */
+export function subjectIsValid<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
+  if (!subjectIsSet(draft)) return false;
+  if (draft.source !== "trace" || !filterQueryIsSet(draft.filterQuery)) return true;
+  return queryIsValid(draft.filterQuery);
+}
+
 /** A trace-subject query is set when it has non-whitespace content. */
 export function filterQueryIsSet(filterQuery: string | null): boolean {
   return (filterQuery ?? "").trim().length > 0;
@@ -511,7 +529,7 @@ export function conditionsAreSet<C extends ProviderClients>(draft: AutomationDra
  * Slack/email section goes green even with an empty name; the name gates
  * Save on its own field, not this indicator.
  */
-function configIsComplete<C extends ProviderClients>(
+export function configIsComplete<C extends ProviderClients>(
   registry: ClientProviderRegistry<C>,
   draft: AutomationDraft<C>,
 ): boolean {
@@ -555,11 +573,11 @@ export const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
   1440: "1 day",
 };
 
-function configurationSummary<C extends ProviderClients>(
+export function configurationSummary<C extends ProviderClients>(
   registry: ClientProviderRegistry<C>,
   draft: AutomationDraft<C>,
 ): string {
-  if (!draft.action) return "Choose a type first";
+  if (!draft.action) return "Choose where it delivers";
   const identity = { name: draft.name };
   switch (draft.action) {
     case TriggerAction.SEND_EMAIL:
@@ -582,7 +600,7 @@ function configurationSummary<C extends ProviderClients>(
  * True when the active action is a notify provider — used to gate the preview pane, cadence stage,
  * and test-fire UI.
  */
-function isNotifyAction<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
+export function isNotifyAction<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
   return (
     draft.action === TriggerAction.SEND_EMAIL ||
     draft.action === TriggerAction.SEND_SLACK_MESSAGE ||
@@ -693,6 +711,7 @@ export function createAutomationDraftModel<C extends ProviderClients>(
     isNotifyAction,
     filtersAreSet,
     subjectIsSet,
+    subjectIsValid,
     filterQueryIsSet,
     cadenceIsSet,
     conditionsAreSet,

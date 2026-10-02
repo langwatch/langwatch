@@ -273,9 +273,45 @@ const normalizeEvaluator = (
   return { ...withoutPairwise, comparison: fromPairwise(_pairwise) };
 };
 
-/** Repair only legacy evaluator comparison data; results and targets stay intact. */
+const savedStateSchema = z.looseObject({ targets: z.array(z.unknown()) });
+const targetWithHttpConfigSchema = z.looseObject({ httpConfig: z.looseObject({}) });
+const experimentRowSchema = z.looseObject({ workbenchState: savedStateSchema });
+
+const targetWithoutHttpCredentials = (target: unknown): unknown => {
+  const parsed = targetWithHttpConfigSchema.safeParse(target);
+  if (!parsed.success) return target;
+  const { auth: _auth, headers: _headers, ...httpConfig } = parsed.data.httpConfig;
+
+  return { ...parsed.data, httpConfig };
+};
+
+/** An old saved state's HTTP targets carry a dead copy of the agent's credentials;
+ * it is dropped on read. */
+export const workbenchStateWithoutHttpCredentials = (state: unknown): unknown => {
+  const parsed = savedStateSchema.safeParse(state);
+
+  return parsed.success
+    ? { ...parsed.data, targets: parsed.data.targets.map(targetWithoutHttpCredentials) }
+    : state;
+};
+
+/** An experiment row as read: its saved state without the dead credential copy. */
+export const experimentRowWithoutHttpCredentials = (row: unknown): unknown => {
+  const parsed = experimentRowSchema.safeParse(row);
+
+  return parsed.success
+    ? {
+        ...parsed.data,
+        workbenchState: workbenchStateWithoutHttpCredentials(parsed.data.workbenchState),
+      }
+    : row;
+};
+
+/** Repair only legacy data: evaluator comparisons and the dead HTTP credential copy;
+ * results stay intact. */
 export const normalizeWorkbenchState = (stored: unknown): PersistedEvaluationsV3State | null => {
-  const state = (stored as PersistedEvaluationsV3State | null) ?? null;
+  const state =
+    (workbenchStateWithoutHttpCredentials(stored) as PersistedEvaluationsV3State | null) ?? null;
   if (!state || !Array.isArray(state.evaluators)) return state;
 
   return { ...state, evaluators: state.evaluators.map(normalizeEvaluator) };

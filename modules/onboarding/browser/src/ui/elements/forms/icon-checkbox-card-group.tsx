@@ -1,4 +1,4 @@
-import { CheckboxCard, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { CheckboxCard, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
 import type React from "react";
 

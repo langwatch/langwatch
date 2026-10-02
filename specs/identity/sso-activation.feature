@@ -334,6 +334,21 @@ Feature: Going live with your own identity provider, without asking us
     When it is not known yet whether they arrived through a connection
     Then they are sent nowhere until it is
 
+  # The test sign-in returns to the setup screen, not to `/`. That screen is
+  # organization-scoped, so the tester, who belongs to no organization, is
+  # bounced from it like anybody else with no organization. The bounce asks
+  # the same server question as the landing, so it cannot hand the tester the
+  # screen that creates an organization, and it never shows them the setup
+  # screen of an organization they are not a member of.
+
+  @integration
+  Scenario: A test sign-in that returns to the setup screen is sent to what happened
+    Given an administrator's test sign-in left them signed in as somebody who belongs to no organization
+    When the browser comes back to the single sign-on setup screen
+    Then they are sent to what happened to their test sign-in
+    And not to the screen that creates an organization
+    But somebody who simply has no organization yet is still sent to the screen that creates one
+
   @integration
   Scenario: A test arrival is told the test worked and offered the way back
     Given an administrator has signed in through a connection that is not live

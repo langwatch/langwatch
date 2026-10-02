@@ -5,11 +5,11 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { Box, Stack, Text, VStack } from "@chakra-ui/react";
 import type {
   LangWatchQLVegaLiteChartProps,
   VegaValidationWarning,
 } from "@langwatch/analytics-contract/visualization";
+import { Box, Stack, Text, VStack } from "@langwatch/design-system/primitives";
 import { type RefObject, useId } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 

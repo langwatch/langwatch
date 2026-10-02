@@ -51,3 +51,23 @@ Feature: Collaborative presence
     When a subscriber listens on that project's tenant emitter and another on a second project's
     Then only the first subscriber receives the update
     And the payload carries the conversation's owner, so langy's watch can drop it for other users
+
+  # Presence is the one writer of the `broadcast:*` wire (record §3.3): trace and scenario publish
+  # their tenant signals through it and keep no Redis broadcast of their own.
+  @unit
+  Scenario Outline: A peer's project signal reaches only the project it was published for
+    Given a peer publishes a "<channel>" signal for one project through presence
+    When a subscriber listens on that project's tenant emitter and another on a second project's
+    Then only the first subscriber receives the signal
+
+    Examples:
+      | channel            |
+      | trace_updated      |
+      | discover_updated   |
+      | simulation_updated |
+
+  @unit
+  Scenario: A tiered project signal is dropped once the project's allowance is spent
+    Given a peer publishes many "delta" simulation signals for one project in a burst
+    When the project's delta allowance runs out
+    Then the signals past the allowance are dropped rather than relayed

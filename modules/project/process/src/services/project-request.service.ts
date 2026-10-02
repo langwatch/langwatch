@@ -1,9 +1,7 @@
-import { ProjectPermissionDeniedError } from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,
-  ProjectNotFoundError,
-  type Project,
   type ProjectApi,
   type TopicClusteringRequest,
 } from "@langwatch/project-contract";
@@ -26,13 +24,6 @@ export class ProjectRequestService {
 
   static create(options: ProjectRequestOptions): ProjectRequestService {
     return new ProjectRequestService(options);
-  }
-
-  async getProject({ projectId }: { projectId: string }): Promise<Project> {
-    const project = await this.options.projects.findById(projectId);
-    if (!project) throw new ProjectNotFoundError();
-
-    return project;
   }
 
   /**

@@ -99,6 +99,23 @@ describe("public application configuration projection", () => {
     });
   });
 
+  describe("given the password switches the dev server projects for auth", () => {
+    const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
+    const passwords = (source: Record<string, string>) =>
+      resolvePublicAppConfig({ ...base, ...source }).auth?.emailPasswordEnabled;
+
+    it("mounts passwords as auth's own rule does", () => {
+      expect(passwords({})).toBe(true);
+      expect(passwords({ IS_SAAS: "true" })).toBe(true);
+      expect(passwords({ IS_SAAS: "1", AUTH_PROVIDER: "auth0" })).toBe(false);
+      expect(passwords({ IS_SAAS: "true", AUTH_PROVIDER: "auth0" })).toBe(false);
+      expect(passwords({ IS_SAAS: "true", AUTH_PROVIDER: "email" })).toBe(true);
+      expect(
+        passwords({ IS_SAAS: "true", AUTH_PROVIDER: "auth0", LOCAL_PASSWORDS_ENABLED: "on" }),
+      ).toBe(true);
+    });
+  });
+
   it("retains the gateway public-url, legacy-url, and deployment-default precedence", () => {
     expect(
       resolveGatewayBaseUrl({

@@ -3,7 +3,7 @@
  * can ask for a pause after it ("Hello Rogerio [pause], I'm Langy [pause]").
  * The caret blinks while idle and disappears when the last segment lands.
  */
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import type { TypeSegment } from "../../model/typewriter-segment.ts";

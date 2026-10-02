@@ -1,5 +1,5 @@
-import { Field, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Field, VStack } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 

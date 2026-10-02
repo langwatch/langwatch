@@ -1,12 +1,13 @@
-import { Field, Tabs, Text, VStack } from "@chakra-ui/react";
 import type {
   AgentInputBinding as FieldMapping,
   Field as Variable,
   HttpAuth,
+  HttpAuthType,
   HttpHeader,
   HttpMethod,
 } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { Field, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
@@ -48,6 +49,7 @@ export type AgentHttpEditorTabsProps = {
   onAuthChange: (auth: HttpAuth | undefined) => void;
   headers: HttpHeader[];
   onHeadersChange: (headers: HttpHeader[]) => void;
+  stored?: { authType: HttpAuthType | undefined; headerKeys: string[] };
   method: HttpMethod;
   url: string;
   localMappings: Record<string, FieldMapping>;
@@ -79,6 +81,7 @@ export function AgentHttpEditorTabs({
   onAuthChange,
   headers,
   onHeadersChange,
+  stored,
   method,
   url,
   localMappings,
@@ -160,11 +163,19 @@ export function AgentHttpEditorTabs({
       )}
 
       <Tabs.Content value="auth" flex={1} overflowY="auto" paddingX={6} paddingY={4}>
-        <AuthConfigSection value={auth} onChange={onAuthChange} />
+        <AuthConfigSection
+          value={auth}
+          onChange={onAuthChange}
+          {...(stored?.authType ? { storedType: stored.authType } : {})}
+        />
       </Tabs.Content>
 
       <Tabs.Content value="headers" flex={1} overflowY="auto" paddingX={6} paddingY={4}>
-        <HeadersConfigSection value={headers} onChange={onHeadersChange} />
+        <HeadersConfigSection
+          value={headers}
+          onChange={onHeadersChange}
+          {...(stored ? { storedKeys: stored.headerKeys } : {})}
+        />
       </Tabs.Content>
 
       <Tabs.Content value="test" flex={1} overflowY="auto" paddingX={6} paddingY={4}>

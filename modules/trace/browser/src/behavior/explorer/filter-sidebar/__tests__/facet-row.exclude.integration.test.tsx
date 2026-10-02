@@ -4,14 +4,14 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 import { FacetRow } from "../../../../ui/sections/explorer/filter-sidebar/facet-row.tsx";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 const ITEM: FacetItem = {
   value: "error",
@@ -30,17 +30,15 @@ const renderRow = ({
   onToggle?: (value: string) => void;
   onExclude?: (value: string) => void;
 }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetRow
-        item={ITEM}
-        state={state}
-        maxCount={12}
-        onToggle={onToggle}
-        onExclude={onExclude}
-        field="status"
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FacetRow
+      item={ITEM}
+      state={state}
+      maxCount={12}
+      onToggle={onToggle}
+      onExclude={onExclude}
+      field="status"
+    />,
   );
 
 afterEach(() => {

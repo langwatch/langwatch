@@ -1,12 +1,12 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useCallback, useState } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
 import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRunAgainActions } from "./use-run-again-actions.ts";
 
 /**
@@ -59,7 +59,7 @@ export function useScenarioRunDetail({
   const scenarioId = stream.scenarioState?.scenarioId;
   const batchRunId = stream.scenarioState?.batchRunId;
 
-  const { data: scenarioData } = api.scenarios.getByIdIncludingArchived.useQuery(
+  const { data: scenarioData } = scenarioClient.scenarios.getByIdIncludingArchived.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: !!project?.id && !!scenarioId },
   );

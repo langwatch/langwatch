@@ -4,12 +4,13 @@
  * the same object the four doors are mounted on, so what a test drives is the
  * declaration and the application, never a stand-in for either.
  *
- * Built through {@link ScimApp.createWithService}, not {@link ScimApp.create}:
+ * Built through {@link ScimModule.createWithService}, not {@link ScimModule.create}:
  * the production path also resolves four peers it needs only to build the
  * `ScimService` (`AuthzApi`, `UserApi`, `AuthApi`, `GovernanceRestApi`) and reads
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ScimService,
   type ScimDirectoryOwnership,
@@ -24,7 +25,7 @@ import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
-import { ScimApp } from "../../../app/scim.app.ts";
+import { ScimModule } from "../../../app/scim.app.ts";
 import {
   ScimConnectionsService,
   type ScimConnectionReads,
@@ -32,6 +33,7 @@ import {
 import { ScimDirectoryExternalIdsService } from "../../../services/scim-directory-external-ids.service.ts";
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
+import { ScimTokenMintService } from "../../../services/scim-token-mint.service.ts";
 
 export class ScimServiceFake extends ScimService {
   readonly verifyToken = vi.fn(
@@ -90,10 +92,17 @@ export function scimTestApp(
     webhookSecret?: string | undefined;
     planType?: string;
     oversight?: ScimOversightService;
-    operators?: Parameters<typeof ScimApp.createWithService>[0]["operators"];
+    /** The users the platform-operator grant answers yes for. */
+    platformOperators?: readonly string[];
     activity?: ScimSyncActivityEntry[];
+    /** What authz answers a token minter lacks of an organization admin's permissions. */
+    minterLacks?: string[];
   } = {},
 ) {
+  const findPermissionsBeyondCaller = vi.fn(
+    async (_input: Parameters<AuthzApi["findPermissionsBeyondCaller"]>[0]) =>
+      options.minterLacks ?? [],
+  );
   const scim = options.scim ?? new ScimServiceFake();
   const offered = options.connections ?? [];
   const identity: ScimConnectionReads = {
@@ -114,12 +123,16 @@ export function scimTestApp(
     },
   };
   const connections = ScimConnectionsService.create(identity);
-  const app = ScimApp.createWithService({
+  const app = ScimModule.createWithService({
     scim,
     connections,
     directoryExternalIds: ScimDirectoryExternalIdsService.create({
       connections,
-      identities: { findDirectoryExternalIds: () => Promise.resolve([]) },
+      identities: {
+        findDirectoryExternalIds: () => Promise.resolve([]),
+        findUserResource: () => Promise.resolve(null),
+        findDirectoryConnectionsForUser: () => Promise.resolve([]),
+      },
     }),
     reconciliation: ScimReconciliationService.create({
       identity,
@@ -135,9 +148,20 @@ export function scimTestApp(
     entitlements,
     auditLog,
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),
+    minting: ScimTokenMintService.create({ findPermissionsBeyondCaller }),
     ...(options.oversight ? { oversight: options.oversight } : {}),
-    ...(options.operators ? { operators: options.operators } : {}),
+    ...(options.platformOperators
+      ? {
+          platformOperators: {
+            can: async ({ principal, permission, scope }) =>
+              scope.type === "platform" &&
+              permission.startsWith("ops:") &&
+              principal.type === "user" &&
+              !!options.platformOperators?.includes(principal.id),
+          },
+        }
+      : {}),
   });
 
-  return { app, scim, audited };
+  return { app, scim, audited, findPermissionsBeyondCaller };
 }

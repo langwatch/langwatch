@@ -16,6 +16,7 @@ describe("given one of our own codes", () => {
       "sso_assertion_without_address",
       "sso_domain_not_verified",
       "sso_domain_proof_lapsed",
+      "sso_existing_account_unconfirmed",
       "sso_sign_in_refused",
     ]) {
       const failure = testSignInFailureFor({ code });
@@ -42,5 +43,25 @@ describe("given a code that is not ours", () => {
     expect(
       testSignInFailureFor({ code: "access_denied", description: "not assigned" }).detail,
     ).toBe("access_denied: not assigned");
+  });
+});
+
+describe("given the ID token named a different issuer", () => {
+  /** @scenario "An ID token from another issuer is refused with both issuers named" */
+  it("names both issuers in our own words", () => {
+    const failure = testSignInFailureFor({
+      code: "sso_issuer_mismatch",
+      expectedIssuer: "https://login.microsoftonline.com/app-tenant/v2.0",
+      receivedIssuer: "https://login.microsoftonline.com/home-tenant/v2.0",
+    });
+
+    expect(testSignInFailureIsOurs("sso_issuer_mismatch")).toBe(true);
+    expect(failure.title).toBe("Your identity provider names a different issuer");
+    expect(failure.detail).toBe(
+      [
+        "This connection expects: https://login.microsoftonline.com/app-tenant/v2.0",
+        "Your identity provider sent: https://login.microsoftonline.com/home-tenant/v2.0",
+      ].join("\n"),
+    );
   });
 });

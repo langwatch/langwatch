@@ -1,13 +1,22 @@
-import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { usePeriodSelector, analyticsMetrics } from "@langwatch/analytics-browser-kit";
 import type { UiCustomGraphProps } from "@langwatch/browser-host/declarations";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-browser-kit";
+import {
+  Box,
+  chakra,
+  Grid,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 
 import { CustomGraph } from "../../../../behavior/lent-peers.tsx";
+import { analyticsMetrics } from "../../../../model/analytics/analytics-registry.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
+import { usePeriodSelector } from "../../../elements/analytics/period-selector.tsx";
 import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
 

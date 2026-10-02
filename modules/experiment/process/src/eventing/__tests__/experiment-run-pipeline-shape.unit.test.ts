@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AppendStore, Projection, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import type { ExperimentRunPlan } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunStateRepository } from "../../repositories/experiment-run-state.repository.ts";

@@ -167,7 +167,7 @@ service:
 # Usage: make service-watch svc=aigateway
 #        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
-	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
+	@test -n "$(svc)" || (echo "usage: make service-watch svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@$(BUILD_SIM_CONSOLES)

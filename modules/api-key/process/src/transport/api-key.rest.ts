@@ -6,6 +6,8 @@
 import {
   ApiKeyAdminRequiredError,
   ApiKeyApi,
+  ApiKeyScopeViolationError,
+  INGESTION_PERMISSIONS,
   apiKeyRestCreateSchema,
   apiKeyRestDetailSchema,
   apiKeyRestListSchema,
@@ -25,6 +27,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { principalRefSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 /** Every operation in this family is filed under one tag. */
@@ -42,6 +45,18 @@ const INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
 export const apiKeyRestCredential = defineRestMiddleware(
   "apiKeyRestCredential",
   z.object({ apiKeyId: z.string(), userId: z.string().nullable() }),
+);
+
+/**
+ * The project credential the ingestion mint reads: the principal it is checked as (a person
+ * only for a project-bound access token) and the project's organization.
+ */
+export const apiKeyIngestionCaller = defineRestMiddleware(
+  "apiKeyIngestionCaller",
+  z.object({
+    principal: principalRefSchema.nullable(),
+    organizationId: z.string(),
+  }),
 );
 
 /** The credential, as the two organization-wide questions ask about it. */
@@ -74,13 +89,13 @@ const detailOf = (apiKey: ApiKeyDetail): ApiKeyRestDetail => ({
   expiresAt: apiKey.expiresAt,
   lastUsedAt: apiKey.lastUsedAt,
   revokedAt: apiKey.revokedAt,
-  roleBindings: apiKey.roleBindings.map((rb) => ({
+  roleBindings: apiKey.grants.map((rb) => ({
     id: rb.id,
     role: rb.role,
     scopeType: rb.scopeType,
     scopeId: rb.scopeId,
   })),
-  bindings: apiKey.roleBindings.map((rb) => ({
+  bindings: apiKey.grants.map((rb) => ({
     role: rb.role,
     scopeType: rb.scopeType,
     scopeId: rb.scopeId,
@@ -88,8 +103,8 @@ const detailOf = (apiKey: ApiKeyDetail): ApiKeyRestDetail => ({
 });
 
 /**
- * Real adminness for the presented credential: an org-scope ADMIN role
- * binding on the calling user, or on the service key itself. Deliberately
+ * Real adminness for the presented credential: an org-scope ADMIN binding on
+ * the key itself and, for a personal key, on its owner too. Deliberately
  * stricter than holding organization:manage, which a custom role can carry.
  */
 const callerIsAdmin = async ({
@@ -101,9 +116,8 @@ const callerIsAdmin = async ({
   caller: ApiKeyRestCaller;
   organizationId: string;
 }): Promise<boolean> =>
-  caller.userId
-    ? app.isOrgAdmin({ userId: caller.userId, organizationId })
-    : app.isOrgAdminApiKey({ apiKeyId: caller.apiKeyId, organizationId });
+  (await app.isOrgAdminApiKey({ apiKeyId: caller.apiKeyId, organizationId })) &&
+  (caller.userId === null || (await app.isOrgAdmin({ userId: caller.userId, organizationId })));
 
 /**
  * Whether the credential may read a key it does not own: real adminness AND
@@ -202,6 +216,38 @@ const refuseNonAdminPrivilegedMint = async ({
   throw new ApiKeyAdminRequiredError(privilege({ isService, assignedToAnother }));
 };
 
+type ApiKeyRestCreate = z.infer<typeof apiKeyRestCreateSchema>;
+
+/**
+ * The one shape a person's project session may mint: personal, their own, one CUSTOM binding to
+ * that project, holding exactly INGESTION_PERMISSIONS. Expiry is the caller's; none never expires.
+ */
+const isIngestionShape = ({
+  input,
+  projectId,
+  callerUserId,
+}: {
+  input: ApiKeyRestCreate;
+  projectId: string;
+  callerUserId: string;
+}): boolean => {
+  const [binding, ...extra] = input.bindings ?? [];
+  const permissions = [...(input.permissions ?? [])].toSorted();
+
+  return (
+    input.keyType === "personal" &&
+    (input.assignedToUserId === undefined || input.assignedToUserId === callerUserId) &&
+    (input.projectIds ?? []).length === 0 &&
+    binding !== undefined &&
+    extra.length === 0 &&
+    binding.role === "CUSTOM" &&
+    binding.scopeType === "PROJECT" &&
+    binding.scopeId === projectId &&
+    input.permissionMode === "restricted" &&
+    permissions.join(",") === [...INGESTION_PERMISSIONS].toSorted().join(",")
+  );
+};
+
 export const apiKeyRest: Readonly<{
   protocol: "rest";
   namespace: string;
@@ -241,7 +287,7 @@ export const apiKeyRest: Readonly<{
         expiresAt: key.expiresAt,
         lastUsedAt: key.lastUsedAt,
         revokedAt: key.revokedAt,
-        roleBindings: key.roleBindings.map((rb) => ({
+        roleBindings: key.grants.map((rb) => ({
           id: rb.id,
           role: rb.role,
           scopeType: rb.scopeType,
@@ -260,13 +306,13 @@ export const apiKeyRest: Readonly<{
     tags: API_KEY_TAGS,
     summary: "Create an API key",
     description:
-      'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.',
+      'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights, held by both the key making the request and its member. A key can grant at most what the key making the request holds. The plaintext token is returned once — store it securely.',
     errors: [
       INVALID_TOKEN,
       {
         status: 403,
         description:
-          "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
+          "Requested binding exceeds what the key making the request holds, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
       },
       {
         status: 422,
@@ -296,6 +342,7 @@ export const apiKeyRest: Readonly<{
         callerUserId: caller.userId,
       }),
       createdByUserId: caller.userId,
+      callerApiKeyId: caller.apiKeyId,
       organizationId: scope.id,
       expiresAt: input.expiresAt,
       permissionMode: input.permissionMode,
@@ -361,13 +408,13 @@ export const apiKeyRest: Readonly<{
     tags: API_KEY_TAGS,
     summary: "Update an API key",
     description:
-      "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
+      "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to, and a key can grant at most what the key making the request holds. The token itself never changes.",
     errors: [
       INVALID_TOKEN,
       {
         status: 403,
         description:
-          "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+          "Insufficient permissions (requires organization:manage), the requested binding exceeds what the key owner or the key making the request holds, or the scope does not belong to this organization (api_key_scope_violation)",
       },
       { status: 404, description: "API key not found, or not yours to edit (api_key_not_found)" },
       { status: 409, description: "API key is already revoked (api_key_already_revoked)" },
@@ -386,6 +433,7 @@ export const apiKeyRest: Readonly<{
     await app.updateAsCaller({
       id: input.id,
       callerUserId: caller.userId,
+      callerApiKeyId: caller.apiKeyId,
       callerIsAdmin: isAdmin,
       organizationId: scope.id,
       name: input.name,
@@ -440,6 +488,64 @@ export const apiKeyRest: Readonly<{
     });
 
     return { success: true };
+  })
+
+  // A person's project-bound sign-in mints their app's ingestion key here (record, OAuth
+  // sentences): no organization:manage, and no key may mint one, so a leaked key cannot breed.
+  .post("/ingestion", "createIngestionApiKey")
+  .withCredential("project")
+  .withInput(apiKeyRestCreateSchema)
+  .withPermission("traces:create")
+  .withOutput(apiKeyRestMintedSchema)
+  .withStatus(201)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Create an ingestion API key",
+    description:
+      'Mint the caller\'s own ingestion key for the project their sign-in session is bound to, as `langwatch login --project` does. Only one shape is accepted: keyType "personal", owned by the caller, one CUSTOM binding to that project, permissionMode "restricted" and exactly the ingestion permissions. Name it after the machine; omit expiresAt for a key that never expires. Requires a person\'s project session holding traces:create; an API key cannot mint one.',
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "The caller is not a person's sign-in session, lacks traces:create, or asked for any other shape (api_key_scope_violation)",
+      },
+      { status: 422, description: "Validation error (validation_error)" },
+    ],
+  })
+  .withMiddleware(apiKeyIngestionCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    const { principal } = caller;
+    if (principal?.type !== "user") {
+      throw new ApiKeyScopeViolationError("Only a person's sign-in session mints an ingestion key");
+    }
+    const userId = principal.id;
+    if (!isIngestionShape({ input, projectId: scope.id, callerUserId: userId })) {
+      throw new ApiKeyScopeViolationError(
+        "An ingestion key is personal, bound to this one project, and holds only ingestion",
+      );
+    }
+
+    const result = await app.create({
+      name: input.name,
+      description: input.description,
+      userId,
+      createdByUserId: userId,
+      organizationId: caller.organizationId,
+      expiresAt: input.expiresAt,
+      permissionMode: "restricted",
+      permissions: [...INGESTION_PERMISSIONS],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: scope.id }],
+    });
+
+    return {
+      token: result.token,
+      apiKey: {
+        id: result.apiKey.id,
+        name: result.apiKey.name,
+        createdAt: result.apiKey.createdAt,
+      },
+    };
   })
 
   .build();

@@ -1,21 +1,21 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
- * Tests that ModelProviderApp.create builds collaborators from declared members and config,
+ * Tests that ModelProviderModule.create builds collaborators from declared members and config,
  * not from hand-composed infrastructure. Regression: before regaining build step, calls
  * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { ModelProviderApp } from "../model-provider.app.ts";
+import { ModelProviderModule } from "../model-provider.app.ts";
 import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
@@ -106,8 +106,8 @@ function fakeRedis(): RedisConnection {
  */
 function createRealModelProviderApp(
   repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
-): Promise<ModelProviderApp> {
-  return ModelProviderApp.create({
+): Promise<ModelProviderModule> {
+  return ModelProviderModule.create({
     repositories,
     dependencies: {
       projects: createFullModelProviderTestProjects(),
@@ -124,16 +124,24 @@ function createRealModelProviderApp(
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
       defaultModel: undefined,
+      probeBaseUrls: {
+        gemini: undefined,
+        deepseek: undefined,
+        xai: undefined,
+        cerebras: undefined,
+        groq: undefined,
+        elevenlabs: undefined,
+      },
     },
     resources: new ResourceScope(),
     secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
       "model-provider",
-      Object.values(ModelProviderApp.secrets),
+      Object.values(ModelProviderModule.secrets),
     ),
   });
 }
 
-describe("ModelProviderApp.create", () => {
+describe("ModelProviderModule.create", () => {
   describe("given only the process's own redis and secrets members", () => {
     it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
       const app = await createRealModelProviderApp();

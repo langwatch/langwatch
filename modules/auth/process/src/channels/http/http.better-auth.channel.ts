@@ -4,7 +4,11 @@ export type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/server";
 import { passkey } from "@better-auth/passkey";
-import type { SSOUserResolution, SSOUserResolutionInput } from "@better-auth/sso";
+import type {
+  SSOUserResolution,
+  SSOUserResolutionContext,
+  SSOUserResolutionInput,
+} from "@better-auth/sso";
 import { sso } from "@better-auth/sso";
 import {
   isCredentialMutationPath,
@@ -17,7 +21,12 @@ import {
   type AuthApi,
 } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { SignInMethodPolicy, SsoAssertionApi } from "@langwatch/identity-contract";
+import {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
+  type SignInMethodPolicy,
+  type SsoAssertionApi,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate } from "@langwatch/time";
@@ -53,6 +62,7 @@ import {
   type FindGoverningConnections,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
+import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
 import {
   passkeySignUpRegistration,
   type SignUpVerification,
@@ -83,8 +93,8 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   /** The signing secret. Never logged, never reported, never defaulted. */
   secret: string;
   /**
-   * Whether the email/password routes MOUNT. See {@link isEmailPasswordEnabled}
-   * for the rule; mounting is not the gate, the request hook is.
+   * Whether the email/password routes MOUNT. The auth contract's
+   * `isEmailPasswordEnabled` is the rule; mounting is not the gate, the request hook is.
    */
   emailPasswordEnabled: boolean;
   /** Whether the two-factor plugin is mounted. */
@@ -106,17 +116,6 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   /** Generic-OIDC connections this deployment mounted, already built. */
   genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
 }>;
-
-/**
- * Whether BetterAuth's email/password (credentials) routes are MOUNTED.
- * (ADR-027). Mounting is not the gate: the `before` hook below is what blocks
- */
-export const isEmailPasswordEnabled = (deployment: {
-  authProvider: string | undefined;
-  isSaas: boolean;
-  localPasswords: boolean;
-}): boolean =>
-  deployment.authProvider === "email" || !deployment.isSaas || deployment.localPasswords;
 
 /**
  * Seals better-auth's own sign-up route unconditionally, before any licence
@@ -359,6 +358,7 @@ export const createAuthOptions = ({
   signInLockout,
   findGoverningConnections,
   passwordResetSession,
+  idTokenIssuerRefusals,
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
@@ -373,6 +373,8 @@ export const createAuthOptions = ({
   findGoverningConnections: FindGoverningConnections;
   /** Opens the session a completed password reset earned. */
   passwordResetSession?: PasswordResetSessionChannel;
+  /** Keeps the issuer of an ID token the engine refused, so the redirect can name it. */
+  idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
   // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
@@ -386,15 +388,18 @@ export const createAuthOptions = ({
    * because the answer is not fixed at boot, and only single sign-on requests
    * pay for the read. See `rules/trusted-origins.rules.ts`.
    */
-  trustedOrigins: async (request) =>
-    resolveTrustedOrigins({
+  trustedOrigins: async (request) => {
+    const registeredIssuers = await ssoIssuers.issuersForRequest(request);
+    return resolveTrustedOrigins({
       baseUrl: deployment.baseUrl,
       publicBaseUrl: deployment.publicBaseUrl,
       trustedIdpOrigins: deployment.trustedIdpOrigins,
       idpSimulatorUrl: deployment.idpSimulatorUrl,
-      registeredIssuers: await ssoIssuers.issuersForRequest(request),
+      registeredIssuers,
+      issuerEndpointOrigins: (await ssoIssuers.endpointOriginsFor?.(registeredIssuers)) ?? [],
       isProduction: deployment.isProduction,
-    }),
+    });
+  },
   secret: deployment.secret,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
@@ -659,6 +664,7 @@ export const createAuthOptions = ({
   logger: {
     disabled: false,
     log: (level, message, ...args) => {
+      idTokenIssuerRefusals?.note([message, ...args]);
       if (level === "error") {
         logger.error({ args }, message);
       } else if (level === "warn") {
@@ -738,7 +744,18 @@ function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
     /** Somebody with no account who signs in through their employer's
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
-    resolveUser: async (input) => resolveSsoUser({ assertions, input }),
+    resolveUser: async (input, context) => resolveSsoUser({ assertions, input, context }),
+  });
+}
+
+/** What the provider said about the address: SAML never says anything; OIDC is
+ *  read from the signature-checked ID token and the userinfo response. */
+function emailVerificationOf(input: SSOUserResolutionInput): AssertedEmailVerification {
+  if (input.protocol !== "oidc") return "unasserted";
+  const tokenIssuer = input.verifiedIdTokenClaims.iss;
+  return assertedEmailVerification({
+    claimSources: [input.verifiedIdTokenClaims, input.providerClaims],
+    issuer: typeof tokenIssuer === "string" ? tokenIssuer : input.accountKey.issuer,
   });
 }
 
@@ -750,9 +767,11 @@ function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
 export async function resolveSsoUser({
   assertions,
   input,
+  context,
 }: {
   assertions: SsoAssertionApi;
   input: SSOUserResolutionInput;
+  context: SSOUserResolutionContext;
 }): Promise<SSOUserResolution> {
   try {
     const decision = await assertions.decide({
@@ -760,12 +779,28 @@ export async function resolveSsoUser({
       accountId: input.accountKey.accountId,
       email: input.providerUser.email,
     });
-    if (decision.action === "continue") return { action: "continue" };
-
     /** RETURNED, NEVER THROWN: the plugin catches and answers
      *  `SSO_USER_RESOLUTION_FAILED`, destroying a thrown handled error.
      *  Returned, the code reaches the screen that renders its copy. */
-    return { action: "reject", code: decision.error.code };
+    if (decision.action === "reject") return { action: "reject", code: decision.error.code };
+
+    // Only an admitted assertion is linked to anybody (specs/identity/scim-sso-signin.feature).
+    const resolution = await assertions.resolveUser({
+      protocol: input.protocol,
+      providerId: input.providerId,
+      accountKey: input.accountKey,
+      email: input.providerUser.email,
+      emailVerified: input.providerUser.emailVerified,
+      emailVerification: emailVerificationOf(input),
+    });
+    if (resolution.action !== "link" || !resolution.confirmAddress) return resolution;
+    // Inside the library's callback transaction, so a failed link leaves the address unconfirmed.
+    await context.database.update({
+      model: "user",
+      where: [{ field: "id", value: resolution.userId }],
+      update: { emailVerified: true },
+    });
+    return { action: "link", userId: resolution.userId, profile: resolution.profile };
   } catch (error) {
     /** We log our own failure because nobody else will: the plugin discards
      *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */
@@ -783,6 +818,9 @@ export async function resolveSsoUser({
  */
 export interface BetterAuthSsoIssuers {
   issuersForRequest(request: Request | undefined): Promise<string[]>;
+  /** The public origins those issuers' discovery documents serve endpoints
+   *  from. Absent, only the issuers' own origins are trusted. */
+  endpointOriginsFor?(issuers: readonly string[]): Promise<string[]>;
 }
 
 /**
@@ -791,6 +829,8 @@ export interface BetterAuthSsoIssuers {
 export type BetterAuthTransportOptions = Readonly<{
   /** The Auth service whose sessions this instance mints and revokes. */
   auth: AuthApi;
+  /** Where an ID token refused for its issuer is noted for the callback's redirect. */
+  idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
   /** The instance's storage engine — see {@link BetterAuthStorage}. */
@@ -856,6 +896,7 @@ const transportOptions = ({
   ssoMigration,
   storage,
   users,
+  idTokenIssuerRefusals,
 }: BetterAuthTransportOptions) => {
   const passwordResetSession = PasswordResetSessionChannel.create();
   const authOptions = createAuthOptions({
@@ -870,6 +911,7 @@ const transportOptions = ({
     signInLockout,
     findGoverningConnections,
     passwordResetSession,
+    idTokenIssuerRefusals,
     hooks: {
       federation,
       invites,

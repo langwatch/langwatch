@@ -3,7 +3,7 @@
  * branch behind a hover. Renders nothing while no folder is connected. Disconnecting asks first,
  * since it stops what's running on the machine and the chip is small enough to hit by accident.
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { FolderCode } from "lucide-react";
 import { useEffect, useState } from "react";
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -6,6 +5,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioServerConfig } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets, SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 /** A deployment with no telemetry endpoint: the executor is never composed. */
@@ -14,7 +14,10 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   voicePublicBaseUrl: void 0,
   voiceTunnel: false,
   voiceWorkerOnly: false,
+  consumedResourceClasses: ["light", "voice"],
+  slotBudget: 3,
   voiceCallMaxSeconds: void 0,
+  allowLoopbackVoiceProviders: false,
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],
   defaultModel: void 0,
@@ -40,6 +43,7 @@ export function scenarioExecutorPeers() {
     secrets: createApiFixture<SecretApi>(),
     workflows: createApiFixture<WorkflowApi>(),
     apiKeys: createApiFixture<ApiKeyApi>(),
+    gateway: createApiFixture<GatewayApi>(),
   };
 }
 

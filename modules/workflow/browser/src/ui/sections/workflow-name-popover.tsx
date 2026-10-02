@@ -1,11 +1,19 @@
-import { Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { WorkflowIcon } from "@langwatch/workflow-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { WorkflowIcon } from "../elements/workflow-icons.tsx";
 
 export type WorkflowEmojiPickerRenderProps = {
   open: boolean;

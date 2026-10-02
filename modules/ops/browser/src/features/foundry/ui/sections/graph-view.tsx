@@ -1,5 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 
 import "@xyflow/react/dist/style.css";
 import {

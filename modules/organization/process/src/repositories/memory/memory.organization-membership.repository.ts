@@ -1,3 +1,4 @@
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -6,7 +7,6 @@ import {
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
   OrganizationUserRole,
-  RoleBindingScopeType,
   TeamNotFoundError,
   type Organization,
   type OrganizationFounding,
@@ -617,16 +617,16 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async findPersonalTeamsInScopes(params: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<{ name: string }[]> {
     const reached: { name: string }[] = [];
     for (const scope of params.scopes) {
-      if (scope.scopeType !== RoleBindingScopeType.TEAM) continue;
+      if (scope.scopeType !== GrantScopeTier.TEAM) continue;
       const team = this.memory.teams.get(scope.scopeId);
       if (team?.isPersonal) reached.push({ name: team.name });
     }
     for (const scope of params.scopes) {
-      if (scope.scopeType !== RoleBindingScopeType.PROJECT) continue;
+      if (scope.scopeType !== GrantScopeTier.PROJECT) continue;
       const project = this.memory.projects.get(scope.scopeId);
       const team = project ? this.memory.teams.get(project.teamId) : undefined;
       if (team && (project?.isPersonal || team.isPersonal)) reached.push({ name: team.name });
@@ -640,7 +640,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((team) => team.id);
   }
 
-  async findTeamRoleBindings({
+  async findTeamGrants({
     organizationId,
     userId,
     teamIds,

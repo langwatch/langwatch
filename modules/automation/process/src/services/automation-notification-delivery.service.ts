@@ -7,6 +7,7 @@ import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import type { TraceRecord } from "@langwatch/trace-contract";
+import type { WebhookSendRequestResult } from "@langwatch/webhook-contract";
 
 import {
   automationNotificationChannels,
@@ -17,7 +18,6 @@ import {
   type SlackWebhookDeliveryChannel,
   type WebhookDeliveryRequest,
   type WebhookDeliveryTransport,
-  type WebhookSendResult,
 } from "../channels/automation-notification-channels.registry.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../channels/automation-test-fire.channel.ts";
@@ -77,7 +77,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     baseHost: string;
     /** `NEXTAUTH_SECRET`, as the application spells it. */
     unsubscribeSigningSecret?: string;
-    /** Supplied once an SSRF-fenced outbound sender is composable here. */
+    /** The webhook module's `sendRequest`; absent where no webhook action can be delivered. */
     webhookTransport?: WebhookDeliveryTransport;
     slackWebhookClient?: SlackWebhookClientChannel;
     slackApiTransport?: SlackApiTransport;
@@ -289,7 +289,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     return this.slackApi.post(input);
   }
 
-  sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendResult> {
+  sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendRequestResult> {
     if (!this.webhooks) {
       return Promise.reject(
         new Error(

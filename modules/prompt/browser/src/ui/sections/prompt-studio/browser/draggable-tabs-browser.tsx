@@ -1,13 +1,4 @@
 import {
-  Box,
-  type BoxProps,
-  HStack,
-  type StackProps,
-  Tabs,
-  type TabsRootProps,
-  VStack,
-} from "@chakra-ui/react";
-import {
   closestCenter,
   DndContext,
   type DragEndEvent,
@@ -19,6 +10,15 @@ import {
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Box,
+  type BoxProps,
+  HStack,
+  type StackProps,
+  Tabs,
+  type TabsRootProps,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import React from "react";
 
 import { TabIdProvider } from "../studio-internals.ts";

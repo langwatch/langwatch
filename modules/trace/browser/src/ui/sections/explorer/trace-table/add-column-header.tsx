@@ -1,5 +1,5 @@
-import { IconButton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import type React from "react";

@@ -55,7 +55,10 @@ export type AutomationPreviewTrace = {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: "ok" | "error" | "warning";
+  input?: string | null;
+  output?: string | null;
 };
 
 export type AutomationSlackChannel = {
@@ -77,10 +80,6 @@ type BorrowedProcedures = {
 
   dashboards: {
     getAll: { query: { input: ProjectScope; output: AutomationDashboard[] } };
-  };
-
-  dataset: {
-    getAll: { query: { input: ProjectScope; output: AutomationDataset[] } };
   };
 
   traces: {
@@ -119,9 +118,9 @@ type BorrowedProcedures = {
   };
 
   organization: {
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;

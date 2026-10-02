@@ -1,8 +1,10 @@
+import type { LedgerActor } from "@langwatch/authorization";
 import {
-  newAuthzBindingId,
+  newAuthzGrantId,
   type AuthzApi,
   type AuthzBindingForSynthesis,
-  type GrantsLedgerActor,
+  type AuthzGrantCaller,
+  GrantScopeTier,
 } from "@langwatch/authz-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
@@ -21,7 +23,6 @@ import {
   type OrganizationUser,
   OrganizationUserRole,
   PricingModel,
-  RoleBindingScopeType,
   type TeamUserRole,
   type User,
   CannotRemoveLastAdminError,
@@ -51,6 +52,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
+import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 
 /**
@@ -89,7 +91,7 @@ type TeamMembershipLike = {
 export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
 
 export class OrganizationMembershipService {
-  static enrichTeamWithRoleBindings<
+  static enrichTeamWithGrants<
     T extends {
       members: TeamMembershipLike[];
       id: string;
@@ -98,29 +100,29 @@ export class OrganizationMembershipService {
   >({
     team,
     userId,
-    userRoleBindings,
+    userGrants,
     organizationId,
   }: {
     team: T;
     userId: string;
-    userRoleBindings: AuthzBindingForSynthesis[];
+    userGrants: AuthzBindingForSynthesis[];
     organizationId: string;
   }): T {
     const teamProjectIds = new Set(team.projects.map((p) => p.id));
     // TEAM scope takes precedence over PROJECT scope so the synthesized role is
     // deterministic when a user has both kinds of binding for the same team.
-    const teamBinding = userRoleBindings.find(
+    const teamBinding = userGrants.find(
       (b) =>
         b.organizationId === organizationId &&
-        b.scopeType === RoleBindingScopeType.TEAM &&
+        b.scopeType === GrantScopeTier.TEAM &&
         b.scopeId === team.id,
     );
     const projectBinding = teamBinding
       ? undefined
-      : userRoleBindings.find(
+      : userGrants.find(
           (b) =>
             b.organizationId === organizationId &&
-            b.scopeType === RoleBindingScopeType.PROJECT &&
+            b.scopeType === GrantScopeTier.PROJECT &&
             teamProjectIds.has(b.scopeId),
         );
     const binding = teamBinding ?? projectBinding;
@@ -154,6 +156,8 @@ export class OrganizationMembershipService {
     grantCache: OrganizationGrantCache;
     testArrivals: OrganizationTestArrivals;
     admissions: OrganizationAdmissions;
+    /** Authz's escalation rule, asked before a role change writes anything. */
+    ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -167,6 +171,8 @@ export class OrganizationMembershipService {
       grantCache: OrganizationGrantCache;
       testArrivals: OrganizationTestArrivals;
       admissions: OrganizationAdmissions;
+      /** Authz's escalation rule, asked before a role change writes anything. */
+      ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
@@ -571,9 +577,9 @@ export class OrganizationMembershipService {
   }: {
     organizationId: string;
     userId: string;
-    admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+    admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
   }): Promise<"created" | "already-present"> {
-    const grantId = newAuthzBindingId();
+    const grantId = newAuthzGrantId();
     const outcome = await this.repo.createMembership({
       organizationId,
       userId,
@@ -595,6 +601,7 @@ export class OrganizationMembershipService {
           scopeId: organizationId,
         },
       ],
+      caller: { type: "system" },
       actor: admittedBy.actor,
       source: "join-request",
       onDuplicate: "skip",
@@ -655,6 +662,8 @@ export class OrganizationMembershipService {
     disabled?: boolean;
     /** The user the credential acts as; null for a service key. */
     actingUser: OrganizationPlanUser | null;
+    /** Whose holdings bound the grants a role change writes. */
+    caller: AuthzGrantCaller;
   }): Promise<
     OrganizationMemberSummary & {
       teams: MemberTeamBinding[];
@@ -671,6 +680,7 @@ export class OrganizationMembershipService {
           userId,
           role,
           currentUserId: actingUser?.id ?? null,
+          caller: params.caller,
           ...(actingUser ? { planUser: actingUser } : {}),
         });
         teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];

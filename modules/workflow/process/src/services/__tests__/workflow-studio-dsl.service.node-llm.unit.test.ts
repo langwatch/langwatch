@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

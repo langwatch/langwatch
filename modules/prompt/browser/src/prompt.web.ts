@@ -1,12 +1,14 @@
 /**
  * What a browser installs when it installs prompt: the Prompt Studio screen.
- * `publishSurfaces` was superseded by the kit (ARCHITECTURE.md §14, ruled
- * 2026-09-18) and is deleted here, not repointed.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const promptWeb = defineWebModule("prompt")
+import { promptApi } from "./behavior/prompt-api.ts";
+
+export const promptWeb = defineBrowserModule("prompt")
+  .withApi(promptApi, { contracts: [promptTrpc, promptTagTrpc] })
   .withHosts({
     requires: ["PromptHostApi"],
     mounts: { PromptHostApi: { load: () => import("./behavior/prompt-host-mount.tsx") } },

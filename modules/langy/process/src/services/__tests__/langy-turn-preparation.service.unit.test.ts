@@ -3,6 +3,7 @@ import {
   LangyAgentUnavailableError,
   LangyModelNotAllowedError,
   LangyTurnInProgressError,
+  langyWorkerCredentialsSchema,
   renderLangyTurnContext,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -13,7 +14,11 @@ import {
   workerCredentials,
   conversationDetail,
 } from "../../__tests__/support/langy-turn-deps.ts";
-import type { LangyWorker } from "../../channels/langy-worker.channel.ts";
+import type {
+  LangyWorker,
+  LangyWorkerDispatchInput,
+  LangyWorkerProbeInput,
+} from "../../channels/langy-worker.channel.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**
@@ -62,6 +67,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
     },
     context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
+    skillGates: { resolveDisabled: vi.fn(async () => []) },
     metrics: { count: vi.fn() },
     admission: {
       claim: vi.fn(async () => ({
@@ -345,6 +351,30 @@ describe("LangyTurnPreparationService golden path", () => {
       expect.objectContaining({
         credentials: expect.not.objectContaining({ githubToken: expect.anything() }),
       }),
+    );
+  });
+
+  /** @scenario The warm and the turn's probe carry the same disabled skills */
+  it("probes for a worker with the same disabled skills the dispatch sends", async () => {
+    const probe = vi.fn(async (_input: LangyWorkerProbeInput) => false);
+    const dispatch = vi.fn(async (_input: LangyWorkerDispatchInput) => "accepted" as const);
+    const fixture = makeFixture({
+      skillGates: { resolveDisabled: vi.fn(async () => ["dashboard-widgets"]) },
+      worker: {
+        probe,
+        dispatch,
+        cancel: vi.fn(async () => undefined),
+        warm: vi.fn(async () => undefined),
+      },
+    });
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    const probeArgs = probe.mock.calls[0]![0];
+    const dispatched = dispatch.mock.calls[0]![0];
+    expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+    expect(probeArgs.disabledSkillIds).toEqual(
+      langyWorkerCredentialsSchema.parse(dispatched.credentials).disabledSkillIds,
     );
   });
 

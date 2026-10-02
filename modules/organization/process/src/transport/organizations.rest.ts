@@ -21,7 +21,7 @@ export const organizationsProvisioningRest: Readonly<{
 }> = defineRestRouter(OrganizationApi)
   .withNamespace("organizations")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("instance-admin")
+  .withCredential("instance_admin")
 
   .post("/", "provisionOrganization")
   .withAccess({

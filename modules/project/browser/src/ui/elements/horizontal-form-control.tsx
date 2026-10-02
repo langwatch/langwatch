@@ -4,7 +4,14 @@
  * `react-feather` glyph became `lucide-react`, the set every moved package uses.
  */
 
-import { Box, Field, HStack, Spacer, type SystemStyleObject, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  HStack,
+  Spacer,
+  type SystemStyleObject,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";

@@ -1,3 +1,6 @@
+import { describeError } from "@langwatch/browser-host/errors";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Button,
   Field,
@@ -9,9 +12,7 @@ import {
   Textarea,
   VStack,
   Wrap,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+} from "@langwatch/design-system/primitives";
 import { type Instant, Temporal, currentTimeZone } from "@langwatch/time";
 import { Boxes, Building2, Folder, KeyRound, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -19,7 +20,6 @@ import { useMemo, useState } from "react";
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
-import { describeError } from "../../../../model/describe-error.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import type { GatewayTeam } from "../../../../model/gateway-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";

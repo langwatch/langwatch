@@ -4,8 +4,9 @@ import {
   SimulationVerdict as Verdict,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
-import type { BatchRun, BatchRunSummary } from "@langwatch/suite-browser-kit";
 import { nowInstant } from "@langwatch/time";
+
+import type { BatchRun, BatchRunSummary } from "../../../model/suite/run-history-transforms.ts";
 
 export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {

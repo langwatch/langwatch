@@ -26,3 +26,7 @@ export * from "./workflow-component.commands.ts";
 export * from "./workflow-rest.schemas.ts";
 export { normalizeReasoningFromProviderFields } from "./reasoning-parameters.ts";
 export * from "./studio-field-mapping.ts";
+export * from "./workflow-lifecycle.events.ts";
+export * from "./workflow-host-slice.ts";
+export * from "./http-agent-node-secrets.ts";
+export * from "./workflow-run-permissions.ts";

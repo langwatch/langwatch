@@ -5,10 +5,10 @@
  */
 
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useCallback, useState, useEffect } from "react";
 
 import type { Scenario } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
 import type { RunDialogSubject } from "../run/run-dialog-types.ts";
 import { RunDialog } from "../run/run-dialog.tsx";

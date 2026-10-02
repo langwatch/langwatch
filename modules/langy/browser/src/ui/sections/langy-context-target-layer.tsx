@@ -1,21 +1,17 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
+import { Check, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
 import {
   absorbContextTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
-  useLangyStore,
-} from "@langwatch/langy-browser-kit";
-import { Check, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+} from "../../behavior/langy-context-target.store.ts";
 
-/**
- * Duplicated from `@langwatch/langy-browser-kit`'s own copy (which serves `useLangyContextTarget`)
- * rather than reached-into: a kit exports one JS entry point, so a raw stylesheet has no subpath to
- * travel through. See the handoff for the packaging question this leaves open.
- */
+// Stylesheet shared with `useLangyContextTarget`; a copy exists beside that hook.
 import "../../behavior/langy-context-target.css";
-import { createPortal } from "react-dom";
-
+import { useLangyStore } from "../../behavior/langy.store.ts";
 import { useLangyContextArming } from "../../behavior/use-langy-context-arming.ts";
 
 /**

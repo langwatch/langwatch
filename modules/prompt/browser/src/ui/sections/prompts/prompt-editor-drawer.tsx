@@ -1,4 +1,3 @@
-import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import type { UiPromptEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
@@ -7,35 +6,43 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  Box,
+  Button,
+  Circle,
+  Heading,
+  HStack,
+  Spinner,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  FormVariablesSection,
-  VersionBadge,
-} from "@langwatch/prompt-browser-kit";
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
-import { renderSourceTypeIcon, useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
+import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 
-import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
 import {
   useEditorInputMappings,
   usePromptEditorForm,
 } from "../../../behavior/prompts/use-prompt-editor-form.ts";
 import { usePromptEditorSave } from "../../../behavior/prompts/use-prompt-editor-save.ts";
+import { useLatestPromptVersion } from "../../../behavior/use-latest-prompt-version.ts";
 import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
+import { usePromptDefaultModel } from "../../../behavior/use-prompt-default-model.ts";
+import { usePromptVersion } from "../../../behavior/use-prompt-version.ts";
 import {
   inputTypeForField,
   missingMappingIdsFor,
 } from "../../../model/prompts/prompt-editor-values.ts";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { SaveVersionDialog } from "../../elements/prompts/forms/save-version-dialog.tsx";
+import { VersionBadge } from "../../elements/version-badge.tsx";
+import { useRegisterDrawerFooter } from "../../elements/workflow/studio-drawer-footer.tsx";
+import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
 import { PromptMessagesField } from "../prompt-studio/fields/prompt-messages-field.tsx";
+import { FormVariablesSection } from "../variables/form-variables-section.tsx";
 import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";
@@ -207,10 +214,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { targetId, promptId, promptVersionId, isOpen, availableSources } = opened;
 
   // The cascade-resolved model for prompts created here.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = usePromptDefaultModel();
 
   const { inputMappings, setInputMappings, onInputMappingsChange } = useEditorInputMappings({
     fromProps: opened.inputMappings,
@@ -218,14 +222,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   });
 
   // The pinned version when one is named, else the latest.
-  const promptQuery = api.prompts.getByIdOrHandle.useQuery(
-    {
-      idOrHandle: promptId ?? "",
-      projectId: project?.id ?? "",
-      versionId: promptVersionId,
-    } as { idOrHandle: string; projectId: string; versionId?: string },
-    { enabled: !!promptId && !!project?.id && isOpen, refetchOnWindowFocus: false },
-  );
+  const promptQuery = usePromptVersion({
+    idOrHandle: promptId,
+    versionId: promptVersionId,
+    enabled: isOpen,
+  });
 
   const form = usePromptEditorForm({
     isOpen,

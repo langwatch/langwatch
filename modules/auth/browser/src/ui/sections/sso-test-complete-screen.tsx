@@ -1,4 +1,4 @@
-import { Button, Text } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signOut, useSession } from "../../behavior/auth-client.tsx";

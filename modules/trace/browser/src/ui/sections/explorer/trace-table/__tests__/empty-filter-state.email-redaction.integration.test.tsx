@@ -4,10 +4,11 @@
  * An email-shaped search explains redaction when the project redacts PII.
  * See specs/traces-v2/email-search-redaction-notice.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
 import { EmptyFilterState } from "../empty-filter-state.tsx";
@@ -44,11 +45,7 @@ function piiLevel(level: string, entities: string[] = []) {
 
 function renderEmptyState({ query }: { query: string }) {
   useExplorerStore.getState().applyQueryText(query);
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <EmptyFilterState />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<EmptyFilterState />);
 }
 
 const NOTICE = /email addresses are redacted before a trace is stored/i;

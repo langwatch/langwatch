@@ -1,13 +1,11 @@
-import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, Center, Link, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
 
-import { analyticsApi } from "../../behavior/analytics-api.ts";
-import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useAnalyticsFeedbacks } from "../../behavior/use-analytics-documents.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
-import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
 function voteGlyph(vote: number | null | undefined): string {
   if (vote === 1) return "👍";
@@ -17,8 +15,7 @@ function voteGlyph(vote: number | null | undefined): string {
 }
 
 export const FeedbacksTable = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const feedbacks = analyticsApi.analytics.feedbacks.useQuery(filterParams, queryOpts);
+  const feedbacks = useAnalyticsFeedbacks();
   const host = useAnalyticsHost();
   const openTrace = (traceId: string) =>
     host.setQuery(traceDetailsAddress({ current: host.route().query, traceId }));
@@ -107,13 +104,4 @@ export const FeedbacksTable = () => {
       </Table.Root>
     </VStack>
   );
-};
-
-export const DocumentsCountsSummary = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = analyticsApi.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
-
-  const count = documents.data?.totalUniqueDocuments;
-
-  return <SummaryMetricValue current={count} />;
 };

@@ -10,14 +10,15 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { useFilterStore, useUIStore } from "@langwatch/trace-browser-kit";
 import { FIELD_VALUES, SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
 import { ArrowUpRight, Check, Copy, HelpCircle, Sparkles, Wand2, Zap } from "lucide-react";
 import type React from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { Drawer } from "../../drawer.tsx";
 import { QueryPreview } from "./query-preview.tsx";
 

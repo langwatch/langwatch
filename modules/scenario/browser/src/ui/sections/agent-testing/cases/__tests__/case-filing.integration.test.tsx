@@ -6,9 +6,9 @@
  * @see specs/features/agent-testing/page-structure.feature
  * @see specs/features/agent-testing/suites-rail.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,35 +57,12 @@ const mutation = vi.hoisted(() => (mutate: (...args: unknown[]) => void) => () =
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
-    evaluators: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
-    },
     useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
       suites: {
         testSuites: { getAll: { invalidate: vi.fn(), setData: mockSetTestSuites } },
         getById: { invalidate: vi.fn() },
       },
     }),
-    scenarios: {
-      // The run dialog reads the configurations its scope already ran with.
-      getRunConfigurations: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-      getAll: { useQuery: mockScenariosGetAll },
-      getExternalSetSummaries: { useQuery: emptyQuery },
-      getLastResultSummaries: { useQuery: mockLastResults },
-      getScenarioSetRunData: { useQuery: emptyQuery },
-      getSuiteRunData: { useQuery: emptyQuery },
-      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
-      archive: { useMutation: mutation(mockArchiveScenario) },
-      duplicate: { useMutation: mutation(vi.fn()) },
-      moveToTestSuite: { useMutation: mutation(vi.fn()) },
-    },
     suites: {
       testSuites: {
         getAll: { useQuery: mockTestSuitesGetAll },
@@ -111,7 +88,57 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       getOrganizationWithMembersAndTheirTeams: { useQuery: emptyQuery },
     },
     agents: { getAll: { useQuery: mockAgentsGetAll } },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn(), setData: mockSetTestSuites } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn(), setData: mockSetTestSuites } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
+      },
+    }),
+    scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+      getAll: { useQuery: mockScenariosGetAll },
+      getExternalSetSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: mockLastResults },
+      getScenarioSetRunData: { useQuery: emptyQuery },
+      getSuiteRunData: { useQuery: emptyQuery },
+      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
+      archive: { useMutation: mutation(mockArchiveScenario) },
+      duplicate: { useMutation: mutation(vi.fn()) },
+      moveToTestSuite: { useMutation: mutation(vi.fn()) },
+    },
   },
 }));
 
@@ -137,7 +164,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -163,7 +190,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 // usePeriodSelector reads through the workflows package's own host
 // abstraction (WorkflowHostProvider); this surface only needs a stable period
 // state, not a real host, so the hook is stubbed directly.
-vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => {
+vi.mock("../../../../elements/analytics/period-selector.tsx", async (importOriginal) => {
   const mod = await importOriginal<object>();
   return {
     ...mod,
@@ -178,10 +205,6 @@ vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => {
     }),
   };
 });
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const REFUNDS = {
   id: "suite_refunds",
@@ -216,7 +239,7 @@ describe("the Scenarios tab", () => {
 
   const renderTab = () => {
     mockOpenDrawer.mockClear();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
   };
 
   /**
@@ -392,14 +415,13 @@ describe("the scenario editor", () => {
 
   /** @scenario "The scenario editor offers the test suites of the project" */
   it("offers every test suite of the project and an option to file none", () => {
-    render(
+    renderWithDesignSystem(
       <ScenarioForm
         testSuiteOptions={[
           { id: "suite_refunds", name: "Refunds" },
           { id: "suite_checkout", name: "Checkout" },
         ]}
       />,
-      { wrapper: Wrapper },
     );
 
     const field = screen.getByLabelText("Test suite");
@@ -409,7 +431,7 @@ describe("the scenario editor", () => {
   });
 
   it("opens on the suite the scenario is filed in", () => {
-    render(
+    renderWithDesignSystem(
       <ScenarioForm
         defaultValues={{ testSuiteId: "suite_checkout" }}
         testSuiteOptions={[
@@ -417,14 +439,13 @@ describe("the scenario editor", () => {
           { id: "suite_checkout", name: "Checkout" },
         ]}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByLabelText("Test suite")).toHaveValue("suite_checkout");
   });
 
   it("hides the suite field where no suites are offered", () => {
-    render(<ScenarioForm />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioForm />);
 
     expect(screen.queryByLabelText("Test suite")).not.toBeInTheDocument();
   });

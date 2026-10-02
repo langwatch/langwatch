@@ -179,6 +179,9 @@ class FakeWorkflowRepository extends WorkflowRepository {
   ): Promise<WorkflowVersion> {
     return this.createVersion(input);
   }
+  async updateVersionDslIfUnchanged(): Promise<boolean> {
+    return true;
+  }
   async setVersionPointers(): Promise<void> {}
   async publish(input: {
     id: string;
@@ -343,6 +346,44 @@ describe("WorkflowService", () => {
 
       expect(created.version).toMatchObject({ version: "7", autoSaved: false });
     });
+  });
+
+  /** @scenario "Saving a graph leaves a saved HTTP agent's credentials with the agent" */
+  it("stores a saved HTTP agent node with its credentials blank", async () => {
+    const workflowService = service(new FakeWorkflowRepository());
+    const httpAgentNode = {
+      id: "http_agent",
+      data: {
+        agent: "agents/agent_1",
+        parameters: [
+          { identifier: "agent_type", type: "str", value: "http" },
+          { identifier: "auth_type", type: "str", value: "bearer" },
+          { identifier: "auth_token", type: "str", value: "token-secret" },
+          { identifier: "headers", type: "dict", value: { "x-tenant-key": "tenant-secret" } },
+        ],
+      },
+    };
+
+    const created = await workflowService.create({
+      projectId: "project_1",
+      dsl: { version: "1", name: "Triage", nodes: [httpAgentNode], edges: [] },
+      commitMessage: "first",
+    });
+
+    expect(JSON.stringify(created.version.dsl)).not.toContain("token-secret");
+    expect(JSON.stringify(created.version.dsl)).not.toContain("tenant-secret");
+    expect(created.version.dsl.nodes).toMatchObject([
+      {
+        data: {
+          parameters: [
+            { identifier: "agent_type", value: "http" },
+            { identifier: "auth_type", value: "bearer" },
+            { identifier: "auth_token", value: "" },
+            { identifier: "headers", value: { "x-tenant-key": "" } },
+          ],
+        },
+      },
+    ]);
   });
 
   /** @scenario "Published version selection is tenant scoped" */

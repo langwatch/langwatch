@@ -21,6 +21,19 @@ export interface SlackRenderDefaults {
 
 export type SlackTemplateType = "string" | "block_kit";
 
+/** The `templateType` a Slack send renders with: the author's pick when there is one, else
+ *  Block Kit over a bot connection and plain text over a webhook (ADR-041). */
+export function resolveSlackTemplateType({
+  configured,
+  deliveryMethod,
+}: {
+  configured: string | null | undefined;
+  deliveryMethod: "bot" | "webhook";
+}): SlackTemplateType {
+  if (configured === "block_kit" || configured === "string") return configured;
+  return deliveryMethod === "bot" ? "block_kit" : "string";
+}
+
 export type SlackPayload = { text: string } | { blocks: Record<string, unknown>[] };
 
 export interface RenderedSlack {

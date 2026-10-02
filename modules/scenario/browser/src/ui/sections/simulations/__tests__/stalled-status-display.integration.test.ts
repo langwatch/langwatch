@@ -1,5 +1,4 @@
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getOverlayConfig } from "@langwatch/suite-browser-kit";
 /**
  * Integration tests for stalled scenario run visual treatment.
  * @see specs/scenarios/stalled-scenario-runs.feature - UI Display integration scenarios
@@ -7,6 +6,7 @@ import { getOverlayConfig } from "@langwatch/suite-browser-kit";
 import { describe, expect, it } from "vitest";
 
 import { STATUS_DISPLAY_TEXT_MAP } from "../../../../model/simulation-console/constants.ts";
+import { getOverlayConfig } from "../../../elements/suite/runs/simulation-status-overlay.tsx";
 
 // ============================================================================
 // ScenarioRunStatusIcon - warning color distinct from error

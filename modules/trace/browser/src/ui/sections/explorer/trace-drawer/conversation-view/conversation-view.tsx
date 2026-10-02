@@ -1,6 +1,15 @@
-import { Box, Button, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { hasRedactionMarker } from "@langwatch/redaction";
-import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 import {
   buildConversationMarkdownChunks,
   buildParsedTurns,

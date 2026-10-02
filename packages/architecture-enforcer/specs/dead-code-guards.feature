@@ -55,6 +55,13 @@ Feature: Code nothing reads is refused before it is inherited
       Then it reports the Prisma repository, because a method only the twin carries passes every suite and is missing in production
 
     @unit @architecture
+    Scenario: A twin pair under features/<concern>/repositories is checked like a top-level pair
+      Given a Prisma repository and its memory twin sit in a concern's repositories folder
+      And the Prisma repository declares a method the twin does not
+      When architecture lint checks the workspace
+      Then it reports the twin, the repository and the method against the process package
+
+    @unit @architecture
     Scenario: Twins that carry the same methods report nothing
       Given a Prisma repository and its memory twin declare the same methods
       When architecture lint checks the workspace

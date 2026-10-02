@@ -86,7 +86,7 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
 		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
 		// The api application's own name for the port it binds
-		// (packages/process-server/src/config.ts), as WORKER_METRICS_PORT is the
+		// (packages/process/src/config.ts), as WORKER_METRICS_PORT is the
 		// worker's. The line above is main's monolith spelling, which it never reads.
 		fmt.Sprintf("API_PORT=%d", s.APIPort),
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
@@ -420,17 +420,34 @@ func StorageS3Env(resolved map[string]string, endpoint string) []string {
 	}
 }
 
-// VoiceProviderEnv points the scenario SDK's ElevenLabs client at voicesim on
-// port, or nil when the developer already named ELEVENLABS_BASE_URL. The SDK
-// reads it in the scenario child, which gets it only once the product forwards
-// it (see specs/setup/haven-voicesim.feature). OPENAI_BASE_URL is deliberately
-// not set: the product falls back to it for every OpenAI model call.
+// VoiceProviderEnv points the product's ElevenLabs provider at voicesim on
+// port, or nil when the developer already named ELEVENLABS_BASE_URL. The
+// storage seed stores the base URL on the ElevenLabs provider row, under a
+// dummy key when none is set. VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1 is the
+// product's dev switch that lets a loopback voice host through; haven sets it
+// only here, beside the voicesim URL. OPENAI_BASE_URL is deliberately not set:
+// the product has no audio-only OpenAI seam, and it would move every model call.
 func VoiceProviderEnv(resolved map[string]string, port int) []string {
 	if resolved["ELEVENLABS_BASE_URL"] != "" {
 		return nil
 	}
-	return []string{fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port)}
+	env := []string{
+		fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port),
+		VoiceLoopbackSwitch + "=1",
+	}
+	// The ElevenLabs credential probe goes to voicesim too; see LLMProviderEnv.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
+	if resolved["ELEVENLABS_API_KEY"] == "" {
+		env = append(env, "ELEVENLABS_API_KEY=voicesim")
+	}
+	return env
 }
+
+// VoiceLoopbackSwitch is the product's dev-only switch (packages/config
+// deployment-facts.ts) admitting a loopback ElevenLabs host such as voicesim.
+const VoiceLoopbackSwitch = "VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS"
 
 // AnalyticsProviderEnv points the product's PostHog (server and browser) and
 // nurturing's Customer.io client at analyticssim's haven route, with dummy keys
@@ -453,13 +470,30 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 	return env
 }
 
+// llmProbeProviders are the providers whose credential probe the model-provider
+// module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
+// only: a dummy key would seed an organization-level row for each one.
+var llmProbeProviders = []string{"DEEPSEEK_BASE_URL", "XAI_BASE_URL", "CEREBRAS_BASE_URL", "GROQ_BASE_URL", "GEMINI_BASE_URL"}
+
 // LLMProviderEnv points the product's OpenAI and Anthropic providers at llmsim
 // on port: the base URL the seed, the gateway and LiteLLM read, plus a dummy
-// key when none is set. A provider whose base URL .env already names is left
-// alone (see specs/setup/haven-llmsim.feature). The gateway appends /v1 itself.
+// key when none is set. DeepSeek, xAI, Cerebras, Groq and Gemini get a base URL
+// alone, which only their credential probe reads. A provider whose base URL .env
+// already names is left alone (see specs/setup/haven-llmsim.feature). The gateway
+// appends /v1 itself.
 func LLMProviderEnv(resolved map[string]string, port int) []string {
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var env []string
+	for _, name := range llmProbeProviders {
+		if resolved[name] == "" {
+			env = append(env, name+"="+base+"/v1")
+		}
+	}
+	// A deployment that blocks local calls (every SaaS-shaped stack) would refuse the
+	// loopback probe; naming the loopback host admits the sims. Dev stacks only.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
 	for _, p := range []struct{ key, url, value string }{
 		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
 		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},

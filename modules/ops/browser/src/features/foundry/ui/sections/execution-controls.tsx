@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Flex, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Play } from "lucide-react";
 import { useState } from "react";
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useExecutionStore } from "../../behavior/execution.store.ts";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
-import { useTargetProject } from "../../behavior/use-target-project.ts";
+import { useTargetProjectKey } from "../../behavior/use-target-project-key.ts";
 
 /** The mark each run outcome shows in the log; anything else reads as failed. */
 const LOG_STATUS_ICONS: Record<string, string> = {
@@ -26,11 +26,12 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
     updateLogEntry,
   } = useExecutionStore();
   const trace = useTraceStore((s) => s.trace);
-  const project = useTargetProject();
-  const apiKey = project?.apiKey;
+  const { project, mintApiKey } = useTargetProjectKey();
 
   async function handleSend() {
-    if (running || !apiKey) return;
+    if (running || !project) return;
+    const apiKey = await mintApiKey();
+    if (!apiKey) return;
     setRunning(true);
     const executor = getFoundryExecutor({
       apiKey,
@@ -110,13 +111,13 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
         size="sm"
         colorPalette="orange"
         onClick={handleSend}
-        disabled={running || !apiKey}
+        disabled={running || !project}
         loading={running}
         loadingText="Sending..."
       >
         <Play size={14} /> Send Traces
       </Button>
-      {!apiKey && (
+      {!project && (
         <Text fontSize="xs" color="fg.muted" mt={1}>
           Navigate to a project first
         </Text>

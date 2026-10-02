@@ -1,20 +1,20 @@
 /**
  * The feedback capability, over the Design System's toaster. A screen
  * hands over the raw error; the words are resolved HERE from its `code`
- * via `@langwatch/error-presentation/presentation` — never `error.message`.
+ * via `@langwatch/handled-error/presentation` — never `error.message`.
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
+import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/error-presentation/presentation";
+} from "@langwatch/handled-error/presentation";
 import {
   readAuthoredMessageOfUnhandled,
   readEnvelopeTraceId,
   readHandledError,
-} from "@langwatch/error-presentation/read-handled-error";
-import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
+} from "@langwatch/handled-error/read-handled-error";
 
 import { UiFeedback, type UiFailureNotice, type UiSuccessNotice } from "./capabilities.ts";
 import { isHandledByGlobalHandler } from "./errors.ts";
@@ -200,11 +200,12 @@ export class BrowserUiFeedback extends UiFeedback {
     super();
   }
 
-  succeeded({ title, description, id }: UiSuccessNotice): void {
+  succeeded({ title, description, id, action }: UiSuccessNotice): void {
     this.target.create({
       ...(id ? { id } : {}),
       title,
       ...(description ? { description } : {}),
+      ...(action ? { action: { label: action.label, onClick: action.run } } : {}),
       type: "success",
     });
   }

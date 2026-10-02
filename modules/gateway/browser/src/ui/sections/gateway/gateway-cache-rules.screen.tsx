@@ -1,3 +1,8 @@
+import { Switch } from "@chakra-ui/react";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
@@ -5,15 +10,10 @@ import {
   HStack,
   Spacer,
   Spinner,
-  Switch,
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 

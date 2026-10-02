@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,12 +18,10 @@ describe("WorkflowCodeEditorModalHost", () => {
   it("contains an editor render failure without closing the modal", () => {
     vi.spyOn(console, "error").mockImplementation(() => void 0);
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <WorkflowCodeEditorModalHost open onRequestClose={vi.fn()}>
-          <BrokenEditor />
-        </WorkflowCodeEditorModalHost>
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <WorkflowCodeEditorModalHost open onRequestClose={vi.fn()}>
+        <BrokenEditor />
+      </WorkflowCodeEditorModalHost>,
     );
 
     expect(screen.getByRole("alert")).toBeTruthy();

@@ -1,11 +1,11 @@
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 /**
  * The sidebar's counts read the list's own predicate (the active query, the
  * exact window, the hidden origins), each facet with its own field left out,
  * and facets that share a predicate share one batched scan.
  * @see specs/traces-v2/search.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   explorerHiddenOrigins,
@@ -14,7 +14,6 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
@@ -83,7 +82,7 @@ async function facetsFor({
 }) {
   const { repository, calls } = recordingRepository();
   const service = TraceListService.create({
-    discoverUpdates: MemoryTraceTenantBroadcastChannel.create(),
+    discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: createApiFixture<EvaluationApi>({}),

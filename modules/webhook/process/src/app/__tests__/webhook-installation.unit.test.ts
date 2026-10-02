@@ -1,17 +1,17 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The feature installs: a memory-tier process gets a working `WebhookApi` over installer-built
  * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import { webhookServer } from "../../webhook.server.ts";
+import { webhookProcessModule } from "../../webhook.module.ts";
 
 const ORGANIZATION_ID = "organization-1";
 
@@ -46,7 +46,7 @@ function stores() {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(webhookServer)])
+    .withModules([withMemoryRepositories(webhookProcessModule)])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
@@ -72,7 +72,7 @@ describe("webhook app installation", () => {
       try {
         const app = runtime.service(WebhookApi);
 
-        expect(runtime.module(webhookServer).provided).toBe(app);
+        expect(runtime.module(webhookProcessModule).provided).toBe(app);
 
         const { endpoint, secret } = await app.create({
           organizationId: ORGANIZATION_ID,

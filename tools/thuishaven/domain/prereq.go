@@ -147,6 +147,10 @@ func (p Prereq) Manual() bool {
 	return true
 }
 
+// SomaxconnFloor is the accept queue a vite lane behind portless needs on
+// macOS; Node asks for 511, and 1024 leaves that request uncapped.
+const SomaxconnFloor = 1024
+
 // Prereqs is the catalogue, in install order: every entry's After names only
 // entries above it. That order is load-bearing — TestCatalogueOrderRespectsAfter
 // pins it — because OrderPrereqs sorts by it rather than re-deriving a
@@ -267,6 +271,25 @@ var Prereqs = []Prereq{{
 		Key:     "portless",
 		Label:   "portless",
 		Install: "npm install -g " + PortlessPackage(),
+	}},
+}, {
+	// A machine setting, not a tool: haven never runs sudo, so it prints the
+	// command. Cause traced in .claude/handoffs/haven-vite-502.md.
+	Key:         "somaxconn",
+	Name:        "Accept queue",
+	Summary:     fmt.Sprintf("at least %d, so vite cold loads through the proxy do not 502", SomaxconnFloor),
+	Requirement: PrereqRecommended,
+	DarwinOnly:  true,
+	Detail: "macOS caps every listen queue at kern.ipc.somaxconn, 128 by default.\n" +
+		"    portless opens one upstream connection per request, so a cold page\n" +
+		"    load bursts hundreds at vite; the kernel resets the overflow and the\n" +
+		"    proxy answers 502, which reads as a blank page.",
+	Candidates: []Candidate{{
+		Key:   "somaxconn",
+		Label: "kern.ipc.somaxconn",
+		Manual: fmt.Sprintf("vite cold loads through the proxy can 502 under bursts: "+
+			"sudo sysctl kern.ipc.somaxconn=%d (lasts until reboot; to persist, "+
+			"add kern.ipc.somaxconn=%d to /etc/sysctl.conf)", SomaxconnFloor, SomaxconnFloor),
 	}},
 }, {
 	Key:         "postgres",

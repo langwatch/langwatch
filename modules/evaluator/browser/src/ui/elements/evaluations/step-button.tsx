@@ -1,5 +1,5 @@
-import { Box, HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+import { Box, HStack, RadioCard, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LuChevronRight } from "react-icons/lu";
 

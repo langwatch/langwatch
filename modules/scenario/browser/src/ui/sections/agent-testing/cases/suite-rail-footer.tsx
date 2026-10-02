@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { HStack, IconButton, Spacer } from "@langwatch/design-system/primitives";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 
 import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";

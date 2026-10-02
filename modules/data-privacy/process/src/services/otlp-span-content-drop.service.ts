@@ -10,8 +10,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 
-import type { DataPrivacyResolution } from "../app/data-privacy.members.ts";
 import { ContentDropPolicyService } from "./content-drop-policy.service.ts";
+import type { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:content-drop");
 
@@ -30,7 +30,7 @@ export interface OtlpSpanContentDropServiceOptions {
    * asks — `DataPrivacyService` satisfies it, as does the resolution-only
    * service a process that cannot write a policy composes.
    */
-  dataPrivacy: DataPrivacyResolution;
+  dataPrivacy: Pick<DataPrivacyResolutionService, "getResolvedForProject">;
   /**
    * The kill switch (`LANGWATCH_DATA_PRIVACY_ENFORCEMENT`). Off means the
    * span is stored whole, read-path visibility rules are the only

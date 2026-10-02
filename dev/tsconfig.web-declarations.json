@@ -64,8 +64,7 @@
   ],
   "files": [
     "../modules/analytics/browser/src/__tests__/lwql-fixtures.ts",
-    "../modules/analytics/browser/src/testing.tsx",
-    "../packages/browser-trpc/src/workflow-api.ts"
+    "../modules/analytics/browser/src/testing.tsx"
   ],
   "exclude": [
     "../modules/*/browser*/src/**/__tests__/**",
@@ -82,9 +81,6 @@
   "references": [
     {
       "path": "../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../packages/browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../packages/csv/tsconfig.build.json"
@@ -204,19 +200,7 @@
       "path": "../modules/annotation/browser/tsconfig.build.json"
     },
     {
-      "path": "../modules/authz/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../modules/coding-agent/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../modules/langy/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../modules/model-provider/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../modules/trace/browser-kit/tsconfig.build.json"
     }
   ],
   "langwatchDeclarationGroup": {

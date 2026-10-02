@@ -6,16 +6,18 @@ import {
   Portal,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  absorbContextTarget,
-  type LangyContextChip,
-  type LangyContextTargetDescriptor,
-  useLangyContextTargetStore,
-} from "@langwatch/langy-browser-kit";
+} from "@langwatch/design-system/primitives";
+import { disabledLangySkillIds, LANGY_SKILL_GATE_FLAG } from "@langwatch/langy-contract";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
+import {
+  absorbContextTarget,
+  type LangyContextTargetDescriptor,
+  useLangyContextTargetStore,
+} from "../../../../behavior/langy-context-target.store.ts";
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 
 /**
@@ -95,18 +97,16 @@ function buildItems({
   mode,
   chips,
   pageTargets,
+  hiddenSkillIds,
 }: {
   mode: PaletteMode;
   chips: LangyContextChip[];
   pageTargets: LangyContextTargetDescriptor[];
+  /** The flag-gated skills withheld from this caller. */
+  hiddenSkillIds: ReadonlySet<string>;
 }): PaletteItem[] {
   if (mode === "skills") {
-    // TODO(merge): main gates mutually-exclusive skills via
-    // `isSkillAvailable({ skill, isFlagEnabled })` reading `skill.featureFlag`
-    // / `skill.excludedByFlag`. Neither exists yet on this branch's
-    // `LangySkill` (langy-skills.ts, outside this lane's paths). Port by
-    // adding those two fields plus `isSkillAvailable`, then filter here.
-    return LANGY_SKILLS.map((skill) => ({
+    return LANGY_SKILLS.filter((skill) => !hiddenSkillIds.has(skill.id)).map((skill) => ({
       value: `skill:${skill.id}`,
       label: skill.label,
       detail: skill.summary,
@@ -214,6 +214,11 @@ export function LangyComposerPalette({
   const activeChipIds = useLangyContextTargetStore((s) => s.activeChipIds);
   const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
   const chrome = MODE_CHROME[mode];
+  const { enabled: gateFlagOn } = useFeatureFlag(LANGY_SKILL_GATE_FLAG);
+  const hiddenSkillIds = useMemo(
+    () => new Set(disabledLangySkillIds(() => gateFlagOn)),
+    [gateFlagOn],
+  );
 
   // A row that names something on the page lights that thing up while the
   // pointer is on it — the palette says which card it means instead of asking
@@ -225,8 +230,8 @@ export function LangyComposerPalette({
     const pageTargets = Object.values(registeredTargets).filter(
       (target) => !activeChipIds.has(target.id),
     );
-    return buildItems({ mode, chips, pageTargets });
-  }, [mode, chips, registeredTargets, activeChipIds]);
+    return buildItems({ mode, chips, pageTargets, hiddenSkillIds });
+  }, [mode, chips, registeredTargets, activeChipIds, hiddenSkillIds]);
 
   const collection = useMemo(() => paletteCollection({ items, query, mode }), [items, query, mode]);
 

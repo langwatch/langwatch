@@ -11,7 +11,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { ScimApp } from "../app/scim.app.ts";
+import type { ScimModule } from "../app/scim.app.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import {
@@ -119,7 +119,7 @@ export function composeScimSyncPipeline(
 
 export const scimSyncEventing = defineEventingModule({
   pipeline: SCIM_SYNC_PIPELINE_NAME,
-  build: ({ repositories }: EventingSetup<ScimRepositories, ScimApp>) =>
+  build: ({ repositories }: EventingSetup<ScimRepositories, ScimModule>) =>
     composeScimSyncPipeline(repositories),
   connect: ({ app, commands }) => app.connectScimSync(commands),
 });

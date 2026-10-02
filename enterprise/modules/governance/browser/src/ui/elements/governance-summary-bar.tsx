@@ -1,6 +1,6 @@
 /** Summary strip showing pre-formatted figures; holds no queries or sums. */
 
-import { Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /**

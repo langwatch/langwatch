@@ -1,9 +1,9 @@
-import type { Actor } from "@langwatch/actor";
 import { createErrorHandler } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
+import type { Actor } from "@langwatch/authorization";
 import type { AuthzApi, AuthzListTeamMemberBindingsInput } from "@langwatch/authz-contract";
 import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -197,6 +197,7 @@ describe("the secret REST family", () => {
       ]);
     });
 
+    /** @scenario "Legacy REST remains a thin compatibility transport" */
     /** @scenario "The modern public API is validated REST" */
     it("reads, replaces and deletes a secret at the id its path names", async () => {
       const created = await plural.request("/api/secrets", {
@@ -220,6 +221,7 @@ describe("the secret REST family", () => {
     });
   });
 
+  /** @scenario "Every transport uses one service" */
   it("declares main's five operations", () => {
     expect(secretRest.router().routes.map((route) => route.operation)).toEqual([
       "getApiSecrets",

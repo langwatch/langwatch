@@ -1,6 +1,5 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useMemo } from "react";
-
-import { promptApi } from "./prompt-api.ts";
 
 export type TagDefinition = {
   name: string;
@@ -8,7 +7,7 @@ export type TagDefinition = {
 };
 
 export function usePromptTags({ projectId, enabled }: { projectId: string; enabled: boolean }) {
-  const query = promptApi.promptTags.getAll.useQuery(
+  const query = promptClient.promptTags.getAll.useQuery(
     { projectId },
     { enabled: enabled && !!projectId },
   );

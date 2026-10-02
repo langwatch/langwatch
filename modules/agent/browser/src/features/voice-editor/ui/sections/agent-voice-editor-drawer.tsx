@@ -4,8 +4,8 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 
 import {
   useVoiceAgentEditor,

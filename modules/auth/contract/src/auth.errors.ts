@@ -190,6 +190,20 @@ export class DirectRegistrationUnavailableError extends HandledError {
   }
 }
 
+/** A sign-up request arrived from a web address other than the installation's configured one. */
+export class InvalidAuthOriginError extends HandledError {
+  declare readonly code: "auth_invalid_origin";
+
+  constructor() {
+    super(
+      "auth_invalid_origin",
+      "This request came from a different web address than the one this installation is set up for.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "InvalidAuthOriginError";
+  }
+}
+
 /** A credential sign-in that did not check out; a wrong password and an unheld address match. */
 export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
   declare readonly code: "identity_sign_in_refused";

@@ -7,7 +7,7 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 
 import { fetchBatchRuns, tallyBatchRuns, type BatchRun } from "./batchRunProgress";
@@ -126,7 +126,7 @@ export async function waitForBatchRun({
       latestRuns = await fetchBatchRuns({
         endpoint,
         batchRunId,
-        headers: buildAuthHeaders({ apiKey }),
+        headers: buildRequestHeaders({ apiKey }),
       });
       const progress = tallyBatchRuns(latestRuns);
 

@@ -1,4 +1,4 @@
-import { Box, Center } from "@chakra-ui/react";
+import { Box, Center } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LuChevronDown, LuChevronUp, LuGripHorizontal } from "react-icons/lu";
 

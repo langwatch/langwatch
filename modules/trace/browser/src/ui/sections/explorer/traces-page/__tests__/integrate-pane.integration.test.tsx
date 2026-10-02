@@ -2,8 +2,9 @@
 // action (not tab).
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/integrate-pane.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+// Spec: specs/api-keys/api-keys-v2.feature
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,7 +24,7 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
 
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
     selector({ askLangy: vi.fn() }),
@@ -38,6 +39,20 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
     setupSkills: {
       getPrompt: { useQuery: () => ({ data: undefined }) },
     },
+  },
+}));
+
+const mintPersonalToken = vi.hoisted(() => vi.fn());
+
+vi.mock("@langwatch/api-key-client", () => ({
+  useMintPersonalToken: (input: unknown) => {
+    mintPersonalToken(input);
+    return {
+      token: undefined,
+      isMinting: false,
+      scopeNote: "",
+      mint: vi.fn(),
+    };
   },
 }));
 
@@ -63,11 +78,7 @@ vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
 import { IntegratePane } from "../integrate-pane.tsx";
 
 function renderPane() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IntegratePane />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<IntegratePane />);
 }
 
 afterEach(() => {
@@ -81,7 +92,9 @@ describe("the integrate pane", () => {
       renderPane();
 
       const title = screen.getByText("Instrument your agents in seconds");
-      const tokenCard = screen.getByText(/generate an access token/i);
+      const tokenCard = screen.getByRole("button", {
+        name: /create a personal access token/i,
+      });
       const actions = screen.getByRole("button", {
         name: /see sdk instructions/i,
       });
@@ -95,6 +108,16 @@ describe("the integrate pane", () => {
       ).toBeTruthy();
       expect(screen.getByRole("button", { name: /setup via agent/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
+    });
+
+    /** @scenario The traces integrate pane mints only an ingestion token */
+    it("mints its token with the default ingestion-only permissions", () => {
+      renderPane();
+
+      expect(mintPersonalToken).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project_1" }),
+      );
+      expect(mintPersonalToken.mock.calls[0]?.[0]).not.toHaveProperty("permissions");
     });
 
     /** @scenario The setup paths are not a tab strip */

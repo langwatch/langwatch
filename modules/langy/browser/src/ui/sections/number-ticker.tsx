@@ -1,4 +1,4 @@
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { useEffect } from "react";
 

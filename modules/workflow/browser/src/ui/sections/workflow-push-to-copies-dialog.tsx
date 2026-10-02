@@ -3,12 +3,13 @@
  * Reset keyed on ID values to prevent mid-dialog changes from refetches.
  */
 
-import { Button, Text, VStack } from "@chakra-ui/react";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
+
+import { workflowApi } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /** One replica, as the picker lists it. */
 type WorkflowCopy = { id: string; name: string; fullPath: string };
@@ -70,7 +71,9 @@ export function WorkflowPushToCopiesDialog({
   const host = useWorkflowHost();
   const { projectId } = host.scope();
   const utils = workflowApi.useUtils();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [edited, setEdited] = useState<{ copyIds: string; selected: ReadonlySet<string> } | null>(
+    null,
+  );
 
   const copies = workflowApi.workflow.getCopies.useQuery(
     { workflowId, projectId: projectId ?? "" },
@@ -79,9 +82,10 @@ export function WorkflowPushToCopiesDialog({
   const pushToCopies = workflowApi.workflow.pushToCopies.useMutation();
 
   const copyIds = (copies.data ?? []).map((copy) => copy.id).join(",");
-  useEffect(() => {
-    setSelected(new Set(copyIds === "" ? [] : copyIds.split(",")));
-  }, [copyIds]);
+  const selected: ReadonlySet<string> =
+    edited?.copyIds === copyIds
+      ? edited.selected
+      : new Set(copyIds === "" ? [] : copyIds.split(","));
 
   useEffect(() => {
     if (copies.error) {
@@ -94,7 +98,7 @@ export function WorkflowPushToCopiesDialog({
     const next = new Set(selected);
     if (next.has(copyId)) next.delete(copyId);
     else next.add(copyId);
-    setSelected(next);
+    setEdited({ copyIds, selected: next });
   };
 
   const push = async () => {
@@ -111,7 +115,7 @@ export function WorkflowPushToCopiesDialog({
         title: "Workflow pushed",
         description: `"${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated workflow(s).`,
       });
-      setSelected(new Set());
+      setEdited({ copyIds, selected: new Set() });
       onClose();
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't push the workflow" });

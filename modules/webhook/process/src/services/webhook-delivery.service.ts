@@ -121,7 +121,7 @@ const WEBHOOK_DELIVERY_OUTBOX = {
   // An arrow, not a direct reference: this const is evaluated at module load,
   // before the class below is initialised, so naming the static here would be
   // a temporal-dead-zone ReferenceError that no type check would catch.
-  retryDelayMs: (input: { attempt: number }) => retryDelayMs(input),
+  retryDelayMs: (input: { attempt: number }) => WebhookDeliveryService.retryDelayMs(input),
   // Sends are slow (a receiver can burn the full 10s timeout) and
   // parallel-safe: batches are independent, and Stripe-style receivers
   // must tolerate concurrent deliveries.
@@ -225,8 +225,14 @@ export class WebhookDeliveryService {
   }
 
   /** The delay before the attempt after the 1-based `attempt` that just failed. */
-  static retryDelayMs(input: { attempt: number }): number {
-    return retryDelayMs(input);
+  static retryDelayMs({
+    attempt,
+    random = Math.random,
+  }: {
+    attempt: number;
+    random?: () => number;
+  }): number {
+    return retryDelayMs({ attempt, random });
   }
 
   /** The delivery view as a spend row; see the fold rules for what it promises. */

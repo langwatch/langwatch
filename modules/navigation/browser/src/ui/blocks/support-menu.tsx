@@ -3,8 +3,8 @@
  * platform/app; host answers Crisp availability (application-loaded script).
  */
 
-import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
+import { Menu, MenuSeparator } from "@langwatch/design-system/menu";
+import { Box, Portal, VStack } from "@langwatch/design-system/primitives";
 import type { FocusEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {

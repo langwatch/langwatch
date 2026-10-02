@@ -3,7 +3,7 @@
  * failures surfaced as the AC copy. It opens the call through the transport client registry.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useTalkToItCall } from "../../behavior/use-talk-to-it-call.ts";
 import { getVoiceTransportClient } from "../../behavior/voice-transport-client.registry.ts";

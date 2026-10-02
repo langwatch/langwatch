@@ -1,4 +1,4 @@
-import { HStack, Input, Text, chakra } from "@chakra-ui/react";
+import { HStack, Input, Text, chakra } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
 

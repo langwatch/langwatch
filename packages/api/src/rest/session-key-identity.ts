@@ -3,20 +3,10 @@
  * the key's headers, asks the minting module who holds it, and puts that actor and project on the
  * request, so no handler reads the headers. The module's verifier throws its own refusals.
  */
-import type { Actor } from "@langwatch/actor";
+import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 
 import { ProjectMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
-
-/** What the caller presented: the bearer key, the project it names, and its session's address. */
-export type SessionKeyPresented = Readonly<{
-  token: string;
-  projectId: string | null;
-  instanceToken: string | null;
-}>;
-
-/** Who the minting module says holds the key, and the project the key is bound to. */
-export type SessionKeyHolder = Readonly<{ actor: Actor; projectId: string }>;
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 export class SessionKeyIdentity implements RestIdentity {
   readonly #instanceTokenHeader: string;

@@ -1,5 +1,5 @@
-import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Box, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import type { ScenarioSetData } from "@langwatch/scenario-contract";
 import { Settings } from "lucide-react";

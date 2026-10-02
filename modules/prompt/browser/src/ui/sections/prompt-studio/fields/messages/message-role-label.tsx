@@ -1,4 +1,4 @@
-import { Text, type TextProps } from "@chakra-ui/react";
+import { Text, type TextProps } from "@langwatch/design-system/primitives";
 
 export type MessageRole = "system" | "user" | "assistant";
 

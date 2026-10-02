@@ -1,4 +1,4 @@
-import { Flex, Skeleton } from "@chakra-ui/react";
+import { Flex, Skeleton } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { ColumnMeta } from "./trace-table-shell.tsx";

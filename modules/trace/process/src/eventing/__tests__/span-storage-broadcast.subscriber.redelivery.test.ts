@@ -3,6 +3,7 @@
  * @unit
  * Byte-identical messages trigger viewer refetch; the 15s queue TTL is debounce, not safety.
  */
+import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber.ts";
@@ -22,17 +23,9 @@ function makeBroadcastSink(fail = false) {
     sent,
     deps: {
       broadcast: {
-        async broadcastToTenant({
-          tenantId,
-          event,
-          eventType,
-        }: {
-          tenantId: string;
-          event: string;
-          eventType: "trace_updated" | "discover_updated";
-        }) {
+        async publishProjectEvent({ projectId, channel, event }: PresenceProjectEvent) {
           if (fail) throw new Error("subscriber connection lost");
-          sent.push(`${tenantId}|${eventType}|${event}`);
+          sent.push(`${projectId}|${channel}|${event}`);
         },
       },
     },

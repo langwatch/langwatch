@@ -3,7 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 export type StoredApiKey = ApiKey & { hashedSecret: string };
 /** A key as its own row holds it: its grants are authz's, joined by the service. */
-export type ApiKeyRow = Omit<StoredApiKey, "roleBindings">;
+export type ApiKeyRow = Omit<StoredApiKey, "grants">;
 export type ApiKeyCreateRecord = {
   name: string;
   description: string | null;
@@ -23,15 +23,17 @@ export type ApiKeyCreateRecord = {
   expiresAt: Instant | null;
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
+  /** Minted by LangWatch for itself; hides the key and keeps it out of customers' hands. */
+  isSystemManaged?: boolean;
   startsDisabled: boolean;
-  roleBindings: ApiKeyScope[];
+  grants: ApiKeyScope[];
 };
 export type ApiKeyUpdateRecord = {
   id: string;
   name?: string;
   description?: string | null;
   permissionMode?: string;
-  roleBindings?: ApiKeyScope[];
+  grants?: ApiKeyScope[];
   revokedAt?: Instant | null;
   lastUsedAt?: Instant;
   hashedSecret?: string;
@@ -79,7 +81,12 @@ export abstract class ApiKeyRepository {
    * Cross-tenant by design (a fleet-wide sweep, not a request); the name is
    * a parameter because choosing which reserved name to sweep is policy.
    */
-  abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
+  abstract revokeExpiredByName(input: {
+    name: string;
+    now: Instant;
+    /** Only keys the system minted, for a name a customer key may also carry. */
+    systemManagedOnly?: boolean;
+  }): Promise<number>;
   /**
    * The live keys minted under one key, inside its organization. Bounded
    * by `organizationId` so the cascade goes through the ordinary tenancy

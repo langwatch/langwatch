@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Text } from "@chakra-ui/react";
 import { MenuItem } from "@langwatch/design-system/menu";
+import { Text } from "@langwatch/design-system/primitives";
 import { Building2, CalendarDays, Clock } from "lucide-react";
 
 import { FilterChip, FilterChipRow } from "../../../../ui/elements/governance-filter-chip.tsx";

@@ -1,9 +1,9 @@
-import { Box } from "@chakra-ui/react";
+import { FullLogo } from "@langwatch/design-system/full-logo";
+import { Box } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
-import { FullLogo } from "../elements/icons/full-logo.tsx";
 
 let logoVisibleOnce = false;
 

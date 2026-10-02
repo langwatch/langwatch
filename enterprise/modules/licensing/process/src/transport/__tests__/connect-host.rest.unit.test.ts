@@ -1,16 +1,16 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * The connect host's routes and the install's parser, end to end: a refusal
- * thrown as a HandledError crosses the standard REST body and arrives on the
- * install as the same code. Spec: specs/self-hosting/connected-services/
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   ConnectLicenseRevokedError,
   LicenseSyncRateLimitedError,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The connect host's routes and the install's parser, end to end: a refusal
+ * thrown as a HandledError crosses the standard REST body and arrives on the
+ * install as the same code. Spec: specs/self-hosting/connected-services/
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpConnectLicenseChannel } from "../../channels/http/http.connect-license.channel.ts";

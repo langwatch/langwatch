@@ -3,16 +3,12 @@ import "@testing-library/jest-dom/vitest";
  * Dataset values collapse behind a fade and expand on click, like other cells.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ExpandableDatasetCell } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+import { ExpandableDatasetCell } from "../expandable-dataset-cell.tsx";
 
 afterEach(() => {
   cleanup();
@@ -32,9 +28,7 @@ describe("a dataset value too long to fit its row", () => {
   const expandCell = async () => {
     const user = userEvent.setup();
 
-    render(<ExpandableDatasetCell value={OVERFLOWING_VALUE} columnName="input" />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(<ExpandableDatasetCell value={OVERFLOWING_VALUE} columnName="input" />);
 
     await user.click(screen.getByText(OVERFLOWING_VALUE));
 

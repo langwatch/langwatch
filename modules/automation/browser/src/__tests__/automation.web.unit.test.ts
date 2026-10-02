@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createUi, installedDrawerLoaders } from "@langwatch/ui-kernel";
+import { createUi, installedDrawerLoaders } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";
@@ -30,6 +30,15 @@ describe("given a browser that installs automation", () => {
   describe("when an address names the automation drawer, as a chart's alert bell writes it", () => {
     it("answers with the automation drawer", async () => {
       const loaded = await installedDrawerLoaders([automationWeb]).automation?.();
+
+      expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
+    });
+  });
+
+  describe("when an address names the drawer the API used to hand out", () => {
+    /** @scenario "A link issued before the drawer changed still opens the automation" */
+    it("answers with the automation authoring drawer", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).editAutomationFilter?.();
 
       expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
     });

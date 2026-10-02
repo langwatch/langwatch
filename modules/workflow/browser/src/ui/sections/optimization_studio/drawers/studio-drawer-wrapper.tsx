@@ -1,19 +1,20 @@
-import { Box, Button, HStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ComponentIcon, DrawerFooterContext } from "@langwatch/workflow-browser-kit";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { motion } from "motion/react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Columns, Copy, MoreHorizontal, Trash2, X } from "react-feather";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 
+import { offerStudioDrawerFooter } from "../../../../behavior/studio-drawer-footer.store.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
 import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";
 import { getNodeDisplayName } from "../../workflow-nodes.tsx";
@@ -64,6 +65,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
   // Footer registered by child components via useRegisterDrawerFooter
   const [registeredFooter, setRegisteredFooter] = useState<React.ReactNode>(null);
   const effectiveFooter = footer ?? registeredFooter;
+  useLayoutEffect(() => offerStudioDrawerFooter(setRegisteredFooter), []);
 
   const isOpen = node !== undefined;
   const showControls = node !== undefined && isExpandableNode(node);
@@ -212,9 +214,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
           )}
 
           <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
-            <DrawerFooterContext.Provider value={setRegisteredFooter}>
-              {children}
-            </DrawerFooterContext.Provider>
+            {children}
           </Drawer.Body>
 
           {effectiveFooter && (
@@ -281,9 +281,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
 
               {/* Body */}
               <Box flex={1} overflowY="auto" overflowX="hidden">
-                <DrawerFooterContext.Provider value={setRegisteredFooter}>
-                  {children}
-                </DrawerFooterContext.Provider>
+                {children}
               </Box>
 
               {/* Footer */}

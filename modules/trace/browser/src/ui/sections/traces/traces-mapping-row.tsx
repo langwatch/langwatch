@@ -1,5 +1,12 @@
-import { Box, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { TRACE_MAPPING_LABELS } from "@langwatch/dataset-contract";
+import {
+  Box,
+  GridItem,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Select as MultiSelect } from "chakra-react-select";
 import { ArrowRight } from "react-feather";

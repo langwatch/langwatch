@@ -1,11 +1,11 @@
-import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+import { Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 

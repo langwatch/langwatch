@@ -1,5 +1,8 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Avatar } from "@langwatch/design-system/avatar";
+import { Menu } from "@langwatch/design-system/menu";
+import { Popover } from "@langwatch/design-system/popover";
 import {
-  Avatar,
   Box,
   Button,
   type ButtonProps,
@@ -10,17 +13,14 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Menu } from "@langwatch/design-system/menu";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, type Instant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { usePromptVersionHistory } from "../../../../behavior/prompts/use-prompt-version-history.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import {
@@ -28,8 +28,8 @@ import {
   type PromptVersionSnapshot,
 } from "../../../../model/prompt-version-diff.ts";
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
-import { HistoryIcon } from "../../../../ui/elements/history-icon.tsx";
-import { VersionChanges } from "../../../../ui/elements/prompts/version-changes.tsx";
+import { HistoryIcon } from "../../../elements/history-icon.tsx";
+import { VersionChanges } from "../../../elements/prompts/version-changes.tsx";
 
 type VersionLoadRequest = {
   versionId: string;
@@ -549,15 +549,11 @@ export function VersionHistoryListPopover({
   }, []);
   const { project } = usePromptProject();
   const host = usePromptHost();
-  const { data: prompts = [], isLoading } = promptApi.prompts.getAllVersionsForPrompt.useQuery(
-    {
-      idOrHandle: configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: open && !!project?.id && !!configId,
-    },
-  );
+  const { versions: prompts, isLoading } = usePromptVersionHistory({
+    configId,
+    projectId: project?.id,
+    isOpen: open,
+  });
 
   /**
    * Load version data into the form without creating a new version.

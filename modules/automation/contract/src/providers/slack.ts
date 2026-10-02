@@ -31,6 +31,9 @@ export function isSlackWebhookUrl(value: string): boolean {
 
 export const slackActionParamsSchema = z
   .object({
+    /** The named Slack connection this automation delivers through (ADR-093 §5a); when set,
+     *  the connection's kind decides the method and the legacy secret fields are ignored. */
+    slackIntegrationId: z.string().min(1).optional(),
     slackDelivery: slackDeliveryMethodSchema.optional(),
     slackWebhook: z.string().optional(),
     slackBotToken: z.string().optional(),
@@ -38,6 +41,16 @@ export const slackActionParamsSchema = z
     slackBotTokenSet: z.boolean().optional(),
   })
   .superRefine((params, context) => {
+    // A connection carries its own secret; a bot connection's missing channel is refused later.
+    if (params.slackIntegrationId) return;
+    if (!params.slackDelivery && !params.slackWebhook?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose a Slack connection.",
+        path: ["slackIntegrationId"],
+      });
+      return;
+    }
     const method = params.slackDelivery ?? "webhook";
     if (method === "webhook") {
       const url = params.slackWebhook?.trim();
@@ -80,8 +93,9 @@ const definition: SharedDef = {
   action: "SEND_SLACK_MESSAGE",
   category: "notify",
   label: "Slack",
-  description: "Post a message to a Slack webhook when a trace matches.",
-  alertDescription: "Post a message to a Slack webhook when the alert fires.",
+  description: "Post a message to Slack when a trace matches.",
+  alertDescription: "Post a message to Slack when it fires.",
+  reportDescription: "Post the report to Slack on its schedule.",
   actionParamsSchema: slackActionParamsSchema,
 };
 

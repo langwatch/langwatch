@@ -2,6 +2,8 @@
  * Passkeys section: create, view, and manage passkeys in account settings.
  */
 
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Alert,
   Box,
@@ -14,9 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 

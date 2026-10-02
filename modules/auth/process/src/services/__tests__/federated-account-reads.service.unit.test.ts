@@ -1,9 +1,9 @@
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 /**
  * The read a peer is answered from when it owns no `Account` row: which
  * providers let this person in, and none of the rows behind them.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";

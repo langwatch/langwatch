@@ -1,3 +1,4 @@
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   Field,
@@ -7,8 +8,7 @@ import {
   SimpleGrid,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
+} from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";

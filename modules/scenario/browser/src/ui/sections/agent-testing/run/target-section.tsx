@@ -5,10 +5,10 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { chakra, VStack } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { chakra, VStack } from "@langwatch/design-system/primitives";
 import { getRoutePath } from "@langwatch/workflow-contract";
 
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";

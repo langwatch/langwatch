@@ -1,19 +1,19 @@
-/**
- * The pepper chain main hashed every key under: API_KEY_PEPPER, else CREDENTIALS_SECRET, else
- * NEXTAUTH_SECRET, refusing the boot when none is set (Alex, 2026-09-28).
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { API_KEY_PREFIX } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+/**
+ * The pepper chain main hashed every key under: API_KEY_PEPPER, else CREDENTIALS_SECRET, else
+ * NEXTAUTH_SECRET, refusing the boot when none is set (Alex, 2026-09-28).
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { hashApiKeySecret } from "../../rules/api-key-token.rules.ts";
-import { ApiKeyApp } from "../api-key.app.ts";
+import { ApiKeyModule } from "../api-key.app.ts";
 
 const LOOKUP_ID = "LocalDevPrivate1";
 const SECRET = "LocalDevPrivateAccessTokenSecretFixedValue000000";
@@ -26,7 +26,7 @@ async function appOver({
 }: {
   environment: Readonly<Record<string, string>>;
   hashedUnder: string;
-}): Promise<ApiKeyApp> {
+}): Promise<ApiKeyModule> {
   const memory = MemoryApiKeyDatabase.create();
   const apiKeys = MemoryApiKeyRepository.create({ memory });
   await apiKeys.create({
@@ -42,11 +42,11 @@ async function appOver({
     ingestSourceType: null,
     ingestionTemplateId: null,
     startsDisabled: false,
-    roleBindings: [],
+    grants: [],
   });
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
 
-  return ApiKeyApp.create({
+  return ApiKeyModule.create({
     repositories: { apiKeys },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
@@ -57,11 +57,8 @@ async function appOver({
       organizations: createApiFixture<OrganizationApi>({}),
       projects: createApiFixture<ProjectApi>({}),
     },
-    members: {
-      redis: null,
-      encryption: { encrypt: (plaintext) => plaintext, decrypt: (ciphertext) => ciphertext },
-    },
-    secrets: resolver.scopeTo("api-key", Object.values(ApiKeyApp.secrets)),
+    secrets: resolver.scopeTo("api-key", Object.values(ApiKeyModule.secrets)),
+    members: { redis: null },
   });
 }
 

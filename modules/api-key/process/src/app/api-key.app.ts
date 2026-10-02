@@ -12,6 +12,7 @@ import {
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type MintRunKeyInput,
   type NamedApiKeyBinding,
   type UpdateApiKeyInput,
   ApiKeyApi,
@@ -33,7 +34,8 @@ import {
   type CliKeyScopeSummary,
   type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -42,20 +44,20 @@ import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@l
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import {
-  RedisAgentSandboxKeyShareRepository,
-  type AgentSandboxKeySealing,
-  type AgentSandboxKeyShareRedis,
-} from "../repositories/redis/redis.agent-sandbox-key-share.repository.ts";
-import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.service.ts";
-import { ApiKeyBindingIdService } from "../services/api-key-binding-id.service.ts";
+  RedisApiKeyAnswerCacheRepository,
+  type ApiKeyAnswerCacheRedis,
+} from "../repositories/redis/redis.api-key-answer-cache.repository.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
+import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 
-/** Who an operation is performed by, and whose membership is proved. */
+/** Who performs an operation, whose membership is proved, and any operator acting as them. */
 export interface ApiKeyCaller {
   readonly id: string;
+  readonly impersonatorId?: string | undefined;
 }
 
 type ApiKeyDependencies = Readonly<{
@@ -74,11 +76,8 @@ export type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
-  /** Where a project's runs share their sandbox key: Redis, else this process's memory. */
-  members: Readonly<{
-    redis: AgentSandboxKeyShareRedis | null;
-    encryption: AgentSandboxKeySealing;
-  }>;
+  /** Where every pod shares its token answers: Redis, else this process's memory. */
+  members: Readonly<{ redis: ApiKeyAnswerCacheRedis | null }>;
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
@@ -119,7 +118,7 @@ function scopeNames(
 
 /** The first pepper the chain answers; none refuses the boot rather than hashing under "". */
 async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
-  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyApp.secrets;
+  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyModule.secrets;
   const answered = await secrets.into(pepper, (primary) =>
     secrets.into(pepperFallback, (credentials) =>
       secrets.into(pepperLastFallback, (session) =>
@@ -135,7 +134,7 @@ async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
   return answered;
 }
 
-export class ApiKeyApp implements ApiKeyApi {
+export class ApiKeyModule implements ApiKeyApi {
   static readonly contract = ApiKeyApi;
   static readonly dependencies: ApiKeyDependencies = {
     authorization: AuthzApi,
@@ -143,7 +142,7 @@ export class ApiKeyApp implements ApiKeyApi {
     projects: ProjectApi,
   };
 
-  static readonly reads = ["redis", "encryption"] as const;
+  static readonly reads = ["redis"] as const;
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
     pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
@@ -151,16 +150,20 @@ export class ApiKeyApp implements ApiKeyApi {
     pepperLastFallback: sessionSecret,
   } as const;
 
-  static async create(setup: ApiKeySetup): Promise<ApiKeyApp> {
+  static async create(setup: ApiKeySetup): Promise<ApiKeyModule> {
     const pepper = await apiKeyPepper(setup.secrets);
     const authorization = setup.dependencies.authorization;
+    const { redis } = setup.members;
     const service = ApiKeyService.create({
       repository: setup.repositories.apiKeys,
+      answers: redis
+        ? RedisApiKeyAnswerCacheRepository.create({ redis })
+        : MemoryApiKeyAnswerCacheRepository.create(),
       authz: authorization,
       grants: authorization,
       organizations: setup.dependencies.organizations,
       projects: setup.dependencies.projects,
-      bindingIds: ApiKeyBindingIdService.create(),
+      bindingIds: { generateBindingId: newAuthzGrantId },
       legacyGrants: LegacyApiKeyGrantService.create({
         authz: authorization,
         grants: authorization,
@@ -172,31 +175,20 @@ export class ApiKeyApp implements ApiKeyApi {
       }),
       tokens: ApiKeyTokenService.create(pepper),
     });
-    const sandboxKeys = AgentSandboxKeyMintService.create({
-      apiKeys: service,
-      projects: setup.dependencies.projects,
-      share: RedisAgentSandboxKeyShareRepository.create({
-        redis: setup.members.redis,
-        sealing: setup.members.encryption,
-      }),
-    });
+    const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
 
-    return new ApiKeyApp(service, authorization, sandboxKeys);
+    return new ApiKeyModule(service, authorization, runKeys);
   }
 
-  private constructor(
-    service: ApiKeyService,
-    authorization: AuthzApi,
-    sandboxKeys: AgentSandboxKeyMintService,
-  ) {
+  private constructor(service: ApiKeyService, authorization: AuthzApi, runKeys: RunKeyMintService) {
     this.#service = service;
     this.#authorization = authorization;
-    this.#sandboxKeys = sandboxKeys;
+    this.#runKeys = runKeys;
   }
 
   readonly #service: ApiKeyService;
   readonly #authorization: AuthzApi;
-  readonly #sandboxKeys: AgentSandboxKeyMintService;
+  readonly #runKeys: RunKeyMintService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -220,11 +212,8 @@ export class ApiKeyApp implements ApiKeyApi {
   ): Promise<ResolvedApiKeyCredential | null> {
     return this.#service.findResolvedToken(input);
   }
-  async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
-    return this.#service.regenerateLegacyProjectKey(input);
-  }
-  getOrMintAgentSandboxKey(input: { projectId: string; organizationId: string }): Promise<string> {
-    return this.#sandboxKeys.getOrMint(input);
+  mintRunKey(input: MintRunKeyInput): Promise<string> {
+    return this.#runKeys.mintRunKey(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -413,7 +402,10 @@ export class ApiKeyApp implements ApiKeyApi {
     });
 
     const { orgName, teamName, activeProjectIds, projectName, customRoleName } =
-      await this.#service.enrichBindingsWithNames({ bindings });
+      await this.#service.enrichBindingsWithNames({
+        bindings,
+        organizationId: input.organizationId,
+      });
 
     return bindings
       .filter((b) => b.scopeType !== "PROJECT" || activeProjectIds.has(b.scopeId))
@@ -460,12 +452,13 @@ export class ApiKeyApp implements ApiKeyApi {
           organizationId: input.organizationId,
         });
 
-    const allBindings = apiKeys.flatMap((k) => k.roleBindings);
+    const allBindings = apiKeys.flatMap((k) => k.grants);
     // A key row renders the scope's NAME — "Acme" and "Checkout", not two
     // opaque ids — so the scope half of the enrichment is read alongside the
     // custom-role half. Both come from the one call.
     const { orgName, teamName, projectName, customRoleName, customRoles } =
       await this.#service.enrichBindingsWithNames({
+        organizationId: input.organizationId,
         bindings: allBindings.map((rb): ApiKeyBinding => ({
           id: rb.id,
           role: rb.role,
@@ -512,7 +505,7 @@ export class ApiKeyApp implements ApiKeyApi {
       // key with no label of its own can still be shown against the machine
       // it came from. Null for keys minted outside a CLI session.
       parentApiKeyId: apiKey.parentApiKeyId ?? null,
-      roleBindings: apiKey.roleBindings.map((rb) => ({
+      grants: apiKey.grants.map((rb) => ({
         id: rb.id,
         role: rb.role,
         customRoleId: rb.customRoleId ?? null,
@@ -536,6 +529,14 @@ export class ApiKeyApp implements ApiKeyApi {
     input: CreateApiKeyRequest,
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
+    // An operator acting as a member holds no grant to issue credentials as them.
+    if (by.impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "apiKeys:create",
+        scope: { type: "organization", id: input.organizationId },
+        denialReason: "no-binding",
+      });
+    }
     await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
     const assignedToAnother = Boolean(input.assignedToUserId) && input.assignedToUserId !== by.id;

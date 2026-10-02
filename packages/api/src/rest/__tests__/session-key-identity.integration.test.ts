@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import type { SessionKeyPresented } from "@langwatch/authorization";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -9,7 +10,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import { SessionKeyIdentity, type SessionKeyPresented } from "../session-key-identity.ts";
+import { SessionKeyIdentity } from "../session-key-identity.ts";
 
 const INSTANCE_HEADER = "x-agent-instance-token";
 const NOW = Date.parse("2026-09-25T12:00:00Z");
@@ -25,7 +26,7 @@ const declaration = defineRestRouter(Api)
   .withNamespace("session-key")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
-  .withCredential("sessionKey")
+  .withCredential("session_key")
   .get("/api/session-key/me", "sessionKeyMe")
   .withAccess(anyAuthenticated({ reason: "the session key door fixture" }))
   .withOutput(z.object({ actorId: z.string().nullable(), projectId: z.string() }))
@@ -46,9 +47,9 @@ function hostWith(presented: SessionKeyPresented[]) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -70,7 +71,7 @@ function hostWith(presented: SessionKeyPresented[]) {
     declaration.router(),
     () => ({ whoAmI: (input: { actorId: string | null; projectId: string }) => input }),
     {
-      facts: [bindRestCredential("sessionKey", () => door)],
+      facts: [bindRestCredential("session_key", () => door)],
     },
   );
 
@@ -178,9 +179,9 @@ describe("the session key door", () => {
         identities: {
           project: closed,
           organization: closed,
-          apiKey: closed,
-          scimToken: closed,
-          "instance-admin": closed,
+          api_key: closed,
+          scim_token: closed,
+          instance_admin: closed,
           browser: closed,
         },
         bearers: () => closed,

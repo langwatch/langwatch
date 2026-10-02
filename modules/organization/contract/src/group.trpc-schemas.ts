@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { organizationGroupBindingInputSchema } from "./group.ts";
+import { organizationGroupGrantInputSchema } from "./group.ts";
 
 /**
  * The transport inputs the group surface publishes; every call also carries
@@ -18,23 +18,23 @@ export type GroupApiGroupScope = z.infer<typeof groupApiGroupScopeSchema>;
 export const groupApiCreateInputSchema = z.object({
   organizationId: z.string(),
   name: groupApiNameSchema,
-  bindings: z.array(organizationGroupBindingInputSchema).optional(),
+  grants: z.array(organizationGroupGrantInputSchema).optional(),
   memberIds: z.array(z.string()).optional(),
 });
 export type GroupApiCreateInput = z.infer<typeof groupApiCreateInputSchema>;
 
-export const groupApiAddBindingInputSchema = z.object({
+export const groupApiAddGrantInputSchema = z.object({
   organizationId: z.string(),
   groupId: z.string(),
-  ...organizationGroupBindingInputSchema.shape,
+  ...organizationGroupGrantInputSchema.shape,
 });
-export type GroupApiAddBindingInput = z.infer<typeof groupApiAddBindingInputSchema>;
+export type GroupApiAddGrantInput = z.infer<typeof groupApiAddGrantInputSchema>;
 
-export const groupApiRemoveBindingInputSchema = z.object({
+export const groupApiRemoveGrantInputSchema = z.object({
   organizationId: z.string(),
-  bindingId: z.string(),
+  grantId: z.string(),
 });
-export type GroupApiRemoveBindingInput = z.infer<typeof groupApiRemoveBindingInputSchema>;
+export type GroupApiRemoveGrantInput = z.infer<typeof groupApiRemoveGrantInputSchema>;
 
 export const groupApiMemberInputSchema = z.object({
   organizationId: z.string(),
@@ -61,9 +61,33 @@ export const groupApiApplyEditsInputSchema = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   rename: z.object({ name: groupApiNameSchema }).nullable().optional(),
-  bindingIdsToDelete: z.array(z.string()),
-  bindingsToCreate: z.array(organizationGroupBindingInputSchema),
+  grantIdsToRevoke: z.array(z.string()),
+  grantsToCreate: z.array(organizationGroupGrantInputSchema),
   memberUserIdsToAdd: z.array(z.string()),
   memberUserIdsToRemove: z.array(z.string()),
 });
 export type GroupApiApplyEditsInput = z.infer<typeof groupApiApplyEditsInputSchema>;
+
+const groupGrantRoleSchema = z.object({
+  role: z.string().optional(),
+  customRoleId: z.string().nullish(),
+});
+
+/** Every place a group write names a grant: a new group, one grant, a batch of edits. */
+const groupGrantsSchema = z.object({
+  ...groupGrantRoleSchema.shape,
+  grants: z.array(groupGrantRoleSchema).optional(),
+  grantsToCreate: z.array(groupGrantRoleSchema).optional(),
+});
+
+/** Whether a group write grants a custom role: the question only Enterprise answers yes to. */
+export function assignsGroupCustomRole(input: unknown): boolean {
+  const parsed = groupGrantsSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { grants = [], grantsToCreate = [], ...single } = parsed.data;
+
+  return [single, ...grants, ...grantsToCreate].some(
+    (grant) => Boolean(grant.customRoleId) || grant.role === "CUSTOM",
+  );
+}

@@ -1,11 +1,10 @@
+import * as fs from "node:fs";
 /**
  * `langwatch ingest hook <tool>`: runs at session start/end, posting one OTLP
  * log to join the session's traces to its repo/branch. NOTHING ON STDOUT EVER
  * (a hook's stdout is injected into the model's prompt) and ALWAYS EXIT ZERO.
  * @see specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
-
-import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
@@ -30,6 +29,7 @@ import {
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -642,6 +642,7 @@ export async function postSessionContext({
       method: "POST",
       headers: {
         ...target.headers,
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         // Last, so a headers variable carrying its own content-type cannot
         // mislabel a body we know the encoding of.
         "content-type": "application/json",

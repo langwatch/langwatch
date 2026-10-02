@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 const appearance = vi.hoisted(() => ({
@@ -41,14 +41,12 @@ afterAll(() => {
 const { ConnectFromCodeDrawer } = await import("../connect-from-code-drawer.tsx");
 
 function renderDrawer() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConnectFromCodeDrawer
-        open
-        onClose={vi.fn()}
-        renderCopyButton={({ label }) => <button type="button">Copy {label}</button>}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConnectFromCodeDrawer
+      open
+      onClose={vi.fn()}
+      renderCopyButton={({ label }) => <button type="button">Copy {label}</button>}
+    />,
   );
 }
 

@@ -10,9 +10,10 @@ import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
   buildTemplateContext,
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
+  resolveSlackTemplateType,
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
-  type SlackTemplateType,
   type TemplateContext,
   type TemplateSourceKind,
   type TestFireInput,
@@ -198,9 +199,11 @@ export class AutomationTemplateService {
       );
     }
 
+    const contentType = destination.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
     const rendered = await renderWebhookBody({
       template: destination.bodyTemplate,
       context,
+      contentType,
       defaultBody,
     });
     const response = await this.delivery.sendWebhook({
@@ -209,6 +212,7 @@ export class AutomationTemplateService {
       headers: destination.headers,
       signingSecrets: destination.signingSecrets,
       body: rendered.body,
+      contentType,
       triggerName: input.trigger.name,
     });
 
@@ -228,7 +232,10 @@ export class AutomationTemplateService {
     defaults: TriggerTemplateDefaults,
   ): Promise<TestFireResult> {
     const rendered = await renderTriggerSlack({
-      templateType: this.slackType(input.draft.slackTemplateType),
+      templateType: resolveSlackTemplateType({
+        configured: input.draft.slackTemplateType,
+        deliveryMethod: input.botDestination ? "bot" : "webhook",
+      }),
       template: input.draft.slackTemplate ?? null,
       context,
       defaults,
@@ -262,9 +269,5 @@ export class AutomationTemplateService {
       missingVariables: rendered.missingVariables,
       errors: rendered.errors,
     };
-  }
-
-  private slackType(value: string | null | undefined): SlackTemplateType | null {
-    return value === "string" || value === "block_kit" ? value : null;
   }
 }

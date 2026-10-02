@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { type AuthzApi, AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -279,6 +279,7 @@ export class SsoArrivalService {
       ],
       // The signup is the product acting on a domain rule, not an
       // administrator granting access.
+      caller: { type: "system" },
       actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
       onDuplicate: "skip",
       commandId: `sso-admission:${grantId}`,

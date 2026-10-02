@@ -3,7 +3,7 @@
  * Permissions parse against the authorization registry's own vocabulary, so a
  * role the decision engine could not read is refused here.
  */
-import { authzPermissionSchema } from "@langwatch/authz-contract";
+import { authzPermissionSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 /** One organization, for the read that lists its custom roles. */

@@ -3,7 +3,7 @@
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  */
 
-import { HStack, Icon } from "@chakra-ui/react";
+import { HStack, Icon } from "@langwatch/design-system/primitives";
 import { Archive, Copy, FolderInput, ListChecks, Pencil, Play, Plus } from "lucide-react";
 
 /** The icon of every action the two menus offer, keyed by what it does. */

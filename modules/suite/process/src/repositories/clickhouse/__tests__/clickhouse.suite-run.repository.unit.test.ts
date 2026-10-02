@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";

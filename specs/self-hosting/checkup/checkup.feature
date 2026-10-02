@@ -157,6 +157,14 @@ Feature: The checkup page of a self-hosted install
     And the storage row reads pass
 
   @unit
+  Scenario: The SMTP check mentions credentials only when it sent some
+    Given an SMTP relay that accepts the connection
+    When the explicit SMTP check runs with an SMTP user configured
+    Then the row says the server accepted a connection and the credentials
+    When the explicit SMTP check runs with no SMTP user configured
+    Then the row says the server accepted a connection, with no mention of credentials
+
+  @unit
   Scenario: A canary that needs an input it was not given is not checked
     Given no scenario run plan was named
     When the explicit canaries run
@@ -310,3 +318,10 @@ Feature: The checkup page of a self-hosted install
     Then the payload is shown pretty printed
     And a copy button copies it
     And the two switches are beside it
+
+  @unit
+  Scenario: A checkup canary runs with a minimal key of its own, never the project key
+    Given an installation whose oldest project the canaries run against
+    When an administrator runs a canary check
+    Then the canary calls with a key minted for it, owned by nobody and bound to that project
+    And the key holds only what that canary's probe calls, and the project's legacy key is never read

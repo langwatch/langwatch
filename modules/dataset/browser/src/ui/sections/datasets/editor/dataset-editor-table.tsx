@@ -4,10 +4,23 @@
  * (`inMemoryDataset` + `onUpdateDataset`, caller owns the data).
  */
 
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { downloadCsv } from "@langwatch/csv/download";
+import { datasetClient } from "@langwatch/dataset-client";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+  InMemoryDataset,
+} from "@langwatch/dataset-contract";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { getImageUrl } from "@langwatch/design-system/external-image";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Pagination } from "@langwatch/design-system/pagination";
 import {
   Box,
   Button,
-  Checkbox,
   Heading,
   HStack,
   Spacer,
@@ -15,34 +28,10 @@ import {
   Text,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { downloadCsv } from "@langwatch/csv/download";
-import {
-  type AutosaveState,
-  type DatasetAttachmentSlot,
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-  type DatasetTableRowData,
-  datasetTableCss,
-  useTableKeyboardNavigation,
-  VirtualizedTableBody,
-} from "@langwatch/dataset-browser-kit";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-  InMemoryDataset,
-} from "@langwatch/dataset-contract";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { getImageUrl } from "@langwatch/design-system/external-image";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Pagination } from "@langwatch/design-system/pagination";
+} from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
@@ -72,13 +61,24 @@ import {
   type EditorRecord,
   rekeyEditorRecords,
 } from "../../../../behavior/use-dataset-editor-store.ts";
+import { useTableKeyboardNavigation } from "../../../../behavior/use-table-keyboard-navigation.ts";
 import {
   formatSearchRecordCount,
   noSearchMatchesMessage,
   plainRecordCount,
   searchFailedMessage,
 } from "../../../../model/dataset-editor-copy.ts";
+import {
+  type AutosaveState,
+  type DatasetAttachmentSlot,
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+  type DatasetTableRowData,
+} from "../../../../model/dataset-table-context.tsx";
+import { datasetTableCss } from "../../../../model/dataset-table-styles.ts";
+import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body.tsx";
 import { AttachmentCell } from "../../attachment-cell.tsx";
+import { StoredObjectImage } from "../../stored-object/stored-object-image.tsx";
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 
@@ -255,7 +255,7 @@ function useEditorDatasetPage({
   // equivalent — it is already gated on the term belonging to this dataset.)
   const requestedPage = datasetChanged ? 1 : page;
 
-  const databaseDataset = api.datasetRecord.listPaginated.useQuery(
+  const databaseDataset = datasetClient.datasetRecord.listPaginated.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: datasetId ?? "",
@@ -363,7 +363,10 @@ function editorDataToLoad({
   inMemoryDataset,
 }: {
   datasetId: string | undefined;
-  page: { columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] } | undefined;
+  page:
+    | { columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] }
+    | null
+    | undefined;
   inMemoryDataset: InMemoryDataset | undefined;
 }): { columns: EditorColumn[]; records: EditorRecord[]; dbDatasetId: string | undefined } | false {
   if (datasetId) return page ? { ...savedEditorData(page), dbDatasetId: datasetId } : false;
@@ -681,7 +684,7 @@ function useEditorCsvDownload({
   columns: EditorColumn[];
   store: ReturnType<typeof createDatasetEditorStore>;
 }) {
-  const downloadDataset = api.datasetRecord.download.useMutation();
+  const downloadDataset = datasetClient.datasetRecord.download.useMutation();
   const downloadCSV = useCallback(async () => {
     const exported = await exportedEditorData({
       datasetId,

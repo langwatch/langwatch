@@ -1,7 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
-import type { UserProfile } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
@@ -22,22 +20,13 @@ const user: UserProfile = {
   deactivatedAt: null,
 };
 
-/** The one operation an operator's email edit reaches on the directory. */
+/** The one operation an operator's email edit reaches; user ends the sessions on a real change. */
 const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
-
-function authFake() {
-  const revokeAllBrowserSessions = vi.fn(async () => undefined);
-  return {
-    revokeAllBrowserSessions,
-    auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
-  };
-}
 
 class RepositoryFake extends AdminBackofficeRepository {
   execute = vi.fn();
   findUserById = vi.fn(async () => ({ data: user }));
-  setUserDeactivatedAt = vi.fn(async () => undefined);
 }
 
 class AuditFake extends AdminAuditSink {
@@ -54,65 +43,42 @@ function input(email: string): AdminOperationInput {
   };
 }
 
+function serviceWith(updateProfile: UserApi["updateProfile"]) {
+  return AdminBackofficeService.create({
+    repository: new RepositoryFake(),
+    users: new TestUserApi({ updateProfile }),
+    audit: new AuditFake(),
+  });
+}
+
 describe("AdminBackofficeService user email updates", () => {
   /** @scenario "An operator changing a user's email revokes their browser sessions" */
-  it("persists an email before revoking browser sessions", async () => {
-    const order: string[] = [];
-    const updateProfile = vi.fn(async (): Promise<UserProfile> => {
-      order.push("profile");
-      return { ...user, email: "new@example.com" };
-    });
-    const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const { auth, revokeAllBrowserSessions } = authFake();
-    revokeAllBrowserSessions.mockImplementation(async () => {
-      order.push("sessions");
-    });
-    const service = AdminBackofficeService.create({
-      repository: new RepositoryFake(),
-      users,
-      auth,
-      audit: new AuditFake(),
-    });
+  it("hands the normalised email to user, which revokes on a real change", async () => {
+    const updateProfile = updateProfileFake("new@example.com");
 
-    await service.execute(input(" NEW@example.com "));
+    await serviceWith(updateProfile).execute(input(" NEW@example.com "));
 
     expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
-    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: user.id });
-    expect(order).toEqual(["profile", "sessions"]);
   });
 
   /** @scenario "A change that only differs in case or spacing revokes nothing" */
-  it("does not revoke sessions for a normalized case-only change", async () => {
+  it("hands a case-only change to user as the stored email", async () => {
     const updateProfile = updateProfileFake();
-    const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const { auth, revokeAllBrowserSessions } = authFake();
-    const service = AdminBackofficeService.create({
-      repository: new RepositoryFake(),
-      users,
-      auth,
-      audit: new AuditFake(),
-    });
 
-    await service.execute(input("ALICE@EXAMPLE.COM"));
+    await serviceWith(updateProfile).execute(input(" ALICE@EXAMPLE.COM "));
 
-    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: user.email });
   });
 
   /** @scenario "A failed revocation still leaves the new backoffice email in place" */
-  it("retains the profile update when browser-session revocation fails", async () => {
-    const updateProfile = updateProfileFake("new@example.com");
-    const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const { auth, revokeAllBrowserSessions } = authFake();
-    revokeAllBrowserSessions.mockRejectedValue(new Error("redis unavailable"));
-    const service = AdminBackofficeService.create({
-      repository: new RepositoryFake(),
-      users,
-      auth,
-      audit: new AuditFake(),
+  it("surfaces a revocation failure from user, which saved the email first", async () => {
+    const updateProfile = vi.fn(async (): Promise<UserProfile> => {
+      throw new Error("redis unavailable");
     });
 
-    await expect(service.execute(input("new@example.com"))).rejects.toThrow("redis unavailable");
-
+    await expect(serviceWith(updateProfile).execute(input("new@example.com"))).rejects.toThrow(
+      "redis unavailable",
+    );
     expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
   });
 });

@@ -1,15 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { workflowServer } from "../../workflow.server.ts";
+import { workflowProcessModule } from "../../workflow.module.ts";
 import { createWorkflowTestInfrastructure, createWorkflowTestService } from "./workflow.fixture.ts";
 
 const NOW = new Date("2026-09-09T00:00:00.000Z");
@@ -40,7 +40,7 @@ function process_() {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
 
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(workflowServer)])
+    .withModules([withMemoryRepositories(workflowProcessModule)])
     .withConfig({
       workflow: {
         stagingThresholdBytes: undefined,
@@ -63,7 +63,10 @@ function process_() {
       "model-provider": createApiFixture({}, "ModelProviderApi"),
       experiment: createApiFixture({}, "ExperimentApi"),
       monitor: createApiFixture({}, "MonitorApi"),
-      nurturing: createApiFixture({}, "NurturingApi"),
+      secret: createApiFixture({}, "SecretApi"),
+      organization: createApiFixture({}, "OrganizationApi"),
+      "api-key": createApiFixture({}, "ApiKeyApi"),
+      project: createApiFixture({}, "ProjectApi"),
     });
 }
 
@@ -75,7 +78,7 @@ describe("workflow app installation", () => {
       try {
         const app = runtime.service(WorkflowApi);
 
-        expect(runtime.module(workflowServer).provided).toBe(app);
+        expect(runtime.module(workflowProcessModule).provided).toBe(app);
         await expect(app.list({ projectId: "project-1" })).resolves.toEqual([]);
       } finally {
         await runtime.stop();

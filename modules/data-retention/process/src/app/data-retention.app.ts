@@ -24,8 +24,8 @@ import {
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -120,13 +120,13 @@ type DataRetentionMembers = Readonly<{
  * with no ClickHouse refuses at boot rather than silently metering at zero.
  */
 type DataRetentionSetup = FeatureSetup<
-  typeof DataRetentionApp.dependencies,
+  typeof DataRetentionModule.dependencies,
   DataRetentionMembers,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;
 
-export class DataRetentionApp implements DataRetentionApiContract {
+export class DataRetentionModule implements DataRetentionApiContract {
   static readonly contract = DataRetentionApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -164,7 +164,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
     members,
     dependencies,
     config,
-  }: DataRetentionSetup): DataRetentionApp {
+  }: DataRetentionSetup): DataRetentionModule {
     const storageMeter = StorageMeterService.create({
       clickhouse: members.clickhouse,
       cache: RedisStorageMeterCacheRepository.create({
@@ -198,10 +198,9 @@ export class DataRetentionApp implements DataRetentionApiContract {
         entitlement: dependencies.entitlement,
         isSaas: config.isSaas,
       }),
-      administrators: dependencies.users,
     });
 
-    return new DataRetentionApp({
+    return new DataRetentionModule({
       retention,
       policy,
       snapshots: DataRetentionSnapshotService.create({
@@ -341,7 +340,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
       retentionDays: input.retentionDays,
     });
     if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
-      this.#policy.assertCanDisableRetention({ actor });
+      await this.#policy.assertCanDisableRetention({ actor });
     }
 
     // `ScopeTargetNotFoundError` is a handled 404: the runtime maps its status
@@ -395,8 +394,8 @@ export class DataRetentionApp implements DataRetentionApiContract {
   }
 
   /**
-   * The address the platform-operator allow-list is written in, resolved from
-   * the caller's id rather than read off the request.
+   * The caller's profile, resolved from the id rather than read off the
+   * request.
    */
   async #actor(userId: string): Promise<RetentionActor> {
     const user = await this.#users.findById({ id: userId });

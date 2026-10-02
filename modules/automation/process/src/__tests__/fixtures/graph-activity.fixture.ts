@@ -1,5 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AutomationClock,AutomationProjectDirectory } from "../../app/automation.members.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {
@@ -95,9 +95,9 @@ export class RecordingDelivery extends AutomationNotificationDelivery {
   async sendWebhook(input: {
     url: string;
     eventId: string;
-  }): Promise<{ status: number; body: string; eventId: string }> {
+  }): Promise<{ status: number; dispatchId: string }> {
     this.webhooks.push(input.url);
-    return { status: 200, body: "", eventId: input.eventId };
+    return { status: 200, dispatchId: input.eventId };
   }
 }
 

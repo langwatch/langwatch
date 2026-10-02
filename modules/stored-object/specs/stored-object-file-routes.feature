@@ -1,5 +1,5 @@
 Feature: File reads answer through the installed stored-object module
-  The process mounts the /api/files byte door over the one StoredObjectApp boot
+  The process mounts the /api/files byte door over the one StoredObjectModule boot
   constructed; the caller is the project key the process's project door
   resolved (Alex, 2026-09-30: REST is the API key's), the read count comes from
   its rate limiter, and the key is pinned to its own project.

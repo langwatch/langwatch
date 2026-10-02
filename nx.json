@@ -466,10 +466,9 @@
       "inputs": [
         "go",
         "^go",
-        "{workspaceRoot}/packages/error-presentation/src/**/*",
         "{workspaceRoot}/packages/handled-error/src/**/*"
       ],
-      "outputs": ["{workspaceRoot}/packages/error-presentation/src/codes.generated.ts"]
+      "outputs": ["{workspaceRoot}/packages/handled-error/src/codes.generated.ts"]
     }
   },
   "parallel": 4,

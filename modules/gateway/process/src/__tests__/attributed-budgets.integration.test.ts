@@ -24,6 +24,7 @@ import {
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
@@ -148,6 +149,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
     service = PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: organizationApiOver(prisma),
       projects: new TestProjectApi(),
       evaluators: {} as never,
       monitors: {} as never,

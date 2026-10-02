@@ -2,10 +2,17 @@
  * The dataset picker the "Add to Dataset" drawer opens with.
  */
 
-import { Button, createListCollection, Field, HStack, Spinner, Text } from "@chakra-ui/react";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";
 
 type DatasetOption = { id: string; name: string };
@@ -94,9 +101,11 @@ export function DatasetSelector<
     localStorageDatasetId ? [localStorageDatasetId] : [],
   );
 
-  useEffect(() => {
+  const [storedIdFrom, setStoredIdFrom] = useState(localStorageDatasetId);
+  if (storedIdFrom !== localStorageDatasetId) {
+    setStoredIdFrom(localStorageDatasetId);
     setSelectedValue(localStorageDatasetId ? [localStorageDatasetId] : []);
-  }, [localStorageDatasetId]);
+  }
 
   return (
     <HorizontalFormControl

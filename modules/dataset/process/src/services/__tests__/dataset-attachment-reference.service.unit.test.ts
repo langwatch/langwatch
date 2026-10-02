@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
   type StoredObjectMetadata,
 } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { DatasetAttachmentReferenceService } from "../dataset-attachment-reference.service.ts";

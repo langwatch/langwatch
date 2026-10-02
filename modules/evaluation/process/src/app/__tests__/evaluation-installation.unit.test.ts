@@ -1,6 +1,4 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 /**
@@ -13,16 +11,17 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { evaluationServer } from "../../evaluation.server.ts";
+import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 function process(
@@ -50,7 +49,6 @@ function process(
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
       experiment: createApiFixture<ExperimentApi>(),
-      automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
@@ -93,7 +91,7 @@ describe("given a process that installs the evaluation feature", () => {
       try {
         const app = runtime.service(EvaluationApi);
 
-        expect(runtime.module(evaluationServer).provided).toBe(app);
+        expect(runtime.module(evaluationProcessModule).provided).toBe(app);
         await expect(app.listCustomEvaluators({ projectId: "project-1" })).resolves.toEqual([]);
         await expect(app.warmupEvaluators({ projectId: "project-1", count: 1 })).resolves.toEqual({
           success: true,

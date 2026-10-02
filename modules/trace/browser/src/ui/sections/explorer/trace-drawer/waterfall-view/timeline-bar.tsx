@@ -1,4 +1,4 @@
-import { Box, Flex } from "@chakra-ui/react";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { memo, useCallback } from "react";
 

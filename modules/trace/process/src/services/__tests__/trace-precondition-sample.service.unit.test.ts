@@ -1,6 +1,6 @@
-/** Main's `traces.getSampleTraces` selection: passing traces first, topped up below ten. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+/** Main's `traces.getSampleTraces` selection: passing traces first, topped up below ten. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

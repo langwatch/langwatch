@@ -7,7 +7,7 @@ Practical examples implementing LangWatch design guidelines.
 Standard page with header, actions, and content.
 
 ```tsx
-import { HStack, Spacer, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
@@ -36,7 +36,7 @@ export function ExamplePage() {
 Use for resource creation, editing, and selection flows.
 
 ```tsx
-import { Button, Field, Input, useDisclosure, VStack } from "@chakra-ui/react";
+import { Button, Field, Input, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 export function ResourceDrawer() {
@@ -82,7 +82,7 @@ export function ResourceDrawer() {
 Use for destructive action confirmations only.
 
 ```tsx
-import { Button, useDisclosure, Text } from "@chakra-ui/react";
+import { Button, useDisclosure, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/dialog";
 
 export function DeleteConfirmDialog({ itemName, onConfirm }) {
@@ -143,7 +143,7 @@ For custom translucent containers (overlay components have this built-in).
 ## Menu
 
 ```tsx
-import { Button } from "@chakra-ui/react";
+import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical, Pencil, Trash } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 
@@ -169,7 +169,7 @@ import { Menu } from "@langwatch/design-system/menu";
 Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/best_practices/drawers.md` ("Going to another drawer and back") for the canonical walkthrough.
 
 ```tsx
-import { Button, HStack } from "@chakra-ui/react";
+import { Button, HStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/browser-host/drawer";
@@ -255,7 +255,7 @@ export function ItemDrawer() {
 ## Popover
 
 ```tsx
-import { Button, Text } from "@chakra-ui/react";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import { Info } from "lucide-react";
 import { Popover } from "@langwatch/design-system/popover";
 

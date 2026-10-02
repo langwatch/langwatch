@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -61,8 +61,8 @@ vi.mock("../../../../../behavior/facet-visibility.store.ts", async (importOrigin
     }),
   selectVisibilityFor: () => ({ hidden: [], shown: [] }),
 }));
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -73,6 +73,12 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
         sidebarCollapsed: false,
         sidebarWidth: null,
       }),
+  };
+});
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useFilterStore: (selector: (s: unknown) => unknown) =>
       selector({
         ast: { type: "group", combinator: "and", filters: [] },
@@ -161,10 +167,11 @@ vi.mock("@dnd-kit/sortable", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 import type * as traceContractModule from "@langwatch/trace-contract";
 import type React from "react";
 
+import type * as actualModule1 from "../../../../../behavior/explorer.store.ts";
+import type * as actualModule0 from "../../../../../behavior/ui.store.ts";
 import { FilterSidebar } from "../filter-sidebar.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
@@ -181,11 +188,7 @@ beforeEach(() => {
 });
 
 function renderSidebar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FilterSidebar />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<FilterSidebar />);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

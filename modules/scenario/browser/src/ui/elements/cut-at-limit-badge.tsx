@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@langwatch/design-system/primitives";
 
 /**
  * The "Cut at the call limit" marker (AC28). A single presentational badge so

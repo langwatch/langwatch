@@ -1,4 +1,4 @@
-import { Heading, Text, VStack } from "@chakra-ui/react";
+import { Heading, Text, VStack } from "@langwatch/design-system/primitives";
 
 /** What an address that does not exist for this reader shows. */
 export function PageAbsentNotice() {

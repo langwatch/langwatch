@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryIdentityRepositories } from "./memory/memory.identity.repositories.ts";
 import {

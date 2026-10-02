@@ -11,7 +11,7 @@ import {
   EXPERIMENT_LIFECYCLE_PIPELINE_NAME,
 } from "@langwatch/experiment-contract";
 
-import type { ExperimentApp } from "../app/experiment.app.ts";
+import type { ExperimentModule } from "../app/experiment.app.ts";
 import { RecordExperimentRanCommand } from "./experiment-lifecycle.commands.ts";
 import {
   experimentRanEventSchema,
@@ -38,6 +38,6 @@ export function buildExperimentLifecyclePipeline(): ExperimentLifecyclePipeline 
 
 export const experimentLifecycleEventing = defineEventingModule({
   pipeline: EXPERIMENT_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, ExperimentApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<never, ExperimentModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

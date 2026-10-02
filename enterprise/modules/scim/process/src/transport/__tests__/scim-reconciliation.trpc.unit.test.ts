@@ -2,7 +2,7 @@
 /**
  * @vitest-environment node
  * `scimReconciliation.getRequests` over the real runtime and a real
- * `ScimApp`: what the directory asked for, read by somebody who may see
+ * `ScimModule`: what the directory asked for, read by somebody who may see
  * single sign-on without managing it (ADR-126).
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
@@ -30,8 +30,10 @@ const ENTRY = {
 
 function testPorts(
   permits: (permission: string) => boolean,
+  enterprise: boolean,
 ): TrpcRuntimeMembers<ScimTrpcTestContext> {
   return {
+    entitlements: { holds: async () => enterprise },
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -72,17 +74,21 @@ const OKTA: OrganizationSsoConnection = {
 
 function mount(
   permits: (permission: string) => boolean = () => true,
-  options: { planType?: string; activity?: ScimSyncActivityEntry[] } = {},
+  options: { enterprise?: boolean; activity?: ScimSyncActivityEntry[] } = {},
 ) {
   const scim = new ScimServiceFake();
   scim.findRequestLog.mockResolvedValue([ENTRY]);
   scim.findDirectoryOwnership.mockResolvedValue([]);
-  const { app } = scimTestApp({ scim, connections: [OKTA], ...options });
+  const { app } = scimTestApp({
+    scim,
+    connections: [OKTA],
+    ...(options.activity ? { activity: options.activity } : {}),
+  });
   const trpc = initTRPC.context<ScimTrpcTestContext>().create();
   const router = createTrpcRuntime<ScimTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: testPorts(permits),
+    members: testPorts(permits, options.enterprise ?? true),
   }).mount(scimReconciliationTrpcTransport, () => app);
 
   return { scim, caller: router.createCaller({ actor: { id: "user-1" } }) };
@@ -169,12 +175,32 @@ describe("the scimReconciliation tRPC namespace", () => {
     });
 
     /** @scenario "A connection's panel is refused once the plan no longer includes directory sync" */
-    it("refuses an organization whose plan lapsed", async () => {
-      const { caller } = mount(() => true, { planType: "FREE" });
+    it("refuses an organization whose plan lapsed, naming SCIM", async () => {
+      const { caller } = mount(() => true, { enterprise: false });
 
       await expect(
         caller.getById({ organizationId: "org-acme", connectionId: "conn-okta" }),
-      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      ).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required", meta: { feature: "SCIM" } },
+      });
+    });
+  });
+
+  describe("when the request log is read below Enterprise", () => {
+    it("answers it: the log is how a lapsed plan is diagnosed", async () => {
+      const { caller } = mount(() => true, { enterprise: false });
+
+      await expect(
+        caller.getRequests({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).resolves.toHaveLength(1);
+    });
+
+    it("tells a caller without sso:view that, not what the plan lacks", async () => {
+      const { caller } = mount(() => false, { enterprise: false });
+
+      await expect(
+        caller.getById({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -217,12 +243,14 @@ describe("the scimReconciliation tRPC namespace", () => {
     });
 
     /** @scenario "Recent directory activity is refused once the plan no longer includes directory sync" */
-    it("refuses an organization whose plan lapsed", async () => {
-      const { caller } = mount(() => true, { planType: "FREE", activity: [pushed] });
+    it("refuses an organization whose plan lapsed, naming SCIM", async () => {
+      const { caller } = mount(() => true, { enterprise: false, activity: [pushed] });
 
       await expect(
         caller.getActivity({ organizationId: "org-acme", connectionId: "conn-okta" }),
-      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      ).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required", meta: { feature: "SCIM" } },
+      });
     });
   });
 });

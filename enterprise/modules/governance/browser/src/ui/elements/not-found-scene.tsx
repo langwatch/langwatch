@@ -1,6 +1,6 @@
 /** Simplified 404 scene for governance pages behind feature flags. */
 
-import { Button, Center, Heading, Stack, Text } from "@chakra-ui/react";
+import { Button, Center, Heading, Stack, Text } from "@langwatch/design-system/primitives";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";
 

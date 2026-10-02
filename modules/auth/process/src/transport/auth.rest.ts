@@ -10,7 +10,7 @@ import {
   type RestAnswer,
   type RestProtocolProducer,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";

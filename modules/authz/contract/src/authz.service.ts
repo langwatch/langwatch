@@ -1,7 +1,17 @@
+import type {
+  AuthzGetDecisionInput,
+  AuthzGetProjectAnyDecisionInput,
+  AuthzPermission,
+  AuthzScopeLineageInput,
+  AuthzScopeLineageResult,
+  DeclaredScopeTier,
+  PermissionDecision,
+  PermissionScopeArg,
+  TierOfScopeArg,
+} from "@langwatch/authorization";
 import type { Instant } from "@langwatch/time";
 
 import type { AuthzFindPermissionsBeyondCallerInput } from "./authz-grants-rest.schemas.ts";
-import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage.ts";
 import type {
   AuthzAccessBreakdownInput,
   AuthzAccessBreakdownOutput,
@@ -10,7 +20,7 @@ import type {
   AuthzListManagedBindingsForOrganizationOutput,
   AuthzListManagedBindingsForUserInput,
   AuthzListManagedBindingsForUserOutput,
-} from "./authz.binding-management.ts";
+} from "./authz.grant-management.ts";
 import type {
   ApiKeyPermissionCheck,
   ApiKeyProjectDecision,
@@ -24,6 +34,7 @@ import type {
   AuthzCanBatchPermissionsByIdsOutput,
   AuthzCheckByIdsInput,
   AuthzCheckByIdsOutput,
+  AuthzCanInput,
   AuthzCheckDetailedOutput,
   AuthzCheckInput,
   AuthzCustomRole,
@@ -34,8 +45,6 @@ import type {
   AuthzExplainDecisionInput,
   AuthzExplainDecisionOutput,
   AuthzGetApiKeyProjectDecisionInput,
-  AuthzGetDecisionInput,
-  AuthzGetProjectAnyDecisionInput,
   AuthzListBindingsForSynthesisInput,
   AuthzListApiKeyBindingsInput,
   AuthzListGroupBindingsInput,
@@ -48,13 +57,9 @@ import type {
   AuthzRequireProjectPermissionInput,
   AuthzResolveScopeInput,
   AuthzTeamMemberBinding,
-  PermissionDecision,
 } from "./authz.queries.ts";
 import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz.ts";
 import type * as authzModule from "./authz.ts";
-import type { PermissionScopeArg, TierOfScopeArg } from "./declaration.ts";
-import type { AuthzPermission } from "./registry.ts";
-import type { BindingScopeTier } from "./vocabulary.ts";
 
 /**
  * The complete portable read and decision capability. Concrete server
@@ -67,7 +72,7 @@ export abstract class AuthzService {
    * factory or package subpath that ordinary callers could invoke.
    */
   protected mintAuthorizationWitness<
-    Tier extends BindingScopeTier,
+    Tier extends DeclaredScopeTier,
     Permission extends AuthzPermission,
   >({
     tier,
@@ -88,10 +93,10 @@ export abstract class AuthzService {
 
   abstract checkDetailed(args: AuthzCheckInput): Promise<AuthzCheckDetailedOutput>;
 
-  abstract can(args: AuthzCheckInput): Promise<boolean>;
+  abstract can(args: AuthzCanInput): Promise<boolean>;
 
   /** The only public operation that returns an authorization witness. */
-  abstract authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>(args: {
+  abstract authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;

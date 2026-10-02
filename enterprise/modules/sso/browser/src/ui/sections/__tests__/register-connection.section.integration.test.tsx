@@ -4,7 +4,7 @@
  * their console's side second, and only then the values it handed back.
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = {
@@ -42,6 +42,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
   };
 });
 
+import { IDENTITY_PROVIDER_PRESETS } from "../../../model/identity-providers.ts";
 import { FakeSsoHost, renderWithSsoHost } from "../../../testing.tsx";
 import { RegisterConnectionSection } from "../register-connection.section.tsx";
 
@@ -152,6 +153,28 @@ describe("registering an identity provider", () => {
       expect(screen.getByLabelText("Issuer address")).toBeInTheDocument();
       expect(screen.getByLabelText("Client id")).toBeInTheDocument();
       expect(screen.getByLabelText("Client secret")).toBeInTheDocument();
+    });
+  });
+
+  describe("when Microsoft Entra ID is picked", () => {
+    /** @scenario "The registration form says where Microsoft Entra ID shows its issuer" */
+    it("says where the issuer is found and points at App registrations", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-entra"));
+
+      expect(screen.getByText(/OpenID Connect metadata document address/)).toBeInTheDocument();
+      expect(screen.getByText(/remove \/\.well-known\/openid-configuration/)).toBeInTheDocument();
+      expect(screen.getByText(/App registrations → New registration/)).toBeInTheDocument();
+    });
+
+    it("points a SAML application at Enterprise applications", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-entra"));
+      fireEvent.click(screen.getByTestId("sso-protocol-saml"));
+
+      expect(screen.getByText(/Enterprise applications → New application/)).toBeInTheDocument();
     });
   });
 
@@ -318,6 +341,32 @@ describe("registering an identity provider", () => {
 
       expect(screen.getByTestId("sso-register-unavailable")).toBeInTheDocument();
       expect(screen.queryByText("Who signs your team in?")).toBeNull();
+    });
+  });
+});
+
+describe("given the identity provider picker", () => {
+  describe("when it renders", () => {
+    it("names every provider in full on its tile", () => {
+      renderSection();
+
+      for (const preset of IDENTITY_PROVIDER_PRESETS) {
+        const tile = screen.getByTestId(`identity-provider-${preset.id}`);
+        expect(within(tile).getByText(preset.name, { exact: true }), preset.name).toBeDefined();
+      }
+    });
+  });
+
+  describe("when a provider is picked", () => {
+    it("explains the two ways to connect in plain sentences", () => {
+      renderSection();
+      fireEvent.click(screen.getByTestId("identity-provider-keycloak"));
+
+      expect(
+        screen.getByText(
+          "There are two ways to connect. Pick the one your identity provider's app gave you. Either one works.",
+        ),
+      ).toBeDefined();
     });
   });
 });

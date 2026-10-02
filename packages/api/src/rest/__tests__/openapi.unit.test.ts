@@ -347,7 +347,7 @@ describe("the security requirement an operation publishes", () => {
     /** @scenario "A route's own credential wins over its family's door" */
     it("publishes the route's scheme, not the family's", () => {
       const published = restRouteDocumentation({
-        route: route({ credential: "scimToken" }),
+        route: route({ credential: "scim_token" }),
         credential: "project",
       });
 

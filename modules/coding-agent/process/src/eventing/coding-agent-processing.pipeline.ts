@@ -16,9 +16,17 @@ import {
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+  canonicalLogRecordSchema,
+} from "@langwatch/log-contract";
+import {
+  canonicalMetricDataPointSchema,
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+} from "@langwatch/metric-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { CodingAgentApp } from "../app/coding-agent.app.ts";
+import type { CodingAgentModule } from "../app/coding-agent.app.ts";
 import type {
   CodingAgentClock,
   CodingAgentCostEstimator,
@@ -34,6 +42,7 @@ import {
   EventingCodingAgentTraceSessionAppendService,
   EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
+import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
 import { EventingCodingAgentSessionStoreService } from "../services/coding-agent-session-store.service.ts";
 import { EventingContributeLogFactsService } from "../services/contribute-log-facts.service.ts";
@@ -48,6 +57,8 @@ import {
 import { CodingAgentTraceSessionsMapProjection } from "./coding-agent-trace-sessions.projection.ts";
 import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subscriber.ts";
 import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
+
+const metricPointIdOf = canonicalMetricDataPointSchema.pick({ pointId: true });
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
@@ -64,6 +75,11 @@ export interface CodingAgentProcessingPipelineDeps {
   sessionFoldCache: CodingAgentSessionFoldCacheRepository;
   /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
   github?: CodingAgentPullRequestMapping;
+  /** Lifts what log and metric received into this pipeline's contribution commands. */
+  receivedFacts: Pick<
+    CodingAgentReceivedFactsService,
+    "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
+  >;
 }
 
 /**
@@ -148,6 +164,30 @@ export class EventingCodingAgentProcessingAdapter {
           traceCanonicalisation: deps.traceCanonicalisation,
         }),
       )
+      .withPeerSubscriber("codingAgentLogFactsDispatch", {
+        eventType: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+        data: canonicalLogRecordSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `coding-agent-log-facts:${event.tenantId}:${String(event.aggregateId)}`,
+            ttlMs: 60_000,
+          },
+        },
+        handle: (record) => deps.receivedFacts.contributeReceivedLogRecord(record),
+      })
+      .withPeerSubscriber("codingAgentMetricFactsDispatch", {
+        eventType: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+        data: canonicalMetricDataPointSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `coding-agent-metric-facts:${event.tenantId}:${metricPointIdOf.parse(event.data).pointId}`,
+            ttlMs: 60_000,
+          },
+        },
+        handle: (point) => deps.receivedFacts.contributeReceivedMetricPoint(point),
+      })
       // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
       // order-dependent model-call derivations. The log lane fills the session-context
       // memo from a declaration; the span lane only reads it.
@@ -194,7 +234,7 @@ export type CodingAgentProcessingPipeline = ReturnType<
  */
 export const codingAgentEventing = defineEventingModule({
   pipeline: "coding_agent_processing",
-  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentApp>) =>
+  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentModule>) =>
     app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

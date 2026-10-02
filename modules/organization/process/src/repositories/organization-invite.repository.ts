@@ -1,9 +1,9 @@
+import type { GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   Organization,
   OrganizationInvite,
   OrganizationUser,
   OrganizationUserRole,
-  RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 
 /** The columns a pending or payment-pending invite is written with. */
@@ -65,7 +65,7 @@ export abstract class OrganizationInviteRepository {
   }): Promise<Organization & { members: OrganizationUser[] }>;
   /** The personal teams a set of role-binding scopes reaches, by each owner's name for it. */
   abstract findPersonalTeamsInScopes(input: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<{ name: string }[]>;
 
   abstract createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite>;

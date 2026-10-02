@@ -1,25 +1,25 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp } from "@langwatch/kernel";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { enterpriseGatewayServer } from "../../enterprise-gateway.server.ts";
+import { enterpriseGatewayProcessModule } from "../../enterprise-gateway.module.ts";
 
 function boot() {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
-    .withModules([enterpriseGatewayServer])
+    .withModules([enterpriseGatewayProcessModule])
     .withStores(memoryStores())
     .withMembers({ isSaas: false })
     .withObservability((observability) => observability.withLogging(logger))
@@ -36,7 +36,7 @@ function boot() {
 describe("enterprise gateway installation", () => {
   /** @scenario "The enterprise gateway serves routing policies and personal virtual keys" */
   it("serves routingPolicy and personalVirtualKeys", () => {
-    expect(enterpriseGatewayServer.transports.map((transport) => transport.namespace)).toEqual([
+    expect(enterpriseGatewayProcessModule.transports.map((transport) => transport.namespace)).toEqual([
       "routingPolicy",
       "personalVirtualKeys",
     ]);
@@ -48,7 +48,7 @@ describe("enterprise gateway installation", () => {
 
     try {
       const app = runtime.service(EnterpriseGatewayApi);
-      expect(runtime.module(enterpriseGatewayServer).provided).toBe(app);
+      expect(runtime.module(enterpriseGatewayProcessModule).provided).toBe(app);
       await expect(app.countRoutingPolicies({ organizationId: "org_1" })).resolves.toBe(0);
       await expect(app.listRoutingPolicies({ organizationId: "org_1" })).resolves.toEqual([]);
     } finally {

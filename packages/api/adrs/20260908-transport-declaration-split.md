@@ -44,6 +44,9 @@ declaration per route.**
 
 ### `defineTrpcContract`, on the new `@langwatch/api/contract` entry
 
+Amended 2026-09-30 (Alex): the entry moved to `@langwatch/kernel/contract`, the light core, so
+`@langwatch/api` depends on module contracts without a cycle.
+
 ```ts
 export const annotationTrpc = defineTrpcContract("annotation")
   .query("getById")

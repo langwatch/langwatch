@@ -7,6 +7,7 @@ import type { Instant } from "@langwatch/time";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { inertReceivedFacts } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentProjectActivity,
@@ -139,6 +140,7 @@ function compose(
     sessionContextMemo: repositories.sessionContextMemo,
     sessionFoldCache: repositories.sessionFoldCache,
     ...(github ? { github } : {}),
+    receivedFacts: inertReceivedFacts,
   }).build();
 
   return { pipeline, insert, redis, set, projectActivity };

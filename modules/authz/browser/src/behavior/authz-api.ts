@@ -4,13 +4,13 @@
  */
 
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type {
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
   AuthzManagedOrganizationBinding,
   AuthzOwnStanding,
-  AuthzPermission,
   AuthzRevokeGrantByIdInput,
   Grant,
   GrantPage,
@@ -79,15 +79,11 @@ export type AuthzApiMap = {
     revokeGrant: {
       mutation: { input: Omit<AuthzRevokeGrantByIdInput, "actor">; output: GrantRevoked };
     };
-  };
-
-  roleBinding: {
     /**
-     * Every role binding in the organization — audit-grade RBAC data, which is
-     * why the procedure is gated at `organization:manage` and why the page
-     * behind it is too.
+     * Every grant in the organization, principals and scopes named: audit-grade
+     * data, which is why the procedure is gated at `organization:manage`.
      */
-    listForOrg: {
+    listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
     };
   };
@@ -104,9 +100,9 @@ export type AuthzApiMap = {
       };
     };
 
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;
@@ -123,13 +119,10 @@ export type AuthzApiMap = {
     };
   };
 
-  limits: {
-    /**
-     * The organization's plan, narrowed to the one fact these pages ask of it:
-     * whether it is Enterprise. The gateway's map reads the same procedure alike.
-     */
-    getUsage: {
-      query: { input: OrganizationScope; output: { activePlan: { type: string } } };
+  plan: {
+    /** The organization's plan, narrowed to the one fact these pages need: Enterprise or not. */
+    getActivePlan: {
+      query: { input: OrganizationScope; output: { type: string } };
     };
   };
 };

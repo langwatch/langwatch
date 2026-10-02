@@ -1,4 +1,4 @@
-import { Alert, Field } from "@chakra-ui/react";
+import { Alert, Field } from "@langwatch/design-system/primitives";
 import type { ManagedModelProvider } from "@langwatch/enterprise-managed-provider-contract";
 
 export function ManagedModelProviderAlert({

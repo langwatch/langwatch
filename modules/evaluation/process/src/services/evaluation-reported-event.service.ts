@@ -8,7 +8,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 
-import { type EvaluationInputsOffload } from "../app/evaluation.members.ts";
+import type { EvaluationInputsOffload } from "./evaluation-inputs-offload.service.ts";
 
 export type EvaluationReportedResult = {
   status: "processed" | "error" | "skipped";

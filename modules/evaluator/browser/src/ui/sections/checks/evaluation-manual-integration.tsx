@@ -1,16 +1,22 @@
-import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react";
+import { useMintPersonalToken } from "@langwatch/api-key-client";
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
+import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
+import { RenderCode } from "../workflow/code/render-code.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Sample values for the fields a Go example can send, in the order the request
@@ -158,16 +164,16 @@ export function EvaluationManualIntegration({
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const isOutputMandatory = evaluatorDefinition.requiredFields.includes("output");
-  const projectAPIKey = api.project.getProjectAPIKey.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project,
-    },
-  );
+  const minting = useMintPersonalToken({
+    organizationId: organization?.id,
+    projectId: project?.id,
+    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    name: "Personal access token",
+    permissions: ["evaluations:manage"],
+  });
+  const token = minting.token ?? null;
 
   const snippet: SnippetContext = {
     name,
@@ -253,10 +259,27 @@ export function EvaluationManualIntegration({
         </Tabs.Content>
         <Tabs.Content value="curl" padding={0}>
           <VStack align="start" width="full" gap={3}>
+            {project && organization && (
+              <PersonalAccessTokenBanner
+                token={token}
+                isCreating={minting.isMinting}
+                scopeNote={minting.scopeNote}
+                onCreate={() =>
+                  void minting
+                    .mint()
+                    .catch((error: unknown) =>
+                      showErrorToast({
+                        error,
+                        fallbackTitle: "Couldn't create the personal access token",
+                      }),
+                    )
+                }
+              />
+            )}
             <Box className="markdown" width="full">
               <RenderCode
                 code={`# Set your API key and endpoint URL
-API_KEY="${projectAPIKey.data?.apiKey ?? "your_langwatch_api_key"}"
+API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\

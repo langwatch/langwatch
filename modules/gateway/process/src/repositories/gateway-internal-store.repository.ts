@@ -32,12 +32,6 @@ export abstract class GatewayInternalStoreRepository {
   }): Promise<Pick<GatewayBudgetBucketBoundary, "periodStartedAt"> | null>;
 
   /**
-   * Every project in an organization, which is the tenant list a ClickHouse
-   * spend read is scoped by. An organization with no projects has no spend.
-   */
-  abstract findProjectIdsForOrganization(organizationId: string): Promise<string[]>;
-
-  /**
    * The key rows a batch of spend admissions is attributed against. One
    * read for up to 500 records: the appended event carries the result from
    * then on, so nothing downstream re-reads identity per request.
@@ -50,11 +44,6 @@ export abstract class GatewayInternalStoreRepository {
       lastUsedAt: Instant | null;
     }[]
   >;
-
-  /** The team each named project belongs to, for the same batch join. */
-  abstract findProjectTeams(
-    projectIds: readonly string[],
-  ): Promise<{ id: string; teamId: string }[]>;
 
   /**
    * Advance `lastUsedAt` on the keys a drain batch admitted. Best effort:

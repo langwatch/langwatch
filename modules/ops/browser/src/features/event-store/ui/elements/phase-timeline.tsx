@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 
 export const PHASE_ICONS: Record<string, string> = {
   mark: "\u2691",

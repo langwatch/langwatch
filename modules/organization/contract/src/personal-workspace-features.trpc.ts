@@ -4,7 +4,7 @@
  * navigation and deletes nothing, and the owner is who may switch it.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { personalFeaturesSchema } from "./personal-workspace.ts";

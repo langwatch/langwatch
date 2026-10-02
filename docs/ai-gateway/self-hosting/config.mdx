@@ -43,6 +43,8 @@ These apply to the base URLs customers configure on their own provider credentia
 
 The gateway caches each resolved virtual key in process. When a cached entry passes its JWT expiry and the refresh fails for a transport reason (network error, timeout, 5xx, unparseable response), the entry keeps serving: its soft expiry is extended by `SOFT_BUMP_SECONDS` per failed refresh, up to the JWT expiry plus `HARD_GRACE_SECONDS`. A `401`, `403` or `404` from the control plane evicts the entry at once.
 
+A change-feed event (a budget debit, a provider or routing edit) also evicts the entry so the next request reads fresh config. If that refetch fails for a transport reason, the gateway serves the evicted entry again, for up to one hour after its config was last confirmed. Revoking, disabling or rotating a key leaves no such fallback.
+
 | Var                                        | Default | Purpose                                                                                                                                                                   |
 | ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh during a control plane outage. `0` takes the default                                                                                 |

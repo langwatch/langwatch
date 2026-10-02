@@ -10,15 +10,8 @@ import type {
   AnnotationScore,
 } from "@langwatch/annotation-contract";
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
-import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-browser-kit";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
-import type {
-  Dataset,
-  DatasetRecord,
-  DatasetRecordEntry,
-  DatasetSummary,
-} from "@langwatch/dataset-contract";
 import type {
   PresenceCursorEvent,
   PresenceCursorInput,
@@ -27,10 +20,9 @@ import type {
   PresenceProjectInput,
   PresenceUpdateInput,
 } from "@langwatch/presence-contract";
-import type { MediaProbeResult, SimulationRunStatus } from "@langwatch/scenario-contract";
+import type { MediaProbeResult } from "@langwatch/scenario-contract";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import { type TimeInput } from "@langwatch/time";
-import type { ExportProgress, ExportProgressEvent } from "@langwatch/trace-browser-kit";
 import type {
   AiActionResult,
   ChangeTraceNameCommand,
@@ -42,6 +34,7 @@ import type {
   ExplorerInstantEvalProgress,
   ExplorerInstantEvalRuns,
   ExplorerInstantEvalRunInput,
+  ExportProgressEvent,
   FacetValuesResult,
   RouteSearchInput,
   RouteSearchResult,
@@ -61,8 +54,10 @@ import type {
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
+import type { CodingAgentSessionDisplay } from "../model/coding-agent/trace/session-display.ts";
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
+import type { ExportProgress } from "../model/export-types.ts";
 
 /** The project every trace procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -102,19 +97,6 @@ export type SavedViewRead = {
   createdAt: TimeInput;
   updatedAt: TimeInput;
 };
-
-/** One scenario run, as the trace header chip reads it. */
-export type TraceScenarioRunRead = {
-  scenarioRunId: string;
-  name?: string | null;
-  status?: SimulationRunStatus;
-  durationInMs?: number | null;
-  results?: {
-    metCriteria?: string[];
-    unmetCriteria?: string[];
-    reasoning?: string | null;
-  } | null;
-} | null;
 
 export type TraceApiMap = {
   traces: {
@@ -581,89 +563,9 @@ export type TraceApiMap = {
     };
   };
 
-  apiKey: {
-    /** One key id resolved to a display name. */
-    nameById: {
-      query: {
-        input: { organizationId: string; apiKeyId: string };
-        output: { name: string } | null;
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          projectId?: string;
-          organizationId?: string;
-          name: string;
-          bindings?: unknown;
-        };
-        output: { id: string; token: string; name: string };
-      };
-    };
-  };
-
   /** The project's privacy settings, read to explain a filter that redaction empties. */
   dataPrivacy: {
     getSnapshot: { query: { input: ProjectScope; output: DataPrivacySnapshot } };
-  };
-
-  /**
-   * The dataset family's own segment, declared here because the "Add to Dataset" drawer
-   * is this family's and calls it.
-   */
-  dataset: {
-    /** Every live dataset in the project, newest first. */
-    getAll: { query: { input: ProjectScope; output: DatasetSummary[] } };
-
-    /** One dataset, or `null` for an archived or missing one. */
-    getById: {
-      query: { input: ProjectScope & { datasetId: string }; output: Dataset | null };
-    };
-
-    /** The trace and thread mapping a dataset is filled from. */
-    updateMapping: {
-      mutation: {
-        input: ProjectScope & {
-          datasetId: string;
-          mapping?: { mapping: Record<string, unknown>; expansions: string[] };
-          threadMapping?: { mapping: Record<string, unknown> };
-        };
-        output: Dataset;
-      };
-    };
-  };
-
-  datasetRecord: {
-    /** Appends entries. What the "Add to Dataset" submit calls. */
-    create: {
-      mutation: {
-        input: ProjectScope & { datasetId: string; entries: DatasetRecordEntry[] };
-        output: DatasetRecord[];
-      };
-    };
-
-    /**
-     * Declared for its INVALIDATION rather than its answer: adding records has
-     * to make the dataset editor's page stale, and nothing here reads it.
-     */
-    getAll: {
-      query: { input: ProjectScope & { datasetId: string }; output: unknown };
-    };
-  };
-
-  evaluators: {
-    getById: {
-      query: {
-        input: ProjectScope & { id: string; organizationId?: string };
-        output: {
-          id: string;
-          name: string;
-          slug?: string | null;
-          evaluatorType?: string | null;
-          config?: Record<string, unknown> | null;
-        } | null;
-      };
-    };
   };
 
   monitors: {
@@ -688,32 +590,15 @@ export type TraceApiMap = {
 
   organization: {
     /**
-     * The organization graph, narrowed to what this family needs.
+     * The scope skeleton, narrowed to the presence switches this family reads.
      */
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
-          name: string;
-          slug?: string;
-          presenceEnabled?: boolean;
-          teams: {
-            id: string;
-            name: string;
-            slug?: string;
-            isPersonal?: boolean;
-            ownerUserId?: string | null;
-            members?: { userId: string }[];
-            projects: {
-              id: string;
-              name: string;
-              slug: string;
-              apiKey?: string;
-              firstMessage?: boolean;
-              presenceEnabled?: boolean;
-            }[];
-          }[];
+          presenceEnabled: boolean;
+          teams: { id: string; projects: { id: string; presenceEnabled: boolean }[] }[];
         }[];
       };
     };
@@ -731,38 +616,6 @@ export type TraceApiMap = {
           }[];
           teams: { id: string; name: string; slug: string }[];
         } | null;
-      };
-    };
-  };
-
-  prompts: {
-    getAllPromptsForProject: {
-      query: {
-        input: ProjectScope;
-        output: { id: string; handle: string | null; name: string }[];
-      };
-    };
-    getByIdOrHandle: {
-      query: {
-        input: ProjectScope & { idOrHandle: string; version?: number };
-        output: {
-          id: string;
-          handle: string | null;
-          name: string;
-          version: number;
-        } | null;
-      };
-    };
-    create: {
-      mutation: { input: ProjectScope & Record<string, unknown>; output: { id: string } };
-    };
-  };
-
-  scenarios: {
-    getRunState: {
-      query: {
-        input: ProjectScope & { scenarioRunId: string };
-        output: TraceScenarioRunRead;
       };
     };
   };

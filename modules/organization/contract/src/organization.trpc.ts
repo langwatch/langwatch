@@ -1,13 +1,26 @@
 /** Organization and membership procedures; `invite.*` is its own namespace (`invite.trpc.ts`). */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import {
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+} from "@langwatch/authz-contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
+import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
 
 import {
+  INVITE_ACCEPTED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+} from "./organization-lifecycle.events.ts";
+import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
+  organizationDirectoryCountsSchema,
+  organizationMemberDirectorySchema,
   organizationMemberProvenanceByUserSchema,
+  organizationMemberRecordSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
@@ -24,6 +37,7 @@ import {
   organizationApiWithMembersInputSchema,
 } from "./organization.trpc-schemas.ts";
 import { organizationIntentSchema } from "./organization.ts";
+import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
 
 /** The first organization a person creates, and the name they gave it. */
 export const organizationApiCreateAndAssignInputSchema = z.object({
@@ -42,9 +56,6 @@ export type OrganizationApiCreateAndAssignInput = z.infer<
  * partial one would strip fields the shell reads.
  */
 export const organizationFullyLoadedListSchema = z.array(z.unknown());
-
-/** The same reason, for the two single-aggregate reads beside it. */
-export const organizationAggregateSchema = z.unknown();
 
 export const organizationTrpc = defineTrpcContract("organization")
   /** Sign-up: the caller's first organization and its first team. */
@@ -65,9 +76,24 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** Every organization the caller can reach, fully loaded and redacted. */
-  .query("getAll", { cache: { tier: "session", persist: true } })
+  .query("getAll")
   .withInput(organizationApiGetAllInputSchema)
   .withOutput(organizationFullyLoadedListSchema)
+
+  /** The shell's scope skeleton, narrowed to the caller. */
+  .query("getScopeGraph", {
+    // Grants are appended under their organization, so they hint under their own tenant.
+    invalidatedBy: [
+      { event: PROJECT_CREATED_EVENT_TYPE, scope: "organizationId" },
+      ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+      { event: INVITE_ACCEPTED_EVENT_TYPE, scope: "organizationId" },
+      GRANT_ATTACHED_EVENT_TYPE,
+      GRANT_ROLE_CHANGED_EVENT_TYPE,
+      GRANT_REVOKED_EVENT_TYPE,
+    ],
+  })
+  .withInput(organizationApiScopeGraphInputSchema)
+  .withOutput(scopeGraphSchema)
 
   .mutation("update")
   .withInput(organizationApiUpdateInputSchema)
@@ -76,11 +102,16 @@ export const organizationTrpc = defineTrpcContract("organization")
   /** The member pickers' read: names always, addresses only for an administrator. */
   .query("getOrganizationWithMembersAndTheirTeams")
   .withInput(organizationApiWithMembersInputSchema)
-  .withOutput(organizationAggregateSchema)
+  .withOutput(organizationMemberDirectorySchema)
+
+  /** The Directory's tab badges: counts only, so a closed tab loads no list. */
+  .query("getDirectoryCounts")
+  .withInput(organizationApiScopeSchema)
+  .withOutput(organizationDirectoryCountsSchema)
 
   .query("getMemberById")
   .withInput(organizationApiMemberScopeSchema)
-  .withOutput(organizationAggregateSchema)
+  .withOutput(organizationMemberRecordSchema)
 
   /** Why each member is here; a second query so a failure degrades only the chips. */
   .query("getMemberProvenance")

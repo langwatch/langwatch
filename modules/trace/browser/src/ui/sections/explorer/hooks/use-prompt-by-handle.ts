@@ -1,4 +1,5 @@
-import { api } from "../../../../behavior/trace-api.ts";
+import { promptClient } from "@langwatch/prompt-client";
+
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
@@ -8,14 +9,13 @@ import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-vie
 export function usePromptByHandle(handle: string | null | undefined) {
   const { project } = useOrganizationTeamProject();
   const isReadOnly = useIsReadOnlyTrace();
-  const lookup = api.prompts.getByIdOrHandle.useQuery(
+  const lookup = promptClient.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: handle ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !!handle && !isReadOnly,
-      staleTime: 60_000,
       retry: false,
     },
   );

@@ -11,6 +11,7 @@ import {
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
 } from "@langwatch/experiment-contract";
+import { workflowWithoutHttpAgentSecrets } from "@langwatch/workflow-contract";
 
 import { extractDatasetId, pickLatestRun } from "../rules/experiment-evaluations-list.rules.ts";
 import type { ExperimentWorkflowLinkService } from "./experiment-workflow-link.service.ts";
@@ -57,16 +58,17 @@ export class ExperimentListingService {
     // unreliable, so the count and the page slice run off the same array.
     const allExperiments = await Promise.all(
       (await this.options.experiments.list({ projectId: input.projectId })).map(
-        async (experiment) => ({
-          ...experiment,
-          workflow: experiment.workflowId
+        async (experiment) => {
+          const workflow = experiment.workflowId
             ? await this.options.links.findWorkflow({
                 id: experiment.workflowId,
                 projectId: input.projectId,
                 includeVersion: true,
               })
-            : null,
-        }),
+            : null;
+
+          return { ...experiment, workflow: workflow && workflowWithoutHttpAgentSecrets(workflow) };
+        },
       ),
     );
     const nonLegacyExperiments = allExperiments.filter(

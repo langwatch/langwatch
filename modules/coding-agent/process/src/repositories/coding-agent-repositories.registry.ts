@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { LiveCodingAgentRepositories } from "./live/live.coding-agent.repositories.ts";
 import { MemoryCodingAgentRepositories } from "./memory/memory.coding-agent.repositories.ts";

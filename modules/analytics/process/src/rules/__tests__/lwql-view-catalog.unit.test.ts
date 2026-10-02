@@ -11,6 +11,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import {
   LangWatchQLCatalogShapesService,
   LWQL_COLUMN_UNITS,
@@ -21,7 +22,7 @@ import {
   gateForContentCategory,
   isContentAttributeKey,
 } from "../lwql-content-gating.rules.ts";
-import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -707,7 +708,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
   /** @scenario "The gated column set is derived from the data privacy policy, not hand-listed" */
   it("withholds every gated column from a caller holding nothing", () => {
     const gated = catalogShapes.gatedColumns({
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       views: LWQL_VIEW_CATALOG,
     });
     const everyGatedColumn = [
@@ -731,6 +732,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
   it("treats an absent permission as withheld, not as held", () => {
     const undefinedFlags = catalogShapes.gatedColumns({
       protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCapturedInput: undefined,
         canSeeCapturedOutput: null,
         canSeeCosts: undefined,
@@ -746,6 +748,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
     expect(
       catalogShapes.gatedColumns({
         protections: {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,
           canSeeCosts: true,
@@ -762,6 +765,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
   it("separates the cost gate from the content gates", () => {
     const contentOnly = catalogShapes.gatedColumns({
       protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
         canSeeCosts: true,
@@ -773,6 +777,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
 
     const costOnly = catalogShapes.gatedColumns({
       protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCapturedInput: true,
         canSeeCapturedOutput: true,
         canSeeCosts: false,
@@ -802,6 +807,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
   it("withholds a column needing two permissions when only one is held", () => {
     const outputOnly = catalogShapes.gatedColumns({
       protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: true,
         canSeeCosts: true,
@@ -830,6 +836,7 @@ describe("given the LangWatchQL view catalog when a caller's permissions are tur
 describe("given the LangWatchQL view catalog when a dataset is gated as a whole", () => {
   const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];
   const holding = (input: boolean, output: boolean) => ({
+    catalogue: EVERY_CATALOGUE_PERMISSION,
     canSeeCapturedInput: input,
     canSeeCapturedOutput: output,
     canSeeCosts: true,
@@ -864,12 +871,15 @@ describe("given the LangWatchQL view catalog when a dataset is gated as a whole"
     }
   });
 
+  const WITH_GATED_DATASET = { ...LWQL_CATALOG, [GATED_DATASET.name]: LWQL_CATALOG.traces };
+
   it("hides the dataset from a caller who lacks its permission", () => {
     expect(
       catalogShapes
         .visibleViews({
           protections: holding(false, true),
           views,
+          catalog: WITH_GATED_DATASET,
         })
         .map((view) => view.name),
     ).not.toContain(GATED_DATASET.name);
@@ -878,7 +888,7 @@ describe("given the LangWatchQL view catalog when a dataset is gated as a whole"
   it("shows it to a caller who holds it, so the case above is about the permission", () => {
     expect(
       catalogShapes
-        .visibleViews({ protections: holding(true, true), views })
+        .visibleViews({ protections: holding(true, true), views, catalog: WITH_GATED_DATASET })
         .map((view) => view.name),
     ).toContain(GATED_DATASET.name);
   });
@@ -886,7 +896,7 @@ describe("given the LangWatchQL view catalog when a dataset is gated as a whole"
   it("leaves every other dataset visible", () => {
     expect(
       catalogShapes
-        .visibleViews({ protections: holding(false, false), views })
+        .visibleViews({ protections: holding(false, false), views, catalog: WITH_GATED_DATASET })
         .map((view) => view.name),
     ).toEqual(LWQL_VIEW_CATALOG.map((view) => view.name));
   });

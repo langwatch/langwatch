@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,10 +14,6 @@ import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 vi.mock("../../../behavior/automation-api.ts", () => ({
   api: { useUtils: () => ({}) },
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function selectContainingOption(optionName: RegExp): HTMLSelectElement {
   const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
@@ -56,7 +52,7 @@ describe("CadenceSection", () => {
     });
 
     it("renders the threshold rule", () => {
-      render(<CadenceSection />, { wrapper: Wrapper });
+      renderWithDesignSystem(<CadenceSection />);
 
       expect(selectContainingOption(/greater than/i)).toBeInTheDocument();
       expect(selectContainingOption(/1 hour/i)).toBeInTheDocument();
@@ -66,7 +62,7 @@ describe("CadenceSection", () => {
     describe("when the threshold is edited", () => {
       it("commits the parsed number to the draft", async () => {
         const user = userEvent.setup();
-        render(<CadenceSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CadenceSection />);
 
         const input = screen.getByRole("spinbutton");
         await user.clear(input);
@@ -79,7 +75,7 @@ describe("CadenceSection", () => {
     describe("when the operator is changed", () => {
       it("commits it to the draft", async () => {
         const user = userEvent.setup();
-        render(<CadenceSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CadenceSection />);
 
         await user.selectOptions(selectContainingOption(/greater than/i), "Less than");
 
@@ -91,7 +87,7 @@ describe("CadenceSection", () => {
   describe("given a report draft", () => {
     it("renders the friendly schedule picker, not a raw cron field", () => {
       seed({ source: "report" });
-      render(<CadenceSection />, { wrapper: Wrapper });
+      renderWithDesignSystem(<CadenceSection />);
 
       expect(selectContainingOption(/Weekly/i)).toBeInTheDocument();
       expect(screen.queryByPlaceholderText("0 9 * * 1")).not.toBeInTheDocument();
@@ -100,7 +96,7 @@ describe("CadenceSection", () => {
     it("commits the cron schedule to the draft in advanced mode", async () => {
       const user = userEvent.setup();
       seed({ source: "report" });
-      render(<CadenceSection isEdit />, { wrapper: Wrapper });
+      renderWithDesignSystem(<CadenceSection isEdit />);
 
       await user.click(screen.getByLabelText(/Edit as a cron expression/i));
       const cron = screen.getByPlaceholderText("0 9 * * 1");
@@ -112,10 +108,57 @@ describe("CadenceSection", () => {
   });
 
   describe("given a trace automation draft", () => {
-    it("renders the digest cadence and settle window", () => {
-      seed({ source: "trace" });
-      render(<CadenceSection />, { wrapper: Wrapper });
+    /** @scenario "The cadence section is shown for notification triggers" */
+    it("asks how to receive messages and shows the settle window", () => {
+      seed({ source: "trace", action: "SEND_EMAIL" });
+      renderWithDesignSystem(<CadenceSection />);
 
+      expect(screen.getByText("How do you want to receive messages?")).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /one message per matching trace/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Settle window")).toBeInTheDocument();
+      // The settle wait answers "why wasn't this instant?", so the section says so.
+      expect(screen.getByText(/no new spans have arrived for this long/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "Cadence defaults to a 5-minute digest for new notifications" */
+    it("pre-picks batches every 5 minutes", () => {
+      seed({ source: "trace", action: "SEND_EMAIL" });
+      renderWithDesignSystem(<CadenceSection />);
+
+      expect(screen.getByRole("radio", { name: /in batches/i })).toBeChecked();
+      expect(selectContainingOption(/every 5 minutes/i)).toHaveValue("5min_digest");
+    });
+
+    it("commits a per-trace choice to the draft", async () => {
+      const user = userEvent.setup();
+      seed({ source: "trace", action: "SEND_EMAIL" });
+      renderWithDesignSystem(<CadenceSection />);
+
+      await user.click(screen.getByRole("radio", { name: /one message per matching trace/i }));
+
+      expect(useAutomationStore.getState().draft.notificationCadence).toBe("immediate");
+    });
+
+    it("returns to the batch window the author had when they flip back", async () => {
+      const user = userEvent.setup();
+      seed({ source: "trace", action: "SEND_EMAIL" });
+      renderWithDesignSystem(<CadenceSection />);
+
+      await user.selectOptions(selectContainingOption(/every hour/i), "hourly_digest");
+      await user.click(screen.getByRole("radio", { name: /one message per matching trace/i }));
+      await user.click(screen.getByRole("radio", { name: /in batches/i }));
+
+      expect(useAutomationStore.getState().draft.notificationCadence).toBe("hourly_digest");
+    });
+
+    /** @scenario "The receive choice is not duplicated when the channel hosts it" */
+    it("offers only the settle window when the channel hosts the chooser beside its templates", () => {
+      seed({ source: "trace", action: "SEND_SLACK_MESSAGE" });
+      renderWithDesignSystem(<CadenceSection />);
+
+      expect(screen.queryByText("How do you want to receive messages?")).not.toBeInTheDocument();
       expect(screen.getByText("Settle window")).toBeInTheDocument();
     });
   });

@@ -10,13 +10,18 @@ import type {
   translateTrpc,
 } from "@langwatch/model-provider-contract";
 
+/** One organization of `organization.getScopeGraph`, narrowed to what the scope picker reads. */
+export type ModelProviderScopeGraphOrganization = {
+  id: string;
+  name: string;
+  teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+};
+
 type BorrowedProcedures = {
   organization: {
-    /**
-     * Declared for its cache entry. Deleting a provider changes the
-     * organization graph the shell holds, so it must be invalidated.
-     */
-    getAll: { query: { input: { isDemo?: boolean }; output: unknown } };
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: ModelProviderScopeGraphOrganization[] };
+    };
   };
 };
 

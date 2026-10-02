@@ -1,10 +1,10 @@
+import type { IdentityApi } from "@langwatch/identity-contract";
+import type { OrganizationApi, OrganizationFounding } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  * The orphaned-organization rate, read from the organization and identity owners (D12).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { IdentityApi } from "@langwatch/identity-contract";
-import type { OrganizationApi, OrganizationFounding } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { SignUpHealthService } from "../sign-up-health.service.ts";

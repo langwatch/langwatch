@@ -1,9 +1,3 @@
-import {
-  INITIAL_TIME_RANGE,
-  useFilterStore,
-  ACTIVE_LENS_KEY,
-  useViewStore,
-} from "@langwatch/trace-browser-kit";
 // @vitest-environment jsdom
 // Time range scopes all queries; fragment absence differs from default (not
 // the same thing).
@@ -15,7 +9,10 @@ import { act, renderHook } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
+import { INITIAL_TIME_RANGE } from "../../../../../behavior/query.slice.ts";
 import { getPresetById } from "../../../../../behavior/time-range-presets.ts";
+import { ACTIVE_LENS_KEY } from "../../../../../behavior/view.slice.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });

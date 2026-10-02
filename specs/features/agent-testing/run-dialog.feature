@@ -204,6 +204,14 @@ Feature: The run dialog
     And the dialog stays open and says a target is needed
     And no run is scheduled
 
+  @integration
+  Scenario: The only agent of a project is not chosen for a scenario with no saved agent
+    Given a project with one agent and a scenario that has no saved agent
+    When the run dialog is opened
+    Then the agent card is not marked chosen
+    And Run sends no target and the dialog says a target is needed
+    And choosing the card marks it and Run sends that agent
+
   # --- Chips ---
 
   @integration

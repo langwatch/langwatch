@@ -1,8 +1,8 @@
-import { LangyTurnHandoffRedisRepository } from "@langwatch/langy-process";
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { LANGY_HANDOFF_TTL_SECONDS } from "../repositories/langy-live-turn.repository.ts";
+import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 
 function fakeRedis() {
   return memoryRedisDouble();

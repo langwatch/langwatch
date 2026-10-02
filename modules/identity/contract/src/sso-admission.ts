@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { SsoAssertionRefusedError } from "./identity.errors.ts";
+import type { AssertedEmailVerification } from "./sso-email-verification.ts";
 
 /** The person arriving, as every step of an admission names them. */
 export interface SsoArrivingUser {
@@ -33,6 +34,34 @@ export interface SsoAssertionRefusal {
 }
 
 export type SsoAssertionDecision = Readonly<{ action: "continue" }> | SsoAssertionRefusal;
+
+/** An admitted assertion, as the user resolver reads it: who asserted whom. */
+export interface SsoUserResolutionInput {
+  protocol: "oidc" | "saml";
+  providerId: string;
+  accountKey: Readonly<{ issuer: string; accountId: string }>;
+  email: string;
+  /** The sign-in library's own reading: the OIDC provider sent `email_verified: true`. */
+  emailVerified: boolean;
+  /** Every verification claim the provider sent (`xms_edov` included); SAML says nothing. */
+  emailVerification: AssertedEmailVerification;
+}
+
+/**
+ * Which existing person an admitted assertion signs in as. `continue` leaves the choice to
+ * the sign-in library's own rule; `OAuthAccountNotLinked` is that library's refusal, kept so
+ * the screen reads what it always read. `confirmAddress`: confirm it in the link's own commit.
+ */
+export type SsoUserResolution =
+  | Readonly<{ action: "continue" }>
+  | Readonly<{ action: "link"; userId: string; profile: "preserve"; confirmAddress?: true }>
+  | Readonly<{
+      action: "reject";
+      code:
+        | "OAuthAccountNotLinked"
+        | "sso_existing_account_unconfirmed"
+        | "sso_domain_not_verified";
+    }>;
 
 /**
  * Where somebody's own sign-in leaves them: testing a connection that has not

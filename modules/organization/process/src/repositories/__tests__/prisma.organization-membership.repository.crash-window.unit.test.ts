@@ -1,8 +1,8 @@
 /** Crash window between Prisma write and ledger append: removal and demotion converge on retry. */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -210,6 +210,7 @@ describe("given an admin being demoted to member", () => {
 
       await expect(
         repository.updateMemberRole({
+          caller: { type: "system" },
           organizationId: "org_1",
           userId: "user_a",
           role: OrganizationUserRole.MEMBER,

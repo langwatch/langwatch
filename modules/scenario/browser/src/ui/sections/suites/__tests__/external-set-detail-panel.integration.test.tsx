@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/suite-bugfixes-1956.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
@@ -17,13 +17,17 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
-  );
+vi.mock("@langwatch/browser-host/page-visibility", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     usePageVisibility: () => true,
+  };
+});
+vi.mock("@langwatch/browser-host/sse-subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useSSESubscription: vi.fn(() => ({
       connectionState: "disconnected",
       isConnected: false,
@@ -49,7 +53,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -63,6 +67,20 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    useUtils: () => ({}),
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
@@ -78,19 +96,13 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
       cancelBatchRun: { useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })) },
       onSimulationUpdate: {},
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
-    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
   },
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule0 from "@langwatch/browser-host/page-visibility";
+import type * as actualModule1 from "@langwatch/browser-host/sse-subscription";
 
 import { ExternalSetDetailPanel } from "../external-set-detail-panel.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const period = {
   startDate: Temporal.Instant.from("2025-01-01T00:00:00Z"),
@@ -130,9 +142,9 @@ describe("<ExternalSetDetailPanel/>", () => {
           error: null,
         });
 
-        render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={period} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <ExternalSetDetailPanel scenarioSetId="ext-set-1" period={period} />,
+        );
 
         fireEvent.click(screen.getByLabelText(/View details for/));
 

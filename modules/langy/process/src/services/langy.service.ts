@@ -17,15 +17,15 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../app/langy.members.ts";
-import type {
-  ConversationDetail,
-  ConversationListItem,
-  ConversationListPage,
+import {
+  ADOPTABLE_CONVERSATION_ID,
+  type ConversationDetail,
+  type ConversationListItem,
+  type ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
 import type { LatestControlRequest } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
-  ADOPTABLE_CONVERSATION_ID,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
@@ -53,7 +53,7 @@ export { ADOPTABLE_CONVERSATION_ID };
 
 /**
  * The Langy feature's own conversation-and-turn service: the full surface
- * `LangyApp` forwards from. Folded out of the contract package per
+ * `LangyModule` forwards from. Folded out of the contract package per
  * ADR-133 (the flagged "contract-service" shape); now the sole definition.
  */
 export class LangyService {

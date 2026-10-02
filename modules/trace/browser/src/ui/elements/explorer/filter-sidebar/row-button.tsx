@@ -1,3 +1,3 @@
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 
 export const RowButton = chakra("button");

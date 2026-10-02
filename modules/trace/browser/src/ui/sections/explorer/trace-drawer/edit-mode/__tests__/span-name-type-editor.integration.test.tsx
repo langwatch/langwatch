@@ -1,9 +1,9 @@
 // Name/type editors seed from existing correction, preserving prior
 // reviewer's work (not reverted on touch).
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -28,10 +28,8 @@ function draftState() {
 }
 
 function renderEditor() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SpanNameTypeEditor spanId="span-1" capturedName={CAPTURED_NAME} capturedType="llm" />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <SpanNameTypeEditor spanId="span-1" capturedName={CAPTURED_NAME} capturedType="llm" />,
   );
 }
 

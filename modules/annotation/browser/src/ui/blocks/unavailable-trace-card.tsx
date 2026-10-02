@@ -3,7 +3,7 @@
  * not resolve: it says so plainly and hands back a way on.
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 export function UnavailableTraceCard({
   canRemove,

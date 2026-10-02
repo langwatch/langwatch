@@ -86,7 +86,7 @@ describe("resolveCapability, given a LangWatch CLI tool call", () => {
         render: "resourceRemoved",
         tone: "removed",
         surface: "automations",
-        overline: "Delete trigger",
+        overline: "Delete automation",
       });
     });
   });

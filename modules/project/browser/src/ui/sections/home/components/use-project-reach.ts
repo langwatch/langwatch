@@ -1,6 +1,5 @@
-import type { ProjectReach } from "@langwatch/langy-browser-kit";
-
 import { homeApi } from "../../../../behavior/home-api.ts";
+import type { ProjectReach } from "../../../../model/langy/langy-project-reach.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 export interface ProjectReachResult extends ProjectReach {

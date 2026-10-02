@@ -2,7 +2,7 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaModelCostCatalogRepository } from "../../../model-provider.server.ts";
+import { PrismaModelCostCatalogRepository } from "../../../model-provider.module.ts";
 
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature

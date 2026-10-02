@@ -4,10 +4,9 @@
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer.tsx";
@@ -32,6 +31,38 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
+    suites: {
+      testSuites: { getAll: { useQuery: () => ({ data: [] }) } },
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
+        getByIdIncludingArchived: { invalidate: vi.fn() },
+        listVersions: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
       getRunConfigurations: {
@@ -85,27 +116,6 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         }),
       },
     },
-    suites: {
-      testSuites: { getAll: { useQuery: () => ({ data: [] }) } },
-      // Every run of the v2 dialog is queued under a plan name.
-      runPlan: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-      },
-    },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-    },
-    useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
-        getByIdIncludingArchived: { invalidate: vi.fn() },
-        listVersions: { invalidate: vi.fn() },
-      },
-    }),
   },
 }));
 
@@ -133,7 +143,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -176,10 +186,6 @@ vi.mock("../../../../../behavior/use-can.ts", () => ({
     permissions: [],
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function scenarioAt(version: number) {
   return {
@@ -228,9 +234,8 @@ describe("the version chip in the scenario editor", () => {
   afterEach(cleanup);
 
   const renderEditor = () =>
-    render(
+    renderWithDesignSystem(
       <ScenarioFormDrawer open scenarioId="case_1" variant="agent-testing" onClose={vi.fn()} />,
-      { wrapper: Wrapper },
     );
 
   /** @scenario "The editor shows the current version beside the scenario name" */
@@ -262,9 +267,7 @@ describe("the version chip in the scenario editor", () => {
       refetch: mocks.mockGetByIdRefetch,
     });
     view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <ScenarioFormDrawer open scenarioId="case_1" variant="agent-testing" onClose={vi.fn()} />
-      </ChakraProvider>,
+      <ScenarioFormDrawer open scenarioId="case_1" variant="agent-testing" onClose={vi.fn()} />,
     );
 
     expect(await screen.findByTestId("case-version-5")).toBeInTheDocument();
@@ -361,7 +364,7 @@ describe("the History drawer", () => {
 
   afterEach(cleanup);
 
-  const renderHistory = () => render(<ScenarioVersionHistoryDrawer open />, { wrapper: Wrapper });
+  const renderHistory = () => renderWithDesignSystem(<ScenarioVersionHistoryDrawer open />);
 
   /** @scenario "History opens a popover listing the versions newest first" */
   it("lists the versions newest first", () => {
@@ -494,11 +497,7 @@ describe("the History drawer", () => {
       isError: false,
       refetch: mocks.mockListVersionsRefetch,
     });
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <ScenarioVersionHistoryDrawer open />
-      </ChakraProvider>,
-    );
+    view.rerender(<ScenarioVersionHistoryDrawer open />);
 
     const rows = screen.getAllByTestId(/^version-row-\d+$/);
     expect(rows[0]!.getAttribute("data-testid")).toBe("version-row-6");

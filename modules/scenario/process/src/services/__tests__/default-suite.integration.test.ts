@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -16,6 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * files it back into Default rather than leaving it loose.
  */
 import type { SimulationService } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -184,6 +184,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
   });
 
   /** @scenario "Default suite owning slug takes numbered slug when another suite owns 'default'" */
+  /** @scenario "A Default suite created while another suite already owns the slug takes a numbered slug" */
   it("takes a numbered slug when another suite of the project owns 'default'", async () => {
     await database().simulationSuite.create({
       data: {

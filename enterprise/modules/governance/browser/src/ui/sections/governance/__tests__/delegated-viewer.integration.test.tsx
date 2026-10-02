@@ -45,13 +45,7 @@ const harness = vi.hoisted(() => ({
   requested: [] as string[],
 }));
 
-// The overview's hero mounts the inline command palette, which reaches a
-// provider this test does not stand up; main mocks the same seam, and the
-// shader behind the hero, which jsdom has no canvas for.
-vi.mock("@langwatch/navigation-browser/surfaces/command-bar", () => ({
-  CommandPalette: ({ placeholder }: { placeholder: string }) => <input placeholder={placeholder} />,
-  useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
-}));
+// jsdom has no canvas for the shader behind the overview's hero.
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 vi.mock("../../../../features/overview/ui/sections/quarantine-fill-panel.tsx", () => ({
   QuarantineFillAlert: () => null,
@@ -207,6 +201,7 @@ describe("governance pages for a delegated viewer", () => {
     });
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
+    /** @scenario "The Departments tab offers no controls to a viewer without the manage grant" */
     it("offers no department controls without governance:manage", () => {
       renderPage({
         Page: PeoplePage,

@@ -1,5 +1,5 @@
-import { Button } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 
 /**

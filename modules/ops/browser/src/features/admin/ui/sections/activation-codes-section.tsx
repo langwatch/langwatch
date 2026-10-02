@@ -1,4 +1,12 @@
-import { Box, Button, Card, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Spacer,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 

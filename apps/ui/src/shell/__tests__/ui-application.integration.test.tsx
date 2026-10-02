@@ -1,12 +1,12 @@
 import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
-import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
+import { createUiApplication, type UiApplicationInstall } from "@langwatch/browser/application";
 import {
   type UiFeatureInstall,
   uiRoutePageKeys,
   type UiPageLoaderRegistry,
-} from "@langwatch/ui-kernel/feature-install";
-import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
+} from "@langwatch/browser/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
+import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";
@@ -60,11 +60,12 @@ class StubSession extends UiSession {
   }
 }
 
-/** The host's registry: one loader for every page key the route table names. */
+/** The host's registry: one loader per page key the route table names; layouts pass through. */
 function hostLoaders(page: ComponentType): UiPageLoaderRegistry {
   const registry: Record<string, () => Promise<{ default: ComponentType }>> = {};
   for (const key of uiRoutePageKeys(uiRouteTable)) {
-    registry[key] = async () => ({ default: page });
+    const component = key.startsWith("layouts/") ? Outlet : page;
+    registry[key] = async () => ({ default: component });
   }
   return registry;
 }
@@ -83,6 +84,7 @@ function applicationOf({
       shellLayouts: {
         auth: async () => ({ default: () => <Outlet /> }),
         chrome: async () => ({ default: () => <Outlet /> }),
+        "full-screen": async () => ({ default: () => <Outlet /> }),
       },
       loaders,
       errorFallback: () => <div data-testid="page-error" />,

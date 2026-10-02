@@ -210,6 +210,167 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     When I bind role "admin" through /api/role-bindings, or change a binding to it
     Then the request is refused with code grant_exceeds_caller_permissions and status 403
 
+  # Every door that grants refuses escalation alike: authz runs the rule on the grant write
+  # itself, and a door that writes something of its own first asks the same rule before it.
+  # Each refusal is code grant_exceeds_caller_permissions, status 403, with meta.missingPermissions.
+
+  @unit
+  Scenario: Creating a group with a grant above the caller is refused
+    Given I hold "organization:manage" but not every permission of role "admin" on a team
+    When I create a group that holds role "admin" on that team
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And no group is created
+
+  @unit
+  Scenario: Adding a grant to a group above the caller is refused
+    Given I do not hold every permission of role "admin" on a team
+    When I add a grant of role "admin" on that team to a group
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+
+  @unit
+  Scenario: Editing a group to add a grant above the caller is refused before any edit
+    Given I do not hold every permission of role "admin" on a team
+    When I save a group edit that renames the group and adds role "admin" on that team
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And the group is neither renamed nor stripped of any grant
+
+  @unit
+  Scenario: Adding a member to a group whose grants exceed the caller is refused
+    Given a group holds role "admin" on a team
+    And I do not hold every permission of role "admin" on that team
+    When I add myself or anyone else to that group
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+
+  @unit
+  Scenario: Adding a team member with a role above the caller is refused
+    Given I do not hold every permission of role "admin" on a team
+    When I add a member to that team with role "admin"
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+
+  @unit
+  Scenario: Saving a team's members with a role above the caller is refused
+    Given I do not hold every permission of role "admin" on a team
+    When I save the team's members with a member changed to role "admin"
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+
+  @unit
+  Scenario: Changing a member's organization role above the caller is refused before the seat changes
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I change a member's organization role to admin
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And the member's seat is unchanged
+
+  @unit
+  Scenario: A role change that corrects team roles is refused before the seat changes
+    Given a member who is a viewer on a team where I may not grant the member role
+    When I change their organization role to member, naming no team roles
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And meta.missingPermissions names what I lack
+    And the member's seat and team roles are unchanged
+
+  @unit
+  Scenario: Changing a member's team role above the caller is refused before anything is written
+    Given I do not hold every permission of role "admin" on a team
+    When I change a member's role on that team to "admin"
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+
+  @unit
+  Scenario: Inviting someone to a role above the inviter is refused and stores no invitation
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I invite someone as an organization admin
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And no invitation is stored
+
+  @unit
+  Scenario: Inviting by legacy team ids is bounded by the inviter's own team access
+    Given I hold "organization:manage" but no access to a team
+    When I invite someone as a member naming that team in the legacy team id list
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And no invitation is stored
+
+  @unit
+  Scenario: Inviting through a seat checkout is bounded by the inviter
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I buy seats for an invitation as an organization admin
+    Then the invitation is refused with code grant_exceeds_caller_permissions
+    And no invitation is held for payment
+
+  @unit
+  Scenario: A seat checkout inviting past the inviter writes nothing
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I buy seats for an invitation as an organization admin
+    Then the checkout is refused with code grant_exceeds_caller_permissions
+    And meta.missingPermissions names what I lack
+    And no pending seat checkout is stored and no checkout session is opened
+
+  @unit
+  Scenario: A service key grants through the organization doors, bounded by its own grants
+    Given a service organization key that acts as no person
+    When it adds a group grant, a team member, a member role or an invitation
+    Then the write answers as the key, and is refused only beyond what the key itself holds
+
+  @unit
+  Scenario: A personal key is bounded by the key, not by its owner
+    Given a personal organization key narrower than the member who owns it
+    When it grants through an organization door
+    Then the write is bounded by what the key holds, not by its owner
+
+  @unit
+  Scenario: A key-authenticated request grants at most what the requesting key holds
+    Given a personal organization key narrower than the organization admin who owns it
+    When it creates a service key or edits a key's bindings through /api/api-keys
+    Then each binding is bounded by what the requesting key holds, as well as by any key owner
+    And a service key or a key for another member needs the admin role on the key and its owner
+    And a refused request writes no key and no binding
+
+  @unit
+  Scenario: A custom role the organization does not have is refused before anything is written
+    When a door is asked to grant a custom role the organization does not have
+    Then it is refused with code custom_role_not_assignable before anything is written
+
+  @unit
+  Scenario: Creating a staffed team is bounded by its creator, who still becomes its admin
+    Given I may create teams but hold no team role at the organization
+    When I create a team naming myself as its admin and someone else as a member
+    Then I become the team's admin
+    And the other member is written only if I hold what their role confers
+
+  @unit
+  Scenario: Minting a SCIM token requires a full organization admin
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I mint a SCIM token
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And no token is minted
+
+  @unit
+  Scenario: An expired organization admin is not an admin for API key management
+    Given my organization admin grant has passed its end moment
+    When I manage the organization's service API keys
+    Then I am not treated as an organization admin
+
+  @unit
+  Scenario: A service key's grants are bounded by the person who creates it
+    When a member creates or edits a service API key
+    Then its built-in role grants are written answering as that member, never as the system
+
+  @unit
+  Scenario: A grant write nobody answers for is refused
+    Given a grant write arrives with no person or API key to answer for it
+    When it grants any role
+    Then it is refused with code grant_exceeds_caller_permissions
+
+  @unit
+  Scenario: Granting at or below the caller's own level still succeeds
+    Given I hold every permission of role "admin" on a team
+    When I add a member to that team with role "admin"
+    Then the grant is written
+
+  @unit
+  Scenario: A write that follows from an act already authorized is not bounded by a caller
+    Given an invitation was created by someone who held what it grants
+    When the invitee accepts it
+    Then its grants are written without asking what the invitee holds
+
   @unit
   Scenario: The last administrator grant of an organization cannot be revoked
     Given exactly one user holds role "admin" on the organization
@@ -296,3 +457,28 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
   Scenario: The first call to a deprecated operation is logged once
     When I list bindings through /api/role-bindings twice
     Then one warning is logged naming the role-bindings family, the operation and "/api/grants"
+
+  # ============================================================================
+  # Plans: the management families are Enterprise, as main (402, meta.feature)
+  # ============================================================================
+
+  @integration
+  Scenario: Both grant families answer 402 below Enterprise, naming the management API
+    Given the organization is on a plan below Enterprise
+    When I list or create a grant through /api/grants or /api/role-bindings
+    Then each request is refused with code enterprise_plan_required and status 402
+    And meta.feature is "MANAGEMENT_API"
+    And no grant is written
+
+  @unit
+  Scenario: The groups family answers 402 below Enterprise, naming GROUPS
+    Given the organization is on a plan below Enterprise
+    When I list groups through /api/groups
+    Then the request is refused with code enterprise_plan_required and meta.feature "GROUPS"
+    And the groups are never read
+
+  @unit
+  Scenario: The organization and groups families answer 402 below Enterprise, as main
+    Then every /api/organization route names meta.feature "MANAGEMENT_API" when it refuses
+    And every /api/groups route names meta.feature "GROUPS" when it refuses
+    And the plan is asked only after the caller is authenticated and permitted

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryPromptRepositories } from "../repositories/memory/memory.prompt.repositories.ts";

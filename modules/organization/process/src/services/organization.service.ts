@@ -5,6 +5,7 @@ import {
   type JoinRequestJoining,
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,
+  OrganizationS3SecretRequiredError,
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PersonalTeamProtectedError,
   TeamNotFoundError,
@@ -274,6 +275,10 @@ export class OrganizationService extends OrganizationServiceContract {
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
+    const keepsSecret = !!parsed.s3Endpoint && parsed.s3SecretAccessKey === undefined;
+    if (keepsSecret && !(await this.repository.hasStoredS3Secret(parsed.organizationId))) {
+      throw new OrganizationS3SecretRequiredError();
+    }
     const wasSharingEnabled =
       parsed.traceSharingEnabled === false
         ? (await this.repository.findStoredSettings(parsed.organizationId))?.traceSharingEnabled ===
@@ -546,16 +551,16 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.groupService.listGroupBindings(input);
   }
 
-  async addGroupBinding(
-    input: Parameters<OrganizationGroupService["addGroupBinding"]>[0],
-  ): ReturnType<OrganizationGroupService["addGroupBinding"]> {
-    return this.groupService.addGroupBinding(input);
+  async addGroupGrant(
+    input: Parameters<OrganizationGroupService["addGroupGrant"]>[0],
+  ): ReturnType<OrganizationGroupService["addGroupGrant"]> {
+    return this.groupService.addGroupGrant(input);
   }
 
-  async removeGroupBinding(
-    input: Parameters<OrganizationGroupService["removeGroupBinding"]>[0],
-  ): ReturnType<OrganizationGroupService["removeGroupBinding"]> {
-    return this.groupService.removeGroupBinding(input);
+  async removeGroupGrant(
+    input: Parameters<OrganizationGroupService["removeGroupGrant"]>[0],
+  ): ReturnType<OrganizationGroupService["removeGroupGrant"]> {
+    return this.groupService.removeGroupGrant(input);
   }
 
   async applyGroupEdits(

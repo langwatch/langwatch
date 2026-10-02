@@ -1,4 +1,10 @@
 import {
+  type HttpTestErrorExplanation,
+  type HttpTestResult,
+  messagesToJson,
+  type TestMessage,
+} from "@langwatch/agent-contract/http-test";
+import {
   Alert,
   Box,
   Button,
@@ -10,13 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  type HttpTestErrorExplanation,
-  type HttpTestResult,
-  messagesToJson,
-  type TestMessage,
-} from "@langwatch/agent-contract/http-test";
+} from "@langwatch/design-system/primitives";
 import { AlertCircle, Play } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -49,8 +49,6 @@ export function renderTemplate(template: string, variables: Record<string, strin
   }
   return result;
 }
-
-export { formatDuration, getStatusColor } from "../blocks/http-test-response-display.tsx";
 
 export function HttpTestPanel({
   onTest,

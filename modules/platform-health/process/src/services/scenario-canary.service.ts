@@ -4,6 +4,7 @@ import { isTerminalStatus, type ScenarioApi } from "@langwatch/scenario-contract
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { deriveProbeCause } from "../rules/probe-cause.rules.ts";
 import {
   type CanaryConfig,
   type CanaryOutcome,
@@ -178,9 +179,10 @@ export class ScenarioCanaryService {
         { error, scenarioRunId },
         "Scenario canary attempt failed to launch or read the run",
       );
+      const cause = deriveProbeCause(error);
       return {
         ...(scenarioRunId ? { scenarioRunId } : {}),
-        verdict: { healthy: false, reason: "run_failed" },
+        verdict: { healthy: false, reason: "run_failed", ...(cause && { cause }) },
       };
     }
   }

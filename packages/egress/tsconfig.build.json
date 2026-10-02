@@ -24,19 +24,7 @@
   ],
   "references": [
     {
-      "path": "../../modules/automation/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../eventing/tsconfig.build.json"
-    },
-    {
       "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../task/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
     }
   ]
 }

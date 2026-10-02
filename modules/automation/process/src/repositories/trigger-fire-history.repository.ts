@@ -1,6 +1,8 @@
 import type {
+  AutomationApiFireHistoryInput,
   AutomationFireStats,
   TriggerFire,
+  TriggerFirePage,
   TriggerFireStats,
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
@@ -22,6 +24,8 @@ export abstract class TriggerFireHistoryRepository {
     triggerId: string;
     limit: number;
   }): Promise<TriggerFire[]>;
+  /** One page of the trigger's whole fire history, keyset on (createdAt desc, id desc). */
+  abstract listPageByTriggerId(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
   abstract findAllRecentForProject(input: {
     projectId: string;
     limit: number;

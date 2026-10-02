@@ -7,7 +7,15 @@
  * nothing and appears nowhere else, and that refusal is the whole of what
  * somebody who has just pasted a token needs to read.
  */
-import { Alert, Badge, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Badge,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { scimApi, type ScimRequestRow } from "../../behavior/scim-api.ts";
 import { connectionLabel, readableDate } from "../../model/display-formatters.ts";

@@ -1,13 +1,14 @@
-import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
+import { RawDrawer as ChakraDrawer } from "@langwatch/design-system/drawer";
+import { Portal } from "@langwatch/design-system/primitives";
+import * as React from "react";
+
+import { useLangyStore } from "../../behavior/langy/langy.store.ts";
 import {
   LANGY_DOCK_GAP,
   LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
-  useLangyStore,
-} from "@langwatch/langy-browser-kit";
-import * as React from "react";
-
+} from "../../model/langy/langy-panel-layout.ts";
 import { CloseButton } from "../elements/close-button.tsx";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 

@@ -14,6 +14,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 /**
@@ -96,7 +97,8 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass,
     stranding: new StubStranding([]),
-    platformOperators: new StubPlatformOperators([OLIVE.id]),
+    authorization: new StubPlatformOperators([OLIVE.id]),
+    licensing: licensingFixture(),
   });
 });
 

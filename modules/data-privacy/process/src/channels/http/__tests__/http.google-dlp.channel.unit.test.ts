@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { PiiAnalysisMetrics } from "../../../app/data-privacy.members.ts";
 import { GoogleDlpRedactionService } from "../../../services/google-dlp-redaction.service.ts";
+import type { PiiAnalysisMetricsOtelService } from "../../../services/pii-analysis-metrics-otel.service.ts";
 import { HttpGoogleDlpChannel } from "../http.google-dlp.channel.ts";
 
 /** Counters, not spies: the package clears mocks per test, which would hide a load at import. */
@@ -25,7 +25,10 @@ vi.mock("@google-cloud/dlp", () => {
 
 const credential = JSON.stringify({ project_id: "test-project" });
 
-class SilentMetrics implements PiiAnalysisMetrics {
+class SilentMetrics implements Pick<
+  PiiAnalysisMetricsOtelService,
+  "analysisCalled" | "analysisObserved" | "analysisFinished"
+> {
   analysisCalled(): void {}
   analysisObserved(): void {}
   analysisFinished(): void {}

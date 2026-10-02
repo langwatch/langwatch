@@ -3,9 +3,9 @@
  *
  * Node drawer header menu (Duplicate/Delete) for component nodes only.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component } from "@langwatch/workflow-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,7 +26,7 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       deleteNode: mockDeleteNode,
     }),
 }));
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../elements/workflow-icons.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentIcon: () => <div data-testid="component-icon" />,
 }));
@@ -68,12 +68,10 @@ function makeNode(type: string): Node<Component> {
 
 function renderDrawer(node: Node<Component>) {
   const onClose = vi.fn();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <StudioDrawerWrapper node={node} onClose={onClose}>
-        <div>body</div>
-      </StudioDrawerWrapper>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <StudioDrawerWrapper node={node} onClose={onClose}>
+      <div>body</div>
+    </StudioDrawerWrapper>,
   );
   return { onClose };
 }

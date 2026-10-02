@@ -1,9 +1,9 @@
 // Granting, changing and revoking: each refreshes the lists and tells the reader, or reports.
 
-import type { GrantDraft } from "@langwatch/authz-browser-kit";
 import { toDate } from "@langwatch/time";
 
 import { useAuthzHost } from "../model/authz-host.ts";
+import type { GrantDraft } from "../ui/sections/grants/grant-dialog.tsx";
 import { authzApi } from "./authz-api.ts";
 
 export function useGrantSave({
@@ -17,7 +17,7 @@ export function useGrantSave({
   const utils = authzApi.useUtils();
   const saved = (title: string) => {
     void utils.authz.listGrants.invalidate();
-    void utils.roleBinding.listForOrg.invalidate();
+    void utils.authz.listManagedGrants.invalidate();
     host.succeeded({ title });
     onSaved();
   };
@@ -48,7 +48,7 @@ export function useGrantRevoke({ organizationId }: { organizationId: string }) {
   const revokeGrant = authzApi.authz.revokeGrant.useMutation({
     onSuccess: () => {
       void utils.authz.listGrants.invalidate();
-      void utils.roleBinding.listForOrg.invalidate();
+      void utils.authz.listManagedGrants.invalidate();
       host.succeeded({ title: "Access revoked" });
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't revoke this access" }),

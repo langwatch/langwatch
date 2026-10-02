@@ -1,5 +1,5 @@
-import { Button } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { ChevronDown, Columns3 } from "lucide-react";

@@ -14,10 +14,10 @@ import { describe, expect, it } from "vitest";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { findPermissionsBeyondHeld } from "../../rules/grant-escalation.rules.ts";
-import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
 import { AuthzGrantManagementService } from "../../services/authz-grant-management.service.ts";
+import { AuthzGrantWriterService } from "../../services/authz-grant-writer.service.ts";
 import { authzTrpcTransport } from "../authz.trpc.ts";
 
 const ORG = "org-1";
@@ -70,7 +70,7 @@ function world({ sessionUserId = MANAGER }: { sessionUserId?: string } = {}) {
   const callers: AuthzPrincipalRef[] = [];
   let next = 0;
 
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockImplementation(async ({ scopes }) =>
     SCOPES.filter((scope) =>
       scopes.some((asked) => asked.scopeType === scope.type && asked.scopeId === scope.id),
@@ -139,7 +139,7 @@ function world({ sessionUserId = MANAGER }: { sessionUserId?: string } = {}) {
     listManagedBindingsForOrganization: async ({ organizationId }: { organizationId: string }) =>
       organizationId === OTHER_ORG ? [...foreignRows] : [...rows],
   };
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     bindings,
     ledger,
     newBindingId: () => `rb_new_${++next}`,

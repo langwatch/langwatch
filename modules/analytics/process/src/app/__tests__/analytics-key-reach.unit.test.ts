@@ -6,7 +6,6 @@
  * @vitest-environment node
  */
 import type { LangWatchQLKeyReach } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
@@ -19,11 +18,12 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-123";
@@ -76,7 +76,7 @@ async function appOver(input: {
   flaggedProjects?: readonly string[];
 }) {
   const flagsAsked: string[] = [];
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (_key, target) => {
@@ -87,6 +87,23 @@ async function appOver(input: {
       }),
       authz: createApiFixture<AuthzApi>({
         hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        canBatchPermissionsByIds: ({ permissions, teams, projects }) =>
+          Promise.resolve({
+            organizationRole: null,
+            byPermission: new Map(
+              permissions.map((permission) => {
+                const held = input.grants.includes(permission);
+                return [
+                  permission,
+                  {
+                    teams: new Map(teams.map(({ teamId }) => [teamId, held])),
+                    projects: new Map(projects.map(({ projectId }) => [projectId, held])),
+                  },
+                ];
+              }),
+            ),
+          }),
       }),
       dataPrivacy: createApiFixture<DataPrivacyApi>({
         getResolvedForProject: () => Promise.resolve(PLATFORM_DEFAULT_DATA_PRIVACY),
@@ -135,7 +152,7 @@ async function referenceFor(input: { listed: readonly Project[]; grants: readonl
   return (await appOver(input)).app.describeQueryReferenceForKey({ reach: KEY });
 }
 
-describe("AnalyticsApp.describeQueryReferenceForKey", () => {
+describe("AnalyticsModule.describeQueryReferenceForKey", () => {
   describe("when the key holds analytics:view on a readable project", () => {
     /** @scenario "A key holding analytics:view reads the reference" */
     it("describes both query languages in one payload", async () => {
@@ -209,7 +226,7 @@ describe("AnalyticsApp.describeQueryReferenceForKey", () => {
   });
 });
 
-describe("AnalyticsApp.describeLangWatchQLSchemaForKey", () => {
+describe("AnalyticsModule.describeLangWatchQLSchemaForKey", () => {
   const isEvalAvailable = (schema: {
     appFunctions: readonly { name: string; available: boolean }[];
   }) => schema.appFunctions.find((entry) => entry.name === "eval")?.available;

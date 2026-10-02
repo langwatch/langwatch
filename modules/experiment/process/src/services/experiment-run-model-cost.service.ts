@@ -1,4 +1,8 @@
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  getStaticModelCostRates,
+  type ModelCostRate,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { customRateAttributesOf, modelCostRatesOf } from "../rules/experiment-model-cost.rules.ts";
@@ -52,6 +56,14 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
     });
 
     return priced > 0 ? priced : undefined;
+  }
+
+  /** The project's custom cost rules ahead of the static catalogue, as main's getLLMModelCosts. */
+  async listFor({ projectId }: { projectId: string }): Promise<readonly ModelCostRate[]> {
+    return [
+      ...modelCostRatesOf(await this.modelProviders.listCosts({ projectId })),
+      ...getStaticModelCostRates(),
+    ];
   }
 
   /** An unreadable rule set prices from the catalogue alone: a cell never fails on it. */

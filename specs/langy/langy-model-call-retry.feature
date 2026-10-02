@@ -84,6 +84,13 @@ Feature: Langy retries a transient model or tool failure inside the turn
       Then the retry line is cleared
 
     @unit
+    Scenario: The retry line shows on a turn that picks up after an answered card
+      Given the turn already shows output, such as a card the person answered
+      And the manager's "Thinking…" line arrived before the worker's first frame
+      When the first model call fails and the worker schedules a retry
+      Then the retry line is a status of its own, not the "Thinking…" placeholder the panel hides
+
+    @unit
     Scenario: An in-stream error that is not a plan limit is left to the worker's retries
       Given a relayed call's 200 stream ends with an error event that names no plan limit
       When the same conversation's calls keep failing that way

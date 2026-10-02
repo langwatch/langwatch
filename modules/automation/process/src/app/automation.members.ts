@@ -10,7 +10,6 @@ import type {
   TriggerMatchRecordedEventData,
   TriggerSummary,
   WebhookActionParams,
-  WebhookDeliveryInput,
   GraphAlertTemplateContext,
 } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
@@ -31,15 +30,12 @@ import type {
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 
 // Re-exported: several files in this module still import these names from
 // here rather than from where they are actually declared.
-export type {
-  AutomationGraphNotifier,
-  AutomationNotificationDelivery,
-  AutomationSlackBotTokenDecryptor,
-};
+export type { AutomationGraphNotifier, AutomationNotificationDelivery, SlackDestinationService };
 export interface AutomationClock {
   now(): Instant;
 }
@@ -126,7 +122,6 @@ export interface AutomationGraphDelivery {
   }): Promise<string[]>;
   isSendClaimed(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void>;
 }
 
 export type GraphAlertDispatchInput = {
@@ -167,6 +162,7 @@ export type AutomationWebhookStoredParams = {
   url: string;
   method: WebhookActionParams["method"];
   bodyTemplate: string | null;
+  contentType?: string;
   headersEncrypted?: string;
   headers?: Record<string, string>;
   signingSecretEncrypted?: string;
@@ -265,8 +261,6 @@ export abstract class AutomationScheduledIntent {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult>;
-
-  abstract pruneWebhookDeliveries(now?: Instant): Promise<number>;
 }
 
 export abstract class AutomationSettlementExecutor {
@@ -383,8 +377,10 @@ export type GraphTriggerEvaluationDeps = {
   triggerSent: GraphTriggerSentRepository;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;
-  slackTokens: AutomationSlackBotTokenDecryptor;
+  slackDestinations: SlackDestinationService;
   dispatchErrors: AutomationDispatchError;
+  /** Records what each check observed; never throws, so it cannot suppress an alert. */
+  latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
   clock: AutomationClock;
   baseHost: string;
 };

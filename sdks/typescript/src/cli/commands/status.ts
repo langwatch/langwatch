@@ -5,8 +5,9 @@ import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
-import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
+import { isUserScopedApiKey } from "@/internal/api/auth";
 import { createLangWatchApiClient } from "@/internal/api/client";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -151,7 +152,7 @@ async function fetchCount({
   const response = await langwatchFetch(`${context.endpoint}${url}`, {
     method: options?.method,
     headers: {
-      ...buildAuthHeaders({ apiKey: context.apiKey, projectId: context.projectId }),
+      ...buildRequestHeaders({ apiKey: context.apiKey, projectId: context.projectId }),
       ...(options?.body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
@@ -401,7 +402,7 @@ function printFetchFailure({
   console.log(chalk.red("  ✗ Could not fetch any project resources."));
   console.log(chalk.gray(`    Reason: ${sampleError}`));
   console.log();
-  if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
+  if (allUnauthorized && isUserScopedApiKey(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
     console.log(
       chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`),
     );

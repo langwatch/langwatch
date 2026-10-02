@@ -13,6 +13,12 @@ import {
   type UiAnalyticsReader,
 } from "./analytics.ts";
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 /** The envelope version every destination has received since 2025-05-29. */
 const EVENT_VERSION = "2025-05-29";
 

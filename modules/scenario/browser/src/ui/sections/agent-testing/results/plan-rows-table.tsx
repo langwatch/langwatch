@@ -4,11 +4,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
 import { useState } from "react";
 
@@ -23,6 +22,7 @@ import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
 import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline.tsx";
+import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import { targetsLabel } from "./result-atoms.ts";
 import {
   ResultsTableBody,

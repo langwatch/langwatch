@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { HStack, Spinner, Text } from "@chakra-ui/react";
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Boxes } from "lucide-react";
 

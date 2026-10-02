@@ -1,6 +1,16 @@
-import { Badge, Box, Button, HStack, Input, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Tabs,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
@@ -84,13 +94,14 @@ export function PersonalConfigureScreen() {
             </SectionCard>
           ) : null}
 
-          {personalContextQuery.data?.workspace.project.apiKey ? (
+          {personalProjectId && ctx.organizationId ? (
             <SectionCard
               title="Personal OTLP Endpoint"
               description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
             >
               <PersonalOtlpEndpointPanel
-                apiKey={personalContextQuery.data.workspace.project.apiKey}
+                organizationId={ctx.organizationId}
+                projectId={personalProjectId}
               />
             </SectionCard>
           ) : null}

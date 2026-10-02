@@ -12,8 +12,8 @@ import {
   type GraphTriggerEvaluationReason,
   type GraphTriggerEvaluationResult,
   type GraphTriggerSweepCandidate,
-  type SlackActionParams,
   type SlackChannelListing,
+  TriggerFilterQueryInvalidError,
 } from "@langwatch/automation-contract";
 import {
   mapTraceToDatasetEntry,
@@ -21,22 +21,37 @@ import {
   type DatasetApi,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
-import { WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import type { NotificationService } from "@langwatch/notification-contract";
+import {
+  EmailProviderNotConfiguredError,
+  type NotificationService,
+} from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
-import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-contract";
+import {
+  FilterParseError,
+  traceSchema,
+  type TraceApi,
+  type TraceRecord,
+} from "@langwatch/trace-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
-import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
+import {
+  AutomationTestFire,
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
+  type TestFireEmail,
+  type TestFireSlackBot,
+  type TestFireSlackWebhook,
+  type TestFireWebhook,
+} from "../channels/automation-test-fire.channel.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
@@ -59,11 +74,8 @@ import {
   type AutomationSettlementTraceFilters,
 } from "../services/automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import {
-  AutomationSlackSecretsService,
-  type AutomationSecretCrypto,
-  type AutomationSlackBotTokenDecryptor,
-} from "../services/automation-slack-secrets.service.ts";
+import type { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
+import type { AutomationSecretCrypto } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service.ts";
@@ -76,6 +88,7 @@ import {
   type ReportDispatchDeps,
 } from "../services/report-dispatch.service.ts";
 import { RunawayContainmentService } from "../services/runaway-containment.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import type {
   AutomationAuditSink,
@@ -101,27 +114,26 @@ export type AutomationProcessMembers = Readonly<{
   logger: Logger;
   encryption: Encryption;
   publicBaseUrl: string | undefined;
-  /** SaaS verifies a webhook receiver's certificate; self-hosted receivers often self-sign. */
-  isSaas: boolean;
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
   members: AutomationProcessMembers;
+  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
+  slackDestinations: SlackDestinationService;
+  slackConnections: AutomationSlackConnectionService;
   /** Every mail automation sends goes out through notification, which writes the envelope. */
-  notifications: Pick<NotificationService, "sendEmail">;
+  notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
+  /** Where a webhook action's attempt is sent and logged (ADR-167). */
+  webhooks: Pick<WebhookApi, "sendRequest">;
+  /** Where a saved filter query is dry-run: trace owns the query grammar. */
+  traces: Pick<TraceApi, "translateTraceFilter">;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
   unsubscribeSigningSecret: string | undefined;
   repositories: Pick<
     AutomationRepositories,
-    | "triggers"
-    | "suppressions"
-    | "webhookDeliveries"
-    | "persistCaps"
-    | "callCounter"
-    | "webhookRateLimits"
-    | "emailCaps"
+    "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
@@ -130,7 +142,7 @@ type AutomationInfrastructureInput = Readonly<{
 export type AutomationComposedInfrastructure = AutomationInfrastructure &
   Readonly<{ delivery: AutomationNotificationDelivery; emailCaps: AutomationEmailCapService }>;
 
-/** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
+/** Builds the {@link AutomationInfrastructure} `AutomationModule.create` composes over. */
 export function buildAutomationInfrastructure(
   input: AutomationInfrastructureInput,
 ): AutomationComposedInfrastructure {
@@ -150,15 +162,20 @@ export function buildAutomationInfrastructure(
     clock,
     notifier: buildGraphAlertNotifier({ ...input, providers, clock, delivery, emailCaps }),
     logger: new ApiAutomationLogger(members.logger),
-    slackTokens: new ApiAutomationSlackTokens(providers),
+    slackDestinations: input.slackDestinations,
+    slackConnections: input.slackConnections,
     dispatchErrors: new ApiAutomationDispatchErrors(),
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
-    testFire: new UndeliverableApiTestFire(),
+    testFire: ApiAutomationTestFire.create({
+      mail: input.notifications,
+      delivery,
+      webhooks: input.webhooks,
+    }),
     persistCaps: input.repositories.persistCaps,
     providers,
     slackChannels: new UnavailableAutomationSlackDirectory(),
-    traceFilters: new UnwiredAutomationTraceFilterCompiler(),
+    traceFilters: new TraceApiFilterCompiler(input.traces, members.logger),
     limits: input.repositories.callCounter,
     audit: new AuditLogAutomationAuditSink(input.auditLog),
     publicBaseUrl: members.publicBaseUrl,
@@ -200,22 +217,18 @@ export function buildGraphAlertNotifier(
 }
 
 /**
- * Mail, Slack and webhook delivery through notification and the fenced webhook sender
- * (main's worker-webhook-egress.composition.ts). No public origin, no delivery.
+ * Mail, Slack and webhook delivery through notification, Slack and the webhook module's
+ * `sendRequest` (ADR-167). No public origin, no delivery.
  */
 function buildNotificationDelivery(
   input: Pick<
     AutomationInfrastructureInput,
-    "members" | "notifications" | "unsubscribeSigningSecret" | "repositories"
+    "members" | "notifications" | "webhooks" | "unsubscribeSigningSecret"
   >,
 ): AutomationNotificationDelivery {
   const { members } = input;
   if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
 
-  const egress = WebhookEgressService.create({
-    rateLimiter: input.repositories.webhookRateLimits,
-    tls: { rejectUnauthorized: members.isSaas },
-  });
   return AutomationNotificationDeliveryService.create({
     mailer: input.notifications,
     renderer: ReactEmailMailRenderer.create(),
@@ -223,7 +236,7 @@ function buildNotificationDelivery(
     ...(input.unsubscribeSigningSecret === undefined
       ? {}
       : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
-    webhookTransport: EgressWebhookDeliveryTransport.create(egress),
+    webhookTransport: input.webhooks,
     logger: members.logger,
   });
 }
@@ -290,19 +303,6 @@ class ApiAutomationLogger implements AutomationLogger {
 
   warn(fields: Record<string, unknown>, message: string): void {
     this.logger.warn(fields, message);
-  }
-}
-
-/**
- * The stored Slack bot token, read through the SAME registry the authoring
- * redaction path uses — one cipher, so a token stored by one door is
- * readable by the other.
- */
-class ApiAutomationSlackTokens implements AutomationSlackBotTokenDecryptor {
-  constructor(private readonly providers: AutomationProviderRegistryService) {}
-
-  findDecryptedToken(params: SlackActionParams): string | null {
-    return this.providers.findDecryptedSlackBotToken(params);
   }
 }
 
@@ -390,22 +390,58 @@ class UncontainedApiAutomationRunaway
   }
 }
 
-/** A test fire goes out over the worker's transports, never this process's. */
-class UndeliverableApiTestFire extends AutomationTestFire {
-  sendEmail(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test email"));
+/** A test fire takes the real fire's transports: notification's mail, Slack, the webhook module. */
+export class ApiAutomationTestFire extends AutomationTestFire {
+  static create(input: {
+    mail: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
+    delivery: Pick<AutomationNotificationDelivery, "sendSlackWebhook" | "sendSlackBot">;
+    webhooks: Pick<WebhookApi, "sendRequest">;
+  }): ApiAutomationTestFire {
+    return new ApiAutomationTestFire(input.mail, input.delivery, input.webhooks);
   }
 
-  sendSlack(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test Slack message"));
+  private constructor(
+    private readonly mail: Pick<NotificationService, "sendEmail" | "getMailDelivery">,
+    private readonly delivery: Pick<
+      AutomationNotificationDelivery,
+      "sendSlackWebhook" | "sendSlackBot"
+    >,
+    private readonly webhooks: Pick<WebhookApi, "sendRequest">,
+  ) {
+    super();
   }
 
-  sendSlackBot(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test Slack message"));
+  /** Refuses with no mail provider (ARCHITECTURE.md §6), where a real send skips quietly. */
+  async sendEmail(input: TestFireEmail): Promise<void> {
+    const { provider } = await this.mail.getMailDelivery();
+    if (provider === undefined) throw new EmailProviderNotConfiguredError();
+    await this.mail.sendEmail({ to: input.recipients, subject: input.subject, html: input.html });
   }
 
-  sendWebhook(): Promise<{ status: number }> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test webhook"));
+  sendSlack(input: TestFireSlackWebhook): Promise<void> {
+    return this.delivery.sendSlackWebhook({ ...input, triggerName: "test fire" });
+  }
+
+  sendSlackBot(input: TestFireSlackBot): Promise<void> {
+    return this.delivery.sendSlackBot({ ...input, triggerName: "test fire" });
+  }
+
+  /** A test fire (ADR-040 §1): uncapped, never logged; a non-2xx throws the classified error. */
+  async sendWebhook(input: TestFireWebhook): Promise<{ status: number }> {
+    const { status } = await this.webhooks.sendRequest({
+      projectId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+      url: input.url,
+      method: input.method,
+      headers: input.headers,
+      body: input.body,
+      contentType: input.contentType,
+      signingSecrets: input.signingSecrets,
+      dispatchId: generate("event").toString(),
+      label: `Webhook for trigger "${input.triggerName}"`,
+      source: { module: "automation", ref: TEST_FIRE_TRIGGER_ID_SENTINEL },
+      testFire: true,
+    });
+    return { status };
   }
 }
 
@@ -425,13 +461,31 @@ class UnavailableAutomationSlackDirectory implements AutomationSlackDirectory {
 }
 
 /**
- * ADR-043's filter-query dry run, absent: no compiler for this facet exists
- * yet on either process, so a non-empty `filterQuery` cannot be saved until
- * one is built. A real gap, not a parity loss.
+ * ADR-043's filter-query dry run, over trace's own translator as main's
+ * readFilterQuery used it. The translator's account can name internal
+ * columns, so it goes to the log and the author gets the handled error.
  */
-class UnwiredAutomationTraceFilterCompiler implements AutomationTraceFilterCompiler {
-  assertCompiles(): void {
-    throw new ApiAutomationUnavailableError("validate a trace filter query");
+class TraceApiFilterCompiler implements AutomationTraceFilterCompiler {
+  constructor(
+    private readonly traces: Pick<TraceApi, "translateTraceFilter">,
+    private readonly logger: Logger,
+  ) {}
+
+  assertCompiles({ query, projectId }: Readonly<{ query: string; projectId: string }>): void {
+    try {
+      this.traces.translateTraceFilter({
+        query,
+        tenantId: projectId,
+        timeRange: { from: 0, to: 0 },
+      });
+    } catch (error) {
+      if (!(error instanceof FilterParseError)) throw error;
+      this.logger.warn(
+        { projectId, error: error.message },
+        "trace query refused by the translator",
+      );
+      throw new TriggerFilterQueryInvalidError();
+    }
   }
 }
 
@@ -454,7 +508,7 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
 /** Every repository this feature's settlement half reads or writes, from the module's registry. */
 export type AutomationSettlementRepositories = Pick<
   AutomationRepositories,
-  "triggers" | "suppressions" | "webhookDeliveries" | "graphTriggerSent"
+  "triggers" | "suppressions" | "graphTriggerSent"
 >;
 
 /**
@@ -512,6 +566,9 @@ export function createAutomationSettlement(input: {
    */
   delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;
+  slackDestinations: SlackDestinationService;
+  /** Releases a runaway-paused Slack automation's connection claim. */
+  slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
   crypto: AutomationSecretCrypto;
   /** The deployment's own origin; every link in a digest is built from it. */
   baseHost: string;
@@ -562,7 +619,6 @@ export function createAutomationSettlement(input: {
   const ledger = AutomationSettlementLedgerService.create({
     triggers: repositories.triggers,
     suppressions: repositories.suppressions,
-    webhookDeliveries: repositories.webhookDeliveries,
     clock,
     persistCaps: input.persistCapSlots,
     persistCap: persistCaps
@@ -577,6 +633,7 @@ export function createAutomationSettlement(input: {
       runaway: createRunaway(ledger),
       triggers: repositories.triggers,
       clock,
+      slackConnections: input.slackConnections,
     });
   }
 
@@ -601,7 +658,7 @@ export function createAutomationSettlement(input: {
       }),
       delivery: input.delivery,
       emailCaps: input.emailCaps,
-      slack: AutomationSlackSecretsService.create(input.crypto),
+      slackDestinations: input.slackDestinations,
       webhooks: AutomationWebhookSecretsService.create(input.crypto),
       clock,
       observability: input.observability,
@@ -615,7 +672,6 @@ export function createAutomationSettlement(input: {
         analytics: input.analytics,
         logger: input.logger,
       }),
-      repositories.webhookDeliveries,
       input.graphActivity,
     ),
   };
@@ -653,7 +709,6 @@ class LateContainmentBreach extends AutomationSettlementBreach {
 class ComposedScheduledIntents extends AutomationScheduledIntent {
   constructor(
     private readonly heartbeat: GraphTriggerHeartbeatService,
-    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
     private readonly graphActivity: AutomationGraphActivity | undefined,
   ) {
     super();
@@ -679,10 +734,6 @@ class ComposedScheduledIntents extends AutomationScheduledIntent {
     }
 
     return this.graphActivity.evaluateGraphTrigger(candidate);
-  }
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number> {
-    return this.deliveries.pruneExpired(now);
   }
 }
 
@@ -811,7 +862,7 @@ export function createAutomationReportDispatcher(input: {
   analytics: Pick<AnalyticsApi, "getTimeseries">;
   traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
   delivery: AutomationNotificationDelivery;
-  crypto: AutomationSecretCrypto;
+  slackDestinations: SlackDestinationService;
   suppression: { filterSuppressed: ReportDispatchDeps["filterSuppressedRecipients"] };
   baseHost: string;
 }): ReportDispatcher {
@@ -828,7 +879,7 @@ export function createAutomationReportDispatcher(input: {
       repositories.triggers.findById({ triggerId, projectId }),
     findProject: (projectId) => input.projects.findById(projectId),
     delivery: input.delivery,
-    slackProvider: AutomationSlackSecretsService.create(input.crypto),
+    slackDestinations: input.slackDestinations,
     filterSuppressedRecipients: (recipients) => input.suppression.filterSuppressed(recipients),
     listReportTraces: createReportTraceList({ traces: input.traces, baseHost: input.baseHost }),
     loadReportCharts: (chartInput) => charts.loadReportCharts(chartInput),

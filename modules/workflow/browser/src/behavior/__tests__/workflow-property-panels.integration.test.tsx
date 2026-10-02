@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component, End, Entry } from "@langwatch/workflow-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import type * as reactModule from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,8 +56,7 @@ const common = {
   renderCodeEditor: codeEditor,
 };
 
-const renderPanel = (children: React.ReactNode) =>
-  render(<ChakraProvider value={defaultSystem}>{children}</ChakraProvider>);
+const renderPanel = (children: React.ReactNode) => renderWithDesignSystem(children);
 
 describe("Workflow property panels", () => {
   beforeEach(() => {

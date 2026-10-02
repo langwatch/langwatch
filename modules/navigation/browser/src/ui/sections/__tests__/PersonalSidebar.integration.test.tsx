@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Personal sidebar: Traces entry by project slug, org follows chrome organization.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
@@ -82,18 +82,16 @@ const orgWithPersonalProject = ({ orgId, slug }: { orgId: string; slug: string }
 });
 
 function renderLinks() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          pathname: "/me",
-          currentUserId: "user-1",
-          openableTeams: state.organization?.teams ?? [],
-        }}
-      >
-        <PersonalSidebarLinks showExpanded={true} />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        pathname: "/me",
+        currentUserId: "user-1",
+        openableTeams: state.organization?.teams ?? [],
+      }}
+    >
+      <PersonalSidebarLinks showExpanded={true} />
+    </WithStubNavigationHost>,
   );
 }
 

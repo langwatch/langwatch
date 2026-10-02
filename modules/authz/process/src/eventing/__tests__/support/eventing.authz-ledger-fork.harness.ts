@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { vi } from "vitest";
 

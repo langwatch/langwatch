@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/prompts/deploy-prompt-dialog.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,7 +13,7 @@ vi.mock("../../../../../model/prompt-host.ts", () => ({
 }));
 
 vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
-  usePromptProject: () => ({ project: { id: "project-1", apiKey: "test-api-key" } }),
+  usePromptProject: () => ({ project: { id: "project-1" } }),
 }));
 
 const mockCreateTagMutateAsync = vi.fn().mockResolvedValue({});
@@ -41,6 +41,18 @@ const mockInvalidate = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
+    useUtils: () => ({
+      prompts: { getTagsForConfig: { invalidate: mockInvalidate } },
+      promptTags: { getAll: { invalidate: vi.fn().mockResolvedValue(undefined) } },
+    }),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      prompts: { getTagsForConfig: { invalidate: mockInvalidate } },
+      promptTags: { getAll: { invalidate: vi.fn().mockResolvedValue(undefined) } },
+    }),
     prompts: {
       getAllVersionsForPrompt: { useQuery: () => mockVersionsQuery() },
       getTagsForConfig: { useQuery: () => mockTagsQuery() },
@@ -50,10 +62,6 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
       create: { useMutation: () => ({ mutateAsync: mockCreateTagMutateAsync }) },
       delete: { useMutation: () => ({ mutateAsync: mockDeleteTagMutateAsync }) },
     },
-    useUtils: () => ({
-      prompts: { getTagsForConfig: { invalidate: mockInvalidate } },
-      promptTags: { getAll: { invalidate: vi.fn().mockResolvedValue(undefined) } },
-    }),
   },
 }));
 
@@ -67,7 +75,7 @@ vi.mock("../generate-prompt-api-snippet-dialog.tsx", () => {
   return { GeneratePromptApiSnippetDialog: Dialog };
 });
 
-vi.mock("../../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
+vi.mock("../../../../blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 
@@ -132,11 +140,7 @@ const defaultProps = {
 };
 
 function renderDialog(props = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DeployPromptDialog {...defaultProps} {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<DeployPromptDialog {...defaultProps} {...props} />);
 }
 
 beforeEach(() => {

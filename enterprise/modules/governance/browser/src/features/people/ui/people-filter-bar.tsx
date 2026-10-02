@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Text } from "@langwatch/design-system/primitives";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import { Building2 } from "lucide-react";
 

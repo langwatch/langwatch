@@ -53,7 +53,7 @@ function pkg(kind: "contract" | "process" | "browser", feature = "widget"): Clas
 function generatedModuleList(identifiers: readonly string[] = []): void {
   write(
     "packages/installed-server-modules/src/server-modules.generated.ts",
-    `export const serverModules = [${identifiers.join(", ")}] as const;\n`,
+    `export const processModules = [${identifiers.join(", ")}] as const;\n`,
   );
 }
 
@@ -61,7 +61,7 @@ function generatedModuleList(identifiers: readonly string[] = []): void {
 function referenceFeature(): void {
   generatedModuleList(["widgetServer"]);
   write("modules/widget/contract/src/widget.api.ts");
-  write("modules/widget/process/src/widget.server.ts");
+  write("modules/widget/process/src/widget.module.ts");
   write("modules/widget/process/src/app/widget.app.ts");
   write("modules/widget/process/src/app/__tests__/widget.fixture.ts");
   write("modules/widget/process/src/services/widget.service.ts");
@@ -250,10 +250,52 @@ describe("feature shape", () => {
     });
   });
 
-  describe("given a feature that lacks a piece of the reference", () => {
-    it("asks for the installer when no <feature>.server.ts exists", () => {
+  describe("given repositories nested under features/<concern>/", () => {
+    const NESTED = "modules/widget/process/src/features/billing/repositories";
+
+    function nestedRepositories(): void {
+      write(`${NESTED}/billing.repository.ts`);
+      write(`${NESTED}/prisma/prisma.billing.repository.ts`);
+      write(`${NESTED}/memory/memory.billing.repository.ts`);
+      write(`${NESTED}/__tests__/billing.repository.contract.test.ts`);
+    }
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("accepts a concern that rides the module's one top-level registry", () => {
       referenceFeature();
-      rmSync(join(root, "modules/widget/process/src/widget.server.ts"));
+      nestedRepositories();
+
+      expect(findings()).toEqual([]);
+    });
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("asks for a registry when no repositories folder holds one", () => {
+      referenceFeature();
+      nestedRepositories();
+      rmSync(join(root, "modules/widget/process/src/repositories/widget-repositories.registry.ts"));
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["unregistered-repositories"]);
+    });
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("asks for the memory twin and its contract test inside the concern", () => {
+      referenceFeature();
+      nestedRepositories();
+      rmSync(join(root, NESTED, "memory"), { recursive: true });
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["postgres-without-memory"]);
+
+      write(`${NESTED}/memory/memory.billing.repository.ts`);
+      rmSync(join(root, NESTED, "__tests__"), { recursive: true });
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["memory-twin-untested"]);
+    });
+  });
+
+  describe("given a feature that lacks a piece of the reference", () => {
+    it("asks for the installer when no <feature>.module.ts exists", () => {
+      referenceFeature();
+      rmSync(join(root, "modules/widget/process/src/widget.module.ts"));
 
       expect(findings().map((finding) => finding.kind)).toEqual(["no-installer"]);
     });
@@ -274,7 +316,7 @@ describe("feature shape", () => {
         {
           feature: "widget",
           kind: "installer-not-booted",
-          path: "modules/widget/process/src/widget.server.ts",
+          path: "modules/widget/process/src/widget.module.ts",
         },
       ]);
     });

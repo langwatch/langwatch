@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -41,13 +41,17 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),
       debouncedTimeRange: { from: 1, to: 2, label: undefined },
     }),
+}));
+
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
 }));
 
@@ -83,11 +87,7 @@ afterEach(() => cleanup());
 describe("<TokenValuePicker /> server-side search", () => {
   describe("given the user edits a categorical chip's value", () => {
     it("queries facetValues with a prefix and surfaces a value beyond the preloaded top-N", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<TokenValuePicker anchor={anchor} onClose={vi.fn()} />);
 
       // Prefilled with the chip's current value ("checkout") — pristine, no
       // server hit. Editing it to "finance" flips to a server-side search.
@@ -109,11 +109,7 @@ describe("<TokenValuePicker /> server-side search", () => {
     });
 
     it("does not hit the server while the input still holds the unedited value", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<TokenValuePicker anchor={anchor} onClose={vi.fn()} />);
 
       // Pristine (input === currentValue) → every call stays disabled.
       expect(apiMock.useQuery).not.toHaveBeenCalledWith(
@@ -136,11 +132,7 @@ describe("<TokenValuePicker /> server-side search", () => {
               : { data: undefined, isLoading: false },
         );
 
-        render(
-          <ChakraProvider value={defaultSystem}>
-            <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
-          </ChakraProvider>,
-        );
+        renderWithDesignSystem(<TokenValuePicker anchor={anchor} onClose={vi.fn()} />);
 
         const input = screen.getByPlaceholderText(/Filter service values/i);
         fireEvent.change(input, { target: { value: "gpt-5-mini" } });

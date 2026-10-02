@@ -3,7 +3,7 @@
  * @see dev/docs/best_practices/selection-action-bar.md
  */
 
-import { Box, chakra, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Folder } from "lucide-react";

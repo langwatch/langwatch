@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@langwatch/design-system/dialog";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
   Badge,
   Box,
   Button,
@@ -14,19 +26,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
@@ -69,7 +69,6 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
 import { CatalogLayoutControl } from "../../../features/ingestion-sources/toolCatalog/catalog-layout-control.tsx";
 import { InventoryCatalogPane } from "../../../features/ingestion-sources/toolCatalog/inventory-catalog-pane.tsx";
@@ -599,7 +598,10 @@ function useIngestionSourcesPage() {
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
+    {
+      enabled: !!orgId && canRead,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
+    },
   );
 
   const panes = useInventoryPanes({ orgId, canManageTools });
@@ -881,9 +883,7 @@ function useAddParam({
  * ANOMALY RULES USED TO BE A FOURTH TAB AND IS NOT ONE ANY MORE. A rule is a
  * standing instruction about what to watch for, not a thing the organization
  * runs, so it belongs with alerts and signals rather than in an inventory.
- * `AnomalyRulesTab` itself is untouched and still exported, because the
- * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
- * the same component.
+ * `AnomalyRulesTab` is kept, though no route renders it yet.
  *
  * The Catalog pane is `ToolCatalogTab`, over the page's own registry read;
  * registering or editing a tool opens `AiToolEntryDrawer` from the page.
@@ -2732,9 +2732,9 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
     {
       key: "readSeats",
-      label: "Also record licence counts",
+      label: "Also record license counts",
       placeholder: "",
-      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned, only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      hint: "Reads once a day how many Copilot Studio licenses the tenant has bought and how many are assigned, only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
       control: "switch",
       defaultOn: READ_SEATS_DEFAULT_ON,
       // Advanced because the default is already the answer for almost

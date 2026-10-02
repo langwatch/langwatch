@@ -1,20 +1,20 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Evaluator application with memory persistence and stub collaborators;
  * repository is real but in-memory.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
-import { EvaluatorApp, type EvaluatorGraph } from "../evaluator.app.ts";
+import { EvaluatorModule, type EvaluatorGraph } from "../evaluator.app.ts";
 
 /** The workflow and monitor rows, as recording doubles. */
 export function testEvaluatorGraph(overrides: Partial<EvaluatorGraph> = {}): EvaluatorGraph {
@@ -59,7 +59,7 @@ export function createEvaluatorTestApp(
     graph?: EvaluatorGraph;
   }> = {},
 ): Readonly<{
-  app: EvaluatorApp;
+  app: EvaluatorModule;
   repository: MemoryEvaluatorRepository;
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
@@ -80,7 +80,7 @@ export function createEvaluatorTestApp(
     ...input.modelProviders,
   });
 
-  const app = EvaluatorApp.createWithGraph(
+  const app = EvaluatorModule.createWithGraph(
     {
       repositories: { evaluators: repository },
       dependencies: {

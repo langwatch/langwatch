@@ -41,6 +41,13 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       members: [member("sam", "Sam"), member("ana", "Ana")],
       teams: [],
     },
+    "organization.getDirectoryCounts": {
+      members: 2,
+      openInvites: 2,
+      joinRequests: 1,
+      groups: 2,
+      teams: 0,
+    },
     "invite.getOrganizationPendingInvites": [
       invite("ivy", "PENDING"),
       invite("ian", "PENDING"),
@@ -55,10 +62,24 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
     "limits.getUsage": { membersCount: 2, membersLiteCount: 0 },
     "joinRequests.pending": [{ joinRequestId: "jr-1" }],
     "group.listAll": [
-      { id: "g1", name: "Engineering", scimSource: "okta", bindings: [], memberCount: 3 },
-      { id: "g2", name: "Hand-made", scimSource: null, bindings: [], memberCount: 1 },
+      {
+        id: "g1",
+        name: "Engineering",
+        scimSource: "okta",
+        grants: [
+          {
+            role: "ADMIN",
+            customRoleName: null,
+            scopeType: "ORGANIZATION",
+            scopeName: "Acme",
+            scopeId: "org-1",
+          },
+        ],
+        memberCount: 3,
+      },
+      { id: "g2", name: "Hand-made", scimSource: null, grants: [], memberCount: 1 },
     ],
-    "team.getTeamsWithRoleBindings": [],
+    "team.getTeamsWithGrants": [],
   };
 
   const endpoint = (path: string) => ({
@@ -152,12 +173,32 @@ describe("the directory page", () => {
       expect(screen.getByTestId("people-cuts")).toHaveTextContent("Everybody");
     });
 
+    /** @scenario A tab that names a count names it the same way as its siblings */
     it("counts everybody on the people tab and every group on the groups tab", () => {
       renderDirectory();
 
       expect(screen.getByRole("tab", { name: /People/ })).toHaveTextContent("People 5");
       expect(screen.getByRole("tab", { name: /Groups/ })).toHaveTextContent("Groups 2");
       expect(screen.getByRole("tab", { name: /Teams/ })).toHaveTextContent("Teams & projects 0");
+    });
+
+    /** @scenario The tabs name the subjects this page owns */
+    it("offers the people, the teams and the groups, and no tab for how people arrive", () => {
+      renderDirectory();
+
+      const names = screen.getAllByRole("tab").map((tab) => tab.textContent ?? "");
+      expect(names).toHaveLength(3);
+      expect(names[0]).toMatch(/^People/);
+      expect(names[1]).toMatch(/^Teams/);
+      expect(names[2]).toMatch(/^Groups/);
+    });
+
+    /** @scenario A reader who may not view governance is offered no departments tab */
+    it("offers no departments tab and lands on the people when the address names it", () => {
+      renderDirectory({ query: { tab: "departments" } });
+
+      expect(screen.queryByRole("tab", { name: /Departments/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /People/ })).toHaveAttribute("aria-selected", "true");
     });
 
     /** @scenario The page leads with whether it is working */
@@ -200,6 +241,17 @@ describe("the directory page", () => {
       const chips = screen.getAllByTestId("group-directory-chip");
       expect(chips).toHaveLength(1);
       expect(rows[0]).toContainElement(chips[0] ?? null);
+    });
+  });
+
+  describe("when the groups tab lists what each group grants", () => {
+    /** @scenario The groups the directory sent say what they grant */
+    it("names the roles a directory group carries and says so for one that grants nothing", () => {
+      renderDirectory({ query: { tab: "groups" } });
+
+      const rows = screen.getAllByTestId("group-row");
+      expect(rows[0]).toHaveTextContent("ADMIN");
+      expect(rows[1]).toHaveTextContent("No access configured");
     });
   });
 

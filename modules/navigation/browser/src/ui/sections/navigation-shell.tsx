@@ -3,7 +3,7 @@
  * Drawer mounted separately (portal-based). Moved from platform/app; DashboardLayout deleted.
  */
 
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { useEffect, type ReactNode } from "react";
 
 import {
@@ -30,6 +30,8 @@ export type NavigationShellProps = {
   orgScope?: boolean;
   /** Overrides the title this shell would compose from the address. */
   pageTitle?: string;
+  /** A full-screen tool: the same gates, then the page alone with no bars. */
+  fullScreen?: boolean;
 };
 
 export function NavigationShell({
@@ -38,6 +40,7 @@ export function NavigationShell({
   personalScope = false,
   orgScope = false,
   pageTitle,
+  fullScreen = false,
 }: NavigationShellProps) {
   const host = useNavigationHost();
   const state = useNavigationShellState({
@@ -48,7 +51,7 @@ export function NavigationShell({
 
   if (state.status === "not-found") return <>{host.notFound()}</>;
   if (state.status === "loading") return <>{host.waiting()}</>;
-  if (state.status === "chromeless") return <>{children}</>;
+  if (state.status === "chromeless" || fullScreen) return <>{children}</>;
 
   const isIconRail = mode === "icon-rail";
 

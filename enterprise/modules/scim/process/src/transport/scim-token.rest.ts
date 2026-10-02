@@ -36,7 +36,7 @@ import { z } from "zod";
  */
 export const scimTokenRestActor = defineRestMiddleware(
   "scimTokenRestActor",
-  z.object({ actorId: z.string() }),
+  z.object({ actorId: z.string(), apiKeyId: z.string() }),
 );
 
 export const scimTokenRest = defineRestRouter(ScimApi)
@@ -78,15 +78,19 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   })
   .withMiddleware(scimTokenRestActor)
   .handle(async ({ app, input, scope }, actor) => {
-    const created = await app.generateToken({
-      organizationId: scope.id,
-      // The connection is the token's whole write authority, and the
-      // application refuses without one. Dropping it here made every REST
-      // create answer `scim_connection_required` no matter what the caller
-      // sent, while the tRPC door passed it and worked.
-      connectionId: input.connectionId,
-      description: input.description,
-    });
+    const created = await app.generateToken(
+      {
+        organizationId: scope.id,
+        // The connection is the token's whole write authority, and the
+        // application refuses without one. Dropping it here made every REST
+        // create answer `scim_connection_required` no matter what the caller
+        // sent, while the tRPC door passed it and worked.
+        connectionId: input.connectionId,
+        description: input.description,
+      },
+      // The key bounds the mint, never its owner: only a full-admin key may mint.
+      { id: actor.actorId, apiKeyId: actor.apiKeyId },
+    );
 
     app.recordTokenAudit({
       organizationId: scope.id,

@@ -4,9 +4,9 @@
  * Spec: specs/navigation/navigation-modes.feature
  */
 
-import { Box, Button, HStack, Portal } from "@chakra-ui/react";
+import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
-import { UserAvatar } from "@langwatch/user-browser-kit";
+import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -15,6 +15,7 @@ import {
   useNavigationModeStore,
 } from "../../behavior/navigation-mode.store.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
+import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import {
   useNavigationHost,
   type NavigationHost,
@@ -48,6 +49,7 @@ function userMenuLabel(user: Pick<NavigationUser, "name" | "email"> | null | und
 export function AppHeaderUserMenu() {
   const host = useNavigationHost();
   const user = host.currentUser();
+  const avatarSrc = useUserAvatarUrl(user?.image);
   const plan = host.plan();
   const accountMenu = host.accountMenu();
 
@@ -78,7 +80,7 @@ export function AppHeaderUserMenu() {
         >
           <UserAvatar
             name={user?.name ?? void 0}
-            image={user?.image ?? void 0}
+            src={avatarSrc}
             size="xs"
             backgroundColor="orange.400"
             color="white"

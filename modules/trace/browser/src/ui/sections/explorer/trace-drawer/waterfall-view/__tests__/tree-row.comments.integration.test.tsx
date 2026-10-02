@@ -1,9 +1,9 @@
 // Waterfall comment action: label when no room, commented span display,
 // read-only view.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,26 +113,24 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
 }
 
 function renderRow(comments: AnnotationByTrace[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TreeRow
-        node={node()}
-        rootStart={0}
-        rootDuration={1000}
-        isSelected={false}
-        isPrompt={false}
-        logCount={0}
-        isCollapsed={false}
-        hasChildren={false}
-        hiddenDescendantCount={0}
-        isDimmed={false}
-        signals={[]}
-        traceId={TRACE_ID}
-        comments={comments}
-        onToggleCollapse={vi.fn()}
-        onSelect={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TreeRow
+      node={node()}
+      rootStart={0}
+      rootDuration={1000}
+      isSelected={false}
+      isPrompt={false}
+      logCount={0}
+      isCollapsed={false}
+      hasChildren={false}
+      hiddenDescendantCount={0}
+      isDimmed={false}
+      signals={[]}
+      traceId={TRACE_ID}
+      comments={comments}
+      onToggleCollapse={vi.fn()}
+      onSelect={vi.fn()}
+    />,
   );
 }
 

@@ -4,18 +4,18 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
+import { useMemo } from "react";
+
 import {
   type BatchRun,
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
-} from "@langwatch/suite-browser-kit";
-import { useMemo } from "react";
-
-import { api } from "../../scenario-api.ts";
+} from "../../../model/suite/run-history-transforms.ts";
+import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
 import { useRunHistoryPagination } from "../../suites/use-run-history-pagination.ts";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 import { batchNote, type RunPlan } from "./run-plans.ts";
 import { runTitle } from "./run-titles.ts";
 
@@ -46,7 +46,7 @@ export function useRunPlanBatches({
   // useRunHistoryPagination sends none: the pinned `period.endDate` would
   // hold the count at page load while the list keeps growing, and the run
   // numbers would stop matching the rows.
-  const { data: batchCount } = api.scenarios.getScenarioSetBatchRunCount.useQuery(
+  const { data: batchCount } = scenarioClient.scenarios.getScenarioSetBatchRunCount.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: plan.scenarioSetId,

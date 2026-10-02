@@ -121,6 +121,3 @@ export function useProjectHost(): ProjectHostApi {
   }
   return host;
 }
-
-/** The grant the platform page asked for, unchanged. */
-export const PROJECT_SETTINGS_PAGE_PERMISSION = "organization:view";

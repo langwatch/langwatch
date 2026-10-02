@@ -1,9 +1,8 @@
-import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 
-import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { GeneratePromptApiSnippetDialog } from "../prompt-studio/dialogs/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
@@ -49,7 +48,6 @@ export function PromptEditorFooter({
   onApply,
   onDiscard,
 }: PromptEditorFooterProps) {
-  const { project } = usePromptProject();
   // Form context may not be available when rendered outside FormProvider
   // (e.g., in Drawer.Footer or StudioDrawerWrapper footer slot).
   // Falls back gracefully when all values are provided via props.
@@ -76,7 +74,7 @@ export function PromptEditorFooter({
           hasUnsavedChanges={hasUnsavedChanges}
         />
       )}
-      <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
+      <GeneratePromptApiSnippetDialog promptHandle={handle}>
         <GeneratePromptApiSnippetDialog.Trigger>
           <GenerateApiSnippetButton hasHandle={!!handle} />
         </GeneratePromptApiSnippetDialog.Trigger>

@@ -40,13 +40,10 @@ describe("given the agent test scenario id and an http agent", () => {
       },
       target: { type: "http", referenceId: "agent_http" },
       reads: {
-        project: () =>
-          Promise.resolve({
-            success: true,
-            data: { apiKey: "sk-lw-project", organizationId: "org_1" },
-          }),
+        project: () => Promise.resolve({ success: true, data: { organizationId: "org_1" } }),
         adapter,
         agentName,
+        runKey: () => Promise.resolve("run-key"),
       },
       config,
     });
@@ -60,6 +57,7 @@ describe("given the agent test scenario id and an http agent", () => {
     expect(result.data.scenario.id).toBe(AGENT_TEST_SCENARIO_ID);
     expect(result.data.scenario.name).toBe("Test ACME Support Agent");
     expect(result.data.adapterData).toEqual(httpAdapterData);
+    expect(result.telemetry.apiKey).toBe("run-key");
     expect(result.resolvedModels).toBeNull();
     expect(agentName).toHaveBeenCalled();
     expect(adapter).toHaveBeenCalled();

@@ -2,7 +2,7 @@
  * Main's governance metered-lane read, now served by the ledger's owner
  * (`governanceGatewaySpend.clickhouse.repository.ts`).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayClickHouseClient } from "../../../app/gateway.members.ts";

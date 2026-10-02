@@ -1,6 +1,5 @@
 import { agentSchema, connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RunActor, ScenarioApi } from "@langwatch/scenario-contract";
@@ -9,6 +8,7 @@ import {
   type RunPlanConfigInput,
   type Suite,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature

@@ -27,7 +27,10 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
   .withDocs({
     summary: "Create a Slack alert trigger",
     description:
-      "Create a trigger that posts to a Slack incoming webhook when traces match its filters. " +
+      "Create a trigger that posts to Slack when traces match its filters, through a Slack " +
+      "connection (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming " +
+      "webhook URL (`slack_webhook`), which is stored as a connection. The trigger stores no " +
+      "secret of its own. " +
       "The `/api/triggers` family supersedes this narrower form, which stays for callers " +
       "written against it.",
     tags: ["Triggers"],
@@ -35,17 +38,28 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
       { status: 400, description: "The body was not valid JSON" },
       { status: 401, description: "Missing or invalid API key" },
       { status: 403, description: "The API key lacks triggers:manage" },
-      { status: 422, description: "The body failed validation" },
+      {
+        status: 422,
+        description:
+          "The body failed validation, the connection is not one this project can use (`slack_integration_missing`), or a bot connection was named without `slack_channel_id` (`invalid_action_params`)",
+      },
     ],
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     await app.create({
       projectId: scope.id,
+      // A connection typed here is stored for the caller; a key names no user, so the service.
+      actorId: actor?.type === "user" ? actor.id : `svc_${scope.id}`,
       action: "SEND_SLACK_MESSAGE",
       name: input.name,
       message: input.message,
       filters: input.filters,
-      actionParams: { slackWebhook: input.slack_webhook },
+      actionParams: input.slack_connection_id
+        ? {
+            slackIntegrationId: input.slack_connection_id,
+            ...(input.slack_channel_id ? { slackChannelId: input.slack_channel_id } : {}),
+          }
+        : { slackWebhook: input.slack_webhook ?? "" },
       alertType: input.alert_type,
     });
 

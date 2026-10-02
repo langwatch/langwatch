@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ProcessStore } from "@langwatch/eventing";
+import {
+  captureTraceCarrier,
+  DIAGNOSTIC_SAFE,
+  DispatchError,
+  type ProcessRef,
+  type ProcessStore,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 
 import {
@@ -13,12 +20,14 @@ import {
   type PendingEnvelope,
 } from "./webhook-batch-planner.service.ts";
 
+const logger = createLogger("langwatch:webhooks:endpoint-stream");
+
 /**
  * What the endpoint stream needs, and nothing the delivery process manager
  * carries beside it: the durable store the buffer and outbox commit
  * through, and an overridable clock for tests. Reachable from any process
  * that holds a `processStore` — the worker's delivery process manager and
- * the api's `WebhookApp` both compose over this same service, so a replay
+ * the api's `WebhookModule` both compose over this same service, so a replay
  * append never needs the process manager's dispatch/plan/prune graph.
  */
 export interface WebhookEndpointStreamDeps {
@@ -38,9 +47,9 @@ export interface WebhookEndpointStreamDeps {
  * the org.
  *
  * Redelivery safety: deliver appends carry an inbox sourceEventId (the
- * store absorbs duplicates), flushes are revision-guarded, and the batch
- * message key is a content hash, so any retry re-derives the same key and
- * the outbox suppresses it.
+ * store absorbs duplicates), each flush reads and writes under the stream's
+ * lock, and the batch message key is a content hash, so any retry re-derives
+ * the same key and the outbox suppresses it.
  */
 export class WebhookEndpointStreamService {
   private constructor(private readonly deps: WebhookEndpointStreamDeps) {}
@@ -63,57 +72,91 @@ export class WebhookEndpointStreamService {
     sourceEventId?: string;
   }): Promise<void> {
     const now = (this.deps.now ?? Date.now)();
-    // Endpoints belong to the ORGANIZATION, so the stream does too: one row
-    // per endpoint holds one buffer, one outstanding-send count, and
-    // therefore one max_in_flight, no matter how many of the org's projects
-    // feed it. Keying by project would give an endpoint N of each.
-    const ref = {
-      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-      projectId: organizationId,
-      processKey: `endpoint:${endpoint.id}`,
-    };
-    const existing = await this.deps.processStore.findByRef<EndpointStreamState>({
+    const ref = this.streamRef({ organizationId, endpointId: endpoint.id });
+    // Read outside the stream's lock on purpose: holding it across this query would queue every
+    // append in the org behind it, and a racing count is what max_in_flight always was.
+    const outstanding = await this.deps.processStore.countPendingMessages({
       ref,
+      intentType: "sendBatch",
     });
-    const pending: PendingEnvelope[] = existing?.state.pending ? [...existing.state.pending] : [];
-    if (append) {
-      const item: PendingEnvelope = { envelope: append, appendedAtMs: now };
-      if (appendSalt) {
-        item.salt = appendSalt;
-      }
-
-      pending.push(item);
-    }
-
-    const outstanding = (await this.deps.processStore.findMessagesByRef({ ref })).filter(
-      (m) => m.intentType === "sendBatch" && m.status === "pending",
-    ).length;
-
+    const traceCarrier = captureTraceCarrier();
     const planner = WebhookBatchPlannerService.create({ endpoint });
-    const { messages, remaining, inFlight } = planner.plan({
-      organizationId,
-      pending,
-      outstanding,
-      now,
-    });
 
-    const result = await this.deps.processStore.commit<EndpointStreamState>({
-      ref,
-      tenantId: organizationId,
-      sourceEventId: sourceEventId ?? null,
-      expectedRevision: existing?.revision ?? 0,
-      state: { pending: remaining },
-      nextWakeAt: planner.findNextWakeAt({ remaining, inFlight, now }),
-      messages,
-      now,
-    });
-    if (result.outcome === "revisionConflict") {
-      // A concurrent append or flush won the stream's revision; retry this
-      // intent so nothing is lost (idempotent by inbox id and content key).
-      throw new Error(
-        `webhook stream flush hit a revision conflict on endpoint ${endpoint.id}; retrying`,
-      );
+    try {
+      // Every gateway request in the org appends here, and appends have no order to preserve,
+      // so the buffer is read INSIDE the store's lock: a racing append never fails for racing.
+      await this.deps.processStore.transact<EndpointStreamState>({
+        ref,
+        tenantId: organizationId,
+        sourceEventId: sourceEventId ?? null,
+        now,
+        apply: (current) => {
+          const pending: PendingEnvelope[] = current?.state.pending
+            ? [...current.state.pending]
+            : [];
+          if (append) {
+            pending.push({
+              envelope: append,
+              appendedAtMs: now,
+              ...(appendSalt ? { salt: appendSalt } : {}),
+            });
+          }
+          const { messages, remaining, inFlight } = planner.plan({
+            organizationId,
+            pending,
+            outstanding: outstanding.count,
+            now,
+            traceCarrier,
+          });
+          return {
+            state: { pending: remaining },
+            nextWakeAt: planner.findNextWakeAt({
+              remaining,
+              inFlight,
+              outstandingDueAt: outstanding.nextAttemptAt,
+              now,
+            }),
+            messages,
+          };
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name === "DispatchError" ||
+          (DIAGNOSTIC_SAFE in error && error[DIAGNOSTIC_SAFE] === true))
+      ) {
+        throw error;
+      }
+      // A foreign message is redacted at every telemetry surface, so name the failure here
+      // with ids we already log and the error's class, never its text.
+      throw new DispatchError({
+        message: `webhook stream flush failed on endpoint ${endpoint.id}: ${failureClassOf(error)}`,
+        retryable: true,
+      });
     }
+  }
+
+  /**
+   * Re-enabling an endpoint revives the batches that parked as dead while it was paused, with a
+   * fresh attempt budget; pending ones flow on their next attempt.
+   */
+  async requeueParked({
+    organizationId,
+    endpointId,
+  }: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<number> {
+    const revived = await this.deps.processStore.requeueDeadMessages({
+      ...this.streamRef({ organizationId, endpointId }),
+      messageKeyPrefix: "send:",
+      now: (this.deps.now ?? Date.now)(),
+    });
+    if (revived > 0) {
+      logger.info({ endpointId, revived }, "webhook endpoint re-enabled; parked batches requeued");
+    }
+    return revived;
   }
 
   /**
@@ -144,4 +187,31 @@ export class WebhookEndpointStreamService {
       sourceEventId: `replay:${replayId}:${endpoint.id}:${envelope.id}`,
     });
   }
+
+  /**
+   * Endpoints belong to the ORGANIZATION, so the stream does too: one row per endpoint holds one
+   * buffer, one outstanding-send count and one max_in_flight, however many projects feed it.
+   */
+  private streamRef({
+    organizationId,
+    endpointId,
+  }: {
+    organizationId: string;
+    endpointId: string;
+  }): ProcessRef {
+    return {
+      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+      projectId: organizationId,
+      processKey: `endpoint:${endpointId}`,
+    };
+  }
+}
+
+/** A foreign failure's class, safe to quote: its name plus a machine code (Prisma P-code,
+ *  errno). */
+function failureClassOf(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "non-error";
+  const name = error instanceof Error ? error.name : "non-error";
+  const code = "code" in error ? error.code : undefined;
+  return typeof code === "string" ? `${name} (${code})` : name;
 }

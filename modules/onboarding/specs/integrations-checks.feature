@@ -43,3 +43,10 @@ Feature: The setup checklist reports how far a project has been set up
     When they call integrationsChecks.getCheckStatus
     Then the answer parses against the declared checklist schema
 
+
+  @integration
+  Scenario: The alert step reads as done from automation's own list
+    Given a project
+    When the setup checklist renders its alert step
+    Then the step reads as done exactly when automation lists an automation for the project
+    And onboarding's server answer carries no trigger figure

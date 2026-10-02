@@ -1,4 +1,12 @@
-import { Badge, Box, Collapsible, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Collapsible,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";

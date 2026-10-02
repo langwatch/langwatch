@@ -1,4 +1,4 @@
-import { Badge, Card, HStack, Table, Text } from "@chakra-ui/react";
+import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";

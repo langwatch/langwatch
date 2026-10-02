@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import { findTargetHandler, isMiddleware } from "hono/utils/handler";
 import { mergePath } from "hono/utils/url";
 
-import { composeApiApplication } from "./src/hosting/api-application.ts";
+import { composeApiApplication } from "../process/src/transport/api-surface.ts";
 import { addressesOf, basePathOf, canonicalV1Path } from "./src/rest/addressing.ts";
 
 const [outFile, repoRoot] = process.argv.slice(2);
@@ -50,10 +50,10 @@ function serveDescriptor(descriptor, source) {
 
 const installed = join(
   repoRoot,
-  "packages/installed-server-modules/src/server-modules.generated.ts",
+  "apps/api/src/process-modules.generated.ts",
 );
-const { serverModules } = await import(pathToFileURL(installed).href);
-for (const module of serverModules) {
+const { processModules } = await import(pathToFileURL(installed).href);
+for (const module of processModules) {
   const source = `module ${module.name}`;
   for (const descriptor of module.transports ?? []) {
     try {
@@ -68,7 +68,7 @@ const lanes = composeApiApplication({ rest: { app: new Hono() }, trpc: {} });
 for (const route of lanes.routes) {
   const handler = findTargetHandler(route.handler);
   if (isMiddleware(handler) || route.path === "/*" || route.path === "*") continue;
-  serve(route.method, route.path, "packages/api/src/hosting/api-application.ts");
+  serve(route.method, route.path, "packages/process/src/transport/api-surface.ts");
 }
 
 const healthFile = join(repoRoot, "apps/api/src/api-health-route.ts");

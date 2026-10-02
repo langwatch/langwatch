@@ -325,11 +325,6 @@ const LEGACY_INERT: string[] = [
   "modules/authz/specs/access-reviews.feature",
   "modules/authz/specs/agent-principals.feature",
   "modules/authz/specs/authz-passports.feature",
-  // 2026-09-08 api-legacy-delete: the builder this was bound through is gone
-  // and the new runtime has not earned SSE back yet. Each scenario is
-  // @unimplemented; the requirement stands. Remove the entry with its first
-  // real binding (dev/docs/plans/strict-feature-layout.md, section 5).
-  "packages/api/specs/sse-streaming.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
@@ -377,7 +372,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/vk-config-bundle.feature",
   "specs/ai-gateway/governance/vk-personal-scope.feature",
   "specs/ai-gateway/governance/vk-scope-inheritance.feature",
-  "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
@@ -415,13 +409,7 @@ const LEGACY_INERT: string[] = [
   "specs/analytics/posthog-cost-control.feature",
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
-  // ADR-093's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the implementation, and the reference PR (R0) binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
-  "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
@@ -522,7 +510,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-worker-isolation.feature",
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
-  "specs/licensing/license-activation-ui.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",
@@ -559,7 +546,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/telemetry.feature",
   "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
@@ -748,6 +734,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
   "specs/automations/authoring-drawer.feature",
+  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
+  // excerpts, the default Slack message) gained bindings; the other
+  // nineteen Liquid-template scenarios stay untagged.
+  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

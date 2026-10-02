@@ -3,11 +3,13 @@
  */
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   displayTypedValue,
   serializeOptionalTypedScalarValue,
 } from "@langwatch/design-system/json-value-text";
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 import {
   parseScenarioParameterDefinitions,
   type RunParameterValues,
@@ -17,7 +19,7 @@ import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { api, type SimulationSuite, type RouterOutputs } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import { useScenarios } from "../scenarios/use-scenarios.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";
 import { useRunAttempt } from "./use-run-attempt.ts";
 
@@ -233,7 +235,7 @@ function countActiveScenarios({
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -276,10 +278,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   });
 
   // Fetch active scenarios to exclude archived ones from the confirmation count
-  const { data: allScenarios } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && !!pendingSuite },
-  );
+  const { data: allScenarios } = useScenarios({
+    projectId: project?.id,
+    enabled: !!pendingSuite,
+  });
 
   const parameterDefinitions = useMemo(
     () =>

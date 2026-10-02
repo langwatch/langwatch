@@ -1,6 +1,6 @@
 /** Sparkline showing series shape with no axes or numbers; drawn as polyline. */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 
 export function GovernanceSummarySparkline({
   points,

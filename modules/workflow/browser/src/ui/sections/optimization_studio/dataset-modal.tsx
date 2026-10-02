@@ -1,31 +1,31 @@
-/**
- * Dataset dialog for the workflow entry-point node: same experience as the rest of the
- * platform: the shared dataset picker for choosing, the shared TanStack editor for
- * editing.
- */
-import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
+/**
+ * Dataset dialog for the workflow entry-point node: same experience as the rest of the
+ * platform: the shared dataset picker for choosing, the shared TanStack editor for
+ * editing.
+ */
+import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import {
-  datasetColumnsToFields,
-  inMemoryDatasetToNodeDataset,
-} from "@langwatch/workflow-browser-kit";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
 import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import {
+  datasetColumnsToFields,
+  inMemoryDatasetToNodeDataset,
+} from "../../../model/studio-dataset.utils.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },
@@ -113,10 +113,11 @@ export function DatasetModal({
   const { openDrawer } = useDrawer();
   const updateNodeInternals = useUpdateNodeInternals();
 
-  useEffect(() => {
+  const [openFrom, setOpenFrom] = useState<boolean | null>(null);
+  if (openFrom !== open) {
+    setOpenFrom(open);
     setEditingDataset(open ? editingDataset_ : undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
 
   const { attachEntryDataset } = useWorkflowStore(({ attachEntryDataset }) => ({
     attachEntryDataset,

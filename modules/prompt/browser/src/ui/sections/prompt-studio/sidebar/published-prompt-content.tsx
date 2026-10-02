@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { getDisplayHandle, OrganizationBadge } from "../../../../prompt-reference.ts";

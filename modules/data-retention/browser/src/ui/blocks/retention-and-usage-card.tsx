@@ -1,5 +1,5 @@
-import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { OverviewCard, SettingRow } from "@langwatch/design-system/settings-card";
 
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";

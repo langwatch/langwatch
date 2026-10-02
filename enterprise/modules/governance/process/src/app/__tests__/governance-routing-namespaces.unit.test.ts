@@ -5,12 +5,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { governanceServer } from "../../governance.server.ts";
+import { governanceProcessModule } from "../../governance.module.ts";
 
 describe("the governance module", () => {
   /** @scenario "Governance serves neither routing policies nor personal virtual keys" */
   it("serves neither routingPolicy nor personalVirtualKeys", () => {
-    const namespaces = governanceServer.transports.map((transport) => transport.namespace);
+    const namespaces = governanceProcessModule.transports.map((transport) => transport.namespace);
 
     expect(namespaces).not.toContain("routingPolicy");
     expect(namespaces).not.toContain("personalVirtualKeys");

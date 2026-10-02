@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";

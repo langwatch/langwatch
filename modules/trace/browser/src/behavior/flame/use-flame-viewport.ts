@@ -33,9 +33,11 @@ export function useFlameViewport({
   viewportRef.current = viewport;
 
   // Reset viewport when underlying spans change.
-  useEffect(() => {
+  const [viewportFrom, setViewportFrom] = useState(fullRange);
+  if (viewportFrom !== fullRange) {
+    setViewportFrom(fullRange);
     setViewport(fullRange);
-  }, [fullRange]);
+  }
 
   const cancelAnimation = useCallback(() => {
     if (animationRef.current !== null) {

@@ -1,10 +1,18 @@
+import { InputGroup } from "@langwatch/design-system/input-group";
 /**
  * The scannable code, the same value written out to type in, and the first
  * code that finishes the setup. It says the key is shown once BEFORE the
  * button that ends the chance to read it, and names nothing internal.
  */
-import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 

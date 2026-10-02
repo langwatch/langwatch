@@ -1,22 +1,18 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
  * Tests the monitor application layer over the memory repository.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   MonitorNotFoundError,
   type MonitorPatchInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
-import { buildMonitorInfrastructure } from "../monitor-composition.build.ts";
 import {
   createMonitorTestApp,
   createMonitorTestRepositories,
@@ -69,7 +65,7 @@ async function patchWith(changes: MonitorPatchInput["changes"]) {
   return app.patch({ id: "monitor-1", projectId: "project-1", changes });
 }
 
-describe("MonitorApp", () => {
+describe("MonitorModule", () => {
   describe("when the monitors running one evaluator are asked for", () => {
     it("answers them by id and name, and none that run another evaluator", async () => {
       const { app, repository } = harness();
@@ -265,7 +261,6 @@ describe("MonitorApp", () => {
       const { app } = harness({
         replication,
         evaluators: new FakeMonitorEvaluators(["evaluator-1", "evaluator-copied"]),
-        generateId: () => "monitor_replica",
       });
 
       const replica = await app.copy(copy);
@@ -278,7 +273,7 @@ describe("MonitorApp", () => {
         },
       ]);
       expect(replica).toMatchObject({
-        id: "monitor_replica",
+        id: expect.any(String),
         projectId: "project-2",
         evaluatorId: "evaluator-copied",
         enabled: false,
@@ -301,37 +296,6 @@ describe("MonitorApp", () => {
       expect(replication.deletedWorkflows).toEqual([
         { workflowId: "workflow-copied", projectId: "project-2" },
       ]);
-    });
-
-    describe("when the process composes its own replication", () => {
-      it("deletes the uncommitted workflow the refused replica copied", async () => {
-        const copied: Evaluator = {
-          id: "evaluator-copied",
-          projectId: "project-2",
-          name: "Toxicity",
-          slug: null,
-          type: "workflow",
-          config: null,
-          workflowId: "workflow-copied",
-          copiedFromEvaluatorId: "evaluator-1",
-          archivedAt: null,
-          createdAt: NOW,
-          updatedAt: NOW,
-        };
-        const deleteUncommitted = vi.fn(async () => undefined);
-        const built = buildMonitorInfrastructure({
-          evaluators: createApiFixture<EvaluatorApi>({ copy: async () => copied }),
-          evaluation: createApiFixture<EvaluationApi>(),
-          workflows: createApiFixture<WorkflowApi>({ deleteUncommitted }),
-        });
-        const { app } = harness({ replication: built.replication });
-
-        await expect(app.copy(copy)).rejects.toMatchObject({ code: "evaluator_not_found" });
-        expect(deleteUncommitted).toHaveBeenCalledWith({
-          workflowId: "workflow-copied",
-          projectId: "project-2",
-        });
-      });
     });
   });
 

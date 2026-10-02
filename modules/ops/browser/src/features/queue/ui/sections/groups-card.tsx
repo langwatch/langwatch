@@ -1,3 +1,4 @@
+import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
   Box,
@@ -10,8 +11,7 @@ import {
   Spinner,
   Table,
   Text,
-} from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
+} from "@langwatch/design-system/primitives";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";
@@ -83,7 +83,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const primaryQueue = queueNames[0];
   const groupsQuery = api.ops.listGroups.useQuery(
     { queueName: primaryQueue ?? "", page: 1, pageSize: 200 },
-    { refetchInterval: 10000, enabled: !!primaryQueue },
+    { enabled: !!primaryQueue },
   );
 
   const allGroups = useMemo(() => {
@@ -145,7 +145,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
     { queueName: primaryQueue ?? "" },
-    { enabled: !!primaryQueue, refetchInterval: 10000 },
+    { enabled: !!primaryQueue },
   );
   const isTenantPaused = !!(tenantScope && pausedTenantsQuery.data?.includes(tenantScope));
 

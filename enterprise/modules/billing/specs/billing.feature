@@ -96,3 +96,17 @@ Feature: Enterprise billing compatibility
     Given a self-hosted deployment, where main mounted an empty currency router
     When the plans page asks which currency to show
     Then billing refuses with the handled not_found, the 404 main's missing procedure answered
+
+  @unit
+  Scenario: An impersonated back-office call with no impersonator id is refused
+    Given an operator impersonating a customer, on a door that names the impersonator by address only
+    When the connected-billing back office is called
+    Then billing is asked as nobody and refuses with the shared not-found
+    And it is never asked as the impersonated customer
+
+  @unit
+  Scenario: A view-only operator reads the billing overview but is refused on every billing write
+    Given a platform operator holding ops:view and not ops:manage
+    When they read a customer's connected-billing overview
+    Then the overview answers
+    And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with the shared not-found

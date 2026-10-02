@@ -5,6 +5,7 @@ import { MANAGED_MODELS, type VirtualKeyWithScopes } from "@langwatch/gateway-co
  * soft-deleted rows, and ordering follows the routing policy or else fallback priority.
  */
 import { isDispatchableProvider, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type {
@@ -23,13 +24,19 @@ export class GatewayScopeResolutionService {
   private constructor(
     private readonly repository: GatewayScopeResolutionRepository,
     private readonly platformProviders: GatewayPlatformProviders,
+    private readonly projects: Pick<ProjectApi, "listNamesByIds">,
   ) {}
 
   static create(input: {
     repository: GatewayScopeResolutionRepository;
     platformProviders: GatewayPlatformProviders;
+    projects: Pick<ProjectApi, "listNamesByIds">;
   }): GatewayScopeResolutionService {
-    return new GatewayScopeResolutionService(input.repository, input.platformProviders);
+    return new GatewayScopeResolutionService(
+      input.repository,
+      input.platformProviders,
+      input.projects,
+    );
   }
 
   /**
@@ -41,7 +48,7 @@ export class GatewayScopeResolutionService {
     vk: VirtualKeyWithScopes,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<EligibleModelProvider[]> {
-    const scopes = await this.reachableScopes(vk, transaction);
+    const scopes = await this.reachableScopes(vk);
     const reachable = await this.repository.findProvidersReachableFromScopes({
       ...scopes,
       transaction,
@@ -122,7 +129,6 @@ export class GatewayScopeResolutionService {
    */
   private async reachableScopes(
     vk: VirtualKeyWithScopes,
-    transaction?: GatewayPersistenceTransaction,
   ): Promise<{ organizationIds: string[]; teamIds: string[]; projectIds: string[] }> {
     const organizationIds = new Set<string>([vk.organizationId]);
     const teamIds = new Set<string>();
@@ -143,12 +149,10 @@ export class GatewayScopeResolutionService {
     }
 
     if (projectIds.size > 0) {
-      const inheritedTeamIds = await this.repository.findTeamIdsForProjects({
-        projectIds: [...projectIds],
-        transaction,
-      });
-      for (const teamId of inheritedTeamIds) {
-        teamIds.add(teamId);
+      // A project read needs no transaction: the gateway writes no project row.
+      const inherited = await this.projects.listNamesByIds({ projectIds: [...projectIds] });
+      for (const project of inherited) {
+        teamIds.add(project.teamId);
       }
     }
 

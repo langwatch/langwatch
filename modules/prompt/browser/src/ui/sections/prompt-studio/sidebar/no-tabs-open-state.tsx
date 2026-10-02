@@ -1,5 +1,5 @@
-import { Center, EmptyState, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Center, EmptyState, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { LuFileText } from "react-icons/lu";
 
 import { AddPromptButton } from "./add-prompt-button.tsx";

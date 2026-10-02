@@ -2,9 +2,9 @@
  * Governance page guard moved from `organization:manage` to `governance:view`.
  * Assert against real built-in roles that nobody gets locked out (ADR-092).
  */
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
-import { permissionSatisfiedBy } from "../registry.ts";
 import { type BuiltinRoleKey, builtinRoleGrants, builtinRolePermissions } from "../roles.ts";
 
 const ALL_ROLE_KEYS: readonly BuiltinRoleKey[] = [

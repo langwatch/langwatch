@@ -3,11 +3,8 @@
  * no kind, and writes bound to the permission cross product `GET /permissions`
  * publishes, so nothing a caller can read is ungrantable.
  */
-import {
-  ALL_PERMISSIONS,
-  bindingScopeCanGrantPermission,
-  permissionResource,
-} from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS, permissionResource } from "@langwatch/authorization";
+import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 /** Every resource the registry names, in registry order. */

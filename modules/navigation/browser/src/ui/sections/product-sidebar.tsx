@@ -1,6 +1,7 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
-import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
+import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
+import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, Search } from "lucide-react";
 import { useRef, useState } from "react";
 

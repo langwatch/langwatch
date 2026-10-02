@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The long-poll share over the real session core, runtime and in-memory store: the session-key
  * door's check, and the instance token every later poll and post is addressed by.
@@ -7,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { LOCAL_CONTROL_PROTOCOL_VERSION, type RegisterFrame } from "@langwatch/langy-contract";
 import { memorySessionState } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";

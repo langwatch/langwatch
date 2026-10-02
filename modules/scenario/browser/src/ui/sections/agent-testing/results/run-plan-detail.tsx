@@ -1,11 +1,4 @@
-import { HStack } from "@chakra-ui/react";
-/**
- * One run plan: its runs in a rail on the left, the results of the selected
- * run filling the rest of the page.
- * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/suites/run-notes.feature
- */
-import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { HStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
@@ -13,7 +6,18 @@ import {
   useRunPlanBatches,
   useSelectedBatch,
 } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
+/**
+ * One run plan: its runs in a rail on the left, the results of the selected
+ * run filling the rest of the page.
+ * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/suites/run-notes.feature
+ */
+import type {
+  Period,
+  PeriodMode,
+  RelativePresetKey,
+} from "../../../elements/analytics/period-selector.tsx";
 import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
 import { RunsSidebar } from "./runs-sidebar.tsx";
 

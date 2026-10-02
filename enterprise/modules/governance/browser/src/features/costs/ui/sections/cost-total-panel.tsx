@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceCostProviderDayRow } from "@langwatch/enterprise-governance-contract";
 import { useMemo } from "react";
 

@@ -34,10 +34,6 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     );
   }
 
-  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
-    return this.store.governanceTenantIds.get(organizationId) ?? null;
-  }
-
   async hasOpenAlert(input: { ruleId: string; since: Instant }): Promise<boolean> {
     const since = toDate(input.since).getTime();
     return this.store.alerts.some(

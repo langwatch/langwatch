@@ -1,11 +1,11 @@
 // Replicates datasets across projects using host.copyTargets() for authz instead of server imports.
 
-import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
+import { datasetClient } from "@langwatch/dataset-client";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, createListCollection, Field, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 
 export function CopyDatasetDialog({
@@ -21,7 +21,7 @@ export function CopyDatasetDialog({
 }) {
   const host = useDatasetHost();
   const project = host.project();
-  const copyDataset = datasetApi.dataset.copy.useMutation();
+  const copyDataset = datasetClient.dataset.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
 
   const targets = host.copyTargets();

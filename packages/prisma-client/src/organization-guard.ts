@@ -1,4 +1,8 @@
-import { CLI_LOGIN_KEY_NAME_PREFIX, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import {
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+  RESERVED_SYSTEM_KEY_NAMES,
+} from "@langwatch/api-key-contract";
 
 import { clauseField, isClause } from "./clause-field.ts";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
@@ -39,12 +43,12 @@ export const PRISMA_READ_ACTIONS = [
 const READ_ACTIONS = new Set<string>(PRISMA_READ_ACTIONS);
 
 /**
- * A reserved, system-managed key name. `ApiKeyService.create` refuses any
- * customer key into one, so an exact match here reaches platform rows only —
- * never `contains`/`startsWith`, which would widen the reach.
+ * A reserved, system-managed key name, matched exactly, never by `contains`/`startsWith`.
+ * New customer keys are refused one; a customer row predating a name's reservation is
+ * kept off the sweep by `isSystemManaged: true`, which the sweep below requires.
  */
 const isSystemManagedKeyName = (value: unknown): boolean =>
-  typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
+  typeof value === "string" && RESERVED_SYSTEM_KEY_NAMES.includes(value);
 
 /**
  * Matches exactly `expiresAt: { not: null, lte: <Date> }` — an expiry that
@@ -58,14 +62,18 @@ const isElapsedExpiryBound = (value: unknown): boolean => {
 };
 
 /**
- * Maintenance sweep for system-managed keys: matches reserved name, revokedAt: null,
- * and elapsed-expiry bound. Literal matching prevents scope creep.
+ * Maintenance sweep for system-managed keys: matches reserved name, revokedAt: null, and
+ * elapsed-expiry bound. Names other than the two customers never could use must also say
+ * `isSystemManaged: true`, so a customer's key under a later-reserved name is never swept.
  */
 const isSystemManagedKeySweep = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
   const where = clause as Record<string, unknown>;
+  const name = where.name;
+  const neverCustomerName = typeof name === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(name);
   return (
-    isSystemManagedKeyName(where.name) &&
+    isSystemManagedKeyName(name) &&
+    (neverCustomerName || where.isSystemManaged === true) &&
     where.revokedAt === null &&
     isElapsedExpiryBound(where.expiresAt)
   );
@@ -314,6 +322,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // action (findMany). Action-gating prevents replayed writes on bookkeeping.
     extraBound: ({ clause, action }) => action === "findMany" && isBranchRecheckSweep(clause),
   },
+  // Nurturing's read model: an organization row by its id, and a project's
+  // organization by the project id, which belongs to exactly one organization.
+  NurturingOrganization: {},
+  NurturingProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
 };
 
 /**
@@ -333,6 +347,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "ModelProvider",
   "ModelDefaultConfig",
   "SlackIntegration",
+  "SlackConnectionClaim",
   // Enforced by guardProjectId's SCOPED_MODELS instead (org id, row id, or
   // project FK on every query); sweep/prune use the raw-SQL opt-out. The
   // delivery log is shared with the project-scoped automations channel,

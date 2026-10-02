@@ -1,19 +1,12 @@
 import {
-  type TimeRange,
-  useFilterStore,
-  type LensConfig,
-  getPersistedActiveLensId,
-  useViewStore,
   type BarStateOverrides,
   type FragmentState,
   buildFragment,
   computeOverrides,
-  isOverridesEmpty,
-  parseFragment,
-} from "@langwatch/trace-browser-kit";
-import {
   instantEvalChipsOf,
   instantEvalRunKey,
+  isOverridesEmpty,
+  parseFragment,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 /**
@@ -22,7 +15,10 @@ import {
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
+import { type TimeRange } from "../../../../behavior/query.slice.ts";
 import { getPresetById } from "../../../../behavior/time-range-presets.ts";
+import { type LensConfig, getPersistedActiveLensId } from "../../../../behavior/view.slice.ts";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";

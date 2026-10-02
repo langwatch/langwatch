@@ -1,15 +1,15 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * Both doors of the usage-report receiver through the REST runtime: one
- * operation behind each, a refusal crossing as its code.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   LangWatchCloudOnlyError,
   type IncomingUsageReportRequest,
   type SaasApi,
 } from "@langwatch/enterprise-saas-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * Both doors of the usage-report receiver through the REST runtime: one
+ * operation behind each, a refusal crossing as its code.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { usageReportRest } from "../usage-report.rest.ts";

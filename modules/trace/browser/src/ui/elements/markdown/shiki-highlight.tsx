@@ -1,4 +1,4 @@
-import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
+import { Box, ClientOnly, CodeBlock } from "@langwatch/design-system/primitives";
 import {
   ensureShikiLangLoaded,
   isShikiLangReady,

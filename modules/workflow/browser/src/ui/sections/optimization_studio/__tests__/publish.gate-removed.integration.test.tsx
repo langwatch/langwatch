@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -41,11 +41,11 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
-    project: { id: "proj-1", slug: "test-project", apiKey: "test-key" },
+    project: { id: "proj-1", slug: "test-project" },
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => {
+vi.mock("../../../../behavior/workflow-api.ts", () => {
   const queryStub = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, refetch: vi.fn() }),
   });
@@ -58,7 +58,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
     }),
   });
   return {
-    api: {
+    workflowApi: {
       useUtils: () => ({
         optimization: { getComponents: { invalidate: vi.fn() } },
       }),
@@ -109,7 +109,6 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
     },
   };
 });
-
 vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys.ts", () => ({
   useModelProviderKeys: () => ({
     hasProvidersWithoutCustomKeys: false,
@@ -195,11 +194,7 @@ vi.mock("@langwatch/browser-host/link", () => ({
 const { Publish } = await import("../publish.tsx");
 
 function renderPublish() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <Publish isDisabled={false} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<Publish isDisabled={false} />);
 }
 
 describe("given the studio Publish menu is rendered", () => {

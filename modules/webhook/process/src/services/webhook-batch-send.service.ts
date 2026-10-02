@@ -32,20 +32,26 @@ export class WebhookBatchSendService {
    */
   run(): IntentExecutor<SendBatchPayload> {
     return async (payload: SendBatchPayload, context: IntentContext): Promise<void> => {
-      // The service's deliverable read owns the liveness predicate. A deleted
-      // or disabled endpoint drains its queue without delivering: the spend
-      // record keeps the events, re-enable plus replay covers the gap.
-      const endpoint = await this.deps.endpoints.findDeliverable({
+      // Deleted means the customer asked us to stop, so the batch is acknowledged. Disabled
+      // (by them, or by auto-disable) means the receiver is expected back, so the batch waits
+      // on the ladder, parks as dead when it runs out, and re-enabling revives it.
+      const disposition = await this.deps.endpoints.getDeliveryDisposition({
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
       });
-      if (!endpoint) {
+      if (disposition.state === "gone") {
         logger.info(
           { endpointId: payload.endpointId, batchId: payload.batchId },
-          "webhook batch dropped: endpoint disabled or gone (replay covers the gap)",
+          "webhook batch discarded: endpoint deleted",
         );
 
         return;
+      }
+      if (disposition.state === "paused") {
+        throw new DispatchError({
+          message: `Webhook endpoint ${payload.endpointId} is disabled; batch ${payload.batchId} stays queued`,
+          retryable: true,
+        });
       }
 
       const startedAt = (this.deps.now ?? Date.now)();

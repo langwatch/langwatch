@@ -1,9 +1,10 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { WorkflowCardActions, WorkflowCardDisplay } from "@langwatch/workflow-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { WorkflowCardActions, WorkflowCardDisplay } from "../ui/elements/workflow-card.tsx";
 
 class ResizeObserverStub {
   observe() {}
@@ -12,7 +13,7 @@ class ResizeObserverStub {
 }
 
 function renderCard(children: React.ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{children}</ChakraProvider>);
+  return renderWithDesignSystem(children);
 }
 
 describe("Workflow card", () => {

@@ -8,7 +8,7 @@ import {
   NativeSelect,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { type CodeEvaluatorConfig, codeEvaluatorOutputFields } from "@langwatch/evaluator-contract";
 import type { ReactNode } from "react";
 import { LuPlus, LuX } from "react-icons/lu";

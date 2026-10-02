@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Covers what an operator is told about a payload's references and who
  * may act on it - the row half of the payload-store scenarios.
  */
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

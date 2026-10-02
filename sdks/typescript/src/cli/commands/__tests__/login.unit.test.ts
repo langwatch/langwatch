@@ -35,8 +35,8 @@ vi.mock("@/cli/utils/governance/config", () => ({
   isLoggedIn: (cfg: { access_token?: string } | undefined) => !!cfg?.access_token,
 }));
 
-// The slug path's server boundary: POST /api/auth/cli/project-key.
-const fetchProjectKeyBySlug = vi.fn();
+// The slug path's server boundary: a forked project session minting the ingestion key.
+const mintProjectIngestionKey = vi.fn();
 vi.mock("@/cli/utils/governance/session-api", async () => {
   const actual = await vi.importActual<typeof sessionApiModule>(
     "@/cli/utils/governance/session-api",
@@ -44,7 +44,7 @@ vi.mock("@/cli/utils/governance/session-api", async () => {
   return {
     SessionApiError: actual.SessionApiError,
     fetchPersonalProject: vi.fn(),
-    fetchProjectKeyBySlug: (...args: unknown[]) => fetchProjectKeyBySlug(...args),
+    mintProjectIngestionKey: (...args: unknown[]) => mintProjectIngestionKey(...args),
   };
 });
 
@@ -146,7 +146,7 @@ describe("loginCommand", () => {
           control_plane_url: "https://app.langwatch.ai",
           access_token: "lw_at_x",
         } as never);
-        fetchProjectKeyBySlug.mockResolvedValue({
+        mintProjectIngestionKey.mockResolvedValue({
           api_key: "sk-lw-project",
           project: { id: "p1", slug: "checkout", name: "Checkout" },
         });
@@ -162,7 +162,7 @@ describe("loginCommand", () => {
         try {
           await loginCommand({ project: "checkout" });
 
-          expect(fetchProjectKeyBySlug).toHaveBeenCalledWith(
+          expect(mintProjectIngestionKey).toHaveBeenCalledWith(
             expect.objectContaining({ access_token: "lw_at_x" }),
             "checkout",
           );
@@ -189,7 +189,7 @@ describe("loginCommand", () => {
 
         await expect(loginCommand({ project: "checkout" })).rejects.toThrow("process.exit(1)");
 
-        expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
+        expect(mintProjectIngestionKey).not.toHaveBeenCalled();
         const printed = errorSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("langwatch login");
         expect(printed).toContain("--api-key");
@@ -237,7 +237,7 @@ describe("loginCommand", () => {
       );
 
       expect(runDeviceFlowLogin).not.toHaveBeenCalled();
-      expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
+      expect(mintProjectIngestionKey).not.toHaveBeenCalled();
     });
   });
 

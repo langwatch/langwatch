@@ -1,9 +1,9 @@
-import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { createListCollection, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 
 import {

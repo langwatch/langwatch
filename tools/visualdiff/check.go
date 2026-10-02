@@ -28,6 +28,7 @@ type checkFlags struct {
 	batchSize             int
 	all, mark, down       bool
 	devUI, shared, fast   bool
+	colorScheme           ColorScheme
 	// stack is the haven stack checked (-url aside); baseURL a live main to compare
 	// with instead of the baseline; adoptOnly refuses to boot (diffsuite owns the stacks).
 	stack, baseURL    string
@@ -175,6 +176,7 @@ func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {
 	flags.BoolVar(&parsed.down, "down", false, "destroy check's own stack and forget its seed")
 	flags.BoolVar(&parsed.devUI, "dev-ui", false, "serve pages from the stack's Vite dev server instead of a production build")
 	flags.BoolVar(&parsed.fast, "fast", false, "render on a lean Chromium: quicker, but not the pixels a pull request shows")
+	scheme := flags.String("color-scheme", "light", "colour scheme to capture: light, dark or both (both reports the dark pass as <id>@dark)")
 	flags.BoolVar(&parsed.shared, "shared", false, "lanes share the stack: boot, seed and ui build under a lock, never restart it")
 	flags.StringVar(&parsed.stack, "stack", CheckSlug, "the haven stack to check; diffsuite's branch stack under diffsuite")
 	flags.StringVar(&parsed.baseURL, "base-url", "", "a running main to compare with instead of the pinned baseline; diffsuite's main stack under diffsuite")
@@ -182,6 +184,10 @@ func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {
 	flags.BoolVar(&parsed.routes, "routes", false, "capture every route too, and write report/ beside check-report.md")
 	if err := flags.Parse(args); err != nil {
 		return parsed, err
+	}
+	var schemeErr error
+	if parsed.colorScheme, schemeErr = ParseColorScheme(*scheme); schemeErr != nil {
+		return parsed, schemeErr
 	}
 	fromSuite(&parsed, flags)
 	root, err := filepath.Abs(parsed.root)
@@ -313,6 +319,7 @@ func checkPlan(parsed checkFlags, side RunnerSide, config *Config) RunnerPlan {
 	identity := SeedIdentity{}.withSeededDefaults()
 	return RunnerPlan{
 		Viewport:    configuredViewport(config, Viewport{Width: 1440, Height: 900}),
+		ColorScheme: parsed.colorScheme,
 		Settle:      config.Settle,
 		Sides:       []RunnerSide{side},
 		OutDir:      CheckDir(parsed.root),

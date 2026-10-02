@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -29,7 +29,7 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     ingestionTemplateId: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -80,6 +80,7 @@ describe("LegacyApiKeyGrantService", () => {
           scopeId: "org-1",
         },
       ],
+      caller: { type: "system" },
       actor: { type: "system", id: "system:read-through-mint" },
       source: "read-through-mint",
       onDuplicate: "skip",
@@ -125,7 +126,7 @@ describe("LegacyApiKeyGrantService", () => {
   /** @scenario "A key owned by a user mints nothing it did not already have" */
   it.each([
     ["created at cutover", apiKey({ createdAt: CUTOVER_AT })],
-    ["already bound", apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] })],
+    ["already bound", apiKey({ grants: [{ id: "binding-1" }] as ApiKey["grants"] })],
     ["user owned", apiKey({ userId: "user-1" })],
     ["ingestion", apiKey({ ingestSourceType: "claude_code" })],
   ])("does not widen a %s key", async (_label, key) => {

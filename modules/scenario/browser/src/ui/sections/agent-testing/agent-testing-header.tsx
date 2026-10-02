@@ -1,14 +1,14 @@
+import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * The one header line of the Agent Testing page: the page title on the left and the
  * tabs in the middle.
  * @see specs/features/agent-testing/page-structure.feature
  */
-import { Box, Grid, GridItem, HStack, Tabs, Text } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, Grid, GridItem, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 
 import type { AgentTestingTab } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import type { OpenPlanTitle } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../model/agent-testing/shared/design.ts";
-import type { OpenPlanTitle } from "./use-agent-testing-store.ts";
 
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;

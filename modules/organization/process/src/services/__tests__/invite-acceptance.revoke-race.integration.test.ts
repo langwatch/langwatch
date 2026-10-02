@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * @see specs/organizations/organization-members-rest-api.feature
- * An acceptance parked on a revoke's row lock re-reads the revoked row: no membership lands.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationInvite } from "@langwatch/organization-contract";
 import {
@@ -11,6 +5,12 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+/**
+ * @vitest-environment node
+ * @see specs/organizations/organization-members-rest-api.feature
+ * An acceptance parked on a revoke's row lock re-reads the revoked row: no membership lands.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

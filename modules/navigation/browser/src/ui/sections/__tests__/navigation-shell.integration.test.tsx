@@ -3,8 +3,8 @@
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -139,22 +139,20 @@ function renderShell({
   readings?: Partial<StubNavigationReadings>;
   personalScope?: boolean;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{ ...BASE_READINGS, ...readings }}
-        actions={{
-          navigate: navigateMock,
-          replace: replaceMock,
-          rememberScope: rememberScopeMock,
-          openDrawer: openDrawerMock,
-        }}
-      >
-        <NavigationShell personalScope={personalScope}>
-          <div data-testid="page-body" />
-        </NavigationShell>
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{ ...BASE_READINGS, ...readings }}
+      actions={{
+        navigate: navigateMock,
+        replace: replaceMock,
+        rememberScope: rememberScopeMock,
+        openDrawer: openDrawerMock,
+      }}
+    >
+      <NavigationShell personalScope={personalScope}>
+        <div data-testid="page-body" />
+      </NavigationShell>
+    </WithStubNavigationHost>,
   );
 }
 

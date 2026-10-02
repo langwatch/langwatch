@@ -1,5 +1,5 @@
-import { Button, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, List, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { ScenarioArchiveItem } from "../../model/scenario-list.types.ts";
 

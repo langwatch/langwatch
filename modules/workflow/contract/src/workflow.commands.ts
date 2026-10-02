@@ -55,6 +55,16 @@ export const copyWorkflowCommandSchema = z.object({
 });
 
 /**
+ * Who a run acts as: a member and the key they started it with, or a service key alone. The run's
+ * key holds no more than either; only a run that names nobody (a scheduler) acts as the system.
+ */
+export const workflowRunPrincipalSchema = z.union([
+  z.object({ userId: z.string().min(1), callerApiKeyId: z.string().min(1).optional() }).strict(),
+  z.object({ userId: z.null(), callerApiKeyId: z.string().min(1) }).strict(),
+]);
+export type WorkflowRunPrincipal = z.infer<typeof workflowRunPrincipalSchema>;
+
+/**
  * Dispatch input shared by every workflow transport. The graph is resolved by
  * the service, so callers can only name the workflow and an optional version.
  */
@@ -67,6 +77,7 @@ export const runWorkflowCommandSchema = z.object({
   runEvaluations: z.boolean().optional(),
   origin: workflowRunOriginSchema.optional(),
   causalityDepth: z.number().int().nonnegative().optional(),
+  principal: workflowRunPrincipalSchema.optional(),
   parentTrace: z
     .object({
       traceId: z.string(),

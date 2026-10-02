@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

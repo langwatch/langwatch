@@ -60,7 +60,7 @@ function harness() {
   return { app, traces, loadTraces };
 }
 
-describe("AnnotationApp review reads", () => {
+describe("AnnotationModule review reads", () => {
   it("hydrates a known annotation author and preserves a null author", async () => {
     const { app } = harness();
 

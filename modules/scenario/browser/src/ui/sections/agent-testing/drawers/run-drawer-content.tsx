@@ -4,9 +4,17 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
+import {
+  Accordion,
+  Box,
+  Grid,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";

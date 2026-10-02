@@ -3,8 +3,8 @@
  * Pins the score settings screen's wait for its project before it asks for scores.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -55,12 +55,10 @@ class StubScoresHost extends AnnotationScoresHostApi {
 }
 
 function renderScreen(project: AnnotationScoresProject | undefined) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationScoresHostProvider value={new StubScoresHost(project)}>
-        <AnnotationScoresScreen />
-      </AnnotationScoresHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotationScoresHostProvider value={new StubScoresHost(project)}>
+      <AnnotationScoresScreen />
+    </AnnotationScoresHostProvider>,
   );
 }
 

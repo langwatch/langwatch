@@ -3,15 +3,12 @@
  * their effective permissions at the scope, so expiry and key ceilings apply.
  * @see specs/rbac/grants-rest-api.feature
  */
-import {
-  ALL_PERMISSIONS,
-  builtinRolePermissions,
-  type CollectedBinding,
-} from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
+import { builtinRolePermissions, type CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
 import { AuthzService } from "../authz.service.ts";
 
@@ -40,7 +37,7 @@ function authzFor({
       findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
     }),
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
 }
 
@@ -137,7 +134,7 @@ describe("given a caller's own permissions bound what they may grant", () => {
   });
 
   describe("when an organization admin grants anything", () => {
-    it("finds nothing beyond the admin", async () => {
+    it("finds only the platform permissions beyond the admin", async () => {
       const authz = authzFor({ userBindings: [onOrganization("admin")], membership: "ADMIN" });
 
       const missing = await authz.findPermissionsBeyondCaller({
@@ -147,7 +144,7 @@ describe("given a caller's own permissions bound what they may grant", () => {
         permissions: [...ALL_PERMISSIONS],
       });
 
-      expect(missing).toEqual([]);
+      expect(missing.toSorted()).toEqual(["ops:manage", "ops:view"]);
     });
   });
 

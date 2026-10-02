@@ -226,16 +226,25 @@ func TestMirrorLeg(t *testing.T) {
 			"a VK with no mirror tier must never be mirrored")
 	})
 
-	// With no mirror configured (the self-hosted default) the leg is dormant and
-	// the customer path is byte-for-byte what it always was.
+	// With no mirror configured (the self-hosted default) the leg is dormant:
+	// the customer gets exactly one copy, with its content and without the
+	// reserved markers, which the ingest pipeline would otherwise strip and log
+	// as user-submitted reserved attributes.
+	// @scenario "An install with no mirror sends model calls without the mirror's markers"
 	t.Run("when no mirror is configured", func(t *testing.T) {
 		p := baseParams()
 		p.MirrorTier = mirrorTierContent
+		p.MirrorSourceOrgID = "org-acme"
 		byProject := emitOne(t, MirrorConfig{}, p).spansByProject(t)
 
 		require.Len(t, byProject["proj-customer"], 1)
 		assert.Empty(t, byProject["proj-mirror"])
-		assert.Contains(t, byProject["proj-customer"][0][string(attrInputMessages)], "Jane Doe")
+		attrs := byProject["proj-customer"][0]
+		assert.Contains(t, attrs[string(attrInputMessages)], "Jane Doe")
+		_, hasTier := attrs[string(attrMirrorTier)]
+		_, hasOrgMarker := attrs[string(attrMirrorSourceOrg)]
+		assert.False(t, hasTier, "the customer copy carries the reserved tier marker")
+		assert.False(t, hasOrgMarker, "the customer copy carries the reserved source marker")
 	})
 }
 

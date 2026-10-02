@@ -3,7 +3,7 @@
  *
  * Version field required; validation error shows on submit only.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -31,8 +31,8 @@ vi.mock("../../../../behavior/use-model-selection.ts", () => ({
   useModelSelection: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     modelProvider: {
       getResolvedDefault: {
         // A configured model so the field renders without the sparkles path.
@@ -57,14 +57,14 @@ function Harness({ children }: { children: ReactNode }) {
     defaultValues: { version: "", commitMessage: "" },
   });
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(() => undefined)}>
           {children}
           <button type="submit">Submit</button>
         </form>
       </FormProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

@@ -1,6 +1,6 @@
-/** @see specs/self-hosting/connected-services/connected-billing.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicenseSeatChange, LicensingApi } from "@langwatch/enterprise-licensing-contract";
+/** @see specs/self-hosting/connected-services/connected-billing.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

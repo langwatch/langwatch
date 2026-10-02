@@ -1,3 +1,4 @@
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 /**
  * The automation REST families over a process's own door, as a test supplies
  * one: a project API key that resolves to `project_1`, and the facts a
@@ -9,10 +10,8 @@ import {
   createRestRuntime,
   projectRestFacts,
   type MountableRestApp,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { AutomationApi } from "@langwatch/automation-contract";
-import { HandledError } from "@langwatch/handled-error";
 
 import { createAutomationRest } from "../automation.rest.ts";
 import { slackAutomationRest } from "../slack-trigger.rest.ts";
@@ -24,12 +23,6 @@ export const TEST_PROJECT = { id: "project_1", slug: "acme" } as const;
 /** The default `platformUrl` a case's `Partial<AutomationApi>` did not override. */
 const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
   `https://app.test/${projectSlug}${path}`;
-
-/** Renders the typed refusal the way every client reads it: by code. */
-const renderHandled: RestErrorHandler = (error, c) =>
-  HandledError.isHandled(error)
-    ? c.json({ error: error.code }, error.httpStatus as 400)
-    : c.json({ error: String(error) }, 500);
 
 function runtime() {
   return createRestRuntime({
@@ -78,7 +71,7 @@ function requests(hono: MountableRestApp) {
   };
 }
 
-/** `/api/triggers`, over whichever slice of the application a case names. */
+/** `/api/triggers`, refusing through the canonical boundary, over the slice a case names. */
 export function mountAutomationRest(app: Partial<AutomationApi>) {
   const withDefaults: AutomationApi = { platformUrl: defaultPlatformUrl, ...app } as AutomationApi;
 
@@ -86,7 +79,7 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
     runtime().mount(createAutomationRest().router(), {
       app: () => withDefaults,
       credential: "project",
-      onError: renderHandled,
+      onError: canonicalErrorResponse,
       facts: projectFacts(),
     }),
   );
@@ -96,6 +89,25 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
 export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
   return requests(
     runtime().mount(slackAutomationRest.router(), {
+      app: () => app as AutomationApi,
+      credential: "project",
+      onError: canonicalErrorResponse,
+    }),
+  );
+}
+
+/** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
+export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
+  const refusing = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new ProjectMissingCredentialsError();
+      },
+    },
+  });
+
+  return requests(
+    refusing.mount(slackAutomationRest.router(), {
       app: () => app as AutomationApi,
       credential: "project",
       onError: canonicalErrorResponse,

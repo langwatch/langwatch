@@ -1,18 +1,22 @@
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { TrpcContract } from "@langwatch/api/contract";
 /**
  * @vitest-environment node
- * What the ops surface answers, over the real runtime and a real `OpsApp`.
+ * What the ops surface answers, over the real runtime and a real `OpsModule`.
  * Every operator page reads its fields off these shapes, so a changed one
  * is a blank card rather than an error.
  */
 import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fixture.ts";
+import {
+  createOpsTestApp,
+  OPS_STAFF_ADDRESS,
+  platformOperatorAuthz,
+} from "../../app/__tests__/ops.fixture.ts";
 import type { OpsReplayRunner } from "../../app/ops.app.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
@@ -31,7 +35,11 @@ function mount<Contract extends TrpcContract>(
   capability: Partial<OpsCapability> = {},
   members: NonNullable<Parameters<typeof createOpsTestApp>[0]>["members"] = {},
 ) {
-  const { app } = createOpsTestApp({ capability, members });
+  const { app } = createOpsTestApp({
+    capability,
+    members,
+    authz: platformOperatorAuthz({ holders: { [OPERATOR.id]: ["ops:view", "ops:manage"] } }),
+  });
   const trpc = initTRPC.context<OpsAnswersContext>().create();
   const router = createTrpcRuntime<OpsAnswersContext>({
     root: trpc,
@@ -48,7 +56,7 @@ function mount<Contract extends TrpcContract>(
 }
 
 describe("the ops surface's declared answers", () => {
-  describe("given an operator on the allow-list", () => {
+  describe("given an operator holding the platform-operator grant", () => {
     it("answers the scope probe with the platform reach", async () => {
       const { operator } = mount(opsDashboardTrpcTransport);
 
@@ -150,7 +158,7 @@ describe("the ops surface's declared answers", () => {
     });
   });
 
-  describe("given a caller who is not on the allow-list", () => {
+  describe("given a caller who holds no platform-operator grant", () => {
     it("refuses the read rather than answering an empty one", async () => {
       const { outsider } = mount(opsDashboardTrpcTransport);
 
@@ -219,14 +227,16 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("when an answer drifts from what the procedure declared", () => {
-    it("preserves the response while the runtime reports the mismatch", async () => {
+    it("answers a 500 and never sends the raw value the schema refused", async () => {
       const { operator } = mount(opsQueueTrpcTransport, {
         unblockQueueGroup: async () => ({}) as { wasBlocked: boolean },
       });
 
-      await expect(operator.unblockGroup({ queueName: "traces", groupId: "g-1" })).resolves.toEqual(
-        {},
-      );
+      const failure = await operator
+        .unblockGroup({ queueName: "traces", groupId: "g-1" })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
     });
   });
 });

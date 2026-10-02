@@ -28,7 +28,8 @@ import type {
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
+import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
@@ -194,6 +195,8 @@ export interface LangWatchQLServiceDependencies {
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
+  /** Who may read each view's table and column; `LWQL_CATALOG` unless a test narrows it. */
+  readonly catalog?: LwqlCatalogue;
   readonly limits?: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
   readonly now?: () => Instant;
@@ -201,6 +204,7 @@ export interface LangWatchQLServiceDependencies {
 
 export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
+  private readonly catalog: LwqlCatalogue;
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Instant;
   private readonly validation = LangWatchQLValidationService.create();
@@ -212,6 +216,7 @@ export class LangWatchQLService {
 
   private constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
+    this.catalog = deps.catalog ?? LWQL_CATALOG;
     this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
     this.now = deps.now ?? nowInstant;
   }
@@ -243,6 +248,7 @@ export class LangWatchQLService {
       database: this.deps.database,
       protections,
       views: this.views,
+      catalog: this.catalog,
       isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
   }
@@ -281,7 +287,11 @@ export class LangWatchQLService {
       // permissions that dataset requires.
       allowedTables: catalogShapes.allowedTables({
         database: this.deps.database,
-        views: catalogShapes.visibleViews({ protections, views: this.views }),
+        views: catalogShapes.visibleViews({
+          protections,
+          views: this.views,
+          catalog: this.catalog,
+        }),
       }),
       // Derived from the *full* catalog on purpose: a column of a hidden
       // dataset must stay gated so that naming it unqualified — where no table

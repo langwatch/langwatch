@@ -1,3 +1,4 @@
+import { SCENARIO_RESOURCE_CLASSES } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
@@ -5,7 +6,6 @@ import {
   type ExecutionJobData,
   ScenarioExecutionPoolService,
 } from "../services/scenario-execution-pool.service.ts";
-import { VoiceConcurrencyGateService } from "../services/voice-concurrency-gate.service.ts";
 
 function poolRunning(
   execute: ScenarioExecutionRunner["execute"],
@@ -13,7 +13,7 @@ function poolRunning(
 ): ScenarioExecutionPoolService {
   const pool = ScenarioExecutionPoolService.create({
     concurrency: 10,
-    voiceGate: VoiceConcurrencyGateService.create({ max }),
+    projectSlots: { voice: max * SCENARIO_RESOURCE_CLASSES.voice.weight },
   });
   pool.connect({ execute, skipCancelled: () => undefined });
   return pool;

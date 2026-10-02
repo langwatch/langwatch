@@ -36,12 +36,16 @@ export type CreatePasskeyUserRow = CreatePasskeyUserInput &
   UserAddressConfirmation;
 export type SetFirstUserPasswordRow = SetFirstUserPasswordInput & UserCredentialIssuer;
 
+export type UserDeactivationOutcome =
+  | Readonly<{ outcome: "deactivated"; user: UserProfile }>
+  | Readonly<{ outcome: "none_active" }>;
+
 /** Persistence owned by User. It never crosses the feature boundary. */
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
-  /** Ignores case: rows written before sign-in lowercased addresses may carry capitals. */
-  findByEmail(email: string): Promise<UserProfile | null>;
+  /** Every account on this address, case aside: older rows may carry capitals. */
+  findByEmail(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
@@ -70,7 +74,15 @@ export interface UserRepository {
   setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void>;
   findLastHomePath(id: string): Promise<string | null>;
   setLastHomePath(input: { id: string; path: string | null }): Promise<void>;
+  /** The database's clock: user's facts are stamped from it, never from one server's. */
+  readClock(): Promise<Instant>;
   setDeactivatedAt(input: { id: string; deactivatedAt: Instant | null }): Promise<UserProfile>;
+  /** Deactivates `id` only while one of `others` stays active; two racing never both pass. */
+  deactivateWhileOthersActive(input: {
+    id: string;
+    deactivatedAt: Instant;
+    others: readonly string[];
+  }): Promise<UserDeactivationOutcome>;
   setAvatar(input: { id: string; image: string | null }): Promise<void>;
   /** The usage report's count, install-wide: the part after the `@`, never an address. */
   countUsage(): Promise<UserUsageCount>;

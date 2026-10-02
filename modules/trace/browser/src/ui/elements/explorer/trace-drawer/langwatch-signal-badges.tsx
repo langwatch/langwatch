@@ -1,4 +1,4 @@
-import { HStack, Icon } from "@chakra-ui/react";
+import { HStack, Icon } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import type { IconType } from "react-icons";

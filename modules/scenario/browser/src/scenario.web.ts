@@ -4,9 +4,9 @@
  * bar opens (`?drawer.open=<name>`) under the names the product already uses.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const scenarioWeb = defineWebModule("scenario")
+export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({
     requires: ["ScenarioHostApi"],
     mounts: { ScenarioHostApi: { load: () => import("./behavior/scenario-host-mount.tsx") } },
@@ -54,6 +54,12 @@ export const scenarioWeb = defineWebModule("scenario")
         default: (
           await import("./ui/sections/agent-testing/cases/agent-testing-case-editor-drawer.tsx")
         ).AgentTestingCaseEditorDrawer,
+      }),
+    },
+    agentTestingSuiteEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/agent-testing/drawers/suite-editor-drawer.tsx"))
+          .SuiteEditorDrawer,
       }),
     },
   })

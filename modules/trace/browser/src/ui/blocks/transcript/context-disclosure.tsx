@@ -1,4 +1,4 @@
-import { Box, Button, Icon, Text } from "@chakra-ui/react";
+import { Box, Button, Icon, Text } from "@langwatch/design-system/primitives";
 import { asMarkdownBody } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuFileText } from "react-icons/lu";

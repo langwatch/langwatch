@@ -45,6 +45,7 @@ describe("GovernanceCostSummaryService.summary", () => {
 
   describe("given a lane mixing dollar usage with usage billed elsewhere", () => {
     /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
+    /** @scenario "A currency total is withheld when part of what it covers holds no amount" */
     it("withholds the dollar figure over an unpriced cell and totals the euros on their own line", async () => {
       const { costRollup, read } = setup();
       costRollup.seed(cell({}));
@@ -86,6 +87,7 @@ describe("GovernanceCostSummaryService.summary", () => {
 
   describe("given a day whose bill was reissued in another currency", () => {
     /** @scenario "A bill reissued in another currency reads as a revision, not as new spend" */
+    /** @scenario "A day reissued in another currency names what it held before, not the two amounts added together" */
     it("names what each currency held before the reissue and sums none of them together", async () => {
       const { costRollup, read } = setup();
       const revisedAt = Date.parse("2026-09-20T10:00:00Z") / 1000;
@@ -166,6 +168,93 @@ describe("GovernanceCostSummaryService.summary", () => {
       });
 
       await expect(read()).rejects.toThrow("ledger unreachable");
+    });
+  });
+
+  describe("given the markers a day carries about how far to trust its figure", () => {
+    const DAY = 86_400;
+    const nowSeconds = Date.parse("2026-09-25T12:00:00Z") / 1000;
+
+    /** @scenario "A day a pull touched recently can still change" */
+    it("marks a day touched inside the settling window as able to still change", async () => {
+      const { costRollup, read } = setup();
+      costRollup.seed(cell({ lastObservedAt: nowSeconds - 2 * DAY }));
+
+      const [day] = (await read()).series;
+
+      expect(day?.billedProvisional).toBe(true);
+    });
+
+    /** @scenario "A day no pull has touched for longer than the settling window reads settled" */
+    it("reads a day untouched for longer than the settling window as settled", async () => {
+      const { costRollup, read } = setup();
+      costRollup.seed(cell({ lastObservedAt: nowSeconds - 60 * DAY }));
+
+      const [day] = (await read()).series;
+
+      expect(day?.billedProvisional).toBe(false);
+    });
+
+    /** @scenario "A day summarized before the markers existed reads as settled" */
+    it("reads a day with no recorded pull touch as settled and not revised", async () => {
+      const { costRollup, read } = setup();
+      costRollup.seed(cell({}));
+
+      const [day] = (await read()).series;
+
+      expect(day).toMatchObject({ billedProvisional: false, billedRevisedAt: null });
+    });
+
+    /** @scenario "A day that was revised and can still change says both" */
+    it("says a restated day was revised, what it held, and that it may still change", async () => {
+      const { costRollup, read } = setup();
+      const revisedAt = nowSeconds - DAY;
+      costRollup.seed(
+        cell({
+          amountNanoUsd: 5_000_000_000,
+          amountNanoMinor: 5_000_000_000,
+          revisedAt,
+          previousAmountNanoUsd: 3_000_000_000,
+          lastObservedAt: revisedAt,
+        }),
+      );
+
+      const [day] = (await read()).series;
+
+      expect(day).toMatchObject({
+        billedUsd: 5,
+        billedRevisedAt: revisedAt * 1000,
+        billedProvisional: true,
+      });
+      expect(day?.billedByCurrency).toEqual([
+        { currencyCode: "USD", amount: 5, previousAmount: 3 },
+      ]);
+    });
+
+    /** @scenario "Gateway days never claim they might change" */
+    it("marks no gateway day as able to still change", async () => {
+      const day = gatewayDay({
+        amountNanoUsd: 2_000_000_000,
+        requestCount: 1,
+        pricedRequestCount: 1,
+      });
+      const summary = await setup({ gatewayDays: async () => [day] }).read();
+
+      expect(summary.series[0]).toMatchObject({ gatewayUsd: 2, billedProvisional: false });
+    });
+
+    /** @scenario "A revised day whose earlier figure cannot be stated in dollars withholds it" */
+    it("marks the day revised but names no earlier amount when part of it holds no dollars", async () => {
+      const { costRollup, read } = setup();
+      const revisedAt = nowSeconds - DAY;
+      costRollup.seed(cell({ model: "gpt-5-eu", ...EUR, revisedAt, lastObservedAt: revisedAt }));
+
+      const [day] = (await read()).series;
+
+      expect(day?.billedRevisedAt).toBe(revisedAt * 1000);
+      expect(day?.billedByCurrency).toEqual([
+        { currencyCode: "EUR", amount: 5, previousAmount: null },
+      ]);
     });
   });
 });

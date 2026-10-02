@@ -3,7 +3,7 @@
  * The trace module's own registry, selected memory-only. A write then read
  * through the SAME instances proves it boots without Postgres or ClickHouse.
  */
-import { instantiateRepositories } from "@langwatch/kernel";
+import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";

@@ -1,11 +1,11 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { langyGuidedOnboarding } from "../langy-guided-onboarding.capability.ts";
 /**
  * The one capability Langy publishes: what a guided onboarding may do to the
  * panel, proven against the store it writes.
  */
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { langyGuidedOnboarding } from "../langy-guided-onboarding.capability.ts";
+import { useLangyStore } from "../langy.store.ts";
 
 const scope = { userId: "user_1", organizationId: "org_1", projectId: "proj_1" };
 

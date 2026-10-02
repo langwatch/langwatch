@@ -605,7 +605,7 @@ async function readKeyOrRefuse({
     if (status === 403) {
       throw new LocalCallFailure({
         code: "key_refused",
-        message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
+        message: `LangWatch did not mint an ingestion key for this login: it needs permission to send traces (traces:create) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
       });
     }
     if (code === "endpoint_missing") {
@@ -667,6 +667,17 @@ function runFileTool({ call, root }: { call: LocalCall; root: string }): string 
     case "local_bash":
       throw new Error("a command is not a file tool");
   }
+}
+
+/** Which step refused the key (the key exchange unless the error names the lookup) and its code. */
+function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | undefined } {
+  if (typeof error !== "object" || error === null) return { stage: "key", code: undefined };
+  const stage = "stage" in error ? error.stage : undefined;
+  const code = "code" in error ? error.code : undefined;
+  return {
+    stage: stage === "lookup" ? "lookup" : "key",
+    code: typeof code === "string" ? code : undefined,
+  };
 }
 
 /** The HTTP status a rejected key request carries, whichever client threw it. */

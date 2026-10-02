@@ -102,7 +102,7 @@ jobs:
 
           # Auto-derive npm dist-tag from version: any `-` suffix (beta, rc,
           # alpha, next, etc.) → `prerelease`; clean semver → `latest`.
-          # Same convention as scenario js (.github/workflows/javascript-publish.yml).
+          # Same convention as the langwatch/scenario JS publish.
           if [[ "$pkg_version" == *"-"* ]]; then
             npm_tag="prerelease"
           else
@@ -265,8 +265,8 @@ jobs:
             # from the repo root).
             "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
-            # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
-            # source is .ts (the import specifier names the .ts file;
+            # (modules/langy/browser/scripts/generate-langy-skills.ts) when a
+            # tree rebuilds. The source is .ts (the import specifier names the .ts file;
             # the tarball never ships a compiled .js, so asserting .js
             # here always failed even on a correctly packaged tarball.
             "package/app/skills/_lib/frontmatter.ts"

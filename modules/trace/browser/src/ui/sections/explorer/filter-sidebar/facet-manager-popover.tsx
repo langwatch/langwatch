@@ -1,3 +1,6 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -9,17 +12,8 @@ import {
   RadioCard,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  FACET_PERSPECTIVES,
-  getFacetGroupId,
-  orderedGroupDefsForPerspective,
-  useUIStore,
-} from "@langwatch/trace-browser-kit";
 import {
   Activity,
   AlertCircle,
@@ -50,8 +44,14 @@ import {
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  FACET_PERSPECTIVES,
+  getFacetGroupId,
+  orderedGroupDefsForPerspective,
+} from "../../../../behavior/facet-constants.ts";
 import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
 import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 // Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
 // TracesPage). Below this + a little slack the "shown / total" count chip

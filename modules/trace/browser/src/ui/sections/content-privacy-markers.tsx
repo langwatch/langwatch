@@ -1,5 +1,5 @@
-import { Alert, HStack, Icon, Link, Text, VStack } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Alert, HStack, Icon, Link, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract";
 import type React from "react";

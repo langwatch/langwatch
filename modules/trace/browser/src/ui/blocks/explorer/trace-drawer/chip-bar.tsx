@@ -1,5 +1,5 @@
-import { HStack, VStack } from "@chakra-ui/react";
-import { Chip, type ChipProps } from "@langwatch/trace-browser-kit";
+import { Chip, type ChipProps } from "@langwatch/design-system/chip";
+import { HStack, VStack } from "@langwatch/design-system/primitives";
 import type { ReactElement, ReactNode } from "react";
 
 export interface ChipDef extends ChipProps {

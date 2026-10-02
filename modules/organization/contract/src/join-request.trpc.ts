@@ -4,7 +4,7 @@
  * the identity feature's own join-matching decision, unread here.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

@@ -6,7 +6,7 @@
 
 import { trace, SpanStatusCode, context as otelContext, type Span } from "@opentelemetry/api";
 
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import type { Logger } from "@/logger";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
@@ -153,7 +153,7 @@ export class EvaluationsFacade {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.#apiKey }),
+          ...buildRequestHeaders({ apiKey: this.#apiKey }),
         },
         body: JSON.stringify(requestBody),
       });

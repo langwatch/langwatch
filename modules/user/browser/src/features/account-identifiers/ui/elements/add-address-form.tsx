@@ -1,4 +1,4 @@
-import { Button, HStack, Input } from "@chakra-ui/react";
+import { Button, HStack, Input } from "@langwatch/design-system/primitives";
 
 /** The address field and its two answers, on a row under the offers. Enter sends, Escape closes. */
 export function AddAddressForm({

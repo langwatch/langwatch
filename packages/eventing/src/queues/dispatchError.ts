@@ -11,8 +11,8 @@ export class DispatchError extends Error {
   readonly retryAfterMs?: number;
   /**
    * The remediation sentence, written for a customer, when this rejection has
-   * one (e.g. "the bot isn't in that channel"). Absent for transport failures,
-   * whose `message` is assembled from internals not fit for a person to read.
+   * one (e.g. "the bot isn't in that channel"). A transport failure never
+   * relays `message` (internals); at most fixed copy naming its kind is set.
    */
   readonly customerMessage?: string;
 
@@ -111,7 +111,11 @@ export function extractHttpStatus(error: unknown): number | undefined {
 /** Convert raw dispatch failure to DispatchError with retryable decision from HTTP status. */
 export function toDispatchError(
   error: unknown,
-  { message, retryable: retryableOverride }: { message: string; retryable?: boolean },
+  {
+    message,
+    retryable: retryableOverride,
+    customerMessage,
+  }: { message: string; retryable?: boolean; customerMessage?: string },
 ): DispatchError {
   if (isDispatchError(error)) return error;
   if (retryableOverride !== undefined) {
@@ -119,9 +123,10 @@ export function toDispatchError(
       message,
       retryable: retryableOverride,
       cause: error,
+      customerMessage,
     });
   }
   const status = extractHttpStatus(error);
   const retryable = status === undefined ? true : isRetryableHttpStatus(status);
-  return new DispatchError({ message, retryable, cause: error });
+  return new DispatchError({ message, retryable, cause: error, customerMessage });
 }

@@ -1,8 +1,8 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 const WARMUP_INTERVAL_MS = 30_000; // Send warmup every 30 seconds
@@ -20,7 +20,7 @@ export const useLambdaWarmup = () => {
   // Calculate number of warmup requests: half of concurrency, min 1
   const warmupCount = Math.max(1, Math.floor(concurrency / 2));
 
-  const warmupMutation = api.evaluations.warmupLambda.useMutation();
+  const warmupMutation = experimentApi.evaluations.warmupLambda.useMutation();
 
   // Use ref to avoid dependency on mutate function which changes every render
   const mutateRef = useRef(warmupMutation.mutate);

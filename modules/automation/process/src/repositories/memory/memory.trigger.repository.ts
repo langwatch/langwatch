@@ -117,6 +117,33 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(row?.projectId === input.projectId ? row : null);
   }
 
+  findSlackTriggers(input: { projectIds: readonly string[] }): Promise<Trigger[]> {
+    return Promise.resolve(
+      this.rows()
+        .filter(
+          (row) =>
+            input.projectIds.includes(row.projectId) &&
+            row.action === "SEND_SLACK_MESSAGE" &&
+            !row.deleted,
+        )
+        .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime()),
+    );
+  }
+
+  replaceActionParamsIfUnchanged(input: {
+    triggerId: string;
+    projectId: string;
+    expected: unknown;
+    actionParams: Record<string, unknown>;
+  }): Promise<boolean> {
+    const row = this.memory.triggers.get(input.triggerId);
+    const unchanged =
+      row?.projectId === input.projectId &&
+      JSON.stringify(row.actionParams ?? {}) === JSON.stringify(input.expected ?? {});
+    if (row && unchanged) this.write({ ...row, actionParams: input.actionParams });
+    return Promise.resolve(unchanged);
+  }
+
   findAllByProjectId(input: { projectId: string }): Promise<Trigger[]> {
     return Promise.resolve(
       this.rows()

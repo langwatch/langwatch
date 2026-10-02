@@ -79,9 +79,9 @@ describe("given the checked-in module lists", () => {
 
     it("reads each module's members off the `reads` its App declared", () => {
       const root = moduleTree(`
-        export class AnnotationApp {
+        export class AnnotationModule {
           static readonly contract = AnnotationApi;
-          static readonly reads = reads("clock", "logger");
+          static readonly reads = ["clock", "logger"] as const;
         }
       `);
 
@@ -90,7 +90,7 @@ describe("given the checked-in module lists", () => {
 
     it("records an empty list for a module whose App names no member", () => {
       const root = moduleTree(`
-        export class AnnotationApp {
+        export class AnnotationModule {
           static readonly contract = AnnotationApi;
         }
       `);
@@ -120,7 +120,7 @@ describe("given the checked-in module lists", () => {
 
       // The generator keeps the kernel declared on the server half (generatemodules.go).
       expect(Object.keys(owner.dependencies).toSorted((a, b) => a.localeCompare(b))).toEqual(
-        [...imported, "@langwatch/kernel"].toSorted((a, b) => a.localeCompare(b)),
+        [...imported, "@langwatch/process"].toSorted((a, b) => a.localeCompare(b)),
       );
     });
   });

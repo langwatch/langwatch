@@ -49,7 +49,6 @@ type BorrowedProcedures = {
               name: string;
               slug: string;
               firstMessage?: boolean | null;
-              apiKey?: string | null;
             }[];
           }[];
         }[];

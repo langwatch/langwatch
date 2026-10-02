@@ -1,11 +1,11 @@
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PiiAnalysis, PiiClearing } from "../app/data-privacy.members.ts";
+import type { PiiClearing } from "../rules/pii-analysis.rules.ts";
 import type { GoogleDlpRedactionService } from "./google-dlp-redaction.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
 
 /** Both analysis services behind the one seam the redaction passes call: main's adapter. */
-export class PiiAnalysisService implements PiiAnalysis {
+export class PiiAnalysisService {
   static create(input: {
     dlp: GoogleDlpRedactionService;
     presidio: PresidioRedactionService;

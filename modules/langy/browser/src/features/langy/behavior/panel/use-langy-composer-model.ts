@@ -1,8 +1,8 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import { useEffect, useMemo } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { resolveComposerModel } from "../../../../model/langy-composer-model.ts";
 import { useLangyModelOptions } from "./use-langy-model-options.ts";
 

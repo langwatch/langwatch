@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VisuallyHidden, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 

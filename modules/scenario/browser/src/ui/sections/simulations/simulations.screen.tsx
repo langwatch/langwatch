@@ -7,7 +7,7 @@ import { useEffect } from "react";
 
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
 import { resolveSimulationsRedirect } from "../../../behavior/suites/use-suite-routing.ts";
-import SimulationsPage from "../../../ui/sections/suites/simulations-page.tsx";
+import SimulationsPage from "../suites/simulations-page.tsx";
 
 function SimulationsRoutePage() {
   const router = useRouter();

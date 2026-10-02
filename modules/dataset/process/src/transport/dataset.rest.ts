@@ -189,7 +189,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
 
       // The legacy spelling of the batch-records route above; same grain, and
       // the same application operation, so the two can never disagree.
-      .post("/:slug/entries", "postApiDatasetBySlugEntries")
+      .post("/:datasetSlug/entries", "postApiDatasetBySlugEntries")
       .withParams(datasetRestSlugParamsSchema)
       .withInput(datasetRestLegacyEntriesSchema)
       .withPermission("datasets:update")
@@ -198,7 +198,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .handle(async ({ app, input, scope }) => {
         await app
           .batchCreateRecords({
-            slugOrId: input.slug,
+            slugOrId: input.datasetSlug,
             projectId: scope.id,
             entries: input.entries,
           })
@@ -381,6 +381,25 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .handle(async ({ app, input, scope }) =>
         app.listRecords({
           slugOrId: input.slugOrId,
+          projectId: scope.id,
+          page: input.page,
+          limit: input.limit,
+        }),
+      )
+
+      // The legacy spelling of the records list, beside the legacy `POST` of the
+      // same path; SDKs that add entries there read them back from it too.
+      .get("/:datasetSlug/entries", "getApiDatasetBySlugEntries")
+      .withParams(datasetRestSlugParamsSchema)
+      .withQuery(datasetRestPaginationQuerySchema)
+      .withPermission("datasets:view")
+      .withOutput(datasetRestRecordPageSchema)
+      .withDocs({
+        description: "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",
+      })
+      .handle(async ({ app, input, scope }) =>
+        app.listRecords({
+          slugOrId: input.datasetSlug,
           projectId: scope.id,
           page: input.page,
           limit: input.limit,

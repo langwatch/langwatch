@@ -1,5 +1,4 @@
-// Host port for activity tables: replay, trace, GitHub install; narrower
-// than full-family ports; scope-agnostic.
+// Host port for activity tables: permission, route, query, navigation and notices.
 
 import { createContext, useContext } from "react";
 

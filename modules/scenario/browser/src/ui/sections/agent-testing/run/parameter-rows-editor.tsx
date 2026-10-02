@@ -3,8 +3,8 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { chakra, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Lock, LockOpen, Plus, X } from "lucide-react";

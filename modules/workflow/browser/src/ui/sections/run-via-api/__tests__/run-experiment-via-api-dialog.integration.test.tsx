@@ -2,20 +2,15 @@
  * Run via API dialog: language and data-source pickers with copyable snippets.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RunExperimentViaApiDialog } from "../run-experiment-via-api-dialog.tsx";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderDialog = () =>
-  render(
+  renderWithDesignSystem(
     <RunExperimentViaApiDialog
       open={true}
       onOpenChange={() => {}}
@@ -28,7 +23,6 @@ const renderDialog = () =>
       datasetName="My Dataset"
       projectSlug="my-project"
     />,
-    { wrapper: Wrapper },
   );
 
 const dialogText = () => screen.getByRole("dialog").textContent ?? "";

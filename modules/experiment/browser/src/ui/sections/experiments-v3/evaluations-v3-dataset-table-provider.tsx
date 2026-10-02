@@ -1,9 +1,4 @@
-import {
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-} from "@langwatch/dataset-browser-kit";
 import { getImageUrl } from "@langwatch/design-system/external-image";
-import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 /**
  * Adapter that backs the shared dataset table cells with the evaluations workbench
  * store. The cells (EditableCell, TableCell) only know the narrow DatasetTableContext
@@ -12,6 +7,11 @@ import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import {
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+} from "../../../model/dataset/dataset-table-context.tsx";
+import { StoredObjectImage } from "../stored-object/stored-object-image.tsx";
 
 const renderImage = (value: string): ReactNode | null => {
   const src = getImageUrl(value);

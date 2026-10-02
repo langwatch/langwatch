@@ -1,8 +1,17 @@
-import { Box, Button, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type {
   UiAgentWorkflowEditorDrawerProps,
   UiAgentWorkflowMappingProps,
 } from "@langwatch/browser-host/drawer";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 

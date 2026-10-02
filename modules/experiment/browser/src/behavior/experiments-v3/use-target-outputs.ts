@@ -1,7 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 type TargetOutputs = TargetConfig["outputs"];
 
@@ -15,7 +15,7 @@ export const useTargetOutputs = (
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const promptQueries = api.useQueries((t) =>
+  const promptQueries = experimentApi.useQueries((t) =>
     targets.map((target) =>
       t.prompts.getByIdOrHandle(
         { idOrHandle: target?.promptId ?? "", projectId },

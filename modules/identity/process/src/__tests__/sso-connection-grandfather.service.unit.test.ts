@@ -11,6 +11,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -86,7 +87,8 @@ function serviceOf(store: InMemoryConnections): SsoConnectionService {
       stranding: new StubStranding([]),
       // The grandfather verb states history and runs no operator gate; an
       // empty operator set proves it does not need one.
-      platformOperators: new StubPlatformOperators(),
+      authorization: new StubPlatformOperators(),
+      licensing: licensingFixture(),
     }),
     ledger,
   );

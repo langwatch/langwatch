@@ -6,7 +6,7 @@
 
 import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
 import {
-  isElevenLabsHost,
+  isAllowedElevenLabsUrl,
   type ModelProviderApi,
   type ModelProviderCustomKeys,
 } from "@langwatch/model-provider-contract";
@@ -35,6 +35,8 @@ export interface ElevenLabsApiCredential {
 /** The one model-provider operation both voice credential reads stand on. */
 export type ElevenLabsCredentialCollaborators = {
   modelProviders: Pick<ModelProviderApi, "getCustomKeys">;
+  /** The dev loopback switch (allowLoopbackVoiceProviders); absent is off. */
+  allowLoopbackVoiceProviders?: boolean;
 };
 
 export class GatewayElevenLabsCredentialService {
@@ -109,7 +111,8 @@ export class GatewayElevenLabsCredentialService {
       return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
     }
 
-    if (!isElevenLabsHost(configured)) {
+    const allowLoopback = this.collaborators.allowLoopbackVoiceProviders ?? false;
+    if (!isAllowedElevenLabsUrl({ url: configured, secure: "https:", allowLoopback })) {
       logger.warn(
         { modelProviderId },
         "an ElevenLabs credential names a base URL outside elevenlabs.io; using the default host instead",

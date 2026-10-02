@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   SsoArrivalApi,
   SsoAuthenticationActivityApi,
@@ -10,6 +9,7 @@ import type {
  * domain-matched organization must not gain a member off a licensing store answer of "no
  */
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

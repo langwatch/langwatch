@@ -1,5 +1,14 @@
-import { Alert, Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 

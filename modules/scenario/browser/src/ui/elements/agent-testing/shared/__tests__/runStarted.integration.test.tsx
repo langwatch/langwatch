@@ -7,15 +7,14 @@
  * plan and the run it started; one scenario opens in the run drawer.
  * @see specs/features/agent-testing/run-dialog.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useRunStartedHandler } from "../../../../sections/agent-testing/cases/use-case-run-actions.ts";
 import type { RunStartedInfo } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
-import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
 
 const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
@@ -37,10 +36,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mockToast },
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** A button that reports one run as started, the way the run dialog does. */
 function StartRun({ info }: { info: RunStartedInfo }) {
@@ -71,7 +66,7 @@ describe("where a queued run lands", () => {
       /** @scenario "A run of several scenarios opens the results of the run it started" */
       it("opens the Results tab on the plan and the run, with no toast", async () => {
         const user = userEvent.setup();
-        render(<StartRun info={SUITE_RUN} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<StartRun info={SUITE_RUN} />);
 
         await user.click(screen.getByRole("button", { name: "Start" }));
 
@@ -93,9 +88,9 @@ describe("where a queued run lands", () => {
     /** @scenario "A run of one scenario opens in the run drawer" */
     it("opens the run drawer on that scenario and stays on the page", async () => {
       const user = userEvent.setup();
-      render(<StartRun info={{ ...SUITE_RUN, scenarioId: "case_1", targetId: "agent_1" }} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <StartRun info={{ ...SUITE_RUN, scenarioId: "case_1", targetId: "agent_1" }} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Start" }));
 

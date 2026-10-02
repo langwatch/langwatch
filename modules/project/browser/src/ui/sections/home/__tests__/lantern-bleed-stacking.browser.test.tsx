@@ -1,9 +1,10 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * Real-Chromium paint-order test for the Langy home's lit block: jsdom paints
  * nothing, so only a browser can say which layer ends up on top of a card.
  * Spec: specs/home/langy-home.feature
  */
-import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,11 +21,13 @@ import { HomePage } from "../home-screen.tsx";
 
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 vi.mock("posthog-js", () => ({ default: { capture: vi.fn() } }));
-vi.mock("@langwatch/langy-browser-kit", () => ({
+vi.mock("../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy: vi.fn() }),
-  LangyMark: () => null,
-  SERIF: "serif",
 }));
+
+vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
+
+vi.mock("../../../../model/langy/asaplangy-tokens.ts", () => ({ SERIF: "serif" }));
 vi.mock("../components/use-home-composition.ts", () => ({
   useHomeComposition: () => "langy",
 }));

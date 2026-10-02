@@ -4,6 +4,13 @@
  */
 
 import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  type ScopeAssignment,
+} from "@langwatch/data-retention-contract";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
   Alert,
   Badge,
   Button,
@@ -14,32 +21,24 @@ import {
   Table,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import {
-  isScopeInFilter,
-  resolveScopeFilter,
-  ScopeChipPicker,
-  ScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
-import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  type ScopeAssignment,
-} from "@langwatch/data-retention-contract";
-import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
 import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
+import {
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
@@ -149,7 +148,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     projectId,
     scope: storageScope,
   });
-  // Platform admin = an email in ADMIN_EMAILS, NOT an org admin. Only they may
+  // Platform admin = a holder of the platform-operator grant, NOT an org admin. Only they may
   // disable retention; the route enforces this independently. It decides
   // nothing here but whether the drawer offers the "No retention" option.
   const isPlatformAdmin = host.isPlatformAdmin();
@@ -201,24 +200,21 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     onConfirm: () => void | Promise<void>;
   } | null>(null);
 
-  // Poll system.mutations while a retroactive apply is in flight, then idle.
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
-  const [pollMs, setPollMs] = useState<number | false>(false);
   const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
     { projectId },
-    { enabled: projectIsWritable, refetchInterval: pollMs },
+    {
+      enabled: projectIsWritable,
+      // needs a read hint: retroactive retention mutation finished (system.mutations)
+    },
   );
   const activeMutations = progressQuery.data ?? [];
-  useEffect(() => {
-    setPollMs(activeMutations.length > 0 ? 3000 : false);
-  }, [activeMutations.length]);
 
   // Per-call toasts intentionally omitted — the drawer flow fans this out one
   // call per category. Call sites emit a single aggregated notice.
   const triggerUpdate = dataRetentionApi.dataRetention.triggerRetroactiveUpdate.useMutation({
     onSuccess: () => {
-      setPollMs(3000);
       void progressQuery.refetch();
     },
   });

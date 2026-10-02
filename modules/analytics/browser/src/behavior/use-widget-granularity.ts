@@ -1,6 +1,6 @@
 /**
  * The datapoint step each dashboard widget runs at, held in URL state (like
- * `usePeriodSelector`) so a shared link reproduces the same chart. Only
+ * `useAnalyticsPeriod`) so a shared link reproduces the same chart. Only
  * offered steps are accepted on input, or a hand-typed URL could error.
  */
 

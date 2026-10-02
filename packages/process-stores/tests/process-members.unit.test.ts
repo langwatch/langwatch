@@ -15,11 +15,11 @@ import {
   systemClock,
 } from "../src/config-members.ts";
 import {
-  createProcessMembers,
+  buildProcessStores,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
 } from "../src/create-members.ts";
-import { MEMBER_NAMES, reads, type ProcessConfig } from "../src/index.ts";
+import { MEMBER_NAMES, type ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all. */
 function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
@@ -37,14 +37,14 @@ describe("given a process that hands in a member itself", () => {
     it("answers with what the caller passed", () => {
       const clock = { now: () => Temporal.Instant.from("2026-09-10T12:00:00.000Z") };
 
-      const members = createProcessMembers({ config: config(), members: { clock } });
+      const members = buildProcessStores({ config: config(), members: { clock } }).members;
 
       expect(members.read("clock")).toBe(clock);
     });
 
     it("never closes a client the caller owns", async () => {
       const clock = { now: () => nowInstant() };
-      const members = createProcessMembers({ config: config(), members: { clock } });
+      const members = buildProcessStores({ config: config(), members: { clock } }).members;
       members.read("clock");
 
       await members.close();
@@ -56,11 +56,12 @@ describe("given a process that hands in a member itself", () => {
   describe("when the member is handed in as an own property whose value is undefined", () => {
     /** @scenario "A member handed in as undefined is a refusal, not an omission" */
     it("refuses naming the member rather than building the real client", () => {
-      expect(() =>
-        createProcessMembers({
-          config: config(),
-          members: { clock: undefined },
-        }),
+      expect(
+        () =>
+          buildProcessStores({
+            config: config(),
+            members: { clock: undefined },
+          }).members,
       ).toThrow(MemberSuppliedUndefinedError);
     });
   });
@@ -74,14 +75,14 @@ describe("given a process that named no store", () => {
       ["clickhouse", "CLICKHOUSE_URL"],
       ["redis", "REDIS_URL"],
     ] as const)("refuses %s by name", (member, hint) => {
-      const members = createProcessMembers({ config: config() });
+      const members = buildProcessStores({ config: config() }).members;
 
       expect(() => members.read(member)).toThrow(MemberNotConfiguredError);
       expect(() => members.read(member)).toThrow(hint);
     });
 
     it("refuses the members built over Redis for the same reason", () => {
-      const members = createProcessMembers({ config: config() });
+      const members = buildProcessStores({ config: config() }).members;
 
       for (const member of ["cache", "idempotency", "rateLimiter"] as const) {
         expect(() => members.read(member)).toThrow("REDIS_URL");
@@ -89,7 +90,7 @@ describe("given a process that named no store", () => {
     });
 
     it("refuses object storage that names no bucket", () => {
-      const members = createProcessMembers({ config: config() });
+      const members = buildProcessStores({ config: config() }).members;
 
       expect(() => members.read("objectStorage")).toThrow(MemberNotConfiguredError);
     });
@@ -109,13 +110,12 @@ describe("given the members built over one Redis connection", () => {
           calls.push("idempotency");
           return Promise.resolve("OK");
         },
-        incr: () => {
+        eval: () => {
           calls.push("rateLimiter");
           return Promise.resolve(1);
         },
-        expire: () => Promise.resolve(1),
       });
-      const members = createProcessMembers({ config: config(), members: { redis } });
+      const members = buildProcessStores({ config: config(), members: { redis } }).members;
 
       void members.read("cache").find("key");
       void members.read("idempotency").claim("key", 60);
@@ -132,7 +132,7 @@ describe("given a member source with several clients open", () => {
       const closed: string[] = [];
       // No queue and a supplied Postgres client, so the only client this source
       // opens is the runtime itself and the close it records is the one asserted.
-      const members = createProcessMembers({
+      const members = buildProcessStores({
         config: config({
           eventing: {
             store: { kind: "producer-only" },
@@ -141,7 +141,7 @@ describe("given a member source with several clients open", () => {
           },
         }),
         members: { prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }) },
-      });
+      }).members;
       // The two members with a close of their own, in construction order.
       const eventing = members.read("eventing");
       vi.spyOn(eventing, "close").mockImplementation(() => {
@@ -155,7 +155,7 @@ describe("given a member source with several clients open", () => {
     });
 
     it("reads a member again after it closed, building it afresh", async () => {
-      const members = createProcessMembers({ config: config() });
+      const members = buildProcessStores({ config: config() }).members;
       const first = members.read("clock");
 
       await members.close();
@@ -180,10 +180,6 @@ describe("given the closed member list", () => {
     it("names no audit member: the sink is the audit-log module's app", () => {
       expect([...MEMBER_NAMES]).not.toContain("audit");
       expect(MEMBER_NAMES).toHaveLength(15);
-    });
-
-    it("reads a module's declaration back as the tuple it wrote", () => {
-      expect(reads("clock", "logger")).toEqual(["clock", "logger"]);
     });
   });
 });

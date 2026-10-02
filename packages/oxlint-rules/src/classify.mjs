@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { FEATURE_PREFIX, stripFeaturePrefix } from "../grammar/feature-layout-policy.mjs";
+
 // One answer to "what file am I standing in", computed once per file and read
 // by every rule. It replaces five helpers that each asked a slice of the same
 // question with their own regex: `normalizedFilename`, `isStrictServiceModule`,
@@ -11,20 +13,22 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** @typedef {object} FileClassification - File metadata for the feature-layout classifier. */
 
-const FEATURE_SOURCE =
-  /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/(.+)$/;
+const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser)\/(.+)$/;
 const APPLICATION_SOURCE = /^apps\/([^/]+)\/src\/(.+)$/;
 const ENTERPRISE_COMPOSITION_SOURCE =
   /^enterprise\/packages\/composition\/(api|worker)\/src\/(.+)$/;
 const SHARED_PACKAGE_SOURCE = /^packages\/(config|design-system)\/src\/(.+)$/;
 const SHARED_PACKAGE = /^packages\/(config|design-system|eventing|group-queue)\//;
 const PACKAGE_SOURCE_OR_TESTS = /^(src|tests)\//;
-const SERVICE_MODULE = /^(enterprise\/)?modules\/[^/]+\/process\/src\/services\/.+\.service\.ts$/;
-const PRISMA_REPOSITORY_SEAM =
-  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/repositories\/prisma\/.+\.repository\.ts$/;
-const MODULE_PACKAGE =
-  /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)(?:\/|$)/;
-const MODULE_ROLES = ["contract", "process", "browser", "browser-kit"];
+const SERVICE_MODULE = new RegExp(
+  `^(enterprise/)?modules/[^/]+/process/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`,
+);
+const PRISMA_REPOSITORY_SEAM = new RegExp(
+  `^(?:enterprise/)?modules/[^/]+/process/src/${FEATURE_PREFIX}repositories/prisma/.+\\.repository\\.ts$`,
+);
+const MODULE_PACKAGE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser)(?:\/|$)/;
+const LIBRARY_SOURCE = /^((?:enterprise\/)?modules\/([^/]+)\/[^/]+)\/(.+)$/;
+const MODULE_ROLES = ["contract", "process", "browser"];
 const PROCESS_LAYERS = new Set([
   "services",
   "repositories",
@@ -40,6 +44,7 @@ const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
 const classificationCache = new Map();
 const modulePackageCache = new Map();
+const libraryRootCache = new Map();
 
 /** The absolute path of the file a rule is looking at. */
 export function normalizedFilename(context) {
@@ -69,15 +74,38 @@ function strictSourceOf({ enterprise, feature, relative: packageRelative, role }
 
 function layerOf({ role, sourcePath }) {
   if (role !== "process" || !sourcePath) return undefined;
-  const first = sourcePath.slice(0, sourcePath.indexOf("/"));
+  const layerPath = stripFeaturePrefix(sourcePath);
+  const first = layerPath.slice(0, layerPath.indexOf("/"));
 
   return PROCESS_LAYERS.has(first) ? first : undefined;
+}
+
+function featureClassification({ base, feature }) {
+  const packageRelative = feature[4];
+  if (!PACKAGE_SOURCE_OR_TESTS.test(packageRelative)) return base;
+
+  const classification = {
+    ...base,
+    enterprise: Boolean(feature[1]),
+    feature: feature[2],
+    kind: feature[3],
+    relative: packageRelative,
+    role: feature[3],
+    sourcePath: packageRelative.startsWith("src/")
+      ? packageRelative.slice("src/".length)
+      : undefined,
+  };
+  classification.layer = layerOf(classification);
+  classification.strictSource = strictSourceOf(classification);
+
+  return classification;
 }
 
 function classifyPath(cwd, filename) {
   const workspacePath = workspacePathOf(cwd, filename);
   const isTest = TEST_FILE.test(workspacePath) || TEST_DIRECTORY.test(workspacePath);
   const modulePackage = workspacePath.match(MODULE_PACKAGE);
+  const library = modulePackage ? undefined : libraryPackageOf(cwd, workspacePath);
   const base = {
     enterprise: false,
     feature: undefined,
@@ -88,8 +116,8 @@ function classifyPath(cwd, filename) {
     isTest,
     kind: undefined,
     layer: undefined,
-    module: modulePackage?.[2],
-    moduleEnterprise: Boolean(modulePackage?.[1]),
+    module: modulePackage?.[2] ?? library?.module,
+    moduleEnterprise: Boolean(modulePackage?.[1]) || Boolean(library?.enterprise),
     relative: undefined,
     role: "other",
     sourcePath: undefined,
@@ -98,26 +126,20 @@ function classifyPath(cwd, filename) {
   };
 
   const feature = workspacePath.match(FEATURE_SOURCE);
-  if (feature) {
-    const enterprise = Boolean(feature[1]);
-    const packageRelative = feature[4];
-    if (!PACKAGE_SOURCE_OR_TESTS.test(packageRelative)) return base;
+  if (feature) return featureClassification({ base, feature });
 
-    const classification = {
+  if (library && PACKAGE_SOURCE_OR_TESTS.test(library.relative)) {
+    return {
       ...base,
-      enterprise,
-      feature: feature[2],
-      kind: feature[3],
-      relative: packageRelative,
-      role: feature[3],
-      sourcePath: packageRelative.startsWith("src/")
-        ? packageRelative.slice("src/".length)
+      enterprise: library.enterprise,
+      feature: library.module,
+      kind: "library",
+      relative: library.relative,
+      role: "library",
+      sourcePath: library.relative.startsWith("src/")
+        ? library.relative.slice("src/".length)
         : undefined,
     };
-    classification.layer = layerOf(classification);
-    classification.strictSource = strictSourceOf(classification);
-
-    return classification;
   }
 
   const application = workspacePath.match(APPLICATION_SOURCE);
@@ -143,6 +165,30 @@ function classifyPath(cwd, filename) {
   if (SHARED_PACKAGE.test(workspacePath)) return sharedPackageOf(base, workspacePath);
 
   return base;
+}
+
+/** A module's portable library: any other package folder in the module (ARCHITECTURE.md §3). */
+function libraryPackageOf(cwd, workspacePath) {
+  const match = workspacePath.match(LIBRARY_SOURCE);
+  if (!match || !libraryRootsOf(cwd).has(match[1])) return undefined;
+
+  return {
+    enterprise: workspacePath.startsWith("enterprise/"),
+    module: match[2],
+    relative: match[3],
+  };
+}
+
+function libraryRootsOf(cwd) {
+  const cached = libraryRootCache.get(cwd);
+  if (cached) return cached;
+  const roots = new Set();
+  for (const pkg of modulePackages(cwd).values()) {
+    if (pkg.role === "library") roots.add(pkg.root);
+  }
+  libraryRootCache.set(cwd, roots);
+
+  return roots;
 }
 
 function sharedRoleOf(workspacePath) {
@@ -202,8 +248,8 @@ function moduleRootsOf(cwd) {
   return [...new Set([...catalogueRootsOf(cwd), ...scanned])];
 }
 
-function readModulePackage(cwd, moduleRoot, role) {
-  const root = `${moduleRoot}/${role}`;
+function readModulePackage({ cwd, moduleRoot, folder }) {
+  const root = `${moduleRoot}/${folder}`;
   const manifestPath = join(cwd, root, "package.json");
   if (!existsSync(manifestPath)) return undefined;
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -213,14 +259,15 @@ function readModulePackage(cwd, moduleRoot, role) {
     exports: new Set(Object.keys(manifest.exports ?? {})),
     module: moduleRoot.slice(moduleRoot.lastIndexOf("/") + 1),
     name: manifest.name,
-    role,
+    role: MODULE_ROLES.includes(folder) ? folder : "library",
     root,
   };
 }
 
 /**
  * Every module package in the workspace by package name: the catalogue's roots
- * plus both module trees, one package per role folder that has a package.json.
+ * plus both module trees, one package per folder that has a package.json; a
+ * folder outside the four roles is a `library`.
  */
 export function modulePackages(cwd) {
   const cached = modulePackageCache.get(cwd);
@@ -228,8 +275,8 @@ export function modulePackages(cwd) {
 
   const packages = new Map();
   for (const moduleRoot of moduleRootsOf(cwd)) {
-    for (const role of MODULE_ROLES) {
-      const pkg = readModulePackage(cwd, moduleRoot, role);
+    for (const folder of directoriesOf(join(cwd, moduleRoot))) {
+      const pkg = readModulePackage({ cwd, moduleRoot, folder });
       if (pkg?.name) packages.set(pkg.name, pkg);
     }
   }
@@ -252,4 +299,5 @@ export function modulePackageOf(cwd, specifier) {
 export function resetClassificationCache() {
   classificationCache.clear();
   modulePackageCache.clear();
+  libraryRootCache.clear();
 }

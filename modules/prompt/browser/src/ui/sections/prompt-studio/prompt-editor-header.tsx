@@ -1,4 +1,4 @@
-import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
+import { Box, Button, HStack, useDisclosure } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 
@@ -87,7 +87,6 @@ export function PromptEditorHeader({
           )}
           <GeneratePromptApiSnippetDialog
             promptHandle={handle}
-            apiKey={project?.apiKey}
             variables={formMethods.watch("version.configData.inputs")}
           >
             <GeneratePromptApiSnippetDialog.Trigger>

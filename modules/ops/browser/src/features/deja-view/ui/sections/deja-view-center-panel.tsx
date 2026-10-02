@@ -1,4 +1,12 @@
-import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { hashEventTypeColor } from "../../model/deja-view-fragment.ts";

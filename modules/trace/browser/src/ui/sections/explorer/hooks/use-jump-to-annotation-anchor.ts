@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import type { FocusSection } from "../../../../behavior/focus-section.store.ts";
 import { isFocusSection, useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../behavior/span-pulse.store.ts";
@@ -52,9 +52,9 @@ export function canJumpToAnnotationAnchor({
  * and briefly haloed.
  */
 export function useJumpToAnnotationAnchor(): (anchor: AnnotationAnchorTarget) => void {
-  const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
-  const clearSpan = useDrawerStore((s) => s.clearSpan);
-  const setViewModeTransient = useDrawerStore((s) => s.setViewModeTransient);
+  const openSpanInTrace = useTraceDrawer((s) => s.openSpanInTrace);
+  const clearSpan = useTraceDrawer((s) => s.clearSpan);
+  const setViewModeTransient = useTraceDrawer((s) => s.setViewModeTransient);
   const requestFocus = useFocusSectionStore((s) => s.request);
 
   return useCallback(

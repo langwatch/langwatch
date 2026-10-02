@@ -18,6 +18,9 @@ flows:
       - action: go
         with:
           path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace trace_visualdiff_1"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: "{noteText}"
@@ -29,6 +32,9 @@ flows:
       - action: go
         with:
           path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace trace_visualdiff_1"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: "{noteText}"
@@ -46,6 +52,10 @@ flows:
         with:
           label: /^Name/
           value: vd-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
       - action: fill
         with:
           label: /^Description/
@@ -80,6 +90,10 @@ flows:
         with:
           label: /^Name/
           value: vd-scoreed-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
       - action: fill
         with:
           label: /^Description/
@@ -145,6 +159,34 @@ flows:
     steps:
       - action: go
         with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qedit-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qedit-score-{uid}
+      - action: go
+        with:
           path: /{slug}/annotations
       - action: click
         with:
@@ -162,7 +204,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -171,7 +214,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -326,6 +369,34 @@ flows:
     steps:
       - action: go
         with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qm-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qm-score-{uid}
+      - action: go
+        with:
           path: /{slug}/annotations
       - action: click
         with:
@@ -343,7 +414,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -352,7 +424,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -383,6 +455,34 @@ flows:
     steps:
       - action: go
         with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qres-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qres-score-{uid}
+      - action: go
+        with:
           path: /{slug}/annotations
       - action: click
         with:
@@ -400,7 +500,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -409,7 +510,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/

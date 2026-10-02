@@ -1,6 +1,7 @@
 // Reading graph trigger series; distinguish cardinality overflow (SKIPPED) from
 // real failures (propagate) to avoid hiding outages.
 
+import { SeriesPercentageUnsupportedError } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { GraphTriggerSeriesEvaluationService } from "../graph-trigger-series-evaluation.service.ts";
@@ -26,6 +27,8 @@ function planThatFailsWith(error: unknown) {
       },
     },
     graph: { groupBy: "metadata.user_id" },
+    series: { metric: "metadata.trace_id", aggregation: "cardinality" },
+    seriesName: "0/metadata.trace_id/cardinality",
     timePeriod: 60,
     timeseriesInput: { series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }] },
   };
@@ -76,6 +79,30 @@ describe("GraphTriggerSeriesEvaluationService.evaluate", () => {
         triggerId: "trigger-1",
         projectId: "project-1",
         groupBy: "metadata.user_id",
+      });
+    });
+  });
+
+  describe("given the query builder refuses the series as a percentage", () => {
+    /** @scenario "An alert on a series the query refuses is skipped, not retried forever" */
+    it("skips that trigger instead of failing the evaluation", async () => {
+      const { evaluate } = planThatFailsWith(new SeriesPercentageUnsupportedError());
+
+      await expect(evaluate()).resolves.toMatchObject({
+        status: "skipped",
+        detail: "series cannot be shown as a percentage",
+      });
+    });
+
+    it("names the series in the log, so the author knows which one to edit", async () => {
+      const { evaluate, logged } = planThatFailsWith(new SeriesPercentageUnsupportedError());
+
+      await evaluate();
+
+      expect(logged[0]).toMatchObject({
+        triggerId: "trigger-1",
+        seriesMetric: "metadata.trace_id",
+        seriesAggregation: "cardinality",
       });
     });
   });

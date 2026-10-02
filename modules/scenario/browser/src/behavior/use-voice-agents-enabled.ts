@@ -4,10 +4,9 @@
  * is still arriving, so nothing flashes on before the flag resolves.
  */
 
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-
-import { useFeatureFlag } from "./use-feature-flag.ts";
-import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /** The flag every voice surface reads. */
 export const VOICE_AGENTS_FLAG_KEY = "release_voice_agents_enabled";

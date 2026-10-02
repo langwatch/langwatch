@@ -7,7 +7,6 @@ import type { Instant } from "@langwatch/time";
 
 export abstract class SpendSpikeAnomalyRepository {
   abstract findActiveRules(): Promise<AnomalyRule[]>;
-  abstract findGovernanceTenantId(organizationId: string): Promise<string | null>;
   abstract hasOpenAlert(input: { ruleId: string; since: Instant }): Promise<boolean>;
   abstract createAlert(input: {
     rule: AnomalyRule;

@@ -36,7 +36,7 @@ const existing: StoredApiKey = {
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
   hashedSecret: "hashed",
-  roleBindings: [
+  grants: [
     {
       id: "rb_old",
       customRoleId: null,
@@ -49,7 +49,12 @@ const existing: StoredApiKey = {
 
 type LedgerFailure = "attach" | "role" | null;
 
-function makeService(failure: LedgerFailure) {
+type Principal = { type: string; id?: string };
+
+function makeService(
+  failure: LedgerFailure,
+  can: (input: { principal: Principal }) => Promise<boolean> = async () => true,
+) {
   const repository = {
     create: vi.fn(async (input: Record<string, unknown>) => ({
       ...existing,
@@ -66,9 +71,9 @@ function makeService(failure: LedgerFailure) {
   const dependencies = {
     authz: {
       listApiKeyBindings: async ({ apiKeyIds }: { apiKeyIds: string[] }) =>
-        existing.roleBindings.map((binding) => ({ ...binding, apiKeyId: apiKeyIds[0] })),
+        existing.grants.map((binding) => ({ ...binding, apiKeyId: apiKeyIds[0] })),
       hasPermission: async () => true,
-      can: async () => true,
+      can,
       listUserBindings: async () => [],
       listScopeBindings: async () => [],
       listUserCreatedRoles: async () => [{ id: "role_1", permissions: ["langy:view"] }],
@@ -113,6 +118,7 @@ function makeService(failure: LedgerFailure) {
   const service = ApiKeyLifecycleService.create(
     { ...(dependencies as object), repository } as never,
     policy,
+    { forget: async () => void 0 },
   );
   return { service, repository, grantCalls };
 }
@@ -224,5 +230,88 @@ describe("given a replace whose new grants do not become readable", () => {
     );
 
     expect(repository.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a request made with an organization key", () => {
+  const KEY_ID = "key_requesting";
+  const keyRefuses = async ({ principal }: { principal: Principal }) => principal.type !== "apiKey";
+
+  /** @scenario A key-authenticated request grants at most what the requesting key holds */
+  it("refuses a create past the key, though its member holds it, writing nothing", async () => {
+    const { service, repository, grantCalls } = makeService(null, keyRefuses);
+
+    expect(
+      await codeOf(() =>
+        service.create({
+          name: "Past The Key",
+          userId: null,
+          createdByUserId: USER_ID,
+          callerApiKeyId: KEY_ID,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [ORG_BINDING],
+        }),
+      ),
+    ).toBe("api_key_scope_violation");
+
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(grantCalls).toEqual([]);
+  });
+
+  it("refuses an edit the key does not hold and replaces nothing", async () => {
+    const { service, repository, grantCalls } = makeService(null, keyRefuses);
+
+    expect(
+      await codeOf(() =>
+        service.update({
+          id: EXISTING_ID,
+          ...CALLER,
+          callerApiKeyId: KEY_ID,
+          bindings: [ORG_BINDING],
+        }),
+      ),
+    ).toBe("api_key_scope_violation");
+
+    expect(grantCalls).toEqual([]);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("asks the owner and the key, and attaches with the key as the caller", async () => {
+    const asked: Principal[] = [];
+    const { service, grantCalls } = makeService(null, async ({ principal }) => {
+      asked.push(principal);
+      return true;
+    });
+
+    await service.update({
+      id: EXISTING_ID,
+      ...CALLER,
+      callerApiKeyId: KEY_ID,
+      bindings: [ORG_BINDING],
+    });
+
+    expect(asked).toEqual([
+      { type: "user", id: USER_ID },
+      { type: "apiKey", id: KEY_ID },
+    ]);
+    expect(grantCalls).toContainEqual(
+      expect.objectContaining({
+        method: "attachBindings",
+        caller: { type: "apiKey", id: KEY_ID },
+      }),
+    );
+  });
+
+  it("asks only the member when no key made the request", async () => {
+    const asked: Principal[] = [];
+    const { service } = makeService(null, async ({ principal }) => {
+      asked.push(principal);
+      return true;
+    });
+
+    await service.update({ id: EXISTING_ID, ...CALLER, bindings: [ORG_BINDING] });
+
+    expect(asked).toEqual([{ type: "user", id: USER_ID }]);
   });
 });

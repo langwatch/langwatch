@@ -16,6 +16,7 @@ import {
   type StudioServerEvent,
   type StudioWorkflow,
   type WorkflowApi,
+  type WorkflowRunPrincipal,
 } from "@langwatch/workflow-contract";
 
 import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
@@ -255,6 +256,7 @@ export class ExperimentWorkflowCellService {
     loadedEvaluators,
     resultMapperConfig,
     isAborted,
+    principal,
     state,
   }: {
     cell: ExecutionCell;
@@ -263,6 +265,7 @@ export class ExperimentWorkflowCellService {
     loadedEvaluators?: LoadedEvaluators;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;
+    principal?: WorkflowRunPrincipal | undefined;
     state: FoldedFlowState;
   }): AsyncGenerator<EvaluationV3Event> {
     const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
@@ -282,6 +285,7 @@ export class ExperimentWorkflowCellService {
       targetNodes: new Set([cell.targetId]),
       config: resultMapperConfig ?? {},
       isAborted,
+      principal,
     });
   }
 
@@ -294,6 +298,7 @@ export class ExperimentWorkflowCellService {
     resultMapperConfig,
     isAborted,
     sandboxApiKey,
+    principal,
   }: {
     cell: ExecutionCell;
     projectId: string;
@@ -304,6 +309,7 @@ export class ExperimentWorkflowCellService {
     isAborted?: () => Promise<boolean>;
     /** The run's agent cache credential, when it minted one. */
     sandboxApiKey?: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): AsyncGenerator<EvaluationV3Event> {
     yield { type: "cell_started", rowIndex: cell.rowIndex, targetId: cell.targetId };
 
@@ -337,7 +343,7 @@ export class ExperimentWorkflowCellService {
       };
 
       const enrichedEvent = sandboxKey.withSandboxApiKey(
-        await this.workflows.prepareStudioEvent({ event: rawEvent, projectId }),
+        await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
         sandboxApiKey,
       );
 
@@ -376,6 +382,7 @@ export class ExperimentWorkflowCellService {
           loadedEvaluators,
           resultMapperConfig,
           isAborted,
+          principal,
           state,
         });
       }

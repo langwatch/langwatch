@@ -1,4 +1,4 @@
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 /**
@@ -6,6 +6,6 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
  */
 export function useDrawerProjectId(): string {
   const { project } = useOrganizationTeamProject();
-  const openedProjectId = useDrawerStore((s) => s.projectId);
+  const openedProjectId = useTraceDrawer((s) => s.projectId);
   return openedProjectId ?? project?.id ?? "";
 }

@@ -10,7 +10,7 @@ import { z } from "zod";
 
 /**
  * Where the agent manager answers, and the addresses its worker calls back on.
- * `internalSecret` resolves through `LangyApp.secrets` (ADR-132), never this
+ * `internalSecret` resolves through `LangyModule.secrets` (ADR-132), never this
  * slice — see `assertLangyServerConfig` for the "both or neither" refusal.
  */
 export const langyConfig = Config.define((c) => ({

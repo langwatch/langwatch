@@ -28,7 +28,7 @@ flows:
       - action: fill
         with:
           testId: datasets-search
-          value: "dsfind-{uid}"
+          value: "{keptName}"
       - action: expect
         with:
           text: "{keptName}"

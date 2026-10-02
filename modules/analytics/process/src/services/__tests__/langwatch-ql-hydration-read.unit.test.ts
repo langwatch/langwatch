@@ -7,6 +7,7 @@ import {
   LWQL_TRACES_PER_THREAD_CEILING,
   type LangWatchQLTraceSource,
 } from "../langwatch-ql-hydration-read.service.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 function trace({ id, threadId = "thread-a" }: { id: string; threadId?: string }): Trace {
   return {
@@ -35,7 +36,7 @@ function resolvedTraceCall(traceIds: readonly string[]) {
 
 const readInput = {
   projectIds: ["project-1"],
-  protections: {},
+  protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
   maxReadBytes: 128_000_000,
 };
 

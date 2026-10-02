@@ -1,6 +1,6 @@
 /** Server rejections placed where the reader is looking; field errors not toasts. */
 
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 /**

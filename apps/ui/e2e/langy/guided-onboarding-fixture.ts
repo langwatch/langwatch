@@ -16,19 +16,21 @@ import {
 } from "@langwatch/config/public-app-config";
 import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 import {
-  findLatestFlagshipForProvider,
+  pickRecommendedChatModel,
   getProviderModelOptions,
 } from "@langwatch/model-provider-contract";
+import type { GuidedPath } from "@langwatch/onboarding-contract";
+import { expect } from "vitest";
+
+import {
+  GUIDED_PROVIDERS,
+  type GuidedProvider,
+} from "../../src/shell/features/guided-onboarding/model/guided-providers.ts";
 import {
   buildGuidedKickoffParts,
   type GuidedKickoffInput,
   type GuidedKickoffTourStatus,
-  GUIDED_PROVIDERS,
-  type GuidedProvider,
-} from "@langwatch/onboarding-browser-kit";
-import type { GuidedPath } from "@langwatch/onboarding-contract";
-import { expect } from "vitest";
-
+} from "../../src/shell/features/guided-onboarding/model/kickoff.ts";
 import { APP_BASE, CONFIG, useAccount, useProject } from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import {
@@ -422,7 +424,7 @@ const GUIDED_MODEL_PILLS_MAX = 4;
 function guidedChatModels(provider: GuidedProvider): string[] {
   const backend = provider.registryKey === "openai_codex" ? "openai" : provider.registryKey;
   const catalog = getProviderModelOptions(backend, "chat").map((option) => option.value);
-  const recommended = findLatestFlagshipForProvider(backend, "chat")[0]?.slice(backend.length + 1);
+  const recommended = pickRecommendedChatModel(backend)?.slice(backend.length + 1);
   const ordered = recommended
     ? [recommended, ...catalog.filter((m) => m !== recommended)]
     : catalog;

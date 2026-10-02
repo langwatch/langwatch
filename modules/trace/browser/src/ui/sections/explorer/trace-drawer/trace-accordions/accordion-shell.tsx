@@ -1,4 +1,4 @@
-import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Accordion, Badge, Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { type ReactNode, useRef } from "react";
 import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
 

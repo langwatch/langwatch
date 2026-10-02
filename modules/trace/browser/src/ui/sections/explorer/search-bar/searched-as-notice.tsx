@@ -1,9 +1,9 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { requoteBareTerms } from "@langwatch/trace-contract";
 import { Sparkles } from "lucide-react";
 import type React from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 /**

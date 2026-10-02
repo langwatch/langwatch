@@ -4,13 +4,16 @@
  * inside other modules' pages, which is why its host mounts above the tree.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { langyApi } from "./behavior/langy-api.ts";
-import { langyAsk } from "./behavior/langy-ask.capability.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
+// Declares the `langy:` slices at install, so other modules read them from first paint.
+import "./behavior/langy-context-target.store.ts";
+import "./behavior/langy-page-context.store.ts";
+import "./behavior/langy-registrations.store.ts";
 
-export const langyWeb = defineWebModule("langy")
+export const langyWeb = defineBrowserModule("langy")
   .withApi(langyApi)
   // Path-less: the route table nests every project and settings page under
   // it, so the panel and its provider survive navigation between them.
@@ -20,10 +23,9 @@ export const langyWeb = defineWebModule("langy")
     },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
-  // the scope it entered, or ask it a question with the view it is about. The
-  // shell wires these into the consumer's own `*HostApi`; nothing else
-  // reaches Langy's store.
-  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding, ask: langyAsk })
+  // the scope it entered. The shell wires this into the consumer's own
+  // `*HostApi`; nothing else reaches Langy's store.
+  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

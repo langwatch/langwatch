@@ -1,6 +1,7 @@
 // Package voicesim is a local stand-in for the voice providers a scenario voice
 // call talks to: ElevenLabs Conversational AI (the signed URL and the
-// conversation socket) and OpenAI's speech and transcription endpoints. Every
+// conversation socket, plus the model list a credential probe asks for) and
+// OpenAI's speech and transcription endpoints. Every
 // answer is canned and deterministic: tones for audio, scripted agent lines,
 // one fixed caller transcript. A console under /_sim shows recent calls.
 //
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -27,15 +29,33 @@ type Config struct {
 	Addr string
 	// Stack is the haven stack slug the console names (VOICESIM_STACK, may be empty).
 	Stack string
+	// MaxCalls is how many recent calls the console keeps (VOICESIM_MAX_CALLS, default 200).
+	MaxCalls int
+	// MaxEventsPerCall bounds one call's protocol log (VOICESIM_MAX_EVENTS_PER_CALL, default 500).
+	MaxEventsPerCall int
+	// Seed loads one finished sample call at start, so the console has content (VOICESIM_SEED=1).
+	Seed bool
 }
 
 // LoadConfig reads voicesim's configuration from the environment.
 func LoadConfig() Config {
-	cfg := Config{Addr: os.Getenv("VOICESIM_ADDR"), Stack: os.Getenv("VOICESIM_STACK")}
+	cfg := Config{
+		Addr: os.Getenv("VOICESIM_ADDR"), Stack: os.Getenv("VOICESIM_STACK"),
+		MaxCalls:         envInt("VOICESIM_MAX_CALLS", defaultMaxCalls),
+		MaxEventsPerCall: envInt("VOICESIM_MAX_EVENTS_PER_CALL", defaultMaxEventsPerCall),
+		Seed:             os.Getenv("VOICESIM_SEED") == "1",
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5591"
 	}
 	return cfg
+}
+
+func envInt(key string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }
 
 // Server answers the provider calls and the console.
@@ -53,10 +73,16 @@ func NewServer(cfg Config) *Server {
 
 func newServer(cfg Config, bundle fs.FS) *Server {
 	s := &Server{cfg: cfg, console: newConsole(bundle)}
+	s.calls.maxCalls, s.calls.maxEvents = cfg.MaxCalls, cfg.MaxEventsPerCall
+	if cfg.Seed {
+		s.seedCall()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /v1/convai/conversation/get-signed-url", s.handleSignedURL)
 	mux.HandleFunc("GET /v1/convai/conversation", s.handleConversation)
+	mux.HandleFunc("GET /models", s.handleModels)
+	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/audio/speech", s.handleSpeech)
 	mux.HandleFunc("POST /v1/audio/transcriptions", s.handleTranscription)
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
@@ -123,6 +149,16 @@ func (s *Server) handleSignedURL(w http.ResponseWriter, r *http.Request) {
 	query := url.Values{"agent_id": {r.URL.Query().Get("agent_id")}, "conversation_signature": {"voicesim"}}
 	signed := url.URL{Scheme: scheme, Host: r.Host, Path: "/v1/convai/conversation", RawQuery: query.Encode()}
 	writeJSON(w, http.StatusOK, map[string]string{"signed_url": signed.String()})
+}
+
+// handleModels is ElevenLabs' model list, the call the product's credential probe
+// makes with the key in xi-api-key. Any key is accepted; it is served at /models
+// as well because a deployment's base URL may or may not carry the /v1 root.
+func (s *Server) handleModels(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, []map[string]any{
+		{"model_id": "eleven_multilingual_v2", "name": "Eleven Multilingual v2", "can_do_text_to_speech": true},
+		{"model_id": "eleven_flash_v2_5", "name": "Eleven Flash v2.5", "can_do_text_to_speech": true},
+	})
 }
 
 // handleSpeech is OpenAI's text-to-speech: a caller tone as long as the text,

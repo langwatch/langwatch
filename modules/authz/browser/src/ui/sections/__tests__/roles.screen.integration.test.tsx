@@ -30,10 +30,10 @@ const { api, state } = vi.hoisted(() => {
   const api = {
     useUtils: () => ({
       role: { getAll: { invalidate: state.invalidate } },
-      roleBinding: { listForOrg: { invalidate: state.invalidateBindings } },
+      authz: { listManagedGrants: { invalidate: state.invalidateBindings } },
     }),
-    roleBinding: {
-      listForOrg: {
+    authz: {
+      listManagedGrants: {
         useQuery: () => ({ data: state.bindings, isLoading: false, isError: false }),
       },
     },

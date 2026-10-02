@@ -1,6 +1,7 @@
 /** Icon-rail product column (moved from platform/app; uses NavigationLink). */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
 
@@ -8,7 +9,6 @@ import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products.ts";
-import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
 export const ICON_RAIL_WIDTH = "64px";
@@ -114,7 +114,7 @@ export function IconRail({
         alignItems="center"
         marginBottom={2}
       >
-        <LogoIcon width={LOGO_HEIGHT * (38 / 52)} height={LOGO_HEIGHT} />
+        <LogoIcon height={LOGO_HEIGHT} />
       </NavigationLink>
 
       {options.map((product) => (

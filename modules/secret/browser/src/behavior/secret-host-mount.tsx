@@ -19,7 +19,6 @@ import {
   SecretHostProvider,
   type SecretFailureNotice,
   type SecretHostScope,
-  type SecretSuccessNotice,
 } from "../model/secret-host.ts";
 
 class CapabilitySecretHost extends SecretHostApi {
@@ -42,15 +41,11 @@ class CapabilitySecretHost extends SecretHostApi {
   }
 
   scope(): SecretHostScope {
-    return { projectId: this.projectId, projectName: void 0 };
+    return { projectId: this.projectId };
   }
 
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
-  }
-
-  succeeded(notice: SecretSuccessNotice): void {
-    this.feedback.succeeded(notice);
   }
 
   failed(failure: SecretFailureNotice): void {

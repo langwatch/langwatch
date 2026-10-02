@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Eye } from "lucide-react";
 
 import { useLiteMemberGuard } from "../../behavior/personal-workspace-session.ts";

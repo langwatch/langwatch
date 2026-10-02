@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,6 +46,13 @@ vi.mock("../../../behavior/evaluator-api.ts", () => ({
     useUtils: () => ({
       evaluators: { getAll: { invalidate: vi.fn() } },
     }),
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      evaluators: { getAll: { invalidate: vi.fn() } },
+    }),
     evaluators: {
       getAll: {
         useQuery: () => ({ data: evaluatorsQueryData, isLoading: false }),
@@ -72,10 +79,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getFlowCallbacks: () => undefined,
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("EvaluatorListDrawer", () => {
   const mockOnSelect = vi.fn();
   const mockOnClose = vi.fn();
@@ -91,7 +94,7 @@ describe("EvaluatorListDrawer", () => {
   });
 
   const renderDrawer = (props = {}) => {
-    return render(
+    return renderWithDesignSystem(
       <EvaluatorListDrawer
         open={true}
         onClose={mockOnClose}
@@ -99,7 +102,6 @@ describe("EvaluatorListDrawer", () => {
         onCreateNew={mockOnCreateNew}
         {...props}
       />,
-      { wrapper: Wrapper },
     );
   };
 

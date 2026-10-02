@@ -68,6 +68,30 @@ describe("given the client the session is read with", () => {
     });
   });
 
+  describe("when the answer carries the reader's sealing keys", () => {
+    it("holds this epoch's key and the last beside the reader", async () => {
+      const reading = await readUiActor(
+        readingClient(() =>
+          Promise.resolve({
+            data: { user: { id: "user-jane" }, cacheKey: "k2", previousCacheKey: "k1" },
+          }),
+        ),
+      );
+
+      expect(reading.cacheKey).toBe("k2");
+      expect(reading.previousCacheKey).toBe("k1");
+    });
+
+    it("holds no key when the answer named none", async () => {
+      const reading = await readUiActor(
+        readingClient(() => Promise.resolve({ data: { user: { id: "user-jane" } } })),
+      );
+
+      expect(reading.cacheKey).toBeNull();
+      expect(reading.previousCacheKey).toBeNull();
+    });
+  });
+
   describe("when the endpoint refuses the read", () => {
     /** @scenario "A genuine refusal still goes to sign in" */
     it("reads nobody, and names the refusal rather than losing it", async () => {

@@ -4,14 +4,13 @@
  * one registry, and the address bar is what opens and stacks it.
  */
 import {
-  clearDrawerStack,
   CurrentDrawer,
   type UiEvaluatorEditorDrawerProps,
   useDrawer,
 } from "@langwatch/browser-host/drawer";
-import { defineWebModule } from "@langwatch/ui-kernel";
-import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import { defineBrowserModule } from "@langwatch/browser";
+import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -37,7 +36,6 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
-  clearDrawerStack();
   window.history.replaceState(null, "", "/");
 });
 
@@ -66,11 +64,11 @@ function EvaluatorEditorDrawer(_props: UiEvaluatorEditorDrawerProps) {
   );
 }
 
-const traceModule = defineWebModule("trace").withDrawers({
+const traceModule = defineBrowserModule("trace").withDrawers({
   traceDetails: { load: () => Promise.resolve({ default: TraceDetailsDrawer }) },
 });
 
-const evaluatorModule = defineWebModule("evaluator").withDrawers({
+const evaluatorModule = defineBrowserModule("evaluator").withDrawers({
   evaluatorEditor: { load: () => Promise.resolve({ default: EvaluatorEditorDrawer }) },
 });
 

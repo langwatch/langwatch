@@ -1,10 +1,10 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useCallback } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
+import { useResolvedDefaultModel } from "../../../behavior/scenarios/use-scenario-models.ts";
 import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { generateScenarioWithAI } from "../../../model/scenario-generation.ts";
 import { storePromptForScenario } from "../../../model/scenario-prompt-storage.ts";
 import { getDefaultModelState } from "../../../model/scenarios/default-model-state.ts";
@@ -78,10 +78,10 @@ export function ScenarioCreateModal({
   });
 
   // Cascade-resolved model for scenario generation.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = useResolvedDefaultModel({
+    projectId: project?.id,
+    featureKey: "scenarios.generator",
+  });
 
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,

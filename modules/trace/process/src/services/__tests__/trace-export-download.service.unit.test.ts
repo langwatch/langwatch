@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The prepared export owns the rate window, redactions, progress signals and
  * slot lifetime, before the HTTP bytes door starts consuming its stream.
  * @vitest-environment node
  */
 import type { PresenceApi } from "@langwatch/presence-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

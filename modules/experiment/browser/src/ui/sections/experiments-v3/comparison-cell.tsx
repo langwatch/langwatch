@@ -1,5 +1,6 @@
-import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
 import { Markdown } from "@langwatch/browser-host/markdown";
+import { RawPopover as Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Icon, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { parseEvaluationResult, type ParsedEvaluationResult } from "@langwatch/evaluator-contract";
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";

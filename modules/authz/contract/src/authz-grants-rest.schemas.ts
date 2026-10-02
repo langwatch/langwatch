@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 /**
  * The wire shapes of `/api/grants`, the successor to `/api/role-bindings`: a
  * grant names who (principal), what (role) and where (scope). Built-in roles
@@ -5,7 +6,6 @@
  */
 import { z } from "zod";
 
-import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
 import { authzPrincipalRefSchema } from "./authz.ts";
 
 const MAX_ID_LENGTH = 128;
@@ -13,6 +13,27 @@ const idSchema = z.string().min(1).max(MAX_ID_LENGTH);
 
 export const builtInRoleIdSchema = z.enum(["admin", "member", "viewer"]);
 export type BuiltInRoleId = z.infer<typeof builtInRoleIdSchema>;
+
+/** Every place a grant write names a role: a create, a role change, a member's new grants. */
+const grantRolesSchema = z.object({
+  roleId: z.string().optional(),
+  grant: z.object({ roleId: z.string() }).optional(),
+  bindingsToCreate: z.array(z.object({ customRoleId: z.string().nullish() })).optional(),
+});
+
+/** Whether a grant write assigns a role beyond the built-in three: an Enterprise question. */
+export function assignsCustomGrantRole(input: unknown): boolean {
+  const parsed = grantRolesSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { roleId, grant, bindingsToCreate = [] } = parsed.data;
+  const named = [roleId, grant?.roleId].filter((id) => id !== undefined);
+
+  return (
+    named.some((id) => !builtInRoleIdSchema.validate(id)) ||
+    bindingsToCreate.some((binding) => Boolean(binding.customRoleId))
+  );
+}
 
 export const grantPrincipalTypeSchema = z.enum(["user", "group", "apiKey"]);
 export type GrantPrincipalType = z.infer<typeof grantPrincipalTypeSchema>;
@@ -107,7 +128,7 @@ export const authzCreateGrantInputSchema = z
     grant: grantCreateSchema,
     /** Whose permissions bound what may be granted: the key or the person asking. */
     caller: authzPrincipalRefSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzCreateGrantInput = z.infer<typeof authzCreateGrantInputSchema>;
@@ -118,7 +139,7 @@ export const authzChangeGrantRoleInputSchema = z
     grantId: z.string().min(1),
     roleId: z.string().min(1),
     caller: authzPrincipalRefSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzChangeGrantRoleInput = z.infer<typeof authzChangeGrantRoleInputSchema>;
@@ -127,7 +148,7 @@ export const authzRevokeGrantByIdInputSchema = z
   .object({
     organizationId: z.string().min(1),
     grantId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzRevokeGrantByIdInput = z.infer<typeof authzRevokeGrantByIdInputSchema>;

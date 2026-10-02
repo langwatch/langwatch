@@ -1,4 +1,8 @@
-import { type AvatarFallbackProps, Avatar as ChakraAvatar } from "@chakra-ui/react";
+import {
+  type AvatarFallbackProps,
+  Avatar as ChakraAvatar,
+  type AvatarRootProps,
+} from "@chakra-ui/react";
 import * as React from "react";
 
 import { firstGrapheme } from "../first-grapheme.ts";
@@ -40,6 +44,27 @@ export const Avatar: typeof ChakraAvatar = {
   ...ChakraAvatar,
   Fallback: AvatarFallback,
 };
+
+/** Initials once the URL fails; tracks the URL so a new photo is not stuck on an old failure. */
+function UserAvatarPhoto({ src }: { src: string | null }) {
+  const [brokenUrl, setBrokenUrl] = React.useState<string | null>(null);
+  if (!src || src === brokenUrl) return null;
+  return <Avatar.Image src={src} onError={() => setBrokenUrl(src)} />;
+}
+
+/** A person: photo from `src`, else initials from `name`. Never fetches; caller resolves `src`. */
+export function UserAvatar({
+  name,
+  src,
+  ...rootProps
+}: Omit<AvatarRootProps, "children"> & { name?: string | null; src?: string | null }) {
+  return (
+    <Avatar.Root {...rootProps}>
+      <UserAvatarPhoto src={src ?? null} />
+      <Avatar.Fallback name={name ?? void 0} />
+    </Avatar.Root>
+  );
+}
 
 export type {
   AvatarFallbackProps,

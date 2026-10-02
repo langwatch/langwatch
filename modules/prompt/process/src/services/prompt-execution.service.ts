@@ -6,6 +6,7 @@ import {
   parseLLMError,
   PromptPlaygroundNotPermittedError,
   type PlaygroundStreamEvent,
+  type PromptApiCaller,
   type PromptExecuteRequest,
 } from "@langwatch/prompt-contract";
 import {
@@ -148,7 +149,10 @@ export class PromptExecutionService {
     return new PromptExecutionService(input);
   }
 
-  async execute(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>> {
+  async execute(
+    input: PromptExecuteRequest,
+    by?: PromptApiCaller,
+  ): Promise<AsyncIterable<PlaygroundStreamEvent>> {
     const { projectId, formValues, variables, messages, threadId } = input;
 
     if (this.#authz.isDemoProject({ projectId })) throw new PromptPlaygroundNotPermittedError();
@@ -166,6 +170,7 @@ export class PromptExecutionService {
     try {
       preparedEvent = await this.#workflow.prepareStudioEvent({
         projectId,
+        ...(by ? { principal: { userId: by.id } } : {}),
         event: buildPromptExecutionEvent({
           formValues,
           messages,

@@ -6,13 +6,11 @@ Feature: Telling a tenant's open tabs that a trace moved, from another process
   A finished background discover refresh in the api tells the same tabs to
   refetch their facets, and a running export reports its progress the same way.
 
-  Trace publishes through its own Redis channel onto main's tenant channels
-  (`broadcast:trace_updated`, `broadcast:discover_updated`). Presence's fan-out
-  subscribes to those channels in every process and relays each message to the
-  tenant's emitter, which Trace's subscriptions read. The channel and the
-  message body are a WIRE FORMAT: the publisher and the subscriber never
-  type-check against each other, and an unknown channel is accepted by Redis
-  and delivered to nobody, so both halves are pinned by literal.
+  Trace publishes through presence (`PresenceApi.publishProjectEvent`, record
+  §3.3) on the `trace_updated` and `discover_updated` channels. Presence is the
+  one writer of the `broadcast:*` wire: its fan-out subscribes in every process
+  and relays each message to the tenant's emitter, which Trace's subscriptions
+  read. Trace keeps no Redis broadcast of its own.
 
   @unit
   Scenario: A trace summary advancing reaches the channel the application subscribes to
@@ -33,14 +31,8 @@ Feature: Telling a tenant's open tabs that a trace moved, from another process
     Then the payload names the span storage event and the trace it belongs to
 
   @unit
-  Scenario: The envelope carries the tenant and the producer's payload verbatim
-    Given a broadcast for a known tenant
-    When the message is put on the wire
-    Then it carries the tenant id and the producer's serialised payload unchanged
-
-  @unit
   Scenario: A failed publish does not fail the ingestion that caused it
-    Given a publisher that cannot reach Redis
+    Given presence refusing the publish
     When the trace update broadcast subscriber runs
     Then the subscriber completes and the durable write stands
 

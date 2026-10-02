@@ -7,6 +7,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import {
   workflowDslSchema,
   type Workflow,
+  type WorkflowDsl,
   type WorkflowReference,
   type WorkflowVersion,
   type WorkflowWithVersion,
@@ -278,6 +279,29 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     this.store.versions.set(updated.id, updated);
 
     return Promise.resolve(updated);
+  }
+
+  updateVersionDslIfUnchanged(input: {
+    id: string;
+    projectId: string;
+    dsl: WorkflowDsl;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const existing = this.store.versions.get(input.id);
+    if (
+      !existing ||
+      existing.projectId !== input.projectId ||
+      existing.updatedAt.getTime() !== input.updatedAt.getTime()
+    ) {
+      return Promise.resolve(false);
+    }
+    this.store.versions.set(input.id, {
+      ...existing,
+      dsl: input.dsl,
+      updatedAt: toDate(nowInstant()),
+    });
+
+    return Promise.resolve(true);
   }
 
   setVersionPointers(input: {

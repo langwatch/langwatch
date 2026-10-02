@@ -4,29 +4,29 @@
  * pruned against the installing graph's store.
  */
 
-/** Spec: specs/server/declarative-process-composition.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+/** Spec: specs/server/declarative-process-composition.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { apiKeyServer } from "../../api-key.server.ts";
-import type { ApiKeyApp } from "../../app/api-key.app.ts";
+import { apiKeyProcessModule } from "../../api-key.module.ts";
+import type { ApiKeyModule } from "../../app/api-key.app.ts";
 import { MemoryApiKeyRepositories } from "../../repositories/memory/memory.api-key.repositories.ts";
 import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../agent-sandbox-key-reap.process.ts";
 import { apiKeyEventing } from "../api-key.pipeline.ts";
 import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
 
 /** The sandbox sweep never calls into the app, so a stand-in proves nothing there. */
-const unusedApp = createApiFixture<ApiKeyApp>();
+const unusedApp = createApiFixture<ApiKeyModule>();
 
 function installed(participation: "produce" | "consume" = "consume") {
   const repositories = MemoryApiKeyRepositories.create();
   const revokeExpiredByName = vi.spyOn(repositories.apiKeys, "revokeExpiredByName");
   const findElapsedLoginKeys = vi.spyOn(repositories.apiKeys, "findElapsedLoginKeys");
   const revoke = vi.fn(async (input: { id: string }) => ({ id: input.id }) as never);
-  const app = createApiFixture<ApiKeyApp>({ revoke });
+  const app = createApiFixture<ApiKeyModule>({ revoke });
   const processStore = InMemoryProcessStore.createForTesting();
   const deleteDispatchedBefore = vi.spyOn(processStore, "deleteDispatchedBefore");
   const definition = apiKeyEventing.build({
@@ -56,7 +56,7 @@ describe("given the API-key module's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("carries the declaration onto the installable module", () => {
-      expect(apiKeyServer.eventing).toBe(apiKeyEventing);
+      expect(apiKeyProcessModule.eventing).toBe(apiKeyEventing);
       expect(apiKeyEventing.pipeline).toBe("agent_sandbox_maintenance");
     });
   });
@@ -81,9 +81,12 @@ describe("given the API-key module's eventing declaration", () => {
         {} as never,
       );
 
-      expect(revokeExpiredByName).toHaveBeenCalledTimes(1);
+      expect(revokeExpiredByName).toHaveBeenCalledTimes(2);
       expect(revokeExpiredByName.mock.calls[0]![0]).toMatchObject({
         name: AGENT_SANDBOX_API_KEY_NAME,
+      });
+      expect(revokeExpiredByName.mock.calls[1]![0]).toMatchObject({
+        name: WORKFLOW_RUN_API_KEY_NAME,
       });
     });
 

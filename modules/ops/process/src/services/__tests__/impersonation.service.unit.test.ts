@@ -8,6 +8,7 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
@@ -78,6 +79,10 @@ const target = (overrides: Partial<ImpersonationTarget> = {}): ImpersonationTarg
   ...overrides,
 });
 
+const PLATFORM_OPERATOR_ID = "user_platform_operator";
+
+const platformGrants = platformOperatorAuthz({ holders: { [PLATFORM_OPERATOR_ID]: ["ops:view"] } });
+
 const serviceFor = (repository: InMemoryImpersonationRepository) => {
   const audit = new RecordingAuditSink();
   return {
@@ -85,7 +90,8 @@ const serviceFor = (repository: InMemoryImpersonationRepository) => {
     service: ImpersonationService.create({
       repository,
       access: AdminAccessService.create({
-        adminEmails: ["root@langwatch.ai"],
+        authz: platformGrants,
+        users: { findByEmail: async () => null },
       }),
       audit,
       now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
@@ -123,7 +129,9 @@ describe("ImpersonationService", () => {
     );
   });
 
-  /** @scenario "An admin cannot impersonate another admin" */
+  /** @scenario An administrator cannot impersonate another administrator */
+  /** @scenario A deactivated account cannot be impersonated */
+  /** @scenario An account that does not exist is not impersonated */
   it("rejects missing, deactivated, and platform-admin targets", async () => {
     await expect(
       serviceFor(new InMemoryImpersonationRepository(null)).service.start(input),
@@ -137,7 +145,7 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(CannotImpersonateDeactivatedUserError);
     await expect(
       serviceFor(
-        new InMemoryImpersonationRepository(target({ email: "Root@Langwatch.ai" })),
+        new InMemoryImpersonationRepository(target({ id: PLATFORM_OPERATOR_ID })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
   });
@@ -194,7 +202,7 @@ describe("ImpersonationService", () => {
       ...overrides,
     });
 
-    /** @scenario "An operator cannot hop from one impersonation straight into another" */
+    /** @scenario An operator already impersonating cannot jump straight to another account */
     it("refuses the hop before looking the target up or auditing anything", async () => {
       const repository = new InMemoryImpersonationRepository(target());
       repository.window = openWindow();
@@ -208,7 +216,7 @@ describe("ImpersonationService", () => {
       expect(repository.window).toEqual(openWindow());
     });
 
-    /** @scenario "An operator cannot hop from one impersonation straight into another" */
+    /** @scenario An operator already impersonating cannot jump straight to another account */
     it("allows the start once the window has lapsed or names the operator themselves", async () => {
       const lapsed = new InMemoryImpersonationRepository(target());
       lapsed.window = openWindow({ expires: Temporal.Instant.from("2025-12-31T23:59:59.000Z") });

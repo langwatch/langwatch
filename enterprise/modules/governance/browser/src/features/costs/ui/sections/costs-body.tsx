@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Alert, Skeleton, VStack } from "@chakra-ui/react";
+import { Alert, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceCostSummary } from "@langwatch/enterprise-governance-contract";
 
 import { summaryHoldsFigures } from "../../model/measured-rows.ts";

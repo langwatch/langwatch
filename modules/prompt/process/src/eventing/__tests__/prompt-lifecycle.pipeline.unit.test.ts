@@ -1,18 +1,17 @@
 /**
- * A project's new prompt is recorded on prompt's own pipeline, and the worker's
- * subscriber tells nurturing. @see specs/features/customer-io-nurturing-integration.feature
+ * A project's new prompt is recorded on prompt's own pipeline, and nurturing
+ * reacts to its event from its own side.
+ * @see specs/features/customer-io-nurturing-integration.feature
  */
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
+import { PROMPT_CREATED_EVENT_TYPE } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
 
 import { RecordPromptCreatedCommand } from "../prompt-lifecycle.commands.ts";
 import {
-  PROMPT_CREATED_EVENT_TYPE,
   PROMPT_CREATED_EVENT_VERSION,
   type PromptCreatedEvent,
 } from "../prompt-lifecycle.events.ts";
-import { buildPromptLifecyclePipeline } from "../prompt-lifecycle.pipeline.ts";
 
 const created = {
   promptId: "prompt-1",
@@ -43,45 +42,6 @@ describe("the prompt lifecycle pipeline", () => {
         idempotencyKey: "project-1:prompt-1:created",
         data: created,
       });
-    });
-  });
-
-  describe("when the worker's subscriber handles prompt_created", () => {
-    /** @scenario "First prompt creation identifies user with has_prompts true" */
-    it("tells nurturing the prompt and its org-wide count with the event it came from", async () => {
-      const recorded: NurturingSignal[] = [];
-      const subscriber = buildPromptLifecyclePipeline({
-        recordSignal: async (signal) => {
-          recorded.push(signal);
-        },
-      }).eventSubscribers.get("promptCreatedNurturing");
-      if (!subscriber) throw new Error("the pipeline declares no nurturing subscriber");
-      const event = createdEvent();
-
-      await subscriber.handle(event, { tenantId: "project-1", aggregateId: "prompt-1" });
-
-      expect(recorded).toEqual([
-        {
-          kind: "prompt_created",
-          sourceEventId: event.id,
-          tenantId: "project-1",
-          occurredAt: 1_700_000_000_000,
-          ...created,
-        },
-      ]);
-    });
-
-    it("lets a nurturing failure reach the queue, which retries it", async () => {
-      const subscriber = buildPromptLifecyclePipeline({
-        recordSignal: async () => {
-          throw new Error("nurturing unavailable");
-        },
-      }).eventSubscribers.get("promptCreatedNurturing");
-      if (!subscriber) throw new Error("the pipeline declares no nurturing subscriber");
-
-      await expect(
-        subscriber.handle(createdEvent(), { tenantId: "project-1", aggregateId: "prompt-1" }),
-      ).rejects.toThrow("nurturing unavailable");
     });
   });
 });

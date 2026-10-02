@@ -1,11 +1,11 @@
+import type { WebScreen } from "@langwatch/browser";
+import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
 /**
  * Main's page guards, one row per page (withPermissionGuard / withFeatureFlagGuard
  * on origin/main), read against what the installed modules now declare.
  * specs/ui/page-permission-guards.feature
  */
-import { webModules } from "@langwatch/installed-web-modules";
-import type { WebScreen } from "@langwatch/ui-kernel";
-import { resolveUiPageAccess } from "@langwatch/ui-kernel/page-guard";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { describe, expect, it } from "vitest";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
@@ -56,7 +56,7 @@ const MAIN_GUARDS: readonly MainGuard[] = [
   { page: "pages/settings/data-privacy", permission: "project:view" },
   { page: "pages/settings/data-retention", permission: "project:view" },
   { page: "pages/settings/email-suppressions", permission: "triggers:view" },
-  { page: "pages/settings/integrations", permission: "organization:manage" },
+  { page: "pages/settings/integrations", permission: "organization:view" },
   { page: "pages/settings/plans", permission: "organization:view" },
   { page: "pages/settings/usage", permission: "cost:view" },
   { page: "pages/settings/topic-clustering", permission: "project:manage" },
@@ -76,7 +76,7 @@ const MAIN_GUARDS: readonly MainGuard[] = [
 ];
 
 const declared: Record<string, WebScreen> = Object.fromEntries(
-  webModules.flatMap((module) => Object.entries(module.installation.screens)),
+  browserModules.flatMap((module) => Object.entries(module.installation.screens)),
 );
 
 function accessFor({
@@ -91,7 +91,9 @@ function accessFor({
   const screen = declared[page];
   return resolveUiPageAccess({
     ...(screen?.requires === void 0 ? {} : { permission: screen.requires }),
-    ...(screen?.flags === void 0 ? {} : { flags: screen.flags }),
+    ...(screen?.flags === void 0
+      ? {}
+      : { flags: screen.flags.map((flag) => (typeof flag === "string" ? flag : flag.name)) }),
     featureFlag: () => flagsOn,
     hasPermission: (needed) => grants.includes(needed),
     isSettled: () => true,

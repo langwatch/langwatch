@@ -1,15 +1,16 @@
-import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
+import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import type { LlmConfigOutputType } from "@langwatch/workflow-browser-kit";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../../../behavior/lent-model-provider.tsx";
 import { useModelSelectionOptions } from "../../../../../behavior/use-model-selection-options.ts";
+import type { LlmConfigOutputType } from "../../../../../model/workflow/types.ts";
 import {
   LLMConfigPopover,
   type Output,
@@ -113,7 +114,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             open={popoverOpen}
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >
-            <ChakraPopover.Anchor asChild>
+            <Popover.Anchor asChild>
               <HStack
                 paddingY={2}
                 paddingX={3}
@@ -131,7 +132,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                   <ChevronDown size={16} />
                 </Box>
               </HStack>
-            </ChakraPopover.Anchor>
+            </Popover.Anchor>
             <LLMConfigPopover
               values={field.value}
               onChange={(values) => {

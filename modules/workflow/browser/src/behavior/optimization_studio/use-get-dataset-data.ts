@@ -1,14 +1,15 @@
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
+import { type DatasetOutputs } from "@langwatch/dataset-client";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { datasetDatabaseRecordsToInMemoryDataset } from "@langwatch/workflow-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import { useMemo } from "react";
 
+import { datasetDatabaseRecordsToInMemoryDataset } from "../../model/studio-dataset.utils.ts";
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
+import { type WorkflowApiRouter } from "../workflow-api.ts";
 
 type DatasetView = { records: DatasetRecordEntry[]; columnTypes: DatasetColumns };
 
@@ -73,13 +74,13 @@ export const useGetDatasetData = ({
   rows: DatasetRecordEntry[];
   columns: DatasetColumns;
   query: UseTRPCQueryResult<
-    RouterOutputs["datasetRecord"]["getHead"],
+    DatasetOutputs["datasetRecord"]["getHead"],
     TRPCClientErrorLike<WorkflowApiRouter>
   >;
   total: number | undefined;
 } => {
   const { project } = useOrganizationTeamProject();
-  const databaseDataset = api.datasetRecord.getHead.useQuery(
+  const databaseDataset = datasetClient.datasetRecord.getHead.useQuery(
     { projectId: project?.id ?? "", datasetId: dataset?.id ?? "" },
     {
       enabled: !!project && !!dataset?.id && dataset?.id !== "",
@@ -90,11 +91,6 @@ export const useGetDatasetData = ({
       // PRECONDITION_FAILED. Don't retry that — treat it as "no rows yet" (the
       // hook returns `rows ?? []` below) instead of hammering the server.
       retry: retryUnlessPreparing,
-      trpc: {
-        context: {
-          skipBatch: true,
-        },
-      },
     },
   );
   const databaseDataset_ =

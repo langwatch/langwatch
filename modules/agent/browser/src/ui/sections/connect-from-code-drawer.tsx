@@ -3,6 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   Box,
   Button,
@@ -12,8 +13,7 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+} from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";

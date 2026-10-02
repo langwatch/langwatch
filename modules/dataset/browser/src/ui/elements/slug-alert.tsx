@@ -1,4 +1,4 @@
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /** Base warning surface shared by Dataset slug validation messages. */

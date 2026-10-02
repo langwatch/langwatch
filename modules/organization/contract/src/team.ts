@@ -1,17 +1,11 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
+import { authzGrantCallerSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { organizationIdSchema } from "./organization.ts";
 
 export const organizationTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
 export type OrganizationTeamRole = z.infer<typeof organizationTeamRoleSchema>;
-
-export const organizationLedgerActorSchema = z
-  .object({
-    type: z.enum(["user", "system"]),
-    id: z.string().nullable(),
-  })
-  .strict();
-export type OrganizationLedgerActor = z.infer<typeof organizationLedgerActorSchema>;
 
 export const organizationTeamSchema = z
   .object({
@@ -81,13 +75,14 @@ export const changeOrganizationTeamMemberInputSchema = z
     organizationId: organizationIdSchema,
     teamId: z.string().min(1),
     userId: z.string().min(1),
-    actor: organizationLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 
 export const addOrganizationTeamMemberInputSchema =
   changeOrganizationTeamMemberInputSchema.safeExtend({
     role: organizationTeamRoleSchema,
+    caller: authzGrantCallerSchema,
   });
 export type AddOrganizationTeamMemberInput = z.infer<typeof addOrganizationTeamMemberInputSchema>;
 
@@ -208,7 +203,8 @@ export const createOrganizationTeamWithMembersInputSchema = z
     organizationId: organizationIdSchema,
     name: z.string().trim().min(1).max(255),
     members: z.array(organizationTeamMemberInputSchema),
-    actor: organizationLedgerActorSchema,
+    caller: authzGrantCallerSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type CreateOrganizationTeamWithMembersInput = z.infer<
@@ -220,7 +216,8 @@ export const updateOrganizationTeamWithMembersInputSchema = z
     teamId: z.string().min(1),
     name: z.string().trim().min(1).max(255),
     members: z.array(organizationTeamMemberInputSchema),
-    actor: organizationLedgerActorSchema,
+    caller: authzGrantCallerSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type UpdateOrganizationTeamWithMembersInput = z.infer<

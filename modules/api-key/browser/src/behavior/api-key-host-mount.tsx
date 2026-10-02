@@ -94,7 +94,6 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
       projectId: activeScopeIds.projectId,
       projectName: graph.activeProject?.project.name,
       projectSlug: graph.activeProject?.project.slug,
-      projectApiKey: graph.activeProject?.project.apiKey ?? void 0,
     };
   }
 

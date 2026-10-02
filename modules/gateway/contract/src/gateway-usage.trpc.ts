@@ -4,7 +4,7 @@
  * key's own destination rather than in the viewer's selected project.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

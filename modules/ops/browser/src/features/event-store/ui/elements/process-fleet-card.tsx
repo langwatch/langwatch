@@ -1,4 +1,13 @@
-import { Badge, Box, Button, Card, HStack, Spacer, Table, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
 
 import { hasFleetTrouble } from "../../model/process-presentation.ts";

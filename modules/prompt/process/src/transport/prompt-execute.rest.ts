@@ -20,7 +20,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
   .withPermission("prompts:view", { at: "route", param: "projectId" })
   .withResponse("sse", {})
   .withDocs({ hide: true, description: "Streams playground execution events." })
-  .handle(async ({ app, input, response }) =>
-    response.events(events(await app.executePlayground(input))),
+  .handle(async ({ app, input, actor, response }) =>
+    response.events(events(await app.executePlayground(input, actor))),
   )
   .build();

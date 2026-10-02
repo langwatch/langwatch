@@ -1,19 +1,18 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * What an organization's own administrator reads about its connection
  * (specs/identity/sso-connection-history.feature).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
-  createSsoTestEntitlements,
   createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoBreakGlass,
@@ -25,8 +24,12 @@ import { ssoSetupTrpcTransport } from "../sso-setup.trpc.ts";
 
 type TestContext = { actor: { id: string } };
 
-function runtimePorts(permits: (permission: string) => boolean): TrpcRuntimeMembers<TestContext> {
+function runtimePorts(
+  permits: (permission: string) => boolean,
+  enterprise: boolean,
+): TrpcRuntimeMembers<TestContext> {
   return {
+    entitlements: { holds: async () => enterprise },
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -99,8 +102,8 @@ async function harness(
   options: {
     permits?: (permission: string) => boolean;
     setup?: SsoSetupView;
-    /** The organization's plan, which the commands — and only the commands —
-     *  are gated on. */
+    /** The organization's plan, which the declared gates — and only they —
+     *  ask about. */
     planType?: string;
     /** The cutover identity answers for this organization, if any. */
     migration?: SsoMigrationView | null;
@@ -142,6 +145,12 @@ async function harness(
           allowed: options.licensed ?? true,
           inspections: [],
         }),
+        // Several organizations, so an organization administrator publishes a record.
+        getDomainClaimAuthority: async () => ({
+          authorizesDomainClaims: options.licensed ?? true,
+          hostsSingleOrganization: false,
+          licenseDigests: [],
+        }),
       }),
       auditLog,
       identity: createSsoTestIdentity({
@@ -155,7 +164,6 @@ async function harness(
         commands,
         breakGlass,
       }),
-      entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
       featureFlags: createSsoTestFeatureFlags(options.optedIn ?? []),
     },
   });
@@ -163,7 +171,10 @@ async function harness(
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: runtimePorts(options.permits ?? (() => true)),
+    members: runtimePorts(
+      options.permits ?? (() => true),
+      (options.planType ?? "ENTERPRISE") === "ENTERPRISE",
+    ),
   }).mount(ssoSetupTrpcTransport, () => app);
 
   return {
@@ -199,6 +210,7 @@ describe("the organization's own single sign-on surface", () => {
         "getMigrationProgress",
         "getSetup",
         "grantBreakGlass",
+        "identityProvider",
         "onHistoryActivity",
         "proveDomain",
         "register",
@@ -210,6 +222,7 @@ describe("the organization's own single sign-on surface", () => {
         "selectMigrationRoute",
         "setArrivals",
         "startLegacyMigration",
+        "updateIdentityProvider",
       ]);
     });
   });
@@ -279,10 +292,12 @@ describe("the organization's own single sign-on surface", () => {
       await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).resolves.toEqual({
         waitsForReview: false,
         disputed: false,
+        verified: false,
       });
       expect(ceremony.claimDomain).toHaveBeenCalledWith({
         ...TARGET,
         domain: "acme.test",
+        proof: "dns-txt",
         actor: { userId: "user_ana" },
       });
     });
@@ -388,6 +403,91 @@ describe("the organization's own single sign-on surface", () => {
     });
   });
 
+  describe("given an administrator editing their identity provider", () => {
+    const IDP = {
+      protocol: "oidc" as const,
+      issuer: "https://acme.okta.com",
+      clientId: "client",
+      clientSecret: "shhh",
+    };
+
+    it("prefills the form with the settings identity holds, never the secret", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.identityProvider(TARGET)).resolves.toEqual({
+        protocol: "oidc",
+        issuer: "https://acme.okta.com",
+        clientId: "client",
+        hasClientSecret: true,
+      });
+      expect(commands.getIdentityProvider).toHaveBeenCalledWith(TARGET);
+    });
+
+    it("answers no settings for a grandfathered connection", async () => {
+      const { caller, commands } = await harness();
+      commands.getIdentityProvider.mockResolvedValueOnce({ protocol: "grandfathered" });
+
+      await expect(caller.identityProvider(TARGET)).resolves.toBeNull();
+    });
+
+    it("passes the settings on for the same connection, and audits no secret", async () => {
+      const { auditLog, caller, commands } = await harness();
+
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).resolves.toBeUndefined();
+
+      expect(commands.updateIdentityProvider).toHaveBeenCalledWith({
+        ...TARGET,
+        idp: IDP,
+        actor: { userId: "user_ana" },
+      });
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.updateIdentityProvider",
+        args: { ...TARGET, protocol: "oidc" },
+        targetKind: "ssoConnection",
+        targetId: "ssoc_1",
+      });
+      expect(JSON.stringify(auditLog.record.mock.calls)).not.toContain("shhh");
+    });
+
+    it("keeps the stored secret when the field is left blank", async () => {
+      const { caller, commands } = await harness();
+
+      await caller.updateIdentityProvider({
+        ...TARGET,
+        idp: { protocol: "oidc", issuer: "https://acme.okta.com", clientId: "client" },
+      });
+
+      expect(commands.updateIdentityProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ idp: expect.objectContaining({ clientSecret: null }) }),
+      );
+    });
+
+    /** @scenario "Only an administrator who may manage single sign-on can edit" */
+    it("refuses a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.identityProvider(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.getIdentityProvider).not.toHaveBeenCalled();
+      expect(commands.updateIdentityProvider).not.toHaveBeenCalled();
+    });
+
+    it("is gated on the plan like registering", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required" },
+      });
+      expect(commands.updateIdentityProvider).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given an installation that never held a licence", () => {
     /** @scenario "An unlicensed self-hosted installation is told what would change that" */
     it("refuses every setup step by the licence, and commands identity with nothing", async () => {
@@ -462,8 +562,20 @@ describe("the organization's own single sign-on surface", () => {
             certificate: null,
           },
         }),
-      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      ).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required", meta: { feature: "SSO" } },
+      });
       expect(commands.register).not.toHaveBeenCalled();
+    });
+
+    it("tells a caller without sso:manage that, before it says what the plan lacks", async () => {
+      const { caller, commands } = await harness({
+        planType: "LAUNCH",
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.activate(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(commands.activate).not.toHaveBeenCalled();
     });
 
     it("refuses to change who it admits, which is the same purchase", async () => {

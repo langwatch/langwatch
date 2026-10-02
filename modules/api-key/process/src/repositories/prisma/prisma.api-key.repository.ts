@@ -29,7 +29,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
   private constructor(private readonly database: PrismaApiKeyDatabase) {}
 
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
-    const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
+    const { grants: _grants, startsDisabled, expiresAt, ...data } = input;
     return this.database.apiKey.create({
       data: {
         ...data,
@@ -67,6 +67,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: {
         organizationId: input.organizationId,
         revokedAt: null,
+        isSystemManaged: false,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId: input.userId }, { userId: null, ingestSourceType: null }],
       },
@@ -78,13 +79,14 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: {
         organizationId: input.organizationId,
         revokedAt: null,
+        isSystemManaged: false,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
       orderBy: { createdAt: "desc" },
     });
   }
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
-    const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
+    const { id, grants: _grants, revokedAt, lastUsedAt, ...data } = input;
     return this.database.apiKey.update({
       where: { id },
       data: {
@@ -169,13 +171,18 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
    * not: null }` is explicit, not left to `lte`: a NULL treated as "before
    * now" would revoke every key of this name in the product at once.
    */
-  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
+  async revokeExpiredByName(input: {
+    name: string;
+    now: Instant;
+    systemManagedOnly?: boolean;
+  }): Promise<number> {
     const now = toDate(input.now);
     const { count } = await this.database.apiKey.updateMany({
       where: {
         name: input.name,
         revokedAt: null,
         expiresAt: { not: null, lte: now },
+        ...(input.systemManagedOnly ? { isSystemManaged: true } : {}),
       },
       data: { revokedAt: now },
     });

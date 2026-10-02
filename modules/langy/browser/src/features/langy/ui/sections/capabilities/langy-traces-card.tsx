@@ -1,14 +1,14 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
 /**
  * Traces capability card (`langwatch.trace.search` / `langwatch.trace.get`).
  */
-import { Button, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy-contract";
-import { useExplorerLinkLensId } from "@langwatch/trace-browser-kit";
 import { Search } from "lucide-react";
 
+import { useTraceExplorerScope } from "../../../../../behavior/trace-explorer-scope.ts";
 import {
   collectionOf,
   textValue,
@@ -136,7 +136,7 @@ export function LangyTracesCard({ descriptor, input, output, projectSlug }: Capa
   // The search Langy actually ran, offered back as somewhere to GO.
   const router = useRouter();
   const search = readTraceSearchQuery(input);
-  const lensId = useExplorerLinkLensId();
+  const lensId = useTraceExplorerScope((s) => s.linkLensId);
   const narrowsTheSearch =
     !!search.query || !!search.filter || !!search.errorsOnly || (search.origins?.length ?? 0) > 0;
   const queryHref = narrowsTheSearch

@@ -1,7 +1,7 @@
-import { chakra } from "@chakra-ui/react";
 import { Link as UiLink } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
+import { chakra } from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";

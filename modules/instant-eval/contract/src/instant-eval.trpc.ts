@@ -1,3 +1,3 @@
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 export const instantEvalTrpc = defineTrpcContract("instantEval").build();

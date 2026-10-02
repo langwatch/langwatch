@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi, WorkflowMappingFields } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ async function setup() {
   return { ...fixture, agent, fields, listFields };
 }
 
-describe("AgentApp workflow field enrichment", () => {
+describe("AgentModule workflow field enrichment", () => {
   /** @scenario "A workflow agent reports the end node's results as its output fields" */
   it("returns all declared outputs and preserves their object type", async () => {
     const { app, agent, listFields } = await setup();

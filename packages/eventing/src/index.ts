@@ -2,6 +2,17 @@
  * Event Sourcing Module: event sourcing infrastructure with explicit dependencies.
  */
 
+// Module eventing seam
+export type {
+  EventingParticipation,
+  FeatureEventing,
+  FeatureEventingSetup,
+  PriorEventsQuery,
+  PriorEventsRead,
+  ReadHintMap,
+  ReadHintTarget,
+} from "./pipeline/feature-eventing.ts";
+
 // Commands
 export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";
 export type { CommandEnvelope } from "./commands/commandEnvelope.ts";
@@ -138,6 +149,7 @@ export type {
   EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
+  PeerSubscriberContext,
   PeerSubscriberDefinition,
 } from "./subscribers/eventSubscriber.types.ts";
 export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types.ts";

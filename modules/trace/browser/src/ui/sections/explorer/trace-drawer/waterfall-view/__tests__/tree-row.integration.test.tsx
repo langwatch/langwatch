@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TreeRow } from "../tree-row.tsx";
@@ -45,18 +45,12 @@ const baseProps = {
 };
 
 function renderRow(logCount: number) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TreeRow node={node()} logCount={logCount} {...baseProps} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TreeRow node={node()} logCount={logCount} {...baseProps} />);
 }
 
 function renderNamed(spanName: string, over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TreeRow node={node({ name: spanName })} logCount={0} {...baseProps} {...over} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TreeRow node={node({ name: spanName })} logCount={0} {...baseProps} {...over} />,
   );
 }
 

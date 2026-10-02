@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -12,6 +11,7 @@ import {
   type ShareWithProject,
   TraceSharingDisabledError,
 } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type { ShareCacheRepository } from "../../repositories/share-cache.repository.ts";

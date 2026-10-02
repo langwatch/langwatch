@@ -38,11 +38,23 @@ describe("the project tRPC declarations", () => {
         "create",
         "getFieldRedactionStatus",
         "getHasFirstMessage",
-        "getProjectAPIKey",
-        "regenerateApiKey",
+        "getLegacyKeyStatus",
+        "revokeProjectApiKey",
         "triggerTopicClustering",
         "update",
       ]);
+    });
+
+    /** @scenario The procedures that revealed or rotated the project key are gone */
+    it("declares neither the key reveal nor the key rotation", () => {
+      expect(Object.keys(projectTrpc.members)).not.toContain("getProjectAPIKey");
+      expect(Object.keys(projectTrpc.members)).not.toContain("regenerateApiKey");
+      expect(Object.keys(declaredAccess(projectTrpcTransport))).not.toContain(
+        "project.getProjectAPIKey",
+      );
+      expect(Object.keys(declaredAccess(projectTrpcTransport))).not.toContain(
+        "project.regenerateApiKey",
+      );
     });
 
     it("reads with a query and changes with a mutation", () => {
@@ -52,9 +64,9 @@ describe("the project tRPC declarations", () => {
         ),
       ).toEqual({
         create: "mutation",
-        getProjectAPIKey: "query",
         getHasFirstMessage: "query",
-        regenerateApiKey: "mutation",
+        getLegacyKeyStatus: "query",
+        revokeProjectApiKey: "mutation",
         update: "mutation",
         getFieldRedactionStatus: "query",
         archiveById: "mutation",
@@ -80,13 +92,9 @@ describe("the project tRPC declarations", () => {
           permissions: ["project:create", "organization:manage"],
           enforces: { teamId: expect.any(String), organizationId: expect.any(String) },
         },
-        // The base key is a project-level write credential, so reading it
-        // costs what it grants.
-        // Reading the base key is gated the same as rotating it: the key
-        // authenticates every ingestion call the project accepts.
-        "project.getProjectAPIKey": { kind: "permission", permission: "project:manage" },
         "project.getHasFirstMessage": { kind: "permission", permission: "project:view" },
-        "project.regenerateApiKey": { kind: "permission", permission: "project:manage" },
+        "project.getLegacyKeyStatus": { kind: "permission", permission: "project:manage" },
+        "project.revokeProjectApiKey": { kind: "permission", permission: "project:manage" },
         "project.update": { kind: "permission", permission: "project:update" },
         "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },

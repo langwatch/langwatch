@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { RotateCcw } from "lucide-react";
 
 import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";

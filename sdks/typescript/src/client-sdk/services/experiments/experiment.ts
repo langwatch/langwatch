@@ -6,8 +6,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
 
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import type { Logger } from "@/logger";
@@ -207,7 +207,7 @@ export class Experiment {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.apiKey }),
+          ...buildRequestHeaders({ apiKey: this.apiKey }),
         },
         body: JSON.stringify({
           experiment_name: this.name,
@@ -641,7 +641,7 @@ export class Experiment {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.apiKey }),
+          ...buildRequestHeaders({ apiKey: this.apiKey }),
         },
         body: JSON.stringify({
           trace_id: traceId ?? null,
@@ -1112,7 +1112,7 @@ export class Experiment {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
+        ...buildRequestHeaders({ apiKey: this.apiKey }),
       },
       body: JSON.stringify(body),
     })

@@ -3,7 +3,14 @@ import {
   apiKeyPermissionFormatSchema,
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type {
+  AuthzAccessBinding,
+  AuthzAttachOutcome,
+  AuthzGrantCaller,
+  AuthzPrincipalRef,
+} from "@langwatch/authz-contract";
+import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
@@ -18,6 +25,13 @@ function builtInRolePermission(binding: ApiKeyScope): string {
     return organizationScoped ? "organization:manage" : "project:manage";
   if (binding.role === "MEMBER") return organizationScoped ? "organization:view" : "project:update";
   return "project:view";
+}
+
+/** A grant past its end moment is listed (the Access page shows it) but confers nothing. */
+function isLive(binding: AuthzAccessBinding): boolean {
+  return (
+    !binding.expiresAt || Temporal.Instant.compare(fromDate(binding.expiresAt), nowInstant()) > 0
+  );
 }
 
 export class ApiKeyGrantPolicyService {
@@ -49,7 +63,7 @@ export class ApiKeyGrantPolicyService {
       await this.validateScope(binding, input.organizationId);
     }
 
-    await this.assertCeiling(input);
+    await this.assertCeiling({ ...input, principal: { type: "user", id: input.userId } });
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
@@ -57,6 +71,7 @@ export class ApiKeyGrantPolicyService {
 
     return bindings.some(
       (binding) =>
+        isLive(binding) &&
         binding.scopeType === "ORGANIZATION" &&
         binding.scopeId === input.organizationId &&
         binding.role === "ADMIN",
@@ -71,7 +86,8 @@ export class ApiKeyGrantPolicyService {
     });
 
     return bindings.some(
-      (binding) => binding.apiKeyId === input.apiKeyId && binding.role === "ADMIN",
+      (binding) =>
+        isLive(binding) && binding.apiKeyId === input.apiKeyId && binding.role === "ADMIN",
     );
   }
 
@@ -111,11 +127,17 @@ export class ApiKeyGrantPolicyService {
     return input.permissions?.length ? [...input.permissions].toSorted() : void 0;
   }
 
+  /**
+   * A personal workspace admits no principal but its owner. The one exception is a key the
+   * platform mints for a run nobody started: it has no owner and acts as the system.
+   */
   async assertPersonalScopesOwnedBy(input: {
     scopes: ApiKeyScope[];
     organizationId: string;
     ownerUserId: string | null;
+    isSystemManaged: boolean;
   }): Promise<void> {
+    if (input.isSystemManaged && input.ownerUserId === null) return;
     for (const scope of input.scopes) {
       if (scope.scopeType === "ORGANIZATION") {
         continue;
@@ -172,13 +194,14 @@ export class ApiKeyGrantPolicyService {
     };
   }
 
+  /** Refuses any binding `principal` does not itself hold; a personal key holds key ∩ owner. */
   async assertCeiling({
-    userId,
+    principal,
     organizationId,
     bindings,
     permissions,
   }: {
-    userId: string;
+    principal: AuthzPrincipalRef;
     organizationId: string;
     bindings: ApiKeyScope[];
     permissions: string[];
@@ -189,13 +212,13 @@ export class ApiKeyGrantPolicyService {
       for (const permission of checks) {
         const authzScope = this.authzScope(scope, organizationId);
         const allowed = await this.options.authz.can({
-          principal: { type: "user", id: userId },
+          principal,
           permission: permission as AuthzPermission,
           scope: authzScope,
         });
         if (!allowed) {
           throw new ApiKeyScopeViolationError(
-            `Cannot grant permission ${permission} beyond the owner's ceiling`,
+            `Cannot grant permission ${permission} beyond what the granting credential holds`,
           );
         }
       }
@@ -258,50 +281,51 @@ export class ApiKeyGrantPolicyService {
     bindings: ApiKeyScope[];
     permissions?: string[];
     actor: { type: "user" | "system"; id: string | null };
+    /** Who answers for the grants: the person creating or editing the key, else `system`. */
+    caller: AuthzGrantCaller;
     replace?: boolean;
     roleId?: string;
   }): Promise<ApiKeyScope[]> {
     let bindings = input.bindings;
-    if (input.permissions?.length) {
-      const roleId = input.roleId ?? `apikey:${input.apiKeyId}`;
+    const ownRoleId = input.permissions?.length
+      ? (input.roleId ?? `apikey:${input.apiKeyId}`)
+      : null;
+    if (ownRoleId) {
       await this.options.grants.defineRole({
         organizationId: input.organizationId,
-        roleId,
+        roleId: ownRoleId,
         name: `apikey:${input.apiKeyId}`,
-        permissions: [...input.permissions].toSorted(),
+        permissions: [...(input.permissions ?? [])].toSorted(),
         kind: "system_api_key",
         actor: input.actor,
         requireProjection: true,
       });
       bindings = bindings.map((binding) =>
-        binding.role === "CUSTOM" ? { ...binding, customRoleId: roleId } : binding,
+        binding.role === "CUSTOM" ? { ...binding, customRoleId: ownRoleId } : binding,
       );
     }
 
-    const attached = await this.options.grants.attachBindings({
-      organizationId: input.organizationId,
-      bindings: bindings.map((binding) => ({
-        bindingId: this.options.bindingIds.generateBindingId(),
-        principal: { apiKeyId: input.apiKeyId },
-        role: binding.role,
-        customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
-        scopeType: binding.scopeType,
-        scopeId: binding.scopeId,
-      })),
-      actor: input.actor,
-      source: "grants-service",
-      onDuplicate: "skip",
-      // Both callers act on these rows next: a create activates the credential,
-      // and a replace revokes whatever the attach did not keep. A durable
-      // append that is not yet readable would hand out a token the resolver
-      // refuses, or drop the grants the key already had.
-      requireProjection: true,
+    // The key's own role (kind system_api_key) is assignable by no person, so its bindings were
+    // bounded by assertCeiling before this; every other binding meets authz's central ceiling.
+    const isOwnRole = (binding: ApiKeyScope) =>
+      ownRoleId !== null && binding.role === "CUSTOM" && binding.customRoleId === ownRoleId;
+    const answered = await this.attach({
+      ...input,
+      bindings: bindings.filter((binding) => !isOwnRole(binding)),
+    });
+    const ownRole = await this.attach({
+      ...input,
+      bindings: bindings.filter(isOwnRole),
+      caller: { type: "system" },
     });
     if (input.replace) {
       // A duplicate is an existing binding the caller asked for again, so it is
       // just as much a keeper as a fresh one — an edit that resubmits the key's
       // current scopes attaches nothing and would otherwise revoke the lot.
-      const keep = [...attached.attached, ...attached.duplicates];
+      const keep = [answered, ownRole].flatMap((outcome) => [
+        ...outcome.attached,
+        ...outcome.duplicates,
+      ]);
       await this.options.grants.revokeBindingsWhere({
         organizationId: input.organizationId,
         where: {
@@ -314,5 +338,35 @@ export class ApiKeyGrantPolicyService {
     }
 
     return bindings;
+  }
+  private async attach(input: {
+    apiKeyId: string;
+    organizationId: string;
+    bindings: ApiKeyScope[];
+    actor: { type: "user" | "system"; id: string | null };
+    caller: AuthzGrantCaller;
+  }): Promise<AuthzAttachOutcome> {
+    if (input.bindings.length === 0) return { attached: [], duplicates: [] };
+
+    return this.options.grants.attachBindings({
+      organizationId: input.organizationId,
+      bindings: input.bindings.map((binding) => ({
+        bindingId: this.options.bindingIds.generateBindingId(),
+        principal: { apiKeyId: input.apiKeyId },
+        role: binding.role,
+        customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
+        scopeType: binding.scopeType,
+        scopeId: binding.scopeId,
+      })),
+      caller: input.caller,
+      actor: input.actor,
+      source: "grants-service",
+      onDuplicate: "skip",
+      // Both callers act on these rows next: a create activates the credential,
+      // and a replace revokes whatever the attach did not keep. A durable
+      // append that is not yet readable would hand out a token the resolver
+      // refuses, or drop the grants the key already had.
+      requireProjection: true,
+    });
   }
 }

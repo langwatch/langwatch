@@ -4,7 +4,6 @@
  * code with an opaque origin, no cookies, no parent DOM, only a MessagePort.
  */
 
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
@@ -13,6 +12,7 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -73,9 +73,11 @@ export function SandboxedChartFrame({
   // the chart with it); a widget can still call LW.setHeight to size to its
   // own content instead, which is what onHeightChange below feeds.
   const [height, setHeight] = useState(maxHeight);
-  useEffect(() => {
+  const [heightFor, setHeightFor] = useState(maxHeight);
+  if (heightFor !== maxHeight) {
+    setHeightFor(maxHeight);
     setHeight(maxHeight);
-  }, [maxHeight]);
+  }
 
   // The document at CHART_FRAME_PATH is identical for every widget and every
   // code change — the widget's source travels on lw:init — so a change to

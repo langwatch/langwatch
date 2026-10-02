@@ -3,18 +3,18 @@
  */
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { api as workflowApi, type WorkflowListRow } from "@langwatch/browser-trpc/workflow-api";
 import { toEpochMs } from "@langwatch/time";
-import {
-  useWorkflowHost,
-  type WorkflowCardBase,
-  WorkflowCardActions,
-  WorkflowCardDisplay,
-} from "@langwatch/workflow-browser-kit";
 import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
+import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
+import {
+  type WorkflowCardBase,
+  WorkflowCardActions,
+  WorkflowCardDisplay,
+} from "../elements/workflow-card.tsx";
 import { WorkflowPushToCopiesDialog } from "./workflow-push-to-copies-dialog.tsx";
 import { WorkflowReplicateDialog } from "./workflow-replicate-dialog.tsx";
 

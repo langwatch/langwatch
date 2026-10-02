@@ -13,6 +13,7 @@ import {
   readSessionContext,
   runGitCommand,
 } from "@/cli/commands/ingestion/git-context";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import { GovernanceCliError } from "./cli-api";
@@ -179,6 +180,7 @@ async function drainCodexSpool(args: {
         const response = await doFetch(logsEndpoint, {
           method: "POST",
           headers: {
+            ...buildSdkIdentityHeaders({ surface: "cli" }),
             "content-type": "application/json",
             authorization: `Bearer ${token}`,
           },
@@ -336,6 +338,7 @@ async function postCodexTurns(args: {
     response = await doFetch(endpoint, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
@@ -427,6 +430,7 @@ export async function postCodexSessionContext(args: {
     response = await doFetch(logsEndpoint, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },

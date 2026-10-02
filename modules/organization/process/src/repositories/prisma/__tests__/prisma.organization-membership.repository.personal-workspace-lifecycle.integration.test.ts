@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * When a personal workspace goes, and what happens if its owner comes back.
@@ -12,6 +11,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
-vi.mock("../use-saved-views.tsx", () => ({
+vi.mock("../../../behavior/use-saved-views.tsx", () => ({
   SavedViewsProvider: ({ children }: { children: React.ReactNode }) => children,
   useSavedViews: () => ({
     defaultViews: [{ id: "all-traces", name: "All Traces", origin: null }],

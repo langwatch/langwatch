@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Copy, ExternalLink } from "lucide-react";
 
 export function GroupDrawerHeader({

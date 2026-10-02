@@ -1,4 +1,4 @@
-import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Circle, Code, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunResult as ScenarioResults,

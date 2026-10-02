@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 

@@ -3,18 +3,11 @@
  * member and invite reads/writes for an external API caller — narrower than
  * `organization.trpc-schemas.ts`, which carries the browser's own transport.
  */
+import { grantScopeTierSchema, teamUserRoleSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { organizationApiMemberRoleSchema } from "./organization.trpc-schemas.ts";
 import { organizationIntentSchema, organizationSettingsSchema } from "./organization.ts";
-
-/**
- * Restated rather than imported from `@langwatch/authz-contract`: this
- * package does not depend on it (see `organizationGroupScopeTypeSchema` in
- * `group.ts` for the same restatement).
- */
-const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
-const roleBindingScopeTypeSchema = z.enum(["PROJECT", "TEAM", "ORGANIZATION"]);
 
 /** What `GET /` and `PATCH /` answer: the canonical settings shape. */
 export const organizationManagementRestSettingsSchema = organizationSettingsSchema;
@@ -89,7 +82,7 @@ const organizationManagementRestAccessBindingSchema = z.object({
   id: z.string(),
   role: z.string(),
   customRoleName: z.string().nullable(),
-  scopeType: roleBindingScopeTypeSchema,
+  scopeType: grantScopeTierSchema,
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   permissions: z.array(z.string()),

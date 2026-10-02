@@ -5,7 +5,6 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
-  simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -13,28 +12,12 @@ import {
 } from "@langwatch/scenario-contract";
 
 /**
- * All pure simulation-processing commands defined from event data schemas.
- * computeRunMetrics and finishRun carry DI and stay as manual classes under
- * ./commands/; FinishRunCommand is re-surfaced here for one import site.
+ * The pure simulation-processing commands, defined from event data schemas.
+ * queueRun, computeRunMetrics, finishRun and recordEvaluations carry logic or
+ * DI and are hand-written classes in sibling *.commands.ts files.
  */
 
 export { FinishRunCommand } from "./finish-run.commands.ts";
-
-export const QueueRunCommand = defineCommand({
-  commandType: "lw.simulation_run.queue",
-  eventType: "lw.simulation_run.queued",
-  eventVersion: "2026-03-08",
-  aggregateType: "simulation_run",
-  schema: simulationRunQueuedEventDataSchema,
-  aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:queueRun`,
-  spanAttributes: (d) => ({
-    "payload.scenarioRun.id": d.scenarioRunId,
-    "payload.scenario.id": d.scenarioId,
-    "payload.batchRun.id": d.batchRunId,
-  }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:queue-run`,
-});
 
 export const StartRunCommand = defineCommand({
   commandType: "lw.simulation_run.start",
@@ -181,7 +164,6 @@ export class SimulationProcessingCommandsAdapter {
     return new SimulationProcessingCommandsAdapter();
   }
 
-  readonly queueRun = QueueRunCommand;
   readonly startRun = StartRunCommand;
   readonly messageSnapshot = MessageSnapshotCommand;
   readonly textMessageStart = TextMessageStartCommand;

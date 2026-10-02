@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Stack } from "@chakra-ui/react";
+import { Button, HStack, Input, Stack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useEffect, useState } from "react";
 

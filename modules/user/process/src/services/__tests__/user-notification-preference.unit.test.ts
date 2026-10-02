@@ -2,7 +2,7 @@
  * The per-person notification choice, over the memory repository.
  * @see specs/langy/langy-notifications.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";

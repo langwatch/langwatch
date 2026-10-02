@@ -5,7 +5,7 @@
  * for teardown with its grace. Rendered only for `sso:manage`, where the
  * screen already decided that — it is the page's danger zone.
  */
-import { Box, Button, Card, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Text } from "@langwatch/design-system/primitives";
 import type { SsoConnectionLifecycleState } from "@langwatch/identity-contract";
 import { format } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";

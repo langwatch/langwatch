@@ -1,4 +1,3 @@
-import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
 
 /**
@@ -58,12 +57,6 @@ interface SseStatusState {
   lastEventAt: number;
   setLastEventAt: (ts: number) => void;
   /**
-   * Bumped whenever an SSE event signals fresh data is available, so polling
-   * fallbacks can reset back to their fast cadence.
-   */
-  fastPollRequestedAt: number;
-  requestFastPoll: () => void;
-  /**
    * Three-state live update preference. Persisted to localStorage so the
    * choice survives reloads. See {@link LiveUpdatesMode} for semantics.
    */
@@ -85,8 +78,6 @@ export const useSseStatusStore = create<SseStatusState>((set) => ({
   setSseConnectionState: (state) => set({ sseConnectionState: state }),
   lastEventAt: 0,
   setLastEventAt: (ts) => set({ lastEventAt: ts }),
-  fastPollRequestedAt: 0,
-  requestFastPoll: () => set({ fastPollRequestedAt: nowInstant().epochMilliseconds }),
   liveUpdatesMode: initialMode,
   liveUpdatesEnabled: initialMode !== "paused",
   setLiveUpdatesMode: (mode) => {

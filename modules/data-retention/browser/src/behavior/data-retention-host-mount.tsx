@@ -95,14 +95,19 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
-  // The shell's own workspace and plan reads, under the same cache keys: no second request.
-  const organizations = dataRetentionApi.organization.getAll.useQuery({ isDemo: false });
-  const usage = dataRetentionApi.limits.getUsage.useQuery(
+  // The shell's own workspace read, under the same cache key: no second request.
+  // The plan is the session-cached tier read, not the monthly usage count.
+  const signedIn = !!session.currentUser();
+  const organizations = dataRetentionApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: signedIn },
+  );
+  const activePlan = dataRetentionApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
-  const admin = dataRetentionApi.user.isAdmin.useQuery({});
-  const planType = usage.data?.activePlan.type;
+  const admin = dataRetentionApi.user.isAdmin.useQuery({}, { enabled: signedIn });
+  const planType = activePlan.data?.type;
   const isPlatformAdmin = admin.data?.isAdmin ?? false;
   const readings = useMemo((): RetentionHostReadings => {
     const organization = organizations.data?.find((candidate) => candidate.id === organizationId);

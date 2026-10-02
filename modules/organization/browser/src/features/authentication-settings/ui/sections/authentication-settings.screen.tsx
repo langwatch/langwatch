@@ -1,10 +1,10 @@
+import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * /settings/authentication, in the settings chrome as on main: how everyone signs in and how
  * accounts arrive (the cards sso and scim declare), then the organization's own policies.
  * Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,

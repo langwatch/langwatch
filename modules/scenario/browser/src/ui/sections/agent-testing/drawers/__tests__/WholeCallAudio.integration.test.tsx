@@ -4,15 +4,11 @@
  * recording, offering a Retry when not ready yet.
  * @see specs/features/agents/voice-phone.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { shouldShowWholeCallAudio, WholeCallAudio } from "../whole-call-audio";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 afterEach(cleanup);
 
@@ -57,11 +53,7 @@ describe("shouldShowWholeCallAudio", () => {
 describe("WholeCallAudio", () => {
   describe("when the run has a recording to play", () => {
     it("renders an audio element pointed at the run-audio route", () => {
-      render(
-        <Wrapper>
-          <WholeCallAudio scenarioRunId="run_1" projectId="project_1" />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<WholeCallAudio scenarioRunId="run_1" projectId="project_1" />);
 
       const audio = screen.getByTestId("run-call-audio");
       expect(audio.getAttribute("src")).toContain("/api/voice/run/run_1/audio");
@@ -72,11 +64,7 @@ describe("WholeCallAudio", () => {
 
   describe("when the recording is not ready yet", () => {
     it("shows a not-ready notice and a Retry that re-requests the recording", () => {
-      render(
-        <Wrapper>
-          <WholeCallAudio scenarioRunId="run_1" projectId="project_1" />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<WholeCallAudio scenarioRunId="run_1" projectId="project_1" />);
 
       const firstSrc = screen.getByTestId("run-call-audio").getAttribute("src");
       fireEvent.error(screen.getByTestId("run-call-audio"));

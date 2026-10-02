@@ -1,6 +1,5 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, Text, VStack, keyframes } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";

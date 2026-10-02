@@ -5,9 +5,21 @@
  */
 import {
   ALL_PERMISSIONS,
+  PermissionDeniedError,
+  type AuthzDeclaredScopeId,
+  type AuthzGetDecisionInput,
+  type AuthzGetProjectAnyDecisionInput,
+  type AuthzPermission,
+  type AuthzScopeLineageInput,
+  type AuthzScopeLineageResult,
+  type DeclaredScopeTier,
+  type PermissionDecision,
+  type PermissionScopeArg,
+  type TierOfScopeArg,
+} from "@langwatch/authorization";
+import {
   AuthzEngine,
   AuthzService as AuthzServiceContract,
-  PermissionDeniedError,
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzAccessBinding,
@@ -17,19 +29,17 @@ import {
   type AuthzRolePermissions,
   type AuthzAccessBreakdownInput,
   type AuthzAccessBreakdownOutput,
-  type AuthzDeclaredScopeId,
   type AuthzCanAnyByIdsInput,
   type AuthzCanAnyByIdsOutput,
   type AuthzCanBatchByIdsInput,
   type AuthzCanBatchByIdsOutput,
   type AuthzCanBatchPermissionsByIdsInput,
   type AuthzCanBatchPermissionsByIdsOutput,
+  type AuthzCanInput,
   type AuthzCheckByIdsInput,
   type AuthzCheckByIdsOutput,
   type AuthzDecision,
   type AuthzGetApiKeyProjectDecisionInput,
-  type AuthzGetDecisionInput,
-  type AuthzGetProjectAnyDecisionInput,
   type AuthzListBindingsForSynthesisInput,
   type AuthzListApiKeyBindingsInput,
   type AuthzListGroupBindingsInput,
@@ -42,20 +52,13 @@ import {
   type AuthzListTeamMemberBindingsInput,
   type AuthzListUserAndGroupBindingsInput,
   type AuthzListUserBindingsInput,
-  type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzLegacyAccessNoticeInput,
   type AuthzRequireProjectPermissionInput,
   type AuthzScopeRef,
-  type AuthzScopeLineageInput,
-  type AuthzScopeLineageResult,
   type AuthzTeamMemberBinding,
   type Authorized,
-  type BindingScopeTier,
   type CollectedGrants,
-  type PermissionDecision,
-  type PermissionScopeArg,
-  type TierOfScopeArg,
   scopeOrganizationId,
   AuthzScopeNotFoundError,
   type AuthzFindPermissionsBeyondCallerInput,
@@ -64,16 +67,17 @@ import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
-import { AuthzBindingReaderService } from "./authz-binding-reader.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
+import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
+import type { AuthzPlatformOperatorsService } from "./authz-platform-operators.service.ts";
 import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
 
 const decisions = createLogger("langwatch:authz:decisions");
@@ -94,7 +98,7 @@ type CheckArgs = {
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
   listing: AuthzListingRepository;
-  bindings: AuthzBindingRepository;
+  bindings: AuthzManagedGrantRepository;
   /** Omitted = never cache. */
   epoch?: AuthzEpochRepository;
   /**
@@ -116,6 +120,8 @@ export type AuthzServiceOptions = {
   isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
   findEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
+  /** Answers `can` at the platform; omitted = every platform question is refused. */
+  platformOperators?: Pick<AuthzPlatformOperatorsService, "can">;
 };
 
 const rolePermissionListSchema = z.array(z.string());
@@ -126,7 +132,7 @@ export class AuthzService extends AuthzServiceContract {
 
     return new AuthzService({
       collector,
-      bindingReader: AuthzBindingReaderService.create({
+      bindingReader: AuthzGrantReaderService.create({
         bindings: options.bindings,
         listing: options.listing,
       }),
@@ -143,7 +149,7 @@ export class AuthzService extends AuthzServiceContract {
   private readonly gate: AuthzPermissionGateService;
 
   private readonly collector: AuthzCollectorService;
-  private readonly bindingReader: AuthzBindingReaderService;
+  private readonly bindingReader: AuthzGrantReaderService;
   private readonly snapshots: AuthzGrantSnapshotService;
   private readonly scopeLineage: AuthzScopeLineageService;
   private readonly options: AuthzServiceOptions;
@@ -156,7 +162,7 @@ export class AuthzService extends AuthzServiceContract {
     options,
   }: {
     collector: AuthzCollectorService;
-    bindingReader: AuthzBindingReaderService;
+    bindingReader: AuthzGrantReaderService;
     snapshots: AuthzGrantSnapshotService;
     scopeLineage: AuthzScopeLineageService;
     options: AuthzServiceOptions;
@@ -218,8 +224,12 @@ export class AuthzService extends AuthzServiceContract {
     return { decision, grants };
   }
 
-  async can(args: CheckArgs): Promise<boolean> {
-    const decision = await this.check(args);
+  async can(args: AuthzCanInput): Promise<boolean> {
+    const { scope } = args;
+    if (scope.type === "platform") {
+      return (await this.options.platformOperators?.can(args)) ?? false;
+    }
+    const decision = await this.check({ ...args, scope });
 
     return decision.allowed;
   }
@@ -236,7 +246,7 @@ export class AuthzService extends AuthzServiceContract {
     return this.options.findEngineCutoverAt?.(organizationId) ?? null;
   }
 
-  async authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>({
+  async authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>({
     principal,
     permission,
     scope,

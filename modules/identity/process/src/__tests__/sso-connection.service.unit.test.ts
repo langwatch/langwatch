@@ -9,6 +9,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -64,7 +65,8 @@ beforeEach(() => {
       registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
-      platformOperators: new StubPlatformOperators([OPS.id]),
+      authorization: new StubPlatformOperators([OPS.id]),
+      licensing: licensingFixture(),
     }),
     ledger,
   );

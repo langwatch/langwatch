@@ -5,8 +5,8 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

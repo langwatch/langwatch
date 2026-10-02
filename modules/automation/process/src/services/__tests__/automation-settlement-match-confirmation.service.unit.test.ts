@@ -350,4 +350,34 @@ describe("AutomationSettlementMatchConfirmationService", () => {
       expect(filterEvaluator.evaluationFilterCalls).toEqual([]);
     });
   });
+
+  describe("given an email automation written before the filter-query migration", () => {
+    const legacy = trigger({ filters: { "traces.origin": ["application"] } });
+    const settled = { projectId: "project-1", traceId: "trace-1", foldState: traceSummary() };
+
+    /** @scenario "A settled match is re-checked against an automation's legacy filters" */
+    it("confirms a settled trace that carries the origin its filters name", async () => {
+      const { service, filterEvaluator } = createService();
+
+      const confirmed = await service.confirms({ trigger: legacy, ...settled });
+
+      expect(confirmed).toBe(true);
+      expect(filterEvaluator.traceFilterCalls).toEqual([
+        {
+          filters: { "traces.origin": ["application"] },
+          foldState: settled.foldState,
+          events: null,
+        },
+      ]);
+      expect(filterEvaluator.filterQueryCalls).toEqual([]);
+    });
+
+    /** @scenario "A settled match whose legacy filters no longer hold is dropped quietly" */
+    it("drops a settled trace that does not carry that origin without raising", async () => {
+      const { service, filterEvaluator } = createService();
+      filterEvaluator.traceFilterResult = false;
+
+      await expect(service.confirms({ trigger: legacy, ...settled })).resolves.toBe(false);
+    });
+  });
 });

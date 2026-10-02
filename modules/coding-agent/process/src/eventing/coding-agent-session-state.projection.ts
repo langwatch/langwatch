@@ -4,7 +4,9 @@ import {
   parseMcpToolName,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
-import { z } from "zod";
+
+import type { SessionTitleSource } from "../rules/coding-agent-session-state-mapper.rules.ts";
+import { contextUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
 
 /** One thing the agent did, in the order it did it. */
 export interface SessionStep {
@@ -16,14 +18,6 @@ export interface SessionStep {
   /** Used to keep the sequence true even when spans arrive out of order. */
   startedAtMs: number;
 }
-
-/**
- * Who set the session's `title`, in rank order: harness session name beats
- * generated conversation title beats prompt-derived name. A schema, not a
- * bare union, since the value also decodes back from a row column at runtime.
- */
-export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
-export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
 
 /**
  * One converged metric unit, as its contribution delivered it. A cumulative
@@ -167,24 +161,6 @@ export const MAX_SET = 50;
  */
 export const MAX_USAGE_CONTEXTS = 200;
 
-/**
- * The key one context's usage is kept under. Repository fields are compared case-folded everywhere
- * the usage is read, so they are folded here too and a remote spelled two ways stays one context; a
- * branch name is case sensitive and kept verbatim.
- */
-export function contextUsageKey(context: {
-  repositoryHost: string;
-  repositoryOwner: string;
-  repositoryName: string;
-  branch: string;
-}): string {
-  return [
-    context.repositoryHost.toLowerCase(),
-    context.repositoryOwner.toLowerCase(),
-    context.repositoryName.toLowerCase(),
-    context.branch,
-  ].join("\0");
-}
 const TITLE_RANK: Record<SessionTitleSource, number> = {
   prompt: 1,
   generated: 2,

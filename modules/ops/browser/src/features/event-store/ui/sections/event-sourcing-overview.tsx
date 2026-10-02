@@ -1,5 +1,14 @@
-import { Box, Button, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Box,
+  Button,
+  Card,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
 
@@ -12,12 +21,8 @@ import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 /** Landing page: "is anything wrong, and where?" Headlines/pointers only. Subsystem
  * tables separate (space proportional to trouble, per ops-dashboard.md). */
 export function EventSourcingOverview() {
-  const fleet = api.ops.listProcessFleet.useQuery(undefined, {
-    refetchInterval: 15_000,
-  });
-  const dead = api.ops.listDeadLetterCounts.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
+  const fleet = api.ops.listProcessFleet.useQuery(undefined, {});
+  const dead = api.ops.listDeadLetterCounts.useQuery(undefined, {});
 
   if (fleet.isPending) {
     return (

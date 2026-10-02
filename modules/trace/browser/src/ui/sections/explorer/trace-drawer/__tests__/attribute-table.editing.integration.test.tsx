@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -30,14 +30,12 @@ function renderEditable({
     onEditAttribute,
     onResetAttribute,
   };
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AttributeTable
-        attributes={CAPTURED}
-        restrictedAttributes={restrictedAttributes}
-        editing={editing}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AttributeTable
+      attributes={CAPTURED}
+      restrictedAttributes={restrictedAttributes}
+      editing={editing}
+    />,
   );
 }
 
@@ -215,10 +213,8 @@ describe("AttributeTable editing", () => {
       attributes: Record<string, unknown>,
       correctedFrom: Record<string, unknown>,
     ) {
-      return render(
-        <ChakraProvider value={defaultSystem}>
-          <AttributeTable attributes={attributes} correctedFrom={correctedFrom} />
-        </ChakraProvider>,
+      return renderWithDesignSystem(
+        <AttributeTable attributes={attributes} correctedFrom={correctedFrom} />,
       );
     }
 
@@ -283,16 +279,14 @@ describe("AttributeTable editing", () => {
     describe("when the corrected trace renders", () => {
       /** @scenario "An attribute the correction removes is listed struck through" */
       it("still lists it, marked as removed and struck through", () => {
-        const { getByText, getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{ "gen_ai.request.model": "gpt-5" }}
-              correctedFrom={{
-                "gen_ai.request.model": "gpt-5",
-                "user.email": "someone@acme.test",
-              }}
-            />
-          </ChakraProvider>,
+        const { getByText, getByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{ "gen_ai.request.model": "gpt-5" }}
+            correctedFrom={{
+              "gen_ai.request.model": "gpt-5",
+              "user.email": "someone@acme.test",
+            }}
+          />,
         );
 
         expect(getByText("user.email")).toBeInTheDocument();
@@ -302,16 +296,14 @@ describe("AttributeTable editing", () => {
 
       /** @scenario "An attribute the correction removes is listed struck through" */
       it("does not call the removal an edit", () => {
-        const { queryByText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{ "gen_ai.request.model": "gpt-5" }}
-              correctedFrom={{
-                "gen_ai.request.model": "gpt-5",
-                "user.email": "someone@acme.test",
-              }}
-            />
-          </ChakraProvider>,
+        const { queryByText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{ "gen_ai.request.model": "gpt-5" }}
+            correctedFrom={{
+              "gen_ai.request.model": "gpt-5",
+              "user.email": "someone@acme.test",
+            }}
+          />,
         );
 
         expect(queryByText("Edited")).not.toBeInTheDocument();
@@ -326,16 +318,14 @@ describe("AttributeTable editing", () => {
           configurable: true,
           value: { writeText },
         });
-        const { getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{ "gen_ai.request.model": "gpt-5" }}
-              correctedFrom={{
-                "gen_ai.request.model": "gpt-5",
-                "user.email": "someone@acme.test",
-              }}
-            />
-          </ChakraProvider>,
+        const { getByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{ "gen_ai.request.model": "gpt-5" }}
+            correctedFrom={{
+              "gen_ai.request.model": "gpt-5",
+              "user.email": "someone@acme.test",
+            }}
+          />,
         );
 
         fireEvent.click(getByLabelText("Copy all attributes"));
@@ -349,15 +339,13 @@ describe("AttributeTable editing", () => {
     describe("when the captured trace renders", () => {
       /** @scenario "An attribute the correction removes reads plainly in the captured trace" */
       it("reads like any other row, with nothing said about the removal", () => {
-        const { getByText, queryByText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{
-                "gen_ai.request.model": "gpt-5",
-                "user.email": "someone@acme.test",
-              }}
-            />
-          </ChakraProvider>,
+        const { getByText, queryByText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{
+              "gen_ai.request.model": "gpt-5",
+              "user.email": "someone@acme.test",
+            }}
+          />,
         );
 
         expect(getByText("user.email")).toBeInTheDocument();
@@ -370,13 +358,8 @@ describe("AttributeTable editing", () => {
     describe("when the span detail renders", () => {
       /** @scenario "An attribute the correction added is marked as added" */
       it("marks it as added by an edit", () => {
-        const { getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{ "review.note": "corrected by hand" }}
-              correctedFrom={{}}
-            />
-          </ChakraProvider>,
+        const { getByLabelText } = renderWithDesignSystem(
+          <AttributeTable attributes={{ "review.note": "corrected by hand" }} correctedFrom={{}} />,
         );
 
         expect(getByLabelText("review.note, added by an edit")).toBeInTheDocument();
@@ -392,17 +375,15 @@ describe("AttributeTable editing", () => {
       it("records it as text rather than as a structure", () => {
         const retyped = '{"tools": ["search"], "retries": 0}';
         const onEditAttribute = vi.fn();
-        const { getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{ "langwatch.params": RECORDED }}
-              editing={{
-                edits: {},
-                onEditAttribute,
-                onResetAttribute: vi.fn(),
-              }}
-            />
-          </ChakraProvider>,
+        const { getByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{ "langwatch.params": RECORDED }}
+            editing={{
+              edits: {},
+              onEditAttribute,
+              onResetAttribute: vi.fn(),
+            }}
+          />,
         );
 
         fireEvent.change(getByLabelText("Edit langwatch.params"), {
@@ -422,21 +403,19 @@ describe("AttributeTable editing", () => {
       /** @scenario "The keys that place a trace carry no metadata editor" */
       it("carries no editor and refuses to add it", () => {
         const onEditAttribute = vi.fn();
-        const { queryByLabelText, getByLabelText, getByRole, getByText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{
-                "metadata.environment": "staging",
-                "gen_ai.conversation.id": "thread-1",
-              }}
-              editing={{
-                edits: {},
-                onEditAttribute,
-                onResetAttribute: vi.fn(),
-                isKeyEditable: (key) => key.startsWith("metadata."),
-              }}
-            />
-          </ChakraProvider>,
+        const { queryByLabelText, getByLabelText, getByRole, getByText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{
+              "metadata.environment": "staging",
+              "gen_ai.conversation.id": "thread-1",
+            }}
+            editing={{
+              edits: {},
+              onEditAttribute,
+              onResetAttribute: vi.fn(),
+              isKeyEditable: (key) => key.startsWith("metadata."),
+            }}
+          />,
         );
 
         expect(queryByLabelText("Edit gen_ai.conversation.id")).not.toBeInTheDocument();
@@ -457,19 +436,17 @@ describe("AttributeTable editing", () => {
     describe("when only one of its keys really changed", () => {
       /** @scenario "Only the attribute rows a correction really changed read as edited" */
       it("marks that key alone", () => {
-        const { getAllByText, getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{
-                "gen_ai.request.model": "gpt-5",
-                "gen_ai.request.temperature": 0.2,
-              }}
-              correctedFrom={{
-                "gen_ai.request.model": "gpt-5-mini",
-                "gen_ai.request.temperature": 0.2,
-              }}
-            />
-          </ChakraProvider>,
+        const { getAllByText, getByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{
+              "gen_ai.request.model": "gpt-5",
+              "gen_ai.request.temperature": 0.2,
+            }}
+            correctedFrom={{
+              "gen_ai.request.model": "gpt-5-mini",
+              "gen_ai.request.temperature": 0.2,
+            }}
+          />,
         );
 
         expect(getAllByText("Edited")).toHaveLength(1);
@@ -482,17 +459,15 @@ describe("AttributeTable editing", () => {
     describe("when it turned a recorded text value into a structure", () => {
       /** @scenario "An attribute the correction unpacked from recorded text is not marked as added" */
       it("reads the rows underneath it as edited rather than added", () => {
-        const { queryByLabelText, getByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={{
-                langwatch: { input: { type: "text", value: "hello" } },
-              }}
-              correctedFrom={{
-                langwatch: { input: '{"type":"text","value":"hello"}' },
-              }}
-            />
-          </ChakraProvider>,
+        const { queryByLabelText, getByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={{
+              langwatch: { input: { type: "text", value: "hello" } },
+            }}
+            correctedFrom={{
+              langwatch: { input: '{"type":"text","value":"hello"}' },
+            }}
+          />,
         );
 
         expect(queryByLabelText(/added by an edit/)).not.toBeInTheDocument();
@@ -506,18 +481,16 @@ describe("AttributeTable editing", () => {
   describe("given resource attributes", () => {
     describe("when the span attributes are being corrected", () => {
       it("leaves the resource attributes read-only", () => {
-        const { queryByLabelText } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AttributeTable
-              attributes={CAPTURED}
-              resourceAttributes={{ "service.name": "api" }}
-              editing={{
-                edits: {},
-                onEditAttribute: vi.fn(),
-                onResetAttribute: vi.fn(),
-              }}
-            />
-          </ChakraProvider>,
+        const { queryByLabelText } = renderWithDesignSystem(
+          <AttributeTable
+            attributes={CAPTURED}
+            resourceAttributes={{ "service.name": "api" }}
+            editing={{
+              edits: {},
+              onEditAttribute: vi.fn(),
+              onResetAttribute: vi.fn(),
+            }}
+          />,
         );
 
         expect(queryByLabelText("Edit service.name")).not.toBeInTheDocument();

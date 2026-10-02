@@ -5,7 +5,7 @@ import {
   type AuthzResource,
   permissionResource,
   permissionSatisfiedBy,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import type { z } from "zod";
 
 export const API_KEY_PERMISSION_MODES = ["all", "readonly", "restricted"] as const;
@@ -390,3 +390,10 @@ export function selectionsFromPermissions(permissions: string[]): Record<string,
   }
   return selections;
 }
+
+/**
+ * What SDK ingestion strictly needs, and all a `login --project` key holds (Alex, 2026-10-01):
+ * OTLP traces, logs and metrics and the collector check `traces:create`
+ * (trace-ingest-credential.service.ts:25), as do tracked events (tracked-event.rest.ts:56).
+ */
+export const INGESTION_PERMISSIONS: readonly AuthzPermission[] = ["traces:create"];

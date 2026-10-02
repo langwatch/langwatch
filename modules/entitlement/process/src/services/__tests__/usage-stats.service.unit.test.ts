@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The month's usage reading, as every usage surface receives it.
  *
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { UsageCounter, UsageCount } from "../../app/entitlement.members.ts";

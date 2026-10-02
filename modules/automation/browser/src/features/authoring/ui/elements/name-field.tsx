@@ -1,10 +1,10 @@
-import { Field, Input } from "@chakra-ui/react";
+import { Field, Input } from "@langwatch/design-system/primitives";
 import { useEffect, useRef } from "react";
 
 const NAME_PLACEHOLDER = {
-  trace: "Flag failing traces",
-  customGraph: "High latency alert",
-  report: "Weekly quality digest",
+  trace: "e.g., Flag failing traces",
+  customGraph: "e.g., High latency",
+  report: "e.g., Weekly quality digest",
 } as const;
 
 /** Controlled identity field shared by the authoring host and browser shells. */

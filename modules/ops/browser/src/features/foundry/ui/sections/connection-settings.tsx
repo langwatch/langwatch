@@ -1,4 +1,4 @@
-import { Box, Flex, Text, VStack } from "@chakra-ui/react";
+import { Box, Flex, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -88,7 +88,7 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
                   projects={allProjects}
                   selectedId={selectedProject?.id}
                   onSelect={(project) => {
-                    setSelectedProject(project.id, project.apiKey);
+                    setSelectedProject(project.id);
                     setIsOpen(false);
                   }}
                 />
@@ -110,12 +110,11 @@ function ProjectList({
     id: string;
     name: string;
     slug: string;
-    apiKey: string;
     orgName: string;
     teamName: string;
   }[];
   selectedId: string | undefined;
-  onSelect: (project: { id: string; apiKey: string }) => void;
+  onSelect: (project: { id: string }) => void;
 }) {
   // Group by org
   const grouped = useMemo(() => {

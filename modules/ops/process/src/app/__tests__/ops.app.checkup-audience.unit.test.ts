@@ -1,15 +1,16 @@
-/**
- * Who reads what of the checkup: an install admin the details and the whole
- * install's report, everyone else the verdicts and their own organization's figures.
- * Spec: modules/ops/specs/checkup-audience.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { CheckupAnswer, CheckupResult, OpsOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * Who reads what of the checkup: an install admin the details and the whole
+ * install's report, everyone else the verdicts and their own organization's figures.
+ * Spec: modules/ops/specs/checkup-audience.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
@@ -17,9 +18,14 @@ import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-rep
 import { MemoryDatastoreHealthRepository } from "../../repositories/memory/memory.datastore-health.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
 import { OpsCheckupService } from "../../services/ops-checkup.service.ts";
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import {
+  createOpsTestApp,
+  OPS_STAFF_ADDRESS,
+  OPS_STAFF_ID,
+  platformOperatorAuthz,
+} from "./ops.fixture.ts";
 
-const STAFF: OpsOperator = { id: "user_staff", email: OPS_STAFF_ADDRESS };
+const STAFF: OpsOperator = { id: OPS_STAFF_ID, email: OPS_STAFF_ADDRESS };
 const MEMBER: OpsOperator = { id: "user_member", email: "member@acme.test" };
 const MANAGER: OpsOperator = { id: "user_manager", email: "manager@acme.test" };
 const INSTALL_WIDE_KEYS = [
@@ -57,6 +63,7 @@ function checkupService(): OpsCheckupService {
       collectClickHouseBackupMetrics: true,
       productAnalytics: { key: undefined, host: undefined },
       cloudOps: false,
+      adminEmails: [],
     },
     peers: {
       ...world.peers(),
@@ -81,6 +88,7 @@ function checkupService(): OpsCheckupService {
       }),
       providerTests: createApiFixture<ModelProviderApi>(),
       projectDirectory: createApiFixture<ProjectApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
       mail: { ...world.peers().mail, verifySmtp: async () => undefined },
       storage: {
         ...world.peers().storage,
@@ -105,25 +113,33 @@ function checkupService(): OpsCheckupService {
 }
 
 /** Who holds organization:manage in org-1; nobody else holds anything. */
-function authzWithManagers(managers: readonly string[]): AuthzApi {
-  return createApiFixture<AuthzApi>({
-    hasPermission: async (check) =>
-      check.permission === "organization:manage" &&
-      "organizationId" in check &&
-      check.organizationId === "org-1" &&
-      managers.includes(check.userId),
+function authzWith({
+  managers,
+  operators,
+}: {
+  managers: readonly string[];
+  operators: readonly string[];
+}): AuthzApi {
+  return platformOperatorAuthz({
+    holders: Object.fromEntries(operators.map((id) => [id, ["ops:view", "ops:manage"] as const])),
+    overrides: {
+      hasPermission: async (check) =>
+        check.permission === "organization:manage" &&
+        "organizationId" in check &&
+        check.organizationId === "org-1" &&
+        managers.includes(check.userId),
+    },
   });
 }
 
 function app({
   managers = [],
-  adminEmails = true,
-}: { managers?: readonly string[]; adminEmails?: boolean } = {}) {
+  operators = [OPS_STAFF_ID],
+}: { managers?: readonly string[]; operators?: readonly string[] } = {}) {
   return createOpsTestApp({
     checkup: checkupService(),
     projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
-    authz: authzWithManagers(managers),
-    ...(adminEmails ? {} : { capability: { isAdmin: () => false } }),
+    authz: authzWith({ managers, operators }),
   }).app;
 }
 
@@ -156,7 +172,7 @@ beforeEach(() => {
   world.signedInUserIds.add("user_elsewhere");
 });
 
-describe("given the caller is on the ops back-office list", () => {
+describe("given the caller holds the platform-operator grant", () => {
   describe("when the checkup is read", () => {
     /** @scenario "An install admin reads what each check found and how to fix it" */
     it("answers every row with its detail", async () => {
@@ -204,8 +220,8 @@ describe("given the caller is on the ops back-office list", () => {
   });
 });
 
-describe("given the install sets no ADMIN_EMAILS and the caller manages the organization", () => {
-  const managerApp = () => app({ managers: [MANAGER.id], adminEmails: false });
+describe("given no platform operator exists and the caller manages the organization", () => {
+  const managerApp = () => app({ managers: [MANAGER.id], operators: [] });
 
   describe("when the checkup is read and its paid checks are run", () => {
     /** @scenario "An organization manager reads what each check found with no ADMIN_EMAILS set" */
@@ -255,7 +271,7 @@ describe("given the install sets no ADMIN_EMAILS and the caller manages the orga
   });
 });
 
-describe("given the caller is signed in, not on the ops back-office list and not an organization manager", () => {
+describe("given the caller is signed in, holds no platform grant and is not an organization manager", () => {
   describe("when the checkup is read and its paid checks are run", () => {
     /** @scenario "An organization member reads each check's verdict and nothing more" */
     it("answers each row's name, group, cost and outcome only", async () => {

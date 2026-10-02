@@ -1,5 +1,14 @@
-import { Badge, Box, Button, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { IdentityLookupAnswer, LookupPerson } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";

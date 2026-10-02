@@ -3,15 +3,15 @@
  * @see specs/features/suites/collapsible-suite-sidebar.feature
  * @see specs/navigation/project-avatar-initial.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The sidebar mounts VoiceAgentsCallout, which reaches for project context
 // and fires tRPC queries this rig does not provide. Same stub the sibling
 // suite uses, for the same reason.
-vi.mock("../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: vi.fn(() => ({ project: { id: "project_1" } })),
 }));
 
@@ -64,22 +64,20 @@ describe("given a suite and a scenario set whose names begin with an emoji", () 
     it("shows each whole emoji, because the icon is all that identifies it", () => {
       localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, "true");
 
-      const { container } = render(
-        <ChakraProvider value={defaultSystem}>
-          <SuiteSidebar
-            {...defaultProps}
-            suites={[makeSuite({ name: "🚩 Critical Path" })]}
-            externalSets={[
-              {
-                scenarioSetId: "🏭 nightly",
-                passedCount: 1,
-                failedCount: 0,
-                totalCount: 1,
-                lastRunTimestamp: 1000,
-              },
-            ]}
-          />
-        </ChakraProvider>,
+      const { container } = renderWithDesignSystem(
+        <SuiteSidebar
+          {...defaultProps}
+          suites={[makeSuite({ name: "🚩 Critical Path" })]}
+          externalSets={[
+            {
+              scenarioSetId: "🏭 nightly",
+              passedCount: 1,
+              failedCount: 0,
+              totalCount: 1,
+              lastRunTimestamp: 1000,
+            },
+          ]}
+        />,
       );
 
       expect(screen.getByText("🚩")).toBeInTheDocument();
@@ -96,10 +94,8 @@ describe("given an ordinarily named suite", () => {
   it("still shows its uppercased first letter", () => {
     localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, "true");
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <SuiteSidebar {...defaultProps} suites={[makeSuite({ name: "critical path" })]} />
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <SuiteSidebar {...defaultProps} suites={[makeSuite({ name: "critical path" })]} />,
     );
 
     expect(screen.getByText("C")).toBeInTheDocument();

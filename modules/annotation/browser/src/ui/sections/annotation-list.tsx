@@ -1,6 +1,5 @@
 /** One table renders every annotations view. */
 
-import { Box, Button, Flex, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   annotationQueueItemStatusSchema,
   type AnnotationQueueItemStatus,
@@ -12,6 +11,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
+import { Box, Button, Flex, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucide-react";
@@ -21,6 +21,7 @@ import { annotationApi } from "../../behavior/annotation-api.ts";
 import { useAnnotationColumnChoices } from "../../behavior/use-annotation-column-choices.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
+import { useAnnotationQueueList, useScoreTypes } from "../../behavior/use-annotation-reads.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
 import { usePersonalDatasetGate } from "../../behavior/use-personal-feature-gate.ts";
 import {
@@ -38,7 +39,6 @@ import {
 import {
   addDatasetRecordAddress,
   queueEditorAddress,
-  queueItemHref,
   traceDetailsAddress,
 } from "../../model/annotation-overlay-address.ts";
 import {
@@ -48,6 +48,7 @@ import {
   type AnnotationPeriod,
   type AnnotationPeriodMode,
 } from "../../model/annotation-period.ts";
+import { queueItemHref } from "../../model/annotation-queue-walk.ts";
 import { queueItemsToRows, type AnnotationRow } from "../../model/annotation-row.ts";
 import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotation-view.ts";
 import type { AnnotationView } from "../../model/annotation-view.ts";
@@ -55,6 +56,7 @@ import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-t
 import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
 import { AnnotationColumnsMenu } from "../elements/annotation-columns-menu.tsx";
 import { annotationColumnOptions } from "../elements/annotation-columns.ts";
+import { AnnotationQueueFilter } from "../elements/annotation-queue-filter.tsx";
 import { PeriodPicker } from "../elements/period-picker.tsx";
 import { RedactedField } from "../elements/redacted-field.tsx";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
@@ -161,6 +163,37 @@ function StatusFilterMenu({
   );
 }
 
+/**
+ * The reviewer's pick of queues. The list is read only where the filter shows (no project, no
+ * request); a new pick goes back to page one, since the page the reviewer was on may be gone.
+ */
+function useQueueFilter({
+  projectId,
+  shown,
+  query,
+  setQuery,
+  pageSize,
+}: {
+  projectId: string | undefined;
+  /** Off where the view does not pool member queues: no list read, no filter. */
+  shown: boolean;
+  query: Readonly<Record<string, string | undefined>>;
+  setQuery: (next: Record<string, string | undefined>) => void;
+  pageSize: number;
+}) {
+  const [selectedQueueIds, setSelectedQueueIds] = useState<string[]>([]);
+  const queues = useAnnotationQueueList({ projectId: shown ? projectId : void 0 });
+  const change = useCallback(
+    (queueIds: string[]) => {
+      setSelectedQueueIds(queueIds);
+      setQuery(pageAddress({ current: query, page: 1, pageSize }));
+    },
+    [query, setQuery, pageSize],
+  );
+
+  return { selectedQueueIds, queues: shown ? (queues.data ?? []) : [], change };
+}
+
 function ListPeriodControl({
   reading,
   query,
@@ -227,6 +260,7 @@ export function AnnotationList({
 
   const [statusFilter, setStatusFilter] = useState<AnnotationQueueItemStatus>("pending");
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const showQueueAndUser = viewReadsMemberQueues(view);
 
   const isPageProvidedRows = providedRows !== void 0;
 
@@ -247,21 +281,28 @@ export function AnnotationList({
     [host],
   );
 
+  const queueFilter = useQueueFilter({
+    projectId: project?.id,
+    shown: showQueueAndUser,
+    query,
+    setQuery,
+    pageSize: paging.pageSize,
+  });
+  const selectedQueueIds = queueFilter.selectedQueueIds;
+
   const { assignedQueueItems, queuesLoading, totalCount } = useAnnotationQueues({
     projectId: project?.id,
     selectedAnnotations: statusFilter,
     ...(queueId ? { queueId } : {}),
-    showQueueAndUser: viewReadsMemberQueues(view),
+    queueIds: selectedQueueIds,
+    showQueueAndUser,
     pageOffset: paging.pageOffset,
     pageSize: paging.pageSize,
     ...queuedRange,
     enabled: !isPageProvidedRows,
   });
 
-  const scoreTypes = annotationApi.annotationScore.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const scoreTypes = useScoreTypes({ projectId: project?.id });
 
   const activeScoreTypes: ActiveScoreType[] = useMemo(
     () =>
@@ -309,7 +350,7 @@ export function AnnotationList({
   // paging or switching queue swaps those rows out, so the picks go with them.
   useEffect(() => {
     setRowSelection({});
-  }, [statusFilter, queueId, paging.pageOffset, paging.pageSize, queuedRangeKey]);
+  }, [statusFilter, queueId, selectedQueueIds, paging.pageOffset, paging.pageSize, queuedRangeKey]);
 
   const datasetGate = usePersonalDatasetGate({
     projectId: project?.id,
@@ -362,7 +403,6 @@ export function AnnotationList({
           queueItemHref({
             projectSlug: project?.slug,
             queueItemId: row.queueItemId!,
-            traceId: row.traceId,
           }),
         );
 
@@ -429,6 +469,11 @@ export function AnnotationList({
       <PageLayout.Header>
         {titleContent ?? <PageLayout.Heading>{copy.heading}</PageLayout.Heading>}
         <Spacer />
+        <AnnotationQueueFilter
+          queues={queueFilter.queues}
+          selectedQueueIds={selectedQueueIds}
+          onSelectedQueueIdsChange={queueFilter.change}
+        />
         {copy.showStatusFilter && (
           <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
         )}

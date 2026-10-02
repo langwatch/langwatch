@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -38,12 +38,12 @@ function renderField(initialParameters: Record<string, unknown> = {}) {
     });
 
     return (
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <FormProvider {...methods}>
           <RuntimeParametersField />
           <FormValueProbe />
         </FormProvider>
-      </ChakraProvider>
+      </DesignSystemProvider>
     );
   }
 

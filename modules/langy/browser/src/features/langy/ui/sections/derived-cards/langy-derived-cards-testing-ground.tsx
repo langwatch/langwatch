@@ -3,7 +3,7 @@
  * INTERACTIVE. Rendered by the developer-mode card gallery so the whole channel can be
  * exercised by eye without waiting for a live turn to produce each condition:
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   feedLangyDerivedCardPreview,
   initialLangyDerivedCardPreview,

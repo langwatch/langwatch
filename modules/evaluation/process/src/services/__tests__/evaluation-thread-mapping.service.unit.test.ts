@@ -6,13 +6,13 @@ import type { MappingState } from "@langwatch/dataset-contract";
 import type { Span, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationSpanDigest } from "../../app/evaluation.members.ts";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
 } from "../../rules/evaluation-thread-mapping-service.rules.ts";
+import type { EvaluationSpanDigestService } from "../evaluation-span-digest.service.ts";
 
-const spanDigest: EvaluationSpanDigest = {
+const spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread"> = {
   format: vi.fn(async ({ trace }: { trace: Trace }) =>
     (trace.spans ?? []).map((span: Span) => span.name ?? "span").join(" "),
   ),

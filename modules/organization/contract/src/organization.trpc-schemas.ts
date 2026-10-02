@@ -36,6 +36,36 @@ export function isOrganizationApiCustomRole(role: string): boolean {
   return role.startsWith("custom:");
 }
 
+const assignedRoleSchema = z.object({ role: z.string(), customRoleId: z.string().nullish() });
+
+/** Every place a granting write names team roles: one role, members, updates, invitations. */
+const assignedRolesSchema = z.object({
+  role: z.string().optional(),
+  customRoleId: z.string().nullish(),
+  members: z.array(assignedRoleSchema).optional(),
+  teamRoleUpdates: z.array(assignedRoleSchema).optional(),
+  invites: z.array(z.object({ teams: z.array(assignedRoleSchema).optional() })).optional(),
+});
+
+/** Whether a write assigns any custom team role: the question only Enterprise answers yes to. */
+export function assignsOrganizationCustomRole(input: unknown): boolean {
+  const parsed = assignedRolesSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { role, customRoleId, members = [], teamRoleUpdates = [], invites = [] } = parsed.data;
+  const assigned = [
+    { role: role ?? "", customRoleId },
+    ...members,
+    ...teamRoleUpdates,
+    ...invites.flatMap((invite) => invite.teams ?? []),
+  ];
+
+  return assigned.some(
+    (assignment) =>
+      Boolean(assignment.customRoleId) || isOrganizationApiCustomRole(assignment.role),
+  );
+}
+
 /**
  * The built-in team roles an invitation or a role change may name. `CUSTOM` is
  * deliberately absent: a custom role arrives as the `custom:<id>` form below.
@@ -79,13 +109,11 @@ export const organizationApiUpdateInputSchema = z
       const hasAccessKey = !!data.s3AccessKeyId?.trim();
       const hasSecretKey = !!data.s3SecretAccessKey?.trim();
 
-      return (
-        (hasEndpoint && hasAccessKey && hasSecretKey) ||
-        (!hasEndpoint && !hasAccessKey && !hasSecretKey)
-      );
+      return (hasEndpoint && hasAccessKey) || (!hasEndpoint && !hasAccessKey && !hasSecretKey);
     },
     {
-      message: "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
+      message:
+        "S3 Endpoint and Access Key ID must be provided together; a blank Secret Access Key leaves the stored one unchanged",
     },
   );
 export type OrganizationApiUpdateInput = z.infer<typeof organizationApiUpdateInputSchema>;

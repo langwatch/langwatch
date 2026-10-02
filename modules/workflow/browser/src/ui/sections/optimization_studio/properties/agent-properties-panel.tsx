@@ -1,3 +1,10 @@
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "@langwatch/agent-contract/code-config";
+import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
 import {
   Badge,
   Box,
@@ -9,17 +16,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "@langwatch/agent-contract/code-config";
-import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { type FieldMapping, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
-import { useRegisterDrawerFooter, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+} from "@langwatch/design-system/primitives";
 import type {
   HttpAuth,
   HttpComponentConfig,
@@ -27,6 +24,7 @@ import type {
   HttpMethod,
   AgentComponent,
   Field as DslField,
+  FieldMapping,
 } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
@@ -40,18 +38,24 @@ import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
 import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../../behavior/workflow-api.ts";
 import {
   buildAgentNodeData,
+  draftSettingsWithoutCredentials,
   nodeMatchesAgent,
   readCodeSnapshot,
   readHttpSnapshot,
+  withoutCredentialValues,
 } from "../../../../model/agent-node-data.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "../../../../model/edge-mapping.ts";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
+import { renderSourceTypeIcon } from "../../../elements/workflow-icons.tsx";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
+import { type Variable, VariablesSection } from "../../prompt/variables/variables-section.tsx";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
@@ -152,13 +156,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
 
   const agentId = extractAgentId(agentRef);
 
-  const agentQuery = api.agents.getById.useQuery(
+  const agentQuery = workflowApi.agents.getById.useQuery(
     { id: agentId, projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
 
-  const updateMutation = api.agents.update.useMutation();
-  const trpcContext = api.useUtils();
+  const updateMutation = workflowApi.agents.update.useMutation();
+  const trpcContext = workflowApi.useUtils();
 
   const agentData = agentQuery.data;
   // The node's DSL snapshot is the canonical in-workflow state: it is
@@ -183,7 +187,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
         data: {
           localConfig: {
             name: form.getValues("name"),
-            settings,
+            settings: draftSettingsWithoutCredentials(settings),
           },
         },
       });
@@ -192,7 +196,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     { trailing: true },
   );
 
-  const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
+  const localSettings = draftSettingsWithoutCredentials(localConfig?.settings);
   const draftSources = {
     nodeData: node.data,
     agentType,
@@ -338,7 +342,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
 
     const config = agentConfigFor({
       agentType,
-      http: { url, method, bodyTemplate, outputPath, headers, auth },
+      http: {
+        url,
+        method,
+        bodyTemplate,
+        outputPath,
+        ...withoutCredentialValues({ headers, auth }),
+      },
       code,
       inputs: node.data.inputs ?? [],
       outputs: node.data.outputs ?? [],
@@ -433,11 +443,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   const hasLocalChanges = !!localConfig;
 
   // HTTP test via shared hook
+  const testCredentials = withoutCredentialValues({ headers, auth });
   const { handleTest } = useHttpTest({
+    agentId,
     url,
     method,
-    headers,
-    auth,
+    headers: testCredentials.headers,
+    auth: testCredentials.auth,
     outputPath,
     bodyTemplate,
   });
@@ -503,6 +515,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
           headers={headers}
           onHeadersChange={handleHeadersChange}
           onTest={handleTest}
+          credentialsReadOnly
         />
       )}
 
@@ -568,7 +581,7 @@ function initialHttpDraft({
   httpSnapshot: HttpDraftSource;
   httpConfig: HttpDraftSource;
 }): HttpDraft {
-  return {
+  const draft = {
     url: (localSettings?.url as string) ?? httpSnapshot?.url ?? httpConfig?.url ?? "",
     method:
       (localSettings?.method as HttpMethod) ?? httpSnapshot?.method ?? httpConfig?.method ?? "POST",
@@ -582,15 +595,10 @@ function initialHttpDraft({
       httpSnapshot?.outputPath ??
       httpConfig?.outputPath ??
       "",
-    headers:
-      (localSettings?.headers as HttpHeader[]) ??
-      httpSnapshot?.headers ??
-      httpConfig?.headers ??
-      [],
-    auth: (localSettings?.auth as HttpAuth) ??
-      httpSnapshot?.auth ??
-      httpConfig?.auth ?? { type: "none" },
+    headers: httpSnapshot?.headers ?? httpConfig?.headers ?? [],
+    auth: httpSnapshot?.auth ?? httpConfig?.auth ?? { type: "none" },
   };
+  return { ...draft, ...withoutCredentialValues(draft) };
 }
 
 function initialCode({
@@ -624,8 +632,12 @@ function applyHttpDraft(
   setters.setMethod(source.method ?? "POST");
   setters.setBodyTemplate(source.bodyTemplate ?? "");
   setters.setOutputPath(source.outputPath ?? "");
-  setters.setHeaders(source.headers ?? []);
-  setters.setAuth(source.auth ?? { type: "none" });
+  const credentials = withoutCredentialValues({
+    headers: source.headers ?? [],
+    auth: source.auth ?? { type: "none" },
+  });
+  setters.setHeaders(credentials.headers);
+  setters.setAuth(credentials.auth);
 }
 
 function httpDraftDiffers(draft: HttpDraft, baseline: Partial<HttpDraft>): boolean {
@@ -681,7 +693,12 @@ function persistNameDraft({
   if (name !== savedName) {
     setNode({
       id: nodeId,
-      data: { localConfig: { name: name as string, settings: localConfig?.settings } },
+      data: {
+        localConfig: {
+          name: name as string,
+          settings: draftSettingsWithoutCredentials(localConfig?.settings),
+        },
+      },
     });
     return;
   }
@@ -702,7 +719,9 @@ function trackHttpDraft({
 }) {
   const baseline =
     readHttpSnapshot(nodeData) ?? (agentConfig ? getHttpConfig(agentConfig) : undefined);
-  if (baseline && httpDraftDiffers(draft, baseline)) persist({ ...draft });
+  if (baseline && httpDraftDiffers(draft, baseline)) {
+    persist({ ...draft, ...withoutCredentialValues(draft) });
+  }
 }
 
 function trackCodeDraft({

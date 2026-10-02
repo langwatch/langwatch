@@ -14,6 +14,7 @@ import type {
   StudioServerEvent,
   StudioWorkflow,
   WorkflowApi,
+  WorkflowRunPrincipal,
 } from "@langwatch/workflow-contract";
 
 import {
@@ -56,6 +57,8 @@ type CellEvaluatorContext = {
   targetNodes: Set<string>;
   config: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
+  /** The member who started the run; its calls back into LangWatch act as them. */
+  principal?: WorkflowRunPrincipal | undefined;
 };
 
 export class ExperimentCellExecutionService {
@@ -111,6 +114,7 @@ export class ExperimentCellExecutionService {
     targetNodes,
     config,
     isAborted,
+    principal,
   }: CellEvaluatorContext & {
     evaluatorId: string;
     evaluatorNodeId: string;
@@ -157,7 +161,11 @@ export class ExperimentCellExecutionService {
     const evaluatorEvents: StudioServerEvent[] = [];
     await this.ports.studio.postStudioEvent({
       projectId,
-      event: await this.workflows.enrichStudioEvent({ event: evaluatorEvent, projectId }),
+      event: await this.workflows.enrichStudioEvent({
+        event: evaluatorEvent,
+        projectId,
+        principal,
+      }),
       isAborted,
       onEvent: (serverEvent) => {
         evaluatorEvents.push(serverEvent);
@@ -265,6 +273,7 @@ export class ExperimentCellExecutionService {
     cellConfig,
     traceId,
     isAborted,
+    principal,
   }: {
     cell: ExecutionCell;
     projectId: string;
@@ -276,6 +285,7 @@ export class ExperimentCellExecutionService {
     cellConfig: ResultMapperConfig;
     traceId: string;
     isAborted?: () => Promise<boolean>;
+    principal?: WorkflowRunPrincipal | undefined;
   }): AsyncGenerator<
     EvaluationV3Event,
     { targetOutput?: Record<string, unknown>; targetFailed: boolean }
@@ -300,7 +310,7 @@ export class ExperimentCellExecutionService {
     // Prepare runtime credentials and datasets, then set the run's own
     // sandbox credential on the workflow so its code nodes authenticate.
     const enrichedEvent = sandboxKey.withSandboxApiKey(
-      await this.workflows.prepareStudioEvent({ event: rawEvent, projectId }),
+      await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
       loadedData.sandboxApiKey,
     );
 
@@ -372,6 +382,7 @@ export class ExperimentCellExecutionService {
     loadedData,
     resultMapperConfig,
     isAborted,
+    principal,
   }: {
     cell: ExecutionCell;
     projectId: string;
@@ -379,6 +390,7 @@ export class ExperimentCellExecutionService {
     loadedData: LoadedCellData;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;
+    principal?: WorkflowRunPrincipal | undefined;
   }): AsyncGenerator<EvaluationV3Event> {
     yield { type: "cell_started", rowIndex: cell.rowIndex, targetId: cell.targetId };
 
@@ -418,6 +430,7 @@ export class ExperimentCellExecutionService {
           cellConfig,
           traceId,
           isAborted,
+          principal,
         });
         targetOutput = result.targetOutput;
         targetFailed = result.targetFailed;
@@ -443,6 +456,7 @@ export class ExperimentCellExecutionService {
           targetNodes,
           config: cellConfig,
           isAborted,
+          principal,
         });
       }
     } catch (error) {

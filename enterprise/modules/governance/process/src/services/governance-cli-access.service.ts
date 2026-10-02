@@ -5,7 +5,7 @@
  * RBAC permission, plus the current-membership boundary the credential routes add.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { GovernanceCliRequest } from "@langwatch/enterprise-governance-contract";
 import {
   assertEnterprisePlan,
@@ -239,8 +239,8 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
 }
 
 /** The caller the CLI token door put on the request, in this plane's wire vocabulary. */
-function callerOf({ actor, organizationId }: GovernanceCliRequest): GovernanceCliCaller {
-  const { tokenKey, cliApiKeyId, clientInfo } = actor.cliSession;
+function callerOf({ actor, session, organizationId }: GovernanceCliRequest): GovernanceCliCaller {
+  const { tokenKey, cliApiKeyId, clientInfo } = session;
 
   return {
     user_id: actor.id,

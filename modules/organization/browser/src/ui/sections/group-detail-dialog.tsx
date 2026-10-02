@@ -1,3 +1,5 @@
+import { Dialog } from "@langwatch/design-system/dialog";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Box,
   Button,
@@ -7,9 +9,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { InputGroup } from "@langwatch/design-system/input-group";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,16 +17,16 @@ import { useEffect, useRef, useState } from "react";
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
-  BindingInputRow,
-  type BindingInputRowHandle,
-  DirectBindingRow,
-  type PendingBinding,
+  GrantInputRow,
+  type GrantInputRowHandle,
+  DirectGrantRow,
+  type PendingGrant,
   SourceBadge,
-  StagedBindingRow,
+  StagedGrantRow,
   toggled,
-} from "./group-binding-input-row.tsx";
+} from "./group-grant-input-row.tsx";
+import { MemberAvatar } from "./member-avatar.tsx";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 type PendingAddition = { userId: string; label: string; image: string | null };
@@ -52,7 +52,7 @@ function GroupMemberRow({
   const label = member.name ?? member.email;
   return (
     <HStack py={1} fontSize="sm" opacity={markedForRemoval ? 0.4 : 1} transition="opacity 0.15s">
-      <RandomColorAvatar name={label ?? "?"} image={member.image} size="xs" />
+      <MemberAvatar name={label ?? "?"} image={member.image} size="xs" />
       <Text flex={1} textDecoration={markedForRemoval ? "line-through" : undefined}>
         {label}
       </Text>
@@ -74,7 +74,7 @@ function GroupMemberRow({
 function StagedMemberRow({ addition, onUndo }: { addition: PendingAddition; onUndo: () => void }) {
   return (
     <HStack py={1} fontSize="sm" opacity={0.7}>
-      <RandomColorAvatar name={addition.label} image={addition.image} size="xs" />
+      <MemberAvatar name={addition.label} image={addition.image} size="xs" />
       <Text flex={1} color="green.600">
         {addition.label}
       </Text>
@@ -195,8 +195,8 @@ export function GroupDetailDialog({
   const [pendingName, setPendingName] = useState(group.name);
   const [committedName, setCommittedName] = useState(group.name);
 
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
+  const [pendingGrantRemovals, setPendingGrantRemovals] = useState<Set<string>>(new Set());
+  const [pendingGrantAdditions, setPendingGrantAdditions] = useState<PendingGrant[]>([]);
 
   const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
   const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>([]);
@@ -205,13 +205,13 @@ export function GroupDetailDialog({
   const [memberSearch, setMemberSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const bindingInputRef = useRef<BindingInputRowHandle>(null);
+  const grantInputRef = useRef<GrantInputRowHandle>(null);
 
   const reset = () => {
     setPendingName(group.name);
     setCommittedName(group.name);
-    setPendingBindingRemovals(new Set());
-    setPendingBindingAdditions([]);
+    setPendingGrantRemovals(new Set());
+    setPendingGrantAdditions([]);
     setPendingRemovals(new Set());
     setPendingAdditions([]);
     setAddMemberId("");
@@ -226,8 +226,8 @@ export function GroupDetailDialog({
   const nameChanged = pendingName.trim() !== committedName && pendingName.trim() !== "";
   const hasChanges =
     nameChanged ||
-    pendingBindingRemovals.size > 0 ||
-    pendingBindingAdditions.length > 0 ||
+    pendingGrantRemovals.size > 0 ||
+    pendingGrantAdditions.length > 0 ||
     pendingRemovals.size > 0 ||
     pendingAdditions.length > 0;
 
@@ -238,7 +238,7 @@ export function GroupDetailDialog({
   );
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: open && canManage },
   );
 
@@ -247,11 +247,11 @@ export function GroupDetailDialog({
 
   // ── save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
-    const uncommitted = bindingInputRef.current?.flush() ?? null;
-    const allBindingAdditions = uncommitted
-      ? [...pendingBindingAdditions, uncommitted]
-      : pendingBindingAdditions;
+    // Auto-stage any uncommitted grant row (user selected fields but didn't click Add)
+    const uncommitted = grantInputRef.current?.flush() ?? null;
+    const allGrantAdditions = uncommitted
+      ? [...pendingGrantAdditions, uncommitted]
+      : pendingGrantAdditions;
 
     setIsSaving(true);
     try {
@@ -259,8 +259,8 @@ export function GroupDetailDialog({
         organizationId,
         groupId: group.id,
         rename: nameChanged ? { name: pendingName.trim() } : null,
-        bindingIdsToDelete: [...pendingBindingRemovals],
-        bindingsToCreate: allBindingAdditions.map((b) => ({
+        grantIdsToRevoke: [...pendingGrantRemovals],
+        grantsToCreate: allGrantAdditions.map((b) => ({
           role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
@@ -282,8 +282,8 @@ export function GroupDetailDialog({
   };
 
   // ── helpers ──────────────────────────────────────────────────────────────────
-  const toggleBindingRemoval = (id: string) =>
-    setPendingBindingRemovals((prev) => toggled({ set: prev, id }));
+  const toggleGrantRemoval = (id: string) =>
+    setPendingGrantRemovals((prev) => toggled({ set: prev, id }));
 
   const toggleMemberRemoval = (userId: string) =>
     setPendingRemovals((prev) => toggled({ set: prev, id: userId }));
@@ -347,33 +347,33 @@ export function GroupDetailDialog({
                 </Text>
               </HStack>
 
-              {/* ── Access bindings ── */}
+              {/* ── Access grants ── */}
               <Box>
                 <Text fontSize="sm" fontWeight="semibold" mb={3}>
                   Access granted
                 </Text>
 
-                {d.bindings.length === 0 && pendingBindingAdditions.length === 0 ? (
+                {d.grants.length === 0 && pendingGrantAdditions.length === 0 ? (
                   <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                     No access configured yet.
                   </Text>
                 ) : (
                   <VStack gap={2} align="stretch">
-                    {d.bindings.map((b) => (
-                      <DirectBindingRow
+                    {d.grants.map((b) => (
+                      <DirectGrantRow
                         key={b.id}
-                        binding={b}
-                        markedForRemoval={pendingBindingRemovals.has(b.id)}
+                        grant={b}
+                        markedForRemoval={pendingGrantRemovals.has(b.id)}
                         removable={canManage}
-                        onToggle={() => toggleBindingRemoval(b.id)}
+                        onToggle={() => toggleGrantRemoval(b.id)}
                       />
                     ))}
-                    {pendingBindingAdditions.map((b, i) => (
-                      <StagedBindingRow
+                    {pendingGrantAdditions.map((b, i) => (
+                      <StagedGrantRow
                         key={i}
-                        binding={b}
+                        grant={b}
                         onUndo={() =>
-                          setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
+                          setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== i))
                         }
                       />
                     ))}
@@ -381,10 +381,10 @@ export function GroupDetailDialog({
                 )}
 
                 {canManage && (
-                  <BindingInputRow
-                    ref={bindingInputRef}
+                  <GrantInputRow
+                    ref={grantInputRef}
                     organizationId={organizationId}
-                    onAdd={(b) => setPendingBindingAdditions((prev) => [...prev, b])}
+                    onAdd={(b) => setPendingGrantAdditions((prev) => [...prev, b])}
                   />
                 )}
               </Box>

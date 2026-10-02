@@ -40,10 +40,10 @@ Interrupted vitest workers reparent to pid 1 and keep holding their memory.
 
 ## 3. Use the harness, not hand-rolled stubs
 
-`@langwatch/test-harness` is the toolkit, beside `@langwatch/api-fixture`:
+`@langwatch/test-harness` is the toolkit, and `@langwatch/test-harness/api-fixture` is its double:
 
 - `createApiFixture<XApi>({ ...only the methods this test calls })` (from
-  `@langwatch/api-fixture`) for an app or
+  `@langwatch/test-harness/api-fixture`) for an app or
   peer double. An uncalled method throws by name, so a test cannot pass on a
   silent no-op.
 - `cleanupTestRows` for datastore rows.

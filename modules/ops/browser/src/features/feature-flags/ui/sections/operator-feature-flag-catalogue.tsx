@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
   VisuallyHidden,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {

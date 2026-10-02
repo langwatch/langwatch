@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 
 // tRPC query returns an empty providers list to simulate a freshly
 // created project with zero configured providers.
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -38,7 +38,7 @@ function withProviders(ui: React.ReactNode) {
   });
   return (
     <QueryClientProvider client={queryClient}>
-      <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>
+      <DesignSystemProvider forcedTheme="light">{ui}</DesignSystemProvider>
     </QueryClientProvider>
   );
 }

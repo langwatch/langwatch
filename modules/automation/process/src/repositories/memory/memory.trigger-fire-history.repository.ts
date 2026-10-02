@@ -1,6 +1,8 @@
 import type {
+  AutomationApiFireHistoryInput,
   AutomationFireStats,
   TriggerFire,
+  TriggerFirePage,
   TriggerFireStats,
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
@@ -70,6 +72,27 @@ export class MemoryTriggerFireHistoryRepository extends TriggerFireHistoryReposi
     limit: number;
   }): Promise<TriggerFire[]> {
     return this.findRecent(input);
+  }
+
+  listPageByTriggerId(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    const { cursor, limit } = input;
+    const newestFirst = (left: TriggerFire, right: TriggerFire): number =>
+      right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id);
+    const after = (fire: TriggerFire): boolean =>
+      cursor === null ||
+      fire.createdAt < cursor.createdAt ||
+      (fire.createdAt.getTime() === cursor.createdAt.getTime() && fire.id < cursor.id);
+    const rows = this.memory.fires
+      .filter((fire) => fire.projectId === input.projectId && fire.triggerId === input.triggerId)
+      .map(({ projectId: _projectId, ...fire }) => fire)
+      .filter(after)
+      .toSorted(newestFirst);
+    const fires = rows.slice(0, limit);
+    const last = fires.at(-1);
+    return Promise.resolve({
+      fires,
+      nextCursor: rows.length > limit && last ? { createdAt: last.createdAt, id: last.id } : null,
+    });
   }
 
   findAllRecentForProject(input: { projectId: string; limit: number }): Promise<TriggerFire[]> {

@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the automations page has always
  * called, in the order the authoring drawer and the list reach them.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   automationDailyCapSchema,
@@ -14,6 +14,7 @@ import {
 } from "./automation.responses.ts";
 import {
   automationApiCreateInputSchema,
+  automationApiFireHistoryTrpcInputSchema,
   automationApiListSlackChannelsInputSchema,
   automationApiProjectScopeSchema,
   automationApiRecentActivityInputSchema,
@@ -24,6 +25,9 @@ import {
   automationApiUpdateTriggerFiltersInputSchema,
   automationApiUpsertInputSchema,
   automationApiWebhookDeliveriesInputSchema,
+  nextFiringSchema,
+  triggerFirePageSchema,
+  triggerLatestEvaluationSchema,
 } from "./automation.trpc-schemas.ts";
 import { testFireResultSchema } from "./test-fire.ts";
 import {
@@ -72,6 +76,21 @@ export const automationTrpc = defineTrpcContract("automation")
   .query("getWebhookDeliveries")
   .withInput(automationApiWebhookDeliveriesInputSchema)
   .withOutput(webhookDeliveryRowSchema.array())
+
+  /** One page of an automation's whole fire history, newest first; metadata only. */
+  .query("getFireHistory")
+  .withInput(automationApiFireHistoryTrpcInputSchema)
+  .withOutput(triggerFirePageSchema)
+
+  /** The alert's most recent check; null when it has never been evaluated. */
+  .query("getLatestEvaluation")
+  .withInput(automationApiTriggerScopeSchema)
+  .withOutput(triggerLatestEvaluationSchema.nullable())
+
+  /** When this automation acts next. */
+  .query("getNextFiring")
+  .withInput(automationApiTriggerScopeSchema)
+  .withOutput(nextFiringSchema)
 
   .query("getRecentActivity")
   .withInput(automationApiRecentActivityInputSchema)

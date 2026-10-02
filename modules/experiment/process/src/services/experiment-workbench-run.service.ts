@@ -31,7 +31,6 @@ import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
-import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
 import type {
   ExperimentRunProgressState,
   ExperimentRunStartRecord,
@@ -45,6 +44,7 @@ import {
 } from "./experiment-execution-data.service.ts";
 import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import { ExperimentSavedStateExecutionService } from "./experiment-saved-state-execution.service.ts";
+import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 import {
   ExperimentWorkbenchPipelineRunService,
   type PipelineRunStart,
@@ -112,7 +112,7 @@ export class ExperimentWorkbenchRunService {
         }),
         // The person behind a key; a personal agent refuses a key that names nobody, as main did.
         actor: deriveRunActor({
-          userId: input.credential.kind === "apiKey" ? input.credential.userId : null,
+          userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
           surfaceHeader: null,
         }),
         data: saved.data,

@@ -1,10 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import type { FindOrCreateWorkflowExperimentInput } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -325,6 +325,19 @@ describe("WorkflowEvaluationService.request", () => {
         progress: 0,
         total: 3,
       });
+    });
+  });
+
+  describe("given a graph whose HTTP node holds a secret reference", () => {
+    /** @scenario A run's queued payload never carries a resolved secret */
+    it("queues the version's id and parameters, never the graph or any secret", async () => {
+      const { service, sent } = buildService();
+
+      await service.request({ ...baseInput, parameters: { feature_flag: "on" } });
+
+      const queued = JSON.stringify(sent[0]);
+      expect(queued).not.toMatch(/dsl|nodes|secrets|api_key/);
+      expect(sent[0]).toMatchObject({ workflowVersionId: expect.any(String) });
     });
   });
 

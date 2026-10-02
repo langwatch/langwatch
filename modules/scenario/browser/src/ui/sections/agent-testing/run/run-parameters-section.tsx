@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { Box, chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

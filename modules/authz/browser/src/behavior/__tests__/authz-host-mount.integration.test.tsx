@@ -17,16 +17,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORGANIZATION_ID = "org-1";
 
-type UsageAnswer = { data?: { activePlan: { type: string } }; isLoading: boolean };
+type UsageAnswer = { data?: { type: string }; isLoading: boolean };
 
 const usage = vi.fn((): UsageAnswer => ({ isLoading: true }));
 const usageOptions = vi.fn();
 const organizations = vi.fn((): { data?: unknown[] } => ({}));
 vi.mock("../authz-api.ts", () => ({
   authzApi: {
-    organization: { getAll: { useQuery: () => organizations() } },
-    limits: {
-      getUsage: {
+    organization: { getScopeGraph: { useQuery: () => organizations() } },
+    plan: {
+      getActivePlan: {
         useQuery: (input: unknown, options: unknown) => {
           usageOptions(input, options);
           return usage();
@@ -118,7 +118,7 @@ describe("given an authz host above the roles pages", () => {
     /** @scenario "A mounted host answers the reading its screen renders from" */
     /** @scenario An Enterprise organization's plan reaches the roles page */
     it("reports the organization as Enterprise rather than showing the pitch", () => {
-      usage.mockReturnValue({ data: { activePlan: { type: "ENTERPRISE" } }, isLoading: false });
+      usage.mockReturnValue({ data: { type: "ENTERPRISE" }, isLoading: false });
 
       render(<PlanReader />, { wrapper: harness({ grants: ["organization:view"] }) });
 
@@ -133,7 +133,7 @@ describe("given an authz host above the roles pages", () => {
 
   describe("when the organization's plan answers a free tier", () => {
     it("reports the organization as not Enterprise", () => {
-      usage.mockReturnValue({ data: { activePlan: { type: "FREE" } }, isLoading: false });
+      usage.mockReturnValue({ data: { type: "FREE" }, isLoading: false });
 
       render(<PlanReader />, { wrapper: harness({ grants: ["organization:view"] }) });
 

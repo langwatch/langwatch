@@ -146,6 +146,22 @@ describe("BillingEventsPage", () => {
     expect(screen.getByTestId("billing-events-load-more")).toBeInTheDocument();
   });
 
+  /** @scenario A spend row with no virtual key and the instant eval request type reads as Instant Evals */
+  it("names a keyless instant eval row Instant Evals", () => {
+    listQuery.mockReturnValue({
+      data: {
+        rows: [{ ...SPEND_ROW, virtualKeyId: "", requestType: "instant_eval" }],
+        nextCursor: null,
+        virtualKeyNames: {},
+        clickHouseDisabled: false,
+      },
+      isLoading: false,
+      isFetching: false,
+    });
+    renderPage();
+    expect(screen.getByTestId("billing-events-table")).toHaveTextContent("Instant Evals");
+  });
+
   /** @scenario The ledger explains itself when ClickHouse is disabled */
   it("explains the ClickHouse-disabled degrade", () => {
     listQuery.mockReturnValue({

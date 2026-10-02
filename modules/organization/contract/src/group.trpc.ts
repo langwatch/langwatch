@@ -4,23 +4,23 @@
  * so listing and creating one also ask the Enterprise plan.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
-  groupBindingCreatedSchema,
+  groupGrantCreatedSchema,
   groupDetailSchema,
   groupListItemSchema,
   groupMembershipViewSchema,
   groupWriteAckSchema,
 } from "./group.responses.ts";
 import {
-  groupApiAddBindingInputSchema,
+  groupApiAddGrantInputSchema,
   groupApiApplyEditsInputSchema,
   groupApiCreateInputSchema,
   groupApiGroupScopeSchema,
   groupApiMemberInputSchema,
   groupApiMemberScopeSchema,
-  groupApiRemoveBindingInputSchema,
+  groupApiRemoveGrantInputSchema,
   groupApiRenameInputSchema,
 } from "./group.trpc-schemas.ts";
 import { organizationGroupSchema } from "./group.ts";
@@ -39,12 +39,12 @@ export const groupTrpc = defineTrpcContract("group")
   .withInput(groupApiCreateInputSchema)
   .withOutput(organizationGroupSchema)
 
-  .mutation("addBinding")
-  .withInput(groupApiAddBindingInputSchema)
-  .withOutput(groupBindingCreatedSchema)
+  .mutation("addGrant")
+  .withInput(groupApiAddGrantInputSchema)
+  .withOutput(groupGrantCreatedSchema)
 
-  .mutation("removeBinding")
-  .withInput(groupApiRemoveBindingInputSchema)
+  .mutation("removeGrant")
+  .withInput(groupApiRemoveGrantInputSchema)
   .withOutput(groupWriteAckSchema)
 
   .mutation("addMember")

@@ -1,5 +1,6 @@
-import { type LangyScope, useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
+
+import { type LangyScope, useLangyStore } from "./langy.store.ts";
 
 /**
  * What another module may do to the Langy panel, and nothing more. A consumer

@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 
 /**
  * Missing-value placeholder used by every table cell that renders `{value || dash}` /

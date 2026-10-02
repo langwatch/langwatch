@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { type RefObject, useEffect, useState } from "react";
 
 /** How long the turn under review blinks for when the reader arrives on it. */

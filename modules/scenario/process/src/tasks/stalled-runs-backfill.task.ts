@@ -18,9 +18,9 @@ export type StalledRunFinder = {
 const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
 
 /**
- * One-shot backfill closing historical simulation runs that never received a terminal event. covers
- * every run queued after it shipped,
- * The simulation_run_execution process manager's stall watchdog (ADR-094)
+ * One-shot backfill closing historical simulation runs that never received a terminal event.
+ * Runs queued after the simulation_run_execution process manager's stall watchdog (ADR-094)
+ * shipped are covered by that watchdog instead.
  */
 
 /**

@@ -3,7 +3,6 @@
  * then the project's custom views, which reorder by drag and rename or delete in edit mode.
  */
 
-import { Badge, Box, Button, HStack, IconButton, Input, Text } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -23,13 +22,22 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Check, MoreVertical, User, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
 
+import { useSavedViews } from "../../behavior/use-saved-views.tsx";
 import { type ViewBadgeColors, viewBadgeColors } from "../../model/saved-view-colors.ts";
-import type { SavedView } from "./saved-views-logic.ts";
-import { useSavedViews } from "./use-saved-views.tsx";
+import type { SavedView } from "../../model/saved-views-logic.ts";
 
 function badgeCursor({ isEditMode, isDefault }: { isEditMode: boolean; isDefault: boolean }) {
   if (!isEditMode) return "pointer";

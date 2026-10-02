@@ -1,4 +1,4 @@
-import { HStack, Skeleton, Text } from "@chakra-ui/react";
+import { HStack, Skeleton, Text } from "@langwatch/design-system/primitives";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type React from "react";
 

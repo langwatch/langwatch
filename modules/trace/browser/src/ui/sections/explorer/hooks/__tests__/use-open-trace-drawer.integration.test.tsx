@@ -3,7 +3,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { drawerChrome } from "../../../../../behavior/drawer-chrome.store.ts";
 import { previewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../types/trace.ts";
 
@@ -96,12 +96,19 @@ describe("useOpenTraceDrawer", () => {
   beforeEach(() => {
     seen.calls = [];
     seen.projectId = "project-1";
-    useDrawerStore.getState().setVizTabTransient("flame");
+    drawerChrome.setState(drawerChrome.getInitialState(), true);
   });
 
-  it("seeds the header from the row, prefetches the heavy reads, then opens the drawer", () => {
-    expect(open(trace())).toMatchSnapshot();
-    expect(useDrawerStore.getState().vizTab).toBe("flame");
+  it("prefetches the heavy reads then opens the drawer, without writing the row as the header", () => {
+    const calls = open(trace());
+    expect(calls.filter((call) => call.startsWith("set"))).toEqual([]);
+    expect(calls).toMatchSnapshot();
+  });
+
+  it("hands the row's span count to the drawer for the trace it opens", () => {
+    open(trace({ spanCount: 4 }));
+
+    expect(drawerChrome.getState().expectedSpan).toEqual({ traceId: "trace-1", count: 4 });
   });
 
   it("only opens the drawer when no project is selected", () => {
@@ -113,6 +120,5 @@ describe("useOpenTraceDrawer", () => {
     const calls = open(trace({ traceId: previewTraceId("sample"), conversationId: "conv-1" }));
     expect(calls.filter((call) => call.startsWith("prefetch"))).toEqual([]);
     expect(calls).toMatchSnapshot();
-    expect(useDrawerStore.getState().vizTab).toBe("waterfall");
   });
 });

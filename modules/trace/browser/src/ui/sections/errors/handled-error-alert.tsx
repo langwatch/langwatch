@@ -1,5 +1,5 @@
-import { Alert, List, Text } from "@chakra-ui/react";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { Alert, List, Text } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";

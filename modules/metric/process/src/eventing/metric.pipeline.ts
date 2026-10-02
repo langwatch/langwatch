@@ -1,15 +1,15 @@
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
 import { METRIC_PROCESSING_PIPELINE_NAME } from "@langwatch/metric-contract";
 
-import type { MetricApp } from "../app/metric.app.ts";
+import type { MetricModule } from "../app/metric.app.ts";
 
 /**
  * The registration: the app builds the definition, and the senders are bound back to it once the
- * runtime has built them (ADR-144). Cross-pipeline subscribers (e.g. coding-agent metric-facts)
- * forward through that peer's own `*Api` operation.
+ * runtime has built them (ADR-144). A peer that reacts to a point declares its own peer
+ * subscriber on this event.
  */
 export const metricEventing = defineEventingModule({
   pipeline: METRIC_PROCESSING_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, MetricApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<never, MetricModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

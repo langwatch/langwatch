@@ -1,12 +1,11 @@
-import type { AvatarRootProps } from "@langwatch/design-system/avatar";
-import { UserAvatar } from "@langwatch/user-browser-kit";
+import { type AvatarRootProps, UserAvatar } from "@langwatch/design-system/avatar";
 
 import { getColorForString } from "../../model/rotating-colors.ts";
 
 /**
  * Person avatar with a deterministic name-hashed background behind the initials
  * fallback. Delegates the image/initials/silhouette fallback chain to
- * {@link UserAvatar}; pass `image` to show an uploaded/SSO photo when available.
+ * {@link UserAvatar}; pass `image`, an already resolved URL, to show a photo when available.
  */
 export function RandomColorAvatar({
   name,
@@ -16,7 +15,7 @@ export function RandomColorAvatar({
   return (
     <UserAvatar
       name={name}
-      image={image}
+      src={image}
       color="white"
       background={getColorForString("colors", name).color}
       {...props}

@@ -44,13 +44,16 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     organizationId,
     connectionId,
     limit,
+    issuer = null,
   }: {
     organizationId: string;
     connectionId: string;
     limit: number;
+    issuer?: string | null;
   }): Promise<SsoAuthenticationRecord[]> {
     return this.store.ssoAuthentications
       .filter((row) => row.organizationId === organizationId && row.connectionId === connectionId)
+      .filter((row) => this.throughIssuer({ row, issuer }))
       .toSorted((left, right) => right.authenticatedAtMs - left.authenticatedAtMs)
       .slice(0, limit)
       .map((row) => ({ ...row }));
@@ -59,15 +62,38 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
   async findLastAuthenticationAtMs({
     organizationId,
     connectionId,
+    issuer = null,
   }: {
     organizationId: string;
     connectionId: string;
+    issuer?: string | null;
   }): Promise<number | null> {
     const times = this.store.ssoAuthentications
       .filter((row) => row.organizationId === organizationId && row.connectionId === connectionId)
+      .filter((row) => this.throughIssuer({ row, issuer }))
       .map((row) => row.authenticatedAtMs);
 
     return times.length === 0 ? null : Math.max(...times);
+  }
+
+  /** False for a sign-in whose subject the store's account rows bound under
+   *  another issuer than `issuer`. */
+  private throughIssuer({
+    row,
+    issuer,
+  }: {
+    row: SsoAuthenticationRecord;
+    issuer: string | null;
+  }): boolean {
+    if (issuer === null || row.providerAccountId === null) return true;
+    const accounts = this.store.accounts.get(row.userId) ?? [];
+    return !accounts.some(
+      (account) =>
+        account.provider === row.connectionId &&
+        account.providerAccountId === row.providerAccountId &&
+        account.issuer !== null &&
+        account.issuer !== issuer,
+    );
   }
 
   async findLastAuthenticationByUser({

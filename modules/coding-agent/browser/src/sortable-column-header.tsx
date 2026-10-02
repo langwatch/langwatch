@@ -1,4 +1,4 @@
-import { Button, Icon, Table } from "@chakra-ui/react";
+import { Button, Icon, Table } from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 import type { ColumnSortState } from "./column-sort.ts";

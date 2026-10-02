@@ -3,7 +3,14 @@
  * and Effects, used only when the scenario runs against a voice target (AC17).
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { Collapsible, Field, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import {
+  Collapsible,
+  Field,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { CALLER_VOICE_EFFECTS, type CallerVoiceConfig } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";

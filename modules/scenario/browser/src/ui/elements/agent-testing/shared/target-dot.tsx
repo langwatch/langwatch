@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 
 export function TargetDot({
   color,

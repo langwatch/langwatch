@@ -3,9 +3,6 @@
  * own — ops mounts the operator catalogue view inline.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-/** What another module may mount. ops reads the flag catalogue through it. */
-export const featureFlagWeb = defineWebModule("feature-flag").publishSurfaces({
-  "surfaces/experiment-catalogue": { load: () => import("./experiment-catalogue.ts") },
-});
+export const featureFlagWeb = defineBrowserModule("feature-flag");

@@ -1,4 +1,13 @@
-import { Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Input,
+  Spacer,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";

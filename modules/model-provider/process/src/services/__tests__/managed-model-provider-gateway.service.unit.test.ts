@@ -1,9 +1,9 @@
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 /**
  * Managed status and managed-call parameters come from the managed-provider peer.
  * @see modules/model-provider/specs/model-provider.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createModelProviderTestManagedProviders } from "../../app/__tests__/model-provider.fixture.ts";

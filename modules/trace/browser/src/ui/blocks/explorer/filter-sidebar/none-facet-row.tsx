@@ -1,4 +1,4 @@
-import { CheckboxCard, Box, HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { memo } from "react";
 
 export const NoneFacetRow = memo(function NoneFacetRow({

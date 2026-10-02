@@ -167,13 +167,6 @@ export abstract class OnboardingHostApi {
     succeeded: OnboardingSuccessNotice;
   }): Promise<boolean>;
 
-  /**
-   * A project's legacy base key (the active scope's without `projectId`), or
-   * `undefined` when the reader may not hold it. Separate from the scope graph
-   * on purpose, see the module docblock.
-   */
-  abstract revealProjectApiKey(projectId?: string): string | undefined;
-
   /** Whether this reader asked their operating system for less motion. */
   abstract prefersReducedMotion(): boolean;
 

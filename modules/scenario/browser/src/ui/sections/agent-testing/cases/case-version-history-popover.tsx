@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/case-version-history.feature
  */
 
-import { Button, useDisclosure } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, useDisclosure } from "@langwatch/design-system/primitives";
 import { History } from "lucide-react";
 import { useEffect } from "react";
 

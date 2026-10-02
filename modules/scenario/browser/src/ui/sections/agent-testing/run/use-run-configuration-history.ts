@@ -4,12 +4,12 @@
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { parseSuiteTargets } from "@langwatch/suite-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   configurationsForScope,
   type RunConfigurationEntry,
@@ -39,7 +39,7 @@ export function useRunConfigurationHistory({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const { data: entries } = api.scenarios.getRunConfigurations.useQuery(
+  const { data: entries } = scenarioClient.scenarios.getRunConfigurations.useQuery(
     { projectId },
     { enabled: isEnabled && !!projectId },
   );

@@ -1,6 +1,6 @@
 ---
 name: clickhouse-migration
-description: "Change the ClickHouse schema without breaking the running release: where the goose migrations live and how they are numbered, one statement per StatementBegin block, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the retirement note required before any DROP or type change, keeping the serverless renderer's catalogue in step when a migration adds or changes a view, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'change that column type', 'drop the old table', 'write a goose migration', 'Code 173', 'Code 241', or the migration-safety test named their migration."
+description: "Change the ClickHouse schema without breaking the running release: where the goose migrations live and how they are numbered, one statement per StatementBegin block, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the retirement note required before any DROP or type change, keeping the LWQL catalogue in step when a migration adds or changes a view, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'change that column type', 'drop the old table', 'write a goose migration', 'Code 173', 'Code 241', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
@@ -122,13 +122,14 @@ its `CREATE` fails, and on a live tenant that gap is measured in queries, not se
 
 ## A migration that adds or changes a view touches the catalogue too
 
-The Go serverless renderer keeps its own copy of the LangWatchQL access model:
-`infra/clickhouse-serverless/internal/render/lwql_catalog.json` lists the source tables
-behind per-tenant row filters and the caller-facing views the `langwatch_lwql` user may
-select from. It is asserted equal to the application's catalogue by
-`modules/analytics/process/src/rules/__tests__/manifestParity.unit.test.ts`, so a new
-queryable table or view without the matching entry fails CI — and a _missing_ entry on a
-serverless installation is a query that refuses rather than a query that leaks.
+The application owns the LangWatchQL access model (ADR-159). The views, and the source
+tables behind per-tenant row filters, are the catalogue in
+`modules/analytics/process/src/rules/lwql-view-catalog.rules.ts` (`LWQL_VIEW_CATALOG`). Every
+view's columns and gates are pinned by
+`modules/analytics/process/src/rules/__tests__/lwql-clickhouse-catalogue.unit.test.ts`
+(spec `specs/lwql/catalogue-grants.feature`), so a new queryable table or view without its
+catalogue entry fails CI. A _missing_ entry is a query that refuses rather than a query
+that leaks.
 
 ## The scanner
 

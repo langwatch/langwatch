@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * The one write in the personal-workspace suite that has to succeed.
@@ -13,6 +12,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -80,6 +80,7 @@ describe.skipIf(!DB_URL)(
       sessions,
       grantCache,
       testArrivals: { standingFor: async () => ({ testing: false }) as const },
+      ceiling: { assertWithinCaller: async () => {} },
       admissions: {
         attachBindings: () => Promise.reject(new Error("no admission expected")),
         completeAdmission: () => Promise.reject(new Error("no admission expected")),
@@ -213,6 +214,7 @@ describe.skipIf(!DB_URL)(
       beforeAll(async () => {
         roleChanges.length = 0;
         await memberships.changeMemberRole({
+          caller: { type: "system" },
           organizationId,
           userId: seatUserId,
           role: OrganizationUserRole.EXTERNAL,

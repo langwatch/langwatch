@@ -2,12 +2,9 @@
  * The monitor feature's application layer; all business rules for monitors
  * live here.
  */
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
-import {
-  EvaluationApi,
-  type MonitorPerformanceQuery,
-  type OnlineEvaluationPerformance,
-} from "@langwatch/evaluation-contract";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EvaluationApi, type OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
   EvaluatorApi,
@@ -15,7 +12,7 @@ import {
   findEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
 import {
   MonitorApi,
   MonitorCheckSettingsInvalidError,
@@ -40,61 +37,32 @@ import {
   type EnabledGuardrailMonitor,
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
+import { previousPeriodStartMs } from "../rules/monitor-performance-window.rules.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
+import { MonitorReplicationService } from "../services/monitor-replication.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
-import { buildMonitorInfrastructure } from "./monitor-composition.build.ts";
 
 /** The window the performance strip reports, and compares to the one before it. */
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Copies an evaluator and its workflow into another project; owned by the
- * Evaluator feature.
- */
-export interface MonitorReplicationReader {
-  copyEvaluatorToProject(
-    input: Readonly<{
-      evaluatorId: string;
-      sourceProjectId: string;
-      targetProjectId: string;
-      actor: Readonly<{ id: string }>;
-    }>,
-  ): Promise<Readonly<{ id: string; workflowId: string | null }>>;
-
-  /** Removes a workflow the copy above created, when the monitor insert fails. */
-  deleteReplicatedWorkflow(
-    input: Readonly<{ workflowId: string; projectId: string }>,
-  ): Promise<void>;
-}
-
-/** Technical ports the process supplies. Peer features arrive as API tokens. */
-export interface MonitorAppInfrastructure {
-  /** The evaluator a monitor runs, until `EvaluatorApi` publishes a lookup by id. */
-  evaluators: MonitorEvaluator;
-  /** The online-evaluation results the seven-day trend is folded from. */
-  performance: MonitorPerformance;
-  /** Copying an evaluator, and its workflow, into another project. */
-  replication: MonitorReplicationReader;
-  /** Mints the id a new monitor row is written under. */
-  generateId: () => string;
-  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
-  publicBaseUrl?: string | undefined;
-}
+/** The app's KSUID resource for a monitor row (`KSUID_RESOURCES.MONITOR`). */
+const MONITOR_KSUID_RESOURCE = "monitor";
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type MonitorSetup = FeatureSetup<
-  typeof MonitorApp.dependencies,
+  typeof MonitorModule.dependencies,
   Readonly<{ publicBaseUrl: string | undefined }>,
   undefined,
   MonitorRepositories
 >;
 
-export class MonitorApp implements MonitorApi {
+export class MonitorModule implements MonitorApi {
   static readonly contract = MonitorApi;
   static readonly dependencies = {
     permissions: AuthzApi,
@@ -111,63 +79,33 @@ export class MonitorApp implements MonitorApi {
   #usage: MonitorRepositories["monitors"];
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
-  #performance: MonitorPerformance;
-  #replication: MonitorReplicationReader;
-  #evaluators: MonitorEvaluator;
+  #evaluation: EvaluationApi;
+  #replication: MonitorReplicationService;
   readonly #publicBaseUrl: string | undefined;
 
   private constructor(
     repositories: MonitorRepositories,
     dependencies: MonitorSetup["dependencies"],
-    members: MonitorAppInfrastructure,
+    publicBaseUrl: string | undefined,
   ) {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
-      evaluators: members.evaluators,
-      generateId: members.generateId,
+      evaluators: dependencies.evaluators,
+      generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
     this.#usage = repositories.monitors;
     this.#permissions = dependencies.permissions;
-    this.#performance = members.performance;
-    this.#replication = members.replication;
-    this.#evaluators = members.evaluators;
-    this.#publicBaseUrl = members.publicBaseUrl;
+    this.#evaluation = dependencies.evaluation;
+    this.#replication = MonitorReplicationService.create({
+      evaluators: dependencies.evaluators,
+      workflows: dependencies.workflows,
+    });
+    this.#publicBaseUrl = publicBaseUrl;
   }
 
-  /**
-   * Builds this process's own {@link MonitorAppInfrastructure} from its
-   * evaluator/evaluation peers, then composes as {@link MonitorApp.fromInfrastructure}
-   * does. Replaces apps/api's hand composition, deleted in b383462d96.
-   */
-  static create(setup: MonitorSetup): MonitorApp {
-    const infrastructure = buildMonitorInfrastructure({
-      evaluators: setup.dependencies.evaluators,
-      evaluation: setup.dependencies.evaluation,
-      workflows: setup.dependencies.workflows,
-    });
-
-    return MonitorApp.fromInfrastructure({
-      infrastructure: {
-        ...infrastructure,
-        publicBaseUrl: setup.members.publicBaseUrl ?? infrastructure.publicBaseUrl,
-      },
-      dependencies: setup.dependencies,
-      repositories: setup.repositories,
-    });
-  }
-
-  /**
-   * Composes over an already-built {@link MonitorAppInfrastructure}. Kept
-   * because every unit test's fixture still builds one directly rather than
-   * reading process members.
-   */
-  static fromInfrastructure(setup: {
-    infrastructure: MonitorAppInfrastructure;
-    dependencies: MonitorSetup["dependencies"];
-    repositories: MonitorRepositories;
-  }): MonitorApp {
-    return new MonitorApp(setup.repositories, setup.dependencies, setup.infrastructure);
+  static create(setup: MonitorSetup): MonitorModule {
+    return new MonitorModule(setup.repositories, setup.dependencies, setup.members.publicBaseUrl);
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {
@@ -298,17 +236,13 @@ export class MonitorApp implements MonitorApi {
     const endMs = nowInstant().epochMilliseconds;
     const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
 
-    return this.#performance.getMonitorPerformance({
+    return this.#evaluation.getMonitorPerformance({
       tenantId: input.projectId,
       monitors: monitors.map((monitor) => ({
         id: monitor.id,
         isGuardrail: findEvaluatorDefinitions(monitor.checkType)[0]?.isGuardrail ?? false,
       })),
-      previousStartMs: this.#performance.previousPeriodStartMs({
-        projectId: input.projectId,
-        startMs: currentStartMs,
-        endMs,
-      }),
+      previousStartMs: previousPeriodStartMs({ startMs: currentStartMs, endMs }),
       currentStartMs,
       endMs,
       timeZone: input.timeZone ?? "UTC",
@@ -351,7 +285,11 @@ export class MonitorApp implements MonitorApi {
         evaluatorId: newEvaluatorId,
       });
     } catch (createError) {
-      await this.#rollback({ newEvaluatorId, newWorkflowId, targetProjectId });
+      await this.#replication.rollback({
+        evaluatorId: newEvaluatorId,
+        workflowId: newWorkflowId,
+        projectId: targetProjectId,
+      });
       throw createError;
     }
   }
@@ -395,30 +333,6 @@ export class MonitorApp implements MonitorApi {
     return this.#permissions.hasProjectPermission({ userId: actor.id, projectId, permission });
   }
 
-  /** Undoes the copies made for a replica the monitor insert then refused. */
-  async #rollback(
-    input: Readonly<{
-      newEvaluatorId: string | null;
-      newWorkflowId: string | null;
-      targetProjectId: string;
-    }>,
-  ): Promise<void> {
-    if (input.newEvaluatorId) {
-      await this.#evaluators
-        .archive({ id: input.newEvaluatorId, projectId: input.targetProjectId })
-        .catch(() => undefined);
-    }
-
-    if (input.newWorkflowId) {
-      await this.#replication
-        .deleteReplicatedWorkflow({
-          workflowId: input.newWorkflowId,
-          projectId: input.targetProjectId,
-        })
-        .catch(() => undefined);
-    }
-  }
-
   // ── the platform's own links ──────────────────────────────────────────────
 
   /**
@@ -438,24 +352,4 @@ export class MonitorApp implements MonitorApi {
 
     return monitorPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
-}
-
-/**
- * The evaluator behind a monitor, as this feature reads it. A PORT until
- * EvaluatorApi grows a lookup-by-id capability.
- */
-export interface MonitorEvaluator {
-  /** Refuses by the evaluator feature's own error when the project has none. */
-  getById(input: Readonly<{ id: string; projectId: string }>): Promise<unknown>;
-  /** Rolls a copied evaluator back when the replicated monitor cannot be written. */
-  archive(input: Readonly<{ id: string; projectId: string }>): Promise<unknown>;
-}
-
-export interface MonitorPerformance {
-  getMonitorPerformance(query: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
-
-  /** The start of the window the trend compares against. */
-  previousPeriodStartMs(
-    range: Readonly<{ projectId: string; startMs: number; endMs: number }>,
-  ): number;
 }

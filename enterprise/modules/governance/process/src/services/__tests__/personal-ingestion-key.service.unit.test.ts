@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ApiKey,
   type ApiKeyApi,
@@ -11,6 +8,9 @@ import {
   findPersonalWorkspaceInputSchema,
   type OrganizationService,
 } from "@langwatch/organization-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
@@ -37,7 +37,7 @@ function apiKey(overrides: Partial<ApiKey>): ApiKey {
     ingestionTemplateId: "tpl",
     createdAt: new Date(1_000),
     updatedAt: new Date(1_000),
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -154,6 +154,7 @@ describe("PersonalIngestionKeyService", () => {
   });
 
   describe("when a source is rotated", () => {
+    /** @scenario Rotate says how many keys it revokes and which machines hold them */
     it("revokes every live key of that source and template, then mints one", async () => {
       const { service, revoked, mint } = await setup([
         apiKey({ id: "ak_a", createdByDeviceLabel: "laptop" }),
@@ -171,6 +172,7 @@ describe("PersonalIngestionKeyService", () => {
   });
 
   describe("when the caller revokes a key", () => {
+    /** @scenario Revoking another person's ingestion key answers not found */
     it("refuses another member's key as not found", async () => {
       const { service } = await setup([apiKey({ userId: "user_2" })]);
 
@@ -179,6 +181,7 @@ describe("PersonalIngestionKeyService", () => {
       ).rejects.toMatchObject({ code: "ingestion_key_not_found" });
     });
 
+    /** @scenario A person revokes one of their own ingestion keys */
     it("revokes the caller's own key with cause user", async () => {
       const causes: unknown[] = [];
       const { service } = await setup([apiKey({})], async (input) => {
@@ -301,6 +304,7 @@ describe("PersonalIngestionKeyService", () => {
   });
 
   describe("when the CLI pins a project", () => {
+    /** @scenario Two machines each keep a live key for the same project and tool */
     it("creates a key without revoking any other machine's", async () => {
       const { service, created, revoked } = await setup([apiKey({})]);
 

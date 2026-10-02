@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-prompt-optimization-entrypoints.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,16 +15,27 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
+    agents: { getById: { useQuery: () => ({ data: null, isLoading: false }) } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
     prompts: {
       getByIdOrHandle: {
         useQuery: () => ({ data: { name: "Support draft" }, isLoading: false }),
       },
     },
-    agents: { getById: { useQuery: () => ({ data: null, isLoading: false }) } },
+  },
+}));
+
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({}),
     evaluators: {
       getById: { useQuery: () => ({ data: null, isLoading: false }) },
     },
@@ -36,7 +47,32 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 
-import { useLangyContextTargetStore, useLangyStore } from "@langwatch/langy-browser-kit";
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import {
+  LANGY_ABSENT_CONTEXT_TARGET,
+  LANGY_ABSENT_SURFACE,
+  LANGY_CONTEXT_TARGET_SLICE,
+  LANGY_STORE_SLICE,
+  type LangyContextTargetState,
+  type LangySliceSurface,
+} from "@langwatch/langy-contract";
+
+// Stand in for Langy, the owner of both slices, which this package only reads.
+const langy = defineSlice<LangySliceSurface>({
+  name: LANGY_STORE_SLICE,
+  create: (set, get) => ({
+    ...LANGY_ABSENT_SURFACE,
+    askLangy: (prompt) => set({ isOpen: true, pendingPrompt: prompt }),
+    chooseChip: (id) => set({ chosenChipIds: new Set(get().chosenChipIds).add(id) }),
+  }),
+});
+const targets = defineSlice<LangyContextTargetState>({
+  name: LANGY_CONTEXT_TARGET_SLICE,
+  create: (set, get) => ({
+    ...LANGY_ABSENT_CONTEXT_TARGET,
+    pick: (target) => set({ picked: [...get().picked, target] }),
+  }),
+});
 
 import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import { TargetHeader } from "../../../ui/sections/experiments-v3/TargetSection/target-header.tsx";
@@ -63,11 +99,7 @@ function LangyWiredHeader({ target }: { target: TargetConfig }) {
 }
 
 function renderHeader({ target }: { target: TargetConfig }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <LangyWiredHeader target={target} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<LangyWiredHeader target={target} />);
 }
 
 async function openMenu() {
@@ -121,12 +153,12 @@ describe("given a prompt column on the workbench", () => {
 
 describe("given the optimize handoff", () => {
   beforeEach(() => {
-    useLangyStore.setState({
+    langy.setState({
       isOpen: false,
       pendingPrompt: null,
       chosenChipIds: new Set<string>(),
     });
-    useLangyContextTargetStore.setState({ picked: [] });
+    targets.setState({ picked: [] });
     useEvaluationsV3Store.getState().reset();
     useEvaluationsV3Store.getState().setExperimentSlug("support-quality");
   });
@@ -149,7 +181,7 @@ describe("given the optimize handoff", () => {
       render(<Harness />);
       fireEvent.click(screen.getByText("go"));
 
-      const state = useLangyStore.getState();
+      const state = langy.getState();
       expect(state.isOpen).toBe(true);
       expect(state.pendingPrompt).toBe(
         'Optimize the prompt in the "Support draft" column. Keep that column unchanged as the baseline and work on a duplicate.',
@@ -161,8 +193,8 @@ describe("given the optimize handoff", () => {
       render(<Harness />);
       fireEvent.click(screen.getByText("go"));
 
-      expect(useLangyStore.getState().chosenChipIds.has("experiment:support-quality")).toBe(true);
-      const picked = useLangyContextTargetStore.getState().picked;
+      expect(langy.getState().chosenChipIds.has("experiment:support-quality")).toBe(true);
+      const picked = targets.getState().picked;
       expect(picked.some((chip) => chip.id === "prompt:prompt_1")).toBe(true);
     });
 
@@ -172,7 +204,7 @@ describe("given the optimize handoff", () => {
 
       expect(screen.getByText("go")).toBeDefined();
       fireEvent.click(screen.getByText("go"));
-      expect(useLangyStore.getState().pendingPrompt).toBeNull();
+      expect(langy.getState().pendingPrompt).toBeNull();
     });
   });
 });

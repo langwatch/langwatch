@@ -1,24 +1,31 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import type {
+  AuthzGetDecisionInput,
+  AuthzGetProjectAnyDecisionInput,
+  AuthzPermission,
+  AuthzScopeLineageInput,
+  AuthzScopeLineageResult,
+  DeclaredScopeTier,
+  PermissionDecision,
+  PermissionScopeArg,
+  TierOfScopeArg,
+} from "@langwatch/authorization";
+import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
+import type * as Platform from "./authz-platform-operators.commands.ts";
 import type { RoleBindingRest } from "./authz-rest.schemas.ts";
-import type * as authzScopeLineageModule from "./authz-scope-lineage.ts";
 import type {
   AuthzAdmissionScope,
   AuthzPendingAdmissionRead,
   AuthzResolveAdmissionInput,
 } from "./authz.admission.ts";
-import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
+import type * as Binding from "./authz.grant-management.ts";
 import type * as Queries from "./authz.queries.ts";
 import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
-import type * as declarationModule from "./declaration.ts";
-import type { AuthzPermission } from "./registry.ts";
-import type * as registryModule from "./registry.ts";
-import type { BindingScopeTier } from "./vocabulary.ts";
 
 export interface AuthzCaller {
   readonly id: string;
@@ -32,7 +39,7 @@ export type EffectivePermissions =
 
 /**
  * The complete callable authorization boundary.  This is deliberately a
- * structural interface: callers can use an installed AuthzApp without
+ * structural interface: callers can use an installed AuthzModule without
  * receiving its services, repositories, or transport adapters.
  */
 export interface AuthzApi {
@@ -50,8 +57,8 @@ export interface AuthzApi {
   ): Promise<EffectivePermissions>;
   check(args: Queries.AuthzCheckInput): Promise<AuthzDecision>;
   checkDetailed(args: Queries.AuthzCheckInput): Promise<Queries.AuthzCheckDetailedOutput>;
-  can(args: Queries.AuthzCheckInput): Promise<boolean>;
-  authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>(args: {
+  can(args: Queries.AuthzCanInput): Promise<boolean>;
+  authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
@@ -67,28 +74,24 @@ export interface AuthzApi {
   ): Promise<Queries.AuthzCanBatchPermissionsByIdsOutput>;
   /** Throws `AuthzScopeNotFoundError` when no id names a live scope. */
   getScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef>;
-  checkScopeLineage(
-    args: authzScopeLineageModule.AuthzScopeLineageInput,
-  ): Promise<authzScopeLineageModule.AuthzScopeLineageResult>;
+  checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
   explainDecision(
     args: Queries.AuthzExplainDecisionInput,
   ): Promise<Queries.AuthzExplainDecisionOutput>;
-  getDecision(args: Queries.AuthzGetDecisionInput): Promise<Queries.PermissionDecision>;
-  getProjectAnyDecision(
-    args: Queries.AuthzGetProjectAnyDecisionInput,
-  ): Promise<Queries.PermissionDecision>;
+  getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision>;
+  getProjectAnyDecision(args: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   hasPermission<Permission extends AuthzPermission>(
     check: {
       userId: string;
       permission: Permission;
-    } & declarationModule.PermissionScopeArg<Permission>,
+    } & PermissionScopeArg<Permission>,
   ): Promise<boolean>;
   authorizePermission<
     Permission extends AuthzPermission,
-    ScopeArg extends declarationModule.PermissionScopeArg<Permission>,
+    ScopeArg extends PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
-  ): Promise<Authorized<declarationModule.TierOfScopeArg<ScopeArg>, Permission>>;
+  ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>>;
   authorizeProjectPermission(args: Queries.AuthzRequireProjectPermissionInput): Promise<void>;
   hasApiKeyPermission(args: Queries.ApiKeyPermissionCheck): Promise<boolean>;
   getApiKeyProjectDecision(
@@ -140,12 +143,9 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
-  /** The caller's session version (ADR-164): 0 until first bumped; throws when unreadable. */
+  /** The caller's session version (ADR-170): 0 until first bumped; throws when unreadable. */
   getSessionVersion(input: { userId: string }): Promise<number>;
-  attach(args: Commands.AuthzAttachGrantInput): Promise<Commands.AuthzBindingOutput>;
-  update(args: Commands.AuthzUpdateGrantInput): Promise<void>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;
-  replace(args: Commands.AuthzReplaceGrantInput): Promise<Commands.AuthzBindingOutput>;
   offboard(args: Commands.AuthzOffboardInput): Promise<Commands.AuthzOffboardOutput>;
   invalidateOrganization(args: { organizationId: string }): Promise<void>;
   attachBindings(
@@ -202,6 +202,14 @@ export interface AuthzApi {
   /** Changes only the role, under the same ceiling as a create. */
   changeGrantRole(args: Grants.AuthzChangeGrantRoleInput): Promise<Grants.Grant>;
   revokeGrant(args: Grants.AuthzRevokeGrantByIdInput): Promise<Grants.GrantRevoked>;
+  /** Grants platform-operator to a user: by an ops:manage holder, never to yourself. */
+  grantPlatformOperator(
+    args: Platform.AuthzGrantPlatformOperatorInput,
+  ): Promise<Platform.PlatformOperator>;
+  /** Revokes one platform-operator grant; never the last, unless user erasure asks as `system`. */
+  revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
+  /** Every live platform operator, oldest first. */
+  listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(
     args: Grants.AuthzFindPermissionsBeyondCallerInput,
@@ -222,7 +230,7 @@ export interface AuthzApi {
   hasProjectPermission(input: {
     userId: string;
     projectId: string;
-    permission: registryModule.AuthzPermission;
+    permission: AuthzPermission;
   }): Promise<boolean>;
   /**
    * Deterministic grant id to deduplicate replays and prevent drift from

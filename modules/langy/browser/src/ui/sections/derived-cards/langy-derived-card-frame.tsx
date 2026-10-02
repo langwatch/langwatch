@@ -1,9 +1,9 @@
 /**
  * The derived chrome — provenance, styled ONCE (ADR-060 §4).
  */
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 

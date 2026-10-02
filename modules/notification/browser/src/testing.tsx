@@ -3,8 +3,7 @@
  * host port and records screen requests.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -53,10 +52,8 @@ export function renderWithNotificationHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <NotificationHostProvider value={host}>{element}</NotificationHostProvider>
-      </ChakraProvider>,
+    ...renderWithDesignSystem(
+      <NotificationHostProvider value={host}>{element}</NotificationHostProvider>,
     ),
   };
 }

@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";

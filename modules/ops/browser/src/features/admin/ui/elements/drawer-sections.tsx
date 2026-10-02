@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /** One labeled value in a drawer's detail grid. */

@@ -4,7 +4,7 @@
  * a secret as `secretId`, the wire the browser has always called.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { revealedSecretSchema, revealOnceInputSchema } from "./one-time-reveal.ts";
@@ -19,7 +19,9 @@ import {
 } from "./secret.ts";
 
 /** The caller states the secret; the transport stamps who asked. */
-export const secretTrpcCreateInputSchema = createSecretInputSchema.omit({ actorId: true });
+export const secretTrpcCreateInputSchema = createSecretInputSchema.omit({
+  actorId: true,
+});
 export type SecretTrpcCreateInput = z.infer<typeof secretTrpcCreateInputSchema>;
 
 export const secretTrpcUpdateInputSchema = z

@@ -1,4 +1,4 @@
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import type { VirtualKeyWithScopes, GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,
@@ -6,9 +6,12 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
+import { isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**
@@ -29,9 +32,9 @@ export type Scope = {
 };
 
 /**
- * Identity a key write is authorized as — one vocabulary for both doors, so REST and tRPC cannot
- * diverge: a session with its role-binding cascade, a scoped API key checked as the intersection
- * of key and user at each touched scope, or a legacy project key confined to its own project.
+ * Identity a key write is authorized as, for both doors: a session (role cascade), a scoped API
+ * key (key and user at each scope), a legacy project key or a project-bound access token (the
+ * person), both confined to their own project (ARCHITECTURE.md §1830).
  */
 export type VirtualKeyActor =
   | { kind: "session"; session: VirtualKeySessionActor }
@@ -41,7 +44,8 @@ export type VirtualKeyActor =
       userId: string | null;
       organizationId: string;
     }
-  | { kind: "legacyProjectKey"; projectId: string };
+  | { kind: "legacyProjectKey"; projectId: string }
+  | { kind: "cliAccessToken"; userId: string; projectId: string };
 
 export type ActorContext = {
   actor: VirtualKeyActor;
@@ -122,11 +126,45 @@ export type VirtualKeyReader = Pick<VirtualKeyService, "findById">;
 export class VirtualKeyAuthorizationService {
   static create(input: {
     directory: VirtualKeyAuthorizationRepository;
+    organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">;
+    projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">;
   }): VirtualKeyAuthorizationService {
-    return new VirtualKeyAuthorizationService(input.directory);
+    return new VirtualKeyAuthorizationService(input.directory, input.organizations, input.projects);
   }
 
-  private constructor(private readonly directory: VirtualKeyAuthorizationRepository) {}
+  private constructor(
+    private readonly directory: VirtualKeyAuthorizationRepository,
+    private readonly organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">,
+    private readonly projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">,
+  ) {}
+
+  /** The role an enabled member holds here; none for a stranger or a disabled seat. */
+  private async enabledRole(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<{ role: string } | null> {
+    try {
+      const member = await this.organizations.getMember(input);
+
+      return member.disabledAt === null ? { role: member.role } : null;
+    } catch (error) {
+      if (isMemberNotFound(error)) return null;
+
+      throw error;
+    }
+  }
+
+  /** Of the named projects, those inside this organization. */
+  private async projectIdsInOrganization(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<string[]> {
+    const inOrganization = new Set(
+      await this.projects.listIdsByOrganization({ organizationId: input.organizationId }),
+    );
+
+    return input.projectIds.filter((id) => inOrganization.has(id));
+  }
 
   private async actorHasPermissionAtScope(
     ctx: ActorContext,
@@ -170,6 +208,13 @@ export class VirtualKeyAuthorizationService {
         // project keys), nothing at any other scope. Broader provisioning
         // requires a scoped API key with the bindings to prove it.
         return scope.scopeType === "PROJECT" && scope.scopeId === actor.projectId;
+      case "cliAccessToken": {
+        if (scope.scopeType !== "PROJECT" || scope.scopeId !== actor.projectId) return false;
+        const scopeRef = await this.scopeRefFor(scope);
+        if (!scopeRef) return false;
+
+        return ctx.permissions.sessionHolds({ userId: actor.userId, permission, scope: scopeRef });
+      }
     }
   }
 
@@ -190,7 +235,7 @@ export class VirtualKeyAuthorizationService {
       return { type: "team", id: scope.scopeId };
     }
 
-    const project = await this.directory.findProjectTeam({ projectId: scope.scopeId });
+    const project = await this.projects.findIdentity(scope.scopeId);
     // Fail closed on a dangling project reference.
     if (!project) {
       return null;
@@ -248,22 +293,22 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Update / rotate / delete gate: require the op permission on at least one
-   * of the key's existing scopes. Throws permission_denied when the caller holds it
-   * on none of them.
+   * Change gate (update, re-scope, rotate, disable, enable, revoke): the op permission at EVERY
+   * scope the key covers (Alex, 2026-10-01), so a caller confined to one project changes only
+   * keys scoped to that project alone. Throws permission_denied at the first scope it lacks.
    */
   async assertActorCanOperateOnAnyScope(
     ctx: ActorContext,
     scopes: Scope[],
     permission: AuthzPermission,
   ): Promise<void> {
+    if (scopes.length === 0) throw permissionDenied(permission, undefined);
+
     for (const scope of scopes) {
-      if (await this.actorHasPermissionAtScope(ctx, scope, permission)) {
-        return;
+      if (!(await this.actorHasPermissionAtScope(ctx, scope, permission))) {
+        throw permissionDenied(permission, scope);
       }
     }
-
-    throw permissionDenied(permission, scopes[0]);
   }
 
   /**
@@ -313,8 +358,8 @@ export class VirtualKeyAuthorizationService {
     userId: string;
   }): Promise<MembershipSet> {
     const [organizationRole, memberTeamIds] = await Promise.all([
-      this.directory.findOrganizationRole(input),
-      this.directory.findMemberTeamIds(input),
+      this.enabledRole(input),
+      this.organizations.findMemberTeamIds(input),
     ]);
     const teamIds = new Set(memberTeamIds);
     const projectIds =
@@ -354,7 +399,7 @@ export class VirtualKeyAuthorizationService {
     );
 
     await assertAllResolve("project", idsOfType("PROJECT"), (projectIds) =>
-      this.directory.findProjectIdsInOrganization({ organizationId, projectIds }),
+      this.projectIdsInOrganization({ organizationId, projectIds }),
     );
   }
 
@@ -412,7 +457,7 @@ export class VirtualKeyAuthorizationService {
       return;
     }
 
-    const found = await this.directory.findProjectIdsInOrganization({
+    const found = await this.projectIdsInOrganization({
       organizationId,
       projectIds: [traceProjectId],
     });

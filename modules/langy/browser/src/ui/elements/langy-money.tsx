@@ -1,7 +1,7 @@
 /**
  * A money value that is readable at a glance and exact on demand.
  */
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 
 /** Digits to show once a value is big enough that fractions stop mattering. */
 const CENTS = 2;

@@ -1,14 +1,14 @@
-/**
- * The refusals `/api/prompts` answers, at the statuses main published: the
- * system-prompt pair keeps its own 400/409, and a tag or address refusal is a 422.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   PromptTagInvalidError,
   SystemPromptConflictError,
   SystemPromptRequiredError,
   type PromptApi,
 } from "@langwatch/prompt-contract";
+/**
+ * The refusals `/api/prompts` answers, at the statuses main published: the
+ * system-prompt pair keeps its own 400/409, and a tag or address refusal is a 422.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { PromptService } from "../../services/prompt.service.ts";

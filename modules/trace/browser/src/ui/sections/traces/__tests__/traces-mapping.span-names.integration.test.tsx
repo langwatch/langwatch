@@ -2,9 +2,9 @@
  * Integration tests for the "spans" field mapping dropdown in TracesMapping.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -78,14 +78,12 @@ const traceWithoutResearchSpan: Trace = {
 };
 
 function renderSpansMapping() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TracesMapping
-        traces={[traceWithoutResearchSpan]}
-        traceMapping={{ mapping: {}, expansions: [] }}
-        targetFields={["spans"]}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TracesMapping
+      traces={[traceWithoutResearchSpan]}
+      traceMapping={{ mapping: {}, expansions: [] }}
+      targetFields={["spans"]}
+    />,
   );
 }
 

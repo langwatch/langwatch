@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -11,7 +11,7 @@ import { vi } from "vitest";
 
 import type { AnnotationRepositories } from "../../repositories/annotation.repositories.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
-import { AnnotationApp } from "../annotation.app.ts";
+import { AnnotationModule } from "../annotation.app.ts";
 
 export function createAnnotationTestProjects(organizationId = "organization-1") {
   return Object.assign(createApiFixture<ProjectApi>(), {
@@ -98,8 +98,8 @@ export function createAnnotationTestApp(
       entitlement: EntitlementApi;
     }>;
   }> = {},
-): AnnotationApp {
-  return AnnotationApp.create({
+): AnnotationModule {
+  return AnnotationModule.create({
     repositories: input.repositories ?? MemoryAnnotationRepositories.create(),
     dependencies: {
       projects: input.dependencies?.projects ?? createAnnotationTestProjects(),

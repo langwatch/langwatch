@@ -1,7 +1,10 @@
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
+  UserEmailAmbiguousError,
+  UserLastPlatformOperatorError,
   UserNotFoundError,
   createCredentialUserInputSchema,
   createPasskeyUserInputSchema,
@@ -15,6 +18,7 @@ import {
   userIdInputSchema,
   userNotificationTopicInputSchema,
   setUserNotificationPreferenceInputSchema,
+  userLifecycleChangeInputSchema,
   userProfilesInputSchema,
   type CreateUserInput,
   type CreateCredentialUserInput,
@@ -32,6 +36,7 @@ import {
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
   type UserIdInput,
+  type UserLifecycleChangeInput,
   type UserProfile,
   type UserProfilesInput,
   type UserSsoStatus,
@@ -43,9 +48,12 @@ import {
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
-import type { UserAvatarStorage } from "../app/user.members.ts";
+import type { UserAvatarStorage, UserCliCredentials } from "../app/user.members.ts";
 import type { UserRepository } from "../repositories/user.repository.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
+import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service.ts";
+
+type PlatformOperatorList = Pick<AuthzApi, "listPlatformOperators">;
 
 export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
@@ -56,6 +64,9 @@ export class UserService {
   /** The issuer every credential account row this service mints is stored under. */
   private readonly credentialIssuer: string;
   private readonly now: () => Instant;
+  private readonly platformOperators: PlatformOperatorList;
+  private readonly lifecycle: UserLifecycleNoticeService;
+  private readonly cliCredentials: UserCliCredentials;
 
   private constructor({
     repository,
@@ -64,6 +75,9 @@ export class UserService {
     avatarStorage,
     credentialIssuer,
     now,
+    platformOperators,
+    lifecycle,
+    cliCredentials,
   }: {
     repository: UserRepository;
     organizations: OrganizationApi;
@@ -71,6 +85,9 @@ export class UserService {
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now: () => Instant;
+    platformOperators: PlatformOperatorList;
+    lifecycle: UserLifecycleNoticeService;
+    cliCredentials: UserCliCredentials;
   }) {
     this.repository = repository;
     this.organizations = organizations;
@@ -78,6 +95,9 @@ export class UserService {
     this.avatarStorage = avatarStorage;
     this.credentialIssuer = credentialIssuer;
     this.now = now;
+    this.platformOperators = platformOperators;
+    this.lifecycle = lifecycle;
+    this.cliCredentials = cliCredentials;
   }
 
   static create(options: {
@@ -87,6 +107,9 @@ export class UserService {
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now?: () => Instant;
+    platformOperators: PlatformOperatorList;
+    lifecycle: UserLifecycleNoticeService;
+    cliCredentials: UserCliCredentials;
   }): UserService {
     return new UserService({
       repository: options.repository,
@@ -95,6 +118,9 @@ export class UserService {
       avatarStorage: options.avatarStorage,
       credentialIssuer: options.credentialIssuer,
       now: options.now ?? nowInstant,
+      platformOperators: options.platformOperators,
+      lifecycle: options.lifecycle,
+      cliCredentials: options.cliCredentials,
     });
   }
 
@@ -129,17 +155,22 @@ export class UserService {
     return this.repository.findById(parsed.id);
   }
 
-  findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
+  /** The exact address wins; case-twins with no exact holder are refused rather than guessed. */
+  async findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
+    const accounts = await this.repository.findByEmail(parsed.email);
+    const exact = accounts.find((account) => account.email === parsed.email);
+    if (exact) return exact;
+    if (accounts.length > 1) throw new UserEmailAmbiguousError();
 
-    return this.repository.findByEmail(parsed.email);
+    return accounts[0] ?? null;
   }
 
   /** A case-twin beside a taken address would leave two accounts answering for one person. */
   async emailIsTaken(input: UserEmailInput): Promise<boolean> {
     const parsed = userEmailInputSchema.parse(input);
 
-    return (await this.repository.findByEmail(parsed.email)) !== null;
+    return (await this.repository.findByEmail(parsed.email)).length > 0;
   }
 
   create(input: CreateUserInput): Promise<UserProfile> {
@@ -232,6 +263,11 @@ export class UserService {
 
     const updated = await this.repository.updateProfile(update);
 
+    // Sessions cache the email (invite accept compares it), so a changed one ends them all.
+    if (current && normalizedEmail !== (current.email ?? "").toLowerCase()) {
+      await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
+    }
+
     return updated;
   }
 
@@ -317,20 +353,48 @@ export class UserService {
     await this.repository.setLastHomePath({ id: parsed.id, path: parsed.path });
   }
 
-  async deactivate(input: UserIdInput): Promise<UserProfile> {
-    const parsed = userIdInputSchema.parse(input);
-    const user = await this.repository.setDeactivatedAt({
-      id: parsed.id,
-      deactivatedAt: this.now(),
-    });
+  /**
+   * Never the last active platform operator. Credentials end before user's fact is sent, so access
+   * stops at once on every door, whatever authz's lag or a failed send.
+   */
+  async deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const at = await this.repository.readClock();
+    const user = await this.writeDeactivation({ id: parsed.id, at });
+    await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
+    await this.cliCredentials.revokeForUser({ userId: parsed.id });
+    await this.lifecycle.deactivated({ userId: parsed.id, actor: parsed.actor, at });
 
     return user;
   }
 
-  reactivate(input: UserIdInput): Promise<UserProfile> {
-    const parsed = userIdInputSchema.parse(input);
+  /** Stamped from the database's clock, like deactivation, so the two order across servers. */
+  async reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const at = await this.repository.readClock();
+    const user = await this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
+    await this.lifecycle.reactivated({ userId: parsed.id, actor: parsed.actor, at });
 
-    return this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
+    return user;
+  }
+
+  /** Another operator must stay active by user's own flag, since authz's list lags behind it. */
+  private async writeDeactivation({ id, at }: { id: string; at: Instant }): Promise<UserProfile> {
+    const operators = (await this.platformOperators.listPlatformOperators()).map(
+      (operator) => operator.userId,
+    );
+    if (!operators.includes(id)) {
+      return this.repository.setDeactivatedAt({ id, deactivatedAt: at });
+    }
+
+    const written = await this.repository.deactivateWhileOthersActive({
+      id,
+      deactivatedAt: at,
+      others: operators.filter((userId) => userId !== id),
+    });
+    if (written.outcome === "none_active") throw new UserLastPlatformOperatorError(id);
+
+    return written.user;
   }
 
   async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {

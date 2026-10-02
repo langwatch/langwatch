@@ -3,8 +3,8 @@
  * @see specs/suites/suite-workflow.feature - "Create / Edit Run Plan"
  * @see specs/suites/suite-model-selection.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,19 +55,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
-    scenarios: {
-      getAll: {
-        useQuery: vi.fn(() => ({ data: mockScenarios })),
-      },
-    },
     agents: {
       getAll: {
         useQuery: vi.fn(() => ({ data: mockAgents })),
-      },
-    },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: vi.fn(() => ({ data: mockPrompts })),
       },
     },
     suites: {
@@ -123,8 +113,39 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
     })),
   },
 }));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: vi.fn(() => ({
+      suites: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    })),
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: vi.fn(() => ({ data: mockPrompts })),
+      },
+    },
+  },
+}));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
+    scenarios: {
+      getAll: {
+        useQuery: vi.fn(() => ({ data: mockScenarios })),
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -168,10 +189,6 @@ vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
       </div>
     ) : null,
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeSuiteConfig(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
@@ -218,13 +235,13 @@ describe("<SuiteFormDrawer/>", () => {
     /** @scenario 'Form drawer title reads "New Run Plan" for creation' */
     /** @scenario 'Form placeholder uses "Run Plan" terminology' */
     it("displays the 'New Run Plan' title", () => {
-      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteFormDrawer />);
 
       expect(screen.getByText("New Run Plan")).toBeInTheDocument();
     });
 
     it("renders fields for Name, Description, Scenarios, and Targets", () => {
-      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteFormDrawer />);
 
       expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
       expect(
@@ -235,7 +252,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     it("renders Save and Run Now buttons", () => {
-      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteFormDrawer />);
 
       expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
@@ -243,7 +260,7 @@ describe("<SuiteFormDrawer/>", () => {
 
     /** @scenario "The run plan drawer exposes simulator and judge model fields" */
     it("exposes user-simulator and judge model fields", () => {
-      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteFormDrawer />);
 
       expect(screen.getByText("Models")).toBeInTheDocument();
       expect(screen.getByText("User simulator")).toBeInTheDocument();
@@ -254,7 +271,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a name validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         const saveButton = screen.getByRole("button", { name: /Save/i });
         await user.click(saveButton);
@@ -267,7 +284,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a scenarios validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Type a name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -284,7 +301,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a targets validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Type a name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -305,7 +322,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("clears the name error but keeps scenario and target errors", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Click Save with all fields empty to trigger all validation errors
         const saveButton = screen.getByRole("button", { name: /^Save$/i });
@@ -339,7 +356,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("pre-populates the name field", () => {
         mocks.mockGetByIdData = makeSuiteConfig({ name: "Regression Suite" });
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         const nameInput = screen.getByPlaceholderText(
           "e.g., Critical Path Run Plan",
@@ -352,7 +369,7 @@ describe("<SuiteFormDrawer/>", () => {
           description: "Runs every deploy",
         });
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         const descInput = screen.getByPlaceholderText(
           "Core journeys that must pass before deploy",
@@ -364,7 +381,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("displays the Edit Run Plan title", () => {
         mocks.mockGetByIdData = makeSuiteConfig();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         expect(screen.getByText("Edit Run Plan")).toBeInTheDocument();
       });
@@ -376,7 +393,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("filters the visible scenarios", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // All scenarios should be visible initially
         expect(screen.getByText("Angry refund request")).toBeInTheDocument();
@@ -400,7 +417,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("passes repeatCount as a number to the create mutation", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Fill in required fields
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -440,7 +457,7 @@ describe("<SuiteFormDrawer/>", () => {
   describe("given the drawer registry decides visibility", () => {
     describe("when drawerOpen returns true", () => {
       it("renders the drawer shell", () => {
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         expect(screen.getByTestId("drawer")).toBeInTheDocument();
       });
@@ -450,7 +467,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("does not render drawer content", () => {
         mocks.mockDrawerOpen.mockReturnValue(false);
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
       });
@@ -463,7 +480,7 @@ describe("<SuiteFormDrawer/>", () => {
 
       beforeEach(() => {
         user = userEvent.setup();
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
       });
 
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
@@ -486,7 +503,7 @@ describe("<SuiteFormDrawer/>", () => {
       /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
       it("returns to suite editor with form state intact", async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Enter a name to establish form state
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -514,7 +531,7 @@ describe("<SuiteFormDrawer/>", () => {
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
       it("navigates to the agent HTTP editor drawer", async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
@@ -525,7 +542,7 @@ describe("<SuiteFormDrawer/>", () => {
     describe("when the reader comes back from the agent HTTP editor", () => {
       beforeEach(async () => {
         const user = userEvent.setup();
-        const first = render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        const first = renderWithDesignSystem(<SuiteFormDrawer />);
         await user.type(screen.getByPlaceholderText("e.g., Critical Path Run Plan"), "My Suite");
         await user.click(screen.getByRole("button", { name: "Add Target" }));
         first.unmount();
@@ -533,7 +550,7 @@ describe("<SuiteFormDrawer/>", () => {
 
       /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
       it("returns to the suite editor with the plan it was holding", () => {
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         const nameInputAfter = screen.getByPlaceholderText(
           "e.g., Critical Path Run Plan",
@@ -542,9 +559,9 @@ describe("<SuiteFormDrawer/>", () => {
       });
 
       it("hands the held plan back once, so a later fresh open starts empty", () => {
-        render(<SuiteFormDrawer />, { wrapper: Wrapper }).unmount();
+        renderWithDesignSystem(<SuiteFormDrawer />).unmount();
 
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         const nameInput = screen.getByPlaceholderText(
           "e.g., Critical Path Run Plan",
@@ -557,7 +574,7 @@ describe("<SuiteFormDrawer/>", () => {
       /** @scenario "The caller's unsaved work survives the walk into a sub-flow and back" */
       it("preserves suite name and scenario selections through a child drawer round-trip", async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuiteFormDrawer />);
 
         // Fill in name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");

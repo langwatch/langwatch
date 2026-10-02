@@ -39,6 +39,7 @@ function installed() {
     sessions,
     grantCache,
     testArrivals: { standingFor: async () => ({ testing: false }) },
+    ceiling: { assertWithinCaller: async () => {} },
     admissions: {
       attachBindings: () => Promise.reject(new Error("no admission expected")),
       completeAdmission: () => Promise.reject(new Error("no admission expected")),
@@ -64,6 +65,15 @@ describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
       // would refuse there, long after the licence was issued.
       await expect(organizations.getOldestTeamId(customer.id)).resolves.toEqual(expect.any(String));
       expect(seeded).toEqual([customer.id]);
+    });
+
+    /** @scenario "A customer organization gets the same kind of id as any other organization" */
+    it("gives the organization an organization_ id", async () => {
+      const { service } = installed();
+
+      const customer = await service.createSelfHostedCustomer({ name: "ACME" });
+
+      expect(customer.id).toMatch(/^organization_/);
     });
 
     it("marks the organization as a self-hosted customer", async () => {

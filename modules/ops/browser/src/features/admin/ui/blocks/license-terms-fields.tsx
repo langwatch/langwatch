@@ -1,4 +1,11 @@
-import { Field, HStack, Input, NativeSelect, SimpleGrid, VStack } from "@chakra-ui/react";
+import {
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  SimpleGrid,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import {
   SERVICES,

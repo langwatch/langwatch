@@ -1,8 +1,6 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import type { AuthzDenialReason, AuthzScopeRef } from "./authz.ts";
-
 export const AUTHZ_PROBLEM_CODES = [
   "validation_error",
   "permission_denied",
@@ -37,90 +35,6 @@ export const authzProblemSchema = z
   })
   .strict();
 export type AuthzProblem = z.infer<typeof authzProblemSchema>;
-
-/**
- * ADR-092 §2 — the one denial error. `denialReason` replaces the legacy
- * pattern of smuggling `organizationRole` out of permission checks so error
- * mappers could special-case lite members.
- */
-export class PermissionDeniedError extends HandledError {
-  constructor({
-    permission,
-    scope,
-    denialReason,
-  }: {
-    permission: string;
-    /**
-     * The tier and id the check was refused at — a structural subset of `AuthzScopeRef`, so a
-     * resolved scope ref passes straight in. Callers that only know the tier (a Hono route
-     * holding a project id) do not have to invent the lineage a full scope ref carries.
-     */
-    scope: {
-      type: AuthzScopeRef["type"];
-      id: string;
-    };
-    denialReason: AuthzDenialReason;
-  }) {
-    super(
-      "permission_denied",
-      denialReason === "lite-member-restricted"
-        ? "This feature is not available for your account"
-        : `You do not have permission to access this ${scope.type}`,
-      {
-        httpStatus: 403,
-        meta: {
-          permission,
-          scopeType: scope.type,
-          denialReason,
-        },
-      },
-    );
-    this.name = "PermissionDeniedError";
-  }
-
-  get denialReason(): AuthzDenialReason {
-    return this.meta.denialReason as AuthzDenialReason;
-  }
-}
-
-/** A named scope field had no usable id, so the client can correct its input. */
-export class BlankScopeIdError extends HandledError {
-  declare readonly code: "validation_error";
-
-  constructor({ field }: { field: string }) {
-    super("validation_error", "The request did not name a scope to act in.", {
-      httpStatus: 400,
-      fault: "customer",
-      meta: { fieldErrors: { [field]: ["Required"] } },
-    });
-    this.name = "BlankScopeIdError";
-  }
-}
-
-export class LiteMemberRestrictedError extends HandledError {
-  declare readonly code: "lite_member_restricted";
-
-  constructor(resource: string) {
-    super("lite_member_restricted", "This feature is not available for your account", {
-      meta: { resource },
-      httpStatus: 401,
-    });
-    this.name = "LiteMemberRestrictedError";
-  }
-}
-
-export class ProjectPermissionDeniedError extends HandledError {
-  declare readonly code: "project_permission_denied";
-
-  constructor(permission: string) {
-    super("project_permission_denied", "You do not have permission to do this on this project", {
-      meta: { permission },
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "ProjectPermissionDeniedError";
-  }
-}
 
 export class GrantValidationError extends HandledError {
   declare readonly code: "grant_validation_failed";
@@ -365,22 +279,6 @@ export class AuthzGrantNotConfirmedError extends HandledError {
   }
 }
 
-/**
- * The membership itself is switched off, so nothing in the organization is
- * reachable — distinct from a permission the caller merely lacks.
- */
-export class MembershipDisabledError extends HandledError {
-  declare readonly code: "membership_disabled";
-
-  constructor() {
-    super("membership_disabled", "Your access to this organization has been disabled", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "MembershipDisabledError";
-  }
-}
-
 export class AuthzRoleDuplicateNameError extends HandledError {
   declare readonly code: "custom_role_name_taken";
 
@@ -491,5 +389,46 @@ export class GrantExceedsCallerPermissionsError extends HandledError {
       { httpStatus: 403, meta: { missingPermissions: [...missingPermissions] } },
     );
     this.name = "GrantExceedsCallerPermissionsError";
+  }
+}
+
+/** Nobody grants the platform-operator role to themselves, on any deployment. */
+export class PlatformOperatorSelfGrantError extends HandledError {
+  declare readonly code: "platform_operator_self_grant";
+
+  constructor(meta: { userId: string }) {
+    super("platform_operator_self_grant", "You cannot make yourself a platform operator", {
+      httpStatus: 403,
+      meta,
+    });
+    this.name = "PlatformOperatorSelfGrantError";
+  }
+}
+
+/** Revoking this grant would leave the installation with no platform operator. */
+export class PlatformOperatorLastHolderError extends HandledError {
+  declare readonly code: "platform_operator_last_holder";
+
+  constructor(meta: { grantId: string; userId: string }) {
+    super(
+      "platform_operator_last_holder",
+      "The last platform operator cannot be revoked; grant the role to someone else first",
+      { httpStatus: 409, meta },
+    );
+    this.name = "PlatformOperatorLastHolderError";
+  }
+}
+
+/** A platform permission (`ops:*`) belongs to the platform-operator grant, never a custom role. */
+export class PlatformPermissionNotAssignableError extends HandledError {
+  declare readonly code: "platform_permission_not_assignable";
+
+  constructor(meta: { permissions: readonly string[] }) {
+    super(
+      "platform_permission_not_assignable",
+      "Platform permissions are held only through the platform-operator grant",
+      { httpStatus: 422, meta: { permissions: [...meta.permissions] } },
+    );
+    this.name = "PlatformPermissionNotAssignableError";
   }
 }

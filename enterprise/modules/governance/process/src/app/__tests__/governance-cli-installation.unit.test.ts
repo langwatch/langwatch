@@ -1,6 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -11,11 +10,11 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp } from "@langwatch/kernel";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -24,11 +23,12 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @vitest-environment node
  */
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { governanceServer } from "../../governance.server.ts";
+import { governanceProcessModule } from "../../governance.module.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
@@ -55,9 +55,9 @@ function restHost() {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -67,9 +67,9 @@ function restHost() {
 
 async function boot(rest: RestHost) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
-  await resolver.preflight(Object.values(governanceServer.secrets ?? {}));
+  await resolver.preflight(Object.values(governanceProcessModule.secrets ?? {}));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([governanceServer])
+    .withModules([governanceProcessModule])
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .withMembers({
@@ -109,7 +109,7 @@ describe("the governance installation's CLI plane", () => {
     const runtime = await boot(rest);
 
     try {
-      const mounted = governanceServer.transports.includes(governanceCliRest);
+      const mounted = governanceProcessModule.transports.includes(governanceCliRest);
       const routes = governanceCliRest
         .router()
         .routes.map((route) => `${route.method.toUpperCase()} ${route.path}`);

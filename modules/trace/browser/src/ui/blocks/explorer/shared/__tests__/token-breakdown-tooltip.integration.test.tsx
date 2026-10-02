@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TokenBreakdownTooltipContent } from "../token-breakdown-tooltip.tsx";
@@ -12,18 +12,16 @@ import { TokenBreakdownTooltipContent } from "../token-breakdown-tooltip.tsx";
 afterEach(cleanup);
 
 function renderBreakdown(props: Partial<Parameters<typeof TokenBreakdownTooltipContent>[0]> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TokenBreakdownTooltipContent
-        inputTokens={1000}
-        outputTokens={50}
-        cacheReadTokens={null}
-        cacheCreationTokens={null}
-        reasoningTokens={null}
-        totalWithCache={1050}
-        {...props}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TokenBreakdownTooltipContent
+      inputTokens={1000}
+      outputTokens={50}
+      cacheReadTokens={null}
+      cacheCreationTokens={null}
+      reasoningTokens={null}
+      totalWithCache={1050}
+      {...props}
+    />,
   );
 }
 

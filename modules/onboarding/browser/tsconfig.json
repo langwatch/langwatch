@@ -21,6 +21,15 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -30,13 +39,10 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -46,9 +52,6 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

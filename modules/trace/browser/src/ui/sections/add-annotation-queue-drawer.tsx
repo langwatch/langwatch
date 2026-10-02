@@ -1,3 +1,6 @@
+import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
   Button,
@@ -10,18 +13,20 @@ import {
   Textarea,
   useDisclosure,
   VStack,
-} from "@chakra-ui/react";
-import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { Popover } from "@langwatch/design-system/popover";
+} from "@langwatch/design-system/primitives";
+import { slugify } from "@langwatch/design-system/slugify";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 
-import { api } from "../../behavior/trace-api.ts";
+import {
+  useAnnotationQueue,
+  useActiveAnnotationScores,
+} from "../../behavior/reads/use-annotation-reads.ts";
+import { useOrganizationMembersWithTeams } from "../../behavior/reads/use-organization-members.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { slugify } from "../../model/slugify.ts";
+import { useCreateOrUpdateAnnotationQueue } from "../../behavior/writes/use-trace-writes.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
 import { Drawer } from "./drawer.tsx";
@@ -60,20 +65,6 @@ function toggled(list: Picked[], item: Picked): Picked[] {
   return list.some((p) => p.id === item.id)
     ? list.filter((p) => p.id !== item.id)
     : [...list, item];
-}
-
-/**
- * Everything that lists queues or counts their work: the listing, the queue
- * page, the pickers, the sidebar and its badges. Membership decides whose work
- * an item is, so a walk already open reads the wrong set once it changes.
- */
-function invalidateQueueReads(utils: ReturnType<typeof api.useUtils>) {
-  void utils.annotation.getOptimizedAnnotationQueues.invalidate();
-  void utils.annotation.getQueueBySlugOrId.invalidate();
-  void utils.annotation.getQueues.invalidate();
-  void utils.annotation.getQueueItemsCounts.invalidate();
-  void utils.annotation.getPendingItemsCount.invalidate();
-  void utils.annotation.getAssignedItemsCount.invalidate();
 }
 
 /** A button listing the picked items as tags, opening a list to toggle them. */
@@ -176,17 +167,9 @@ export const AddAnnotationQueueDrawer = ({
   queueId?: string;
 }) => {
   const { project, organization } = useOrganizationTeamProject();
-  const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
+  const createOrUpdateQueue = useCreateOrUpdateAnnotationQueue();
 
-  const queue = api.annotation.getQueueBySlugOrId.useQuery(
-    {
-      queueId: queueId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && !!queueId && !!open,
-    },
-  );
+  const queue = useAnnotationQueue({ projectId: project?.id, queueId, enabled: !!open });
 
   const handleClose = () => {
     if (onOverlayClick) {
@@ -197,16 +180,7 @@ export const AddAnnotationQueueDrawer = ({
     }
   };
 
-  const queryClient = api.useUtils();
-
-  const annotationScores = api.annotationScore.getAllActive.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && !!open,
-    },
-  );
+  const annotationScores = useActiveAnnotationScores({ projectId: project?.id, enabled: !!open });
 
   const { closeDrawer, openDrawer } = useDrawer();
 
@@ -215,14 +189,10 @@ export const AddAnnotationQueueDrawer = ({
     onClose?.();
   };
 
-  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization && !!open,
-    },
-  );
+  const users = useOrganizationMembersWithTeams({
+    organizationId: organization?.id,
+    enabled: !!open,
+  });
 
   const form = useForm<{
     name: string;
@@ -232,6 +202,9 @@ export const AddAnnotationQueueDrawer = ({
       name: queue.data?.name ?? "",
       description: queue.data?.description ?? "",
     },
+    values: queue.data
+      ? { name: queue.data.name, description: queue.data.description ?? "" }
+      : undefined,
   });
   const {
     register,
@@ -246,19 +219,11 @@ export const AddAnnotationQueueDrawer = ({
     description?: string | null;
   };
 
-  const [participants, setParticipants] = useState<Picked[]>(() => participantsOf(queue.data));
-  const [scoreTypes, setScoreTypes] = useState<Picked[]>(() => scoreTypesOf(queue.data));
-
-  // Sync local state when queue data loads (edit mode hydration)
-  useEffect(() => {
-    if (!queue.data) return;
-    setParticipants(participantsOf(queue.data));
-    setScoreTypes(scoreTypesOf(queue.data));
-    reset({
-      name: queue.data.name,
-      description: queue.data.description ?? "",
-    });
-  }, [queue.data, reset]);
+  // The queue's own picks until the user toggles one; a refetch never overwrites an edit.
+  const [editedParticipants, setParticipants] = useState<Picked[]>();
+  const [editedScoreTypes, setScoreTypes] = useState<Picked[]>();
+  const participants = editedParticipants ?? participantsOf(queue.data);
+  const scoreTypes = editedScoreTypes ?? scoreTypesOf(queue.data);
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
@@ -279,7 +244,6 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         onSuccess: (data) => {
-          invalidateQueueReads(queryClient);
           toastQueueSaved({ isUpdate: !!queueId, name: data.name });
           handleClose();
           reset();
@@ -341,7 +305,7 @@ export const AddAnnotationQueueDrawer = ({
                     name: member.user.name,
                   }))}
                   withAvatar
-                  onToggle={(item) => setParticipants((prev) => toggled(prev, item))}
+                  onToggle={(item) => setParticipants(toggled(participants, item))}
                 />
               </FullWidthFormControl>
 
@@ -376,7 +340,7 @@ export const AddAnnotationQueueDrawer = ({
                     id: score.id,
                     name: score.name,
                   }))}
-                  onToggle={(item) => setScoreTypes((prev) => toggled(prev, item))}
+                  onToggle={(item) => setScoreTypes(toggled(scoreTypes, item))}
                   footer={
                     <Button
                       width="100%"

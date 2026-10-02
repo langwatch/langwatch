@@ -1,8 +1,8 @@
-import { Button, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { findSeriesIdentifier } from "@langwatch/automation-contract";
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { Button, Heading, HStack, IconButton, Spacer } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo, type MouseEvent } from "react";
@@ -16,7 +16,7 @@ import { GraphCardMenu } from "./graph-card-menu.tsx";
 
 type GraphCardTrigger = { id: string; active: boolean; alertType: string | null };
 
-/** Main's add/edit alert entry points; both open automation's drawer through the host. */
+/** Main's add/edit automation entry points; both open automation's drawer through the host. */
 function GraphCardAlertButton({
   graphId,
   graph,
@@ -39,9 +39,9 @@ function GraphCardAlertButton({
 
   if (trigger?.active) {
     return (
-      <Tooltip content="Edit alert" positioning={{ placement: "top" }} showArrow>
+      <Tooltip content="Edit automation" positioning={{ placement: "top" }} showArrow>
         <IconButton
-          aria-label="Edit alert"
+          aria-label="Edit automation"
           variant="ghost"
           size="sm"
           color="fg"
@@ -56,7 +56,7 @@ function GraphCardAlertButton({
   return (
     <Button variant="outline" colorPalette="gray" size="sm" onClick={openAlert}>
       <Bell width={16} />
-      Add alert
+      Add automation
     </Button>
   );
 }

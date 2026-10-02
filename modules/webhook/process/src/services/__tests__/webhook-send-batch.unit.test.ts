@@ -14,8 +14,8 @@
  * failure it would be a backoff floor on a batch that is already dead.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { DispatchError, type IntentContext, type ProcessStore } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -52,7 +52,7 @@ const DELIVERABLE: WebhookEndpointView = {
 };
 
 function sendBatchWith(options: {
-  deliverable?: boolean;
+  disposition?: "deliverable" | "paused" | "gone";
   result?: WebhookDispatchResult;
   dispatchThrows?: unknown;
   elapsedMs?: number;
@@ -64,7 +64,10 @@ function sendBatchWith(options: {
     pruneExpiredIdempotencyReceipts: async () => 0,
     getPlan: async () => ({ webhookEndpointsEnabled: true }),
     endpoints: createApiFixture<WebhookDeliveryEndpointService>({
-      findDeliverable: async () => ((options.deliverable ?? true) ? DELIVERABLE : null),
+      getDeliveryDisposition: async () => {
+        const state = options.disposition ?? "deliverable";
+        return state === "deliverable" ? { state, endpoint: DELIVERABLE } : { state };
+      },
       findSigningSecrets: async () => ["secret"],
       getDestinationConfig: async () => ({ kind: "http", url: "https://example.test/hook" }),
       recordDeliveryAttempt: async (attempt) => {
@@ -117,14 +120,23 @@ async function thrownBy(send: () => Promise<unknown>): Promise<DispatchError> {
 }
 
 describe("WebhookDeliveryService.runWebhookSendBatch", () => {
-  describe("given the endpoint is disabled or gone", () => {
-    it("drops the batch without dispatching or logging an attempt", async () => {
-      // Deliberate: the spend record still holds the events, so re-enabling
-      // and replaying covers the gap. A recorded failure here would put a
-      // customer's own pause in their delivery log as an error.
-      const { send, recorded } = sendBatchWith({ deliverable: false });
+  describe("given the endpoint was deleted", () => {
+    it("acknowledges the batch without dispatching or logging an attempt", async () => {
+      const { send, recorded } = sendBatchWith({ disposition: "gone" });
 
       await expect(send()).resolves.toBeUndefined();
+      expect(recorded).toHaveLength(0);
+    });
+  });
+
+  describe("given the endpoint is disabled", () => {
+    it("keeps the batch queued with a retryable throw and logs no attempt", async () => {
+      // A recorded failure here would put a customer's own pause in their
+      // delivery log as an error.
+      const { send, recorded } = sendBatchWith({ disposition: "paused" });
+
+      const error = await thrownBy(send);
+      expect(error.retryable).toBe(true);
       expect(recorded).toHaveLength(0);
     });
   });

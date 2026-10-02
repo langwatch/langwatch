@@ -2,7 +2,7 @@
  * Dataset capability card (`platform_list_datasets`, `platform_get_dataset`,
  * `platform_list_dataset_records`).
  */
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { asJsonDocument } from "@langwatch/langy-contract";
 
 import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";

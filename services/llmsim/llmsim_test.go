@@ -467,6 +467,34 @@ func TestCapsAreConfigurable(t *testing.T) {
 	}
 }
 
+// The product's credential probe lists models at each provider's base URL: Bearer for most,
+// a ?key= query for Gemini. The sim answers all of them for any key and has no refusal mode.
+func TestModelsAnswersTheCredentialProbeForAnyKey(t *testing.T) {
+	srv := newTestServer(t)
+	for _, tc := range []struct{ path, header string }{
+		{"/v1/models", "Bearer sk-not-real"},
+		{"/v1/models", ""},
+		{"/v1/models?key=AIza-not-real", ""},
+		{"/models", "Bearer xai-not-real"},
+	} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+tc.path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.header != "" {
+			req.Header.Set("Authorization", tc.header)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s with %q = %d, want 200", tc.path, tc.header, resp.StatusCode)
+		}
+	}
+}
+
 // @scenario "The llmsim model provider is listed and seeded when haven enables it"
 func TestModelsListNamesTheSeededModels(t *testing.T) {
 	srv := newTestServer(t)

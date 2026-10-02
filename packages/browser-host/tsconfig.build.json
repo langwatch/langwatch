@@ -21,6 +21,7 @@
     "./src/testing.ts",
     "./src/link.tsx",
     "./src/use-drawer.ts",
+    "./src/global-store.ts",
     "./src/upgrade-modal-store.ts",
     "./src/use-organization-team-project.ts",
     "./src/format-time-ago.ts",
@@ -30,9 +31,6 @@
     "./src/isolated-error-boundary.tsx",
     "./src/copy-button.tsx",
     "./src/drawer/index.ts",
-    "./src/transport.ts",
-    "./src/sse-subscription-link.ts",
-    "./src/browser-rpc.ts",
     "./src/address.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
@@ -62,9 +60,6 @@
       "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../browser-trpc/tsconfig.build.json"
-    },
-    {
       "path": "../config/tsconfig.build.json"
     },
     {
@@ -80,9 +75,6 @@
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
-      "path": "../error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
@@ -96,6 +88,9 @@
     },
     {
       "path": "../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../module/tsconfig.build.json"
     },
     {
       "path": "../observability/tsconfig.build.json"

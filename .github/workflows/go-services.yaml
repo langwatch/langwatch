@@ -44,7 +44,7 @@ on:
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
-      - "packages/langy/**"
+      - "modules/langy/contract/**"
       - "skills/**"
       - "feature-map.json"
       - "modules/trace/contract/src/trace-format.schemas.ts"
@@ -122,7 +122,7 @@ jobs:
               - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
-              - 'packages/langy/**'
+              - 'modules/langy/contract/**'
               - 'skills/**'
               - 'feature-map.json'
               - 'modules/trace/contract/src/trace-format.schemas.ts'
@@ -255,6 +255,12 @@ jobs:
       # resolve against; inline YAML steps bind nothing.
       - name: Assert shutdown values render as the pod needs them
         run: ./charts/gateway/tests/shutdown-values.sh
+
+      # A plain install creates no gateway Ingress and no ingress-nginx
+      # annotations, an enabled one carries the class the operator picked,
+      # and the PDB never blocks a node drain at any replica count.
+      - name: Assert the gateway Ingress is opt-in and the PDB allows drains
+        run: ./charts/gateway/tests/ingress-and-pdb.sh
 
       # The chart's graceful window has to stay above the gateway's 45s
       # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),

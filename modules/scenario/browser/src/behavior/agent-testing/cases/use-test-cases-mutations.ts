@@ -7,6 +7,7 @@
 
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useCallback, useState } from "react";
 
 import type { TestCase } from "../../../model/agent-testing/cases/test-cases.ts";
@@ -20,10 +21,11 @@ function toastOnError(fallbackTitle: string) {
 /** The two reads the rail and the table are drawn from. */
 function useCasesInvalidate(projectId: string): () => void {
   const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
   return useCallback(() => {
-    void utils.scenarios.getAll.invalidate({ projectId });
+    void scenarioUtils.scenarios.getAll.invalidate({ projectId });
     void utils.suites.testSuites.getAll.invalidate({ projectId });
-  }, [utils, projectId]);
+  }, [utils, scenarioUtils.scenarios.getAll, projectId]);
 }
 
 export type SuiteMutations = {
@@ -110,7 +112,7 @@ export function useCaseMutations(projectId: string): CaseMutations {
   const invalidate = useCasesInvalidate(projectId);
   const [caseToArchive, setCaseToArchive] = useState<TestCase | null>(null);
 
-  const archive = api.scenarios.archive.useMutation({
+  const archive = scenarioClient.scenarios.archive.useMutation({
     onSuccess: () => {
       invalidate();
       setCaseToArchive(null);
@@ -118,7 +120,7 @@ export function useCaseMutations(projectId: string): CaseMutations {
     onError: toastOnError("Couldn't archive the scenario"),
   });
 
-  const duplicate = api.scenarios.duplicate.useMutation({
+  const duplicate = scenarioClient.scenarios.duplicate.useMutation({
     onSuccess: () => {
       invalidate();
       toaster.create({ title: "Scenario duplicated", type: "success" });
@@ -126,7 +128,7 @@ export function useCaseMutations(projectId: string): CaseMutations {
     onError: toastOnError("Couldn't duplicate the scenario"),
   });
 
-  const move = api.scenarios.moveToTestSuite.useMutation({
+  const move = scenarioClient.scenarios.moveToTestSuite.useMutation({
     onSuccess: invalidate,
     onError: toastOnError("Couldn't move the scenario"),
   });

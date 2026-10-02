@@ -1,6 +1,6 @@
 /**
- * The project's key for Langy's credentials call, against a platform that behaves as production:
- * the project routes refuse a base key to any API key; the device session trades for it by slug.
+ * The project's key for Langy's credentials call, against a platform that refuses to reveal
+ * a base key to any API key: a child of the device session mints an ingestion key by slug.
  * @see specs/langy/langy-local-control.feature
  */
 
@@ -16,13 +16,17 @@ const ENDPOINT = "http://app.test";
 
 type Seen = { method: string; path: string; authorization: string | null; body: unknown };
 
-/** The platform: a project lookup, the refused base-key route, the device-session key route. */
-function fakePlatform({ keyRouteStatus = 200 }: { keyRouteStatus?: number } = {}) {
+function requestUrl(input: string | URL | Request): string | URL {
+  return input instanceof Request ? input.url : input;
+}
+
+/** The platform: a project lookup, the refused base-key route, the fork, the mint, the logout. */
+function fakePlatform({ forkStatus = 200 }: { forkStatus?: number } = {}) {
   const seen: Seen[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input);
+      const url = new URL(requestUrl(input));
       const headers = new Headers(init?.headers);
       const method = init?.method ?? "GET";
       const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
@@ -40,17 +44,25 @@ function fakePlatform({ keyRouteStatus = 200 }: { keyRouteStatus?: number } = {}
           error: "A signed-in project administrator must manage the base API key in the browser",
         });
       }
-      if (method === "POST" && url.pathname === "/api/auth/cli/project-key") {
-        if (keyRouteStatus !== 200) {
-          return json(keyRouteStatus, {
+      if (method === "POST" && url.pathname === "/api/auth/cli/refresh") {
+        if (forkStatus !== 200) {
+          return json(forkStatus, {
             error: "forbidden",
-            error_description: "You need admin access to this project to retrieve its API key.",
+            error_description: "Project not found or you do not have access to it",
           });
         }
         return json(200, {
-          api_key: "sk-lw-acme-project",
+          access_token: "lw_at_child",
+          refresh_token: "lw_rt_child",
+          expires_in: 3600,
           project: { id: "project_acme", slug: "acme-shop", name: "Acme Shop" },
         });
+      }
+      if (method === "POST" && url.pathname === "/api/v1/api-keys/ingestion") {
+        return json(201, { token: "sk-lw-acme-ingest", apiKey: { id: "k1", name: "n" } });
+      }
+      if (method === "POST" && url.pathname === "/api/auth/cli/logout") {
+        return json(200, { ok: true });
       }
       return json(404, { error: "not_found" });
     }),
@@ -82,29 +94,31 @@ afterEach(() => {
 });
 
 describe("platformProjectKeyReader", () => {
-  describe("when the developer's device session may manage the project", () => {
+  describe("when the developer's device session may send the project traces", () => {
     /** @scenario "The project's key comes from the device session, not from the organization key" */
-    it("looks the slug up by id and trades the device session for the key", async () => {
+    it("looks the slug up by id and mints the ingestion key with a child session", async () => {
       const platform = fakePlatform();
       const read = platformProjectKeyReader({ endpoint: ENDPOINT, apiKey: "sk-lw-org-login" });
 
-      await expect(read("project_acme")).resolves.toBe("sk-lw-acme-project");
+      await expect(read("project_acme")).resolves.toBe("sk-lw-acme-ingest");
 
-      const keyCall = platform.seen.find((call) => call.path === "/api/auth/cli/project-key");
-      expect(keyCall).toMatchObject({
+      expect(platform.seen.find((call) => call.path === "/api/auth/cli/refresh")).toMatchObject({
         method: "POST",
-        authorization: "Bearer lw_at_device_session",
-        body: { slug: "acme-shop" },
+        body: { refresh_token: "lw_rt_device_session", project_slug: "acme-shop" },
       });
+      expect(
+        platform.seen.find((call) => call.path === "/api/v1/api-keys/ingestion"),
+      ).toMatchObject({ method: "POST", authorization: "Bearer lw_at_child" });
+      expect(platform.seen.map((call) => call.path)).toContain("/api/auth/cli/logout");
       expect(platform.seen.map((call) => call.path)).not.toContain(
         "/api/projects/project_acme/api-key",
       );
     });
   });
 
-  describe("when the device session may not manage the project", () => {
+  describe("when the device session cannot reach the project", () => {
     it("rejects with the platform's 403 so the call reads as a refusal", async () => {
-      fakePlatform({ keyRouteStatus: 403 });
+      fakePlatform({ forkStatus: 403 });
       const read = platformProjectKeyReader({ endpoint: ENDPOINT, apiKey: "sk-lw-org-login" });
 
       await expect(read("project_acme")).rejects.toMatchObject({ status: 403 });

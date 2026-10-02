@@ -9,6 +9,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
@@ -16,6 +17,7 @@ import {
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
+import { GatewaySpendScopeService } from "../../services/gateway-spend-scope.service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -48,7 +50,7 @@ const WINDOW_FROM = OCCURRED_AT.getTime() - 24 * 60 * 60 * 1000;
 const WINDOW_TO = OCCURRED_AT.getTime() + 24 * 60 * 60 * 1000;
 
 let client: ClickHouseClient;
-let scope: PrismaGatewaySpendScopeRepository;
+let scope: GatewaySpendScopeService;
 
 function ch(): ClickHouseClient {
   if (!client) throw new Error("test ClickHouse client not available");
@@ -141,7 +143,10 @@ async function summariseBy(
 describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real CH)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
-    scope = PrismaGatewaySpendScopeRepository.create({ database: prisma });
+    scope = GatewaySpendScopeService.create({
+      projects: new TraceDestinationProjectService(prisma),
+      virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `Filt Org ${suffix}`, slug: `filt-${suffix}` },

@@ -1,9 +1,8 @@
 // Test host: abstract class; fake records screen actions (queries, drawers, copies, device flow).
 // Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { nowInstant } from "@langwatch/time";
-import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
@@ -81,7 +80,6 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
       projectId: "proj-1",
       projectName: "Web App",
       projectSlug: "web-app",
-      projectApiKey: void 0,
       ...this.options.scope,
     };
   }
@@ -198,11 +196,7 @@ export function renderWithApiKeyHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <ApiKeyHostProvider value={host}>{element}</ApiKeyHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<ApiKeyHostProvider value={host}>{element}</ApiKeyHostProvider>),
   };
 }
 
@@ -210,6 +204,7 @@ export function renderWithApiKeyHost(
 export class FakeAuthorizeHost extends AuthorizeHostApi {
   readonly requests: McpAuthorizeRequest[] = [];
   readonly failures: AuthorizeFailureNotice[] = [];
+  readonly copies: string[] = [];
   readonly moves: { kind: "navigate" | "replace" | "handOff"; to: string }[] = [];
 
   constructor(
@@ -218,8 +213,9 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
       projectId?: string;
       query?: Readonly<Record<string, string | undefined>>;
       answer?: McpAuthorizeAnswer | Error;
-      apiKey?: string;
+      token?: string;
       projectSwitcher?: ReactNode;
+      copyFails?: boolean;
     } = {},
   ) {
     super();
@@ -249,8 +245,8 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     this.moves.push({ kind: "handOff", to: url });
   }
 
-  revealProjectApiKey(): string | undefined {
-    return this.options.apiKey;
+  mintProjectToken(): Promise<string | undefined> {
+    return Promise.resolve(this.options.token);
   }
 
   projectSwitcher(): ReactNode {
@@ -269,16 +265,15 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     this.failures.push(failure);
   }
 
-  copyToClipboard(): Promise<boolean> {
-    return Promise.resolve(true);
+  copyToClipboard(input: { text: string }): Promise<boolean> {
+    this.copies.push(input.text);
+    return Promise.resolve(!this.options.copyFails);
   }
 }
 
 /** Renders an authorize screen inside the Design System's provider and a host. */
 export function renderWithAuthorizeHost(element: ReactElement, host: FakeAuthorizeHost) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AuthorizeHostProvider value={host}>{element}</AuthorizeHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AuthorizeHostProvider value={host}>{element}</AuthorizeHostProvider>,
   );
 }

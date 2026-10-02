@@ -16,8 +16,8 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 vi.mock("../../../../elements/explorer/context/trace-viewer-context.tsx", () => ({
   useTraceViewer: () => ({ traceId: null }),
 }));
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: (selector: (state: typeof storeState) => unknown) => selector(storeState),
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (state: typeof storeState) => unknown) => selector(storeState),
 }));
 vi.mock("../use-drawer-project-id.ts", () => ({
   useDrawerProjectId: () => "p1",

@@ -8,7 +8,7 @@ import {
   LiteMemberRestrictedError,
   PermissionDeniedError,
   ProjectPermissionDeniedError,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import { isPermissionDenial } from "#rules/stored-object-file-access.rules";

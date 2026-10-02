@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { ExternalLink } from "lucide-react";
 import { useRef } from "react";

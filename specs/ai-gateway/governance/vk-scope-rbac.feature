@@ -111,7 +111,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # ============================================================================
 
   @integration
-  Scenario: Updating a VK requires virtualKeys:update at one of the VK's scopes
+  Scenario: Updating a VK requires virtualKeys:update at every one of the VK's scopes
     Given a VirtualKey "vk_demo" scoped to PROJECT "demo"
     And user "ian@acme.test" has `virtualKeys:update` at PROJECT "demo"
     When "ian@acme.test" calls `api.virtualKeys.update` with id="vk_demo" and new name="renamed"
@@ -127,11 +127,19 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And `VirtualKey.revision` increments
 
   @integration
-  Scenario: Deleting a VK requires virtualKeys:delete at one of the VK's scopes
+  Scenario: Deleting a VK requires virtualKeys:delete at every one of the VK's scopes
     Given a VirtualKey "vk_doomed" scoped to TEAM "platform"
     And user "karen@acme.test" has only `virtualKeys:view` at TEAM "platform"
     When "karen@acme.test" calls `api.virtualKeys.delete` with id="vk_doomed"
     Then the call returns 403 FORBIDDEN
+
+  @unit
+  Scenario: Changing a virtual key needs the permission at every scope it covers
+    Given a VirtualKey scoped to PROJECT "demo" and TEAM "platform"
+    When a caller holding `virtualKeys:update` only at PROJECT "demo" changes it
+    Then the call is refused with permission_denied
+    When a caller holding `virtualKeys:update` at PROJECT "demo" and TEAM "platform" changes it
+    Then the call succeeds
 
   # ============================================================================
   # Personal VK — orthogonal lazy-mint path
@@ -297,3 +305,10 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Given a virtual key whose status is disabled
     When a request presents it
     Then the request is refused and no spend is recorded
+
+  @unit
+  Scenario: A project-bound access token cannot write gateway keys outside its project
+    Given an organization admin's access token bound to one project, which has no key row
+    When it creates a virtual key scoped to a team or another project, or edits an organization cache rule
+    Then the write is refused
+    And a key scoped to that one project is checked as the person there

@@ -2,7 +2,7 @@
   "name": "@langwatch/github-browser",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe GitHub integration: the Integrations settings screen and the install popup ceremony.",
+  "description": "Browser-safe GitHub integration: the install popup ceremony langy mounts.",
   "files": [
     "src"
   ],
@@ -21,13 +21,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
-    "@langwatch/design-system": "workspace:*",
-    "@langwatch/github-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "react": "catalog:",
-    "react-feather": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

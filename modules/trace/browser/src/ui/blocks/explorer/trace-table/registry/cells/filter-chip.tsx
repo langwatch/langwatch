@@ -1,5 +1,5 @@
-import { Box, type BoxProps, chakra, Icon } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, type BoxProps, chakra, Icon } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 import type React from "react";
 import { forwardRef } from "react";

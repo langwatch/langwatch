@@ -6,6 +6,7 @@
 
 import {
   useUiCapabilities,
+  useUiDeployment,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -31,6 +32,7 @@ import {
   type AutomationSuccessNotice,
   type AutomationTeam,
 } from "../model/automation-host.ts";
+import type { SlackConnectionSaved } from "../model/slack/slack-connection-types.ts";
 import { automationApi } from "./automation-api.ts";
 
 /** Writes a registered drawer's address, clearing every stale `drawer.*` key. */
@@ -74,7 +76,10 @@ class CapabilityAutomationHost extends AutomationHost {
       feedback: UiFeedback;
       openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"];
       goBackDrawer: ReturnType<typeof useDrawer>["goBack"];
+      closeRegisteredDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
       organizations: readonly AutomationOrganizationGraph[];
+      hasEmailProvider: boolean;
+      appBaseUrl: string;
     },
   ) {
     super();
@@ -144,6 +149,10 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
+  closeDrawer(): void {
+    this.members.closeRegisteredDrawer();
+  }
+
   /** The one sub-flow this family runs: the dataset module's own drawer, hands over and returns. */
   createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
@@ -159,9 +168,27 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
-  /** No deployment-address capability exists yet; recorded gap, see the handoff. */
+  /** Slack's connection drawer, handed over and returned like the dataset drawer. */
+  createSlackConnection(handover: {
+    created: (saved: SlackConnectionSaved) => void;
+    returned: () => void;
+  }): void {
+    this.members.openRegisteredDrawer("slackConnection", {
+      onSuccess: (saved: SlackConnectionSaved) => handover.created(saved),
+      onClose: () => {
+        handover.returned();
+        this.members.goBackDrawer();
+      },
+    });
+  }
+
+  /** The deployment's public address, from the shell's injected config. */
   appBaseUrl(): string {
-    return "";
+    return this.members.appBaseUrl;
+  }
+
+  hasEmailProvider(): boolean {
+    return this.members.hasEmailProvider;
   }
 
   succeeded(notice: AutomationSuccessNotice): void {
@@ -189,7 +216,8 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
   const { session, navigation, route, feedback } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
-  const { openDrawer: openRegisteredDrawer, goBack } = useDrawer();
+  const { openDrawer: openRegisteredDrawer, goBack, closeDrawer } = useDrawer();
+  const deployment = useUiDeployment();
 
   const hostScope = useMemo<AutomationScope>(
     () => ({ organizationId, teamId: scopeHost?.team()?.id ?? null, projectId }),
@@ -200,7 +228,10 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const graph = automationApi.organization.getAll.useQuery({ isDemo: false });
+  const graph = automationApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const organizations = graph.data ?? NO_ORGANIZATIONS;
 
   const host = useMemo(
@@ -214,7 +245,10 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         feedback,
         openRegisteredDrawer,
         goBackDrawer: goBack,
+        closeRegisteredDrawer: closeDrawer,
         organizations,
+        hasEmailProvider: deployment.hasEmailProvider,
+        appBaseUrl: deployment.appBaseUrl,
       }),
     [
       hostScope,
@@ -225,7 +259,10 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
       feedback,
       openRegisteredDrawer,
       goBack,
+      closeDrawer,
       organizations,
+      deployment.hasEmailProvider,
+      deployment.appBaseUrl,
     ],
   );
 

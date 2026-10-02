@@ -32,6 +32,15 @@ import { z } from "zod";
  */
 export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
 
+/**
+ * The API key a run was started with, so the run's own key holds no more; null for a legacy
+ * API key or a project-bound access token, which have no key row.
+ */
+export const suiteCallerKeyFact = defineRestMiddleware(
+  "suiteCallerKey",
+  z.string().min(1).nullable(),
+);
+
 export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
   "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
 );

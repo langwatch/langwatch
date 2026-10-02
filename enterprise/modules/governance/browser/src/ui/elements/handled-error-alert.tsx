@@ -1,6 +1,6 @@
 /** Inline error alert for panels with unresolved errors; inline counterpart to toasts. */
 
-import { Alert } from "@chakra-ui/react";
+import { Alert } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 
 const UNKNOWN_DESCRIPTION = "Something went wrong on our side. Try again in a moment.";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Tests the playground execution endpoint: authentication, RBAC, and workflow engine
  * integration. Verifies request order (origin gate, session, project permission) and
@@ -15,6 +14,7 @@ import {
   CrossOriginRefusedError,
   PromptPlaygroundSignInRequiredError,
 } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
 import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";

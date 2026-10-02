@@ -1,8 +1,9 @@
 // Webhook secrets are encrypted and redacted with __kept__ marker; this also
 // serves as the write protocol (leave alone). Must refuse __kept__ with changed URL.
 
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
+import type { WebhookActionParams } from "@langwatch/automation-contract";
 import { Temporal } from "@langwatch/time";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
@@ -64,6 +65,14 @@ describe("AutomationWebhookSecretsService.redact", () => {
   });
 });
 
+const BASE = {
+  url: "https://acme.test/hook",
+  method: "POST",
+  bodyTemplate: null,
+  contentType: "application/json",
+  headers: {},
+} satisfies WebhookActionParams;
+
 describe("AutomationWebhookSecretsService.persist", () => {
   describe("given the marker comes back for a header", () => {
     it("keeps the stored value instead of writing the marker", () => {
@@ -95,9 +104,35 @@ describe("AutomationWebhookSecretsService.persist", () => {
         }),
       ).toThrow(/re-enter webhook header values/i);
     });
+
+    /** @scenario "Renaming a saved header requires re-entering its value" */
+    it("drops a kept value whose name has no stored counterpart", () => {
+      const saved = adapter.persist({
+        incoming: { ...BASE, headers: { "X-Renamed": WEBHOOK_HEADER_VALUE_KEPT } },
+        existing: stored(),
+      });
+
+      expect(saved.headersEncrypted).toBeUndefined();
+    });
+
+    it("refuses to carry a saved signing secret to a changed destination", () => {
+      const existing = adapter.persist({ incoming: { ...BASE, signingSecret: "whsec-original" } });
+
+      expect(() =>
+        adapter.persist({
+          incoming: {
+            ...BASE,
+            url: "https://attacker.example/collect",
+            signingSecret: WEBHOOK_HEADER_VALUE_KEPT,
+          },
+          existing,
+        }),
+      ).toThrow(/re-enter the signing secret/i);
+    });
   });
 
   describe("given a real value comes back", () => {
+    /** @scenario "Header values are stored encrypted at rest" */
     it("stores it encrypted, not in the clear", () => {
       const saved = adapter.persist({
         incoming: {

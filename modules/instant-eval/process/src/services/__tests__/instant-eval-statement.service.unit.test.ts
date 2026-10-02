@@ -27,7 +27,7 @@ import {
 } from "../instant-eval-statement.service.ts";
 
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
-const PROTECTIONS = {};
+const PROTECTIONS = { catalogue: { permissions: [] } };
 const SQL =
   "SELECT TraceId, eval(conversation(ConversationId), 'x') AS annoyed FROM analytics.traces";
 

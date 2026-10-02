@@ -463,7 +463,7 @@ tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
       // The result type is what makes this valid: a `find*` may answer null,
       // but it has to say so. Without the annotation the rule reports
       // `noResultType`, which is the case directly below.
-      code: "export class ProjectApp { findById(): string | null { return null; } }",
+      code: "export class ProjectModule { findById(): string | null { return null; } }",
     },
     // Deliberate silences: a nullable `find*` is the shape ~1,217 existing methods
     // carry, left alone because converting one changes every caller (de197cba63).

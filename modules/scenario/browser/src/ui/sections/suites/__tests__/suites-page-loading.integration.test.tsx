@@ -3,8 +3,9 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/single-loading-indicator.feature
  */
-import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { Spinner } from "@langwatch/design-system/primitives";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("posthog-js", () => ({
@@ -34,6 +35,17 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: () => ({
@@ -58,7 +70,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "my-project" },
     hasAnyPermission: () => true,
@@ -102,10 +114,6 @@ vi.mock("../run-history-panel.tsx", () => ({
   },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 async function importSuitesPage(): Promise<React.ComponentType> {
   const mod = await import("../simulations-page.tsx");
   return mod.default;
@@ -143,7 +151,7 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
 
     /** @scenario "Sidebar shows skeleton placeholders while loading" */
     it("displays skeleton placeholder rows in the sidebar", () => {
-      render(<SuitesPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuitesPage />);
 
       const skeletons = screen.getAllByTestId("suite-sidebar-skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
@@ -151,13 +159,13 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
 
     /** @scenario "Main panel content is hidden while the page is still loading" */
     it("does not show a spinner", () => {
-      render(<SuitesPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuitesPage />);
 
       expect(screen.queryAllByRole("status")).toHaveLength(0);
     });
 
     it("renders the All Runs panel while sidebar loads", () => {
-      render(<SuitesPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuitesPage />);
 
       // The All Runs panel shows immediately — it fetches data independently
       expect(screen.queryByTestId("all-runs-panel")).toBeInTheDocument();
@@ -191,14 +199,14 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
     });
 
     it("displays the suite list in the sidebar", () => {
-      render(<SuitesPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuitesPage />);
 
       expect(screen.getByText("My Suite")).toBeInTheDocument();
     });
 
     // Default route (no ?suite= param) resolves to ALL_RUNS_ID via useSuiteRouting
     it("renders the main panel when sidebar is done loading", () => {
-      render(<SuitesPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuitesPage />);
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
     });
@@ -208,7 +216,7 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       it("displays a loading indicator in the main panel", () => {
         allRunsPanelLoading = true;
 
-        render(<SuitesPage />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SuitesPage />);
 
         expect(screen.getByText("My Suite")).toBeInTheDocument();
         expect(screen.getByTestId("all-runs-spinner")).toBeInTheDocument();

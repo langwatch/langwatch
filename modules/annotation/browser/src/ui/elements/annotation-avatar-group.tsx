@@ -1,5 +1,5 @@
-import { HStack } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { HStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 

@@ -9,16 +9,18 @@ import {
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { LocalFeatureApis } from "@langwatch/kernel";
+import { LocalFeatureApis } from "@langwatch/process";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 
 import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { AnalyticsQueryApi, queryRest } from "../query.rest.ts";
 
 const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,

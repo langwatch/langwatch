@@ -1,18 +1,14 @@
-import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
-import {
-  AgentLabel,
-  EmptySection,
-  Section,
-  MISSING_VALUE,
-  type DetailPayload,
-  formatShortDate,
-  readableDate,
-} from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { chakra, HStack, Spinner, Table, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { ContributorName } from "./contributor-name.tsx";
+import { type DetailPayload } from "./model/pull-request-detail.ts";
+import { formatShortDate, readableDate } from "./model/short-date.ts";
+import { AgentLabel } from "./ui/elements/agent-label.tsx";
+import { MISSING_VALUE } from "./ui/elements/cells/missing-value.tsx";
+import { EmptySection, Section } from "./ui/elements/detail-section.tsx";
 import { useTerminalReplay } from "./use-terminal-replay.ts";
 
 /** One session as the pull request detail lists it. */

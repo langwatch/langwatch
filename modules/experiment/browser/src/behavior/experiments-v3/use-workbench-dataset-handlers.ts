@@ -1,7 +1,7 @@
 /** The dataset header's actions: pick a saved one, upload a CSV, edit, or save an inline one. */
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useMemo } from "react";
 
@@ -54,7 +54,7 @@ export const useWorkbenchDatasetHandlers = ({
 }) => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = datasetClient.useUtils();
 
   return useMemo(
     () => ({

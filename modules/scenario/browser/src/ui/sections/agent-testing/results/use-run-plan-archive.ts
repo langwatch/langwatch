@@ -4,11 +4,11 @@
  */
 
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useCallback } from "react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 export type RunPlanArchive = {
   isArchiving: boolean;

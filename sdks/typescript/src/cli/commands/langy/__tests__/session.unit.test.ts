@@ -793,7 +793,7 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(result!.ok).toBe(false);
       const error = result!.error as { code: string; message: string };
       expect(error.code).toBe("key_refused");
-      expect(error.message).toContain("project:manage");
+      expect(error.message).toContain("traces:create");
       expect(error.message).toContain("Acme Shop");
       expect(error.message).toContain(".env");
       expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");

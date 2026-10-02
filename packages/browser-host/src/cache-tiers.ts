@@ -1,58 +1,59 @@
 /**
- * Applies the cache tier each contract declares on its reads, keyed by
- * procedure path, so no call site states a staleTime. ADR-164.
+ * Which declared reads the sealed IndexedDB mirror keeps, keyed by procedure path: every query
+ * but the named exclusions (ARCHITECTURE.md §10.2), each with its schema hash. Staleness is the
+ * query client's own default.
  */
 
-import type { TrpcCachePolicy, TrpcCacheTier } from "@langwatch/api/contract";
-import { trpcQueryKey } from "@langwatch/api/web";
-import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
+import { schemaHashOf, type TrpcContract, type TrpcContractMember } from "@langwatch/module";
+import type { QueryKey } from "@tanstack/react-query";
 
-/** How long a read of each tier stays fresh. */
-export const CACHE_TIER_STALE_TIME: Readonly<Record<TrpcCacheTier, number>> = {
-  live: 0,
-  session: Number.POSITIVE_INFINITY,
-  reference: 60 * 60 * 1000,
-};
-
-/** How long a read persisted to disk may be restored; its cache entry lives as long. */
+/** The query client's gcTime default: how long a read's cache entry lives once unobserved. */
 export const PERSISTED_QUERY_MAX_AGE = 24 * 60 * 60 * 1000;
+
+/**
+ * Reads kept off the disk mirror, by dotted procedure path: ones so high-traffic that sealing
+ * every answer costs more than a reload saves. A read too large is skipped by size instead.
+ */
+export const UI_QUERY_MIRROR_EXCLUDED: ReadonlySet<string> = new Set<string>();
 
 /** What the declared contracts ask of the browser's cache. */
 export type UiCachePlan = Readonly<{
-  tiers: ReadonlyMap<string, TrpcCacheTier>;
+  /** Every mirrored read's path. */
   persisted: ReadonlySet<string>;
+  /** A mirrored read's schema hash; a row stored under another is dropped. */
+  schemaHashFor: (path: string) => string | undefined;
 }>;
+
+/** The version each cached read was last answered under, by query hash. */
+export type UiQueryVersions = Map<string, string>;
 
 /** The part of a built `TrpcContract` the plan reads. */
-export type CacheDeclaringContract = Readonly<{
-  namespace: string;
-  members: Readonly<Record<string, Readonly<{ cache?: TrpcCachePolicy }>>>;
-}>;
+export type CacheDeclaringContract = Pick<TrpcContract, "namespace" | "members">;
 
-/** Folds every declared read's policy into one plan, keyed by dotted procedure path. */
+/** Every declared query but the excluded ones, keyed by dotted procedure path. */
 export function cachePlanFor({
   contracts,
+  excluded = UI_QUERY_MIRROR_EXCLUDED,
 }: {
   contracts: readonly CacheDeclaringContract[];
+  excluded?: ReadonlySet<string>;
 }): UiCachePlan {
-  const tiers = new Map<string, TrpcCacheTier>();
-  const persisted = new Set<string>();
+  const mirrored = new Map<string, TrpcContractMember>();
 
   for (const contract of contracts) {
     for (const [name, member] of Object.entries(contract.members)) {
-      if (!member.cache) continue;
       const path = `${contract.namespace}.${name}`;
-      tiers.set(path, member.cache.tier);
-      if (member.cache.persist) persisted.add(path);
+      if (member.kind === "query" && !excluded.has(path)) mirrored.set(path, member);
     }
   }
 
-  return { tiers, persisted };
-}
-
-/** Session and reference reads travel as lone GETs, so each URL's ETag names one body (ADR-164). */
-export function unbatchedCachePaths({ plan }: { plan: UiCachePlan }): ReadonlySet<string> {
-  return new Set([...plan.tiers].flatMap(([path, tier]) => (tier === "live" ? [] : [path])));
+  return {
+    persisted: new Set(mirrored.keys()),
+    schemaHashFor: (path) => {
+      const member = mirrored.get(path);
+      return member && schemaHashOf(member);
+    },
+  };
 }
 
 /** The dotted procedure path a tRPC query key was built from, or undefined for any other key. */
@@ -60,34 +61,4 @@ export function procedurePathOf(queryKey: QueryKey): string | undefined {
   const [path] = queryKey;
   if (!Array.isArray(path) || !path.every((segment) => typeof segment === "string")) return;
   return path.join(".");
-}
-
-/** Registers each declared tier as the query defaults for its procedure (one call per key). */
-export function applyCacheTiers({
-  queryClient,
-  plan,
-}: {
-  queryClient: QueryClient;
-  plan: UiCachePlan;
-}): void {
-  for (const [path, tier] of plan.tiers) {
-    queryClient.setQueryDefaults(trpcQueryKey(path), {
-      staleTime: CACHE_TIER_STALE_TIME[tier],
-      ...(plan.persisted.has(path) ? { gcTime: PERSISTED_QUERY_MAX_AGE } : {}),
-    });
-  }
-}
-
-/** Marks every session-tier read stale; the mounted ones refetch. */
-export function invalidateSessionTier({
-  queryClient,
-  plan,
-}: {
-  queryClient: QueryClient;
-  plan: UiCachePlan;
-}): Promise<void> {
-  return queryClient.invalidateQueries({
-    predicate: (query: Query) =>
-      plan.tiers.get(procedurePathOf(query.queryKey) ?? "") === "session",
-  });
 }

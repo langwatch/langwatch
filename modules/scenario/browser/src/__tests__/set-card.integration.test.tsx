@@ -3,16 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/internal-set-namespace.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SetCard } from "../ui/elements/set-card.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<SetCard/>", () => {
   afterEach(() => {
@@ -30,19 +26,19 @@ describe("<SetCard/>", () => {
 
     describe("when the SetCard renders", () => {
       it("displays the on-platform display name", () => {
-        render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SetCard {...defaultProps} />);
 
         expect(screen.getByText(ON_PLATFORM_DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not display the raw internal ID", () => {
-        render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SetCard {...defaultProps} />);
 
         expect(screen.queryByText(internalSetId)).not.toBeInTheDocument();
       });
 
       it("displays a system/settings icon instead of the default icon", () => {
-        render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SetCard {...defaultProps} />);
 
         // The settings icon should be present (we use Settings from lucide-react)
         // We check for the absence of the default emoji icon
@@ -62,13 +58,13 @@ describe("<SetCard/>", () => {
 
     describe("when the SetCard renders", () => {
       it("displays the set ID as the name", () => {
-        render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SetCard {...defaultProps} />);
 
         expect(screen.getByText(userSetId)).toBeInTheDocument();
       });
 
       it("displays the default icon", () => {
-        render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SetCard {...defaultProps} />);
 
         // The default emoji icon should be present
         expect(screen.getByText("\uD83C\uDFAD")).toBeInTheDocument();

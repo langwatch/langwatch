@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
 
 import {
   DatasetPickerList as DatasetPickerListView,
@@ -17,7 +17,7 @@ export function DatasetPickerList({
   onSelect: (dataset: DatasetPickerSelection) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const datasetsQuery = api.dataset.getAll.useQuery(
+  const datasetsQuery = datasetClient.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && enabled },
   );

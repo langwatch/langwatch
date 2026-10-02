@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * `/api/health/scenarios` over the real probe and canary, peers scripted per call.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import {
   type ScenarioApi,
@@ -11,6 +6,11 @@ import {
   Verdict,
 } from "@langwatch/scenario-contract";
 import { type Suite, suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
+/**
+ * @vitest-environment node
+ * `/api/health/scenarios` over the real probe and canary, peers scripted per call.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";

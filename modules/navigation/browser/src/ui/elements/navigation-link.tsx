@@ -1,6 +1,6 @@
 /** Shared across web packages. External links open new tabs; undefined href renders inert. */
 
-import { chakra } from "@chakra-ui/react";
+import { chakra } from "@langwatch/design-system/primitives";
 import type { AnchorHTMLAttributes, ReactNode, Ref } from "react";
 
 import { useNavigationHost } from "../../model/navigation-host.ts";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, OperatorReportSchedule } from "@langwatch/automation-contract";
 import {
   SLOT_STALE_AFTER_MS,
@@ -6,6 +5,7 @@ import {
   type SchedulerControlAction,
 } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { SchedulerAuditRepository } from "../../repositories/ops-audit.repository.ts";

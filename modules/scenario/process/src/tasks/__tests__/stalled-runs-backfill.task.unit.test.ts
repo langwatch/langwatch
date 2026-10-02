@@ -6,9 +6,9 @@ import {
   type ScenarioExecutionPreparation,
   type ScenarioUnsuccessfulExecutionInput,
 } from "@langwatch/scenario-contract";
-import type { SimulationStalledRun } from "@langwatch/scenario-process";
 import { describe, expect, it, vi } from "vitest";
 
+import type { SimulationStalledRun } from "../../eventing/simulation-eventing.store.ts";
 import { backfillStalledRuns, StalledRunsBackfillTask } from "../stalled-runs-backfill.task.ts";
 
 function makeRun(overrides: Partial<SimulationStalledRun> = {}): SimulationStalledRun {

@@ -53,7 +53,7 @@ Feature: Dataset File Upload REST API
   Scenario: Upload fails when file columns do not match dataset columns
     Given a dataset "strict" exists with columns [{"name": "input", "type": "string"}]
     When I POST /api/dataset/strict/upload with a CSV file containing columns "question" and "answer"
-    Then the request fails with 422 and code "validation_error"
+    Then the request fails with 400 Bad Request
     And the error indicates the uploaded columns do not match the dataset schema
 
   @integration

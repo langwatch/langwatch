@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 
 export function TooltipRow({ label, value }: { label: string; value: string }) {
   return (

@@ -1,9 +1,6 @@
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  MissingSlackBotTokenError,
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automation-contract";
+import { type SlackActionParams, slackDeliveryMethodOf } from "@langwatch/automation-contract";
+
+import { readableSlackActionParams } from "../rules/automation-slack-read.rules.ts";
 
 export interface AutomationSecretCrypto {
   encrypt(value: string): string;
@@ -14,55 +11,23 @@ export abstract class AutomationSlackProvider {
   abstract findDecryptedToken(params: { slackBotToken?: string }): string | null;
 }
 
-/** Host crypto boundary for stored Slack bot credentials. */
-export abstract class AutomationSlackBotTokenDecryptor {
-  abstract findDecryptedToken(params: SlackActionParams): string | null;
-}
-
-function slackBotTokenMissing({
-  incoming,
-  existing,
-}: {
-  incoming: SlackActionParams;
-  existing?: SlackActionParams | null;
-}): boolean {
-  if (slackDeliveryMethodOf(incoming) !== "bot") return false;
-  const raw = incoming.slackBotToken?.trim();
-  const providingNew = !!raw && raw !== SLACK_BOT_TOKEN_KEPT;
-  return !providingNew && !existing?.slackBotToken;
-}
-
+/**
+ * Slack params in their at-rest shape: the save path has already pointed them
+ * at a connection (`AutomationSlackConnectionService.connectActionParams`);
+ * whatever it could not, stores no secret either way.
+ */
 function persistSlackActionParams({
   incoming,
-  existing,
-  crypto,
 }: {
   incoming: SlackActionParams;
-  existing?: SlackActionParams | null;
-  crypto: AutomationSecretCrypto;
 }): SlackActionParams {
-  const method = slackDeliveryMethodOf(incoming);
-  if (method === "webhook") {
-    return {
-      slackDelivery: "webhook",
-      slackWebhook: incoming.slackWebhook?.trim(),
-    };
-  }
-
-  const raw = incoming.slackBotToken?.trim();
-  const keepExisting = !raw || raw === SLACK_BOT_TOKEN_KEPT;
-  const slackBotToken = keepExisting ? existing?.slackBotToken : crypto.encrypt(raw);
+  const slackDelivery = slackDeliveryMethodOf(incoming);
+  const channel = incoming.slackChannelId?.trim();
   return {
-    slackDelivery: "bot",
-    slackChannelId: incoming.slackChannelId?.trim(),
-    slackBotToken,
+    ...(incoming.slackIntegrationId ? { slackIntegrationId: incoming.slackIntegrationId } : {}),
+    slackDelivery,
+    ...(slackDelivery === "bot" && channel ? { slackChannelId: channel } : {}),
   };
-}
-
-function redactSlackActionParams(params: SlackActionParams): SlackActionParams {
-  if (!params.slackBotToken) return params;
-  const { slackBotToken: _drop, ...rest } = params;
-  return { ...rest, slackBotTokenSet: true };
 }
 
 function findDecryptedSlackBotToken(
@@ -71,15 +36,6 @@ function findDecryptedSlackBotToken(
 ): string | null {
   if (!params.slackBotToken) return null;
   return crypto.decrypt(params.slackBotToken);
-}
-
-function assertSlackBotToken(
-  incoming: SlackActionParams,
-  existing: SlackActionParams | null | undefined,
-): void {
-  if (slackBotTokenMissing({ incoming, existing })) {
-    throw new MissingSlackBotTokenError();
-  }
 }
 
 /** Owns Slack action-parameter persistence and secret handling. Crypto is
@@ -93,48 +49,15 @@ export class AutomationSlackSecretsService extends AutomationSlackProvider {
     return new AutomationSlackSecretsService(crypto);
   }
 
-  tokenMissing(input: {
-    incoming: SlackActionParams;
-    existing?: SlackActionParams | null;
-  }): boolean {
-    return slackBotTokenMissing(input);
+  persist(input: { incoming: SlackActionParams }): SlackActionParams {
+    return persistSlackActionParams(input);
   }
 
-  persist(input: {
-    incoming: SlackActionParams;
-    existing?: SlackActionParams | null;
-  }): SlackActionParams {
-    return persistSlackActionParams({ ...input, crypto: this.crypto });
-  }
-
-  redact(params: SlackActionParams): SlackActionParams {
-    return redactSlackActionParams(params);
+  redact(params: unknown): Record<string, unknown> {
+    return readableSlackActionParams(params);
   }
 
   findDecryptedToken(params: { slackBotToken?: string }): string | null {
     return findDecryptedSlackBotToken(params, this.crypto);
-  }
-
-  assertToken(incoming: SlackActionParams, existing: SlackActionParams | null | undefined): void {
-    assertSlackBotToken(incoming, existing);
-  }
-}
-
-/**
- * Narrows the Slack provider to the one thing evaluation asks of it --
- * not the persist/redact surface, which is the drawer's business. A
- * class, not a literal, since the interface it satisfies is nominal.
- */
-export class AutomationSlackBotTokenDecryptorService extends AutomationSlackBotTokenDecryptor {
-  static create(provider: AutomationSlackSecretsService): AutomationSlackBotTokenDecryptorService {
-    return new AutomationSlackBotTokenDecryptorService(provider);
-  }
-
-  private constructor(private readonly provider: AutomationSlackSecretsService) {
-    super();
-  }
-
-  findDecryptedToken(params: SlackActionParams): string | null {
-    return this.provider.findDecryptedToken(params);
   }
 }

@@ -1,7 +1,7 @@
 // Link without router import (ADR-004 sealed); uses anchor with host navigate
 // for left-clicks to avoid full reload while keeping browser link behavior.
 
-import { Link as ChakraLink } from "@chakra-ui/react";
+import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";

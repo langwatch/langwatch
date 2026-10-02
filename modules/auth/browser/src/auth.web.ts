@@ -3,9 +3,10 @@
  * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { SsoTestSignInToken } from "@langwatch/auth-contract";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const authWeb = defineWebModule("auth")
+export const authWeb = defineBrowserModule("auth")
   .withScreens({
     // Placed by the application's route table until a top-level anchor accepts
     // declared routes; the loader is this module's either way.
@@ -53,9 +54,6 @@ export const authWeb = defineWebModule("auth")
     frontDoorTheme: { load: () => import("./model/front-door-theme.ts") },
     /** The front door's host port, which the shell's auth layout implements. */
     host: { load: () => import("./model/auth-host.ts") },
-    /** Auth's half of a peer's host: a sign-in that names a connection, and
-     *  one spelling for a sign-in code. */
-    signIn: { load: () => import("./behavior/sign-in-capability.ts") },
     /** The reader's own passkeys, for the personal workspace's security screen. */
     passkeys: { load: () => import("./behavior/passkey-capability.ts") },
     /** Setting two-step verification up, and fresh backup codes. */
@@ -64,4 +62,6 @@ export const authWeb = defineWebModule("auth")
     signInMethodLinking: {
       load: () => import("./behavior/sign-in-method-linking-capability.ts"),
     },
-  });
+  })
+  /** SSO's "Test sign-in": a sign-in that names a connection. */
+  .lends(SsoTestSignInToken, { load: () => import("./behavior/sign-in-capability.ts") });

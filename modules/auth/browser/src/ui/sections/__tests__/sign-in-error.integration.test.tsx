@@ -1,8 +1,9 @@
+import { signInErrorMayCross } from "@langwatch/auth-contract";
 /**
  * @vitest-environment jsdom
  * Sign-in error UI; regression: federated logout on account collision
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,11 +14,11 @@ import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx"
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
     <MemoryRouter initialEntries={[`/auth/error?error=${error}`]}>
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <WithTestAuthHost route={{ pathname: "/auth/error", query: { error, ...extra } }}>
           <SignInError error={error} />
         </WithTestAuthHost>
-      </ChakraProvider>
+      </DesignSystemProvider>
     </MemoryRouter>,
   );
 }
@@ -44,8 +45,19 @@ describe("<SignInError/>", () => {
 
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(screen.getByText(/sign out completely and sign in again/i)).toBeTruthy();
-      expect(screen.getByText(/method you used originally/i)).toBeTruthy();
+      expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
+      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+    });
+  });
+
+  describe("when single sign-on meets a confirmed account on a domain the connection has not verified", () => {
+    /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+    it("names the domain proof that is missing, not another sign-in method", () => {
+      renderError("sso_domain_not_verified");
+
+      expect(document.body.textContent).toMatch(/domain verification|verify the domain/i);
+      expect(screen.queryByText("Account already exists")).toBeNull();
+      expect(screen.queryByText(/method you used before/i)).toBeNull();
     });
   });
 
@@ -101,6 +113,19 @@ describe("given a failure whose cause was withheld", () => {
     renderError("sign_in_failed");
 
     expect(screen.queryByTestId("sign-in-error-trace")).toBeNull();
+  });
+});
+
+describe("given a sign-in refused because an unconfirmed account holds the address", () => {
+  /** @scenario "The refusal reaches the sign-in screen with words the reader can act on" */
+  it("crosses the boundary as itself and says how to get in", () => {
+    expect(signInErrorMayCross("sso_existing_account_unconfirmed")).toBe(true);
+
+    renderError("sso_existing_account_unconfirmed");
+
+    expect(screen.getByText(/An account with this address already exists/i)).toBeTruthy();
+    expect(screen.getByText(/Sign in the way you did before/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });
 

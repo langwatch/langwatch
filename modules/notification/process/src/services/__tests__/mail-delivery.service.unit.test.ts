@@ -136,7 +136,34 @@ describe("MailDeliveryService", () => {
         settingsWith({ provider: "smtp", smtp: { host: "mail.acme.test" } }),
       ).getView();
 
-      expect(view).toEqual({ provider: "smtp", smtpConfigured: true, misconfigured: false });
+      expect(view).toEqual({
+        provider: "smtp",
+        smtpConfigured: true,
+        smtpSendsCredentials: false,
+        misconfigured: false,
+      });
+    });
+  });
+
+  describe("when the SMTP relay may or may not take a login", () => {
+    const sendsCredentials = async (smtp: MailGatewaySettings["smtp"]) =>
+      (await serviceOver(settingsWith({ provider: "smtp", smtp })).getView()).smtpSendsCredentials;
+
+    it("sends credentials for a connection URL that names a user", async () => {
+      await expect(sendsCredentials({ url: "smtps://user:pass@relay.corp:465" })).resolves.toBe(
+        true,
+      );
+    });
+
+    it("sends none for a connection URL with no user, even beside SMTP_USER", async () => {
+      await expect(
+        sendsCredentials({ url: "smtp://relay.corp:25", user: "ignored" }),
+      ).resolves.toBe(false);
+    });
+
+    it("follows SMTP_USER for discrete host settings", async () => {
+      await expect(sendsCredentials({ host: "relay.corp", user: "mailer" })).resolves.toBe(true);
+      await expect(sendsCredentials({ host: "relay.corp" })).resolves.toBe(false);
     });
   });
 
@@ -144,6 +171,7 @@ describe("MailDeliveryService", () => {
     it("names no gateway", async () => {
       await expect(serviceOver(settingsWith()).getView()).resolves.toEqual({
         smtpConfigured: false,
+        smtpSendsCredentials: false,
         misconfigured: false,
       });
     });
@@ -154,6 +182,7 @@ describe("MailDeliveryService", () => {
     it("reads as no gateway rather than failing the checkup, and says it is misconfigured", async () => {
       await expect(serviceOver(settingsWith({ provider: "resend" })).getView()).resolves.toEqual({
         smtpConfigured: false,
+        smtpSendsCredentials: false,
         misconfigured: true,
       });
     });

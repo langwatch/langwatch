@@ -1,16 +1,16 @@
-/**
- * @vitest-environment jsdom
- *
- * Tests that the Effective summary displays the correct scope baseline
- * (organization, team, or full cascade) based on the scope filter.
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   type DataPrivacySnapshot,
   type PiiLevel,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+/**
+ * @vitest-environment jsdom
+ *
+ * Tests that the Effective summary displays the correct scope baseline
+ * (organization, team, or full cascade) based on the scope filter.
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EffectiveSummary } from "../effective-summary.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 function resolvedWithPii(level: PiiLevel): ResolvedDataPrivacy {

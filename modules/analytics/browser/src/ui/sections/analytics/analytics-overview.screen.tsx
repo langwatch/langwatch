@@ -10,12 +10,12 @@ import {
   Tabs,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
 
-import { analyticsApi } from "../../../behavior/analytics-api.ts";
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { useTopUsedDocuments } from "../../../behavior/use-analytics-documents.ts";
+import { useDashboards } from "../../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -65,8 +65,7 @@ function AnalyticsContent() {
 }
 
 function DocumentsMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = analyticsApi.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
+  const documents = useTopUsedDocuments();
 
   const count = documents.data?.totalUniqueDocuments;
 
@@ -114,10 +113,7 @@ function DocumentsMetrics() {
 function CustomReportsSection({ slug }: { slug: string }) {
   const host = useAnalyticsHost();
   const project = host.project();
-  const dashboardsQuery = analyticsApi.dashboards.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const dashboardsQuery = useDashboards({ projectId: project?.id ?? "" });
   const dashboards = dashboardsQuery.data ?? [];
 
   if (dashboards.length === 0 && !dashboardsQuery.isLoading) {

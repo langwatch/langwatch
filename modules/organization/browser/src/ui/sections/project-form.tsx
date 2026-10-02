@@ -11,7 +11,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Plus } from "lucide-react";
 import type React from "react";
@@ -19,8 +19,8 @@ import { useEffect, useMemo, useState } from "react";
 import { type Control, Controller, type SubmitHandler, useForm } from "react-hook-form";
 
 import { applyHandledErrorToForm, HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
-import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useOrganizationTeams } from "../../behavior/use-organization-teams.ts";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
@@ -61,7 +61,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     defaultValues: {
       name: "",
       // Seed from defaultTeamId so the form always submits a valid teamId
-      // even when teams.data is slow or the RBAC-filtered list is empty —
+      // even when teams is slow or the RBAC-filtered list is empty —
       // finding #82 traced this to the effect below never firing a reset.
       teamId: defaultTeamId ?? "",
     },
@@ -87,42 +87,39 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     setUnclaimedError(applyHandledErrorToForm({ error, form }) ? null : error);
   }, [error, form]);
 
-  const teams = api.team.getTeamsWithMembers.useQuery(
-    { organizationId: effectiveOrganizationId ?? "" },
-    { enabled: !!effectiveOrganizationId },
-  );
+  const teams = useOrganizationTeams({ organizationId: effectiveOrganizationId });
 
   // Set default team when teams are loaded
   useEffect(() => {
-    if (teams.data && teams.data.length > 0 && !teamId) {
+    if (teams && teams.length > 0 && !teamId) {
       // Use defaultTeamId if provided and valid, otherwise use first team
       const teamIdToUse =
-        defaultTeamId && teams.data.some((t: { id: string }) => t.id === defaultTeamId)
+        defaultTeamId && teams.some((t: { id: string }) => t.id === defaultTeamId)
           ? defaultTeamId
-          : (teams.data[0]?.id ?? "");
+          : (teams[0]?.id ?? "");
 
       reset((prev) => ({
         ...prev,
         teamId: teamIdToUse,
       }));
     }
-  }, [teams.data, teamId, reset, defaultTeamId]);
+  }, [teams, teamId, reset, defaultTeamId]);
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data) => {
     onSubmitProp({ ...data, language: "other", framework: "other" });
   };
 
   const showTeamSelector =
-    teams.data?.some((team: { projects: unknown[] }) => team.projects.length > 0) ?? false;
+    teams?.some((team: { projects: unknown[] }) => team.projects.length > 0) ?? false;
 
   const teamOptions = useMemo(() => {
     return (
-      teams.data?.map((team: { id: string; name: string }) => ({
+      teams?.map((team: { id: string; name: string }) => ({
         label: team.name,
         value: team.id,
       })) ?? []
     );
-  }, [teams.data]);
+  }, [teams]);
 
   const teamCollection = useMemo(() => createListCollection({ items: teamOptions }), [teamOptions]);
 

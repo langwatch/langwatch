@@ -14,8 +14,7 @@ flows:
           text: Add Model Provider
       - action: click
         with:
-          selector: '[role="menuitem"]'
-          hasText: /^\s*Cerebras\s*$/
+          testId: model-provider-add-option-cerebras
       - action: fill
         with:
           selector: 'input[type="password"]'
@@ -134,8 +133,7 @@ flows:
           text: Add Model Provider
       - action: click
         with:
-          selector: '[role="menuitem"]'
-          hasText: /^\s*xAI\s*$/
+          testId: model-provider-add-option-xai
       - action: expect
         with:
           text: Scope
@@ -204,6 +202,13 @@ flows:
       - action: expect
         with:
           testId: default-model-override-drawer
+      - action: select
+        with:
+          selector: '[data-testid="default-model-override-drawer"] [role="combobox"]'
+          option: Organization
+      - action: click
+        with:
+          text: Add default models
       - action: select
         with:
           selector: '[data-testid="role-row-default"] [role="combobox"]'

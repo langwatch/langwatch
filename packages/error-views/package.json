@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
-    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "react": "catalog:"
   },
   "devDependencies": {

@@ -24,7 +24,6 @@ import {
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -32,7 +31,8 @@ import {
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -105,7 +105,7 @@ type EntitlementMembers = MembersRead<readonly ["logger"]> &
   Readonly<{ isSaas: boolean; processName: string }>;
 
 type EntitlementSetup = FeatureSetup<
-  typeof EntitlementApp.dependencies,
+  typeof EntitlementModule.dependencies,
   EntitlementMembers,
   EntitlementConfig,
   EntitlementRepositories
@@ -122,7 +122,7 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
 
 /** What a plan allows, and what has been used and spent against it. */
-export class EntitlementApp implements EntitlementApiContract {
+export class EntitlementModule implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   static readonly dependencies = {
     users: UserApi,
@@ -135,7 +135,7 @@ export class EntitlementApp implements EntitlementApiContract {
   static readonly config = entitlementConfig;
   /** `logger` is the closed member; `isSaas`/`processName` are named raw so
    * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
-  static readonly reads = [...reads("logger"), "isSaas", "processName"] as const;
+  static readonly reads = ["logger", "isSaas", "processName"] as const;
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
@@ -174,7 +174,7 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
-  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
+  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementModule {
     const infrastructure = buildEntitlementInfrastructure({
       logger: members.logger,
       isSaas: members.isSaas,
@@ -184,7 +184,7 @@ export class EntitlementApp implements EntitlementApiContract {
       usage: dependencies,
     });
 
-    return new EntitlementApp({ repositories, members: infrastructure, dependencies, config });
+    return new EntitlementModule({ repositories, members: infrastructure, dependencies, config });
   }
 
   /**
@@ -197,8 +197,8 @@ export class EntitlementApp implements EntitlementApiContract {
     members: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config?: EntitlementConfig;
-  }): EntitlementApp {
-    return new EntitlementApp({
+  }): EntitlementModule {
+    return new EntitlementModule({
       repositories: setup.repositories,
       members: setup.members,
       dependencies: setup.dependencies,
@@ -307,7 +307,7 @@ export class EntitlementApp implements EntitlementApiContract {
       id: input.operator.id,
       email: caller?.email ?? null,
       name: caller?.name ?? null,
-      ...(impersonator ? { impersonator: { email: impersonator.email } } : {}),
+      ...(impersonator ? { impersonator: { id: impersonator.id, email: impersonator.email } } : {}),
     };
   }
 }

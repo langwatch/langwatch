@@ -51,6 +51,7 @@ export interface HttpAgentEditorOptions {
   onCreate(input: SaveHttpAgentInput): Promise<AgentBrowser>;
   onUpdate(input: SaveHttpAgentInput & { id: string }): Promise<AgentBrowser>;
   onTest(input: {
+    agentId?: string;
     url: string;
     method: HttpMethod;
     headers: HttpHeader[];
@@ -146,8 +147,21 @@ async function saveHttpAgent(
     });
 }
 
+function unmappedVariableIds(input: {
+  showVariables: boolean | undefined;
+  hasAtLeastOneMapping: boolean;
+  variables: Field[];
+}): Set<string> {
+  const { showVariables, hasAtLeastOneMapping, variables } = input;
+
+  return showVariables && !hasAtLeastOneMapping
+    ? new Set(variables.map(({ identifier }) => identifier))
+    : new Set<string>();
+}
+
 export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
-  const isUnavailable = Boolean(options.agentId) && !readHttpConfig(options.agent);
+  const savedConfig = readHttpConfig(options.agent);
+  const isUnavailable = Boolean(options.agentId) && !savedConfig;
   const defaults = options.defaultScenarioMappings ?? BEST_MATCH_MAPPINGS;
   const inputMappings = options.inputMappings ?? EMPTY_MAPPINGS;
   const [draft, setDraft] = useState(() => initialDraft(void 0, defaults));
@@ -158,9 +172,11 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
 
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(inputMappings);
+  if (mappingsFrom !== inputMappings) {
+    setMappingsFrom(inputMappings);
     setLocalMappings(inputMappings);
-  }, [inputMappings]);
+  }
   useEffect(() => {
     if (!options.open) {
       initialized.current = void 0;
@@ -175,10 +191,11 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
 
   const variables = [...HTTP_FIXED_VARIABLES, ...customVariables];
   const hasAtLeastOneMapping = variables.some(({ identifier }) => localMappings[identifier]);
-  const missingMappingIds =
-    options.showVariables && !hasAtLeastOneMapping
-      ? new Set(variables.map(({ identifier }) => identifier))
-      : new Set<string>();
+  const missingMappingIds = unmappedVariableIds({
+    showVariables: options.showVariables,
+    hasAtLeastOneMapping,
+    variables,
+  });
   const isValid =
     !isUnavailable &&
     draft.name.trim().length > 0 &&
@@ -226,9 +243,14 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
       }));
       setDirty(true);
     },
+    stored: {
+      authType: savedConfig?.auth?.type,
+      headerKeys: savedConfig?.headers?.map(({ key }) => key) ?? [],
+    },
     test: (templateVariables: Record<string, unknown>) => {
       const { url, method, headers, auth, outputPath, bodyTemplate } = draft;
       return options.onTest({
+        ...(options.agentId ? { agentId: options.agentId } : {}),
         url,
         method,
         headers,

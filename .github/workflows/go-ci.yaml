@@ -213,8 +213,8 @@ jobs:
 
       # funlen / gocognit / revive encode house rules over a codebase that
       # predates them (331 pre-existing hits), so they are gated on new and
-      # changed lines only — the same shape as `pnpm lint:new-code` on the
-      # TypeScript side.
+      # changed lines only, much as `pnpm lint:changed` scopes the
+      # TypeScript lint to what a change touched.
       #
       # This step DOES cover ./tools/..., so new thuishaven code is held to
       # the rules even while its existing baseline stands.

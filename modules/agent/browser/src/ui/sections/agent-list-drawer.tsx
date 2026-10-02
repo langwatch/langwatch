@@ -1,8 +1,16 @@
-import { Alert, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";

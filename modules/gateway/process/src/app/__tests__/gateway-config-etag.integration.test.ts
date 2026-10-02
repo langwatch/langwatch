@@ -1,7 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * Real Postgres. Every 60s the gateway revalidates via If-None-Match; the token must move
@@ -43,6 +44,23 @@ async function etag() {
   return GatewayConfigAssemblyService.create({
     repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
     platformProviders: noPlatformProviders,
+    projects: createApiFixture<ProjectApi>({
+      listNamesByIds: async ({ projectIds }) =>
+        (
+          await prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            include: { team: { select: { organizationId: true } } },
+          })
+        ).map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+        })),
+    }),
   }).versionToken(await loadVk());
 }
 

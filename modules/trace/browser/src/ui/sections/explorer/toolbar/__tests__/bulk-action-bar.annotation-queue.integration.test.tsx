@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
     selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
@@ -47,20 +47,17 @@ vi.mock("../../add-to-annotation-queue-dialog.tsx", () => ({
   },
 }));
 
-import { useSelectionStore } from "@langwatch/trace-browser-kit";
-
+import { useSelectionStore } from "../../../../../behavior/explorer.store.ts";
 import { BulkActionBar } from "../bulk-action-bar.tsx";
 
 const renderBar = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <BulkActionBar
-        totalHits={100}
-        pageTraceIds={["t1", "t2", "t3"]}
-        traceNamesById={{}}
-        onExportSelected={vi.fn()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <BulkActionBar
+      totalHits={100}
+      pageTraceIds={["t1", "t2", "t3"]}
+      traceNamesById={{}}
+      onExportSelected={vi.fn()}
+    />,
   );
 
 const buttonNames = () => screen.getAllByRole("button").map((b) => b.textContent ?? "");

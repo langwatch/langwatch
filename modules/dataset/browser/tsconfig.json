@@ -21,16 +21,16 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
+      "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
-      "path": "../browser-kit/tsconfig.build.json"
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -39,22 +39,16 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../../langy/browser-kit/tsconfig.build.json"
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../stored-object/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../stored-object/contract/tsconfig.build.json"
@@ -63,10 +57,7 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../../workflow/browser-kit/tsconfig.build.json"
+      "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

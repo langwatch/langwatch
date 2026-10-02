@@ -1,12 +1,12 @@
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/auth-cache.feature, Rule "A routing-policy or
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

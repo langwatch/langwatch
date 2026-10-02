@@ -62,11 +62,13 @@ import {
 } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -76,6 +78,7 @@ import type { AgentRepositories } from "../repositories/agent.repositories.ts";
 import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
+import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
 import { AgentService } from "../services/agent.service.ts";
 import {
   ConnectedAgentPresenceService,
@@ -106,13 +109,13 @@ type AgentMembers = Readonly<{
  * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
-  typeof AgentApp.dependencies,
+  typeof AgentModule.dependencies,
   AgentMembers,
   AgentServerConfig,
   AgentRepositories
 >;
 
-export class AgentApp implements AgentApi {
+export class AgentModule implements AgentApi {
   static readonly contract = AgentApi;
   static readonly config = agentServerConfig;
   static readonly dependencies = {
@@ -121,6 +124,8 @@ export class AgentApp implements AgentApi {
     permissions: AuthzApi,
     projects: ProjectApi,
     scenarios: ScenarioApi,
+    /** Where the token typed into an HTTP agent is stored, as a project secret. */
+    secrets: SecretApi,
     traces: TraceApi,
     users: UserApi,
     workflows: WorkflowApi,
@@ -133,6 +138,7 @@ export class AgentApp implements AgentApi {
   readonly #copies: AgentCopyService;
   readonly #connected: ConnectedAgentService | undefined;
   readonly #httpTesting: HttpAgentTestService;
+  readonly #httpSecrets: AgentHttpSecretsService;
   readonly #auditLog: AuditLogApi;
   readonly #permissions: AuthzApi;
   readonly #projects: ProjectApi;
@@ -143,6 +149,10 @@ export class AgentApp implements AgentApi {
 
   private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
+    this.#httpSecrets = AgentHttpSecretsService.create({
+      secrets: dependencies.secrets,
+      agents: this.#agents,
+    });
     this.#copies = AgentCopyService.create({
       repository: repositories.agents,
       workflows: dependencies.workflows,
@@ -157,6 +167,8 @@ export class AgentApp implements AgentApi {
     this.#httpTesting = HttpAgentTestService.create({
       workflows: dependencies.workflows,
       traces: dependencies.traces,
+      agents: this.#agents,
+      secrets: dependencies.secrets,
     });
 
     const connected = ConnectedAgentService.create({
@@ -176,8 +188,8 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  static create(setup: AgentSetup): AgentApp {
-    return new AgentApp(setup);
+  static create(setup: AgentSetup): AgentModule {
+    return new AgentModule(setup);
   }
 
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string {
@@ -208,11 +220,11 @@ export class AgentApp implements AgentApi {
   }
 
   async create(input: CreateAgentCommand): Promise<AgentWithFields> {
-    return this.#withFields(await this.#agents.create(input));
+    return this.#withFields(await this.#agents.create(await this.#httpSecrets.forCreate(input)));
   }
 
   async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
-    return this.#withFields(await this.#agents.update(input));
+    return this.#withFields(await this.#agents.update(await this.#httpSecrets.forUpdate(input)));
   }
 
   archive(input: GetAgentInput): Promise<Agent> {
@@ -427,14 +439,20 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  async testRun(input: AgentReferenceInput & { actorId: string }): Promise<AgentTestRunResult> {
+  async testRun(
+    input: AgentReferenceInput & { actorId: string | null; callerApiKeyId?: string | null },
+  ): Promise<AgentTestRunResult> {
     const agent = await this.#withFields(
       await this.#agents.getById({ id: input.agentId, projectId: input.projectId }),
     );
+    const { actorId, callerApiKeyId } = input;
     return this.#scenarios.testAgentRun({
       projectId: input.projectId,
       agent,
-      actor: { id: input.actorId, label: "user" },
+      actor:
+        actorId === null
+          ? undefined
+          : { id: actorId, label: "user", ...(callerApiKeyId ? { apiKeyId: callerApiKeyId } : {}) },
     });
   }
 

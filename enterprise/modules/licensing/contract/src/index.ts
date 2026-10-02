@@ -1,5 +1,6 @@
 export * from "./license.ts";
 export * from "./license-constants.ts";
+export * from "./license-input-form.ts";
 export * from "./license-limit-type.ts";
 export * from "./license-member-type.ts";
 export * from "./license-minting.ts";

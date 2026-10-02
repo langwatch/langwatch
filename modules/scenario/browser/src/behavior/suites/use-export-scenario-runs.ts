@@ -6,7 +6,7 @@ import type {
   ScenarioRunExportStatusFilter,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ExportProgressEvent } from "@langwatch/trace-browser-kit";
+import type { ExportProgressEvent } from "@langwatch/trace-contract";
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
 import { api } from "../scenario-api.ts";

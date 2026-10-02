@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";

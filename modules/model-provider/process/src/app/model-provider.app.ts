@@ -1,7 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
  * `translate.*` all call, so caller attribution and Codex-role defaults are written once.
@@ -70,7 +69,8 @@ import {
   type ModelProviderCustomKeys,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/process";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 
@@ -166,7 +166,7 @@ type ModelProviderMembers = MembersRead<readonly ["redis"]> &
   Readonly<{ nlpServiceUrl: string | undefined }>;
 
 type ModelProviderSetup = FeatureSetup<
-  typeof ModelProviderApp.dependencies,
+  typeof ModelProviderModule.dependencies,
   ModelProviderMembers,
   ModelProviderServerConfig,
   ModelProviderRepositories
@@ -192,6 +192,8 @@ export type ModelProviderBuildConfig = Readonly<{
   executionProxyBaseUrl: string;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
+  /** Per provider, the API root the credential probe uses in place of the vendor's own. */
+  probeBaseUrls: Readonly<Record<string, string | undefined>>;
   /** Hosted-deployment flag. OUT OF SCOPE (config-schema-nuke-batch-c handoff): hardcoded false. */
   isSaas: boolean;
 }>;
@@ -203,7 +205,7 @@ export type ModelProviderBuildConfig = Readonly<{
  */
 const CODEX_CODING_ROLES = ["LANGY", "FAST"] as const;
 
-export class ModelProviderApp implements ModelProviderApi {
+export class ModelProviderModule implements ModelProviderApi {
   static readonly contract = ModelProviderApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -239,15 +241,15 @@ export class ModelProviderApp implements ModelProviderApi {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
   } as const;
   static readonly secrets = {
-    ...ModelProviderApp.platformCredentials,
-    ...ModelProviderApp.operationalSecrets,
+    ...ModelProviderModule.platformCredentials,
+    ...ModelProviderModule.operationalSecrets,
   } as const;
-  static readonly reads = [...reads("redis"), "nlpServiceUrl"] as const;
+  static readonly reads = ["redis", "nlpServiceUrl"] as const;
 
-  static async create(setup: ModelProviderSetup): Promise<ModelProviderApp> {
-    return ModelProviderApp.withPlatformChain(
+  static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
+    return ModelProviderModule.withPlatformChain(
       setup,
-      await ModelProviderApp.resolvePlatformChain(setup.secrets),
+      await ModelProviderModule.resolvePlatformChain(setup.secrets),
     );
   }
 
@@ -259,7 +261,7 @@ export class ModelProviderApp implements ModelProviderApi {
     secrets: ModelProviderSetup["secrets"],
   ): Promise<PlatformProviderChainService> {
     let chain = PlatformProviderChainService.create();
-    for (const [provider, handle] of Object.entries(ModelProviderApp.platformCredentials)) {
+    for (const [provider, handle] of Object.entries(ModelProviderModule.platformCredentials)) {
       chain = await secrets.into(handle, (credential) => chain.with(provider, credential));
     }
 
@@ -269,7 +271,7 @@ export class ModelProviderApp implements ModelProviderApi {
   private static withPlatformChain(
     { repositories, dependencies, members, config }: ModelProviderSetup,
     platformChain: PlatformProviderChainService,
-  ): ModelProviderApp {
+  ): ModelProviderModule {
     const executionProxyBaseUrl = members.nlpServiceUrl
       ? `${members.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
       : UNCONFIGURED_EXECUTION_PROXY;
@@ -281,6 +283,7 @@ export class ModelProviderApp implements ModelProviderApi {
       },
       executionProxyBaseUrl,
       environment: {},
+      probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
     };
     const infrastructure = buildModelProviderInfrastructure({
@@ -288,7 +291,7 @@ export class ModelProviderApp implements ModelProviderApi {
       config: buildConfig,
       dependencies,
     });
-    return new ModelProviderApp({
+    return new ModelProviderModule({
       repositories,
       dependencies,
       members: infrastructure,
@@ -308,8 +311,8 @@ export class ModelProviderApp implements ModelProviderApi {
     members: ModelProviderInfrastructure;
     executionProxyBaseUrl?: string;
     platformChain?: PlatformProviderChainService;
-  }): ModelProviderApp {
-    return new ModelProviderApp({
+  }): ModelProviderModule {
+    return new ModelProviderModule({
       repositories: setup.repositories,
       dependencies: setup.dependencies,
       members: setup.members,

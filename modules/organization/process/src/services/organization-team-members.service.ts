@@ -1,9 +1,10 @@
+import type { LedgerActor } from "@langwatch/authorization";
 /**
  * A team's people: add/remove, create/update, read back with members
  * attached. Every write goes through the authz grants ledger; a change
  * leaving a team with no administrator is refused before it is written.
  */
-import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzAccessBinding, AuthzApi, AuthzGrantCaller } from "@langwatch/authz-contract";
 import {
   CannotRemoveSelfAsLastAdminError,
   PersonalTeamProtectedError,
@@ -25,7 +26,6 @@ import {
   type CreateOrganizationTeamWithMembersInput,
   type GetOrganizationTeamWithMembersInput,
   type ListOrganizationTeamsWithMembersInput,
-  type OrganizationLedgerActor,
   type OrganizationTeam,
   type OrganizationTeamMemberInput,
   type OrganizationTeamWithMembers,
@@ -44,6 +44,10 @@ import {
   shapeTeamMembers,
   type TeamMembershipPlan,
 } from "../rules/team-membership-plan.rules.ts";
+import {
+  OrganizationGrantCeilingService,
+  type OrganizationIntendedGrant,
+} from "./organization-grant-ceiling.service.ts";
 
 type OrganizationTeamMembersOptions = {
   authz: AuthzApi;
@@ -85,6 +89,7 @@ export class OrganizationTeamMembersService {
           scopeId: parsed.teamId,
         },
       ],
+      caller: parsed.caller,
       actor: parsed.actor,
       onDuplicate: "attach",
     });
@@ -193,16 +198,47 @@ export class OrganizationTeamMembersService {
       throw new TeamLastAdminRequiredError(parsed.name);
     }
 
+    // Creating a team makes its creator its ADMIN (a consequence of creating it); everyone
+    // else is bounded by the creator, read at the organization since the team does not exist yet.
+    const isCreatorAsAdmin = (member: OrganizationTeamMemberInput) =>
+      parsed.caller.type === "user" &&
+      member.userId === parsed.caller.id &&
+      memberTarget(member).role === "ADMIN";
+    const others = parsed.members.filter((member) => !isCreatorAsAdmin(member));
+    await OrganizationGrantCeilingService.create(this.deps.grants).assertWithinCaller({
+      organizationId: parsed.organizationId,
+      caller: parsed.caller,
+      grants: others.map((member): OrganizationIntendedGrant => ({
+        ...memberTarget(member),
+        scopeType: "ORGANIZATION",
+        scopeId: parsed.organizationId,
+        confersAs: "TEAM",
+      })),
+    });
+
     const team = await this.deps.createTeam({
       organizationId: parsed.organizationId,
       name: parsed.name,
     });
-    await this.attachTeamMembers({
-      organizationId: parsed.organizationId,
-      teamId: team.id,
-      members: parsed.members,
-      actor: parsed.actor,
-    });
+    const creator = parsed.members.filter(isCreatorAsAdmin);
+    if (creator.length > 0) {
+      await this.attachTeamMembers({
+        organizationId: parsed.organizationId,
+        teamId: team.id,
+        members: creator,
+        caller: { type: "system" },
+        actor: parsed.actor,
+      });
+    }
+    if (others.length > 0) {
+      await this.attachTeamMembers({
+        organizationId: parsed.organizationId,
+        teamId: team.id,
+        members: others,
+        caller: parsed.caller,
+        actor: parsed.actor,
+      });
+    }
 
     return team;
   }
@@ -253,10 +289,24 @@ export class OrganizationTeamMembersService {
         if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
         }
+        // Every add and role change is asked before the first write, so a refusal leaves none.
+        await OrganizationGrantCeilingService.create(this.deps.grants).assertWithinCaller({
+          organizationId: team.organizationId,
+          caller: parsed.caller,
+          grants: [...plan.membersToAdd.map(memberTarget), ...plan.bindingsToChange].map(
+            ({ role, customRoleId }): OrganizationIntendedGrant => ({
+              role,
+              customRoleId,
+              scopeType: "TEAM",
+              scopeId: team.id,
+            }),
+          ),
+        });
 
         await this.emitTeamMembershipPlan({
           organizationId: team.organizationId,
           teamId: team.id,
+          caller: parsed.caller,
           actor: parsed.actor,
           plan,
         });
@@ -329,7 +379,8 @@ export class OrganizationTeamMembersService {
     organizationId: string;
     teamId: string;
     members: OrganizationTeamMemberInput[];
-    actor: OrganizationLedgerActor;
+    caller: AuthzGrantCaller;
+    actor: LedgerActor;
   }): Promise<unknown> {
     return this.deps.grants.attachBindings({
       organizationId: input.organizationId,
@@ -340,6 +391,7 @@ export class OrganizationTeamMembersService {
         scopeType: "TEAM" as const,
         scopeId: input.teamId,
       })),
+      caller: input.caller,
       actor: input.actor,
       onDuplicate: "skip",
     });
@@ -348,7 +400,8 @@ export class OrganizationTeamMembersService {
   private async emitTeamMembershipPlan(input: {
     organizationId: string;
     teamId: string;
-    actor: OrganizationLedgerActor;
+    caller: AuthzGrantCaller;
+    actor: LedgerActor;
     plan: TeamMembershipPlan;
   }): Promise<void> {
     if (input.plan.membersToAdd.length > 0) {
@@ -356,6 +409,7 @@ export class OrganizationTeamMembersService {
         organizationId: input.organizationId,
         teamId: input.teamId,
         members: input.plan.membersToAdd,
+        caller: input.caller,
         actor: input.actor,
       });
     }
@@ -366,6 +420,7 @@ export class OrganizationTeamMembersService {
         bindingId: binding.bindingId,
         role: binding.role,
         customRoleId: binding.customRoleId,
+        caller: input.caller,
         actor: input.actor,
       });
     }

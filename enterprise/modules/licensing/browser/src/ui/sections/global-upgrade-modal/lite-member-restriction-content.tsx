@@ -1,5 +1,5 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { ShieldX } from "lucide-react";
 
 /**

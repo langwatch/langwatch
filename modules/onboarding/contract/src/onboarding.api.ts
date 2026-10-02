@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { OnboardingVariant, GuidedOnboardingState } from "./onboarding-schemas.ts";
 import type { OrganizationInitialized } from "./onboarding.responses.ts";

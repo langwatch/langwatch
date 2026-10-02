@@ -4,6 +4,19 @@ Feature: API key lifecycle
     Then its plaintext token is returned
     And verification returns the key without exposing its secret
 
+  @unit
+  Scenario: No API key is minted while an operator acts as another member
+    Given an operator acting as a member of an organization
+    When the session asks to create a personal or a service API key
+    Then permission_denied is returned with status 403
+    And no key is minted and no token is returned
+
+  @unit
+  Scenario: A member acting as themselves still mints API keys
+    Given a member signed in as themselves
+    When they create a personal API key
+    Then the request is not refused as an impersonated mint and goes on to the membership check
+
   @integration
   Scenario: A view-only member lists only their own API keys
     Given a member with organization:view and no organization:manage permission
@@ -26,6 +39,14 @@ Feature: API key lifecycle
   Scenario: A system-managed key is not customer-addressable
     When a customer uses the reserved Langy session name
     Then creation, rename, read and revoke are rejected as not found or reserved
+
+  @unit
+  Scenario: A customer key named like a system key stays visible and manageable
+    Given a customer key created before "Workflow run" was reserved, carrying that name
+    When its owner lists, edits or revokes it
+    Then it is listed and the edit and revoke succeed
+    And only a key the system minted is hidden, and calls with it never act as the system
+    And no new key, and no rename, may take the name
 
   Scenario: Replacing grants is fail-safe
     When replacement grants are attached
@@ -202,3 +223,25 @@ Feature: API key lifecycle
     Given a restricted key whose CUSTOM binding points at its own private role
     When the key is read back by id
     Then its permissions are the private role's permissions, as main reports them
+
+  @unit
+  Scenario: A key minted by someone holding a grant on an archived team keeps the minter's role
+    Given a member holding grants on a live team and on an archived team
+    When the member's grants are named for the create-key drawer
+    Then the read answers and names the live team
+    And the archived team's grant has no scope name
+    And the create-key drawer shows an error and disables Create when the read fails
+
+  @unit
+  Scenario: Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in
+    Given a personal workspace owned by one member
+    When the platform mints a system-managed key with no owner bound to that workspace
+    Then the binding is accepted and the key acts as no person
+    And a key a person asked for, with no owner or another owner, is still refused there
+
+  @unit
+  Scenario: A pre-2025 legacy API key still authenticates on every header
+    Given a project whose legacy API key is an opaque value from before December 2024, starting "eyJ"
+    When it is sent as a bearer, as basic auth, or as X-Auth-Token
+    Then it authenticates as that project's legacy API key
+    And it is matched as an opaque string, never verified as a JWT

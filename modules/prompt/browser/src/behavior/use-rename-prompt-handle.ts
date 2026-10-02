@@ -1,10 +1,11 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useCallback } from "react";
 
 import { usePromptConfigContext } from "../model/prompt-config-context.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
 import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
-import { promptApi } from "./prompt-api.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 type UseRenamePromptHandleOptions = {
   promptId: string;
@@ -19,9 +20,11 @@ export const useRenamePromptHandle = ({ promptId, onSuccess }: UseRenamePromptHa
   const { triggerChangeHandle } = usePromptConfigContext();
   const host = usePromptHost();
   const { project } = usePromptProject();
-  const utils = promptApi.useUtils();
+  const utils = promptClient.useUtils();
+  const windows = useDraggableTabsBrowserStore((state) => state.windows);
+  const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
-  const { data: permission } = promptApi.prompts.checkModifyPermission.useQuery(
+  const { data: permission } = promptClient.prompts.checkModifyPermission.useQuery(
     {
       idOrHandle: promptId,
       projectId: project?.id ?? "",
@@ -48,6 +51,23 @@ export const useRenamePromptHandle = ({ promptId, onSuccess }: UseRenamePromptHa
 
     const handleSuccess = (prompt: WireVersionedPrompt) => {
       void utils.prompts.getAllPromptsForProject.invalidate();
+      for (const tab of windows.flatMap((window) => window.tabs)) {
+        if (tab.data.form.currentValues.configId !== prompt.id) continue;
+        updateTabData({
+          tabId: tab.id,
+          updater: (data) => ({
+            ...data,
+            form: {
+              currentValues: {
+                ...data.form.currentValues,
+                handle: prompt.handle,
+                scope: prompt.scope,
+              },
+            },
+            meta: { ...data.meta, title: prompt.handle, scope: prompt.scope },
+          }),
+        });
+      }
       host.succeeded({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,
@@ -66,7 +86,7 @@ export const useRenamePromptHandle = ({ promptId, onSuccess }: UseRenamePromptHa
       onSuccess: handleSuccess,
       onError: handleError,
     });
-  }, [promptId, triggerChangeHandle, utils, onSuccess, host]);
+  }, [promptId, triggerChangeHandle, utils, onSuccess, host, windows, updateTabData]);
 
   return {
     renameHandle,

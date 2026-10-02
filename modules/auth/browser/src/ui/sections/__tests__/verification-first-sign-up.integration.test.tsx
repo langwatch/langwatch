@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Sign-up: address, password, account; confirmation enters not gates.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -121,7 +121,6 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
-import { signUpHref } from "../../../model/carried-email.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
 
@@ -152,12 +151,7 @@ const fillPasswordPair = async (container: HTMLElement, password: string) => {
   await userEvent.type(both[1] as HTMLInputElement, password);
 };
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <VerificationFirstSignUp />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<VerificationFirstSignUp />);
 
 describe("given the sign-up screen", () => {
   beforeEach(() => {
@@ -316,34 +310,61 @@ describe("given the sign-up screen", () => {
     });
   });
 
-  describe("when the log-in door hands over an unconfirmed proof", () => {
-    afterEach(() => {
-      window.history.replaceState(null, "", "/");
-    });
+  describe("when the browser is on a web address the installation is not set up for", () => {
+    const invalidOrigin = {
+      data: {
+        error: {
+          code: "auth_invalid_origin",
+          httpStatus: 403,
+          fault: "customer",
+        },
+      },
+    };
 
-    /** @scenario An address with no account on an installation that cannot send email goes to the password step */
-    it("opens on the password step for the carried address and asks for nothing again", async () => {
-      window.history.replaceState(
-        null,
-        "",
-        signUpHref({ email: "sam@acme.com", addressProof: "unconfirmed_proof" }),
-      );
-
-      const { container } = renderScreen();
-
-      expect(await screen.findByTestId("unconfirmed-address")).toHaveTextContent(
-        "sam@acme.com is not confirmed",
-      );
-      expect(enrollmentMock).toHaveBeenCalledWith({
-        email: "sam@acme.com",
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("says which address to check when creating the account is refused", async () => {
+      requestVerificationMock.mockResolvedValue({
+        sent: false,
         addressProof: "unconfirmed_proof",
       });
-      expect(requestVerificationMock).not.toHaveBeenCalled();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
-      await waitFor(() => {
-        expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      enrollmentMock.mockResolvedValue({
+        outcome: "enroll",
+        methodSet: [{ id: "password", kind: "password", connectionId: null }],
+        reasonCode: "identifier_unknown",
       });
-      expect(window.location.hash).toBe("");
+      registerMock.mockRejectedValue(invalidOrigin);
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("unconfirmed-address");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      expect(
+        await screen.findByText(
+          /LangWatch is set up for a different web address than the one you are using/,
+        ),
+      ).toBeTruthy();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("says which address to check when starting the sign-up is refused", async () => {
+      requestVerificationMock.mockRejectedValue(invalidOrigin);
+
+      renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(
+        await screen.findByText(
+          /LangWatch is set up for a different web address than the one you are using/,
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unconfirmed-address")).toBeNull();
     });
   });
 

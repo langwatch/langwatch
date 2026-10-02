@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/case-version-history.feature
  */
 
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Box,
   Button,
@@ -16,8 +17,7 @@ import {
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+} from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Switch } from "@langwatch/design-system/switch";

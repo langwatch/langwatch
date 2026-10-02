@@ -1,6 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -10,6 +8,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +16,7 @@ import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.
 import type { PromptLifecyclePipeline } from "../../eventing/prompt-lifecycle.pipeline.ts";
 import { MemoryPromptRepositories } from "../../repositories/memory/memory.prompt.repositories.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
-import { PromptApp } from "../prompt.app.ts";
+import { PromptModule } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -61,7 +60,7 @@ function harness() {
   // reach for every other method.
   const prompts = createApiFixture<PromptService>({ updatePrompt });
 
-  const app = PromptApp.createWithPrompts(
+  const app = PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>({
@@ -72,7 +71,6 @@ function harness() {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
-        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createTestLogger().logger,
@@ -106,7 +104,7 @@ function harness() {
   return { app, apply, updatePrompt, writtenData };
 }
 
-describe("PromptApp.applySourceToCopy", () => {
+describe("PromptModule.applySourceToCopy", () => {
   describe("given a source that declares a response format", () => {
     it("writes the response format onto the copy", async () => {
       const { apply, writtenData } = harness();
@@ -146,11 +144,11 @@ describe("PromptApp.applySourceToCopy", () => {
       const by = { id: "user-asking" };
 
       await app.applySourceToCopy(
-        { ...target, commitMessage: PromptApp.commitMessageFor("synced", source) },
+        { ...target, commitMessage: PromptModule.commitMessageFor("synced", source) },
         by,
       );
       await app.applySourceToCopy(
-        { ...target, commitMessage: PromptApp.commitMessageFor("pushed", source) },
+        { ...target, commitMessage: PromptModule.commitMessageFor("pushed", source) },
         by,
       );
 
@@ -285,36 +283,36 @@ describe("PromptApp.applySourceToCopy", () => {
   });
 });
 
-describe("PromptApp.commitMessageFor", () => {
+describe("PromptModule.commitMessageFor", () => {
   describe("given a source that has a handle", () => {
     it("names the source by its handle for a pull", () => {
       expect(
-        PromptApp.commitMessageFor("synced", { id: "prompt-source", handle: "support-triage" }),
+        PromptModule.commitMessageFor("synced", { id: "prompt-source", handle: "support-triage" }),
       ).toBe('Updated from source prompt "support-triage"');
     });
 
     it("names the source by its handle for a push", () => {
       expect(
-        PromptApp.commitMessageFor("pushed", { id: "prompt-source", handle: "support-triage" }),
+        PromptModule.commitMessageFor("pushed", { id: "prompt-source", handle: "support-triage" }),
       ).toBe('Pushed from source prompt "support-triage"');
     });
   });
 
   describe("given a source that has no handle", () => {
     it("falls back to the source's id", () => {
-      expect(PromptApp.commitMessageFor("synced", { id: "prompt-source", handle: null })).toBe(
+      expect(PromptModule.commitMessageFor("synced", { id: "prompt-source", handle: null })).toBe(
         'Updated from source prompt "prompt-source"',
       );
     });
   });
 });
 
-describe("PromptApp.create", () => {
+describe("PromptModule.create", () => {
   describe("given its declared repository bundle", () => {
     it("builds a working engine over memory repositories", async () => {
       const { logger: fakeLogger } = createTestLogger();
 
-      const app = PromptApp.create({
+      const app = PromptModule.create({
         dependencies: {
           projects: createApiFixture<ProjectApi>({
             getOrganizationId: async () => "org-1",
@@ -324,7 +322,6 @@ describe("PromptApp.create", () => {
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
-          nurturing: createApiFixture<NurturingApi>(),
         },
         members: {
           logger: fakeLogger,
@@ -365,7 +362,7 @@ describe("PromptApp.create", () => {
         },
       };
 
-      const app = PromptApp.create({
+      const app = PromptModule.create({
         dependencies: {
           projects: createApiFixture<ProjectApi>({
             getOrganizationId: async () => "org-1",
@@ -382,7 +379,6 @@ describe("PromptApp.create", () => {
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
-          nurturing: createApiFixture<NurturingApi>(),
         },
         members: {
           logger: createTestLogger().logger,

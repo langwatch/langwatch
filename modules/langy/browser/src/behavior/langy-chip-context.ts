@@ -1,4 +1,5 @@
-import { shortenChipId, type LangyContextChip } from "@langwatch/langy-browser-kit";
+import { shortenChipId } from "./langy-context-chips.ts";
+import { type LangyContextChip } from "./langy.store.ts";
 
 /**
  * What a context chip actually gives Langy, said out loud.

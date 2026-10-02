@@ -4,9 +4,10 @@
  * handler to each and repeats nothing.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "./topic-clustering.constants.ts";
 import {
   topicClusteringRunHistoryEntrySchema,
   topicClusteringStatusSchema,
@@ -21,11 +22,11 @@ export const topicTrpc = defineTrpcContract("topics")
   .withInput(topicProjectScopeSchema)
   .withOutput(topicSchema.array())
 
-  .query("getClusteringStatus")
+  .query("getClusteringStatus", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringStatusSchema)
 
-  .query("getClusteringRunHistory")
+  .query("getClusteringRunHistory", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringRunHistoryEntrySchema.array())
   .build();

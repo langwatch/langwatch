@@ -1,9 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { type SsoConfig } from "@langwatch/enterprise-sso-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   ssoDomainRecordLocation,
@@ -15,17 +14,13 @@ import {
   type SsoSetupApi,
   type SsoSetupCommandsApi,
 } from "@langwatch/identity-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { OpsApi } from "@langwatch/ops-contract";
+import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwatch/secrets";
-import type { UserApi, UserProfile } from "@langwatch/user-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
+import { SsoModule, type SsoInfrastructure } from "../sso.app.ts";
 import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
-
-/** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
-export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
 
 export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
   return {
@@ -75,30 +70,14 @@ export function createSsoTestLicensing(): LicensingApi {
   });
 }
 
-export function createSsoTestOperators(staffEmail = SSO_TEST_STAFF_EMAIL): OpsApi {
-  return createApiFixture<OpsApi>({
-    isAdmin: (identity) => identity.email === staffEmail,
-  });
-}
-
-function testProfile(id: string, email: string | null): UserProfile {
-  return {
-    id,
-    name: null,
-    email,
-    emailVerified: true,
-    image: null,
-    pendingSsoSetup: false,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    lastLoginAt: null,
-    deactivatedAt: null,
-  };
-}
-
-export function createSsoTestUsers(profiles: Record<string, string | null> = {}): UserApi {
-  return createApiFixture<UserApi>({
-    findById: async ({ id }) => (id in profiles ? testProfile(id, profiles[id] ?? null) : null),
+/** Authz as the back office asks it: yes at the platform for the users named, no for the rest. */
+export function createSsoTestAuthorization(operators: readonly string[] = []): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    can: async ({ principal, permission, scope }) =>
+      scope.type === "platform" &&
+      permission.startsWith("ops:") &&
+      principal.type === "user" &&
+      operators.includes(principal.id),
   });
 }
 
@@ -146,6 +125,7 @@ export class RecordingSsoDomainCeremony implements SsoDomainCeremonyApi {
   readonly claimDomain = vi.fn<SsoDomainCeremonyApi["claimDomain"]>(async () => ({
     waitsForReview: false,
     disputed: false,
+    verified: false,
   }));
   readonly proveDomain = vi.fn<SsoDomainCeremonyApi["proveDomain"]>(async ({ domain }) => ({
     proved: false,
@@ -297,33 +277,21 @@ export class RecordingSsoSetupCommands implements SsoSetupCommandsApi {
     async () => {},
   );
   readonly rename = vi.fn<SsoSetupCommandsApi["rename"]>(async () => {});
+  readonly getIdentityProvider = vi.fn<SsoSetupCommandsApi["getIdentityProvider"]>(async () => ({
+    protocol: "oidc" as const,
+    issuer: "https://acme.okta.com",
+    clientId: "client",
+    hasClientSecret: true,
+  }));
+  readonly updateIdentityProvider = vi.fn<SsoSetupCommandsApi["updateIdentityProvider"]>(
+    async () => {},
+  );
   readonly setArrivals = vi.fn<SsoSetupCommandsApi["setArrivals"]>(async () => {});
   readonly activate = vi.fn<SsoSetupCommandsApi["activate"]>(async () => {});
   readonly discardConnection = vi.fn<SsoSetupCommandsApi["discardConnection"]>(async () => {});
   readonly removeConnection = vi.fn<SsoSetupCommandsApi["removeConnection"]>(async () => ({
     removal: "teardown-requested" as const,
   }));
-}
-
-/** A complete plan, at the type the gate only ever reads `.type` off. */
-export function createSsoTestPlan(type: string): Plan {
-  return {
-    planSource: "subscription",
-    type,
-    name: type,
-    free: false,
-    maxMembers: 0,
-    maxMembersLite: 0,
-    maxMessagesPerMonth: 0,
-    canPublish: true,
-    prices: { USD: 0, EUR: 0 },
-  };
-}
-
-export function createSsoTestEntitlements(planType = "ENTERPRISE"): EntitlementApi {
-  return createApiFixture<EntitlementApi>({
-    getActivePlan: () => Promise.resolve(createSsoTestPlan(planType)),
-  });
 }
 
 /** The flag service, answering `self_serve_sso` for the organizations named. */
@@ -344,25 +312,21 @@ export function createSsoTestApp(
     connections?: RecordingSsoConnectionLedger;
     dependencies?: Partial<{
       licensing: LicensingApi;
-      operators: OpsApi;
-      users: UserApi;
+      authorization: AuthzApi;
       auditLog: AuditLogApi;
       identity: IdentityApi;
-      entitlements: EntitlementApi;
       featureFlags: FeatureFlagApi;
     }>;
   }> = {},
-): Promise<SsoApp> {
+): Promise<SsoModule> {
   const connections = input.connections ?? RecordingSsoConnectionLedger.create();
-  return SsoApp.create({
+  return SsoModule.create({
     config: input.config ?? createSsoTestConfig(),
     dependencies: {
       licensing: input.dependencies?.licensing ?? createSsoTestLicensing(),
-      operators: input.dependencies?.operators ?? createSsoTestOperators(),
-      users: input.dependencies?.users ?? createSsoTestUsers(),
+      authorization: input.dependencies?.authorization ?? createSsoTestAuthorization(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
-      entitlements: input.dependencies?.entitlements ?? createSsoTestEntitlements(),
       featureFlags: input.dependencies?.featureFlags ?? createSsoTestFeatureFlags(),
     },
     members: {

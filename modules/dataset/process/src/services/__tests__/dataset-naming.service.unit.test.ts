@@ -75,7 +75,7 @@ describe("DatasetNamingService", () => {
 
       await expect(
         service.validateDatasetName({ projectId: PROJECT_ID, proposedName: "Refunds" }),
-      ).resolves.toEqual({ available: false, slug: "refunds", conflictsWith: "dataset-1" });
+      ).resolves.toEqual({ available: false, slug: "refunds", conflictsWith: "refunds" });
     });
   });
 

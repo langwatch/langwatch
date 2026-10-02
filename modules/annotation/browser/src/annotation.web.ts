@@ -4,7 +4,7 @@
  * injected value these screens are allowed to read.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
 import { z } from "zod";
 
@@ -23,7 +23,7 @@ function annotationList(view: AnnotationView) {
   };
 }
 
-export const annotationWeb = defineWebModule("annotation")
+export const annotationWeb = defineBrowserModule("annotation")
   .withHosts({
     requires: ["AnnotationHostApi", "AnnotationScoresHostApi"],
     mounts: {
@@ -71,11 +71,6 @@ export const annotationWeb = defineWebModule("annotation")
       requires: "annotations:view",
       load: () => import("./ui/sections/annotation-scores-screen.tsx"),
     },
-  })
-  /** What another module may mount. Today the trace explorer mounts both. */
-  .publishSurfaces({
-    "annotation-chips": { load: () => import("./annotation-chips.ts") },
-    "annotation-scores": { load: () => import("./annotation-scores.ts") },
   })
   /** The score editor, opened by address from the annotation queue drawer. */
   .withDrawers({

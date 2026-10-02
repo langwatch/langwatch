@@ -5,11 +5,11 @@
  */
 
 import { modelProviderTrpc } from "@langwatch/model-provider-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 
-export const modelProviderWeb = defineWebModule("model-provider")
+export const modelProviderWeb = defineBrowserModule("model-provider")
   .withApi(modelProviderApi, { contracts: [modelProviderTrpc] })
   .withHosts({
     requires: ["ModelProviderHostApi"],
@@ -69,27 +69,5 @@ export const modelProviderWeb = defineWebModule("model-provider")
       load: async () => ({
         default: (await import("./ui/elements/model-selector.tsx")).ModelSelector,
       }),
-    },
-  })
-  /**
-   * What another module may mount. langy edits providers inline; evaluator
-   * and trace pick a model or read its cost/error surface.
-   */
-  .publishSurfaces({
-    "ai-sparkles-loader": { load: () => import("@langwatch/model-provider-browser-kit") },
-    "clamp-max-tokens": { load: () => import("@langwatch/model-provider-browser-kit") },
-    "edit-model-provider-form": { load: () => import("./edit-model-provider-form.ts") },
-    "history-icon": { load: () => import("@langwatch/model-provider-browser-kit") },
-    "model-limits": { load: () => import("./model-limits.ts") },
-    "no-models-configured-callout": {
-      load: () => import("@langwatch/model-provider-browser-kit"),
-    },
-    "surfaces/model-error": { load: () => import("@langwatch/model-provider-browser-kit") },
-    "surfaces/model-provider-settings": {
-      load: () => import("./behavior/use-model-providers-settings.ts"),
-    },
-    "surfaces/model-selector": { load: () => import("./ui/elements/model-selector.tsx") },
-    "surfaces/provider-model-selector": {
-      load: () => import("@langwatch/model-provider-browser-kit"),
     },
   });

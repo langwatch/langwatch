@@ -36,11 +36,13 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@trpc/server": "catalog:",
@@ -50,12 +52,12 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "undici": "catalog:",
     "vitest": "catalog:"
   }
 }

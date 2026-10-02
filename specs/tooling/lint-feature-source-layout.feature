@@ -52,3 +52,29 @@ Feature: The feature-source-layout lint rule
     When a path names one of those homes, or a folder the grammar closed
     Then every named home is accepted and every closed folder is refused
     And the message never names a closed folder
+
+  @unit
+  Scenario: A concern may nest services, rules, repositories and eventing one level deep
+    Given a process file under features/<concern>/ in services/, rules/, repositories/ or eventing/
+    When the feature-source-layout rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: Nesting stops at one level and leaves the other homes at the top
+    Given a process file two features/ levels deep, or features/ inside a home folder
+    And a transport, app, task, migration, channel or index file under features/<concern>/
+    When the feature-source-layout rule runs over it
+    Then it reports processPath
+
+  @unit
+  Scenario: A nested rules, service or process-manager file gets the same checks as a top-level one
+    Given a rules module or a process-manager service under features/<concern>/
+    When the feature-source-layout rule runs over it
+    Then it reports rulesImpurity or processManagerService as it would at the top level
+
+  @unit
+  Scenario: A contract concern folder holds that concern's artifacts under the same names
+    Given a contract file under features/<concern>/ named <subject>.<artifact>.ts
+    When the feature-source-layout rule runs over it
+    Then it reports nothing
+    And a contract file there with no subject or with a process-only artifact is still reported

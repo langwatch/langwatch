@@ -1,8 +1,7 @@
 /**
- * Retry policy for a transient model failure, plugged into pi's own retry loop so tool calls that
- * already ran keep their results. The relay's llmretry.go re-sends a rejected 429 first; this
- * covers a failure inside a stream already answered 200.
- * @see specs/langy/langy-model-call-retry.feature
+ * The retry for a model call that failed transiently (overload, dropped stream, network,
+ * timeout, 5xx, 429). It runs inside pi's own retry loop, so tool calls that already ran keep
+ * their result; the relay (services/langyagent/adapters/otelrelay/llmretry.go) covers 429s.
  */
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
@@ -31,7 +30,7 @@ export type FailedModelCall = {
  * hardLimitReasonCodes (llmproxy.go).
  */
 const PLAN_LIMIT_PATTERN =
-  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|quota exceeded|out of budget|billing/i;
+  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|quota exceeded|out of budget|credit balance/i;
 
 /** The wording providers, SDKs and transports use for a failure worth another try. */
 const TRANSIENT_PATTERN = new RegExp(
@@ -79,9 +78,9 @@ export function leadingStatus(errorMessage: string): number | undefined {
 }
 
 /**
- * Whether a failed model call is worth another try. A leading status decides first: 408, 429 and
- * 5xx are transient, any other 4xx is a refusal. With no status, the wording decides. A plan limit
- * never retries.
+ * Whether a failed model call is worth another try. A leading status decides first: 408, 429
+ * and 5xx are transient, every other 4xx a refusal. Otherwise the wording decides. A plan
+ * limit never retries.
  */
 export function isTransientModelFailure(call: FailedModelCall): boolean {
   if (call.stopReason !== "error") return false;
@@ -146,9 +145,9 @@ export function namedWaitMs(errorMessage: string, now: number = Date.now()): num
 }
 
 /**
- * The wait before retry `attempt` (from 1), or null when the provider named a wait too long to
- * take. A named wait is taken as named; otherwise the backoff doubles from
- * MODEL_RETRY_BASE_DELAY_MS, shifted by up to MODEL_RETRY_JITTER so retries do not line up.
+ * The wait before retry number `attempt` (from 1), or null when the provider named one too
+ * long to take. A named wait is taken as named; otherwise the backoff doubles from
+ * MODEL_RETRY_BASE_DELAY_MS with MODEL_RETRY_JITTER either way.
  */
 export function retryDelayMs({
   attempt,
@@ -232,6 +231,10 @@ export function installModelRetry({
     const delayMs = retryDelayMs({ attempt, errorMessage, random });
     if (delayMs === null) return false;
     internals._retryAttempt = attempt;
+    // Held before the attempt is announced, so a stop that answers the
+    // announcement still ends the wait.
+    const controller = new AbortController();
+    internals._retryAbortController = controller;
     internals._emit({
       type: "auto_retry_start",
       attempt,
@@ -245,8 +248,6 @@ export function installModelRetry({
     if (messages.at(-1)?.role === "assistant") {
       internals.agent.state.messages = messages.slice(0, -1);
     }
-    const controller = new AbortController();
-    internals._retryAbortController = controller;
     try {
       await sleep(delayMs, controller.signal);
     } catch {

@@ -2,8 +2,8 @@
  * JSX (forbidden); dialog only now.
  */
 
-import { Button, Input, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 /** What the reader has to type before the destructive button unlocks. */

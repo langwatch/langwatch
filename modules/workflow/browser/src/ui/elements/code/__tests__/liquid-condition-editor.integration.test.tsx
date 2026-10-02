@@ -3,30 +3,26 @@
  *
  * The Liquid condition input makes mistakes visible with errors and warnings.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../workflow-code-editor.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   vscodeThemeName: () => "vs",
 }));
 
 import { LiquidConditionEditor } from "../liquid-condition-editor.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 const noop = () => {};
 
 const renderEditor = (value: string, availableVariables: string[]) =>
-  render(
+  renderWithDesignSystem(
     <LiquidConditionEditor value={value} onChange={noop} availableVariables={availableVariables} />,
-    { wrapper: Wrapper },
   );
 
 describe("LiquidConditionEditor", () => {

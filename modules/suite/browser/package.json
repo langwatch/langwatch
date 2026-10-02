@@ -15,13 +15,30 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/suite-browser-kit": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*"
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/browser": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@tanstack/react-virtual": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

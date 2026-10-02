@@ -6,7 +6,7 @@
  * whose published record has vanished still routes the people already here,
  * so it is never shown as simply "Proved".
  */
-import { Button, HStack, Input, Table, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoIssuedDnsRecord } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
@@ -93,7 +93,8 @@ export function DomainsSection({
 
       {rows.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
-          No domain has been claimed yet. Add the domain your team&apos;s email addresses end in:{" "}
+          No domain has been claimed yet. Add the domain your team&apos;s email addresses end in,
+          for example{" "}
           <Text as="span" fontFamily="mono">
             acme.com
           </Text>{" "}
@@ -151,7 +152,7 @@ export function DomainsSection({
             disabled={domain.trim().length === 0}
             onClick={claimDomain}
           >
-            Claim domain
+            {provesWithLicense ? "Add domain" : "Claim domain"}
           </Button>
         </HStack>
       )}
@@ -371,8 +372,9 @@ function WhyADomainIsProved({ provesWithLicense }: { provesWithLicense: boolean 
   if (provesWithLicense) {
     return (
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        A domain has to be proved before it decides how people sign in. On this installation your
-        enterprise licence is that proof, so there is nothing to publish anywhere.
+        On this installation a domain you add is verified right away, with nothing to publish. Once
+        the connection is live, people who sign in with an address at it go to your identity
+        provider.
       </Text>
     );
   }
@@ -380,7 +382,7 @@ function WhyADomainIsProved({ provesWithLicense }: { provesWithLicense: boolean 
   return (
     <VStack align="stretch" gap={1}>
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        Proving a domain is optional, and you can come back to it at any time: your account manager
+        Proving a domain is optional, and you can come back to it at any time. Your account manager
         at LangWatch can also do it for you. You publish a short value we give you in the
         domain&apos;s DNS, or as a file on your website, and we look for it.
       </Text>

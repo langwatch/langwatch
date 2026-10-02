@@ -4,8 +4,8 @@
  * through the composition's `contactSales` slot; unfilled, no card shows.
  */
 
-import { Box } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
+import { Box } from "@langwatch/design-system/primitives";
 
 /** The sales block, framed the way both pages framed it. */
 export function EnterpriseUpsell() {

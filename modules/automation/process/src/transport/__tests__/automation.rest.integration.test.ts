@@ -1,93 +1,45 @@
 /**
  * @vitest-environment node
- * `/api/triggers` over the real REST runtime and the real condition rule.
+ * `/api/triggers` over the real REST runtime and the real public-API service.
  * @see specs/automations/authoring-drawer.feature
  */
-import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction } from "@langwatch/automation-contract";
+import { describe, expect, it } from "vitest";
 
-import { createCanonicalAutomationApp } from "../../app/__tests__/automation-app.fixture.ts";
 import { createAutomationRest } from "../automation.rest.ts";
-import { mountAutomationRest } from "./automation-rest.harness.ts";
+import { createPublicApiRig, triggerRow } from "./automation-rest-redaction.fixture.ts";
 
-const storedTrigger: Trigger = {
+const stored = triggerRow({
   id: "trigger_1",
-  projectId: "project_1",
   name: "Nightly",
-  action: "ADD_TO_ANNOTATION_QUEUE",
-  actionParams: { annotators: ["user_owner"], createdByUserId: "user_owner" },
-  triggerKind: "AUTOMATION",
-  filterQuery: "",
-  filters: { topics: ["billing"] },
-  active: true,
-  deleted: false,
-  pausedReason: null,
-  pausedAt: null,
-  message: null,
-  alertType: null,
-  customGraphId: null,
-  notificationCadence: "immediate",
-  traceDebounceMs: 0,
-  templates: {
-    slackTemplateType: null,
-    slackTemplate: null,
-    emailSubjectTemplate: null,
-    emailBodyTemplate: null,
+  action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+  actionParams: {
+    annotators: [{ id: "user_owner", name: "Owner" }],
+    createdByUserId: "user_owner",
   },
-  createdAt: new Date("2026-09-01T00:00:00.000Z"),
-  updatedAt: new Date("2026-09-02T00:00:00.000Z"),
-  lastRunAt: null,
-};
-
-const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
-
-afterEach(async () => {
-  await Promise.all(resources.splice(0).map((resource) => resource.close()));
+  filters: { "traces.error": ["true"] },
 });
 
-/**
- * The family over a stubbed application, except the two rules under
- * test -- the condition a trace automation must keep, and the create
- * that enforces it -- both taken from the canonical application.
- */
-function mount(options: { live?: Trigger | null } = {}) {
-  const fixture = createCanonicalAutomationApp();
-
-  resources.push(fixture.resources);
-
-  const updates: unknown[] = [];
-  const app: Partial<AutomationApi> = {
-    getAllForProject: async () => [storedTrigger],
-    findLiveById: async () => (options.live === undefined ? storedTrigger : options.live),
-    assertConditionSurvivesEdit: (input) => fixture.app.assertConditionSurvivesEdit(input),
-    createTraceAutomation: (command) => fixture.app.createTraceAutomation(command),
-    update: vi.fn(async (command: unknown) => {
-      updates.push(command);
-
-      return storedTrigger;
-    }),
-    delete: vi.fn(async () => undefined),
-  };
-
-  return { ...mountAutomationRest(app), app, updates };
-}
-
 describe("the /api/triggers declaration", () => {
-  it("answers at the five addresses and operations its callers hold", () => {
+  it("answers at main's addresses and operations", () => {
     const routes = createAutomationRest()
       .router()
       .routes.map((route) => `${route.method.toUpperCase()} ${route.path} ${route.operation}`);
 
     expect(routes).toEqual([
       "GET / getApiTriggers",
-      "GET /:id getApiTriggersById",
+      "GET /:triggerId getApiTriggersById",
+      "GET /:triggerId/fires getApiTriggersByIdFires",
       "POST / postApiTriggers",
-      "PATCH /:id patchApiTriggersById",
-      "DELETE /:id deleteApiTriggersById",
+      "PATCH /:triggerId patchApiTriggersById",
+      "POST /:triggerId/enable postApiTriggersByIdEnable",
+      "POST /:triggerId/disable postApiTriggersByIdDisable",
+      "POST /:triggerId/test-fire postApiTriggersByIdTestFire",
+      "DELETE /:triggerId deleteApiTriggersById",
     ]);
   });
 
-  it("keeps each route's permission where it has always been", () => {
+  it("keeps each route's permission where main has it", () => {
     const permissions = Object.fromEntries(
       createAutomationRest()
         .router()
@@ -97,8 +49,12 @@ describe("the /api/triggers declaration", () => {
     expect(permissions).toEqual({
       getApiTriggers: "triggers:view",
       getApiTriggersById: "triggers:view",
+      getApiTriggersByIdFires: "triggers:view",
       postApiTriggers: "triggers:create",
       patchApiTriggersById: "triggers:update",
+      postApiTriggersByIdEnable: "triggers:update",
+      postApiTriggersByIdDisable: "triggers:update",
+      postApiTriggersByIdTestFire: "triggers:update",
       deleteApiTriggersById: "triggers:manage",
     });
   });
@@ -107,34 +63,30 @@ describe("the /api/triggers declaration", () => {
 describe("given the REST automation edit", () => {
   describe("when the edit carries delivery settings", () => {
     /** @scenario "A REST edit replaces an automation's delivery settings" */
-    it("forwards the action params so the update replaces them", async () => {
-      const api = mount();
-
-      const response = await api.patch("/api/triggers/trigger_1", {
-        actionParams: { members: ["x@example.com"] },
+    it("replaces them", async () => {
+      const rig = createPublicApiRig({ rows: [stored] });
+      const response = await rig.api.patch("/api/triggers/trigger_1", {
+        actionParams: { annotators: [{ id: "user_2", name: "Two" }] },
       });
 
       expect(response.status).toBe(200);
-      expect(api.updates).toEqual([
-        { id: "trigger_1", projectId: "project_1", actionParams: { members: ["x@example.com"] } },
-      ]);
+      expect(rig.rows.get("trigger_1")?.actionParams).toEqual({
+        annotators: [{ id: "user_2", name: "Two" }],
+      });
     });
   });
 
   describe("when the edit carries only the fields the endpoint documents", () => {
     /** @scenario "A REST edit still changes an automation's name and state" */
-    it("applies the edit and forwards no delivery settings", async () => {
-      const api = mount();
-
-      const response = await api.patch("/api/triggers/trigger_1", {
+    it("applies the edit and leaves the delivery settings alone", async () => {
+      const rig = createPublicApiRig({ rows: [stored] });
+      const response = await rig.api.patch("/api/triggers/trigger_1", {
         name: "Renamed",
         active: false,
       });
 
-      expect(response.status).toBe(200);
-      expect(api.updates).toEqual([
-        { id: "trigger_1", projectId: "project_1", name: "Renamed", active: false },
-      ]);
+      expect(await response.json()).toMatchObject({ name: "Renamed", active: false });
+      expect(rig.rows.get("trigger_1")?.actionParams).toEqual(stored.actionParams);
     });
   });
 });
@@ -143,16 +95,14 @@ describe("given the REST automation create", () => {
   describe("when the request omits the condition entirely", () => {
     /** @scenario "The REST API no longer invents an empty condition" */
     it("refuses it with the machine-readable condition-required code", async () => {
-      const api = mount();
-
-      const response = await api.post("/api/triggers", {
-        name: "No condition",
-        action: "SEND_SLACK_MESSAGE",
-        actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
+      const response = await createPublicApiRig().api.post("/api/triggers", {
+        name: "Everything",
+        action: "SEND_EMAIL",
+        actionParams: { members: ["a@example.com"] },
       });
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
     });
   });
 });
@@ -161,29 +111,30 @@ describe("given a stored automation whose condition is a filter set", () => {
   describe("when a REST patch replaces that condition with an empty one", () => {
     /** @scenario "A REST edit that empties the condition changes nothing" */
     it("refuses with the condition-required code and leaves the stored condition alone", async () => {
-      const api = mount();
+      const rig = createPublicApiRig({ rows: [stored] });
+      const response = await rig.api.patch("/api/triggers/trigger_1", { filters: {} });
 
-      const response = await api.patch("/api/triggers/trigger_1", { filters: {} });
-
-      expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
-      expect(api.updates).toEqual([]);
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
+      expect(rig.rows.get("trigger_1")?.filters).toEqual(stored.filters);
     });
   });
 });
 
 describe("given an id no live automation in the project has", () => {
-  describe("when it is read, edited or deleted", () => {
-    it("answers the one sentence this family has always answered a miss with", async () => {
-      const api = mount({ live: null });
+  describe("when it is read, edited, paused, test-fired or deleted", () => {
+    it("answers trigger_not_found", async () => {
+      const { api } = createPublicApiRig();
 
       for (const response of [
         await api.get("/api/triggers/trigger_gone"),
+        await api.get("/api/triggers/trigger_gone/fires"),
         await api.patch("/api/triggers/trigger_gone", { name: "Renamed" }),
+        await api.post("/api/triggers/trigger_gone/disable"),
+        await api.post("/api/triggers/trigger_gone/test-fire"),
         await api.delete("/api/triggers/trigger_gone"),
       ]) {
         expect(response.status).toBe(404);
-        expect(await response.json()).toEqual({ error: "Trigger not found" });
+        expect(await response.json()).toMatchObject({ code: "trigger_not_found" });
       }
     });
   });

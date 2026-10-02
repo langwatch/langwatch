@@ -1,19 +1,29 @@
-import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import { type BubbleTone } from "@langwatch/design-system/bubble-tones";
+import { useConversationExpand } from "@langwatch/design-system/conversation-expand-context";
+import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
 import {
-  type BubbleTone,
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-  useConversationExpand,
-} from "@langwatch/trace-browser-kit";
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, memo, useCallback, useMemo, useState } from "react";
 
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../behavior/annotation-queue-session.store.ts";
+import { useIsScenarioRole } from "../../../../../behavior/scenario-role.store.tsx";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
+import { formatRelativeTimeAgo } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import { Markdown } from "../../../markdown.tsx";
@@ -29,7 +39,6 @@ import {
   truncateMarkdown,
 } from "../../trace-table/registry/addons/conversation/bubble.tsx";
 import type { TraceListItem } from "../../types/trace.ts";
-import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenario-roles.tsx";
 import { getRolePalette, ReasoningBlock } from "../transcript/index.ts";
 import {
   MessageAnnotateCluster,
@@ -502,7 +511,11 @@ function ThreadMessage({
   // specs/traces-v2/conversation-message-expand.feature
   const { shouldExpandAll } = useConversationExpand();
   const [expanded, setExpanded] = useState(shouldExpandAll);
-  useEffect(() => setExpanded(shouldExpandAll), [shouldExpandAll]);
+  const [expandAllFrom, setExpandAllFrom] = useState(shouldExpandAll);
+  if (expandAllFrom !== shouldExpandAll) {
+    setExpandAllFrom(shouldExpandAll);
+    setExpanded(shouldExpandAll);
+  }
   const canExpand = text.length > THREAD_MAX_CHARS;
   const display =
     !canExpand || expanded

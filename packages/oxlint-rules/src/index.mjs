@@ -8,6 +8,7 @@ import {
 import { defineRule, renderMessage, renderTemplate } from "./define-rule.mjs";
 import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
+import { browserStoreContainmentRule } from "./rules/browser-store-containment.rule.mjs";
 import { clickhouseNoVersionOrderLimitRule } from "./rules/clickhouse-no-version-order-limit.rule.mjs";
 import { clickhouseTenantIdRule } from "./rules/clickhouse-tenant-id.rule.mjs";
 import { cognitiveComplexityRule } from "./rules/cognitive-complexity.rule.mjs";
@@ -18,6 +19,7 @@ import {
 } from "./rules/comment-block-size.rule.mjs";
 import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
+import { effectDerivesStateRule } from "./rules/effect-derives-state.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
 import { enterpriseLicenseHeaderRule } from "./rules/enterprise-license-header.rule.mjs";
 import { environmentBoundariesRule } from "./rules/environment-boundaries.rule.mjs";
@@ -37,10 +39,12 @@ import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
+import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
 import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
 import { noPrototypeStubRule } from "./rules/no-prototype-stub.rule.mjs";
+import { noReduxRule } from "./rules/no-redux.rule.mjs";
 import { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
 import { noTautologicalAssertionRule } from "./rules/no-tautological-assertion.rule.mjs";
 import { overloadByLiteralRule } from "./rules/overload-by-literal.rule.mjs";
@@ -48,6 +52,7 @@ import { boundaryRule } from "./rules/package-boundaries.rule.mjs";
 import { passThroughClassRule } from "./rules/pass-through-class.rule.mjs";
 import { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
 import { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";
+import { queryDataInStateRule } from "./rules/query-data-in-state.rule.mjs";
 import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
@@ -110,6 +115,7 @@ const RULES = [
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noHandRolledPlanGateRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -135,12 +141,20 @@ const RULES = [
   zodObjectIntersectionRule,
   zodSchemaPerCallRule,
   zodValidateForBooleanRule,
+  browserStoreContainmentRule,
+  effectDerivesStateRule,
+  noReduxRule,
+  queryDataInStateRule,
 ];
 
 /** Every registered rule, keyed by the name its own `defineRule` declaration carries. */
 export const rules = Object.fromEntries(RULES.map((rule) => [rule.meta.docs.name, rule]));
 
 export {
+  browserStoreContainmentRule,
+  effectDerivesStateRule,
+  noReduxRule,
+  queryDataInStateRule,
   enterpriseLicenseHeaderRule,
   eventingRolePurityRule,
   signatureMirrorRule,
@@ -188,6 +202,7 @@ export {
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noHandRolledPlanGateRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

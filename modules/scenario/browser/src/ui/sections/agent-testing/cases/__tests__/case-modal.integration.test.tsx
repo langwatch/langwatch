@@ -5,11 +5,10 @@
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTestingCaseEditorDrawer } from "../agent-testing-case-editor-drawer.tsx";
@@ -48,19 +47,60 @@ const onSuccessOf = vi.hoisted(
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    suites: {
+      testSuites: { getAll: { useQuery: mockTestSuitesGetAll } },
+      getAll: { useQuery: emptyQuery },
+      getSummaries: { useQuery: emptyQuery },
+      update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
+    agents: { getAll: { useQuery: mockAgentsGetAll } },
+    modelProvider: {
+      listAllForProjectForFrontend: { useQuery: emptyQuery },
+      getResolvedDefault: { useQuery: emptyQuery },
+    },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
     evaluators: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn(), setData: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
-      suites: {
-        testSuites: { getAll: { invalidate: vi.fn() } },
-        getById: { invalidate: vi.fn() },
       },
     }),
     scenarios: {
@@ -85,20 +125,6 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       },
       create: { useMutation: onSuccessOf(mockCreate) },
       update: { useMutation: onSuccessOf(mockUpdate) },
-    },
-    suites: {
-      testSuites: { getAll: { useQuery: mockTestSuitesGetAll } },
-      getAll: { useQuery: emptyQuery },
-      getSummaries: { useQuery: emptyQuery },
-      update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-    },
-    agents: { getAll: { useQuery: mockAgentsGetAll } },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
-    modelProvider: {
-      listAllForProjectForFrontend: { useQuery: emptyQuery },
-      getResolvedDefault: { useQuery: emptyQuery },
     },
   },
 }));
@@ -140,7 +166,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -167,7 +193,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 // usePeriodSelector reads through the workflows package's own host
 // abstraction (WorkflowHostProvider); the recent-runs button only needs a
 // stable window, not a real host, so the hook is stubbed directly.
-vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => {
+vi.mock("../../../../elements/analytics/period-selector.tsx", async (importOriginal) => {
   const mod = await importOriginal<object>();
   return {
     ...mod,
@@ -182,10 +208,6 @@ vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => {
     }),
   };
 });
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const REFUNDS = { id: "suite_refunds", name: "Refunds", slug: "refunds" };
 
@@ -232,12 +254,11 @@ describe("the scenario dialog", () => {
 
   const openNew = () => {
     openDrawerAs({ testSuiteId: REFUNDS.id });
-    render(
+    renderWithDesignSystem(
       <>
         <AgentTestingCaseEditor />
         <AgentTestingCaseEditorDrawer />
       </>,
-      { wrapper: Wrapper },
     );
   };
 
@@ -406,12 +427,11 @@ describe("the scenario dialog", () => {
         refetch: vi.fn(),
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       expect(await screen.findByLabelText("Parameters")).toHaveValue("customer_plan=free");
@@ -452,12 +472,11 @@ describe("the scenario dialog", () => {
         refetch: vi.fn(),
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       const line = await screen.findByLabelText("Parameters");
@@ -487,12 +506,11 @@ describe("the scenario dialog", () => {
       });
       mockLastResults.mockReturnValue({ data: [], isLoading: false });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       const trigger = await screen.findByTestId("recent-runs-trigger");
@@ -517,12 +535,11 @@ describe("the scenario dialog", () => {
         isLoading: false,
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       const trigger = await screen.findByTestId("recent-runs-trigger");
@@ -562,12 +579,11 @@ describe("the scenario dialog", () => {
         refetch: vi.fn(),
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       expect(await screen.findByText("Edit scenario")).toBeInTheDocument();
@@ -639,12 +655,11 @@ describe("the scenario dialog", () => {
         refetch: vi.fn(),
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       const block = await screen.findByTestId("case-caller-voice-block");
@@ -668,12 +683,11 @@ describe("the scenario dialog", () => {
         refetch: vi.fn(),
       });
       openDrawerAs({ scenarioId: "case_1" });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
 
       await screen.findByTestId("case-caller-voice-block");
@@ -718,12 +732,11 @@ describe("the scenario dialog", () => {
 
     const openInLookups = () => {
       openDrawerAs({ testSuiteId: CASE_LOOKUPS.id });
-      render(
+      renderWithDesignSystem(
         <>
           <AgentTestingCaseEditor />
           <AgentTestingCaseEditorDrawer />
         </>,
-        { wrapper: Wrapper },
       );
     };
 
@@ -801,12 +814,11 @@ describe("the scenario dialog", () => {
           refetch: vi.fn(),
         });
         openDrawerAs({ scenarioId: "case_1" });
-        render(
+        renderWithDesignSystem(
           <>
             <AgentTestingCaseEditor />
             <AgentTestingCaseEditorDrawer />
           </>,
-          { wrapper: Wrapper },
         );
 
         expect(await screen.findByLabelText("golden_sql")).toHaveValue("SELECT 1");
@@ -838,12 +850,11 @@ describe("the scenario dialog", () => {
           refetch: vi.fn(),
         });
         openDrawerAs({ scenarioId: "case_1" });
-        render(
+        renderWithDesignSystem(
           <>
             <AgentTestingCaseEditor />
             <AgentTestingCaseEditorDrawer />
           </>,
-          { wrapper: Wrapper },
         );
 
         expect(await screen.findByTestId("case-field-strict-switch")).toBeChecked();

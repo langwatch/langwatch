@@ -54,6 +54,7 @@ export const prismaTableCatalogue = {
   "BatchEvaluation": "BatchEvaluation",
   "Trigger": "Trigger",
   "SlackIntegration": "SlackIntegration",
+  "SlackConnectionClaim": "slack_connection_claim",
   "WebhookEndpoint": "WebhookEndpoint",
   "WebhookEndpointDelivery": "WebhookEndpointDelivery",
   "Experiment": "Experiment",
@@ -106,12 +107,15 @@ export const prismaTableCatalogue = {
   "InvoiceItem": "InvoiceItem",
   "Group": "Group",
   "GroupMembership": "GroupMembership",
+  "AuthzUserStanding": "AuthzUserStanding",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
   "Role": "Role",
   "ApiKey": "ApiKey",
   "ProjectActiveDay": "ProjectActiveDay",
+  "NurturingProject": "NurturingProject",
+  "NurturingOrganization": "NurturingOrganization",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
   "VirtualKey": "VirtualKey",
   "VirtualKeyScope": "VirtualKeyScope",
@@ -126,6 +130,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
+  "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
   "GatewayBudgetBucketBoundary": "GatewayBudgetBucketBoundary",
   "GatewayBudgetLedger": "GatewayBudgetLedger",
@@ -1098,6 +1103,17 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "updatedById",
     "createdAt",
+    "updatedAt",
+    "claims"
+  ],
+  "SlackConnectionClaim": [
+    "connectionId",
+    "connection",
+    "claimantId",
+    "claimantLabel",
+    "organizationId",
+    "projectId",
+    "createdAt",
     "updatedAt"
   ],
   "WebhookEndpoint": [
@@ -1908,6 +1924,12 @@ export const prismaModelFieldCatalogue = {
     "group",
     "createdAt"
   ],
+  "AuthzUserStanding": [
+    "userId",
+    "deactivatedAt",
+    "erasedAt",
+    "standingChangedAt"
+  ],
   "RoleBinding": [
     "id",
     "organizationId",
@@ -1991,6 +2013,7 @@ export const prismaModelFieldCatalogue = {
     "ingestSourceType",
     "ingestionTemplateId",
     "createdByDeviceLabel",
+    "isSystemManaged",
     "createdAt",
     "updatedAt"
   ],
@@ -1999,6 +2022,18 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "day",
     "createdAt"
+  ],
+  "NurturingProject": [
+    "projectId",
+    "organizationId"
+  ],
+  "NurturingOrganization": [
+    "organizationId",
+    "adminUserId",
+    "seeded",
+    "evaluationCount",
+    "simulationRunCount",
+    "updatedAt"
   ],
   "BillingMeterCheckpoint": [
     "id",
@@ -2230,6 +2265,12 @@ export const prismaModelFieldCatalogue = {
     "encryptedToken",
     "instanceId",
     "updatedAt"
+  ],
+  "GatewayTraceExportKey": [
+    "projectId",
+    "apiKeyId",
+    "encryptedToken",
+    "createdAt"
   ],
   "GatewayBudget": [
     "id",
@@ -2947,7 +2988,12 @@ export const prismaRelationCatalogue = {
     "latestEvaluation": "TriggerLatestEvaluation",
     "customGraph": "CustomGraph"
   },
-  "SlackIntegration": {},
+  "SlackIntegration": {
+    "claims": "SlackConnectionClaim"
+  },
+  "SlackConnectionClaim": {
+    "connection": "SlackIntegration"
+  },
   "WebhookEndpoint": {
     "organization": "Organization",
     "deliveries": "WebhookEndpointDelivery"
@@ -3156,6 +3202,7 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "group": "Group"
   },
+  "AuthzUserStanding": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",
@@ -3172,6 +3219,8 @@ export const prismaRelationCatalogue = {
     "roleBindings": "RoleBinding"
   },
   "ProjectActiveDay": {},
+  "NurturingProject": {},
+  "NurturingOrganization": {},
   "BillingMeterCheckpoint": {},
   "VirtualKey": {
     "principalUser": "User",
@@ -3228,6 +3277,7 @@ export const prismaRelationCatalogue = {
     "organization": "Organization"
   },
   "GatewayConnectUpstream": {},
+  "GatewayTraceExportKey": {},
   "GatewayBudget": {
     "createdBy": "User",
     "ledgerEntries": "GatewayBudgetLedger",

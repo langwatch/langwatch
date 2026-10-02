@@ -1,11 +1,11 @@
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * `personalVirtualKeys.*` over the real tRPC runtime, pinned to main's wire
  * (platform/app/src/server/api/routers/personalVirtualKeys.ts on origin/main).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { personalVirtualKeysTrpcTransport } from "../personal-virtual-keys.trpc.ts";

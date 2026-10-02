@@ -1,17 +1,19 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
-import { PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE } from "@langwatch/organization-contract";
-
 import {
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
-  type IntegrationMethodChosenEvent,
   INVITE_ACCEPTED_EVENT_TYPE,
-  type InviteAcceptedEvent,
   MEMBERS_INVITED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+} from "@langwatch/organization-contract";
+
+import {
+  type IntegrationMethodChosenEvent,
+  type InviteAcceptedEvent,
   type MembersInvitedEvent,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
-  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   type OrganizationSignedUpEvent,
   type PersonalWorkspaceProvisionedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,

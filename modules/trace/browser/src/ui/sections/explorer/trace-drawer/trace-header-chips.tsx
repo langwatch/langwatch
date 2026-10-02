@@ -1,4 +1,4 @@
-import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Circle, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import {
@@ -14,7 +14,7 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import type { EvalChipDisplay } from "../../../../model/evaluation-results.ts";
 import { getEvalChipDisplay } from "../../../../model/evaluation-results.ts";
 import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
@@ -90,7 +90,7 @@ export function useTraceHeaderChipDefs(
  */
 function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
   const conversation = useConversationTurns(trace.conversationId ?? null);
-  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const setViewMode = useTraceDrawer((s) => s.setViewMode);
   const traceIds = useMemo(
     () => [
       trace.traceId,

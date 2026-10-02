@@ -1,7 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
+  CONNECTION_REGISTERED_EVENT_TYPE,
+  DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+  DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   DOMAIN_WITHDRAWN_EVENT_TYPE,
+  VERIFICATION_REQUESTED_EVENT_TYPE,
   emptySsoConnection,
   reduceSsoConnection,
   SSO_DNS_PROOF_TTL_MS,
@@ -31,13 +35,13 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
 import { sha256Hex } from "../rules/pkce.rules.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
+import { licensingFixture, StubPlatformOperators } from "./support/in-memory-connections.ts";
 
 /**
  * The self-serve domain ceremony (ADR-123, D05 tier 3). Integration because
@@ -131,12 +135,6 @@ class LocalBreakGlass implements SsoBreakGlassBindingRepository {
   }
 }
 
-class LocalPlatformOperators implements SsoPlatformOperatorRepository {
-  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    return actorId === OPS_ID;
-  }
-}
-
 class LocalStranding implements SsoConnectionStrandingRepository {
   async findStrandedUserIds(): Promise<string[]> {
     return [];
@@ -216,6 +214,7 @@ async function reachClaimed(): Promise<void> {
     connectionId: CONNECTION,
     domain: DOMAIN,
     actor: ANA,
+    proof: "dns-txt",
   });
 }
 
@@ -226,12 +225,14 @@ async function proveAndCheck(domain: string): Promise<void> {
     connectionId: CONNECTION,
     domain,
     actor: ANA,
+    proof: "dns-txt",
   });
   const issued = await ceremony.proveDomain({
     organizationId: ORG,
     connectionId: CONNECTION,
     domain,
     actor: ANA,
+    proof: "dns-txt",
   });
   proofs.answer = { outcome: "published", values: [issued.proved ? "" : issued.record.value] };
   await ceremony.checkDomainRecord({
@@ -256,12 +257,8 @@ function seedRivalOwner(): void {
 
 let connectionService: SsoConnectionService;
 
-beforeEach(() => {
-  connections = new LocalConnections();
-  proofs = new LocalProofs();
-  files = new LocalFiles();
-  stated = [];
-  clock = T0;
+/** The composition over one installation's licence answer. */
+function compose(licensing: ReturnType<typeof licensingFixture>): void {
   const ledger: SsoConnectionLedger = {
     async commit({ command, facts }) {
       stated.push(...facts);
@@ -280,7 +277,8 @@ beforeEach(() => {
       registrationSlots: connections,
       breakGlass: new LocalBreakGlass(),
       stranding: new LocalStranding(),
-      platformOperators: new LocalPlatformOperators(),
+      authorization: new StubPlatformOperators([OPS_ID]),
+      licensing,
     }),
     ledger,
   );
@@ -289,8 +287,18 @@ beforeEach(() => {
     reads: connections,
     proofs,
     files,
+    licensing,
     now: () => clock,
   });
+}
+
+beforeEach(() => {
+  connections = new LocalConnections();
+  proofs = new LocalProofs();
+  files = new LocalFiles();
+  stated = [];
+  clock = T0;
+  compose(licensingFixture());
 });
 
 describe("asking for a record", () => {
@@ -304,6 +312,7 @@ describe("asking for a record", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
 
     expect(issued.proved).toBe(false);
@@ -334,6 +343,7 @@ describe("what the record says about itself", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
 
     expect(issued.proved).toBe(false);
@@ -354,6 +364,7 @@ describe("what the record says about itself", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
 
     expect(issued.proved).toBe(false);
@@ -371,6 +382,7 @@ describe("checking what the domain publishes", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
 
     return issued.proved ? "" : issued.record.value;
@@ -523,6 +535,7 @@ describe("checking what the domain publishes", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
     proofs.answer = {
       outcome: "published",
@@ -552,6 +565,7 @@ describe("a domain somebody else proved while this claim waited", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
     seedRivalOwner();
     proofs.answer = { outcome: "published", values: [issued.proved ? "" : issued.record.value] };
@@ -597,6 +611,7 @@ describe("adding a domain to a live connection", () => {
       connectionId: CONNECTION,
       domain: "acme.co.uk",
       actor: ANA,
+      proof: "dns-txt",
     });
     expect((await stateOf())?.state).toBe("ACTIVE");
 
@@ -605,6 +620,7 @@ describe("adding a domain to a live connection", () => {
       connectionId: CONNECTION,
       domain: "acme.co.uk",
       actor: ANA,
+      proof: "dns-txt",
     });
     expect((await stateOf())?.state).toBe("ACTIVE");
 
@@ -645,9 +661,10 @@ describe("a domain somebody else holds", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
 
-    expect(outcome).toEqual({ waitsForReview: true, disputed: true });
+    expect(outcome).toEqual({ waitsForReview: true, disputed: true, verified: false });
     expect((await stateOf())?.claimedDomains).toEqual([DOMAIN]);
   });
 
@@ -663,6 +680,7 @@ describe("a domain somebody else holds", () => {
           connectionId: CONNECTION,
           domain: DOMAIN,
           actor: ANA,
+          proof: "dns-txt",
         }),
       ),
     ).toBe("sso_domain_claim_pending");
@@ -678,6 +696,7 @@ describe("taking a domain back out", () => {
       connectionId: CONNECTION,
       domain: DOMAIN,
       actor: ANA,
+      proof: "dns-txt",
     });
     expect((await stateOf())?.state).toBe("VERIFICATION_PENDING");
 
@@ -704,6 +723,7 @@ describe("taking a domain back out", () => {
       connectionId: CONNECTION,
       domain: "acme.co.uk",
       actor: ANA,
+      proof: "dns-txt",
     });
 
     await ceremony.removeDomain({
@@ -773,6 +793,7 @@ describe("a connection the caller may not read", () => {
           connectionId: CONNECTION,
           domain: DOMAIN,
           actor: ANA,
+          proof: "dns-txt",
         }),
       ),
     ).toBe("sso_connection_not_found");
@@ -783,8 +804,155 @@ describe("a connection the caller may not read", () => {
           connectionId: "ssoc_nothing",
           domain: DOMAIN,
           actor: ANA,
+          proof: "dns-txt",
         }),
       ),
     ).toBe("sso_connection_not_found");
+  });
+});
+
+describe("proving a domain with a self-hosted installation's licence", () => {
+  const LICENSE_DIGEST = "sha256:installation-licence";
+  const OPS = { userId: OPS_ID };
+
+  const licensedInstallation = ({
+    hostsSingleOrganization,
+  }: {
+    hostsSingleOrganization: boolean;
+  }) =>
+    compose(
+      licensingFixture({
+        authorizesDomainClaims: true,
+        hostsSingleOrganization,
+        licenseDigests: [LICENSE_DIGEST],
+      }),
+    );
+
+  const claimWithLicense = (actor: { userId: string }) =>
+    ceremony.claimDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "ACME.com",
+      actor,
+      proof: "license-token",
+    });
+
+  describe("given only one organization on the installation", () => {
+    beforeEach(() => licensedInstallation({ hostsSingleOrganization: true }));
+
+    /** @scenario "A self-hosted administrator sets single sign-on up with nobody else involved" */
+    it("verifies the claimed domain at once, the claim approved on the licence's authority", async () => {
+      await reachRegistered();
+
+      await expect(claimWithLicense(ANA)).resolves.toEqual({
+        waitsForReview: false,
+        disputed: false,
+        verified: true,
+      });
+
+      const state = await stateOf();
+      expect(state?.state).toBe("VERIFIED");
+      expect(state?.verifiedDomains).toEqual([DOMAIN]);
+      expect(state?.domainClaims).toEqual([
+        expect.objectContaining({ domain: DOMAIN, state: "APPROVED", authority: "license" }),
+      ]);
+      expect(state?.domainVerifications).toEqual([
+        expect.objectContaining({
+          domain: DOMAIN,
+          method: "license-token",
+          actorId: ANA.userId,
+          tokenHash: null,
+          evidenceRef: LICENSE_DIGEST,
+        }),
+      ]);
+      // Nothing was looked up and no record was handed over.
+      expect(proofs.asked).toEqual([]);
+      expect(files.asked).toEqual([]);
+      expect(stated.map((fact) => fact.type)).toEqual([
+        CONNECTION_REGISTERED_EVENT_TYPE,
+        DOMAIN_CLAIMED_EVENT_TYPE,
+        VERIFICATION_REQUESTED_EVENT_TYPE,
+        DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        DOMAIN_VERIFIED_EVENT_TYPE,
+      ]);
+    });
+
+    it("finishes a verification that stopped part way when the domain is proved again", async () => {
+      await reachRegistered();
+      await connectionService.claimDomain({
+        tenantId: ORG,
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        commandId: "ssocmd_claim_only",
+        occurredAtMs: T0,
+        actor: { type: "user", id: ANA.userId },
+        source: "self-serve",
+        domain: DOMAIN,
+      });
+
+      await expect(
+        ceremony.proveDomain({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          domain: DOMAIN,
+          actor: ANA,
+          proof: "license-token",
+        }),
+      ).resolves.toEqual({ proved: true });
+      expect((await stateOf())?.verifiedDomains).toEqual([DOMAIN]);
+    });
+
+    /** @scenario "A domain another organization on the installation holds is refused at claim time" */
+    it("refuses a domain another organization holds before recording anything", async () => {
+      seedRivalOwner();
+      await reachRegistered();
+
+      expect(await codeOf(claimWithLicense(ANA))).toBe("sso_connection_domain_taken");
+      expect(stated.map((fact) => fact.type)).toEqual([CONNECTION_REGISTERED_EVENT_TYPE]);
+      expect((await stateOf())?.domainClaims).toEqual([]);
+    });
+  });
+
+  describe("given several organizations on the installation", () => {
+    beforeEach(() => licensedInstallation({ hostsSingleOrganization: false }));
+
+    /** @scenario "A platform operator's claim on a multi-organization installation is verified at once" */
+    it("verifies a platform operator's claim at once with the licence as the proof", async () => {
+      await reachRegistered();
+
+      await expect(claimWithLicense(OPS)).resolves.toMatchObject({ verified: true });
+      expect((await stateOf())?.domainVerifications).toEqual([
+        expect.objectContaining({ method: "license-token", actorId: OPS_ID }),
+      ]);
+    });
+
+    it("still refuses the licence to an administrator the surface mistook for an operator", async () => {
+      await reachRegistered();
+
+      expect(await codeOf(claimWithLicense(ANA))).toBe("sso_connection_operator_act_required");
+      expect((await stateOf())?.verifiedDomains).toEqual([]);
+    });
+
+    /** @scenario "A licensed installation still needs domain-ownership evidence" */
+    it("gives an organization administrator a record and file carrying one minted token", async () => {
+      await reachClaimed();
+
+      const issued = await ceremony.proveDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: DOMAIN,
+        actor: ANA,
+        proof: "dns-txt",
+      });
+
+      expect(issued.proved).toBe(false);
+      if (issued.proved) return;
+      expect(issued.record.name).toBe(ssoDnsRecordName({ domain: DOMAIN }));
+      expect(issued.record.file.url).toBe(ssoVerificationFileUrl({ domain: DOMAIN }));
+      expect((await stateOf())?.pendingVerification?.tokenHash).toBe(
+        `sha256:${sha256Hex(issued.record.value)}`,
+      );
+      expect((await stateOf())?.verifiedDomains).toEqual([]);
+    });
   });
 });

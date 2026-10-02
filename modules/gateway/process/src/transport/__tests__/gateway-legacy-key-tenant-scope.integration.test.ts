@@ -1,21 +1,21 @@
-/**
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import {
   gatewayKeyCaller,
   gatewayPlatformRest,
@@ -173,7 +173,7 @@ async function mountAsLegacyProjectKey() {
     listTraceDestinations: async () => [],
   });
 
-  const app = await GatewayApp.create({
+  const app = await GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -187,6 +187,7 @@ async function mountAsLegacyProjectKey() {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma,
@@ -202,6 +203,7 @@ async function mountAsLegacyProjectKey() {
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,
@@ -219,7 +221,7 @@ async function mountAsLegacyProjectKey() {
   });
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {
       const response = await handler();
       return { isReplayed: false, status: response.status, response };

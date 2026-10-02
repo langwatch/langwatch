@@ -4,7 +4,12 @@ import {
   type McpSessionTransport,
 } from "../mcp-session.repository.ts";
 
-type MemoryRecord = { transport: McpSessionTransport; apiKey: string; encryptedApiKey: string };
+type MemoryRecord = {
+  transport: McpSessionTransport;
+  apiKey: string;
+  encryptedApiKey: string;
+  projectId: string | undefined;
+};
 
 /** Session records held in this process: one replica, so every record is its own. */
 export class MemoryMcpSessionRepository extends McpSessionRepository {
@@ -27,11 +32,13 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
     sessionId: string;
     apiKey: string;
     encryptedApiKey: string;
+    projectId?: string;
   }): Promise<void> {
     this.#records.set(`${input.transport}:${input.sessionId}`, {
       transport: input.transport,
       apiKey: input.apiKey,
       encryptedApiKey: input.encryptedApiKey,
+      projectId: input.projectId,
     });
     return Promise.resolve();
   }
@@ -46,7 +53,9 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
   }): Promise<McpSessionRecordLookup> {
     const record = this.#records.get(`${input.transport}:${input.sessionId}`);
     return Promise.resolve(
-      record ? { kind: "found", encryptedApiKey: record.encryptedApiKey } : { kind: "missing" },
+      record
+        ? { kind: "found", encryptedApiKey: record.encryptedApiKey, projectId: record.projectId }
+        : { kind: "missing" },
     );
   }
 

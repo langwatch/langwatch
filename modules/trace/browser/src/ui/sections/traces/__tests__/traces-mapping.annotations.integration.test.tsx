@@ -1,11 +1,11 @@
+import type { DatasetRecordEntry, MappingState } from "@langwatch/dataset-contract";
 // Dataset row includes reviewer annotations (including span-level reviews),
 // auto-filled in column.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetRecordEntry, MappingState } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
@@ -108,16 +108,14 @@ function renderMapping({
   onMapping?: (mapping: MappingState) => void;
   onEntries?: (entries: DatasetRecordEntry[]) => void;
 }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TracesMapping
-        traces={[REVIEWED_TRACE]}
-        traceMapping={{ mapping: {}, expansions: [] }}
-        targetFields={targetFields}
-        setTraceMapping={onMapping}
-        setDatasetEntries={onEntries}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TracesMapping
+      traces={[REVIEWED_TRACE]}
+      traceMapping={{ mapping: {}, expansions: [] }}
+      targetFields={targetFields}
+      setTraceMapping={onMapping}
+      setDatasetEntries={onEntries}
+    />,
   );
 }
 

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, type ButtonProps } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, type ButtonProps } from "@langwatch/design-system/primitives";
 import { memo, useMemo, useState, type ReactNode } from "react";
 
 import { TraceMediaStrip, type TraceMediaPartData } from "../elements/trace-media-strip.tsx";

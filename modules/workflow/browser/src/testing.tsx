@@ -2,25 +2,25 @@
  * Test utilities: mount Workflows screens inside a fake host that records surface interactions.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  WorkflowHostApi,
-  WorkflowHostProvider,
-  type WorkflowCopyTarget,
-  type WorkflowFailureNotice,
-  type WorkflowRouteReading,
-  type WorkflowScope,
-  type WorkflowSuccessNotice,
-} from "@langwatch/workflow-browser-kit";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
+
+import { workflowHostSlice } from "./behavior/workflow-host.store.ts";
+import type {
+  WorkflowCopyTarget,
+  WorkflowFailureNotice,
+  WorkflowHostSlice,
+  WorkflowRouteReading,
+  WorkflowScope,
+  WorkflowSuccessNotice,
+} from "./model/workflow-host.ts";
 
 export type QueryWrite = {
   next: Readonly<Record<string, string | undefined>>;
   options?: { replace?: boolean };
 };
 
-export class FakeWorkflowHost extends WorkflowHostApi {
+export class FakeWorkflowHost implements WorkflowHostSlice {
   readonly navigations: string[] = [];
   /** How many times a screen asked to step back, which is all a test can assert. */
   backs = 0;
@@ -37,9 +37,7 @@ export class FakeWorkflowHost extends WorkflowHostApi {
       query?: Readonly<Record<string, string | undefined>>;
       pathname?: string;
     } = {},
-  ) {
-    super();
-  }
+  ) {}
 
   scope(): WorkflowScope {
     return { projectId: "project-1", projectSlug: "my-project", ...this.options.scope };
@@ -85,17 +83,16 @@ export class FakeWorkflowHost extends WorkflowHostApi {
   }
 }
 
-/** Renders a screen inside the Design System's provider and a host. */
+/** Publishes a host into `workflow:host`, as workflow's host mount does. */
+export function publishWorkflowHost(host: WorkflowHostSlice): void {
+  workflowHostSlice.setState(host, true);
+}
+
+/** Renders a screen inside the Design System's provider with a host published. */
 export function renderWithWorkflowHost(
   element: ReactElement,
   host: FakeWorkflowHost = new FakeWorkflowHost(),
 ) {
-  return {
-    host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <WorkflowHostProvider value={host}>{element}</WorkflowHostProvider>
-      </ChakraProvider>,
-    ),
-  };
+  publishWorkflowHost(host);
+  return { host, ...renderWithDesignSystem(element) };
 }

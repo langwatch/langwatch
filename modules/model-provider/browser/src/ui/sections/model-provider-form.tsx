@@ -1,9 +1,17 @@
-import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   skipListToInput,
   type ModelProviderEditorValue,
@@ -13,6 +21,7 @@ import type { TimeInput } from "@langwatch/time";
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
+import { useCodexCodingDefaultsAskStore } from "../../behavior/codex-coding-defaults-ask.store.ts";
 import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
 import {
   findModelProviderById,
@@ -39,7 +48,6 @@ import {
 } from "../../model/model-provider-helpers.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
-import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask.tsx";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 // DefaultProviderSection has been moved out of this drawer to a page-level
 // section on the model-providers settings page (DefaultModelsSection). See
@@ -88,8 +96,6 @@ export type EditModelProviderFormProps = {
   /** Why the connection did not happen: a refused credential, or a failed or timed out sign-in. */
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
-
-export type { GuidedSave } from "../../behavior/use-guided-save.ts";
 
 /**
  * The current provider counts as enabled: it will be when the form saves.
@@ -264,6 +270,19 @@ async function probeCredential({
   clearRefusal();
 
   return true;
+}
+
+/** Only probe the upstream provider when the user entered a new API key. */
+async function saveIsBlockedByProbe({
+  shouldProbe,
+  ...probe
+}: {
+  shouldProbe: boolean;
+  clearRefusal: () => void;
+  recordRefusal: () => void;
+  validateApiKey: () => Promise<boolean>;
+}): Promise<boolean> {
+  return shouldProbe && !(await probeCredential(probe));
 }
 
 function finishSave({
@@ -960,10 +979,9 @@ export const EditModelProviderForm = ({
       return;
     }
 
-    // Only probe the upstream provider when the user has actually entered a new API key.
-    const needsProbe =
+    const shouldProbe =
       isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired;
-    if (needsProbe && !(await probeCredential({ clearRefusal, recordRefusal, validateApiKey }))) {
+    if (await saveIsBlockedByProbe({ shouldProbe, clearRefusal, recordRefusal, validateApiKey })) {
       return;
     }
 

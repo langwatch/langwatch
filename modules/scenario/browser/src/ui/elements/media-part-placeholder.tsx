@@ -1,4 +1,4 @@
-import { Badge, HStack, Icon, Skeleton, Text } from "@chakra-ui/react";
+import { Badge, HStack, Icon, Skeleton, Text } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 import type { MediaCategory } from "../../model/media-part-source.ts";

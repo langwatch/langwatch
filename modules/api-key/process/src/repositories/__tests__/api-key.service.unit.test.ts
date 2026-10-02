@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
-import { ApiKeyNotFoundError, type ApiKeyBinding } from "@langwatch/api-key-contract";
+import type { ApiKeyBinding } from "@langwatch/api-key-contract";
 import type {
   AuthzAccessBinding,
   AuthzApi,
@@ -13,20 +12,25 @@ import {
   projectWithTeamSchema,
   type ProjectApi,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
 import { ApiKeyTokenService } from "../../services/api-key-token.service.ts";
-import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
+import {
+  ApiKeyService,
+  type ApiKeyDependencies,
+  type ApiKeyGrantId,
+} from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../memory/memory.api-key-answer-cache.repository.ts";
 
-class TestApiKeyBindingId implements ApiKeyBindingId {
+class TestApiKeyBindingId implements ApiKeyGrantId {
   static create(): TestApiKeyBindingId {
     return new TestApiKeyBindingId();
   }
@@ -43,7 +47,7 @@ const KEY_GRANTS = new Map<string, ApiKeyBinding[]>();
 
 beforeEach(() => KEY_GRANTS.clear());
 
-function grantKey(id: string, bindings: ApiKeyCreateRecord["roleBindings"]): void {
+function grantKey(id: string, bindings: ApiKeyCreateRecord["grants"]): void {
   KEY_GRANTS.set(
     id,
     bindings.map((binding, index) => ({
@@ -78,7 +82,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   private rows: ApiKeyRow[] = [];
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
-    const { roleBindings, startsDisabled, ...record } = input;
+    const { grants, startsDisabled, ...record } = input;
     const row: ApiKeyRow = {
       ...record,
       createdByDeviceLabel: record.createdByDeviceLabel ?? null,
@@ -91,7 +95,7 @@ class MemoryApiKeys extends ApiKeyRepository {
       createdAt: now,
       updatedAt: now,
     };
-    grantKey(row.id, roleBindings);
+    grantKey(row.id, grants);
     this.rows.push(row);
     return Promise.resolve(row);
   }
@@ -150,7 +154,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (!row) throw new Error("missing");
-    const { roleBindings, ...columns } = input;
+    const { grants, ...columns } = input;
     Object.assign(row, columns, {
       updatedAt: toDate(nowInstant()),
       ...(input.revokedAt === void 0
@@ -158,7 +162,7 @@ class MemoryApiKeys extends ApiKeyRepository {
         : { revokedAt: input.revokedAt && toDate(input.revokedAt) }),
       ...(input.lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(input.lastUsedAt) }),
     });
-    if (roleBindings) grantKey(row.id, roleBindings);
+    if (grants) grantKey(row.id, grants);
     return Promise.resolve(row);
   }
   revoke({ id }: { id: string }): Promise<ApiKeyRow> {
@@ -263,16 +267,10 @@ class MemoryApiKeys extends ApiKeyRepository {
  */
 class MemoryProjects {
   legacyProjectId: string | null = null;
-  legacyProjectRotationSucceeds = true;
-  rotated: { projectId: string; token: string } | null = null;
   personalWorkspaceOwner: { ownerUserId: string | null } | null = null;
 
   findIdByLegacyApiKey(): Promise<string | null> {
     return Promise.resolve(this.legacyProjectId);
-  }
-  rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
-    this.rotated = input;
-    return Promise.resolve(this.legacyProjectRotationSucceeds);
   }
   findPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> {
     return Promise.resolve(this.personalWorkspaceOwner);
@@ -347,8 +345,6 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
     listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
     listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
     findIdByLegacyApiKey: () => memory.findIdByLegacyApiKey(),
-    rotateLegacyApiKey: (input: { projectId: string; token: string }) =>
-      memory.rotateLegacyApiKey(input),
     findPersonalWorkspaceOwner: () => memory.findPersonalWorkspaceOwner(),
   });
 }
@@ -387,7 +383,11 @@ function createService(
   repository: ApiKeyRepository = new MemoryApiKeys(),
   options: ApiKeyDependencies = dependencies(),
 ): ApiKeyService {
-  return ApiKeyService.create({ repository, ...options });
+  return ApiKeyService.create({
+    repository,
+    answers: MemoryApiKeyAnswerCacheRepository.create(),
+    ...options,
+  });
 }
 
 describe("API-key service", () => {
@@ -555,36 +555,6 @@ describe("API-key service", () => {
     );
   });
 
-  it("rotates the deprecated project credential through the project directory", async () => {
-    const memory = new MemoryProjects();
-    const service = createService(
-      new MemoryApiKeys(),
-      dependencies({ projects: projectPeer(memory) }),
-    );
-
-    const token = await service.regenerateLegacyProjectKey({
-      projectId: "project-1",
-    });
-    expect(token).toMatch(/^sk-lw-[A-Za-z0-9]{48}$/);
-    expect(memory.rotated).toEqual({
-      projectId: "project-1",
-      token,
-    });
-  });
-
-  it("throws when the project credential cannot be rotated", async () => {
-    const memory = new MemoryProjects();
-    memory.legacyProjectRotationSucceeds = false;
-    const service = createService(
-      new MemoryApiKeys(),
-      dependencies({ projects: projectPeer(memory) }),
-    );
-
-    await expect(
-      service.regenerateLegacyProjectKey({ projectId: "missing" }),
-    ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
-  });
-
   it("defaults an unowned service key to organization ADMIN", async () => {
     const service = createService();
     const created = await service.create({
@@ -593,7 +563,7 @@ describe("API-key service", () => {
       permissionMode: "all",
       bindings: [],
     });
-    expect(created.apiKey.roleBindings).toEqual([
+    expect(created.apiKey.grants).toEqual([
       {
         scopeType: "ORGANIZATION",
         scopeId: "org-1",

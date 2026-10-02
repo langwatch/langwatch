@@ -17,12 +17,6 @@ export type ProjectHomeProject = {
    * same fact can lag or never arrive, since it's permission-gated.
    */
   firstMessage?: boolean | null;
-  /**
-   * The project's ingestion key, when the app will hand one over. Optional,
-   * not required — a redacting host (`organization.base-key-redaction`)
-   * answers without it and the prompt says where to find one instead.
-   */
-  apiKey?: string | null;
 };
 
 /** The organization it sits in. */

@@ -4,7 +4,7 @@ import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
  * permission bound to it. A rename here breaks a browser cache key or a URL.
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

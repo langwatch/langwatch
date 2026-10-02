@@ -1,4 +1,4 @@
-import { CheckboxCard, HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, HStack, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 export const NoneAttributeRow: React.FC<{

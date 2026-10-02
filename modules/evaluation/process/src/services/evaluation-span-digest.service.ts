@@ -1,7 +1,5 @@
 import type { Trace, TraceApi } from "@langwatch/trace-contract";
 
-import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
-
 /**
  * A thread monitor judges what the agent did, so `formatted_traces` is the
  * steps view: each turn with its tool calls and results.
@@ -16,7 +14,7 @@ type DigestRenderers = Pick<TraceApi, "renderReadableTrace" | "renderThreadTrans
  * rendered under the judge's budget: a long trace keeps its tool calls and
  * errors first, a long thread shortens turn by turn, and neither is skipped.
  */
-export class EvaluationSpanDigestService implements EvaluationSpanDigest {
+export class EvaluationSpanDigestService {
   static create(traces: DigestRenderers): EvaluationSpanDigestService {
     return new EvaluationSpanDigestService(traces);
   }

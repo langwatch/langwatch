@@ -24,9 +24,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "zod": "catalog:"
   },

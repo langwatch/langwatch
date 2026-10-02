@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
 

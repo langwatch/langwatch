@@ -6,7 +6,7 @@
  * what the afternoon contains. There is no suspend here — the lever for a
  * connection that is hurting people is an operator's, not this page's.
  */
-import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowRight } from "lucide-react";
 
 import { setupProgressFor } from "../../model/setup-progress.ts";

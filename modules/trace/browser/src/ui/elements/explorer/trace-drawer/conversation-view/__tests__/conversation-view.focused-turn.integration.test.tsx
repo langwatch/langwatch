@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Reviewed turn: brought on screen, blinked, tinted while under review.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -87,15 +87,13 @@ function renderView({
   focusTraceId?: string;
   showSessionCheckboxes?: boolean;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationView
-        conversationId="thread-1"
-        currentTraceId="trace-1"
-        focusTraceId={focusTraceId}
-        showSessionCheckboxes={showSessionCheckboxes}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConversationView
+      conversationId="thread-1"
+      currentTraceId="trace-1"
+      focusTraceId={focusTraceId}
+      showSessionCheckboxes={showSessionCheckboxes}
+    />,
   );
 }
 
@@ -184,13 +182,11 @@ describe("given a queue item opened on a thread of several turns", () => {
     const view = renderView({ focusTraceId: "trace-2" });
 
     view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <ConversationView
-          conversationId="thread-1"
-          currentTraceId="trace-1"
-          focusTraceId="trace-3"
-        />
-      </ChakraProvider>,
+      <ConversationView
+        conversationId="thread-1"
+        currentTraceId="trace-1"
+        focusTraceId="trace-3"
+      />,
     );
 
     const frames = focusedFrames();

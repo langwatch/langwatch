@@ -1,7 +1,16 @@
-import { Badge, Box, HStack, IconButton, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  HStack,
+  IconButton,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toDate } from "@langwatch/time";
 import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";

@@ -4,11 +4,11 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLastResultSummaries } from "../../../../behavior/scenarios/use-last-result-summaries.ts";
+import { usePeriodSelector } from "../../../elements/analytics/period-selector.tsx";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";
 
 /** Why the button is off on a scenario that has never run. */
@@ -24,15 +24,12 @@ export function CaseRecentRunsButton({ scenarioId }: { scenarioId: string }) {
   // behind it is on.
   const { period } = usePeriodSelector(DEFAULT_PERIOD_DAYS);
 
-  const { data: lastResults } = api.scenarios.getLastResultSummaries.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scenarioIds: [scenarioId],
-      startDate: period.startDate.epochMilliseconds,
-      endDate: period.endDate.epochMilliseconds,
-    },
-    { enabled: !!project },
-  );
+  const { data: lastResults } = useLastResultSummaries({
+    projectId: project?.id,
+    scenarioIds: [scenarioId],
+    startDate: period.startDate.epochMilliseconds,
+    endDate: period.endDate.epochMilliseconds,
+  });
 
   return (
     <RecentRunsMenu

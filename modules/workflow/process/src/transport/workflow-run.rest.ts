@@ -1,5 +1,9 @@
 import { PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
   workflowRunAnswerSchema,
@@ -7,13 +11,38 @@ import {
   workflowRunRestParamsSchema,
   workflowRunRestVersionedParamsSchema,
   WorkflowApi,
+  type WorkflowRunPrincipal,
 } from "@langwatch/workflow-contract";
+import { z } from "zod";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 const bodyLimit = {
   maxBytes: BODY_LIMIT_JSON_BYTES,
   onExceeded: () => new PayloadTooLargeError(),
 } as const;
+
+/**
+ * The API key a run was started with, so the run's own key holds no more; null for a legacy
+ * API key or a project-bound access token, which have no key row.
+ */
+export const workflowRunCallerKey = defineRestMiddleware(
+  "workflowRunCallerKey",
+  z.string().min(1).nullable(),
+);
+
+/** The member a run acts as and the key they called with, else the calling key alone. */
+function runPrincipalFields({
+  userId,
+  callerKey,
+}: {
+  userId: string | null;
+  callerKey: string | null;
+}): { principal?: WorkflowRunPrincipal } {
+  if (userId !== null) {
+    return { principal: { userId, ...(callerKey ? { callerApiKeyId: callerKey } : {}) } };
+  }
+  return callerKey ? { principal: { userId: null, callerApiKeyId: callerKey } } : {};
+}
 
 export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-run")
@@ -37,10 +66,17 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .handle(({ app, input, scope }) => {
+  .withMiddleware(workflowRunCallerKey)
+  .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 
-    return app.runSynchronous({ workflowId, versionId, projectId: scope.id, inputs });
+    return app.runSynchronous({
+      workflowId,
+      versionId,
+      projectId: scope.id,
+      inputs,
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
+    });
   })
 
   .post("/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun")
@@ -58,10 +94,16 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .handle(({ app, input, scope }) => {
+  .withMiddleware(workflowRunCallerKey)
+  .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, ...inputs } = input;
 
-    return app.runSynchronous({ workflowId, projectId: scope.id, inputs });
+    return app.runSynchronous({
+      workflowId,
+      projectId: scope.id,
+      inputs,
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
+    });
   })
 
   .post("/api/workflows/:workflowId/:versionId/run", "postApiWorkflowsByWorkflowIdByVersionIdRun")
@@ -79,9 +121,16 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .handle(({ app, input, scope }) => {
+  .withMiddleware(workflowRunCallerKey)
+  .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 
-    return app.runSynchronous({ workflowId, versionId, projectId: scope.id, inputs });
+    return app.runSynchronous({
+      workflowId,
+      versionId,
+      projectId: scope.id,
+      inputs,
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
+    });
   })
   .build();

@@ -2,16 +2,17 @@
  * The scope reading the moved studio modules already do.
  */
 
-import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal } from "@langwatch/time";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
+import { useWorkflowHost } from "../../model/workflow-host.ts";
+
 /**
- * The project row, as the studio's closure reads it.
+ * The project row, as the studio's closure reads it. The API key is not part of it:
+ * the publish screen's API modal mints a personal access token instead.
  */
-export type StudioProject = Project;
+export type StudioProject = Omit<Project, "apiKey">;
 
 export type StudioOrganization = { id: string };
 export type StudioTeam = { id: string };
@@ -23,11 +24,9 @@ export type StudioScopeReading = {
   projectId: string | undefined;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
-  modelProviders: RouterOutputs["modelProvider"]["getAllForProject"] | undefined;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
   isLoading: boolean;
-  isRefetching: boolean;
 };
 
 export function useOrganizationTeamProject(
@@ -43,28 +42,12 @@ export function useOrganizationTeamProject(
   const host = useWorkflowHost();
   const scope = host.scope();
 
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: scope.projectId ?? "" },
-    { enabled: !!scope.projectId },
-  );
-
-  /**
-   * ONE EXTRA READ THE APPLICATION DID NOT MAKE, and it is worth naming. `platform/app` had
-   * `apiKey` on the project row the shell already held; the host port carries an identity
-   * and a slug, not a credential.
-   */
-  const projectApiKey = api.project.getProjectAPIKey.useQuery(
-    { projectId: scope.projectId ?? "" },
-    { enabled: !!scope.projectId },
-  );
-
   return useMemo(() => {
     const project: StudioProject | undefined = scope.projectId
       ? {
           id: scope.projectId,
           slug: scope.projectSlug ?? "",
           name: scope.projectName ?? scope.projectSlug ?? "",
-          apiKey: (projectApiKey.data as { apiKey?: string } | undefined)?.apiKey ?? "",
           teamId: scope.teamId ?? "",
           language: "",
           framework: "",
@@ -83,10 +66,8 @@ export function useOrganizationTeamProject(
       hasPermission: (permission: string) => host.hasPermission(permission),
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
-      modelProviders: modelProviders.data,
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),
-      isRefetching: modelProviders.isRefetching,
     };
-  }, [host, scope, modelProviders.data, modelProviders.isRefetching, projectApiKey.data]);
+  }, [host, scope]);
 }

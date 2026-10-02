@@ -1,11 +1,12 @@
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
 
-import type { GithubHost, GithubProjectActivity } from "../app/github.members.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
 } from "./github-branch-mapping.service.ts";
+import type { GithubHost } from "./github-host.service.ts";
 
 const logger = createLogger("langwatch:github:branch-demand");
 
@@ -22,7 +23,7 @@ type BranchMappingOperations = Pick<GithubBranchMappingService, "bringRecheckFor
 
 type GithubBranchDemandDeps = {
   mapping: BranchMappingOperations;
-  project: GithubProjectActivity;
+  project: Pick<ProjectApi, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
   host: GithubHost;
   now?: () => number;
 };

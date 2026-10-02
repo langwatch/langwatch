@@ -2,21 +2,29 @@
 // inline.
 // @vitest-environment jsdom
 // @see specs/traces-v2/sessions-lens.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type LensConfig, useExplorerStore } from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import "@testing-library/jest-dom/vitest";
+
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
+import { type LensConfig } from "../../../../../behavior/view.slice.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
 import type { ConversationGroup } from "../conversation-groups.ts";
 import { ConversationLensBody } from "../conversation-lens-body.tsx";
 
 const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
@@ -68,11 +76,7 @@ const lens: LensConfig = {
 };
 
 function renderBody(groups: ConversationGroup[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationLensBody groups={groups} lens={lens} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ConversationLensBody groups={groups} lens={lens} />);
 }
 
 /** The main row of the first conversation, the surface a reader clicks. */
@@ -86,7 +90,7 @@ const expandToggle = () => screen.getByRole("button", { name: /Expand turns|Coll
 
 beforeEach(() => {
   openDrawerMock.mockClear();
-  useDrawerStore.getState().closeDrawer();
+  setWindowAddress({ url: "/my-project/traces" });
   // The open row outlives a remount now that it lives in the Explorer store.
   useExplorerStore.getState().setExpandedRows([]);
   // The virtualizer windows rows to the scroll element's height, and jsdom
@@ -118,10 +122,6 @@ describe("given the conversations lens is showing grouped rows", () => {
         traceId: "trace-latest",
         t: String(LAST_ACTIVITY_MS),
       });
-      // The drawer's own hooks read the trace off the store, so the row has to
-      // push it there as well as into the URL.
-      expect(useDrawerStore.getState().traceId).toBe("trace-latest");
-      expect(useDrawerStore.getState().occurredAtMs).toBe(LAST_ACTIVITY_MS);
       expect(expandToggle()).toHaveAccessibleName("Expand turns");
     });
   });
@@ -136,7 +136,7 @@ describe("given the conversations lens is showing grouped rows", () => {
 
       expect(expandToggle()).toHaveAccessibleName("Collapse turns");
       expect(openDrawerMock).not.toHaveBeenCalled();
-      expect(useDrawerStore.getState().isOpen).toBe(false);
+      expect(getTraceDrawer().isOpen).toBe(false);
     });
   });
 

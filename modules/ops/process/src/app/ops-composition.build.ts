@@ -1,5 +1,4 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   type EventSourcing,
@@ -9,12 +8,6 @@ import {
   replayProjectionsOf,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
-/**
- * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
- * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
- * capability with its named refusal, exactly as that composition did.
- */
-import type { ResourceOwnership } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import {
   type OpsServerConfig,
@@ -23,6 +16,12 @@ import {
   type OpsQueueReconcileOutcome,
   type QueueInfo,
 } from "@langwatch/ops-contract";
+/**
+ * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
+ * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
+ * capability with its named refusal, exactly as that composition did.
+ */
+import type { ResourceOwnership } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -101,9 +100,6 @@ export type OpsProcessMembers = Readonly<{
   logger: Logger;
   /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
   nodeEnvironment: string | undefined;
-  /** Who reaches the back office — the deployment's own list, named raw
-   *  because it is a fact about the installation, not a store. */
-  adminEmails: readonly string[];
   /** The process's own facts the checkup and the usage report name. */
   isSaas: boolean;
   serviceVersion: string;
@@ -225,7 +221,7 @@ class UnauditedOpsAuditSink extends AdminAuditSink {
   }
 }
 
-/** Builds the {@link OpsAppInfrastructure} `OpsApp.create` composes over. */
+/** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
   config: OpsServerConfig;
@@ -276,7 +272,7 @@ export function buildOpsInfrastructure(input: {
   return {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
-        adminEmails: members.adminEmails,
+        authz: dependencies.authz,
         // Without it every queue read answers the empty NullQueueRepository shape.
         redis: members.redis,
         // Where an organization's connection decides its sign-in, editing
@@ -288,7 +284,6 @@ export function buildOpsInfrastructure(input: {
         audit: new UnauditedOpsAuditSink(members.logger),
         auditLog: dependencies.auditLog,
         users: dependencies.users,
-        auth: dependencies.auth,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -354,6 +349,8 @@ export function buildOpsInfrastructure(input: {
     },
     isProduction: members.nodeEnvironment === "production",
     cloudOps: input.cloudOps,
+    // Cloud never bootstraps: staff are seeded at cutover with the recovery task.
+    operatorSeed: { adminEmails: config.adminEmails, cloud: members.isSaas || input.cloudOps },
   };
 }
 
@@ -367,7 +364,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
   };
 }
 
-export interface OpsOperationsOptions extends AdminAccessServiceOptions {
+export interface OpsOperationsOptions {
+  authz: AdminAccessServiceOptions["authz"];
   database: AdminDatabase & SchedulerAuditDatabase;
   audit: AdminAuditSink;
   /** The shared audit log every operator act is recorded on. */
@@ -377,7 +375,6 @@ export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   redis?: IORedis | Cluster | undefined;
   queuePayloads?: QueuePayloadDecoder | undefined;
   users: UserApi;
-  auth: AuthApi;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -402,7 +399,8 @@ export class OpsOperations {
 
   build(): OpsCapability {
     const access =
-      this.options.access ?? AdminAccessService.create({ adminEmails: this.options.adminEmails });
+      this.options.access ??
+      AdminAccessService.create({ authz: this.options.authz, users: this.options.users });
     const queues = this.options.redis
       ? QueueService.create({
           repo: QueueRedisRepository.create({
@@ -418,7 +416,6 @@ export class OpsOperations {
       adminBackoffice: AdminBackofficeService.create({
         repository: PrismaAdminBackofficeRepository.create(this.options.database),
         users: this.options.users,
-        auth: this.options.auth,
         audit: this.options.audit,
         ssoRouting: this.options.ssoRouting,
       }),

@@ -22,10 +22,19 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The five simulators (`mail`, `idp`, `storage`, `llm`, `voice`) each serve a
-console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and `storage` run
-by default; `llm` and `voice` need `haven up +llm +voice`. `haven logs <name>`
-reads any of them.
+The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each
+serve a console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and
+`storage` run by default; `llm`, `voice` and `analytics` need `haven up +llm
++voice +analytics`. `haven logs <name>` reads any of them.
+
+In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
+every selected simulator runs in the `sims` lane: a second `service combined`
+process beside the `go` lane, which keeps only the gateway and the NLP engine. A
+simulator under load can therefore not starve the gateway. `haven restart sims`
+bounces them together and `haven logs <name>` still reads each one. Load drivers
+hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
+a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
+set to 1 by haven); each simulator's delete endpoint empties it.
 
 Two more are there only when the worktree asked for them (`haven up
 +design-system +mail-room`) — developer tools rather than parts of the product:
@@ -218,9 +227,15 @@ tool calls, Langy's echo mode and forced errors. The overlay sets
 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY=llmsim` where no key is set, skipping any
 provider whose base URL `.env` already names. The storage seed then writes
 those into the seeded OpenAI and Anthropic model providers, so the gateway,
-the nlp service and LiteLLM all reach llmsim. Gemini, Vertex, Azure, xAI and
-Groq have no base-URL override and still reach the real provider if `.env`
-holds their key. Its console at the lane's URL lists the last 500 calls.
+the nlp service and LiteLLM all reach llmsim. The same overlay sets
+`DEEPSEEK_BASE_URL`, `XAI_BASE_URL`, `CEREBRAS_BASE_URL`, `GROQ_BASE_URL` and
+`GEMINI_BASE_URL` to llmsim's `/v1`, with no dummy key: they aim only the
+model-provider credential probe, which asks the sim for `GET .../models` and
+gets 200 for any key (there is no refusal mode), so a first Save succeeds
+instead of meeting the vendor's 401. It also sets `ALLOWED_PROXY_HOSTS` to
+`127.0.0.1` when unset, so a stack that blocks local calls still reaches the
+loopback sims. Vertex, Azure and Bedrock are never probed. Its console at the
+lane's URL lists the last 500 calls.
 
 voice — the voice provider stand-in (`services/voicesim`) — is opt-in: `haven
 up +voice` once runs the `voice` lane, routed at
@@ -231,7 +246,9 @@ and transcription), with tones for audio and fixed text, and checks no key.
 The overlay sets `ELEVENLABS_BASE_URL` to its loopback port unless the
 environment already names one; it never sets `OPENAI_BASE_URL`, because every
 OpenAI model call in the stack falls back to it. Its console, at the lane's
-own URL, lists recent calls with their turns and protocol events.
+own URL, lists recent calls with their turns and protocol events. That
+`ELEVENLABS_BASE_URL` is also where the model-provider credential probe goes:
+voicesim answers `GET /models` and `GET /v1/models` for any key.
 
 analytics — the product-analytics stand-in (`services/analyticssim`) — is
 opt-in: `haven up +analytics` once runs the `analytics` lane, routed at

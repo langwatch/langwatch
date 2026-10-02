@@ -1,6 +1,6 @@
-import { Button, HStack, Icon, Input, Stack, Text } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
+import { Button, HStack, Icon, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { ChevronDown, Columns3, Search } from "lucide-react";

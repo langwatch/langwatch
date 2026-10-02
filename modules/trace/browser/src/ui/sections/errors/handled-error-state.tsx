@@ -1,4 +1,4 @@
-import { Box, Heading, List, Stack, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, List, Stack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertCircle } from "lucide-react";
 import type { ReactNode } from "react";
 

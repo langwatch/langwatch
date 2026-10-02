@@ -43,7 +43,31 @@ describe("classifyLangyCanaryOutcome", () => {
         kind: "settled",
         settlement: { succeeded: true, outcome: "stopped", text: "Hi", error: null },
       }),
-    ).toEqual({ healthy: false, reason: "turn_failed" });
+    ).toMatchObject({ healthy: false, reason: "turn_failed" });
+  });
+
+  /** @scenario "A stopped Langy canary turn reports turn_stopped" */
+  it("names turn_stopped as a stopped turn's cause", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: true, outcome: "stopped", text: "partial", error: null },
+      }),
+    ).toEqual({ healthy: false, reason: "turn_failed", cause: "turn_stopped" });
+  });
+
+  /** @scenario "A failed Langy canary turn reports its cause beside its reason" */
+  it("names the innermost code of a failed turn's error chain as its cause", () => {
+    const error = JSON.stringify({
+      code: "langy_agent_errored",
+      reasons: [{ code: "llm_upstream_error", reasons: [{ code: "insufficient_quota" }] }],
+    });
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: false, outcome: "failed", text: null, error },
+      }),
+    ).toEqual({ healthy: false, reason: "turn_failed", cause: "insufficient_quota" });
   });
 
   /** @scenario "The Langy canary classifies a settled turn as main did" */
@@ -98,6 +122,21 @@ describe("langyCanaryAnswer", () => {
     expect(langyCanaryAnswer({ healthy: false, reason: "empty_reply", ...ids })).toEqual({
       status: 503,
       body: { status: "unhealthy", reason: "empty_reply", ...ids },
+    });
+  });
+
+  /** @scenario "The Langy probe answers 503 with the cause beside the reason" */
+  it("answers an unhealthy run with a cause 503 carrying reason and cause", () => {
+    expect(
+      langyCanaryAnswer({
+        healthy: false,
+        reason: "turn_failed",
+        cause: "insufficient_quota",
+        ...ids,
+      }),
+    ).toEqual({
+      status: 503,
+      body: { status: "unhealthy", reason: "turn_failed", cause: "insufficient_quota", ...ids },
     });
   });
 

@@ -1,11 +1,12 @@
-import { useDisclosure, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useState } from "react";
 
 import { useSession } from "../../../behavior/auth-session.ts";
-import { api } from "../../../behavior/trace-api.ts";
+import { useAnnotationQueues } from "../../../behavior/reads/use-annotation-reads.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useCreateQueueItem } from "../../../behavior/writes/use-trace-writes.ts";
 import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
 import { Dialog } from "../dialog.tsx";
 import { showErrorToast } from "../errors/index.ts";
@@ -147,29 +148,15 @@ export function AddToAnnotationQueueDialog({
   const { project } = useOrganizationTeamProject();
   const { data: session } = useSession();
   const router = useRouter();
-  const utils = api.useUtils();
   const newQueueDrawer = useDisclosure();
   const [annotators, setAnnotators] = useState<Annotator[]>(initialAnnotators ?? []);
 
   // The picker reads the same query, so this shares its cache rather than
   // costing a second round trip.
-  const queues = api.annotation.getQueues.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const queues = useAnnotationQueues({ projectId: project?.id });
 
-  const createQueueItem = api.annotation.createQueueItem.useMutation({
+  const createQueueItem = useCreateQueueItem({
     onSuccess: ({ created, skipped }) => {
-      // The sidebar badges and the queue listing all count pending work, so
-      // every one of them is stale the moment items land.
-      void utils.annotation.getPendingItemsCount.invalidate();
-      void utils.annotation.getAssignedItemsCount.invalidate();
-      void utils.annotation.getQueueItemsCounts.invalidate();
-      void utils.annotation.getOptimizedAnnotationQueues.invalidate();
-      // A walk open elsewhere is reading one step of the same queue, and what
-      // just landed may belong in it — including ahead of where the reviewer
-      // is standing.
-
       const destination = destinationFor({
         annotators,
         projectSlug: project?.slug,

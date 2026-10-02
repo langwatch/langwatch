@@ -3,8 +3,8 @@
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../behavior/use-reachable-products.ts", () => ({
@@ -35,26 +35,24 @@ describe("the front door at /", () => {
   describe("when a signed-in reader who belongs to no organization opens it", () => {
     /** @scenario The front door sends a reader with no organization to onboarding */
     it("resolves without the chrome and sends them to onboarding", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WithStubNavigationHost
-            readings={{
-              organizations: [],
-              organization: undefined,
-              team: undefined,
-              project: undefined,
-              currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
-              isLoading: false,
-              pathname: "/",
-              waiting: <div data-testid="waiting" />,
-            }}
-            actions={{ replace: replaceMock }}
-          >
-            <NavigationShell>
-              <LandingScreen />
-            </NavigationShell>
-          </WithStubNavigationHost>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <WithStubNavigationHost
+          readings={{
+            organizations: [],
+            organization: undefined,
+            team: undefined,
+            project: undefined,
+            currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+            isLoading: false,
+            pathname: "/",
+            waiting: <div data-testid="waiting" />,
+          }}
+          actions={{ replace: replaceMock }}
+        >
+          <NavigationShell>
+            <LandingScreen />
+          </NavigationShell>
+        </WithStubNavigationHost>,
       );
 
       await waitFor(() => {

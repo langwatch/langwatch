@@ -1,5 +1,5 @@
-import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { Markdown } from "@langwatch/browser-host/markdown";
+import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";

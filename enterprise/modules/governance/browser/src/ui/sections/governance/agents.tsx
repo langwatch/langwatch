@@ -1,6 +1,6 @@
-import { Box, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, Spacer, Spinner, VStack } from "@langwatch/design-system/primitives";
 import type {
   GovernanceAgentRow,
   AgentsListingOutcome,

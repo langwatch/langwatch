@@ -1,3 +1,7 @@
+import { createLogger } from "@langwatch/observability";
+import { Hono } from "hono";
+
+import type { Entitlements } from "../access/access.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
  * credential answers which family and hands one application to the hosting.
@@ -7,10 +11,7 @@ import type {
   FeatureRestHost,
   FeatureRestMountOptions,
   MountableTransport,
-} from "@langwatch/kernel";
-import { createLogger } from "@langwatch/observability";
-import { Hono } from "hono";
-
+} from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
@@ -18,12 +19,7 @@ import type { RestDoorCredential, RestTransportDeclaration } from "./declaration
 import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
-import {
-  createRestRuntime,
-  type RestAuditSink,
-  type RestDeprecationLog,
-  type RestIdentity,
-} from "./runtime.ts";
+import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
 
 const restErrorLogger = createLogger("langwatch:api:rest");
 
@@ -32,10 +28,11 @@ const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
 import { SessionKeyIdentity } from "./session-key-identity.ts";
+import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
 export type RestIdentities = Readonly<
-  Record<Exclude<RestDoorCredential, "internalSecret" | "sessionKey" | "cliToken">, RestIdentity>
+  Record<Exclude<RestDoorCredential, "internal_secret" | "session_key" | "cli_token">, RestIdentity>
 >;
 
 /**
@@ -65,6 +62,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     rateLimiter?: RateLimiter | undefined;
     /** What the process answers on behalf of a module, on every family at once. */
     facts?: readonly RestTransportMiddlewareBinding[] | undefined;
+    /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
+    entitlements?: Entitlements | undefined;
   }): RestHost {
     return new RestHost(options);
   }
@@ -110,6 +109,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       doors: identities,
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
+      ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {
@@ -142,9 +142,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): Record<RestDoorCredential, RestIdentity> {
     return {
       ...this.options.identities,
-      internalSecret: this.options.bearers(declaration.namespace),
-      sessionKey: SessionKeyIdentity.unbound(declaration.namespace),
-      cliToken: CliTokenIdentity.unbound(declaration.namespace),
+      internal_secret: this.options.bearers(declaration.namespace),
+      session_key: SessionKeyIdentity.unbound(declaration.namespace),
+      cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
   }
 }

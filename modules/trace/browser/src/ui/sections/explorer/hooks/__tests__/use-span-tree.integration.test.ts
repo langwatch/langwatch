@@ -3,9 +3,9 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness.ts";
 import type * as spanTreePagedQueryModule from "../span-tree-paged-query.ts";
 import { useSpanTree } from "../use-span-tree.ts";
+import { MemoryRouterWrapper } from "./memory-router-wrapper.tsx";
 
 type TreeQueryOptions = {
   queryKey: unknown;
@@ -18,7 +18,7 @@ type DeltaQueryCall = {
   input: { sinceUpdatedAtMs: number };
   options: {
     enabled: boolean;
-    refetchInterval: unknown;
+    refetchInterval?: unknown;
   };
 };
 
@@ -152,7 +152,7 @@ describe("useSpanTree", () => {
     it("holds the tree walk until the header backfills the hint", () => {
       traceQueryArgs = { ...traceQueryArgs, hintReady: false };
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastTreeOptions().enabled).toBe(false);
     });
@@ -160,7 +160,7 @@ describe("useSpanTree", () => {
 
   describe("when the drawer trace is ready", () => {
     it("keys and fetches the shared paged span-tree entry without its own poll interval", () => {
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastTreeOptions().queryKey).toEqual(["spanTree", { projectId: "p1", traceId: "t1" }]);
       expect(lastTreeOptions().queryFn).toBe(QUERY_FN_MARKER);
@@ -173,7 +173,7 @@ describe("useSpanTree", () => {
     it("disables both the fetch and the delta poll", () => {
       traceQueryArgs = { ...traceQueryArgs, isReady: false };
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastTreeOptions().enabled).toBe(false);
       expect(lastDeltaCall().options.enabled).toBe(false);
@@ -182,17 +182,17 @@ describe("useSpanTree", () => {
 
   describe("when the trace is live and SSE is connected", () => {
     it("keeps the delta armed but runs it on no timer — SSE invalidation drives it push-style", () => {
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(true);
-      expect(lastDeltaCall().options.refetchInterval).toBe(false);
+      expect(lastDeltaCall().options.refetchInterval).toBeUndefined();
     });
 
     it("never re-walks the tree on an SSE update — that is ceil(N/500) requests per batch", () => {
       // The tree query owns the page walk; it must not be given a timer of
       // its own, and `useTraceFreshness` invalidates `spanTreeDelta` rather
       // than `spanTree` so a live 100k-span trace merges deltas in place.
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastTreeOptions().refetchInterval).toBeUndefined();
     });
@@ -203,13 +203,13 @@ describe("useSpanTree", () => {
       sseConnectionState = "disconnected";
     });
 
-    it("polls spanTreeDelta from the loaded tree's high-water mark instead of re-walking every page", () => {
+    it("reads spanTreeDelta from the loaded tree's high-water mark instead of re-walking every page", () => {
       treeData = [node("a", 100), node("b", 300)];
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(true);
-      expect(lastDeltaCall().options.refetchInterval).toBe(LIVE_REFETCH_MS);
+      expect(lastDeltaCall().options.refetchInterval).toBeUndefined();
       expect(lastDeltaCall().input).toMatchObject({
         projectId: "p1",
         traceId: "t1",
@@ -221,7 +221,7 @@ describe("useSpanTree", () => {
       // Root starts first (oldest start) but is updated last (newest version).
       treeData = [node("root", 100, 900), node("leaf", 300, 300)];
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().input).toMatchObject({ sinceUpdatedAtMs: 899 });
     });
@@ -229,7 +229,7 @@ describe("useSpanTree", () => {
     it("waits for the tree to load before polling (no high-water mark yet)", () => {
       treeData = undefined;
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(false);
     });
@@ -242,7 +242,7 @@ describe("useSpanTree", () => {
       treeData = [node("a", 100)];
       treeIsFetching = true;
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(false);
     });
@@ -251,7 +251,7 @@ describe("useSpanTree", () => {
       treeData = [node("a", 100)];
       treeIsPreviousData = true;
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(false);
     });
@@ -261,7 +261,7 @@ describe("useSpanTree", () => {
       getQueryData.mockReturnValue(existing);
       deltaData = [node("b", 200)];
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(setQueryData).toHaveBeenCalledWith(
         ["spanTree", { projectId: "p1", traceId: "t1" }],
@@ -274,7 +274,7 @@ describe("useSpanTree", () => {
       getQueryData.mockReturnValue(existing);
       deltaData = [];
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(setQueryData).not.toHaveBeenCalled();
     });
@@ -283,7 +283,7 @@ describe("useSpanTree", () => {
   describe("when SSE reconnects after being down", () => {
     it("fetches one catch-up delta, since a span that landed during the gap raises no event of its own", () => {
       sseConnectionState = "disconnected";
-      const { rerender } = renderHook(() => useSpanTree());
+      const { rerender } = renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
       expect(deltaInvalidate).not.toHaveBeenCalled();
 
       sseConnectionState = "connected";
@@ -298,7 +298,7 @@ describe("useSpanTree", () => {
     it("does not catch up on a trace that is no longer live", () => {
       traceQueryArgs = { ...traceQueryArgs, isLive: false };
       sseConnectionState = "disconnected";
-      const { rerender } = renderHook(() => useSpanTree());
+      const { rerender } = renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       sseConnectionState = "connected";
       rerender();
@@ -312,7 +312,7 @@ describe("useSpanTree", () => {
       traceQueryArgs = { ...traceQueryArgs, isLive: false };
       sseConnectionState = "disconnected";
 
-      renderHook(() => useSpanTree());
+      renderHook(() => useSpanTree(), { wrapper: MemoryRouterWrapper });
 
       expect(lastDeltaCall().options.enabled).toBe(false);
     });

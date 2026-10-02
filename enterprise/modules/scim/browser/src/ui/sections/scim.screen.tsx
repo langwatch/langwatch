@@ -6,8 +6,8 @@
  * token, and a reader without it is offered no control at all.
  */
 
-import { Alert, Heading, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 
 import { scimApi } from "../../behavior/scim-api.ts";

@@ -2,14 +2,14 @@
  * The select column's header while the trace table is still loading.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useSelectionStore } from "@langwatch/trace-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
+import { useSelectionStore } from "../../../../../behavior/explorer.store.ts";
 import type { TraceListItem } from "../../types/trace.ts";
 import { traceSelectColumnDef } from "../select-column.tsx";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
@@ -33,11 +33,7 @@ const SelectHeader = ({ data, isLoading }: { data: TraceListItem[]; isLoading: b
 };
 
 const renderHeader = (props: { data: TraceListItem[]; isLoading: boolean }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SelectHeader {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<SelectHeader {...props} />);
 
 const selectAllButton = () => screen.queryByRole("button", { name: "Select all on this page" });
 

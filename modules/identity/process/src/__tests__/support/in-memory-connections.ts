@@ -1,3 +1,8 @@
+import type { AuthzApi, AuthzCanInput } from "@langwatch/authz-contract";
+import type {
+  DomainClaimLicenseAuthority,
+  LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 import {
   emptySsoConnection,
   reduceSsoConnection,
@@ -5,6 +10,7 @@ import {
   SsoConnectionNotFoundError,
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type {
   SsoConnectionRegistrationRepository,
@@ -14,7 +20,6 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "../../repositories/sso-connection.repository.ts";
 import { findBlockingRegistrationSlots } from "../../rules/sso-connection-registration.rules.ts";
 import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
@@ -115,20 +120,39 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
 }
 
 /**
- * Which actors this deployment counts as LangWatch platform operators. A set
- * of ids, not a boolean, so a test can hold an operator and an
- * organization administrator at once.
+ * Authz as the platform scope asks it: yes for the user ids named, no for the
+ * rest, so a test can hold an operator and an organization administrator at once.
  */
-export class StubPlatformOperators implements SsoPlatformOperatorRepository {
+export class StubPlatformOperators implements Pick<AuthzApi, "can"> {
   private readonly operators: Set<string>;
 
   constructor(operatorIds: string[] = []) {
     this.operators = new Set(operatorIds);
   }
 
-  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    return this.operators.has(actorId);
+  async can({ principal, permission, scope }: AuthzCanInput): Promise<boolean> {
+    return (
+      scope.type === "platform" &&
+      permission.startsWith("ops:") &&
+      principal.type === "user" &&
+      this.operators.has(principal.id)
+    );
   }
+}
+
+/** What the licence may decide, as licensing answers it; unlicensed and one
+ *  organization unless a test says otherwise, so no stray path is licence-bound. */
+export function licensingFixture(
+  overrides: Partial<DomainClaimLicenseAuthority> = {},
+): Pick<LicensingApi, "getDomainClaimAuthority"> {
+  return createApiFixture<LicensingApi>({
+    getDomainClaimAuthority: async () => ({
+      authorizesDomainClaims: false,
+      hostsSingleOrganization: true,
+      licenseDigests: [],
+      ...overrides,
+    }),
+  });
 }
 
 export class StubStranding implements SsoConnectionStrandingRepository {

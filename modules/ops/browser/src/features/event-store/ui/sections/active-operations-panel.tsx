@@ -1,5 +1,5 @@
-import { Text } from "@chakra-ui/react";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Text } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";

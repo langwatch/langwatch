@@ -1,34 +1,9 @@
 /**
- * Maps misconfigured OpenTelemetry exporter URLs onto canonical OTLP paths.
- * See specs/otlp/endpoint-path-canonicalisation.feature.
+ * The marker a corrected OTLP request carries; the mapping itself is `canonicalOtlpPath` in
+ * @langwatch/observability. See specs/otlp/endpoint-path-canonicalisation.feature.
  */
 
 import { randomUUID } from "node:crypto";
-
-export const CANONICAL_OTLP_BASE_PATH = "/api/otel/v1";
-
-/** The suffix an exporter appends for each signal. */
-const SIGNAL_SUFFIX = /\/v1\/(traces|logs|metrics)$/;
-
-// Allow-list of known misconfigurations before the signal suffix; see examples in spec.
-const RECOGNISED_PREFIX =
-  /^(?:\/api\/collector)?(?:\/api(?:\/otel(?:\/v1\/(?:traces|logs|metrics))?)?)?$/;
-
-/**
- * Returns the canonical ingestion path, or null for non-OTLP paths.
- * Callers compare the result with the input to decide if correction is needed.
- */
-export function canonicalOtlpPath(pathname: string): string | null {
-  const normalised = pathname.replace(/\/{2,}/g, "/").replace(/(.)\/+$/, "$1");
-
-  const suffix = SIGNAL_SUFFIX.exec(normalised);
-  if (!suffix) return null;
-
-  const prefix = normalised.slice(0, normalised.length - suffix[0].length);
-  if (!RECOGNISED_PREFIX.test(prefix)) return null;
-
-  return `${CANONICAL_OTLP_BASE_PATH}/${suffix[1]}`;
-}
 
 export const OTLP_CORRECTED_PATH_HEADER = "x-langwatch-otlp-corrected-path";
 

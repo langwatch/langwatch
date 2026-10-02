@@ -1,4 +1,4 @@
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "react-feather";

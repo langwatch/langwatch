@@ -1,14 +1,14 @@
+import type * as observabilityModule from "@langwatch/observability";
 /**
  * @vitest-environment node
  * A tracked-event body the caller got wrong is answered as a 400 and logged as a warning:
  * the client's mistake is not a server error.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type * as observabilityModule from "@langwatch/observability";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
+import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 function app() {
-  return TraceApp.create(
+  return TraceModule.create(
     createApiFixture<TraceAppDependencies>({
       traces: createApiFixture<TraceAppDependencies["traces"]>({
         read: createApiFixture<TraceLegacyRead>(),
@@ -32,7 +32,7 @@ function app() {
   );
 }
 
-describe("TraceApp.trackEventFromRequest", () => {
+describe("TraceModule.trackEventFromRequest", () => {
   describe("when the body is not a valid tracked event", () => {
     it("refuses it and logs at warn, never error", async () => {
       loggerSpies.warn.mockClear();

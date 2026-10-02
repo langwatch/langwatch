@@ -10,8 +10,8 @@ import type {
   AuthRouteReading,
 } from "@langwatch/auth-browser/auth";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { readPublicAppConfig } from "@langwatch/browser/public-config";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { useMemo, type ComponentType } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 

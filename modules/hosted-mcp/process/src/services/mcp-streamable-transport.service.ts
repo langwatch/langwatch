@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import { extractSessionIdHeader } from "../rules/mcp-routes.rules.ts";
-import type { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
+import type { McpCallerAuthService, McpCallerLookup } from "./mcp-caller-auth.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
 import {
   MAX_SESSIONS_PER_KEY,
@@ -89,7 +89,7 @@ export class McpStreamableTransportService {
       return;
     }
 
-    await this.#drive({ req, res, sessionId, token, callerApiKey, session: lookup.session });
+    await this.#drive({ req, res, sessionId, token, caller, session: lookup.session });
   }
 
   async handleDelete(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -107,7 +107,7 @@ export class McpStreamableTransportService {
       return;
     }
     const caller = await auth.resolveCaller(token);
-    if (caller.kind !== "resolved" || caller.apiKey !== session.apiKey) {
+    if (!sessions.adoptsCaller({ transport: "streamable", sessionId, session, caller })) {
       http.send401(
         res,
         auth.isGrantRevoked(token) ? "mcp_grant_revoked" : "Bearer token does not match session",
@@ -115,6 +115,7 @@ export class McpStreamableTransportService {
       return;
     }
 
+    http.noteLogFields(res, { projectId: session.projectId });
     await session.transport.close();
     sessions.streamable.delete(sessionId);
     void sessions.removeRecord({ transport: "streamable", sessionId, apiKey: session.apiKey });
@@ -134,7 +135,7 @@ export class McpStreamableTransportService {
     const lookup = await this.#findSession({ ...input, token, callerApiKey });
     if (lookup.kind === "answered") return true;
     if (lookup.kind === "missing") return false;
-    await this.#drive({ ...input, token, callerApiKey, session: lookup.session });
+    await this.#drive({ ...input, token, caller, session: lookup.session });
     return true;
   }
 
@@ -170,21 +171,22 @@ export class McpStreamableTransportService {
     res: ServerResponse;
     sessionId: string;
     token: string | undefined;
-    callerApiKey: string | undefined;
+    caller: McpCallerLookup;
     session: McpStreamableSession;
     body?: unknown;
   }): Promise<void> {
     const { http, sessions } = this.#collaborators;
-    const { session } = input;
+    const { session, sessionId, caller } = input;
     if (!input.token) {
       http.send401(input.res, "Authorization header required");
       return;
     }
-    if (input.callerApiKey !== session.apiKey) {
+    if (!sessions.adoptsCaller({ transport: "streamable", sessionId, session, caller })) {
       http.send401(input.res, "Bearer token does not match session");
       return;
     }
 
+    http.noteLogFields(input.res, { projectId: session.projectId });
     sessions.markActive(session);
     void sessions.touchRecord({
       transport: "streamable",
@@ -211,7 +213,7 @@ export class McpStreamableTransportService {
 
     const authentication = await auth.authenticate(input.req, input.res);
     if (authentication.kind === "answered") return;
-    const { apiKey } = authentication;
+    const { apiKey, projectId } = authentication;
 
     const caller = await auth.resolveOptionalCaller(auth.extractBearer(input.req));
     const userId = caller.kind === "resolved" ? caller.userId : undefined;
@@ -226,8 +228,8 @@ export class McpStreamableTransportService {
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => generate(SESSION_KSUID_RESOURCE).toString(),
       onsessioninitialized: (id) => {
-        sessions.streamable.set(id, sessions.openSession({ transport, apiKey, userId }));
-        sessions.storeStreamableRecord(id, apiKey);
+        sessions.streamable.set(id, sessions.openSession({ transport, apiKey, projectId, userId }));
+        sessions.storeStreamableRecord({ sessionId: id, apiKey, projectId });
       },
     });
     transport.onclose = () => {
@@ -240,7 +242,7 @@ export class McpStreamableTransportService {
       });
     };
 
-    await sessions.connectServer({ transport, apiKey, userId });
+    await sessions.connectServer({ transport, apiKey, projectId, userId });
     await sessions.runAs(apiKey, () => transport.handleRequest(input.req, input.res, input.body));
   }
 
@@ -263,6 +265,11 @@ export class McpStreamableTransportService {
       return { kind: "missing" };
 
     const { sessionId } = input;
+    const projectId = record.projectId ?? (await auth.projectIdOf(record.apiKey));
+    // A record whose key no longer names a live project has nothing to serve.
+    if (projectId === undefined) return { kind: "missing" };
+    await sessions.backfillRecordProject({ transport: "streamable", sessionId, record, projectId });
+
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => sessionId });
     const transportFields: Record<string, unknown> = Object(transport);
     const inner = transportFields._webStandardTransport;
@@ -277,13 +284,13 @@ export class McpStreamableTransportService {
     // The OAuth user is recovered while the token still carries one; a project key has none.
     const caller = await auth.resolveOptionalCaller(input.token);
     const userId = caller.kind === "resolved" ? caller.userId : undefined;
-    const session = sessions.openSession({ transport, apiKey: record.apiKey, userId });
+    const session = sessions.openSession({ transport, apiKey: record.apiKey, projectId, userId });
     sessions.streamable.set(sessionId, session);
     transport.onclose = () => {
       sessions.streamable.delete(sessionId);
     };
 
-    await sessions.connectServer({ transport, apiKey: record.apiKey, userId });
+    await sessions.connectServer({ transport, apiKey: record.apiKey, projectId, userId });
     return { kind: "found", session };
   }
 }

@@ -1,6 +1,15 @@
-import { Box, Button, Code, HStack, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import type { TestMessage } from "@langwatch/agent-contract/http-test";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Code,
+  HStack,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Minus, Plus } from "lucide-react";
 import { useCallback } from "react";
 

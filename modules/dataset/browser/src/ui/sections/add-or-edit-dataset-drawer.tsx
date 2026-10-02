@@ -1,16 +1,23 @@
 // Create/edit datasets with validation for required name and no duplicate column names.
 
-import { Button, Field, HStack, Input, NativeSelect, VStack } from "@chakra-ui/react";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   type DatasetColumnType,
   datasetColumnTypeSchema,
 } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetSlugValidation } from "../../behavior/use-dataset-slug-validation.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetSlugDisplay } from "../blocks/dataset-slug-display.tsx";
@@ -125,8 +132,8 @@ export function AddOrEditDatasetDrawer({
 }) {
   const host = useDatasetHost();
   const project = host.project();
-  const upsertDataset = datasetApi.dataset.upsert.useMutation();
-  const utils = datasetApi.useUtils();
+  const upsertDataset = datasetClient.dataset.upsert.useMutation();
+  const utils = datasetClient.useUtils();
 
   const [name, setName] = useState(datasetToSave?.name ?? "");
   const [columnTypes, setColumnTypes] = useState<DatasetColumns>(
@@ -240,8 +247,8 @@ export function AddOrEditDatasetDrawer({
               invalid={!!problems.name || (slugInfo?.hasConflict ?? false)}
             >
               <Input
+                name="name"
                 value={name}
-                aria-label="Dataset name"
                 data-testid="dataset-name-input"
                 onChange={(event) => setName(event.target.value)}
               />
@@ -265,6 +272,7 @@ export function AddOrEditDatasetDrawer({
                 {columnTypes.map((column, index) => (
                   <HStack key={index} width="full" gap={2}>
                     <Input
+                      name={`columnTypes.${index}.name`}
                       value={column.name}
                       placeholder="Column name"
                       aria-label={`Column ${index + 1} name`}
@@ -273,6 +281,7 @@ export function AddOrEditDatasetDrawer({
                     />
                     <NativeSelect.Root>
                       <NativeSelect.Field
+                        name={`columnTypes.${index}.type`}
                         value={column.type}
                         aria-label={`Column ${index + 1} type`}
                         onChange={(event) =>

@@ -7,8 +7,8 @@
  * @see specs/features/scenarios/unified-agent-target-section.feature
  * @see specs/agents/agent-dev-tunnel.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,7 +54,7 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
@@ -91,11 +91,7 @@ describe("RunScenarioModal with TargetSelector", () => {
   });
 
   function renderModal() {
-    return render(
-      <ChakraProvider value={defaultSystem}>
-        <RunScenarioModal open={true} onClose={onClose} onRun={onRun} />
-      </ChakraProvider>,
-    );
+    return renderWithDesignSystem(<RunScenarioModal open={true} onClose={onClose} onRun={onRun} />);
   }
 
   async function openDropdown() {

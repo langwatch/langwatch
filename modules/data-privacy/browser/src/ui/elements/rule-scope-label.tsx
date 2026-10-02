@@ -1,5 +1,5 @@
-import { Badge, HStack, Text } from "@chakra-ui/react";
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import { Folder, UserLock } from "lucide-react";
 
 import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";

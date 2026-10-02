@@ -71,21 +71,24 @@ export class LangyTurnPreparationService {
     attempt: LangyTurnAttemptService;
   }): Promise<{ conversationId: string; turnId: string }> {
     const mintedRunToken = args.conversation.isNew ? mintRunToken() : null;
+    // Started before the probe so the probe can carry it: the disabled skills are
+    // part of the worker signature. Never rejects (a flag error reads as gated off).
+    const disabledSkillsPromise = this.deps.skillGates.resolveDisabled({
+      userId: args.userId,
+      projectId: args.projectId,
+      organizationId: args.credentials.organizationId,
+    });
     const earlyWorkerProbe = args.credentials.githubToken
       ? null
-      : args.worker.probe(
-          LANGY_TURN_SHARED.buildWorkerProbeArgs({
-            projectId: args.projectId,
-            actorUserId: args.userId,
-            conversationId: args.conversation.id,
-            model: args.turnModel,
-            credentials: args.credentials,
-          }),
-        );
+      : this.probeWorker(args, disabledSkillsPromise);
     const results = await this.readPreparation(args, mintedRunToken);
+    const disabledSkills = await disabledSkillsPromise;
+    if (disabledSkills.length > 0) {
+      args.credentials.disabledSkillIds = disabledSkills;
+    }
     const runToken = this.requireRunnableTurn(args, results);
     const permit = await this.reservePermit(args);
-    await this.ensureWorkerAccess(args, earlyWorkerProbe);
+    await this.ensureWorkerAccess(args, earlyWorkerProbe ?? this.probeWorker(args, disabledSkills));
     const prepared = this.buildPreparedTurn(args, results, permit.capReachedNote);
     await this.stashPreparedTurn({ args, prepared, runToken, permitReserved: permit.reserved });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
@@ -227,22 +230,27 @@ export class LangyTurnPreparationService {
     return { reserved: permit.reserved, capReachedNote };
   }
 
+  private async probeWorker(
+    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    disabledSkillIds: Promise<string[]> | string[],
+  ): Promise<boolean> {
+    return args.worker.probe(
+      LANGY_TURN_SHARED.buildWorkerProbeArgs({
+        projectId: args.projectId,
+        actorUserId: args.userId,
+        conversationId: args.conversation.id,
+        model: args.turnModel,
+        credentials: args.credentials,
+        disabledSkillIds: await disabledSkillIds,
+      }),
+    );
+  }
+
   private async ensureWorkerAccess(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    earlyWorkerProbe: ReturnType<
-      NonNullable<LangyTurnServiceDependencies["worker"]>["probe"]
-    > | null,
+    workerProbe: Promise<boolean>,
   ) {
-    const workerAvailable = await (earlyWorkerProbe ??
-      args.worker.probe(
-        LANGY_TURN_SHARED.buildWorkerProbeArgs({
-          projectId: args.projectId,
-          actorUserId: args.userId,
-          conversationId: args.conversation.id,
-          model: args.turnModel,
-          credentials: args.credentials,
-        }),
-      ));
+    const workerAvailable = await workerProbe;
     if (workerAvailable) {
       return;
     }
@@ -301,6 +309,7 @@ export class LangyTurnPreparationService {
     const isUiActionSurfaceOpen =
       uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : false;
     const { prompt, labelled } = LANGY_TURN_SHARED.composeLangyTurnPrompt({
+      viewer: args.session.user,
       contextBlock: this.deps.context.render({
         context: args.turnContext,
         isUiActionSurfaceOpen,

@@ -12,12 +12,12 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { WebhookApp, type WebhookAppDependencies } from "../../app/webhook.app.ts";
+import { WebhookModule, type WebhookAppDependencies } from "../../app/webhook.app.ts";
 import { webhookRest } from "../webhook.rest.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 
-/** Every dependency `WebhookApp` needs, defaulted to "not under test here". */
+/** Every dependency `WebhookModule` needs, defaulted to "not under test here". */
 function unreachableDependencies(): WebhookAppDependencies {
   const unreachable = <T extends object>(name: string): T =>
     new Proxy({} as T, {
@@ -64,7 +64,7 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
 
 /** The family over one `WebhookAppDependencies` cut the test supplies. */
 export function mountWebhookRest(dependencies: Partial<WebhookAppDependencies> = {}) {
-  const app = WebhookApp.fromDependencies({ ...unreachableDependencies(), ...dependencies });
+  const app = WebhookModule.fromDependencies({ ...unreachableDependencies(), ...dependencies });
 
   const runtime = createRestRuntime({
     identity: {

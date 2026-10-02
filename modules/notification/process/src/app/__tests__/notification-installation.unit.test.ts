@@ -1,9 +1,9 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
-import { notificationServer } from "../../notification.server.ts";
+import { notificationProcessModule } from "../../notification.module.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";
 
 function process(
@@ -11,7 +11,7 @@ function process(
   resolver = SecretsResolver.over(SecretsChain.start({ environment: {} })),
 ) {
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(notificationServer)])
+    .withModules([withMemoryRepositories(notificationProcessModule)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
     .withConfig({
@@ -40,7 +40,7 @@ describe("notification app installation", () => {
       const app = runtime.service(NotificationApi);
       const created = await app.create(record);
 
-      expect(runtime.module(notificationServer).provided).toBe(app);
+      expect(runtime.module(notificationProcessModule).provided).toBe(app);
 
       await expect(
         app.listRecentByOrganization({ organizationId: "organization-1", since }),

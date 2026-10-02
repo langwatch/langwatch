@@ -1,7 +1,7 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 
 import { api } from "../../../../behavior/trace-api.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 export interface TraceEventsResult {
@@ -16,19 +16,12 @@ export interface TraceEventsResult {
  * summary read; this reads only the `Events.*` columns from stored_spans.
  */
 export function useTraceEvents(): TraceEventsResult {
-  const shared = useSharedTrace();
+  const isReadOnly = useIsReadOnlyTrace();
   const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.traces.traceEvents.useQuery(queryArgs, {
-    enabled: isReady && hintReady && !shared,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    trpc: { context: { skipBatch: true } },
+    enabled: isReady && hintReady && !isReadOnly,
   });
-
-  if (shared) {
-    return { events: shared.events, isLoading: false, isError: false };
-  }
 
   return {
     events: query.data ?? [],

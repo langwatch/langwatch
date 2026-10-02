@@ -69,6 +69,7 @@ export function useGuidedOrganizationCreate({
             projectSlug: response.projectSlug ?? "",
           });
           void utils.organization.getAll.invalidate();
+          void utils.organization.getScopeGraph.invalidate();
           setLeavingCard(true);
           timers.current.push(
             window.setTimeout(() => {

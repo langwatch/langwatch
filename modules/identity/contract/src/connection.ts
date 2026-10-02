@@ -1,7 +1,7 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import type { RoutableConnection } from "./signin-routing.ts";
-import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * SSO connection vocabulary (ADR-117 §5, D04): states, events, and pure reducer.
@@ -33,6 +33,26 @@ export const SSO_CONNECTION_STATES = [
 ] as const;
 export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
 export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
+
+/**
+ * Where a connection's identity provider settings may be replaced: every setup
+ * state and the live pair. A connection on its way out (TEARDOWN_PENDING) is not
+ * dialed again; DISCARDED and TORN_DOWN are history.
+ */
+export const SSO_IDP_EDITABLE_STATES: readonly SsoConnectionLifecycleState[] = [
+  "DRAFT",
+  "CLAIMED",
+  "APPROVED",
+  "REJECTED",
+  "VERIFICATION_PENDING",
+  "VERIFIED",
+  "ACTIVE",
+  "SUSPENDED",
+];
+
+export function ssoConnectionIdpIsEditable(state: string): boolean {
+  return (SSO_IDP_EDITABLE_STATES as readonly string[]).includes(state);
+}
 
 /**
  * Verification methods: DNS TXT, the file the domain serves, license token,
@@ -84,7 +104,7 @@ export type SsoPublishedProofChannel = z.infer<typeof ssoPublishedProofChannelSc
  * rather than inferred from the deployment, because a deployment changes and
  * a fact does not: a dispute about a domain is answered from history alone.
  */
-export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "dns-proof"] as const;
+export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "license", "dns-proof"] as const;
 export const ssoDomainClaimAuthoritySchema = z.enum(SSO_DOMAIN_CLAIM_AUTHORITIES);
 export type SsoDomainClaimAuthority = z.infer<typeof ssoDomainClaimAuthoritySchema>;
 
@@ -180,6 +200,12 @@ export const CONNECTION_TORN_DOWN_EVENT_TYPE = "lw.identity.connection_torn_down
  *  a sign-in reaches a provider by connection id, so two organizations may
  *  both call theirs `okta`, and no saved link breaks when it changes. */
 export const CONNECTION_RENAMED_EVENT_TYPE = "lw.identity.connection_renamed" as const;
+/**
+ * The issuer and credential references (OIDC) or configuration reference (SAML),
+ * replaced on an existing connection. The id stays, so the redirect address at the
+ * provider keeps working, and so do domains, proofs, policy and accounts.
+ */
+export const CONNECTION_IDP_UPDATED_EVENT_TYPE = "lw.identity.connection_idp_updated" as const;
 export const REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE =
   "lw.identity.replacement_connection_registered" as const;
 export const MIGRATION_ROUTE_SELECTED_EVENT_TYPE = "lw.identity.migration_route_selected" as const;
@@ -210,6 +236,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
   MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
@@ -230,14 +257,14 @@ export const connectionRegisteredPayloadSchema = z.object({
   idp: ssoIdpMetadataSchema,
   /** What this connection does with somebody it has never seen. */
   arrivalPolicy: ssoArrivalPolicySchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const domainClaimedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -246,7 +273,7 @@ export const domainClaimApprovedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** The ops user who approved. Recorded because first-verifier-owns makes
    *  this step the abuse boundary (D04 Security Concerns). */
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   /** Defaults to the operator, so every fact written before the published
    *  record could decide a claim decodes as exactly what it was. */
   authority: ssoDomainClaimAuthoritySchema.default("platform-operator"),
@@ -258,7 +285,7 @@ export const domainClaimRejectedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** Why ops said no, in the operator's words. Read back on re-claim. */
   note: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -270,13 +297,13 @@ export const domainClaimRejectedPayloadSchema = z.object({
 export const domainWithdrawnPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionDiscardedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -294,7 +321,7 @@ export const verificationRequestedPayloadSchema = z.object({
    * expired ceremony, the guard refuses to read it as a proof.
    */
   expiresAtMs: z.number().int().nonnegative().nullable().default(null),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -311,7 +338,7 @@ export const domainAttestedPayloadSchema = z.object({
   /** The platform operator who attested. Recorded because an attested domain
    *  is exactly as trustworthy as the operator behind it, and a dispute is
    *  answered from this fact. */
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -319,7 +346,7 @@ export const domainVerifiedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -335,7 +362,7 @@ export const domainProofWaveredPayloadSchema = z.object({
   firstAbsentAtMs: z.number().int().nonnegative(),
   /** When continued absence becomes a lapse. */
   graceEndsAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -349,7 +376,7 @@ export const domainProofLapsedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** Carried forward so the fact says how long it was gone before we acted. */
   firstAbsentAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -362,7 +389,7 @@ export const domainProofRecoveredPayloadSchema = z.object({
   domain: z.string().min(1),
   /** How long the evidence was missing, end to end. */
   absentForMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -375,21 +402,21 @@ export const connectionActivatedPayloadSchema = z.object({
   /** The break-glass recovery reservation this activation holds, so a retry
    *  by the same actor reuses it and nobody else can adopt it. */
   activationReservationCommandId: z.string().min(1).optional(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionSuspendedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   reason: z.string().min(1).nullable(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionResumedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   activationReservationCommandId: z.string().min(1).optional(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -400,13 +427,13 @@ export const teardownRequestedPayloadSchema = z.object({
    *  dispatches the completion command; carrying it on the fact is what
    *  lets a replay reconstruct the deadline without a second store. */
   tearDownAfterMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionTornDownPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -418,7 +445,7 @@ export const connectionTornDownPayloadSchema = z.object({
 export const connectionArrivalPolicySetPayloadSchema = z.object({
   connectionId: z.string().min(1),
   policy: ssoArrivalPolicySchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -447,7 +474,19 @@ export const connectionRenamedPayloadSchema = z.object({
   /** Trimmed and non-empty: a connection with a blank name is one whose card
    *  has nothing on it, and the cards are the only place it is read. */
   name: z.string().trim().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
+  ...sourced,
+});
+
+/** What an identity provider update replaces: everything the engine dials,
+ *  and not the name (`providerId`), which is the rename's fact. */
+export const ssoIdpDialingSchema = ssoIdpMetadataSchema.omit({ providerId: true });
+export type SsoIdpDialing = z.infer<typeof ssoIdpDialingSchema>;
+
+export const connectionIdpUpdatedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  idp: ssoIdpDialingSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -460,19 +499,19 @@ export const replacementConnectionRegisteredPayloadSchema = z.object({
 export const migrationRouteSelectedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   route: ssoMigrationRouteSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const migrationFinalizationStartedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const migrationFinalizedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -552,6 +591,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
     data: connectionRenamedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTION_IDP_UPDATED_EVENT_TYPE),
+    data: connectionIdpUpdatedPayloadSchema,
   }),
   z.object({
     type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
@@ -857,12 +900,14 @@ const withProofCondition = (
       : entry,
   );
 
-/** The facts about the legacy-to-direct pair, and the name on the card. */
+/** The facts about the legacy-to-direct pair, the name on the card and the
+ *  identity provider settings it dials. */
 type SsoMigrationFact = Extract<
   SsoConnectionFact,
   {
     type:
       | typeof CONNECTION_RENAMED_EVENT_TYPE
+      | typeof CONNECTION_IDP_UPDATED_EVENT_TYPE
       | typeof REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE
       | typeof MIGRATION_ROUTE_SELECTED_EVENT_TYPE
       | typeof MIGRATION_FINALIZATION_STARTED_EVENT_TYPE
@@ -873,6 +918,7 @@ type SsoMigrationFact = Extract<
 /** The five the cutover states, out of the twenty-two a connection has. */
 const SSO_MIGRATION_FACT_TYPES: readonly SsoConnectionFact["type"][] = [
   CONNECTION_RENAMED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
   MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
@@ -898,6 +944,12 @@ function reduceSsoMigrationFact({
       // Folded onto the metadata the name already lived in, rather than into
       // a field beside it: one string, one reader, nothing to keep in step.
       return { ...touched, idpMetadata: { ...touched.idpMetadata, providerId: fact.data.name } };
+    case CONNECTION_IDP_UPDATED_EVENT_TYPE:
+      // Replaces what the engine dials and keeps the name, the rename's fact.
+      return {
+        ...touched,
+        idpMetadata: { ...fact.data.idp, providerId: touched.idpMetadata.providerId },
+      };
     case REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE:
       return {
         ...touched,
@@ -1097,6 +1149,12 @@ function reduceSsoLifecycleFact({
             isSsoPublishedProofChannel(state.pendingVerification.method)
               ? state.pendingVerification.tokenHash
               : null,
+          // A licence ceremony's hash is of the installation's licence key: kept as the
+          // evidence and never as a `tokenHash`, since nothing published it to re-read.
+          ...(state.pendingVerification?.domain === fact.data.domain &&
+          state.pendingVerification.method === "license-token"
+            ? { evidenceRef: state.pendingVerification.tokenHash }
+            : {}),
         }),
         pendingVerification: null,
       };

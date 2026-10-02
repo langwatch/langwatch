@@ -1,3 +1,4 @@
+import { Select } from "@chakra-ui/react";
 import {
   Box,
   Button,
@@ -6,11 +7,10 @@ import {
   HStack,
   Input,
   Portal,
-  Select,
   Text,
   Textarea,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";

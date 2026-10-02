@@ -1,3 +1,4 @@
+import { FEATURE_PREFIX, stripFeaturePrefix } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Only `repositories/<store>/**` names a store client, and a registry hands the
@@ -29,8 +30,8 @@ const STORES = [
   },
 ];
 
-const MODULE_ROLES = new Set(["contract", "process", "browser", "browser-kit"]);
-const REPOSITORY_REGISTRY = /^repositories\/[^/]+\.registry\.ts$/;
+const MODULE_ROLES = new Set(["contract", "process", "browser", "library"]);
+const REPOSITORY_REGISTRY = new RegExp(`^${FEATURE_PREFIX}repositories/[^/]+\\.registry\\.ts$`);
 
 function isGoverned(file) {
   if (file.isTest) return false;
@@ -67,9 +68,10 @@ function valueNamesOf(node) {
 }
 
 function isSeam({ row, sourcePath }) {
-  if (sourcePath.startsWith(`repositories/${row.folder}/`)) return true;
+  const layerPath = stripFeaturePrefix(sourcePath);
+  if (layerPath.startsWith(`repositories/${row.folder}/`)) return true;
 
-  return Boolean(row.channelTier) && sourcePath.startsWith(`channels/${row.channelTier}/`);
+  return Boolean(row.channelTier) && layerPath.startsWith(`channels/${row.channelTier}/`);
 }
 
 function isProcessSeam({ file, row, values }) {

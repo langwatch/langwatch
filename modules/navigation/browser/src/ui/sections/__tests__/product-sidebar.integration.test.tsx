@@ -3,8 +3,8 @@
  * Spec: specs/navigation/product-sidebars.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,9 +28,9 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 }));
 
 import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position.ts";
+import { MENU_WIDTH_EXPANDED } from "../../../model/menu-widths.ts";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
-import { MENU_WIDTH_EXPANDED } from "../main-menu.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
 const team = {
@@ -66,28 +66,26 @@ function renderSidebar({
   isCompact?: boolean;
   billedCostEnabled?: boolean;
 }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          organization,
-          organizations: [organization],
-          project: team.projects[0],
-          openableTeams: [team, personalTeam],
-          pathname,
-          permissions: ["triggers:view", "organization:view"],
-          flags: {
-            release_ui_governance_billed_cost_enabled: {
-              enabled: billedCostEnabled,
-              isLoading: false,
-            },
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        organization,
+        organizations: [organization],
+        project: team.projects[0],
+        openableTeams: [team, personalTeam],
+        pathname,
+        permissions: ["triggers:view", "organization:view"],
+        flags: {
+          release_ui_governance_billed_cost_enabled: {
+            enabled: billedCostEnabled,
+            isLoading: false,
           },
-          commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
-        }}
-      >
-        <ProductSidebar surface={surface} isCompact={isCompact} />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+        },
+        commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
+      }}
+    >
+      <ProductSidebar surface={surface} isCompact={isCompact} />
+    </WithStubNavigationHost>,
   );
 }
 
@@ -220,23 +218,21 @@ describe("the product sidebar", () => {
   describe("when the reader has ops access", () => {
     /** @scenario The product sidebars carry no ops section */
     it("renders no Ops section in a product sidebar", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WithStubNavigationHost
-            readings={{
-              organization,
-              organizations: [organization],
-              project: team.projects[0],
-              openableTeams: [team, personalTeam],
-              pathname: "/demo",
-              permissions: ["triggers:view", "organization:view"],
-              opsAccess: { hasAccess: true, isAdmin: true },
-              commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
-            }}
-          >
-            <ProductSidebar surface="llm-ops" isCompact={false} />
-          </WithStubNavigationHost>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <WithStubNavigationHost
+          readings={{
+            organization,
+            organizations: [organization],
+            project: team.projects[0],
+            openableTeams: [team, personalTeam],
+            pathname: "/demo",
+            permissions: ["triggers:view", "organization:view"],
+            opsAccess: { hasAccess: true, isAdmin: true },
+            commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
+          }}
+        >
+          <ProductSidebar surface="llm-ops" isCompact={false} />
+        </WithStubNavigationHost>,
       );
 
       expect(screen.queryByText("Ops")).not.toBeInTheDocument();
@@ -317,17 +313,28 @@ describe("the product sidebar", () => {
       expect(screen.queryByText("Billed")).not.toBeInTheDocument();
     });
 
-    /** @scenario With the billed-cost flag on, Costs appears between Overview and Inventory */
-    it("shows Costs between Overview and Inventory while the flag is on", () => {
+    /** @scenario With the billed-cost flag on, Costs appears without the unfinished Billed destination */
+    it("shows Costs between Overview and Inventory while the flag is on, and never Billed", () => {
       renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: true });
 
-      const labels = screen
-        .getAllByRole("link")
-        .map((link) => link.textContent)
-        .filter((label): label is string =>
-          ["Overview", "Costs", "Inventory"].includes(label ?? ""),
-        );
-      expect(labels).toEqual(["Overview", "Costs", "Inventory"]);
+      const railOrder = (names: string[]) =>
+        screen
+          .getAllByRole("link")
+          .map((link) => link.textContent?.trim())
+          .filter((label) => names.includes(label ?? ""));
+
+      expect(railOrder(["Overview", "Costs", "Inventory"])).toEqual([
+        "Overview",
+        "Costs",
+        "Inventory",
+      ]);
+      expect(railOrder(["People", "Insights", "Analytics", "Signals & Alerts"])).toEqual([
+        "People",
+        "Insights",
+        "Analytics",
+        "Signals & Alerts",
+      ]);
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
     });
 
     /** @scenario "The Platform group lists its three entries under one label" */
@@ -414,24 +421,22 @@ describe("the product sidebar", () => {
       // and keeps its scroll; only the entry marked as the page being
       // shown moves.
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <WithStubNavigationHost
-            readings={{
-              organization,
-              organizations: [organization],
-              project: team.projects[0],
-              openableTeams: [team, personalTeam],
-              pathname: "/gateway/budgets",
-              permissions: ["triggers:view", "organization:view"],
-              flags: {
-                release_ui_governance_billed_cost_enabled: { enabled: true, isLoading: false },
-              },
-              commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
-            }}
-          >
-            <ProductSidebar surface="gateway" isCompact={false} />
-          </WithStubNavigationHost>
-        </ChakraProvider>,
+        <WithStubNavigationHost
+          readings={{
+            organization,
+            organizations: [organization],
+            project: team.projects[0],
+            openableTeams: [team, personalTeam],
+            pathname: "/gateway/budgets",
+            permissions: ["triggers:view", "organization:view"],
+            flags: {
+              release_ui_governance_billed_cost_enabled: { enabled: true, isLoading: false },
+            },
+            commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
+          }}
+        >
+          <ProductSidebar surface="gateway" isCompact={false} />
+        </WithStubNavigationHost>,
       );
 
       await waitFor(() => {

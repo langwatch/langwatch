@@ -1,4 +1,3 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import {
   formatCost,
   formatLatency,
@@ -8,6 +7,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "@langwatch/design-system/pass-rate-indicator";
+import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import type { TargetAggregate } from "@langwatch/experiment-contract";

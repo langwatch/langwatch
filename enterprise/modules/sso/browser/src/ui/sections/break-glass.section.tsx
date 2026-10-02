@@ -5,7 +5,15 @@
  * everything else on this page — a lapsed subscription must never be the
  * reason an organization cannot reach its own recovery path.
  */
-import { Button, HStack, Input, NativeSelect, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  Input,
+  NativeSelect,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { BREAK_GLASS_MAX_WINDOW_DAYS } from "@langwatch/identity-contract";
 import { format } from "@langwatch/time";
 import { useState } from "react";

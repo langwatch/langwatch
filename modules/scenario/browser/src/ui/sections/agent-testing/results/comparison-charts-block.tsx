@@ -4,15 +4,14 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Grid } from "@chakra-ui/react";
-import {
-  type BatchRun,
-  formatCost,
-  formatLatency,
-  type RunGroupSummary,
-} from "@langwatch/suite-browser-kit";
+import { Grid } from "@langwatch/design-system/primitives";
 
 import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
+import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
+import {
+  type BatchRun,
+  type RunGroupSummary,
+} from "../../../../model/suite/run-history-transforms.ts";
 import {
   MiniBarCard,
   type MiniBarGroup,

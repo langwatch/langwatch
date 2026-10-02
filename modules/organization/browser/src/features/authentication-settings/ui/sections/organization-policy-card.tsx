@@ -3,7 +3,7 @@
  * independent of the SSO connection lifecycle. Each rule is its own card in
  * one two-column grid. Spec: specs/identity/org-access-cluster.feature
  */
-import { SimpleGrid } from "@chakra-ui/react";
+import { SimpleGrid } from "@langwatch/design-system/primitives";
 
 import { useJoinRequests } from "../../../../behavior/use-join-requests.ts";
 import { useTwoStepRequirement } from "../../../../behavior/use-two-step-requirement.ts";

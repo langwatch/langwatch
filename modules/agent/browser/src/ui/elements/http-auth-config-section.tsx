@@ -1,10 +1,16 @@
-import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
-import type { HttpAuth, HttpAuthType } from "@langwatch/agent-contract";
+import { type HttpAuth, type HttpAuthType, secretReferenceOf } from "@langwatch/agent-contract";
+import { Field, Input, NativeSelect, VStack } from "@langwatch/design-system/primitives";
+
+import { SecretReferenceLine } from "./secret-reference-line.tsx";
 
 export type AuthConfigSectionProps = {
   value: HttpAuth | undefined;
   onChange: (auth: HttpAuth | undefined) => void;
   disabled?: boolean;
+  /** Credentials live on the agent: the section is read-only and says where they are. */
+  readOnly?: boolean;
+  /** The saved auth kind: its secret is kept by the server while the field is left blank. */
+  storedType?: HttpAuthType;
 };
 
 const AUTH_TYPE_OPTIONS: { value: HttpAuthType; label: string }[] = [
@@ -18,8 +24,50 @@ const AUTH_TYPE_OPTIONS: { value: HttpAuthType; label: string }[] = [
  * Authentication configuration section for HTTP agents.
  * Supports: None, Bearer Token, API Key, Basic Auth
  */
-export function AuthConfigSection({ value, onChange, disabled = false }: AuthConfigSectionProps) {
+export function AuthConfigSection({
+  value,
+  onChange,
+  disabled: disabledProp = false,
+  readOnly = false,
+  storedType,
+}: AuthConfigSectionProps) {
   const authType = value?.type ?? "none";
+  const disabled = disabledProp || readOnly;
+  const keptPlaceholder = (fallback: string) => {
+    if (readOnly) return "Stored on the agent";
+    return storedType !== void 0 && storedType === authType
+      ? "Stored; enter a new value to replace it"
+      : fallback;
+  };
+
+  const credentialField = ({
+    value: current,
+    onValueChange,
+    placeholder,
+  }: {
+    value: string;
+    onValueChange: (next: string) => void;
+    placeholder: string;
+  }) => {
+    const name = secretReferenceOf(current);
+    if (name !== void 0) {
+      return (
+        <SecretReferenceLine
+          name={name}
+          {...(disabled ? {} : { onReplace: () => onValueChange("") })}
+        />
+      );
+    }
+    return (
+      <Input
+        type="password"
+        value={current}
+        onChange={(e) => onValueChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    );
+  };
 
   const handleTypeChange = (newType: HttpAuthType) => {
     switch (newType) {
@@ -61,13 +109,11 @@ export function AuthConfigSection({ value, onChange, disabled = false }: AuthCon
       {value?.type === "bearer" && (
         <Field.Root>
           <Field.Label>Token</Field.Label>
-          <Input
-            type="password"
-            value={value.token}
-            onChange={(e) => onChange({ ...value, token: e.target.value })}
-            placeholder="Enter bearer token"
-            disabled={disabled}
-          />
+          {credentialField({
+            value: value.token,
+            onValueChange: (token) => onChange({ ...value, token }),
+            placeholder: keptPlaceholder("Enter bearer token"),
+          })}
         </Field.Root>
       )}
 
@@ -85,13 +131,11 @@ export function AuthConfigSection({ value, onChange, disabled = false }: AuthCon
           </Field.Root>
           <Field.Root>
             <Field.Label>API Key Value</Field.Label>
-            <Input
-              type="password"
-              value={value.value}
-              onChange={(e) => onChange({ ...value, value: e.target.value })}
-              placeholder="Enter API key"
-              disabled={disabled}
-            />
+            {credentialField({
+              value: value.value,
+              onValueChange: (next) => onChange({ ...value, value: next }),
+              placeholder: keptPlaceholder("Enter API key"),
+            })}
           </Field.Root>
         </>
       )}
@@ -110,13 +154,11 @@ export function AuthConfigSection({ value, onChange, disabled = false }: AuthCon
           </Field.Root>
           <Field.Root>
             <Field.Label>Password</Field.Label>
-            <Input
-              type="password"
-              value={value.password}
-              onChange={(e) => onChange({ ...value, password: e.target.value })}
-              placeholder="Password"
-              disabled={disabled}
-            />
+            {credentialField({
+              value: value.password,
+              onValueChange: (password) => onChange({ ...value, password }),
+              placeholder: keptPlaceholder("Password"),
+            })}
           </Field.Root>
         </>
       )}

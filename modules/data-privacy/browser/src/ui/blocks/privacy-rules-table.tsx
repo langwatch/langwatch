@@ -1,6 +1,6 @@
-import { Button, Card, Table, Text } from "@chakra-ui/react";
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, Card, Table, Text } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 
 import { ruleSummary } from "../../model/data-privacy-rule-config.ts";

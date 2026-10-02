@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/suites/test-suites.feature
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

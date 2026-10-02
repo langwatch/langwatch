@@ -21,9 +21,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "zod": "catalog:"
   },

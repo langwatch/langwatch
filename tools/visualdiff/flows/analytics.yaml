@@ -860,6 +860,7 @@ flows:
 
   - id: dashboard-reorder-dashboards-reads-back
     title: Move a dashboard up in the sidebar and see the order again after a reload
+    isolated: true
     setup:
       - post: /api/dashboards
         body:
@@ -870,7 +871,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/analytics/reports
+          path: /{isolatedSlug}/analytics/reports
       - action: expect
         with:
           count: 'xpath=//a[normalize-space()="vd-reorder-first"]/following::a[normalize-space()="vd-reorder-second"]'
@@ -888,7 +889,7 @@ flows:
           equals: "1"
       - action: go
         with:
-          path: /{slug}/analytics/reports
+          path: /{isolatedSlug}/analytics/reports
       - action: expect
         with:
           count: 'xpath=//a[normalize-space()="vd-reorder-second"]/following::a[normalize-space()="vd-reorder-first"]'
@@ -976,6 +977,11 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
       - action: click
         with:
           text: Add chart
@@ -988,16 +994,16 @@ flows:
           value: vd-widget-queries-{uid}
       - action: click
         with:
-          text: /^\s*Queries/
+          testId: analytics-widget-tab-queries
       - action: click
         with:
-          text: Add query
+          testId: analytics-widget-add-query
       - action: expect
         with:
           text: Queries (2)
       - action: click
         with:
-          text: /^\s*Save\s*$/
+          testId: analytics-widget-save
       - action: expect
         with:
           text: vd-widget-queries-{uid}
@@ -1016,7 +1022,7 @@ flows:
           text: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
-          text: /^\s*Queries/
+          testId: analytics-widget-tab-queries
       - action: expect
         with:
           text: Queries (2)
@@ -1028,7 +1034,7 @@ flows:
           text: Queries (1)
       - action: click
         with:
-          text: /^\s*Save\s*$/
+          testId: analytics-widget-save
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
@@ -1041,7 +1047,7 @@ flows:
           text: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
-          text: /^\s*Queries/
+          testId: analytics-widget-tab-queries
       - action: expect
         with:
           text: Queries (1)
@@ -1058,6 +1064,11 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
       - action: click
         with:
           text: Add chart
@@ -1070,10 +1081,10 @@ flows:
           value: vd-widget-a-{uid}
       - action: click
         with:
-          text: /^\s*Queries/
+          testId: analytics-widget-tab-queries
       - action: click
         with:
-          text: /^\s*Save\s*$/
+          testId: analytics-widget-save
       - action: expect
         with:
           text: vd-widget-a-{uid}
@@ -1092,17 +1103,17 @@ flows:
           text: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
-          label: Rename vd-widget-a-{uid}
+          selector: '.chakra-drawer__content [aria-label="Rename vd-widget-a-{uid}"]'
       - action: fill
         with:
           selector: "input:focus"
           value: vd-widget-b-{uid}
       - action: click
         with:
-          text: /^\s*Queries/
+          testId: analytics-widget-tab-queries
       - action: click
         with:
-          text: /^\s*Save\s*$/
+          testId: analytics-widget-save
       - action: expect
         with:
           text: vd-widget-b-{uid}
@@ -1182,11 +1193,9 @@ flows:
         with:
           selector: "input:focus"
           value: vd-life-renamed-{uid}
-      - action: type
+      - action: click
         with:
-          selector: "input:focus"
-          text: ""
-          submit: "true"
+          text: /^\s*Custom\s*$/
       - action: expect
         with:
           api: /api/dashboards

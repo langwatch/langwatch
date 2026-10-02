@@ -1,13 +1,10 @@
-import { Button } from "@chakra-ui/react";
-import {
-  type PageCursor,
-  rowKindForGrouping,
-  useEffectiveLens,
-  useExplorerStore,
-} from "@langwatch/trace-browser-kit";
+import { Button } from "@langwatch/design-system/primitives";
 import { requoteBareTerms } from "@langwatch/trace-contract";
 import type React from "react";
 
+import { useEffectiveLens, useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import { type PageCursor } from "../../../../behavior/query.slice.ts";
+import { rowKindForGrouping } from "../../../../behavior/view.slice.ts";
 import { HandledErrorState, readHandledError } from "../../errors/index.ts";
 import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 import {

@@ -209,12 +209,10 @@ flows:
           selector: 'xpath=//*[normalize-space()="canary-{uid}"]/ancestor::*[.//*[@role="combobox"]][1]//*[@role="combobox"]'
       - action: click
         with:
-          selector: '[role="option"]'
-          hasText: /^\s*v1\b/
+          testId: "prompt-deploy-tag-canary-{uid}-version-1"
       - action: click
         with:
-          selector: '[role="dialog"] button'
-          hasText: /^\s*Save\s*$/
+          testId: prompt-deploy-save
       - action: expect
         with:
           api: "/api/prompts/tags"
@@ -257,18 +255,21 @@ flows:
       - action: click
         with:
           text: /^Variables$/
-      - action: fill
+      - action: expect
         with:
-          testId: "variable-value-input-input"
-          value: "echo-{uid}"
+          testId: "variable-name-input"
+      - action: click
+        with:
+          text: /^Conversation$/
       - action: type
         with:
           placeholder: "Type your message here"
-          text: "Go"
+          text: "echo-{uid}"
           submit: "true"
       - action: expect
         with:
           text: "echo-{uid}"
+          min: "2"
           timeout: "60000"
 
   - id: prompt-playground-change-model
@@ -303,10 +304,10 @@ flows:
           contains: "vd-prompt-{uid}"
       - action: click
         with:
-          selector: 'xpath=//div[svg[contains(@class,"lucide-chevron-down")]][preceding-sibling::*]'
+          testId: prompt-model-popover-trigger
       - action: click
         with:
-          selector: '[role="dialog"] [role="combobox"]'
+          testId: prompt-model-selector-trigger
       - action: fill
         with:
           field: "Search models"
@@ -402,21 +403,20 @@ flows:
       - action: click
         with:
           text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: fill
         with:
           field: "Settle window"
           value: "30"
+      - action: select
+        with:
+          label: Batch window
+          option: every hour
       - action: click
         with:
-          selector: '[role="combobox"]'
-          hasText: /^\s*Immediate/
-      - action: click
-        with:
-          selector: '[role="option"]'
-          hasText: Every hour
-      - action: click
-        with:
-          text: /^\s*Email/
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -427,6 +427,10 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -446,13 +450,16 @@ flows:
     steps:
       - action: go
         with:
-          path: "/{slug}/automations/alerts"
+          path: "/{slug}/automations/automations"
       - action: click
         with:
-          text: "New alert"
+          text: "New automation"
+      - action: click
+        with:
+          text: A graph
       - action: fill
         with:
-          field: "High latency alert"
+          field: "High latency"
           value: "vd-alert-{uid}"
       - action: select
         with:
@@ -464,15 +471,10 @@ flows:
           option: "Traces"
       - action: click
         with:
-          selector: '[role="combobox"]'
-          hasText: Pick a severity
+          text: /^\s*Continue\s*$/
       - action: click
         with:
-          selector: '[role="option"]'
-          hasText: /^\s*Warning\s*$/
-      - action: click
-        with:
-          text: /^\s*Email/
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -483,9 +485,13 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
-          text: /^\s*Create alert\s*$/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -505,7 +511,7 @@ flows:
           path: "/{slug}/automations/schedules"
       - action: click
         with:
-          text: "New schedule"
+          text: "New report"
       - action: fill
         with:
           field: "Weekly quality digest"
@@ -539,9 +545,10 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
-          text: /^\s*Create schedule\s*$/
+          text: /^\s*Create report\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -574,7 +581,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -585,6 +595,10 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -638,7 +652,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -649,6 +666,10 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -705,7 +726,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -716,6 +740,10 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -735,10 +763,10 @@ flows:
       - action: click
         with:
           selector: '[role="menuitem"]'
-          hasText: /^\s*Delete\s*$/
-      - action: wait
+          hasText: /^\s*Delete automation\s*$/
+      - action: click
         with:
-          millis: "1500"
+          text: /^\s*Delete\s*$/
       - action: go
         with:
           path: "/{slug}/automations/automations"
@@ -826,7 +854,7 @@ flows:
           hasText: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
-          label: "Rename vd-widget-{uid}"
+          selector: '[role="dialog"] [aria-label="Rename vd-widget-{uid}"]'
       - action: fill
         with:
           selector: "input:focus"
@@ -883,11 +911,9 @@ flows:
         with:
           selector: "input:focus"
           value: "vd-renamed-{uid}"
-      - action: type
+      - action: click
         with:
-          selector: "input:focus"
-          text: ""
-          submit: "true"
+          text: /^\s*Custom\s*$/
       - action: expect
         with:
           api: "/api/dashboards"

@@ -113,3 +113,9 @@ export function allLatestAliases(): LatestAliasEntry[] {
   }
   return out;
 }
+
+/**
+ * The platform fallback model: what `openai/latest` resolves to, so a surface
+ * falling back to it shows the model the Default Models settings call "Latest".
+ */
+export const DEFAULT_MODEL = findAliasTarget("openai/latest")[0] ?? "openai/gpt-5";

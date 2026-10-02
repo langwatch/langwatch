@@ -18,6 +18,7 @@ export {
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
   ApiVersionConflictError,
+  BatchingNotSupportedError,
   createErrorHandler,
   EnterprisePlanRequiredError,
   formatError,
@@ -44,6 +45,17 @@ export {
   type RawHttpListener,
 } from "./raw-http.ts";
 
+export type {
+  BoundTransportFacts,
+  FeatureRestHost,
+  FeatureRestMountOptions,
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+  TransportFactBinding,
+  TransportPeers,
+} from "./hosting/transport-hosts.ts";
+
 export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 
 // The access-policy vocabulary: what credential an operation accepts, and what
@@ -61,6 +73,7 @@ export {
   type HandlerCredential,
   handlerManagedAuth,
   internalSecret,
+  isInternalSecretValid,
   isApiKeyReachable,
   policyPermissions,
   publicEndpoint,
@@ -69,4 +82,11 @@ export {
   requiresOnTeam,
 } from "./access-policy.ts";
 
-export { isInternalSecretValid } from "./rest/security.ts";
+// Every mounted route and the policy it declared, recorded as each surface mounts.
+export {
+  allRegisteredRoutes,
+  getRoutePolicy,
+  registerRoutePolicy,
+  type RegisteredRoute,
+} from "./route-registry.ts";
+

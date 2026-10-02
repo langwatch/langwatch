@@ -6,15 +6,14 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
 import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
-import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 import { COMPARE_HINT } from "../compare-agents-section.tsx";
 import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows.ts";
 import { configurationKeyOf } from "../run-configuration.ts";
@@ -45,30 +44,12 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
-    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
       suites: {
         testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
-    scenarios: {
-      getAll: { useQuery: mockScenariosGetAll },
-      getExternalSetSummaries: { useQuery: emptyQuery },
-      getLastResultSummaries: { useQuery: emptyQuery },
-      getScenarioSetRunData: { useQuery: emptyQuery },
-      getRunConfigurations: { useQuery: mockRunConfigurations },
-      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      moveToTestSuite: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-    },
     suites: {
       testSuites: {
         getAll: { useQuery: mockTestSuitesGetAll },
@@ -102,10 +83,55 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       getOrganizationWithMembersAndTheirTeams: { useQuery: emptyQuery },
     },
     agents: { getAll: { useQuery: mockAgentsGetAll } },
-    prompts: { getAllPromptsForProject: { useQuery: mockPromptsGetAll } },
     modelProvider: {
       listAllForProjectForFrontend: { useQuery: emptyQuery },
       getResolvedDefault: { useQuery: emptyQuery },
+    },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: mockPromptsGetAll } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
+      },
+    }),
+    scenarios: {
+      getAll: { useQuery: mockScenariosGetAll },
+      getExternalSetSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: emptyQuery },
+      getScenarioSetRunData: { useQuery: emptyQuery },
+      getRunConfigurations: { useQuery: mockRunConfigurations },
+      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      moveToTestSuite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
   },
 }));
@@ -139,7 +165,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getComplexProps: () => null,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -161,10 +187,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const ONLINE_AGENT = {
   id: "agent_1",
@@ -224,9 +246,9 @@ const caseSubject = (): RunDialogSubject => ({
 function renderDialog(subject: RunDialogSubject) {
   const onClose = vi.fn();
   const onRunStarted = vi.fn();
-  render(<RunDialog subject={subject} onClose={onClose} onRunStarted={onRunStarted} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(
+    <RunDialog subject={subject} onClose={onClose} onRunStarted={onRunStarted} />,
+  );
   return { onClose, onRunStarted };
 }
 
@@ -396,6 +418,39 @@ describe("<RunDialog/>", () => {
     // The refusal happened before anything was queued.
     expect(mockSuitesRunPlan).toHaveBeenCalledTimes(1);
     expect(mockRunScenario).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The only agent of a project is not chosen for a scenario with no saved agent" */
+  it("shows the only agent unchosen and sends no target until it is picked", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    mockSuitesRunPlan.mockRejectedValue(handledRejection("suite_targets_required"));
+    renderDialog(suiteSubject());
+
+    // What is shown is what is held: the one card is not marked chosen.
+    const card = screen.getByTestId("run-dialog-agent-agent_1");
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    expect(card.querySelector("svg.lucide-check")).toBeNull();
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ config: expect.objectContaining({ targets: [] }) }),
+    );
+    expect(await screen.findByTestId("run-dialog-error")).toHaveTextContent(
+      "Choose an agent to run against",
+    );
+
+    mockSuitesRunPlan.mockClear();
+    await user.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          targets: [expect.objectContaining({ type: "http", referenceId: "agent_1" })],
+        }),
+      }),
+    );
   });
 
   // --- Chips ---
@@ -1232,7 +1287,7 @@ describe("<RunDialog/>", () => {
       const order: string[] = [];
       const onClose = vi.fn(() => order.push("close"));
       const onRunStarted = vi.fn(() => order.push("started"));
-      render(
+      renderWithDesignSystem(
         <RunDialog
           subject={suiteSubject({
             initialTarget: { type: "http", id: "agent_1" },
@@ -1240,7 +1295,6 @@ describe("<RunDialog/>", () => {
           onClose={onClose}
           onRunStarted={onRunStarted}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("run-dialog-run"));
@@ -1417,7 +1471,7 @@ describe("run entries on the Scenarios tab", () => {
       data: [configurationEntry({ scope: { mode: "all" } })],
       isLoading: false,
     });
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
     await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));
@@ -1434,7 +1488,7 @@ describe("run entries on the Scenarios tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
 
@@ -1446,7 +1500,7 @@ describe("run entries on the Scenarios tab", () => {
   /** @scenario "A run started from the rail opens on the run it started" */
   it("starts a suite run from the rail, opens its results and holds a place for it", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
     await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));
@@ -2640,8 +2694,8 @@ describe("the evaluators of a run", () => {
 
     await user.click(screen.getByTestId("evaluator-pill-att_sql"));
 
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 
@@ -2755,8 +2809,8 @@ describe("the evaluators of a run", () => {
     await user.click(run);
 
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 
@@ -2777,8 +2831,8 @@ describe("the evaluators of a run", () => {
     const alert = await screen.findByTestId("run-dialog-error");
     expect(alert).toHaveTextContent("missing required mappings");
     await user.click(within(alert).getByRole("button", { name: "Configure the evaluator" }));
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 });

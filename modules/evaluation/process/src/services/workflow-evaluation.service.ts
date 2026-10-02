@@ -5,15 +5,13 @@ import {
 import type { ExecutionStatus, WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-import type { EvaluationWorkflowExecutor } from "../app/evaluation.members.ts";
-
 const workflowExecutionResponseSchema = z.object({
   result: z.record(z.string(), z.unknown()).nullable().optional(),
   status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
 });
 
 /** Runs an evaluator workflow through WorkflowApi and answers Evaluation's result contract. */
-export class WorkflowEvaluationService implements EvaluationWorkflowExecutor {
+export class WorkflowEvaluationService {
   static create(workflows: Pick<WorkflowApi, "run">): WorkflowEvaluationService {
     return new WorkflowEvaluationService(workflows);
   }

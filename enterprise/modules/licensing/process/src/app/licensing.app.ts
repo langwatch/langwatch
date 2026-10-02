@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -24,6 +24,7 @@ import {
   type ConnectCredentialResolution,
   type ConnectedSeats,
   type ConnectDeploymentView,
+  type DomainClaimLicenseAuthority,
   type ConnectService,
   type ConnectStatus,
   type InstanceIdentityView,
@@ -57,15 +58,15 @@ import {
   type GenerateLicenseKeyInput,
   LicenseSigningNotConfiguredError,
   type GenerateLicenseOutput,
+  detectLicenseInputForm,
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import {
-  reads,
   type Encryption,
   type MembersRead,
   type RateLimiter,
@@ -99,11 +100,17 @@ import {
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
+import {
+  type ConfiguredActivationLogger,
+  ConfiguredActivationService,
+  type ConfiguredActivationOutcome,
+} from "../services/configured-activation.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
 import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
+import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
@@ -203,12 +210,12 @@ type LicensingProcessMembers = Readonly<{ isSaas: boolean; serviceVersion: strin
   );
 
 type LicensingSetup = FeatureSetup<
-  typeof LicensingApp.dependencies,
+  typeof LicensingModule.dependencies,
   LicensingProcessMembers,
   LicensingServerConfig
 >;
 
-export class LicensingApp implements LicensingApiContract {
+export class LicensingModule implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
@@ -231,7 +238,10 @@ export class LicensingApp implements LicensingApiContract {
   } as const;
   /** `isSaas` and `serviceVersion` are the process's own facts, drilled in. */
   static readonly reads = [
-    ...reads("prisma", "logger", "encryption", "rateLimiter"),
+    "prisma",
+    "logger",
+    "encryption",
+    "rateLimiter",
     "isSaas",
     "serviceVersion",
   ] as const;
@@ -253,6 +263,8 @@ export class LicensingApp implements LicensingApiContract {
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
   readonly #signingKey: string | undefined;
+  readonly #domainClaims: DomainClaimAuthorityService;
+  #configuredActivation: ConfiguredActivationService | undefined;
 
   private constructor({
     service,
@@ -263,8 +275,10 @@ export class LicensingApp implements LicensingApiContract {
     isSaas,
     generation,
     signingKey,
+    domainClaims,
   }: {
     generation: LicenseGenerationService;
+    domainClaims: DomainClaimAuthorityService;
     service: LicenseService;
     runtime: LicensingRuntime;
     entitlements: LicensingEntitlementSourceService;
@@ -275,6 +289,7 @@ export class LicensingApp implements LicensingApiContract {
   }) {
     this.#isSaas = isSaas;
     this.#signingKey = signingKey;
+    this.#domainClaims = domainClaims;
     this.#service = service;
     this.#entitlements = entitlements;
     this.#runtime = runtime;
@@ -292,16 +307,16 @@ export class LicensingApp implements LicensingApiContract {
     this.#refresh = install.refresh;
   }
 
-  static async create(setup: LicensingSetup): Promise<LicensingApp> {
+  static async create(setup: LicensingSetup): Promise<LicensingModule> {
     const instanceLicenseKey = await setup.secrets.into(
-      LicensingApp.secrets.instanceLicenseKey,
+      LicensingModule.secrets.instanceLicenseKey,
       (value) => value,
     );
     const licensePrivateKey = await setup.secrets.into(
-      LicensingApp.secrets.licensePrivateKey,
+      LicensingModule.secrets.licensePrivateKey,
       (value) => value,
     );
-    return LicensingApp.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
+    return LicensingModule.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
   }
 
   static #assemble(
@@ -310,8 +325,12 @@ export class LicensingApp implements LicensingApiContract {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
-  ): LicensingApp {
+  ): LicensingModule {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
+    // The variable takes a signed key or an activation code. A code is not a
+    // license: it is redeemed at start and stored on an organization.
+    const configured = detectLicenseInputForm(instanceLicenseKey);
+    const signedInstanceKey = configured.form === "license_key" ? configured.licenseKey : undefined;
     // Derived from the closed prisma member: the licence rows are read and written
     // live, and the seat counts are organization's own membership classification
     // (a peer, not owned here).
@@ -363,9 +382,21 @@ export class LicensingApp implements LicensingApiContract {
       retention,
       logger: logger ?? members.logger,
       configuration: LicenseServiceConfiguration.create(),
-      instanceLicenseKey,
+      instanceLicenseKey: signedInstanceKey,
     });
-    const app = new LicensingApp({
+    const connectInfrastructure =
+      connect ??
+      (members.prisma
+        ? connectInstallOverPrisma({
+            database: members.prisma,
+            gateway: dependencies.gateway,
+            config,
+            cryptography,
+            version: members.serviceVersion,
+            instanceLicenseKey: signedInstanceKey,
+          })
+        : unavailableConnectInstall({ version: members.serviceVersion }));
+    const app = new LicensingModule({
       generation: LicenseGenerationService.create(cryptography),
       service,
       runtime,
@@ -375,18 +406,7 @@ export class LicensingApp implements LicensingApiContract {
       }),
       registry: registryParts,
       install: connectInstallParts({
-        infrastructure:
-          connect ??
-          (members.prisma
-            ? connectInstallOverPrisma({
-                database: members.prisma,
-                gateway: dependencies.gateway,
-                config,
-                cryptography,
-                version: members.serviceVersion,
-                instanceLicenseKey,
-              })
-            : unavailableConnectInstall({ version: members.serviceVersion })),
+        infrastructure: connectInfrastructure,
         cryptography,
         seats: repository,
         licenses: service,
@@ -395,9 +415,42 @@ export class LicensingApp implements LicensingApiContract {
       }),
       isSaas: members.isSaas,
       signingKey: licensePrivateKey,
+      domainClaims: DomainClaimAuthorityService.create({
+        isSaas: members.isSaas,
+        licenses: service,
+        organizations: dependencies.organizations,
+      }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
+    if (!members.isSaas && configured.form === "activation_code") {
+      app.#configuredActivation = ConfiguredActivationService.create({
+        configured,
+        connectPermitted: config.connectDisabled !== true,
+        findOrganizations: () => connectInfrastructure.organizations.findAllOldestFirst(),
+        redeem: ({ code }) =>
+          app.#refresh.redeemActivationCode({
+            code,
+            signal: AbortSignal.timeout(BOOT_REDEMPTION_TIMEOUT_MS),
+          }),
+        store: async ({ organizationId, licenseKey }) => {
+          const result = await app.validateAndStoreLicense({ organizationId, licenseKey });
+          if (!result.success) return { success: false, error: result.error };
+          await app.#install.publishUpstream(organizationId);
+          return { success: true };
+        },
+        isValidLicense: (licenseKey) => cryptography.validateLicense({ licenseKey }).valid,
+        logger: activationLoggerOf(members.logger),
+      });
+      // Before the server listens, so the first request already sees the license.
+      resources.ownService({
+        name: "configured license activation",
+        start: async () => {
+          await app.activateConfiguredLicense();
+        },
+        stop: () => undefined,
+      });
+    }
     return app;
   }
 
@@ -430,13 +483,17 @@ export class LicensingApp implements LicensingApiContract {
     return this.#service.isPlatformSsoLicensed({ isSaas: this.#isSaas });
   }
 
+  getDomainClaimAuthority(): Promise<DomainClaimLicenseAuthority> {
+    return this.#domainClaims.getDomainClaimAuthority();
+  }
+
   /**
    * Validates a pasted key and stores it, answering the plan it grants.
    */
   async uploadLicense(
     input: Readonly<{ organizationId: string; licenseKey: string }>,
   ): Promise<PlanInfo> {
-    const result = await this.#service.validateAndStoreLicense({
+    const result = await this.validateAndStoreLicense({
       organizationId: input.organizationId,
       licenseKey: input.licenseKey,
     });
@@ -480,6 +537,20 @@ export class LicensingApp implements LicensingApiContract {
     licenseKey: string;
   }): Promise<StoreLicenseResult> {
     return this.#service.validateAndStoreLicense(input);
+  }
+
+  /** Changes on every license this process stores or removes, so a gate can re-read at once. */
+  async licenseRevision(): Promise<number> {
+    return this.#service.licenseRevision();
+  }
+
+  /**
+   * Redeems an activation code set as `LANGWATCH_LICENSE_KEY`, once: at start,
+   * and again when the first organization is created. A no-op otherwise.
+   */
+  async activateConfiguredLicense(): Promise<ConfiguredActivationOutcome> {
+    if (!this.#configuredActivation) return { outcome: "not_configured" };
+    return this.#configuredActivation.activate();
   }
 
   /** The license registry (ADR-156). Composed on LangWatch Cloud alone. */
@@ -772,6 +843,18 @@ export class LicensingApp implements LicensingApiContract {
   }
 }
 
+/** A redemption at start gives up well before the transport's own timeout. */
+const BOOT_REDEMPTION_TIMEOUT_MS = 15_000;
+
+/** The process logger; a test fabric's error-only logger stays silent here. */
+function activationLoggerOf(logger: unknown): ConfiguredActivationLogger {
+  const candidate = logger as Partial<ConfiguredActivationLogger> | undefined;
+  if (typeof candidate?.info === "function" && typeof candidate.warn === "function") {
+    return candidate as ConfiguredActivationLogger;
+  }
+  return { info: () => undefined, warn: () => undefined };
+}
+
 /** What the registry and the hosted routes resolve to together. */
 type LicenseRegistryParts = Readonly<{
   registry: LicenseRegistryService;
@@ -947,7 +1030,7 @@ function licenseRegistryOverPrisma({
 /**
  * The hosted end of Connect composed from its owners, as main composed it on every deployment:
  * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
- * the family answers behind is the gateway's own, bound in licensing.server.ts.
+ * the family answers behind is the gateway's own, bound in licensing.module.ts.
  */
 function hostedServicesOverPeers({
   gateway,
@@ -1074,6 +1157,7 @@ function unavailableConnectInstall({ version }: { version: string }): ConnectIns
     organizations: {
       findById: () => Promise.resolve(null),
       findLicensedOrganizationIds: () => Promise.resolve([]),
+      findAllOldestFirst: () => Promise.resolve([]),
       setServicesDisabled: () => Promise.reject(unavailable()),
       recordSyncOutcome: () => Promise.reject(unavailable()),
     },

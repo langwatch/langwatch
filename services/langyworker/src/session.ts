@@ -188,6 +188,7 @@ export async function createLangySession({
     settingsManager,
     tools: [...ENABLED_TOOLS],
   });
+  installModelRetry({ session });
 
   installModelRetry({ session });
 

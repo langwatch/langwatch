@@ -74,8 +74,8 @@ export type AnnotationApiProjectScope = z.infer<typeof annotationApiProjectScope
 
 export const annotationApiListAllInputSchema = z.object({
   projectId: z.string(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
 });
 export type AnnotationApiListAllInput = z.infer<typeof annotationApiListAllInputSchema>;
 
@@ -134,8 +134,8 @@ export const annotationApiOptimizedQueuesInputSchema = z.object({
   queueIds: z.array(z.string()).optional(),
   showQueueAndUser: z.boolean().optional(),
   allQueueItems: z.boolean().optional(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
 });
 export type AnnotationApiOptimizedQueuesInput = z.infer<
   typeof annotationApiOptimizedQueuesInputSchema

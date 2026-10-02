@@ -5,7 +5,7 @@
  * that opens this channel (specs/identity/sso-connection-history.feature,
  * "Live updates").
  */
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 
 import { ssoApi } from "./sso-api.ts";
 

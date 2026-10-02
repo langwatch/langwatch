@@ -1,6 +1,5 @@
-import { CheckboxCard, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
-import { type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {
   EVALUATOR_LABEL_FIELD,
   EVALUATOR_VERDICT_FIELD,
@@ -8,13 +7,15 @@ import {
 } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
+import { type FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
   commitRange,
   RangeEndpointInput,
   stepForSpan,
 } from "../../../elements/explorer/filter-sidebar/range-controls.tsx";
+import { formatCount } from "./utils.ts";
 
 interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */
@@ -317,9 +318,12 @@ const ScoreRangeControl: React.FC<{
     currentTo ?? max,
   ]);
 
-  useEffect(() => {
+  const propsKey = `${currentFrom}|${currentTo}|${min}|${max}`;
+  const [valueFrom, setValueFrom] = useState(propsKey);
+  if (valueFrom !== propsKey) {
+    setValueFrom(propsKey);
     setLocalValue([currentFrom ?? min, currentTo ?? max]);
-  }, [currentFrom, currentTo, min, max]);
+  }
 
   const commit = (rawFrom: number, rawTo: number) => {
     const normalized = commitRange({

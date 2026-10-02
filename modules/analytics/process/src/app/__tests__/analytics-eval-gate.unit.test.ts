@@ -1,11 +1,4 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
-/**
- * The eval-function gate is Analytics' own answer, read from the project's
- * rollout — a caller never states it, and a statement that judges nothing
- * never pays for the read.
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -15,11 +8,19 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * The eval-function gate is Analytics' own answer, read from the project's
+ * rollout — a caller never states it, and a statement that judges nothing
+ * never pays for the read.
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
 const PROJECT_ID = "project-judging";
 const ORGANIZATION_ID = "org-judging";
@@ -31,7 +32,7 @@ const ORGANIZATION_ID = "org-judging";
  */
 async function harness(flagAnswer: boolean) {
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (key, target) => {
@@ -78,7 +79,7 @@ async function harness(flagAnswer: boolean) {
     app
       .executeLangWatchQL({
         project: { id: PROJECT_ID, lwqlKey: "lwql-key" },
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         sql,
       })
       .catch(() => void 0);
@@ -89,7 +90,7 @@ async function harness(flagAnswer: boolean) {
 const appFunction = (schema: LangWatchQLSchema, name: string) =>
   schema.appFunctions.find((entry) => entry.name === name);
 
-describe("AnalyticsApp.describeLangWatchQLSchema", () => {
+describe("AnalyticsModule.describeLangWatchQLSchema", () => {
   describe("given the Instant Evals flag is off for the project", () => {
     /** @scenario "The schema publishes eval functions as unavailable while they are gated" */
     it("publishes every eval function as unavailable, leaving extraction availability to permissions", async () => {
@@ -97,7 +98,11 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
-        protections: { canSeeCapturedInput: true, canSeeCapturedOutput: true },
+        protections: {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
       });
 
       expect(
@@ -115,7 +120,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       });
 
       expect(appFunction(schema, "eval")?.available).toBe(true);
@@ -129,7 +134,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
   });
 });
 
-describe("AnalyticsApp.executeLangWatchQL", () => {
+describe("AnalyticsModule.executeLangWatchQL", () => {
   describe("given a statement that calls no eval function", () => {
     it("never resolves the project's Instant Evals gate", async () => {
       const { execute, flagReads } = await harness(true);

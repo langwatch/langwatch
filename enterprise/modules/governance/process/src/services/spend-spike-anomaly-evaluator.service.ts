@@ -4,6 +4,7 @@ import {
   safeParseSpendSpikeThresholdConfig,
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type {
@@ -25,22 +26,26 @@ export type SpendSpikeEvaluationSummary = {
 
 export class SpendSpikeAnomalyEvaluatorService {
   private readonly repository: SpendSpikeAnomalyRepository;
+  private readonly projects: Pick<ProjectApi, "findInternal">;
   private readonly spend: AnomalySpendReader | undefined;
   private readonly dispatcher: AnomalyAlertDispatcherService;
   private readonly diagnostics: GovernanceDiagnosticsSink;
 
   private constructor({
     repository,
+    projects,
     spend,
     dispatcher,
     diagnostics,
   }: {
     repository: SpendSpikeAnomalyRepository;
+    projects: Pick<ProjectApi, "findInternal">;
     spend: AnomalySpendReader | undefined;
     dispatcher: AnomalyAlertDispatcherService;
     diagnostics: GovernanceDiagnosticsSink;
   }) {
     this.repository = repository;
+    this.projects = projects;
     this.spend = spend;
     this.dispatcher = dispatcher;
     this.diagnostics = diagnostics;
@@ -48,12 +53,14 @@ export class SpendSpikeAnomalyEvaluatorService {
 
   static create(options: {
     repository: SpendSpikeAnomalyRepository;
+    projects: Pick<ProjectApi, "findInternal">;
     spend?: AnomalySpendReader;
     dispatcher: AnomalyAlertDispatcherService;
     diagnostics?: GovernanceDiagnosticsSink;
   }): SpendSpikeAnomalyEvaluatorService {
     return new SpendSpikeAnomalyEvaluatorService({
       repository: options.repository,
+      projects: options.projects,
       spend: options.spend,
       dispatcher: options.dispatcher,
       diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
@@ -111,7 +118,12 @@ export class SpendSpikeAnomalyEvaluatorService {
     const windowEnd = now;
     const windowStart = now.subtract({ milliseconds: windowMs });
     const baselineStart = windowStart.subtract({ milliseconds: BASELINE_WINDOWS * windowMs });
-    const tenantId = await this.repository.findGovernanceTenantId(rule.organizationId);
+    const tenantId = (
+      await this.projects.findInternal({
+        organizationId: rule.organizationId,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      })
+    )?.id;
     if (!tenantId) {
       return SpendSpikeAnomalyEvaluatorService.noDataResult({
         rule,

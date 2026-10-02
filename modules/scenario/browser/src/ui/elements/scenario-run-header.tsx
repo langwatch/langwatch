@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 import { CopyIdChip } from "./copy-id-chip.tsx";

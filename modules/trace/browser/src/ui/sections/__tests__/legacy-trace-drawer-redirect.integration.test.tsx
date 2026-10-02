@@ -28,8 +28,8 @@ vi.mock("react-router", async (importOriginal) => ({
     const [pathname = "", search = ""] = harness.router.asPath.split("?");
     return { pathname, search: search ? `?${search}` : "", hash: "", state: null, key: "default" };
   },
-  useNavigate: () => (url: string, options?: { replace?: boolean }) =>
-    options?.replace ? harness.replace(url) : harness.push(url),
+  useNavigate: () => (url: string, options?: { replace?: boolean; state?: unknown }) =>
+    options?.replace ? harness.replace(url, options) : harness.push(url, options),
 }));
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
@@ -37,7 +37,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack } = await import("@langwatch/browser-host/use-drawer");
 const { LegacyTraceDrawerRedirect } = await import("../legacy-trace-drawer-redirect.tsx");
 
 /** The address the redirect last replaced to, or "" if it never navigated. */
@@ -50,7 +49,6 @@ function lastReplacedUrl(): string {
 describe("LegacyTraceDrawerRedirect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDrawerStack();
     harness.router.query = { "drawer.open": "traceDetails" };
     harness.router.asPath = "/test-project/annotations?drawer.open=traceDetails";
   });
@@ -89,7 +87,7 @@ describe("LegacyTraceDrawerRedirect", () => {
 
       expect(harness.replace).toHaveBeenCalled();
       expect(harness.push).not.toHaveBeenCalled();
-      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual(["traceV2Details"]);
+      expect(harness.replace.mock.calls[0]?.[1]?.state ?? null).toBeNull();
     });
 
     it("forwards the partition-pruning timestamp hint when the link carries one", () => {

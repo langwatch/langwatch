@@ -1,4 +1,4 @@
-import { Button, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { LuFlaskConical } from "react-icons/lu";
 
 import { EvalGroup } from "./eval-group.tsx";

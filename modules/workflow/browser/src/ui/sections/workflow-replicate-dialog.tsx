@@ -4,13 +4,20 @@
  * without its dataset lands a graph that cannot run.
  */
 
-import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  createListCollection,
+  Field,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useState } from "react";
+
+import { workflowApi } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export function WorkflowReplicateDialog({
   open,

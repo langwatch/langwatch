@@ -2,7 +2,7 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "@langwatch/model-provider-browser-kit";
+} from "@langwatch/browser-host/model-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { shouldShowGenericTranslateError } from "../translation-error.ts";
@@ -10,7 +10,7 @@ import { shouldShowGenericTranslateError } from "../translation-error.ts";
 // The gating logic is what we own here; the extractors are a boundary (tested in
 // utils/trpcError). Mock them so we can prove the fallback fires only when none
 // matched.
-vi.mock("@langwatch/model-provider-browser-kit", () => ({
+vi.mock("@langwatch/browser-host/model-error", () => ({
   extractMissingModelInfo: vi.fn(),
   extractAiCallFailedInfo: vi.fn(),
   extractProviderDisabledInfo: vi.fn(),

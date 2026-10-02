@@ -24,6 +24,10 @@ const COUNT_SERIES = {
 };
 /** The bucket key the timeseries result really uses — NOT the display name. */
 const COUNT_KEY = buildSeriesName(COUNT_SERIES as never, 0);
+/** The key once `withGroupedPipeline` injects its default pipeline into a grouped pie. */
+const PIPED_COUNT_KEY = `${COUNT_KEY}/trace_id/sum`;
+/** One stored series as the graph's JSON column carries it. */
+type StoredSeries = { [key: string]: string | { field: string; aggregation: string } };
 
 function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
   return {
@@ -181,8 +185,8 @@ describe("ReportChartService.loadReportCharts", () => {
             {
               date: "2026-07-11T09:00:00Z",
               "metadata.model": {
-                "gpt-5-mini": { [COUNT_KEY]: 2 },
-                "claude-opus-4-8": { [COUNT_KEY]: 5 },
+                "gpt-5-mini": { [PIPED_COUNT_KEY]: 2 },
+                "claude-opus-4-8": { [PIPED_COUNT_KEY]: 5 },
               },
             },
           ],
@@ -202,6 +206,177 @@ describe("ReportChartService.loadReportCharts", () => {
       ]);
       expect(chart!.series).toEqual([]);
       expect(chart!.total).toBe(7);
+    });
+  });
+
+  describe("given a summary panel", () => {
+    it("queries with the full time scale, matching what the dashboard UI renders", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            name: "Total traces",
+            graph: {
+              graphId: "graph-1",
+              graphType: "summary",
+              series: [COUNT_SERIES],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: {
+          previousPeriod: [],
+          currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 42 }],
+        },
+      });
+
+      const [chart] = await run({
+        deps,
+        source: { kind: "customGraph", customGraphId: "graph-1" },
+      });
+
+      expect(deps.getTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({ timeScale: "full" }),
+      );
+      expect(chart?.isEmpty).toBe(false);
+    });
+  });
+
+  describe("given a grouped pie graph with no pipeline of its own", () => {
+    const groupedPie = (series: StoredSeries[]) =>
+      makeDeps({
+        graphs: [
+          makeGraph({
+            graph: {
+              graphId: "graph-1",
+              graphType: "pie",
+              series,
+              groupBy: "metadata.model",
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+    it("queries with the default pipeline the backend needs to populate grouped buckets", async () => {
+      const deps = groupedPie([COUNT_SERIES]);
+
+      await run({ deps, source: { kind: "customGraph", customGraphId: "graph-1" } });
+
+      expect(deps.getTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({ pipeline: { field: "trace_id", aggregation: "sum" } }),
+          ],
+        }),
+      );
+    });
+
+    describe("when the graph already defines its own pipeline", () => {
+      it("leaves the author's pipeline alone", async () => {
+        const deps = groupedPie([
+          { ...COUNT_SERIES, pipeline: { field: "trace_id", aggregation: "avg" } },
+        ]);
+
+        await run({ deps, source: { kind: "customGraph", customGraphId: "graph-1" } });
+
+        expect(deps.getTimeseries).toHaveBeenCalledWith(
+          expect.objectContaining({
+            series: [
+              expect.objectContaining({ pipeline: { field: "trace_id", aggregation: "avg" } }),
+            ],
+          }),
+        );
+      });
+    });
+  });
+
+  describe("given a dashboard whose panels genuinely have data", () => {
+    /** @scenario "A dashboard report with data delivers per-panel content" */
+    it("delivers real content for a summary panel and a grouped pie panel alike", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            id: "summary-graph",
+            name: "Total traces",
+            graph: {
+              graphId: "summary-graph",
+              graphType: "summary",
+              series: [COUNT_SERIES],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+          makeGraph({
+            id: "pie-graph",
+            name: "Traces by model",
+            graph: {
+              graphId: "pie-graph",
+              graphType: "donnut",
+              series: [COUNT_SERIES],
+              groupBy: "metadata.model",
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: {
+          previousPeriod: [],
+          currentPeriod: [
+            {
+              date: "2026-07-11T09:00:00Z",
+              [COUNT_KEY]: 9,
+              "metadata.model": {
+                "gpt-5-mini": { [PIPED_COUNT_KEY]: 6 },
+                "claude-opus-4-8": { [PIPED_COUNT_KEY]: 3 },
+              },
+            },
+          ],
+        },
+      });
+
+      const [summary, pie] = await run({
+        deps,
+        source: { kind: "dashboard", dashboardId: "dash-1" },
+      });
+
+      expect(summary?.isEmpty).toBe(false);
+      expect(summary?.series[0]?.data.map((point) => point.value)).toEqual([9]);
+      expect(pie?.isEmpty).toBe(false);
+      expect(pie?.segments).toEqual([
+        { label: "gpt-5-mini", value: 6 },
+        { label: "claude-opus-4-8", value: 3 },
+      ]);
+    });
+  });
+
+  describe("given the period genuinely has no data", () => {
+    /** @scenario "'Nothing to show' appears only when the period is genuinely empty" */
+    it("marks a graph with no series configured empty, without running a query", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            graph: {
+              graphId: "graph-1",
+              graphType: "line",
+              series: [],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+      const [chart] = await run({
+        deps,
+        source: { kind: "customGraph", customGraphId: "graph-1" },
+      });
+
+      expect(chart?.isEmpty).toBe(true);
+      expect(deps.getTimeseries).not.toHaveBeenCalled();
     });
   });
 
@@ -234,6 +409,7 @@ describe("ReportChartService.loadReportCharts", () => {
   describe("given a dashboard with a panel whose stored graph does not parse", () => {
     beforeEach(() => loggerWarn.mockClear());
 
+    /** @scenario "A panel whose configuration cannot be evaluated is left out; the report still delivers" */
     it("leaves that panel out, names it in a warning, and renders the rest", async () => {
       const deps = makeDeps({
         graphs: [
@@ -256,6 +432,42 @@ describe("ReportChartService.loadReportCharts", () => {
         expect.objectContaining({ customGraphId: "graph-broken" }),
         expect.any(String),
       );
+    });
+  });
+
+  describe("given every panel's stored configuration is unusable", () => {
+    /** @scenario "All panels failing retries rather than delivering a false empty report" */
+    it("rejects rather than deliver a false 'nothing to show'", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({ id: "graph-a", graph: { graphType: "line" } }),
+          makeGraph({ id: "graph-b", graph: { graphType: "line" } }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toMatchObject({ code: "report_incomplete" });
+    });
+  });
+
+  describe("given one panel's query fails with an unknown, non-config error", () => {
+    /** @scenario "An unknown panel failure retries the whole report" */
+    it("rejects rather than deliver a report with the panel silently missing", async () => {
+      const deps = {
+        ...makeDeps({
+          graphs: [makeGraph({ id: "graph-1" }), makeGraph({ id: "graph-2" })],
+          timeseries: { previousPeriod: [], currentPeriod: [] },
+        }),
+        getTimeseries: vi.fn(async () => {
+          throw new Error("ClickHouse timed out");
+        }),
+      };
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toThrow("ClickHouse timed out");
     });
   });
 

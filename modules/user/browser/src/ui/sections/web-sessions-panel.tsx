@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Globe } from "lucide-react";
 

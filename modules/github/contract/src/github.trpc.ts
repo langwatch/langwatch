@@ -3,7 +3,7 @@
  * keys, so they are the wire names the integrations page and the coding-agent
  * surfaces have always called.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

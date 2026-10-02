@@ -18,7 +18,7 @@ on:
       # variable the chart sets must still be declared somewhere
       # (env-contract.mjs); without these paths a code change breaks either
       # while the chart CI never runs.
-      - "packages/process-server/src/**"
+      - "packages/process/src/**"
       - "packages/process-stores/src/config-owner.ts"
       - "packages/secrets/src/shared-secrets.ts"
       - "packages/config/src/**"
@@ -53,7 +53,7 @@ on:
       # variable the chart sets must still be declared somewhere
       # (env-contract.mjs); without these paths a code change breaks either
       # while the chart CI never runs.
-      - "packages/process-server/src/**"
+      - "packages/process/src/**"
       - "packages/process-stores/src/config-owner.ts"
       - "packages/secrets/src/shared-secrets.ts"
       - "packages/config/src/**"
@@ -164,6 +164,9 @@ jobs:
           render hosted-prod -f examples/values-hosted-prod.yaml
           render scalable-prod -f examples/values-scalable-prod.yaml
 
+          # autogen off, every Secret operator-owned: the Argo CD posture
+          render autogen-off -f tests/values-autogen-off.yaml
+
           if [ "${#failed[@]}" -gt 0 ]; then
             echo
             echo "presets that failed to render: ${failed[*]}"
@@ -245,6 +248,20 @@ jobs:
       - name: "assert the app knows the control plane address its gateway dials"
         if: "!cancelled()"
         run: ./tests/gateway-control-plane-url.sh
+      # A plain install renders no Ingress for the app or the gateway, an
+      # enabled gateway Ingress uses the class the operator picked, and no
+      # PodDisruptionBudget can block a node drain.
+      - name: "assert ingress is opt-in and disruption budgets allow drains"
+        if: "!cancelled()"
+        run: ./tests/gateway-ingress-and-pdbs.sh
+
+      # Argo CD renders with no cluster access and as revision 1 every time.
+      # With autogen off and operator Secrets the render must be stable, take
+      # remapped key names, never block ClickHouse on LangWatchQL, and keep
+      # every StatefulSet in sync under server-side diff.
+      - name: "assert autogen-off installs converge under Argo CD"
+        if: "!cancelled()"
+        run: ./tests/autogen-off-and-argocd.sh
 
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
@@ -261,6 +278,15 @@ jobs:
       - name: "assert every process env var is read, and the required ones are set"
         if: "!cancelled()"
         run: node tests/env-contract.mjs
+
+      # release-please bumps the gateway and langyagent subchart versions on
+      # every release, and clickhouse-serverless on its own releases. The
+      # umbrella must still build its dependencies right after that bump,
+      # which a committed Chart.lock breaks (the 3.19.1 chart release failed
+      # on exactly this).
+      - name: "assert dependencies build after a subchart version bump"
+        if: "!cancelled()"
+        run: ./tests/dependency-build-after-subchart-bump.sh
 
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,

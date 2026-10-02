@@ -1,5 +1,5 @@
 /** VirtualizedTableRows via spacer rows; non-virtualized render for small tables. */
-import { Table } from "@chakra-ui/react";
+import { Table } from "@langwatch/design-system/primitives";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fragment, type ReactNode, type RefObject, useCallback } from "react";
 

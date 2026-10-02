@@ -1,8 +1,9 @@
-import { isUneditableViewMode, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../../../../behavior/trace-edit.store.ts";
+import { isUneditableViewMode, TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL
@@ -10,7 +11,7 @@ import {
  * and the draft can never disagree about which trace is being edited.
  */
 export function enterTraceEditMode(traceId: string): void {
-  const drawer = useDrawerStore.getState();
+  const drawer = getTraceDrawer();
   if (isUneditableViewMode(drawer.viewMode)) {
     // Transient: the reviewer did not choose the Trace view, so it must not
     // become the tab they land on for every trace afterwards.
@@ -37,19 +38,17 @@ export function openTraceEditorFromConversation({
   traceId,
   occurredAtMs,
 }: {
-  openDrawer: (name: "traceV2Details", params: Record<string, unknown>) => void;
+  openDrawer: (name: typeof TRACE_DRAWER_NAME, params: Record<string, unknown>) => void;
   traceId: string;
   occurredAtMs: number | null;
 }): void {
   const openEditor = () => {
-    const drawer = useDrawerStore.getState();
-    if (drawer.viewMode === "conversation") {
-      drawer.setViewModeTransient("summary");
-    }
-    if (drawer.isOpen) seedOpenDrawerForEdit({ traceId, occurredAtMs });
-    openDrawer("traceV2Details", {
+    // Opening a trace from the conversation view lands on its summary, for this one trace.
+    const leavesConversation = getTraceDrawer().viewMode === "conversation";
+    openDrawer(TRACE_DRAWER_NAME, {
       traceId,
       ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+      ...(leavesConversation ? { mode: "summary" } : {}),
       urlParams: { edit: "1" },
     });
   };
@@ -63,31 +62,10 @@ export function openTraceEditorFromConversation({
   }
 }
 
-/** Moves the on-screen drawer onto the trace, editing, before the URL follows. */
-function seedOpenDrawerForEdit({
-  traceId,
-  occurredAtMs,
-}: {
-  traceId: string;
-  occurredAtMs: number | null;
-}): void {
-  const drawer = useDrawerStore.getState();
-  if (drawer.traceId !== traceId) {
-    drawer.openTrace(traceId, occurredAtMs);
-  }
-  if (useTraceEditStore.getState().editingTraceId !== traceId) {
-    enterTraceEditMode(traceId);
-  } else {
-    // Re-entering the trace already being corrected: the session and its
-    // drafts stay, only the mode bit is re-asserted.
-    useDrawerStore.getState().setIsEditing(true);
-  }
-}
-
 /** Leaves edit mode and drops the uncommitted correction. */
 export function exitTraceEditMode(): void {
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().setIsEditing(false);
+  getTraceDrawer().setIsEditing(false);
 }
 
 /**
@@ -97,7 +75,7 @@ export function exitTraceEditMode(): void {
  */
 export function guardTraceEditExit(run: () => void): boolean {
   const editStore = useTraceEditStore.getState();
-  const hasUnsavedEdits = useDrawerStore.getState().isEditing && selectIsTraceEditDirty(editStore);
+  const hasUnsavedEdits = getTraceDrawer().isEditing && selectIsTraceEditDirty(editStore);
   if (!hasUnsavedEdits) {
     run();
     return true;

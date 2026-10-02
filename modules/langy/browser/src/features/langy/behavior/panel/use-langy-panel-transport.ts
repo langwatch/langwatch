@@ -1,13 +1,5 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import {
-  executeUiAction,
-  type LangyContextChip,
-  type LangyUiActionHandlers,
-  navigateDedupKey,
-  reserveNavigate,
-  useLangyStore,
-} from "@langwatch/langy-browser-kit";
 import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { type RefObject, useMemo, useRef } from "react";
@@ -18,7 +10,11 @@ import {
   type LangyTrpcClient,
 } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
+import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
+import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
+import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { isOnPageOwningAction } from "../../../../model/ui-actions/manifest-routes.ts";
 import {
   createLangyChatTransport,

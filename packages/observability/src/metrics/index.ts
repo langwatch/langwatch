@@ -12,6 +12,7 @@ export {
   METRICS_SCOPE_NAME,
   activateMetrics,
   counter,
+  deactivateMetrics,
   gauge,
   histogram,
   observableGauge,

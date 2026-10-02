@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * CLI token revocation, the governance project and `/api/me/usage`, through the installed app.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -10,10 +5,11 @@ import type {
   GovernanceRestApi,
   PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import {
   type InternalProject,
   PROJECT_KIND,
@@ -22,17 +18,18 @@ import {
 } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+/**
+ * @vitest-environment node
+ * CLI token revocation, the governance project and `/api/me/usage`, through the installed app.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { userServer } from "../../user.server.ts";
-import {
-  createUserTestAuth,
-  createUserTestOps,
-  createUserTestOrganizations,
-} from "./user.fixture.ts";
+import { userProcessModule } from "../../user.module.ts";
+import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -74,7 +71,7 @@ function process(
   peers: Readonly<{ auth?: AuthApi; governance?: GovernanceRestApi; project?: ProjectApi }>,
 ) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(userServer)])
+    .withModules([withMemoryRepositories(userProcessModule)])
     .withMembers({
       passkeysEnabled: false,
       publicBaseUrl: undefined,
@@ -93,15 +90,17 @@ function process(
         ttl: async () => -1,
       }) satisfies RedisConnection,
     )
+    .withEventing(
+      new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
+    )
     .provide({
       auth: peers.auth ?? createUserTestAuth(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
       "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
       gateway: createApiFixture<GatewayApi>(),
       governance: peers.governance ?? createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: createUserTestOrganizations(),
-      ops: createUserTestOps(),
       project: peers.project ?? createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });

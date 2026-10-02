@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -16,6 +15,7 @@ import type {
   GatewayRequestCredential,
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -64,7 +64,7 @@ function mountedPlatform() {
     // receipt: no test here replays anything.
     idempotency: runOnce,
     identity: { authenticate: projectDoor, identify: projectDoor },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
   });
 
   return runtime.mount(gatewayPlatformRest.router(), {

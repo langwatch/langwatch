@@ -11,6 +11,7 @@ import { InstantEvalRunContextService } from "../instant-eval-run-context.servic
 
 /** A member who may see everything: what the run context carries through. */
 const PROTECTIONS: LangWatchQLProtections = {
+  catalogue: { permissions: [] },
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,

@@ -1,8 +1,9 @@
-import type { api } from "@langwatch/browser-trpc/workflow-api";
+import type { ModuleApi } from "@langwatch/api/web";
 
+import type { ExperimentApiMap } from "../experiment-api-map.ts";
 import type { TargetConfig } from "./types.ts";
 
-type TrpcUtils = ReturnType<typeof api.useUtils>;
+type TrpcUtils = ReturnType<ModuleApi<ExperimentApiMap>["useUtils"]>;
 
 /**
  * Synchronously resolve a target's display name from the tRPC query cache.

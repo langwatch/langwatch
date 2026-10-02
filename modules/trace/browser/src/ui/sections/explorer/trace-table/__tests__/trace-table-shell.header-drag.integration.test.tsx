@@ -2,7 +2,7 @@
 // post-drag click swallowed.
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import {
   type ColumnDef,
   getCoreRowModel,
@@ -61,7 +61,7 @@ function Harness({
   });
   lastTable = table;
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <TraceTableShell
         table={table}
         minWidth="280px"
@@ -70,7 +70,7 @@ function Harness({
       >
         <tbody />
       </TraceTableShell>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

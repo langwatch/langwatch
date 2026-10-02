@@ -5,12 +5,15 @@ import "@testing-library/jest-dom/vitest";
  * rollout flag and 3+ variant product rule.
  * @see specs/experiments/comparison-leaderboard.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { BatchComparisonColumn, ComparisonRunData } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type {
+  BatchComparisonColumn,
+  ComparisonRunData,
+} from "../../batch-evaluation-results.types.ts";
 import { ComparisonCharts } from "../comparison-charts.tsx";
 
 const EVALUATOR_ID = "comparison-1";
@@ -76,13 +79,9 @@ const comparisonColumn = (variantIds: string[]): BatchComparisonColumn => ({
   ),
 });
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderCharts = (variantIds: string[], showComparisonLeaderboard: boolean) => {
   const column = comparisonColumn(variantIds);
-  render(
+  renderWithDesignSystem(
     <ComparisonCharts
       comparisonData={[runWith(variantIds)]}
       isVisible={true}
@@ -90,7 +89,6 @@ const renderCharts = (variantIds: string[], showComparisonLeaderboard: boolean) 
       comparisonRows={runWith(variantIds).data!.rows}
       showComparisonLeaderboard={showComparisonLeaderboard}
     />,
-    { wrapper: Wrapper },
   );
 };
 
@@ -141,7 +139,7 @@ describe("the comparison leaderboard's visibility gates", () => {
       const comparisonRows = comparison.data?.rows ?? [];
       const onOpenLeaderboard = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <ComparisonCharts
           comparisonData={[comparison]}
           isVisible={true}
@@ -150,7 +148,6 @@ describe("the comparison leaderboard's visibility gates", () => {
           showComparisonLeaderboard={true}
           onOpenLeaderboard={onOpenLeaderboard}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByRole("button", { name: "Expand leaderboard" }));

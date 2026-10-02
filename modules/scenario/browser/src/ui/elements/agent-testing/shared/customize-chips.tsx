@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

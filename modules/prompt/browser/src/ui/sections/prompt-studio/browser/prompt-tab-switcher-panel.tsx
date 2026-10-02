@@ -1,4 +1,4 @@
-import { Circle, HStack, Text } from "@chakra-ui/react";
+import { Circle, HStack, Text } from "@langwatch/design-system/primitives";
 import type { RefObject } from "react";
 
 import { getDisplayHandle, getPromptFolder } from "../../../../prompt-reference.ts";

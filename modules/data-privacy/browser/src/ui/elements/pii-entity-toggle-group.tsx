@@ -1,5 +1,5 @@
-import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 
 /**
  * A labeled group of PII identifier checkboxes for the custom level. One group

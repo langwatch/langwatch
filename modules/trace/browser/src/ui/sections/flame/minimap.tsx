@@ -1,6 +1,6 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 import { useCallback, useRef } from "react";
 
 import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";

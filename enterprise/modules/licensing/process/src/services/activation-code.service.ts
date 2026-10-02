@@ -21,7 +21,7 @@ import {
   type IssueActivationCodeInput,
   type IssuedActivationCode,
 } from "@langwatch/enterprise-licensing-contract";
-import { licenseSeats } from "@langwatch/plans";
+import { licenseSeats, resolveMembersLite } from "@langwatch/plans";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type {
@@ -100,7 +100,15 @@ export class ActivationCodeService {
       organizationName: input.organizationName,
       email: input.email,
       planType: input.planType,
-      ...licenseSeats({ members: input.maxMembers, membersLite: input.maxMembersLite }),
+      // Resolved now, the way a license issued directly is, so the row shows
+      // the lite seats the minted license will carry.
+      ...licenseSeats({
+        members: input.maxMembers,
+        membersLite: resolveMembersLite({
+          planType: input.planType,
+          maxMembersLite: input.maxMembersLite,
+        }),
+      }),
       licenseTermDays: input.licenseTermDays,
       services: input.services ?? [],
       expiresAt: Temporal.Instant.from(input.expiresAt),

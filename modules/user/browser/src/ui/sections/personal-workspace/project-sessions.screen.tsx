@@ -1,5 +1,5 @@
-import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";

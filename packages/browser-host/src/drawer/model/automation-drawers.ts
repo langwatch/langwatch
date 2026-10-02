@@ -13,5 +13,5 @@ export type UiAutomationDrawerProps = {
   initialFilters?: string;
   /** A traces query to seed a fresh trace automation's subject with. */
   initialFilterQuery?: string;
-  onClose: () => void;
+  onClose?: () => void;
 };

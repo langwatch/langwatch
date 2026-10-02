@@ -20,10 +20,7 @@ import type { DiscoveredPersonRepository } from "./discovered-person.repository.
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
 import type { GovernanceCostChargeRepository } from "./governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
-import type {
-  GovernanceOcsfExportRepository,
-  GovernanceSetupStateRepository,
-} from "./governance-setup-state.repository.ts";
+import type { GovernanceSetupStateRepository } from "./governance-setup-state.repository.ts";
 import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
 import type { IdentityMatchRepository } from "./identity-match.repository.ts";
@@ -68,7 +65,6 @@ export interface GovernanceRepositories {
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
   readonly anomalySpend: GovernanceClickHouseRepositories["anomalySpend"];
-  readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly rollupErasure: RollupErasureRepository;
   readonly setupState: GovernanceSetupStateRepository;
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;

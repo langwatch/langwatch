@@ -3,12 +3,15 @@
  * tour runs, then expands to what the welcome flow collected. Only the button replays the tour.
  * @see specs/langy/langy-guided-onboarding.feature
  */
-import { Box, Button, chakra, Spinner, Text } from "@chakra-ui/react";
-import { CARD_TAXONOMY } from "@langwatch/langy-browser-kit";
-import { type GuidedKickoffInput, guidedTourCardRows } from "@langwatch/onboarding-browser-kit";
+import { Box, Button, chakra, Spinner, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, RotateCw, Route } from "lucide-react";
 import { useState } from "react";
 
+import { CARD_TAXONOMY } from "../../../../../model/asaplangy-tokens.ts";
+import {
+  type GuidedKickoffInput,
+  guidedTourCardRows,
+} from "../../../../guided-onboarding/model/kickoff.ts";
 import { useGuidedTour } from "../../../behavior/use-guided-tour.ts";
 
 const TOUR_RUNNING_LABEL = "Doing guided tour";

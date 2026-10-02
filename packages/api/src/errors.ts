@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   HandledError,
   isZodLikeError,
@@ -98,6 +98,14 @@ export class EndpointWithdrawnError extends HandledError {
   }
 }
 
+/** The tRPC door answers one call per request; the browser sends no batch. */
+export class BatchingNotSupportedError extends HandledError {
+  constructor() {
+    super("batching_not_supported", "Send one tRPC call per request", { httpStatus: 400 });
+    this.name = "BatchingNotSupportedError";
+  }
+}
+
 /**
  * The body passed the cap the route declared. The caller can act on it — send
  * less — and the cap itself is documented on the operation, so nothing about
@@ -121,9 +129,11 @@ export class RateLimitedError extends HandledError {
 }
 
 export class EnterprisePlanRequiredError extends HandledError {
-  constructor() {
+  /** `feature` is the capability main names on `meta.feature`. */
+  constructor(feature?: string) {
     super("enterprise_plan_required", "This operation requires an Enterprise plan", {
       httpStatus: 402,
+      ...(feature ? { meta: { feature } } : {}),
       fault: "customer",
       ...remediation("enterprise_plan_required"),
     });
@@ -340,10 +350,10 @@ export function isDatabaseBusy(error: unknown): boolean {
 
 /** Postgres had no connection to give in time. The request did nothing wrong; retry shortly. */
 export class DatabaseBusyError extends HandledError {
-  declare readonly code: "service_unavailable";
+  declare readonly code: "database_busy";
 
   constructor() {
-    super("service_unavailable", "The service is busy. Retry shortly.", {
+    super("database_busy", "The service is busy. Retry shortly.", {
       httpStatus: 503,
       fault: "platform",
       retryable: true,

@@ -1,1 +1,1 @@
-export { nurturingServer } from "./nurturing.server.ts";
+export { nurturingProcessModule } from "./nurturing.module.ts";

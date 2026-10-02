@@ -8,6 +8,7 @@ export const planProviderUserSchema = z.object({
   name: z.string().nullable().optional(),
   impersonator: z
     .object({
+      id: z.string().optional(),
       email: z.string().nullable().optional(),
     })
     .optional(),

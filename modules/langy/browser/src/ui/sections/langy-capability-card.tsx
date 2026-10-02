@@ -1,8 +1,8 @@
 /**
  * Shared shell for every domain-capability card (task #12).
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import type { CapabilityIconName, CapabilitySurface } from "@langwatch/langy-contract";
 import {
   BarChart3,

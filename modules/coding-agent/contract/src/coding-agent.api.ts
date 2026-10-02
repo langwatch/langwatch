@@ -1,6 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
-import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { moduleApi } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import type { LogContentKey } from "./coding-agent-log-content.ts";
@@ -116,10 +114,6 @@ export interface CodingAgentApi {
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
   /** Derives a received span's session facts and contributes them, as main's dispatch did. */
   contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void>;
-  /** Derives a received log record's session facts and contributes them, as main's did. */
-  contributeReceivedLogRecord(record: CanonicalLogRecord): Promise<void>;
-  /** Derives a received metric point's session facts and contributes them, as main's did. */
-  contributeReceivedMetricPoint(point: CanonicalMetricDataPoint): Promise<void>;
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
   githubWebBase(): string;

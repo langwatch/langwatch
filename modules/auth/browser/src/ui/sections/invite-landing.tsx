@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";

@@ -52,9 +52,6 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../log/contract/tsconfig.build.json"
     },
     {
@@ -64,10 +61,16 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
@@ -80,9 +83,6 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/group-queue/tsconfig.build.json"

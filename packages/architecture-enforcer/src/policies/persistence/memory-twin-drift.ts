@@ -6,6 +6,7 @@ import ts from "typescript";
 import type { ArchitectureViolation } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
+import { repositoryHomes } from "../../workspace/repository-homes.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
@@ -56,7 +57,8 @@ function isSourceFile(path: string): boolean {
   return !path.split(sep).some((segment) => TEST_DIRECTORIES.has(segment));
 }
 
-/** Every module process package's repositories directory, core and enterprise. */
+/** Every module process package's repositories directories, top level and per concern,
+ * core and enterprise. */
 export function repositoryRoots(root: string): string[] {
   const manifests = MODULE_GROUPS.flatMap((group) =>
     listFiles({
@@ -72,7 +74,7 @@ export function repositoryRoots(root: string): string[] {
     return server > 0 && parts.length === server + 2;
   });
 
-  return roots.map((file) => join(file, "..", "src", "repositories")).toSorted();
+  return roots.flatMap((file) => repositoryHomes({ src: join(file, "..", "src") })).toSorted();
 }
 
 /**
@@ -309,7 +311,7 @@ function packageFindings({
   const memory = implementationsIn({ directory: join(repositories, "memory"), word: "Memory" });
   if (memory.size === 0) return [];
 
-  const packagePath = relative(root, join(repositories, "..", ".."));
+  const packagePath = relative(root, repositories).split(`${sep}src${sep}`)[0] ?? "";
   const subjects = [...prisma.keys()].toSorted(byKey);
   const reported = new Set<string>();
   const findings: MemoryTwinDriftFinding[] = [];

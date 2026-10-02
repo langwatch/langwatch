@@ -1,14 +1,14 @@
+import { instantEvalRunKey, type RouteSearchResult } from "@langwatch/trace-contract";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  *
  * What Enter does: each router answer lands where it belongs, and every
  * failure on the way is a phrase search rather than an error state.
  */
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-import { instantEvalRunKey, type RouteSearchResult } from "@langwatch/trace-contract";
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useSubmitSearch } from "../use-submit-search.ts";
 
 type MutateOptions = {

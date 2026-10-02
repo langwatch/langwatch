@@ -2,7 +2,7 @@
  * Participant avatar: coloured initial from name (mirroring RandomColorAvatar, but no photo).
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box } from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 
 export function ParticipantAvatar({ name }: { name: string }) {

@@ -1,7 +1,4 @@
-/** @see modules/onboarding/specs/integrations-checks.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -15,6 +12,8 @@ import {
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi, SimulationSetData } from "@langwatch/scenario-contract";
+/** @see modules/onboarding/specs/integrations-checks.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow, WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -29,7 +28,6 @@ type Holdings = Readonly<{
   charts?: number;
   datasets?: number;
   monitors?: number;
-  triggers?: number;
   scenarioSets?: number | "unreachable";
   modelProviders?: number;
   prompts?: number;
@@ -77,9 +75,6 @@ function checklist(holdings: Holdings = {}) {
       monitors: createApiFixture<MonitorApi>({
         countUsage: async () => ({ monitors: holdings.monitors ?? 0 }),
       }),
-      automations: createApiFixture<AutomationApi>({
-        countUsage: async () => ({ triggers: holdings.triggers ?? 0 }),
-      }),
       scenarios: createApiFixture<ScenarioApi>({
         getScenarioSetsData: async () => {
           if (holdings.scenarioSets === "unreachable") throw new Error("clickhouse down");
@@ -115,7 +110,6 @@ describe("OnboardingChecksService", () => {
         charts: 2,
         datasets: 4,
         monitors: 5,
-        triggers: 2,
         scenarioSets: 2,
         modelProviders: 3,
         prompts: 7,
@@ -130,7 +124,6 @@ describe("OnboardingChecksService", () => {
         customGraphs: 1,
         datasets: 1,
         onlineEvaluations: 1,
-        triggers: 1,
         simulations: 1,
         modelProviders: 1,
         prompts: 1,
@@ -153,7 +146,6 @@ describe("OnboardingChecksService", () => {
         customGraphs: 0,
         datasets: 0,
         onlineEvaluations: 0,
-        triggers: 0,
         simulations: 0,
         modelProviders: 0,
         prompts: 0,

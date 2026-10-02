@@ -1,27 +1,8 @@
 /**
- * What a browser installs when it installs github: the Integrations
- * settings screen, and the connect-popup surface the langy module mounts.
+ * What a browser installs when it installs github: the connect-popup surface
+ * the langy module mounts. The Integrations screen is integration's.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const githubWeb = defineWebModule("github")
-  .withHosts({
-    requires: ["GithubHostApi"],
-    mounts: { GithubHostApi: { load: () => import("./behavior/github-host-mount.tsx") } },
-  })
-  .withScreens({
-    // Placed by the application's settings table until a settings anchor
-    // accepts declared routes; the loader is this module's either way.
-    "pages/settings/integrations": {
-      path: "/settings/integrations",
-      within: "settings",
-      label: "Integrations",
-      requires: "organization:manage",
-      load: () => import("./ui/sections/integrations.screen.tsx"),
-    },
-  })
-  /** What another module may mount. Today langy mounts the connect popup. */
-  .publishSurfaces({
-    "surfaces/github-connect-popup": { load: () => import("./behavior/github-connect-popup.ts") },
-  });
+export const githubWeb = defineBrowserModule("github");

@@ -1,4 +1,4 @@
-import { Box, Link as ChakraLink, Text, VStack } from "@chakra-ui/react";
+import { Box, Link as ChakraLink, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { FaGolang, FaJs, FaPython } from "react-icons/fa6";
 import { LuExternalLink } from "react-icons/lu";

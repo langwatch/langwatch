@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
- * The Online Evaluations table loads every monitor's trend in one bounded ClickHouse read, and
- * publishes the same numbers the analytics page does, both asked through the installed api.
+ * The Online Evaluations table publishes the same numbers the analytics page does, both asked
+ * through the installed api. The bounded-read scenario lives in the evaluation module.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AnalyticsApi, analyticsComparisonWindow } from "@langwatch/analytics-contract";
@@ -40,13 +40,11 @@ const previousStartMs = analyticsComparisonWindow({
 
 let clickHouse: ClickHouseClient;
 let runtime: Awaited<ReturnType<typeof bootApiOverClickHouse>>["runtime"];
-let queryCount = 0;
 
-/** The process's routed ClickHouse member over the migrated test server, counting its reads. */
-function countingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
+/** The process's routed ClickHouse member over the migrated test server. */
+function routedQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
   const driver: QueryDriver = {
     async execute(request) {
-      queryCount++;
       const result = await client.query({
         query: request.sql,
         format: "JSONEachRow",
@@ -137,59 +135,13 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
         previousStartMs,
       }),
     });
-    ({ runtime } = await bootApiOverClickHouse({ clickhouse: countingQueryClient(clickHouse) }));
+    ({ runtime } = await bootApiOverClickHouse({ clickhouse: routedQueryClient(clickHouse) }));
   }, 180_000);
 
   afterAll(async () => {
     await runtime?.stop();
     await deleteSeededTenantRows({ client: clickHouse, tenantId });
   });
-
-  /** @scenario Performance for every monitor is read in one bounded query */
-  it("loads current and previous performance with one real ClickHouse query", async () => {
-    queryCount = 0;
-
-    const performance = await readTablePerformance();
-
-    expect(queryCount).toBe(1);
-    expect(performance).toEqual([
-      {
-        monitorId: scoreEvaluatorId,
-        metric: "score",
-        points: [0.5, 1, 0.9],
-        current: 0.725,
-        previous: 0.5,
-      },
-      {
-        monitorId: guardrailEvaluatorId,
-        metric: "pass_rate",
-        points: [0.5],
-        current: 0.5,
-        previous: 1,
-      },
-    ]);
-  }, 60_000);
-
-  it("returns an explicit no-data result for a monitor without runs", async () => {
-    const performance = await runtime.service(EvaluationApi).getMonitorPerformance({
-      tenantId,
-      monitors: [{ id: `${tenantId}-empty`, isGuardrail: false }],
-      previousStartMs,
-      currentStartMs,
-      endMs,
-      timeZone: "UTC",
-    });
-
-    expect(performance).toEqual([
-      {
-        monitorId: `${tenantId}-empty`,
-        metric: "score",
-        points: [],
-        current: null,
-        previous: null,
-      },
-    ]);
-  }, 60_000);
 
   describe("when the analytics page reads the same period", () => {
     /** @scenario The configuration table matches the analytics page numbers */

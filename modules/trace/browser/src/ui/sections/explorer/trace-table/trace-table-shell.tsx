@@ -1,4 +1,3 @@
-import { Box, Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -9,6 +8,13 @@ import {
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  type SystemStyleObject,
+} from "@langwatch/design-system/primitives";
 import {
   type ColumnMeta as TanstackColumnMeta,
   flexRender,

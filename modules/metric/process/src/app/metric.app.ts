@@ -1,9 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   MetricApi,
   METRIC_DEFAULT_RETENTION_DAYS,
@@ -18,9 +16,9 @@ import {
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
-import { createCodingAgentMetricFactsDispatchSubscriber } from "../eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
@@ -40,20 +38,17 @@ export type MetricInfrastructure = Readonly<{
 type MetricDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
-  codingAgents: typeof CodingAgentApi;
   retention: typeof DataRetentionApi;
 }>;
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
 
 /** The process-owned metric preparation capability, and its durable processing pipeline. */
-export class MetricApp implements MetricApiContract {
+export class MetricModule implements MetricApiContract {
   static readonly contract = MetricApi;
   static readonly config = metricConfig;
   static readonly dependencies: MetricDependencies = {
     dataPrivacy: DataPrivacyApi,
     traces: TraceApi,
-    /** Lifts a received point's session facts onto its own pipeline. */
-    codingAgents: CodingAgentApi,
     /** Each tenant's retention, which the metric rows are stamped with. */
     retention: DataRetentionApi,
   };
@@ -78,7 +73,7 @@ export class MetricApp implements MetricApiContract {
     this.#collection = parts.collection;
   }
 
-  static create({ dependencies, members, config }: MetricSetup): MetricApp {
+  static create({ dependencies, members, config }: MetricSetup): MetricModule {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
     const pipeline = MetricProcessingService.create({
       repository: ClickHouseMetricDataPointAppendRepository.create({
@@ -87,9 +82,6 @@ export class MetricApp implements MetricApiContract {
       }),
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
-      subscribers: [
-        createCodingAgentMetricFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
-      ],
       retention: {
         resolve: (tenantId) =>
           dependencies.retention.getResolvedForProject({ projectId: tenantId }),
@@ -101,7 +93,7 @@ export class MetricApp implements MetricApiContract {
       metrics: service,
       recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
     });
-    const app: MetricApp = new MetricApp({
+    const app: MetricModule = new MetricModule({
       service,
       pipeline,
       receiver: OtlpMetricReceiverService.create({ traces: dependencies.traces, collection }),

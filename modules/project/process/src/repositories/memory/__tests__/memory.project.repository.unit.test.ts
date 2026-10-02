@@ -129,10 +129,10 @@ describe("MemoryProjectRepository", () => {
     });
 
     it("still follows a stored trace-destination pointer to it", async () => {
-      expect(await repository.findTraceDestination("project_1")).toMatchObject({
+      expect(await repository.findTraceDestination("project_1")).toEqual({
         id: "project_1",
         teamId: TEAM_ID,
-        apiKey: "sk-lw-1",
+        archivedAt: expect.any(Date),
       });
       expect(
         await repository.findLiveTraceDestination({

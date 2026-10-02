@@ -2,10 +2,9 @@
  * ComparisonLeaderboardDrawer - full Bradley-Terry leaderboard view (#5103).
  */
 
-import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-browser-kit";
+import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo, useState } from "react";
 
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
@@ -15,6 +14,7 @@ import {
   computeJudgeIndependence,
   computeVerbosityProfile,
 } from "../batch-evaluation-results.judge-bias.ts";
+import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,

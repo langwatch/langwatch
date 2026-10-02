@@ -6,7 +6,8 @@
  * own. Asked here, where a proved domain makes the widest answer mean
  * something, and going live waits for it.
  */
-import { Box, Button, HStack, RadioGroup, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import type { SsoArrivalPolicy, SsoConnectionLifecycleState } from "@langwatch/identity-contract";
 import { useState } from "react";
 

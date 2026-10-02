@@ -1,15 +1,16 @@
-import { HStack, Skeleton, Spacer, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import type { BatchEvaluationData } from "@langwatch/experiment-browser-kit";
-import type { Experiment } from "@langwatch/experiment-contract";
+import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
+import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
+import type { BatchEvaluationData } from "../batch-evaluation-results.types.ts";
+
 type BatchEvaluationResultsHeaderProps = {
   project?: UiHostProject;
-  experiment?: Experiment;
+  experiment?: ExperimentRow;
   shownRunId?: string;
   data: BatchEvaluationData | null;
   charts: { available: boolean; visible: boolean; onChange: (visible: boolean) => void };
@@ -22,7 +23,7 @@ const ExperimentTitle = ({
   experiment,
   shownRunId,
 }: {
-  experiment?: Experiment;
+  experiment?: ExperimentRow;
   shownRunId?: string;
 }) => (
   <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
@@ -51,7 +52,7 @@ const ExperimentLinks = ({
   experiment,
 }: {
   project?: UiHostProject;
-  experiment?: Experiment;
+  experiment?: ExperimentRow;
 }) => (
   <>
     {experiment?.workflowId && (

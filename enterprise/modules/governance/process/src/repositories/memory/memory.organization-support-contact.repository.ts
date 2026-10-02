@@ -35,12 +35,4 @@ export class MemoryOrganizationSupportContactRepository extends OrganizationSupp
     }
     return emails;
   }
-
-  async findConfiguredSupportContact({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string | null> {
-    return this.store.supportContacts.get(organizationId) ?? null;
-  }
 }

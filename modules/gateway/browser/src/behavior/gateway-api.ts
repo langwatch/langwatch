@@ -438,7 +438,6 @@ export type PersonalWorkspaceContext = {
       id: string;
       name: string;
       slug: string;
-      apiKey: string;
       createdAtMs: number;
     };
     created: boolean;
@@ -834,9 +833,9 @@ export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> & {
     /**
      * The organization graph the section's scope is resolved out of.
      */
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: GatewayOrganizationGraph[];
       };
     };
@@ -848,21 +847,15 @@ export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> & {
     };
   };
 
-  limits: {
-    /**
-     * The organization's plan, narrowed to the two facts a gateway surface asks
-     * of it. The procedure answers with a far wider usage report; nothing here
-     * renders the rest, so nothing here declares it.
-     */
-    getUsage: {
+  plan: {
+    /** The organization's plan, narrowed to the two facts a gateway surface asks of it. */
+    getActivePlan: {
       query: {
         input: { organizationId: string };
         output: {
-          activePlan: {
-            type: string;
-            /** Absent on a legacy plan row, which is not the same as false. */
-            webhookEndpointsEnabled?: boolean;
-          };
+          type: string;
+          /** Absent on a legacy plan row, which is not the same as false. */
+          webhookEndpointsEnabled?: boolean;
         };
       };
     };

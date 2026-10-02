@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,12 +51,8 @@ function renderPanel({ strict = false }: { strict?: boolean } = {}) {
       agentId="agent_1"
     />
   );
-  const ui: ReactNode = (
-    <ChakraProvider value={defaultSystem}>
-      {strict ? <StrictMode>{panel}</StrictMode> : panel}
-    </ChakraProvider>
-  );
-  return render(ui);
+  const ui: ReactNode = strict ? <StrictMode>{panel}</StrictMode> : panel;
+  return renderWithDesignSystem(ui);
 }
 
 describe("TalkToItPanel lifecycle", () => {

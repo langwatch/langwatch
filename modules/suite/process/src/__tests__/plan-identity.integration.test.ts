@@ -5,7 +5,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -33,6 +32,7 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -696,9 +696,7 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
     });
 
     describe("when the scope names every suite of the project", () => {
-      /** @scenario
-       * "Naming every suite of the project resolves to the same plan as running everything"
-       */
+      /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
       it("stores the scope as all, so it lands where Run all lands", async () => {
         const agent = createHttpAgent();
         const refunds = await createTestSuite("Refunds");

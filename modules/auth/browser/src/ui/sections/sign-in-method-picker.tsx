@@ -1,5 +1,5 @@
 import "../../model/ambient.d.ts";
-import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";

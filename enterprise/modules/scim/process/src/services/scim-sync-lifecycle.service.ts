@@ -27,7 +27,7 @@
  *
  * See specs/identity/scim-connection-sync.feature.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
@@ -49,8 +49,6 @@ import {
   scimSyncIdFor,
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
-
-import { type ScimSyncLifecycle } from "../app/scim.members.ts";
 
 /** The directory-sync guards and ledger this service drives, named by their shape. */
 export interface ScimSyncLifecycleGuards {
@@ -82,7 +80,17 @@ interface ScimSyncLifecycleAdapterDeps {
   now?: () => number;
 }
 
-export class ScimSyncLifecycleService implements ScimSyncLifecycle {
+export type ScimUserPushOperation = "create" | "update" | "deactivate";
+
+export type ScimRemovalOperation = "delete_user" | "deactivate_user";
+
+/** Durable directory-sync history, which `ScimModule` builds over its own guards and ledger. */
+export type ScimSyncLifecycle = Pick<
+  ScimSyncLifecycleService,
+  "tokenIssued" | "userPushed" | "groupMapped" | "applyFailed" | "applyRedriven" | "revoked"
+>;
+
+export class ScimSyncLifecycleService {
   private readonly guards: ScimSyncLifecycleGuards;
   private readonly ledger: ScimSyncLifecycleLedger;
   private readonly newCommandId: () => string;

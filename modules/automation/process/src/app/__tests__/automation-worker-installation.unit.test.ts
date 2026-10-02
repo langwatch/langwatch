@@ -4,7 +4,6 @@
  */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -15,20 +14,23 @@ import {
 import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { DispatchError, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import type { SlackApi } from "@langwatch/slack-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -37,7 +39,7 @@ import {
   settlementSummary,
   settlementTrace,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
-import { automationServer } from "../../automation.server.ts";
+import { automationProcessModule } from "../../automation.module.ts";
 import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {
@@ -74,15 +76,16 @@ type Installed = Readonly<{
   annotation?: AnnotationApi;
   authz?: AuthzApi;
   notification?: NotificationService;
+  webhook?: WebhookApi;
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
-function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+function composed(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(automationServer)])
+    .withModules([withMemoryRepositories(automationProcessModule)])
     .withConfig({ automation: CONFIG })
     .withStores(memoryStores())
     .withEventing(eventing)
@@ -93,22 +96,41 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
       decrypt: (value: string) => value,
     })
     .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("isSaas", false)
-    .withMember("logging", installed.logger ?? createTestLogger().logger)
-    .provide({
-      analytics: createApiFixture<AnalyticsApi>(),
-      monitor: createApiFixture<MonitorApi>(),
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
-      entitlement: installed.entitlement ?? createApiFixture<EntitlementApi>(),
-      project: installed.project ?? createApiFixture<ProjectApi>(),
-      "audit-log": createApiFixture<AuditLogApi>(),
-      trace: installed.trace ?? createApiFixture<TraceApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
-      dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
-      annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
-      authz: installed.authz ?? createApiFixture<AuthzApi>(),
-      notification: installed.notification ?? createApiFixture<NotificationService>(),
-    });
+    .withMember("logging", installed.logger ?? createTestLogger().logger);
+}
+
+function peers(installed: Installed = {}) {
+  return {
+    analytics: createApiFixture<AnalyticsApi>(),
+    monitor: createApiFixture<MonitorApi>(),
+    evaluator: createApiFixture<EvaluatorApi>(),
+    entitlement: installed.entitlement ?? createApiFixture<EntitlementApi>(),
+    project: installed.project ?? createApiFixture<ProjectApi>(),
+    "audit-log": createApiFixture<AuditLogApi>(),
+    trace: installed.trace ?? createApiFixture<TraceApi>(),
+    evaluation: createApiFixture<EvaluationApi>(),
+    dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
+    annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
+    authz: installed.authz ?? createApiFixture<AuthzApi>(),
+    notification: installed.notification ?? createApiFixture<NotificationService>(),
+    slack: createApiFixture<SlackApi>(),
+    webhook: installed.webhook ?? createApiFixture<WebhookApi>(),
+  };
+}
+
+function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+  return composed(role, eventing, installed).provide(peers(installed));
+}
+
+/** A worker whose process supplies every peer but `absent`. */
+function bootWithout(absent: keyof ReturnType<typeof peers>) {
+  const supplied = Object.fromEntries(
+    Object.entries(peers()).filter(([module]) => module !== absent),
+  );
+  return Promise.resolve().then(() =>
+    // @ts-expect-error MissingSupply: the compiler refuses a worker missing a peer it names
+    composed("worker", eventingFor("worker")).provide(supplied).boot(),
+  );
 }
 
 async function installedOn(role: "api" | "worker") {
@@ -156,6 +178,35 @@ describe("given the automation module installed on the api role", () => {
     const { unrun } = await installedOn("api");
 
     expect(unrun).toContain("reportSchedule");
+  });
+});
+
+describe("given a worker process missing a peer settlement delivers through", () => {
+  /** @scenario "A settlement half that cannot deliver never boots" */
+  it("refuses the boot naming the mail dependency", async () => {
+    await expect(bootWithout("notification")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "notifications",
+    });
+  });
+
+  /** @scenario "An annotation-queue automation cannot run on a worker without the annotation peer" */
+  it("refuses the boot naming the annotation dependency", async () => {
+    await expect(bootWithout("annotation")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "annotations",
+    });
+  });
+
+  /** @scenario "A breached ceiling is contained from every worker that boots" */
+  it("refuses the boot naming the directory containment reads administrators from", async () => {
+    await expect(bootWithout("authz")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "authorization",
+    });
   });
 });
 
@@ -251,6 +302,47 @@ describe("given a memory-tier worker settling a match end to end", () => {
       expect(sent[0]).toMatchObject({ to: "ops@acme.test", replyless: {} });
       expect(sent[0]?.html).toContain("https://app.langwatch.test");
       expect(await worker.lastRunAt()).toBeGreaterThan(0);
+      await worker.runtime.stop();
+    });
+  });
+
+  describe("when a settled window notifies a webhook automation", () => {
+    /** @scenario "A webhook automation hands each attempt to the webhook module" */
+    it("sends the attempt through the webhook module and rethrows its verdict for the outbox", async () => {
+      const requests: WebhookSendRequest[] = [];
+      const refusal = new DispatchError({
+        message: "HTTP 503",
+        retryable: true,
+        retryAfterMs: 60_000,
+      });
+      const webhook = createApiFixture<WebhookApi>({
+        sendRequest: async (request) => {
+          requests.push(request);
+          throw refusal;
+        },
+      });
+      const worker = await settlingWorker({ webhook, trace: tracesHolding(["trace-1"]) });
+      await worker.automations.create(
+        automation("SEND_WEBHOOK", { url: "https://hooks.acme.test/in", method: "POST" }),
+      );
+
+      await expect(
+        worker.run("notifyDigest", {
+          triggerId: "trigger-1",
+          traceIds: ["trace-1"],
+          boundary: 1_000,
+        }),
+      ).rejects.toBe(refusal);
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({
+        projectId: "project-1",
+        url: "https://hooks.acme.test/in",
+        method: "POST",
+        label: 'Webhook for trigger "Settles"',
+        source: { module: "automation", ref: "trigger-1" },
+      });
+      expect(requests[0]?.dispatchId).toMatch(/^evt_[0-9a-f]{32}$/);
       await worker.runtime.stop();
     });
   });

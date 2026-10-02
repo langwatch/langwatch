@@ -1,5 +1,5 @@
 // Post-approval first-trace watch: hooks hold state and act on pure policy (first-trace-policy.ts).
-// Polls until first trace lands, then redirects. React Query handles hidden tabs.
+// Waits for the first-trace read hint, then redirects.
 // Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
 import { useEffect, useMemo, useState } from "react";
@@ -32,7 +32,6 @@ export function useFirstTraceWatch(): FirstTraceWatchState {
     [organizations, userId, organizationId],
   );
 
-  const [hasResult, setHasResult] = useState(false);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [hasSeenNeverSynced, setHasSeenNeverSynced] = useState(false);
   const [hasPriorTraces, setHasPriorTraces] = useState(false);
@@ -45,25 +44,22 @@ export function useFirstTraceWatch(): FirstTraceWatchState {
 
   const polling = resolveFirstTracePolling({
     hasProject: !!personalProject?.id,
-    hasResult,
     isRedirecting,
     isTimedOut,
     hasPriorTraces,
-    hasSeenNeverSynced,
   });
 
   const hasFirstMessage = apiKeyApi.project.getHasFirstMessage.useQuery(
     { projectId: personalProject?.id ?? "" },
     {
       enabled: polling.enabled,
-      refetchInterval: polling.refetchInterval,
+      // needs a read hint: first trace received for the project
       refetchOnWindowFocus: false,
     },
   );
 
   useEffect(() => {
     const firstMessage = hasFirstMessage.data?.firstMessage;
-    if (firstMessage !== undefined && !hasResult) setHasResult(true);
     // Users whose project already had traces keep the current behavior; only
     // a false -> true transition observed on this page, before the timeout,
     // triggers the redirect.
@@ -75,7 +71,7 @@ export function useFirstTraceWatch(): FirstTraceWatchState {
     if (transition === "confirm-never-synced") setHasSeenNeverSynced(true);
     if (transition === "mark-prior-traces") setHasPriorTraces(true);
     if (transition === "redirect" && !isRedirecting) setIsRedirecting(true);
-  }, [hasFirstMessage.data, hasResult, hasSeenNeverSynced, isRedirecting, isTimedOut]);
+  }, [hasFirstMessage.data, hasSeenNeverSynced, isRedirecting, isTimedOut]);
 
   const slug = personalProject?.slug;
   useEffect(() => {

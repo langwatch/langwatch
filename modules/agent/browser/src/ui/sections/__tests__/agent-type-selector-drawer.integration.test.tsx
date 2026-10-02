@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,11 +32,11 @@ const { VoiceTestHost, resetVoiceState } =
 const { AgentManagementHostProvider } = await import("../../../model/agent-management-host.ts");
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <AgentManagementHostProvider value={new VoiceTestHost()}>
       {children}
     </AgentManagementHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 beforeEach(resetVoiceState);

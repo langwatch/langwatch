@@ -26,7 +26,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),

@@ -1,24 +1,26 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * What the budgets list hands the UI: standing (people over their own cap)
  * and the Scope column's anchor name, off the real control plane.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { nowInstant } from "@langwatch/time";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import { gatewayBudgetTrpcTransport } from "../gateway-budget.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -142,7 +144,6 @@ const virtualKeyFindMany = vi.fn(async (args?: { where?: { id?: unknown } }) => 
 /** A fake Prisma client answering the budget row, its bucket boundaries and its scope anchor. */
 function fakePrisma(budgets: Record<string, unknown>[]): PrismaClient {
   return prismaDouble({
-    organization: { findUnique: async () => ({ id: ORG_ID }) },
     gatewayBudget: { findMany: async () => budgets },
     gatewayBudgetBucketBoundary: { findMany: async () => [] },
     virtualKey: { findMany: virtualKeyFindMany },
@@ -157,7 +158,7 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 async function callerFor(budgets: Record<string, unknown>[]) {
-  const app = await GatewayApp.create({
+  const app = await GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -185,11 +186,19 @@ async function callerFor(budgets: Record<string, unknown>[]) {
       evaluators: peer("evaluators"),
       evaluations: peer("evaluations"),
       monitors: peer("monitors"),
-      organizations: peer("organizations"),
+      organizations: createApiFixture<OrganizationApi>({
+        findProvisioningSummary: async (organizationId) => ({
+          id: organizationId,
+          name: "Organization",
+          slug: "organization",
+          createdAt: nowInstant(),
+        }),
+      }),
       featureFlags: peer("featureFlags"),
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
+      apiKeys: peer("apiKeys"),
     },
     members: {
       prisma: fakePrisma(budgets),
@@ -204,6 +213,7 @@ async function callerFor(budgets: Record<string, unknown>[]) {
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

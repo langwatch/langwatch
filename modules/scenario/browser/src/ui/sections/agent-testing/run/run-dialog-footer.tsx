@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Phone, Play } from "lucide-react";

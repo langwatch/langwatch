@@ -6,7 +6,7 @@
 import { z } from "zod";
 
 import { Config } from "./config.ts";
-import { environmentOneOrTrueSchema } from "./env-schemas.ts";
+import { environmentExactOneSchema, environmentOneOrTrueSchema } from "./env-schemas.ts";
 
 const positiveInteger = z.coerce.number().int().positive();
 
@@ -45,6 +45,17 @@ export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => (
           .map((host) => host.trim())
           .filter((host) => host.length > 0),
       ),
+  ),
+}));
+
+/**
+ * Dev only: haven +voice sets it so a voice provider may name a loopback stand-in (voicesim).
+ * Only the literal `1` opens it; no production config sets it. Rule: isAllowedElevenLabsUrl.
+ */
+export const { allowLoopbackVoiceProviders } = Config.define((c) => ({
+  allowLoopbackVoiceProviders: c.env(
+    "VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS",
+    environmentExactOneSchema,
   ),
 }));
 

@@ -13,6 +13,8 @@ export type GatewayToast = {
   description?: string;
   type?: string;
   id?: string;
+  /** The failure behind an error toast, so the registry can word it. */
+  error?: unknown;
 };
 
 export type GatewayToaster = { create: (toast: GatewayToast) => void };
@@ -24,7 +26,7 @@ export function useGatewayToaster(): GatewayToaster {
       create: (toast: GatewayToast) => {
         if (toast.type === "error") {
           host.failed({
-            error: void 0,
+            error: toast.error,
             fallbackTitle: toast.title,
             ...(toast.id ? { id: toast.id } : {}),
           });

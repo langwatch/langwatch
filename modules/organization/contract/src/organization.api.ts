@@ -1,5 +1,6 @@
-import type { AuthzAccessBreakdownOutput, GrantsLedgerActor } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import type { LedgerActor } from "@langwatch/authorization";
+import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
+import { moduleApi } from "@langwatch/module";
 import type {
   GuidedOnboardingRecord,
   OnboardingInitializeOrganizationInput,
@@ -10,21 +11,21 @@ import type { Instant } from "@langwatch/time";
 
 import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
 import type {
-  AddOrganizationGroupBindingInput,
+  AddOrganizationGroupGrantInput,
   ApplyOrganizationGroupEditsInput,
   ChangeOrganizationGroupMemberInput,
   CreateOrganizationGroupInput,
   DeleteOrganizationGroupInput,
   GetOrganizationGroupInput,
   OrganizationGroup,
-  OrganizationGroupBinding,
+  OrganizationGroupGrant,
   OrganizationGroupDetails,
   OrganizationGroupPage,
   OrganizationGroupSummary,
   ListMemberOrganizationGroupsInput,
   ListOrganizationGroupsInput,
   RenameOrganizationGroupInput,
-  RemoveOrganizationGroupBindingInput,
+  RemoveOrganizationGroupGrantInput,
 } from "./group.ts";
 import type {
   JoinRequestAdmitted,
@@ -37,6 +38,7 @@ import type {
 } from "./join-request.responses.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
+  OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
   OrganizationInviteExtended,
@@ -80,6 +82,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
+import type { ScopeGraphOrganization } from "./scope-graph.ts";
 import type { TeamWithProjects } from "./team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
@@ -104,6 +107,8 @@ export interface OrganizationCaller {
   readonly id: string;
   readonly name?: string | null;
   readonly email?: string | null;
+  /** The key a management-API call arrived on: its holdings bound what the call may grant. */
+  readonly apiKeyId?: string | null;
 }
 
 export type OrganizationRestMemberSummary = Readonly<{
@@ -350,7 +355,7 @@ export interface OrganizationApi {
     input: Readonly<{
       organizationId: string;
       userId: string;
-      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+      admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
   ): Promise<"created" | "already-present">;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
@@ -503,11 +508,11 @@ export interface OrganizationApi {
   ): Promise<OrganizationTeamWithMembers[]>;
   listTeamAccess(input: ListOrganizationTeamAccessInput): Promise<OrganizationTeamAccess[]>;
   createTeamWithMembers(
-    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam>;
   updateTeamWithMembers(
-    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void>;
   archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
@@ -521,7 +526,7 @@ export interface OrganizationApi {
     input: ListMemberOrganizationGroupsInput,
   ): Promise<OrganizationGroupSummary[]>;
   createGroup(
-    input: Omit<CreateOrganizationGroupInput, "actor">,
+    input: Omit<CreateOrganizationGroupInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup>;
   renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup>;
@@ -529,23 +534,23 @@ export interface OrganizationApi {
     input: Omit<DeleteOrganizationGroupInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void>;
-  addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
+  addGroupMember(input: ChangeOrganizationGroupMemberInput, by: OrganizationCaller): Promise<void>;
   removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
-  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]>;
-  addGroupBinding(
-    input: Omit<AddOrganizationGroupBindingInput, "actor">,
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupGrant[]>;
+  addGroupGrant(
+    input: Omit<AddOrganizationGroupGrantInput, "actor" | "caller">,
     by: OrganizationCaller,
-  ): Promise<OrganizationGroupBinding>;
-  removeGroupBinding(
-    input: Omit<RemoveOrganizationGroupBindingInput, "actor">,
+  ): Promise<OrganizationGroupGrant>;
+  removeGroupGrant(
+    input: Omit<RemoveOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void>;
   applyGroupEdits(
-    input: Omit<ApplyOrganizationGroupEditsInput, "actor">,
+    input: Omit<ApplyOrganizationGroupEditsInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void>;
   resolveBindingScopeNames(
-    input: Readonly<{ organizationId: string; bindings: readonly OrganizationGroupBinding[] }>,
+    input: Readonly<{ organizationId: string; bindings: readonly OrganizationGroupGrant[] }>,
   ): Promise<ReadonlyMap<string, string>>;
   getPersonalWorkspaceFeatures(
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
@@ -584,11 +589,17 @@ export interface OrganizationApi {
     input: Readonly<{ isDemo: boolean }>,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]>;
+  /** The caller's scope graph, narrowed; the tRPC host versions it. */
+  getScopeGraph(by: OrganizationCaller): Promise<ScopeGraphOrganization[]>;
   /** One organization with its members, addresses redacted for a non-administrator. */
   getOrganizationWithMembersForPicker(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams>;
+  /** The Directory's tab badges: how many of each, never the lists. */
+  getDirectoryCounts(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationDirectoryCounts>;
   /** One member's full record, refused by name where there is none. */
   getMemberOrRefuse(
     input: Readonly<{ organizationId: string; userId: string }>,
@@ -619,8 +630,20 @@ export interface OrganizationApi {
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied>;
   /**
+   * Refuses, writing nothing, invitations that would confer more than `by` holds: the check
+   * {@link createPaymentPendingInvites} makes, for a caller that must ask before its own write.
+   */
+  checkInvitesWithinCaller(
+    input: Readonly<{
+      organizationId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void>;
+  /**
    * Holds a seat checkout's invitations until it is paid, as main's billing did; an address
-   * that already holds an open invitation here is skipped.
+   * that already holds an open invitation here is skipped. `by` is who invited: nobody is
+   * invited to more than they hold (checked before storing; acceptance after payment is `system`).
    */
   createPaymentPendingInvites(
     input: Readonly<{
@@ -628,6 +651,7 @@ export interface OrganizationApi {
       subscriptionId: string;
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
+    by: OrganizationCaller,
   ): Promise<void>;
   /** Drops the held invitations of seat checkouts that were abandoned. */
   cancelPaymentPendingInvites(
@@ -692,11 +716,11 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<TeamWithProjects>;
   updateTeamMembers(
-    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void>;
   createTeamWithGatedMembers(
-    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam>;
   archiveTeamById(input: Readonly<{ teamId: string }>): Promise<void>;
@@ -708,7 +732,7 @@ export interface OrganizationApi {
   listGroupsWithScopeNames(input: Readonly<{ organizationId: string }>): Promise<GroupListItem[]>;
   getGroupWithScopeNames(input: GetOrganizationGroupInput): Promise<GroupDetail>;
   createLicensedGroup(
-    input: Omit<CreateOrganizationGroupInput, "actor">,
+    input: Omit<CreateOrganizationGroupInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup>;
   listMemberGroupsWithScopeNames(

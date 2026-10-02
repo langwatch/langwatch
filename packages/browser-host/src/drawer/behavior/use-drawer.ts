@@ -1,16 +1,31 @@
 /**
- * URL-routed singleton drawers: the address vocabulary and the navigation
- * stack. The router and the trace-drawer funnel are redesigned here because
- * the platform import behind them has no package export.
+ * URL-routed singleton drawers: the address vocabulary. The stack of drawers
+ * is the address plus `history.state`; nothing about it lives in memory.
  */
 
+import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/module";
 import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
-import type { UiDrawerMap, UiDrawerPropsOf, UiFlowCallbacksStore } from "../model/drawer-map.ts";
+import type {
+  DrawerCallbacksIn,
+  UiDrawerMap,
+  UiDrawerPropsOf,
+  UiFlowCallbacksStore,
+  UndeclaredDrawerCallbacks,
+} from "../model/drawer-map.ts";
+import {
+  ancestorsAfterOpen,
+  type DrawerStackEntry,
+  drawerAncestorsState,
+  drawerParamsOfQuery,
+  readDrawerAncestors,
+  readDrawerStack,
+  toRecord,
+} from "../model/drawer-stack.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
-import { type DrawerRouter, drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
+import { drawerRouterRef, readDrawerLocation, useDrawerRouter } from "./drawer-router.ts";
 
 const logger = createLogger("useDrawer");
 
@@ -76,38 +91,61 @@ let flowCallbacks: UiFlowCallbacksStore = {};
  */
 const keptOnClose = new Set<string>();
 
-/**
- * Sets flow callbacks for a drawer type; they persist across navigation until
- * closeDrawer() is called.
- */
-export const setFlowCallbacks = <Name extends string>(
-  drawer: Name,
-  callbacks: NonNullable<UiFlowCallbacksStore[Name]>,
-  options?: {
-    /**
-     * True when a mounted component owns the registration, so that closing a
-     * drawer leaves it alone. The owner takes it back on unmount, by
-     * registering an empty set.
-     */
-    keepOnClose?: boolean;
-  },
-) => {
-  // Deliberately does NOT notify: callers register callbacks before opening a
-  // drawer, or right before a setComplexProps that does notify — so a notify
-  // here is redundant, and expensive (~65 call sites; would cascade a
-  // re-render through the open drawer's subtree on every registration).
-  flowCallbacks[drawer] = callbacks;
-  if (options?.keepOnClose) keptOnClose.add(drawer);
-  else keptOnClose.delete(drawer);
+type FlowCallbackOptions = {
+  /**
+   * True when a mounted component owns the registration, so that closing a
+   * drawer leaves it alone. The owner takes it back on unmount, by
+   * registering an empty set.
+   */
+  keepOnClose?: boolean;
 };
 
+/** A drawer's address name: a token's wire name, or the string itself. */
+const drawerKey = (drawer: string | UiTokenIdentity): string =>
+  typeof drawer === "string" ? drawer : drawer.key;
+
 /**
- * Get flow callbacks for a specific drawer type.
+ * Sets flow callbacks for a drawer, named by its owner's token or, while the
+ * string path stays, by name; they persist across navigation until
+ * closeDrawer() is called.
+ */
+export function setFlowCallbacks<Props>(
+  drawer: UiDrawerToken<Props>,
+  callbacks: DrawerCallbacksIn<Props>,
+  options?: FlowCallbackOptions,
+): void;
+export function setFlowCallbacks<Name extends string>(
+  drawer: Name,
+  callbacks: NonNullable<UiFlowCallbacksStore[Name]>,
+  options?: FlowCallbackOptions,
+): void;
+export function setFlowCallbacks(
+  drawer: string | UiTokenIdentity,
+  callbacks: UndeclaredDrawerCallbacks,
+  options?: FlowCallbackOptions,
+): void {
+  // Deliberately does NOT notify: callers register callbacks before opening a
+  // drawer, or right before a setComplexProps that does notify; a notify here
+  // would cascade a re-render through the open drawer on every registration.
+  const key = drawerKey(drawer);
+  flowCallbacks[key] = callbacks;
+  if (options?.keepOnClose) keptOnClose.add(key);
+  else keptOnClose.delete(key);
+}
+
+/**
+ * Get flow callbacks for a specific drawer, by token or by name.
  * Returns undefined if no callbacks are registered for this drawer.
  */
-export const getFlowCallbacks = <Name extends string>(drawer: Name): UiFlowCallbacksStore[Name] => {
-  return flowCallbacks[drawer];
-};
+export function getFlowCallbacks<Props>(
+  drawer: UiDrawerToken<Props>,
+): DrawerCallbacksIn<Props> | undefined;
+export function getFlowCallbacks<Name extends string>(drawer: Name): UiFlowCallbacksStore[Name];
+export function getFlowCallbacks(
+  drawer: string | UiTokenIdentity,
+): UndeclaredDrawerCallbacks | undefined {
+  return flowCallbacks[drawerKey(drawer)];
+}
 
 /**
  * Clears the flow callbacks of the drawer flows; called automatically by
@@ -129,68 +167,39 @@ export const clearFlowCallbacks = () => {
 export const getAllFlowCallbacks = () => flowCallbacks;
 
 // ============================================================================
-// Drawer Stack (navigation history)
+// Drawer Stack (read from the address and history.state)
 // ============================================================================
 
-type DrawerStackEntry = {
-  drawer: DrawerType;
-  params: Record<string, unknown>;
-};
+/** The whole stack, the open drawer on top; empty when none is open. */
+export const getDrawerStack = (): DrawerStackEntry[] => readDrawerStack(readDrawerLocation());
 
-/**
- * Module-level drawer stack for tracking navigation history.
- * Enables automatic back button visibility based on navigation depth.
- */
-let drawerStack: DrawerStackEntry[] = [];
+/** The open drawer, or `undefined`; read from the address, so never stale. */
+export const getTopDrawer = (): DrawerType | undefined => readDrawerLocation().query["drawer.open"];
 
-export const getDrawerStack = () => drawerStack;
-export const clearDrawerStack = () => {
-  drawerStack = [];
-};
-
-/**
- * The drawer on top of the stack, or `undefined` when empty. Checked by a
- * drawer that mounts from its own store, not the URL (Trace Explorer): the
- * stack is module-global, so a stale one walks back into an unrelated drawer.
- */
-export const getTopDrawer = (): DrawerType | undefined =>
-  drawerStack[drawerStack.length - 1]?.drawer;
-
-// ============================================================================
-// The open rewrite the host installs
-// ============================================================================
-
-/**
- * A rule that redirects one drawer-open request to another — e.g. rewriting a
- * `traceDetails` open to `traceV2Details`. This is a feature's rule, not the
- * framework's, so the application installs it rather than hard-coding it.
- */
-export type DrawerOpenRewrite = (
-  drawer: DrawerType,
-  props: Record<string, unknown> | undefined,
-) => { drawer: DrawerType; props: Record<string, unknown> | undefined };
-
-const passThroughRewrite: DrawerOpenRewrite = (drawer, props) => ({ drawer, props });
-
-let openRewrite: DrawerOpenRewrite = passThroughRewrite;
-
-export const installDrawerOpenRewrite = (rewrite: DrawerOpenRewrite): void => {
-  openRewrite = rewrite;
-};
-
-export const clearDrawerOpenRewrite = (): void => {
-  openRewrite = passThroughRewrite;
-};
-
-/**
- * The drawer the browser URL has open right now. A router reading is a render
- * snapshot and can lag a navigation that already landed, so a decision about
- * what the reader is looking at *at this moment* reads the address bar.
- */
-const openDrawerInLocation = (): DrawerType | undefined => {
-  if (typeof window === "undefined") return undefined;
-  return new URLSearchParams(window.location.search).get("drawer.open") ?? undefined;
-};
+/** The drawers beneath `next` once it opens over the address `query`/`state` describe. */
+function ancestorsForOpen({
+  query,
+  state,
+  next,
+  resetStack,
+  replaceCurrentInStack,
+}: {
+  query: Readonly<Record<string, string | undefined>>;
+  state: unknown;
+  next: DrawerType;
+  resetStack?: boolean;
+  replaceCurrentInStack?: boolean;
+}): DrawerStackEntry[] {
+  const open = query["drawer.open"];
+  return ancestorsAfterOpen({
+    ancestors: readDrawerAncestors(state),
+    current: open ? { drawer: open, params: drawerParamsOfQuery(query) } : undefined,
+    next,
+    resetStack,
+    replaceCurrentInStack,
+    forward: open === next,
+  });
+}
 
 /**
  * Navigate to a drawer from module-level code (e.g., flow callbacks).
@@ -198,13 +207,6 @@ const openDrawerInLocation = (): DrawerType | undefined => {
  * mounted.
  */
 export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boolean } = {}) => {
-  // Reset stack if requested
-  if (options.resetStack) {
-    drawerStack = [{ drawer, params: {} }];
-  } else {
-    drawerStack.push({ drawer, params: {} });
-  }
-
   // Clear complex props since we're navigating fresh
   complexProps = {};
 
@@ -222,8 +224,18 @@ export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boo
     ),
     "drawer.open": drawer,
   };
+  const ancestors = ancestorsForOpen({
+    query: router.query,
+    state: router.state,
+    next: drawer,
+    resetStack: options.resetStack,
+  });
 
-  router.push("?" + qs.stringify(newQuery, { allowDots: true, arrayFormat: "comma" }));
+  const { hash } = splitAsPath(liveAsPath(router.asPath));
+  const newQs = qs.stringify(newQuery, { allowDots: true, arrayFormat: "comma" });
+  router.push(buildUrl(router.pathname, newQs, hash), {
+    state: drawerAncestorsState(ancestors),
+  });
 };
 
 // ============================================================================
@@ -232,37 +244,47 @@ export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boo
 
 /**
  * Updates `drawer.<key>` params in the URL without touching the rest of the
- * query or the open drawer. `push: true` (default) adds a history entry;
- * pass `push: false` for silent updates (e.g. mirroring state on mount).
+ * query, the open drawer or the stack. `push: true` (default) adds a history
+ * entry; pass `push: false` for silent updates.
  */
+export function updateDrawerParams(
+  updates: Record<string, string | undefined>,
+  options: { push?: boolean } = {},
+): void {
+  const router = drawerRouterRef.current;
+  if (!router) {
+    logger.warn(
+      "updateDrawerParams ran with no mounted drawer navigator; the address was not written.",
+    );
+    return;
+  }
+  const push = options.push ?? true;
+  const { path, queryString, hash } = splitAsPath(liveAsPath(router.asPath));
+  const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<string, unknown>;
+  // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
+  // query like `?drawer=foo` it's a string, not the object we mutate below.
+  // Guard the shape so the mutation loop can't throw at runtime.
+  const drawer =
+    parsed.drawer && typeof parsed.drawer === "object" && !Array.isArray(parsed.drawer)
+      ? (parsed.drawer as Record<string, unknown>)
+      : {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === undefined) delete drawer[key];
+    else drawer[key] = value;
+  }
+  parsed.drawer = drawer;
+  const newQs = qs.stringify(parsed, {
+    allowDots: true,
+    arrayFormat: "comma",
+    allowEmptyArrays: true,
+  });
+  router.push(buildUrl(path, newQs, hash), { replace: !push, state: router.state });
+}
+
+/** `updateDrawerParams`, once a navigator is mounted for it to write through. */
 export const useUpdateDrawerParams = () => {
-  const router = useDrawerRouter();
-  return useCallback(
-    (updates: Record<string, string | undefined>, options: { push?: boolean } = {}) => {
-      const push = options.push ?? true;
-      const { path, queryString, hash } = splitAsPath(liveAsPath(router.asPath));
-      const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<string, unknown>;
-      // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
-      // query like `?drawer=foo` it's a string, not the object we mutate below.
-      // Guard the shape so the mutation loop can't throw at runtime.
-      const drawer =
-        parsed.drawer && typeof parsed.drawer === "object" && !Array.isArray(parsed.drawer)
-          ? (parsed.drawer as Record<string, unknown>)
-          : {};
-      for (const [key, value] of Object.entries(updates)) {
-        if (value === undefined) delete drawer[key];
-        else drawer[key] = value;
-      }
-      parsed.drawer = drawer;
-      const newQs = qs.stringify(parsed, {
-        allowDots: true,
-        arrayFormat: "comma",
-        allowEmptyArrays: true,
-      });
-      router.push(buildUrl(path, newQs, hash), { replace: !push });
-    },
-    [router],
-  );
+  useDrawerRouter();
+  return updateDrawerParams;
 };
 
 /**
@@ -292,7 +314,7 @@ export const useDrawerParams = () => {
  * orderings — needed for lens routes like `/traces#conversations`, where naive
  * concatenation parks query params after the hash, invisible to `location.search`.
  */
-function splitAsPath(asPath: string): {
+export function splitAsPath(asPath: string): {
   path: string;
   queryString: string;
   hash: string;
@@ -371,11 +393,6 @@ function buildUrl(path: string, queryString: string, hash: string): string {
   return url;
 }
 
-/**
- * Whether a value survives round-tripping through the URL query string.
- * Note: qs collapses single-element arrays to plain strings on round-trip
- * (`["a"]` → `"a"`), so consumers must handle both `T` and `T[]`.
- */
 function isUrlSerializable(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "function") return false;
@@ -395,75 +412,6 @@ function isUrlSerializable(value: unknown): boolean {
 // Main Hook
 // ============================================================================
 
-// Records an open on the navigation stack: reset, replace the top, or push forward.
-function pushDrawerStack({
-  drawer,
-  params,
-  currentDrawerNow,
-  query,
-  resetStack,
-  replaceCurrentInStack,
-}: {
-  drawer: DrawerType;
-  params: Record<string, unknown>;
-  currentDrawerNow: string | undefined;
-  query: DrawerRouter["query"];
-  resetStack?: boolean;
-  replaceCurrentInStack?: boolean;
-}): void {
-  if (resetStack || !currentDrawerNow) {
-    // Reset stack - fresh start with no back navigation
-    drawerStack = [{ drawer, params }];
-    return;
-  }
-  if (replaceCurrentInStack && drawerStack.length > 0) {
-    // Replace the current entry in the stack (useful for flow callbacks)
-    // This makes "back" skip the replaced drawer
-    drawerStack.pop();
-    drawerStack.push({ drawer, params });
-    return;
-  }
-  // A drawer is already open - navigating forward, push to stack. An empty
-  // stack means the drawer came from a deep link or outlived a reload, so seed
-  // it from the address bar (not the router snapshot, which can still name a
-  // drawer the reader has since dismissed) so back navigation can return there.
-  if (drawerStack.length === 0) {
-    const openInUrl = openDrawerInLocation();
-    if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
-  }
-
-  snapshotTopEntryParams({ currentDrawerNow, query });
-
-  // A drawer appears in the stack once: opening one already in it returns to
-  // that entry instead of stacking a second copy. Without this, trace →
-  // dataset → trace would leave closing the trace walking back into a dataset
-  // drawer the reader had already left behind.
-  const existingIndex = drawerStack.findIndex((entry) => entry.drawer === drawer);
-  if (existingIndex !== -1) drawerStack.length = existingIndex;
-
-  drawerStack.push({ drawer, params });
-}
-
-// Snapshot current URL params for the top-of-stack drawer so goBack
-// restores the full state (e.g. selectedTab set after initial open)
-function snapshotTopEntryParams({
-  currentDrawerNow,
-  query,
-}: {
-  currentDrawerNow: string;
-  query: DrawerRouter["query"];
-}): void {
-  const topEntry = drawerStack[drawerStack.length - 1];
-  if (topEntry?.drawer !== currentDrawerNow) return;
-  const currentUrlParams: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(query)) {
-    if (key.startsWith("drawer.") && key !== "drawer.open") {
-      currentUrlParams[key.replace("drawer.", "")] = value;
-    }
-  }
-  topEntry.params = currentUrlParams;
-}
-
 function warnNonSerializableProps({
   drawer,
   params,
@@ -481,22 +429,92 @@ function warnNonSerializableProps({
   );
 }
 
+type OpenOptions = { replace?: boolean; resetStack?: boolean; replaceCurrentInStack?: boolean };
+
+type UpdateDrawerUrl = (
+  drawer: DrawerType,
+  props?: Record<string, unknown>,
+  options?: { replace?: boolean; state?: unknown },
+) => void;
+
+/** `openDrawer`'s two spellings: by the owner's token, or by name. */
+type OpenDrawer<Map extends object> = {
+  <Props>(
+    drawer: UiDrawerToken<Props>,
+    props?: Partial<Props> & { urlParams?: Record<string, string> },
+    options?: OpenOptions,
+  ): void;
+  <Name extends string>(
+    drawer: Name,
+    props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
+    options?: OpenOptions,
+  ): void;
+};
+
+function openOn({
+  updateDrawerUrl,
+  drawer,
+  props,
+  options = {},
+}: {
+  updateDrawerUrl: UpdateDrawerUrl;
+  drawer: string | UiTokenIdentity;
+  props?: object;
+  options?: OpenOptions;
+}): void {
+  const { replace, resetStack, replaceCurrentInStack } = options;
+  const effectiveDrawer = drawerKey(drawer);
+  const effectiveProps = props === undefined ? undefined : toRecord(props);
+
+  // Extract urlParams and merge with props
+  const { urlParams, ...drawerProps } = effectiveProps ?? {};
+  const allParams: Record<string, unknown> = { ...drawerProps, ...toRecord(urlParams) };
+
+  const { query, state } = readDrawerLocation();
+
+  // The same drawer is already open: update its params where it stands.
+  if (query["drawer.open"] === effectiveDrawer && replace !== false) {
+    updateDrawerUrl(effectiveDrawer, allParams, { replace: true, state });
+    return;
+  }
+
+  warnNonSerializableProps({ drawer: effectiveDrawer, params: allParams });
+
+  updateDrawerUrl(effectiveDrawer, allParams, {
+    replace,
+    state: drawerAncestorsState(
+      ancestorsForOpen({
+        query,
+        state,
+        next: effectiveDrawer,
+        resetStack,
+        replaceCurrentInStack,
+      }),
+    ),
+  });
+}
+
 /**
- * Manages drawer state via URL params, with a navigation stack for the back
- * button. Generic over the registry so a caller naming the application's
- * registry gets per-drawer prop checking; others just get strings.
+ * Manages drawer state via the address, with the stack in `history.state` for
+ * the back button. Generic over the registry so a caller naming the
+ * application's registry gets per-drawer prop checking; others just get strings.
  */
 export const useDrawer = <Map extends object = UiDrawerMap>() => {
   const router = useDrawerRouter();
 
   const currentDrawer = router.query["drawer.open"];
+  const backStack = useMemo(
+    () => (currentDrawer ? readDrawerAncestors(router.state) : []),
+    [currentDrawer, router.state],
+  );
 
-  /**
-   * Internal function to update URL without modifying the stack.
-   * Used by goBack to restore previous drawer state.
-   */
+  /** Writes the address for a drawer and the stack that sits beneath it. */
   const updateDrawerUrl = useCallback(
-    (drawer: DrawerType, props?: Record<string, unknown>, options: { replace?: boolean } = {}) => {
+    (
+      drawer: DrawerType,
+      props?: Record<string, unknown>,
+      options: { replace?: boolean; state?: unknown } = {},
+    ) => {
       // Separate serializable props (for URL) from complex props (kept in memory)
       const serializableProps: Record<string, unknown> = {};
       const nonSerializableProps: Record<string, unknown> = {};
@@ -513,10 +531,10 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
 
       // Build query from the actual browser URL, not a params snapshot: this
       // preserves filter params the address carries and the snapshot does not.
-      const { path, queryString, hash } = splitAsPath(liveAsPath(router.asPath));
+      const { path, queryString, hash } = splitAsPath(liveAsPath(readDrawerLocation().asPath));
       const currentQueryOnly = Object.fromEntries(
         Object.entries(qs.parse(queryString, URL_QS_PARSE_OPTIONS)).filter(
-          ([key]) => !key.startsWith("drawer"),
+          ([key]) => key !== "drawer",
         ),
       );
 
@@ -535,86 +553,43 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
         },
       );
 
-      router.push(buildUrl(path, newQuery, hash), { replace: options.replace ?? false });
+      router.push(buildUrl(path, newQuery, hash), {
+        replace: options.replace ?? false,
+        state: options.state,
+      });
     },
     [router],
   );
 
   /**
-   * Open a drawer with type-safe props.
-   * @example
-   * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
+   * Open a drawer with type-safe props: by its owner's token, or by name
+   * while the string path stays. Opening the drawer that is already open
+   * updates its params in place, unless `replace: false` asks to go forward.
    */
-  const openDrawer = useCallback(
-    <Name extends string>(
-      drawer: Name,
-      props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
-      {
-        replace,
-        resetStack,
-        replaceCurrentInStack,
-      }: {
-        replace?: boolean;
-        resetStack?: boolean;
-        replaceCurrentInStack?: boolean;
-      } = {},
-    ) => {
-      // The host's own rewrite: every trace open lands on the Trace Explorer
-      // drawer, from every entry point, rather than each call site choosing.
-      const { drawer: effectiveDrawer, props: effectiveProps } = openRewrite(
-        drawer,
-        props as Record<string, unknown> | undefined,
-      );
-
-      // Extract urlParams and merge with props
-      const { urlParams, ...drawerProps } = effectiveProps ?? {};
-      const allParams = {
-        ...drawerProps,
-        ...(urlParams as Record<string, string> | undefined),
-      } as Record<string, unknown>;
-
-      // Read the open drawer from the router reading directly to get the
-      // latest value.
-      const currentDrawerNow = router.query["drawer.open"];
-
-      // If the same drawer is already open, just update the URL params without
-      // modifying the stack
-      if (currentDrawerNow === effectiveDrawer) {
-        updateDrawerUrl(effectiveDrawer, allParams, { replace: true });
-        return;
-      }
-
-      pushDrawerStack({
-        drawer: effectiveDrawer,
-        params: allParams,
-        currentDrawerNow,
-        query: router.query,
-        resetStack,
-        replaceCurrentInStack,
-      });
-      warnNonSerializableProps({ drawer: effectiveDrawer, params: allParams });
-
-      updateDrawerUrl(effectiveDrawer, allParams, { replace });
-    },
-    [router, updateDrawerUrl],
+  const openDrawer: OpenDrawer<Map> = useCallback(
+    (drawer: string | UiTokenIdentity, props?: object, options?: OpenOptions) =>
+      openOn({ updateDrawerUrl, drawer, props, options }),
+    [updateDrawerUrl],
   );
 
   /**
    * Close the current drawer.
-   * Also clears the drawer stack and flow callbacks.
+   * Also clears the drawers beneath it and the flow callbacks.
    */
   const closeDrawer = useCallback(() => {
-    // Clear the entire stack and flow callbacks
-    drawerStack = [];
     clearFlowCallbacks();
     complexProps = {};
 
     // Build clean URL from the address the reader is on, so filter params it
     // carries survive the close.
-    const { path, queryString: currentQs, hash } = splitAsPath(liveAsPath(router.asPath));
+    const {
+      path,
+      queryString: currentQs,
+      hash,
+    } = splitAsPath(liveAsPath(readDrawerLocation().asPath));
     const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
-      Object.entries(parsedQuery).filter(([key]) => !key.startsWith("drawer") && key !== "span"),
+      Object.entries(parsedQuery).filter(([key]) => key !== "drawer" && key !== "span"),
     );
     const newQueryString = qs.stringify(cleanQuery, {
       allowDots: true,
@@ -626,28 +601,30 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
   }, [router]);
 
   /**
-   * Go back to the previous drawer in the stack.
-   * If at the root (stack length <= 1), closes the drawer entirely.
+   * Go back to the drawer at `index` beneath the open one, dropping it and
+   * everything above. Nothing at `index` closes the drawer entirely.
    */
+  const goBackTo = useCallback(
+    (index: number) => {
+      const ancestors = readDrawerAncestors(readDrawerLocation().state);
+      const target = ancestors[index];
+      if (!target) {
+        closeDrawer();
+        return;
+      }
+      // Push, so the next browser Back returns to the drawer this one left,
+      // rather than landing on an entry that repeats the address.
+      updateDrawerUrl(target.drawer, target.params, {
+        state: drawerAncestorsState(ancestors.slice(0, index)),
+      });
+    },
+    [closeDrawer, updateDrawerUrl],
+  );
+
+  /** Go back to the previous drawer; with none beneath, closes the drawer. */
   const goBack = useCallback(() => {
-    if (drawerStack.length <= 1) {
-      closeDrawer();
-      return;
-    }
-
-    // Remove current drawer from stack
-    drawerStack.pop();
-
-    // Get the previous drawer
-    const previous = drawerStack[drawerStack.length - 1];
-    if (!previous) {
-      closeDrawer();
-      return;
-    }
-
-    // Restore previous drawer (use replace to avoid browser history pollution)
-    updateDrawerUrl(previous.drawer, previous.params, { replace: true });
-  }, [closeDrawer, updateDrawerUrl]);
+    goBackTo(readDrawerAncestors(readDrawerLocation().state).length - 1);
+  }, [goBackTo]);
 
   /**
    * Check if a specific drawer is currently open.
@@ -663,7 +640,7 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
    * Whether there's a previous drawer to go back to.
    * Use this to conditionally show the back button.
    */
-  const canGoBack = drawerStack.length > 1;
+  const canGoBack = backStack.length > 0;
 
   return useMemo(
     () => ({
@@ -671,11 +648,13 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
       closeDrawer,
       drawerOpen,
       goBack,
+      goBackTo,
       canGoBack,
+      backStack,
       currentDrawer,
       setFlowCallbacks,
       getFlowCallbacks,
     }),
-    [openDrawer, closeDrawer, drawerOpen, goBack, canGoBack, currentDrawer],
+    [openDrawer, closeDrawer, drawerOpen, goBack, goBackTo, canGoBack, backStack, currentDrawer],
   );
 };

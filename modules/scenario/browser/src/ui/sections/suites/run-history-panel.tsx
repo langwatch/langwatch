@@ -2,50 +2,58 @@
  * Unified run history panel for both single-suite and cross-suite views.
  */
 
-import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import {
+  Box,
+  Button,
+  EmptyState,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
-import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import {
-  computeBatchRunSummary,
-  computeGroupSummary,
-  computeRunHistoryTotals,
-  GroupRow,
-  groupRunsByBatchId,
-  groupRunsByScenarioId,
-  groupRunsByTarget,
-  resolveOriginLabel,
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-  RunHistorySkeleton,
-  RunRow,
-  RunSummaryCounts,
-  ScenarioRunExportDialog,
-  type ScenarioRunContextRenderer,
-  useAutoExpansion,
-  useRunHistoryStore,
-  useScrollToBatch,
-} from "@langwatch/suite-browser-kit";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
 import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
+import { useAutoExpansion } from "../../../behavior/suite/use-auto-expansion.ts";
+import { useRunHistoryStore } from "../../../behavior/suite/use-run-history-store.ts";
+import { useScrollToBatch } from "../../../behavior/suite/use-scroll-to-batch.ts";
 import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs.ts";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
 import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { useTargetNameMap } from "../../../behavior/use-target-name-map.ts";
+import {
+  computeBatchRunSummary,
+  computeGroupSummary,
+  computeRunHistoryTotals,
+  groupRunsByBatchId,
+  groupRunsByScenarioId,
+  groupRunsByTarget,
+  resolveOriginLabel,
+} from "../../../model/suite/run-history-transforms.ts";
+import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
+import { ScenarioRunExportDialog } from "../../elements/suite/dialogs/scenario-run-export-dialog.tsx";
+import { RunHistorySkeleton } from "../../elements/suite/runs/run-history-skeleton.tsx";
+import { RunSummaryCounts } from "../../elements/suite/runs/run-summary-counts.tsx";
+import { type ScenarioRunContextRenderer } from "../../elements/suite/runs/scenario-target-row.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
+import { GroupRow } from "../suite/group-row.tsx";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../suite/run-history-filters.tsx";
+import { RunRow } from "../suite/run-row.tsx";
 
 const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
@@ -150,10 +158,7 @@ export function RunHistoryPanel({
   });
 
   // Fetch scenarios for filter options
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const { data: scenarios } = useScenarios({ projectId: project?.id });
 
   const targetNameMap = useTargetNameMap();
 

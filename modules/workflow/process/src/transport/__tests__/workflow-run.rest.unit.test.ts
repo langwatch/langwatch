@@ -1,18 +1,57 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  bindRestMiddleware,
+  createRestRuntime,
+  type RestErrorHandler,
+  principalOfCredential,
+} from "@langwatch/api/rest";
 /** @vitest-environment node */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { workflowRunRest } from "../workflow-run.rest.ts";
+import { workflowRunCallerKey, workflowRunRest } from "../workflow-run.rest.ts";
 
 const renderUnexpected: RestErrorHandler = (error, context) =>
   context.json({ error: String(error) }, 500);
 
-function mount(runSynchronous: WorkflowApi["runSynchronous"]) {
+/** The key row the door binds: only an API key principal has one. */
+function keyRowOf(credential: RestResolvedProjectCredential): string | null {
+  const principal = principalOfCredential(credential);
+  return principal?.type === "apiKey" ? principal.id : null;
+}
+
+/** A key the project door resolved for user_1. */
+function keyCredential(apiKeyId: string): RestResolvedProjectCredential {
+  return {
+    type: "apiKey",
+    apiKeyId,
+    userId: "user_1",
+    organizationId: "org_1",
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    project: {
+      id: "project_1",
+      name: "Acme",
+      slug: "acme",
+      teamId: "team_1",
+      organizationId: "org_1",
+      isPersonal: false,
+      ownerUserId: null,
+    },
+  };
+}
+
+function mount(
+  runSynchronous: WorkflowApi["runSynchronous"],
+  caller: { userId: string | null; credential: RestResolvedProjectCredential } | null = null,
+) {
   const runtime = createRestRuntime({
     identity: {
-      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project_1" } }),
+      authenticate: () => ({
+        actor: caller?.userId ? { type: "user", id: caller.userId } : null,
+        scope: { tier: "project", id: "project_1" },
+      }),
     },
   });
 
@@ -20,6 +59,9 @@ function mount(runSynchronous: WorkflowApi["runSynchronous"]) {
     app: () => createApiFixture<WorkflowApi>({ runSynchronous }, "WorkflowApi"),
     credential: "project",
     onError: renderUnexpected,
+    facts: [
+      bindRestMiddleware(workflowRunCallerKey, () => (caller ? keyRowOf(caller.credential) : null)),
+    ],
   });
 }
 
@@ -59,5 +101,75 @@ describe("the synchronous workflow run routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "success" });
+  });
+
+  /** @scenario "A run started with a personal access token holds no more than that token" */
+  it("runs as the member and names the key they called with, so the run's key holds no more", async () => {
+    const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
+
+    await mount(runSynchronous, { userId: "user_1", credential: keyCredential("pat_1") }).request(
+      "/api/workflows/workflow_1/run",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "hello" }),
+      },
+    );
+
+    expect(runSynchronous).toHaveBeenCalledWith(
+      expect.objectContaining({ principal: { userId: "user_1", callerApiKeyId: "pat_1" } }),
+    );
+  });
+
+  /** @scenario "A run started with a service key acts as that key" */
+  it("runs as the service key that started it, never as the system", async () => {
+    const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
+    const credential: RestResolvedProjectCredential = {
+      type: "apiKey",
+      apiKeyId: "service_key_1",
+      userId: null,
+      organizationId: "org_1",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project: keyCredential("key_1").project,
+    };
+
+    await mount(runSynchronous, { userId: null, credential }).request(
+      "/api/workflows/workflow_1/run",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "hello" }),
+      },
+    );
+
+    expect(runSynchronous).toHaveBeenCalledWith(
+      expect.objectContaining({ principal: { userId: null, callerApiKeyId: "service_key_1" } }),
+    );
+  });
+
+  /** @scenario "A run started with a CLI access token is bounded by the person alone" */
+  it("runs as the person and names no key for their access token, which has no key row", async () => {
+    const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
+    const credential: RestResolvedProjectCredential = {
+      type: "cliAccessToken",
+      userId: "user_1",
+      organizationId: "org_1",
+      project: keyCredential("key_1").project,
+    };
+
+    const response = await mount(runSynchronous, { userId: "user_1", credential }).request(
+      "/api/workflows/workflow_1/run",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "hello" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(runSynchronous).toHaveBeenCalledWith(
+      expect.objectContaining({ principal: { userId: "user_1" } }),
+    );
   });
 });

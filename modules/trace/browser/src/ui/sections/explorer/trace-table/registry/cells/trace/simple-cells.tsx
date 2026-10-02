@@ -1,11 +1,8 @@
-import { Badge, Text } from "@chakra-ui/react";
-import {
-  useFilterStore,
-  originColorPalette,
-  originLabel,
-  formatTokens,
-} from "@langwatch/trace-browser-kit";
+import { formatTokens } from "@langwatch/design-system/display-formatters";
+import { Badge, Text } from "@langwatch/design-system/primitives";
+import { originColorPalette, originLabel } from "@langwatch/trace-contract";
 
+import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";

@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
-import { Box, Flex } from "@chakra-ui/react";
 import { BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import "../elements/auth-front-door.css";

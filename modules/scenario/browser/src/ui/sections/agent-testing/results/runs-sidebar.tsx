@@ -5,7 +5,7 @@
  * @see specs/suites/run-notes.feature
  */
 
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";

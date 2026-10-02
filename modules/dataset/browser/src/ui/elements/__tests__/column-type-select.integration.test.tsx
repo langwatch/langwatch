@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -31,10 +31,8 @@ if (!(Element.prototype as MaybeElementScrollMethods).scrollIntoView) {
 }
 
 const renderSelect = (props: Partial<React.ComponentProps<typeof ColumnTypeSelect>> = {}) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ColumnTypeSelect value="string" onChange={vi.fn()} aria-label="Column 1 type" {...props} />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <ColumnTypeSelect value="string" onChange={vi.fn()} aria-label="Column 1 type" {...props} />,
   );
 
 describe("ColumnTypeSelect", () => {

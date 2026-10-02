@@ -1,11 +1,11 @@
 /** Workflow's version badge and "Run via API" dialog, as workflow lends them (§3.4, rule 7). */
 
-import { Box } from "@chakra-ui/react";
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
   UiRunExperimentViaApiDialogProps,
   UiVersionBoxProps,
 } from "@langwatch/browser-host/declarations";
+import { Box } from "@langwatch/design-system/primitives";
 import { lazy, Suspense, useMemo } from "react";
 
 /** The lent badge; an empty box of the same width until it loads. */

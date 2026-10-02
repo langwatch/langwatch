@@ -1,17 +1,17 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import {
-  type PythonField,
-  WorkflowCodeEditor,
-  WorkflowCodeEditorModal,
-  type WorkflowCodeEditorContractProps,
-  type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostApi,
-} from "@langwatch/workflow-browser-kit";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
+import { workflowApi } from "../../../../behavior/workflow-api.ts";
+import { type PythonField } from "../../../../model/code/python-provider.shared.ts";
+import {
+  WorkflowCodeEditor,
+  WorkflowCodeEditorModal,
+  type WorkflowCodeEditorContractProps,
+  type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostApi,
+} from "../../../elements/code/workflow-code-editor.tsx";
 import { SecretsIndicator } from "../../secrets/secrets-indicator.tsx";
 
 type EditorProps = WorkflowCodeEditorContractProps & {
@@ -34,7 +34,7 @@ type EditorModalProps = WorkflowCodeEditorContractProps & {
 
 function useEditorTransport() {
   const { project } = useOrganizationTeamProject();
-  const secrets = api.secrets.list.useQuery(
+  const secrets = workflowApi.secrets.list.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: Boolean(project?.id) },
   );

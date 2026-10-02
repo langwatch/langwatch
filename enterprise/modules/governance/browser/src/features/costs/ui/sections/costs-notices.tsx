@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Alert, Text, VStack } from "@chakra-ui/react";
+import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useGovernancePlan } from "../../../../behavior/governance-session.ts";
 import { frameExceedsReadCeiling } from "../../model/costs-window.ts";

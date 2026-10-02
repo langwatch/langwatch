@@ -2,31 +2,23 @@
 // and state hook (use-first-trace-watch) so policy is unit-testable.
 // Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
-export const FIRST_TRACE_POLL_INTERVAL_MS = 3_000;
 export const FIRST_TRACE_POLL_TIMEOUT_MS = 10 * 60_000;
 export const FIRST_TRACE_REDIRECT_DELAY_MS = 1_200;
 
-// Polling policy: runs while project exists and watch hasn't concluded. Retry on failed reads;
-// react-query handles hidden tabs.
+// Watch policy: reads while a project exists and the watch hasn't concluded.
 export function resolveFirstTracePolling({
   hasProject,
-  hasResult,
   isRedirecting,
   isTimedOut,
   hasPriorTraces,
-  hasSeenNeverSynced,
 }: {
   hasProject: boolean;
-  hasResult: boolean;
   isRedirecting: boolean;
   isTimedOut: boolean;
   hasPriorTraces: boolean;
-  hasSeenNeverSynced: boolean;
-}): { enabled: boolean; refetchInterval: number | false } {
+}): { enabled: boolean } {
   const enabled = hasProject && !isRedirecting && !isTimedOut && !hasPriorTraces;
-  const refetchInterval =
-    enabled && (hasSeenNeverSynced || !hasResult) ? FIRST_TRACE_POLL_INTERVAL_MS : false;
-  return { enabled, refetchInterval };
+  return { enabled };
 }
 
 /**

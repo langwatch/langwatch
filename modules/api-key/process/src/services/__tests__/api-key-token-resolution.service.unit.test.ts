@@ -4,10 +4,11 @@
  * back as "no", and the hashed secret has to stay on the server side of the boundary.
  */
 
-import { ApiKeyNotFoundError, LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { LANGY_SESSION_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
 
 const CURRENT_TOKEN = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
@@ -34,7 +35,7 @@ const storedKey = (over: Record<string, unknown> = {}) => ({
   organizationId: "organization-1",
   ingestSourceType: null,
   ingestionTemplateId: null,
-  roleBindings: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+  grants: [{ scopeType: "PROJECT", scopeId: "project-1" }],
   ...over,
 });
 
@@ -54,8 +55,8 @@ function serviceWith(fakes: Fakes = {}) {
     // The key's grants live on authz's grants head, not on its row.
     authz: {
       listApiKeyBindings: async () =>
-        Array.isArray(row?.roleBindings)
-          ? row.roleBindings.map((binding: Record<string, unknown>) => ({
+        Array.isArray(row?.grants)
+          ? row.grants.map((binding: Record<string, unknown>) => ({
               ...binding,
               id: "grant-1",
               apiKeyId: row.id,
@@ -65,7 +66,7 @@ function serviceWith(fakes: Fakes = {}) {
           : [],
     },
     repository: {
-      findByLookupId: async () => row && { ...row, roleBindings: undefined },
+      findByLookupId: async () => row && { ...row, grants: undefined },
       upgradeHash: async () => {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");
@@ -80,14 +81,13 @@ function serviceWith(fakes: Fakes = {}) {
         token.startsWith("sk-lw-") ? { lookupId: "lookup", secret: "secret" } : null,
       verify: () => fakes.verify ?? "match",
       hash: () => "rehashed",
-      generateLegacyProjectKey: () => "generated",
     },
     projects: {
       findIdentity: async () => (fakes.identity === undefined ? project() : fakes.identity),
       findIdByLegacyApiKey: async () => fakes.legacyProjectId ?? null,
-      rotateLegacyApiKey: async () => true,
     },
     legacyGrants: { mint: () => calls.push("mint") },
+    answers: MemoryApiKeyAnswerCacheRepository.create(),
   } as never);
 
   return { calls, service };
@@ -258,7 +258,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("resolves that project", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+            grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           }),
           identity: project({ id: "project-2", teamId: "team-2" }),
         });
@@ -273,7 +273,7 @@ describe("ApiKeyTokenResolutionService", () => {
       /** @scenario "An organization or team key still selects a project it covers" */
       it("resolves that project", async () => {
         const { service } = serviceWith({
-          row: storedKey({ roleBindings: [{ scopeType: "TEAM", scopeId: "team-1" }] }),
+          row: storedKey({ grants: [{ scopeType: "TEAM", scopeId: "team-1" }] }),
           identity: project({ id: "project-2", teamId: "team-1" }),
         });
 
@@ -299,7 +299,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses, rather than picking one of them", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [
+            grants: [
               { scopeType: "PROJECT", scopeId: "project-1" },
               { scopeType: "PROJECT", scopeId: "project-2" },
             ],
@@ -314,7 +314,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+            grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           }),
         });
 
@@ -342,11 +342,39 @@ describe("ApiKeyTokenResolutionService", () => {
       });
     });
 
+    describe("given ownerless run keys", () => {
+      /** @scenario "Only a run key nobody started acts as the system" */
+      it("marks only the one with no parent key as an unattended run", async () => {
+        const runKey = { name: WORKFLOW_RUN_API_KEY_NAME, isSystemManaged: true, userId: null };
+        const scheduled = serviceWith({ row: storedKey({ ...runKey, parentApiKeyId: null }) });
+        const keyStarted = serviceWith({
+          row: storedKey({ ...runKey, parentApiKeyId: "service-key-1" }),
+        });
+
+        await expect(
+          scheduled.service.findResolvedToken({ token: CURRENT_TOKEN }),
+        ).resolves.toMatchObject({ isUnattendedRunKey: true, userId: null });
+        await expect(
+          keyStarted.service.findResolvedToken({ token: CURRENT_TOKEN }),
+        ).resolves.toMatchObject({ isUnattendedRunKey: false, userId: null });
+      });
+    });
+
     describe("given a legacy project key", () => {
       it("resolves it to its project", async () => {
         const { service } = serviceWith({ legacyProjectId: "project-1" });
 
         await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
+          type: "legacyProjectKey",
+          project: { id: "project-1" },
+        });
+      });
+
+      it("resolves a pre-2025 `eyJ` value as an opaque legacy key, never as a JWT", async () => {
+        const { service } = serviceWith({ legacyProjectId: "project-1" });
+        const token = "eyJhbGciOiJIUzI1NiJ9.eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEifQ.c2lnbmF0dXJl";
+
+        await expect(service.findResolvedToken({ token })).resolves.toMatchObject({
           type: "legacyProjectKey",
           project: { id: "project-1" },
         });
@@ -407,72 +435,6 @@ describe("ApiKeyTokenResolutionService", () => {
         await expect(service.resolveOrganizationToken({ token: CURRENT_TOKEN })).resolves.toEqual({
           ok: false,
           reason: "unusable_credential",
-        });
-      });
-    });
-  });
-
-  describe("regenerateLegacyProjectKey()", () => {
-    describe("given a project that has no legacy key to rotate", () => {
-      it("refuses, rather than reporting a token it never stored", async () => {
-        const service = ApiKeyTokenResolutionService.create({
-          projects: { rotateLegacyApiKey: async () => false },
-          tokens: { generateLegacyProjectKey: () => "generated" },
-        } as never);
-
-        await expect(
-          service.regenerateLegacyProjectKey({ projectId: "project-1" }),
-        ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
-      });
-    });
-
-    describe("given a project that has one", () => {
-      it("hands back the token it rotated in", async () => {
-        const { service } = serviceWith({});
-
-        await expect(service.regenerateLegacyProjectKey({ projectId: "project-1" })).resolves.toBe(
-          "generated",
-        );
-      });
-    });
-
-    /**
-     * A stateful fake, rather than the fixed-answer one above: rotation must
-     * be observed to actually swap which token resolves, not merely that a
-     * new string came back.
-     */
-    describe("given a rotation against a project directory that swaps the stored token", () => {
-      /** @scenario "Rotation invalidates the previous base key" */
-      it("makes the old token resolve to nothing and the new one resolve to the project", async () => {
-        const projectId = "project-1";
-        let storedToken: string | null = LEGACY_TOKEN;
-
-        const service = ApiKeyTokenResolutionService.create({
-          tokens: { generateLegacyProjectKey: () => "sk-lw-rotated-project-key" },
-          projects: {
-            findIdentity: async () => project(),
-            findIdByLegacyApiKey: async ({ token }: { token: string }) =>
-              token === storedToken ? projectId : null,
-            rotateLegacyApiKey: async (input: { projectId: string; token: string }) => {
-              if (input.projectId !== projectId) return false;
-              storedToken = input.token;
-              return true;
-            },
-          },
-        } as never);
-
-        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
-          type: "legacyProjectKey",
-          project: { id: projectId },
-        });
-
-        const newToken = await service.regenerateLegacyProjectKey({ projectId });
-        expect(newToken).toBe("sk-lw-rotated-project-key");
-
-        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
-        await expect(service.findResolvedToken({ token: newToken })).resolves.toMatchObject({
-          type: "legacyProjectKey",
-          project: { id: projectId },
         });
       });
     });

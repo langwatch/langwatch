@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { SimpleGrid, VStack } from "@chakra-ui/react";
+import { SimpleGrid, VStack } from "@langwatch/design-system/primitives";
 import {
   type GovernanceCostDay,
   type GovernanceCostSummary,

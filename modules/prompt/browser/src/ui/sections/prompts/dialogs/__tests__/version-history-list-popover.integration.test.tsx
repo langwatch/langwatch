@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-version-history-author.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,8 +18,11 @@ vi.mock("@langwatch/browser-host/toaster", () => ({
 vi.mock("@langwatch/browser-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/prompt-api.ts", () => ({
+  promptApi: {},
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) },
     },
@@ -40,11 +43,7 @@ const versionWithAuthor = (author: Author) => [
 
 const renderWithAuthor = async (author: Author) => {
   mockUseQuery.mockReturnValue({ data: versionWithAuthor(author), isLoading: false });
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <VersionHistoryListPopover configId="config-1" />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<VersionHistoryListPopover configId="config-1" />);
   const user = userEvent.setup();
   await user.click(screen.getByTestId("version-history-button"));
 };

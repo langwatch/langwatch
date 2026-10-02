@@ -6,6 +6,7 @@
  * @see enterprise/modules/scim/specs/scim.feature
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { permissionsConferred } from "@langwatch/authz-contract";
 import { ScimTokenNotFoundError } from "@langwatch/enterprise-scim-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -42,8 +43,11 @@ class TokenDirectoryFake extends ScimServiceFake {
   override readonly revokeToken = vi.fn(async () => ({ success: true as const }));
 }
 
-function mount(scim: TokenDirectoryFake = new TokenDirectoryFake()) {
-  const { app, audited } = scimTestApp({ scim });
+function mount(
+  scim: TokenDirectoryFake = new TokenDirectoryFake(),
+  { minterLacks }: { minterLacks?: string[] } = {},
+) {
+  const { app, audited, findPermissionsBeyondCaller } = scimTestApp({ scim, minterLacks });
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({
@@ -59,12 +63,18 @@ function mount(scim: TokenDirectoryFake = new TokenDirectoryFake()) {
   });
   const hono = runtime.mount(scimTokenRest.router(), {
     app: () => app,
-    facts: [{ middleware: scimTokenRestActor, resolve: () => ({ actorId: "user_ana" }) }],
+    facts: [
+      {
+        middleware: scimTokenRestActor,
+        resolve: () => ({ actorId: "user_ana", apiKeyId: "key_ana" }),
+      },
+    ],
     onError: boundaryErrorHandler,
   });
 
   return {
     audited,
+    findPermissionsBeyondCaller,
     scim,
     request: (path: string, init?: RequestInit) =>
       hono.fetch(new Request(`http://api.test/api/scim-tokens${path}`, init)),
@@ -135,6 +145,35 @@ describe("given the SCIM tokens management family", () => {
           args: { tokenId: "scim_token_1", connectionId: "ssoc_okta" },
         },
       ]);
+    });
+  });
+
+  describe("when the key minting holds less than an organization admin", () => {
+    /** @scenario Minting a SCIM token requires a full organization admin */
+    it("refuses with the missing permissions, asks as the key, and mints nothing", async () => {
+      const api = mount(new TokenDirectoryFake(), { minterLacks: ["organization:manage"] });
+
+      const response = await api.request("", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connectionId: "ssoc_okta" }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ code: "grant_exceeds_caller_permissions" });
+      expect(api.findPermissionsBeyondCaller).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        caller: { type: "apiKey", id: "key_ana" },
+        scope: { type: "organization", id: "org_acme" },
+        permissions: [
+          ...permissionsConferred({
+            role: "ADMIN",
+            scopeType: "ORGANIZATION",
+            customPermissions: [],
+          }),
+        ],
+      });
+      expect(api.scim.generateToken).not.toHaveBeenCalled();
     });
   });
 

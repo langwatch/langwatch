@@ -1,4 +1,4 @@
-import { Box, Heading, HStack, Input, Skeleton } from "@chakra-ui/react";
+import { Box, Heading, HStack, Input, Skeleton } from "@langwatch/design-system/primitives";
 import { Edit2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";

@@ -2,7 +2,7 @@
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { describe, expect, it } from "vitest";
 
-import { hasUnsettledSeatChange } from "../seat-change-copy.ts";
+import { isSeatChangeUnsettled } from "../seat-change-copy.ts";
 
 type SeatChange = ConnectedBillingOverview["seatChanges"][number];
 
@@ -16,26 +16,19 @@ const change = (state: SeatChange["state"]): SeatChange => ({
   stripeInvoiceId: null,
 });
 
-describe("whether the Billing section keeps rereading", () => {
-  /** @scenario "The Billing section rereads until a seat change settles" */
-  it("rereads while a change awaits billing or the payment provider, and stops once all settled", () => {
-    const base: Omit<ConnectedBillingOverview, "seatChanges"> = {
-      account: null,
-      grants: [],
-      invoices: [],
-      spend: { spendAvailable: false, limitUsdCents: 0, spentUsdCents: null },
-      terms: { commitUsdCents: 0, maximumUsdCents: 0, overageEnabled: false },
-      seats: { licensed: 0, reported: null, lastSyncAt: null },
-    };
+describe("isSeatChangeUnsettled", () => {
+  describe("when billing or the payment provider has not settled the change", () => {
+    it("is unsettled while it awaits billing or holds an intent", () => {
+      expect(isSeatChangeUnsettled(change("awaiting"))).toBe(true);
+      expect(isSeatChangeUnsettled(change("intent"))).toBe(true);
+    });
+  });
 
-    expect(hasUnsettledSeatChange({ ...base, seatChanges: [change("awaiting")] })).toBe(true);
-    expect(hasUnsettledSeatChange({ ...base, seatChanges: [change("intent")] })).toBe(true);
-    expect(
-      hasUnsettledSeatChange({
-        ...base,
-        seatChanges: [change("invoiced"), change("not_onboarded"), change("nothing_to_invoice")],
-      }),
-    ).toBe(false);
-    expect(hasUnsettledSeatChange(undefined)).toBe(false);
+  describe("when the change has settled", () => {
+    it("is settled once invoiced, not onboarded or with nothing to invoice", () => {
+      expect(isSeatChangeUnsettled(change("invoiced"))).toBe(false);
+      expect(isSeatChangeUnsettled(change("not_onboarded"))).toBe(false);
+      expect(isSeatChangeUnsettled(change("nothing_to_invoice"))).toBe(false);
+    });
   });
 });

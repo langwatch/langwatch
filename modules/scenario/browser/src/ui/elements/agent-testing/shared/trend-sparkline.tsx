@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { TrendPoint } from "@langwatch/scenario-contract";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

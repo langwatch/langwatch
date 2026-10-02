@@ -7,7 +7,7 @@ import {
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, X } from "lucide-react";

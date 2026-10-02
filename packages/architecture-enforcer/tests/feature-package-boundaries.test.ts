@@ -44,7 +44,8 @@ function featurePackage({
   capability = "service",
 }: {
   feature: string;
-  role: "contract" | "process" | "browser";
+  /** `query-language` stands for any module library folder. */
+  role: "contract" | "process" | "browser" | "query-language";
   name?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -170,7 +171,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   if (role === "contract" && capability === "api") {
     write(
       `${prefix}/src/${feature}.api.ts`,
-      `import { moduleApi } from "@langwatch/kernel"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
+      `import { moduleApi } from "@langwatch/module"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
     );
   }
   if (role === "process") {
@@ -386,6 +387,56 @@ describe("feature package boundary lint", () => {
         ({ policy }) => policy === "feature-source-filename",
       ),
     ).toEqual([]);
+  });
+
+  /** @scenario A module library is portable and any module may depend on it */
+  it("accepts a library on its own contract and another library, depended on by any module", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "workflow", role: "query-language" });
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-contract": "workspace:*",
+        "@langwatch/workflow-query-language": "workspace:*",
+        zod: "^4.4.3",
+      },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "process",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "browser",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+
+    const boundaryPolicies = new Set(["package-role", "cross-feature", "feature-layout"]);
+    expect(policies().filter((policy) => boundaryPolicies.has(policy))).toEqual([]);
+  });
+
+  /** @scenario A module library depends on nothing but its contract, libraries and framework-free packages */
+  it("rejects a library on an implementation, a peer's contract or a runtime", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-process": "workspace:*",
+        "@langwatch/workflow-contract": "workspace:*",
+        react: "^19.0.0",
+      },
+    });
+
+    const refused = lintWorkspace({ root, declarations: false })
+      .filter(({ policy, file }) => policy === "package-role" && file.includes("query-language"))
+      .flatMap(({ specifier }) => (specifier === undefined ? [] : [specifier]))
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(refused).toEqual(["@langwatch/agent-process", "@langwatch/workflow-contract", "react"]);
   });
 
   /** @scenario Cross-feature collaboration uses only contracts */
@@ -737,12 +788,12 @@ describe("strict feature source layout", () => {
     featurePackage({
       feature: "widget",
       role: "contract",
-      dependencies: { "@langwatch/kernel": "workspace:*" },
+      dependencies: { "@langwatch/module": "workspace:*" },
     });
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
+      'import { moduleApi } from "@langwatch/module"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
     expect(policies()).not.toContain("feature-layout");
@@ -752,12 +803,12 @@ describe("strict feature source layout", () => {
     featurePackage({
       feature: "widget",
       role: "contract",
-      dependencies: { "@langwatch/kernel": "workspace:*" },
+      dependencies: { "@langwatch/module": "workspace:*" },
     });
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { createApp, moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget"); export const app = createApp;',
+      'import { createApp, moduleApi } from "@langwatch/module"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget"); export const app = createApp;',
     );
 
     expect(policies()).toContain("feature-layout");
@@ -767,12 +818,12 @@ describe("strict feature source layout", () => {
     featurePackage({
       feature: "widget",
       role: "contract",
-      dependencies: { "@langwatch/kernel": "workspace:*" },
+      dependencies: { "@langwatch/module": "workspace:*" },
     });
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
+      'import { moduleApi } from "@langwatch/module"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
     expect(policies()).not.toContain("feature-layout");

@@ -1,12 +1,19 @@
-import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
+import {
+  Box,
+  Button,
+  HStack,
+  NativeSelect,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -36,7 +43,7 @@ export function AddRowsFromCSVModal({
   onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const dataset = api.datasetRecord.getAll.useQuery(
+  const dataset = datasetClient.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
       enabled: !!project && !!datasetId,
@@ -49,8 +56,7 @@ export function AddRowsFromCSVModal({
   const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [canUpload, setCanUpload] = useState(false);
-  const uploadRecords = api.datasetRecord.create.useMutation();
+  const uploadRecords = datasetClient.datasetRecord.create.useMutation();
 
   const preprocessCSV = (csv: string[][]) => {
     setCSVHeaders(csv[0] ?? []);
@@ -86,9 +92,7 @@ export function AddRowsFromCSVModal({
     return columns.every((column) => Object.keys(mapping).includes(column));
   }, [columnTypes, mapping]);
 
-  useEffect(() => {
-    setCanUpload(isMappingsComplete());
-  }, [isMappingsComplete, mapping]);
+  const canUpload = isMappingsComplete();
 
   const onSelectChange = (map: string) => (value: string) => {
     const column = value;

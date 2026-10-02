@@ -29,10 +29,15 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
+import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+
 export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";
 
 /** The W3C trace context header a call carries, bound by the process from the request. */
 export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
+
+/** The API key a test run was started with, so the run's key holds no more; null if none. */
+export const agentCallerKey = defineRestMiddleware("agentCallerKey", z.string().min(1).nullable());
 
 function response(
   agent: AgentOverview,
@@ -61,7 +66,7 @@ function response(
     id: agent.id,
     name: agent.name,
     type: agent.type,
-    config: agent.config,
+    config: agentConfigWithoutSecrets(agent),
     environment: agent.environment,
     ownerUserId: agent.ownerUserId,
     hostLabel: agent.hostLabel,
@@ -205,9 +210,14 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("scenarios:create")
       .withOutput(agentTestRunResponseSchema)
       .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
-      .withMiddleware(projectRestFacts)
-      .handle(({ app, input, scope }, facts) =>
-        app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
+      .withMiddleware(projectRestFacts, agentCallerKey)
+      .handle(({ app, input, scope }, facts, callerKey) =>
+        app.testRun({
+          agentId: input.id,
+          projectId: scope.id,
+          actorId: facts.viewerUserId,
+          callerApiKeyId: callerKey,
+        }),
       )
 
       .post("/:id/call", "callConnectedAgent")

@@ -97,4 +97,6 @@ GET    /_sim/api/settings
 PUT    /_sim/api/settings        {"forcedError": 0 | 4xx | 5xx, "seed": "" | "random" | "<value>"}
 ```
 
-It is a dev shim: no auth, any key accepted. Never expose it.
+It is a dev shim: no auth, any key accepted. Never expose it. That includes
+the model-provider credential probe (`GET /models`, Bearer or `?key=`): it is
+always answered 200, and forced errors apply only to generation calls.

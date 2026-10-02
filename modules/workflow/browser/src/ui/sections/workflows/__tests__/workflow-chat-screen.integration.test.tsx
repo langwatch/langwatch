@@ -4,11 +4,14 @@
  * The standalone chat address with two states worth pinning.
  */
 
-import { blankTemplate, blankTemplateEntryNode } from "@langwatch/workflow-browser-kit";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  blankTemplate,
+  blankTemplateEntryNode,
+} from "../../../../model/templates/blank.template.ts";
 import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../../testing.tsx";
 import WorkflowChatScreen from "../workflow-chat-screen.tsx";
 
@@ -21,8 +24,8 @@ const { state } = vi.hoisted(() => ({
 
 const calls = vi.hoisted(() => ({ chat: vi.fn() }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
     optimization: {
       getPublishedWorkflow: {

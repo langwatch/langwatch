@@ -4,7 +4,15 @@
  * Spec: specs/identity/authentication-settings.feature
  */
 
-import { Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { AtSign, KeyRound, X } from "lucide-react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";

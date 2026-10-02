@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { Square } from "lucide-react";

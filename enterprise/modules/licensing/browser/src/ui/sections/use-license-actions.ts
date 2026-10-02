@@ -13,17 +13,17 @@ export function useLicenseActions({
   onRemoveSuccess,
 }: UseLicenseActionsOptions) {
   const host = useLicensingHost();
-  // The SSO license gate is decided once per process (ADR-027), so a license
-  // activated on a running self-hosted server only enables SSO after a restart.
+  // The SSO license gate re-reads a deny within a minute (ADR-027), so a license
+  // activated on a running self-hosted server turns SSO on without a restart.
   // Only a confirmed `true` means Cloud: while the environment is still
-  // resolving, showing the restart line is the harmless reading, and omitting
-  // it on a self-hosted deployment is not.
+  // resolving, showing the SSO line is the harmless reading, and omitting it on
+  // a self-hosted deployment is not.
   const isSaas = host.isDeploymentSettled() && host.isSaaS();
 
   // Activating or removing a license moves the active plan, which half the
   // app reads (navigation, feature gates, limit copy). Invalidating every
-  // query catches all of them — a page reload would tear the restart
-  // instruction off-screen the moment it appeared.
+  // query catches all of them — a page reload would tear the SSO line
+  // off-screen the moment it appeared.
   const refreshPlanDerivedState = () => {
     host.refreshPlanDerivedState();
   };
@@ -33,7 +33,7 @@ export function useLicenseActions({
       title: "License activated",
       description: isSaas
         ? "Your license has been successfully activated."
-        : "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it.",
+        : "Your license has been successfully activated. If your deployment uses SSO, it turns on within a minute, no restart needed.",
     });
     onUploadSuccess();
     refreshPlanDerivedState();

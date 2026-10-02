@@ -1,5 +1,15 @@
-import { Box, Button, Card, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 

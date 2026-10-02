@@ -1,14 +1,13 @@
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EventingParticipation } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { EventingParticipation } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -20,7 +19,6 @@ import type {
   TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
@@ -36,8 +34,10 @@ import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subs
 import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
-import { passesTraceOriginGuards } from "./origin-guarded.subscriber.ts";
-import { createProjectMetadataHandler } from "./project-metadata.subscriber.ts";
+import {
+  createProjectMetadataHandler,
+  type ProjectMetadataSubscriberDeps,
+} from "./project-metadata.subscriber.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSimulationMetricsSyncHandler } from "./simulation-metrics-sync.subscriber.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
@@ -61,10 +61,6 @@ export interface TraceProcessingPeers {
     DataRetentionApi,
     "getPlatformDefaultRetentionDays" | "getResolvedForProject"
   >;
-  automations: Pick<
-    AutomationApi,
-    "handleTraceTriggerMatch" | "handleEvaluationGraphTriggerActivity"
-  >;
   evaluations: Pick<
     EvaluationApi,
     "queueTraceEvaluation" | "reportEvaluation" | "deriveEvaluatorId"
@@ -76,7 +72,6 @@ export interface TraceProcessingPeers {
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
   scenarios: Pick<ScenarioApi, "computeRunMetrics">;
   topics: Pick<TopicApi, "bootstrapClustering">;
-  nurturing: Pick<NurturingApi, "recordSignal">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -97,7 +92,9 @@ export interface TraceProcessingPipelineInput {
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
-  broadcast: TraceTenantBroadcast;
+  broadcast: Pick<PresenceApi, "publishProjectEvent">;
+  /** Where a project's first and later traces are recorded as trace's own events. */
+  milestones: ProjectMetadataSubscriberDeps["milestones"];
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -206,7 +203,7 @@ export class TraceProcessingRuntimeAdapter {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
-        nurturing: peers.nurturing,
+        milestones: this.input.milestones,
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
         computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),
@@ -218,18 +215,6 @@ export class TraceProcessingRuntimeAdapter {
           return found.kind === "recorded" ? found.experimentId : null;
         },
       }),
-      triggerMatch: async (event, context) => {
-        if (!passesTraceOriginGuards(event, context.state)) return;
-        await peers.automations.handleTraceTriggerMatch({
-          event: { occurredAt: event.occurredAt },
-          context: { tenantId: String(context.tenantId), aggregateId: context.aggregateId },
-        });
-      },
-      graphTriggerActivity: (event, context) =>
-        peers.automations.handleEvaluationGraphTriggerActivity({
-          event: { occurredAt: event.occurredAt },
-          context: { tenantId: String(context.tenantId) },
-        }),
       codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
         normalize: (event) =>
           normalization.normalizeSpanReceived({

@@ -30,11 +30,7 @@ const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
 vi.mock("../../scenario-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-      },
-    }),
+    useUtils: () => ({}),
     suites: {
       run: {
         useMutation: (opts: {
@@ -46,6 +42,16 @@ vi.mock("../../scenario-api.ts", () => ({
         },
       },
     },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getAll: {
         useQuery: () => ({ data: [], isLoading: false }),
@@ -67,7 +73,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   }),
 }));
 
-vi.mock("../../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),

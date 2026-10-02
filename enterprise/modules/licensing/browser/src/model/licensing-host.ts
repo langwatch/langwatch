@@ -75,6 +75,3 @@ export function useLicensingHost(): LicensingHostApi {
   }
   return host;
 }
-
-// No page-level permission guard; enforcement is at the API level.
-export const LICENSE_PAGE_PERMISSION = void 0;

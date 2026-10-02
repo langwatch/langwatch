@@ -1,5 +1,5 @@
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import type { DisplayRoleVisuals } from "@langwatch/trace-browser-kit";
+import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import type { DisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import {
   asMarkdownBody,
   type ChatMessage,

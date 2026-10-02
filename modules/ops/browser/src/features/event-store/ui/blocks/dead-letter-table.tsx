@@ -1,4 +1,4 @@
-import { Card, Table } from "@chakra-ui/react";
+import { Card, Table } from "@langwatch/design-system/primitives";
 
 import type {
   DeadLetterAttemptHistoryRenderer,

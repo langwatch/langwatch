@@ -1,6 +1,7 @@
 /** Top bar: org/product scope (left), account controls (right). Impersonation banner from host. */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Settings as SettingsIcon } from "lucide-react";
 
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
@@ -8,7 +9,6 @@ import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
 import { DevBadge } from "../elements/dev-badge.tsx";
-import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
 import { OrganizationSelect } from "./organization-select.tsx";
@@ -110,7 +110,7 @@ function ProductCluster({
       overflow="hidden"
     >
       <NavigationLink href="/" display="flex" alignItems="center" flexShrink={0}>
-        <LogoIcon width={LOGO_HEIGHT * (38 / 52)} height={LOGO_HEIGHT} />
+        <LogoIcon height={LOGO_HEIGHT} />
       </NavigationLink>
       {activeProductId ? (
         <ProductSwitcherMenu activeProductId={activeProductId} />

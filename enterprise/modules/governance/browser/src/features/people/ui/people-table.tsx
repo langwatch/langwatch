@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Lock } from "lucide-react";

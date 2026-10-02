@@ -11,7 +11,7 @@ const sseCalls: {
   options: { enabled: boolean; onData: (data: unknown) => void };
 }[] = [];
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("@langwatch/browser-host/sse-subscription", () => ({
   useSSESubscription: (
     _route: unknown,
     input: unknown,
@@ -23,8 +23,8 @@ vi.mock("@langwatch/trace-browser-kit", () => ({
 }));
 
 const fetchVersion = vi.fn();
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       experiments: { getWorkbenchVersion: { fetch: fetchVersion } },
     }),

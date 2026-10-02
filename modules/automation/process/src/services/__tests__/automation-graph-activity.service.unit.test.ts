@@ -1,4 +1,6 @@
-import { createProcessMembers } from "@langwatch/process-stores";
+import { openStores, PipelineParticipation } from "@langwatch/process-stores";
+import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,20 +18,58 @@ import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.cu
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-  type AutomationSecretCrypto,
-} from "../automation-slack-secrets.service.ts";
+import type { AutomationSecretCrypto } from "../automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
+import { SlackDestinationService } from "../slack-destination.service.ts";
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
  */
+
+const storesConfig: StoresConfig = {
+  defaultRetentionDays: 30,
+  shutdownDrainTimeoutMs: undefined,
+  clickhousePool: {
+    override: undefined,
+    replicas: undefined,
+    serverMaxConcurrentQueries: undefined,
+    serverNodes: undefined,
+    clientsPerProcess: undefined,
+  },
+  rateLimit: { requests: 60, seconds: 60 },
+  redis: { dbIndex: undefined },
+  objectStorage: {
+    backend: "file",
+    localRoot: "/tmp/langwatch-keyless-test",
+    s3: { bucket: undefined, endpoint: undefined, region: undefined },
+    azure: {
+      authMode: undefined,
+      accountName: undefined,
+      container: undefined,
+      endpoint: undefined,
+      authorityHost: undefined,
+      tokenAudience: undefined,
+      allowInsecureTokenEndpointForTests: undefined,
+      identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
+    },
+  },
+};
+
+/** The encryption member exactly as a process with no key builds it. */
+async function keylessEncryption(name: string) {
+  const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
+  const { members } = await openStores({
+    name,
+    config: storesConfig,
+    secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),
+    pipelines: PipelineParticipation.producer(),
+    production: false,
+  });
+  return members.read("encryption");
+}
 
 /** Reversible and obviously not real, so a leak in a failure message is loud. */
 const crypto = {
@@ -69,22 +109,23 @@ function compose(
     persistence: AutomationGraphDeliveryService.create({
       triggers,
       suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
-      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma),
     }),
     clock,
     projects: new OneProject(),
     analytics: breachingAnalytics(),
     delivery,
     webhooks: AutomationWebhookSecretsService.create(secrets),
-    slackTokens: AutomationSlackBotTokenDecryptorService.create(
-      AutomationSlackSecretsService.create(secrets),
-    ),
+    slackDestinations: SlackDestinationService.create({
+      slack: { findUsableSlackSecret: async () => [] },
+      crypto: secrets,
+    }),
     emailCaps: AutomationEmailCapService.create({
       store: MemoryAutomationEmailCapRepository.create(),
       fallback: MemoryAutomationEmailCapRepository.create(),
     }),
     logger,
     dispatchErrors: new TestDispatchErrors(),
+    latestEvaluations: { record: async () => undefined },
     baseHost: "https://app.langwatch.test",
     emailHourlyCap: 100,
     tenantDailyCap: 10_000,
@@ -180,14 +221,7 @@ describe("AutomationGraphActivityService", () => {
 
     /** @scenario "A process holding no credentials key refuses rather than sending a ciphertext" */
     it("refuses as the unconfigured encryption member and sends nothing to Slack", async () => {
-      const keyless = createProcessMembers({
-        config: {
-          processName: "graph-alert-keyless-test",
-          encryptionKey: "",
-          secrets: {},
-          rateLimit: { requests: 60, seconds: 60 },
-        },
-      }).read("encryption");
+      const keyless = await keylessEncryption("graph-alert-keyless-test");
       const { adapter, delivery } = compose({ triggers: [slackTriggerRow()] }, { crypto: keyless });
 
       await expect(

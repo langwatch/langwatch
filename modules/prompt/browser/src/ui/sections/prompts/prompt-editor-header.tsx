@@ -1,5 +1,5 @@
-import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
+import { Box, Button, HStack, useDisclosure } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
 
@@ -80,7 +80,7 @@ export function PromptEditorHeader({
               />
             </>
           )}
-          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
+          <GeneratePromptApiSnippetDialog promptHandle={handle}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>

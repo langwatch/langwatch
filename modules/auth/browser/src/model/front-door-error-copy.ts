@@ -29,6 +29,11 @@ const num = (error: AuthHandledError, key: string, fallback: number): number => 
 };
 
 export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>> = {
+  auth_invalid_origin: {
+    title: "LangWatch is set up for a different web address than the one you are using",
+    describe: () => "Check the address and try again.",
+  },
+
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking at their own
     // account: either a previous sign-up created it and could not sign them in, or they were a

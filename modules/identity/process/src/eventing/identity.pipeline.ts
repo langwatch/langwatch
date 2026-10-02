@@ -10,7 +10,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityModule } from "../app/identity.app.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { runBreakGlassExpiryWarn } from "./break-glass-expiry-warn.intent.ts";
 import {
@@ -35,7 +35,7 @@ export const IDENTITY_MAINTENANCE_PIPELINE_NAME = "identity_maintenance";
 
 export const identityEventing = defineEventingModule({
   pipeline: IDENTITY_MAINTENANCE_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<IdentityRepositories, IdentityApp>) =>
+  build: ({ app, processStore }: EventingSetup<IdentityRepositories, IdentityModule>) =>
     definePipeline({
       name: IDENTITY_MAINTENANCE_PIPELINE_NAME,
       aggregate: defineAggregate({ type: "global" }),

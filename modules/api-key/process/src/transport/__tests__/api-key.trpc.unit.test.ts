@@ -5,7 +5,7 @@
 // The `apiKey.*` declared transport, exercised through the real runtime
 // with permissive ports: what reaches the app, what the caller is
 // answered, and which refusals cross unchanged. Authorization DECISIONS
-// belong to `ApiKeyApp`; here the app is a stub and transport is the unit under test.
+// belong to `ApiKeyModule`; here the app is a stub and transport is the unit under test.
 
 import {
   ApiKeyAdminRequiredError,
@@ -43,7 +43,7 @@ function storedKey(overrides: Partial<ApiKey> = {}): ApiKey {
     ingestionTemplateId: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -147,7 +147,7 @@ describe("the apiKey tRPC transport", () => {
         ingestSourceType: null,
         ingestionTemplateId: null,
         createdByDeviceLabel: null,
-        roleBindings: [],
+        grants: [],
       };
 
       expect(output?.validate([entry])).toBe(true);

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzAccessBinding, AuthzApi, TeamUserRole } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";

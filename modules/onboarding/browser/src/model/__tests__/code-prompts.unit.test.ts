@@ -2,6 +2,8 @@ import { lstatSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { describe, expect, it } from "vitest";
+
 import {
   PROMPT_AGENT_PERFORMANCE,
   PROMPT_EXPERIMENTS,
@@ -10,9 +12,8 @@ import {
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
-  buildMcpJson,
-} from "@langwatch/onboarding-browser-kit";
-import { describe, expect, it } from "vitest";
+} from "../code-prompts.ts";
+import { buildMcpJson } from "../shared/build-mcp-config.ts";
 
 /**
  * Regression suite for langwatch/langwatch#3104. Gemini CLI's chat-input parser extracts

@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import type { UiInlineCommandPaletteProps } from "@langwatch/browser-host/declarations";
+import { Box } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCommandBar } from "../../behavior/command-bar-context.ts";

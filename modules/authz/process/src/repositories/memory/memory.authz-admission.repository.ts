@@ -26,7 +26,7 @@ export class MemoryAuthzAdmissionRepository extends AuthzAdmissionRepository {
         candidate.organizationId === organizationId &&
         candidate.userId === userId &&
         !candidate.disabled &&
-        !candidate.deactivated,
+        !this.memory.isInactiveUser(candidate.userId),
     );
     if (!row) return { found: false };
     return { found: true, grantId: row.grantId, occurredAtMs: row.occurredAtMs };

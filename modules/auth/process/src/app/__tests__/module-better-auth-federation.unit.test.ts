@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ModuleBetterAuthFederation } from "../auth-composition.build.ts";

@@ -4,7 +4,7 @@ import { z } from "zod";
 /**
  * Redaction pipeline config: DLP engines and enforcement switch.
  * `googleApplicationCredentials` resolves through the process's declared
- * secrets (ADR-132), never this slice — see `DataPrivacyApp.secrets`.
+ * secrets (ADR-132), never this slice — see `DataPrivacyModule.secrets`.
  */
 export const dataPrivacyConfig = Config.define((c) => ({
   googleDlpDisabled: c.env(

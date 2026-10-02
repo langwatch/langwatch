@@ -3,12 +3,12 @@
  * project home's. The reader comes from `GovernanceHostApi.currentUser()`;
  * an absent one falls back to the anonymous greeting rather than a blank.
  */
-import { Heading } from "@chakra-ui/react";
-import { SERIF } from "@langwatch/langy-browser-kit";
+import { Heading } from "@langwatch/design-system/primitives";
 import { nowInstant, toZonedDateTime } from "@langwatch/time";
 import { useEffect, useState } from "react";
 
 import { useGovernanceHost } from "../../../../model/governance-host.ts";
+import { SERIF } from "../../../../model/langy/asaplangy-tokens.ts";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening";
 

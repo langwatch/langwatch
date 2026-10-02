@@ -12,21 +12,6 @@
       "langwatch-declaration-source": "./src/model-provider.web.ts",
       "types": "./dist/model-provider.web.d.ts",
       "default": "./src/model-provider.web.ts"
-    },
-    "./edit-model-provider-form": {
-      "langwatch-declaration-source": "./src/edit-model-provider-form.ts",
-      "types": "./dist/edit-model-provider-form.d.ts",
-      "default": "./src/edit-model-provider-form.ts"
-    },
-    "./model-limits": {
-      "langwatch-declaration-source": "./src/model-limits.ts",
-      "types": "./dist/model-limits.d.ts",
-      "default": "./src/model-limits.ts"
-    },
-    "./surfaces/model-provider-settings": {
-      "langwatch-declaration-source": "./src/behavior/use-model-providers-settings.ts",
-      "types": "./dist/behavior/use-model-providers-settings.d.ts",
-      "default": "./src/behavior/use-model-providers-settings.ts"
     }
   },
   "scripts": {
@@ -35,19 +20,15 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/error-views": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",

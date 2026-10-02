@@ -3,8 +3,8 @@
  * Chakra system is provided) so the test exercises the actual render, not a mock.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -15,11 +15,7 @@ afterEach(() => {
 });
 
 function renderBadge(attributes: Record<string, string>) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SyntheticTraceBadge attributes={attributes} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SyntheticTraceBadge attributes={attributes} />);
 }
 
 describe("<SyntheticTraceBadge />", () => {

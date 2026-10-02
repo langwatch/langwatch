@@ -1,8 +1,8 @@
+import { Link } from "@langwatch/browser-host/link";
 /**
  * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { Check } from "lucide-react";
 
@@ -10,7 +10,7 @@ import { ENTERPRISE_PLAN_FEATURES } from "../../../model/billing-plans.ts";
 
 export function ContactSalesBlock() {
   return (
-    <Card.Root data-testid="contact-sales-block" borderWidth={1} borderColor="border">
+    <Card.Root data-testid="contact-sales-block">
       <Card.Body paddingY={5} paddingX={6}>
         <Text fontWeight="semibold" fontSize="lg">
           Need more?
@@ -20,13 +20,12 @@ export function ContactSalesBlock() {
           templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
           gap={2}
           marginTop={4}
+          color="fg.muted"
         >
           {ENTERPRISE_PLAN_FEATURES.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Check size={16} color="var(--chakra-colors-orange-solid)" />
-              <Text fontSize="sm" color="fg.muted">
-                {feature}
-              </Text>
+              <Check size={16} />
+              <Text fontSize="sm">{feature}</Text>
             </HStack>
           ))}
         </SimpleGrid>
@@ -38,7 +37,7 @@ export function ContactSalesBlock() {
               rel="noopener noreferrer"
               fontWeight="semibold"
             >
-              Contact Sales
+              Contact sales
             </Link>
           </Button>
         </Flex>

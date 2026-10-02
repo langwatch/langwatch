@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack } from "@langwatch/design-system/primitives";
 import { useRef } from "react";
 
 import { type Tab, TabIdProvider, useIsOverflowing } from "../studio-internals.ts";

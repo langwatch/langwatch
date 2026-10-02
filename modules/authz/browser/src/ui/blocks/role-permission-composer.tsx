@@ -1,19 +1,19 @@
 // A role built one part of the product at a time: none, read or full access per
 // resource, the single actions behind a disclosure (main's RolePermissionComposer).
 
+import { SegmentGroup } from "@chakra-ui/react";
+import type { AuthzPermission } from "@langwatch/authorization";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Box,
   Button,
   chakra,
   HStack,
   Input,
-  SegmentGroup,
   Spacer,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { Checkbox } from "@langwatch/design-system/checkbox";
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";

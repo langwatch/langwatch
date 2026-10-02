@@ -1,4 +1,4 @@
-import { HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
 
 /**
  * A list of rows before its data lands, in the real row's geometry (a mark, a

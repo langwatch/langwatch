@@ -4,8 +4,14 @@ import {
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
+  SIGN_IN_SECURITY_ENTERPRISE_REFUSAL,
   type SignInSecuritySettings,
 } from "@langwatch/auth-contract";
+import {
+  EnterprisePlanRequiredError,
+  isEnterpriseTier,
+  type EntitlementApi,
+} from "@langwatch/entitlement-contract";
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 
 import type { SignInAttemptLockRepository } from "../repositories/sign-in-attempt-lock.repository.ts";
@@ -19,11 +25,6 @@ import {
 export interface SignInSecurityMembers {
   findMemberUserIds(input: { organizationId: string }): Promise<readonly string[]>;
   isMember(input: { organizationId: string; userId: string }): Promise<boolean>;
-}
-
-/** Refuses an organization whose plan does not carry these controls. */
-export interface SignInSecurityPlanGate {
-  assertEntitled(input: { organizationId: string }): Promise<void>;
 }
 
 /** A release, put on the record with the administrator's own id. */
@@ -40,7 +41,7 @@ export interface SignInSecuritySettingsDeps {
   settings: SignInSecuritySettingsRepository;
   locks: SignInAttemptLockRepository;
   members: SignInSecurityMembers;
-  plan: SignInSecurityPlanGate;
+  entitlements: Pick<EntitlementApi, "getActivePlan">;
   evidence: SignInSecurityReleaseEvidence;
   sessions: SignInSecuritySessionSweep;
 }
@@ -78,7 +79,7 @@ export class SignInSecuritySettingsService {
 
     const current = await this.get({ organizationId });
     if (willActivateSignInSecurity({ current, next })) {
-      await this.deps.plan.assertEntitled({ organizationId });
+      await this.assertEntitled({ organizationId });
     }
 
     await this.deps.settings.save({
@@ -99,6 +100,14 @@ export class SignInSecuritySettingsService {
     const sweptSessions = await this.deps.sessions.endSessionsPastWindow({ userIds });
 
     return { ok: true, sweptSessions };
+  }
+
+  /** Asked on a save that turns a rule on from off, which only the stored settings tell. */
+  private async assertEntitled({ organizationId }: { organizationId: string }): Promise<void> {
+    const plan = await this.deps.entitlements.getActivePlan({ organizationId });
+    if (!isEnterpriseTier(plan.type)) {
+      throw new EnterprisePlanRequiredError(SIGN_IN_SECURITY_ENTERPRISE_REFUSAL);
+    }
   }
 
   /**

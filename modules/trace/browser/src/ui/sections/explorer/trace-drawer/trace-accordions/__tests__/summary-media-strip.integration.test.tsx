@@ -1,8 +1,8 @@
 // Summary media strip (only way to surface recording/image/attachment since
 // trace input/output are flattened).
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -30,10 +30,6 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 afterEach(() => cleanup());
 
 describe("SummaryMediaStrip", () => {
@@ -50,9 +46,7 @@ describe("SummaryMediaStrip", () => {
     ]);
 
     it("renders a player, an inline image, and an attachment chip", () => {
-      render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SummaryMediaStrip refsJson={refsJson} side="input" />);
 
       expect(screen.getByTestId("media-part-audio")).toHaveAttribute("src", "/api/files/p1/a1");
       expect(screen.getByTestId("media-part-image")).toHaveAttribute("src", "/api/files/p1/i1");
@@ -62,14 +56,13 @@ describe("SummaryMediaStrip", () => {
 
   describe("given no refs attribute or unparseable JSON", () => {
     it("renders nothing", () => {
-      const { container: empty } = render(<SummaryMediaStrip refsJson={undefined} side="input" />, {
-        wrapper: Wrapper,
-      });
+      const { container: empty } = renderWithDesignSystem(
+        <SummaryMediaStrip refsJson={undefined} side="input" />,
+      );
       expect(empty).toBeEmptyDOMElement();
 
-      const { container: garbage } = render(
+      const { container: garbage } = renderWithDesignSystem(
         <SummaryMediaStrip refsJson="not json at all" side="input" />,
-        { wrapper: Wrapper },
       );
       expect(garbage).toBeEmptyDOMElement();
     });
@@ -81,9 +74,9 @@ describe("SummaryMediaStrip", () => {
         { kind: "image", url: "https://attacker.example/beacon.png" },
         { kind: "file", url: "javascript:alert(1)", filename: "invoice.pdf" },
       ]);
-      const { container } = render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
-        wrapper: Wrapper,
-      });
+      const { container } = renderWithDesignSystem(
+        <SummaryMediaStrip refsJson={refsJson} side="input" />,
+      );
       expect(container).toBeEmptyDOMElement();
     });
   });
@@ -99,9 +92,7 @@ describe("SummaryMediaStrip", () => {
 
     /** @scenario "The summary input strip carries only the audio spoken into the trace" */
     it("plays only the caller's recording under the input strip", () => {
-      render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SummaryMediaStrip refsJson={refsJson} side="input" />);
 
       const players = screen.getAllByTestId("media-part-audio");
       expect(players).toHaveLength(1);
@@ -110,9 +101,7 @@ describe("SummaryMediaStrip", () => {
 
     /** @scenario "The summary output strip carries only the reply audio" */
     it("plays only the agent's reply under the output strip", () => {
-      render(<SummaryMediaStrip refsJson={refsJson} side="output" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SummaryMediaStrip refsJson={refsJson} side="output" />);
 
       const players = screen.getAllByTestId("media-part-audio");
       expect(players).toHaveLength(1);
@@ -126,9 +115,9 @@ describe("SummaryMediaStrip", () => {
     /** @scenario "Media refs recorded without a role render on both summary strips" */
     it("renders the recording on both strips, exactly as before", () => {
       for (const side of ["input", "output"] as const) {
-        const { unmount } = render(<SummaryMediaStrip refsJson={refsJson} side={side} />, {
-          wrapper: Wrapper,
-        });
+        const { unmount } = renderWithDesignSystem(
+          <SummaryMediaStrip refsJson={refsJson} side={side} />,
+        );
         expect(screen.getByTestId("media-part-audio")).toHaveAttribute("src", "/api/files/p1/a1");
         unmount();
       }

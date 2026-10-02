@@ -1,6 +1,6 @@
-import { Button, Heading, HStack } from "@chakra-ui/react";
 import type { UiEvaluatorCategorySelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import { Button, Heading, HStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -18,7 +18,7 @@ import {
 } from "./evaluator-editor-shared.tsx";
 import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-selector-content.tsx";
 
-export type { EvaluatorCategoryId } from "../../../index.ts";
+export type { EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 
 export type EvaluatorCategorySelectorDrawerProps = UiEvaluatorCategorySelectorDrawerProps;
 

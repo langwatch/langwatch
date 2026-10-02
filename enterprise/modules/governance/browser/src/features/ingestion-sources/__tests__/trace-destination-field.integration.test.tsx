@@ -15,8 +15,8 @@
  * handling), Decision 11 (the 31-day horizon), Decision 13 (the
  * destination project's redaction policy governs).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -67,11 +67,7 @@ function Harness({
 }
 
 const renderField = (props: Parameters<typeof Harness>[0]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Harness {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<Harness {...props} />);
 
 afterEach(cleanup);
 

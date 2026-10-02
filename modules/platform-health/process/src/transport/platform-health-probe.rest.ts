@@ -4,8 +4,8 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
 import type { LangyKeyCaller } from "@langwatch/langy-contract";
+import { moduleApi } from "@langwatch/module";
 import {
   healthProbeHeadersSchema,
   platformHealthQuerySchema,

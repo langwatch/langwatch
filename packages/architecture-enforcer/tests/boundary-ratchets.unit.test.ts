@@ -1,12 +1,16 @@
 /**
- * Specs: specs/peer-cycles.feature, specs/eventing-table-access.feature.
- * Record: dev/docs/ARCHITECTURE.md §5 and §7 (Alex, 2026-09-29), §17 on these lists.
+ * Specs: peer-cycles, eventing-table-access and framework-module-contracts features.
+ * Record: dev/docs/ARCHITECTURE.md §5, §7 and §10.1, §17 on these lists.
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
+import {
+  frameworkContractEdges,
+  frameworkContractKey,
+} from "../src/policies/boundaries/framework-module-contracts.ts";
 import { peerCycleEdges } from "../src/policies/boundaries/peer-cycles.ts";
 import {
   collectEventingTableAccess,
@@ -19,6 +23,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(here, "..", "..", "..");
 const PEER_CYCLES = join(here, "baselines", "peer-cycle-edges.json");
 const EVENTING_TABLES = join(here, "baselines", "eventing-table-access.json");
+const FRAMEWORK_CONTRACTS = join(here, "baselines", "framework-module-contracts.json");
 
 let snapshot: WorkspaceSnapshot;
 
@@ -49,7 +54,32 @@ function eventingTables() {
   });
 }
 
+function frameworkContracts() {
+  return compareRatchet({
+    current: countByKey(frameworkContractEdges({ snapshot }).map(frameworkContractKey)),
+    listed: readRatchet({ file: FRAMEWORK_CONTRACTS }).findings,
+  });
+}
+
 describe("the ruled transition lists", () => {
+  describe("when the framework packages' contract dependencies are read", () => {
+    /** @scenario "No framework package gains a module contract dependency" */
+    it("finds none missing from the list", () => {
+      expect(
+        frameworkContracts().grown,
+        "let the owning module declare it instead (§10.1)",
+      ).toEqual([]);
+    });
+
+    /** @scenario "A dropped contract dependency leaves the list in the same change" */
+    it("finds every listed edge still present", () => {
+      expect(
+        frameworkContracts().stale,
+        "remove these from tests/baselines/framework-module-contracts.json",
+      ).toEqual([]);
+    });
+  });
+
   describe("when the tree's peer cycle edges are read", () => {
     /** @scenario "No new peer cycle edge lands" */
     it("finds none missing from the list", () => {

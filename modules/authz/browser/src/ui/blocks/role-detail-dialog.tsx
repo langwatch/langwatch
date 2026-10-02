@@ -1,8 +1,8 @@
 // Everything a role can do, read rather than edited, grouped by the part of the
 // product it is about; each line carries the sentence and the token (main's RoleDetailDialog).
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { permissionSentence, permissionsByArea } from "../../model/role-permissions.ts";
 import { PermissionToken } from "../elements/permission-token.tsx";

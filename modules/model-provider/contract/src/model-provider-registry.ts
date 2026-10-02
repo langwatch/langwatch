@@ -102,19 +102,66 @@ export type ModelProviderEditorValue = {
 
 export const ELEVENLABS_HOST_SUFFIX = "elevenlabs.io";
 
-export function isElevenLabsHost(value: string | null | undefined): boolean {
-  if (value === null || value === undefined || value.trim() === "") {
-    return true;
-  }
+/** The only hosts the dev loopback switch admits; exact names, so nothing resolves elsewhere. */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
-  const match = /^https:\/\/([^/?#:]+)(?::\d+)?(?:[/?#]|$)/i.exec(value.trim());
-  const host = match?.[1]?.toLowerCase();
-  if (!host) {
-    return false;
-  }
+/**
+ * The one rule for where an ElevenLabs call may go: `secure` on elevenlabs.io, or, only with the
+ * dev switch (VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS), a loopback host with an explicit port.
+ */
+export function isAllowedElevenLabsUrl({
+  url,
+  secure,
+  allowLoopback,
+}: {
+  url: string;
+  secure: "https:" | "wss:";
+  allowLoopback: boolean;
+}): boolean {
+  // No userinfo, no brackets, no backslashes: an authority this strict parses one way only.
+  const match = /^([a-z]+:)\/\/([a-z0-9.-]+)(?::(\d{1,5}))?(?:[/?#]|$)/i.exec(url.trim());
+  if (!match) return false;
+  const [, rawScheme = "", rawHost = "", port] = match;
+  const scheme = rawScheme.toLowerCase();
+  const host = rawHost.toLowerCase();
 
-  return host === ELEVENLABS_HOST_SUFFIX || host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`);
+  const onElevenLabs =
+    host === ELEVENLABS_HOST_SUFFIX || host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`);
+  if (scheme === secure && onElevenLabs) return true;
+
+  const insecure = secure === "https:" ? "http:" : "ws:";
+  const loopbackScheme = scheme === secure || scheme === insecure;
+  return allowLoopback && loopbackScheme && LOOPBACK_HOSTS.has(host) && port !== undefined;
 }
+
+/** The base-URL key, refined by the one rule; the switch is fixed when the schema is built. */
+function elevenLabsBaseUrlKey({ allowLoopback }: { allowLoopback: boolean }) {
+  return z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (value) =>
+        !value?.trim() || isAllowedElevenLabsUrl({ url: value, secure: "https:", allowLoopback }),
+      {
+        message:
+          "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
+      },
+    );
+}
+
+/** ElevenLabs' credential keys as the registry holds them: never the dev switch. */
+export const elevenLabsKeysSchema = z.object({
+  ELEVENLABS_API_KEY: z.string().min(1),
+  ELEVENLABS_WEBHOOK_SECRET: z.string().nullable().optional(),
+  ELEVENLABS_BASE_URL: elevenLabsBaseUrlKey({ allowLoopback: false }),
+});
+
+/** The dev storage seed's form, admitting voicesim's loopback URL; nothing else parses with it. */
+export const elevenLabsLoopbackKeysSchema = z.object({
+  ...elevenLabsKeysSchema.shape,
+  ELEVENLABS_BASE_URL: elevenLabsBaseUrlKey({ allowLoopback: true }),
+});
 
 export const modelProviders = {
   custom: {
@@ -238,14 +285,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "ELEVENLABS_API_KEY",
     endpointKey: "ELEVENLABS_BASE_URL",
-    keysSchema: z.object({
-      ELEVENLABS_API_KEY: z.string().min(1),
-      ELEVENLABS_WEBHOOK_SECRET: z.string().nullable().optional(),
-      ELEVENLABS_BASE_URL: z.string().nullable().optional().refine(isElevenLabsHost, {
-        message:
-          "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
-      }),
-    }),
+    keysSchema: elevenLabsKeysSchema,
     optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: Temporal.Instant.from("2026-07-25T00:00:00Z"),
     blurb: "Voice models for lifelike text to speech and accurate transcription.",

@@ -1,4 +1,4 @@
-import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, signInProviders, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { SignInMethodPolicyService } from "@langwatch/identity-contract";
 import { z } from "zod";
@@ -50,7 +50,20 @@ export const authServerConfig = Config.define((c) => ({
   auth0ManagementClientId: c.env("AUTH0_MGMT_CLIENT_ID", z.string().min(1).optional()),
   /** The shared leaves sso reads too: which provider is named and its public half. */
   signInProviders,
+  /** The process's own leaf, read here only to tell the browser whether passwords are on. */
+  isSaas,
 }));
+
+/**
+ * Whether BetterAuth's email/password (credentials) routes are MOUNTED.
+ * (ADR-027). Mounting is not the gate: the channel's `before` hook is.
+ */
+export const isEmailPasswordEnabled = (deployment: {
+  authProvider: string | undefined;
+  isSaas: boolean;
+  localPasswords: boolean;
+}): boolean =>
+  deployment.authProvider === "email" || !deployment.isSaas || deployment.localPasswords;
 
 export type AuthServerConfig = ConfigOf<typeof authServerConfig>;
 
@@ -85,6 +98,8 @@ export const authWebConfigSchema = z.strictObject({
   authProvider: z.string().min(1).optional(),
   /** `NEXTAUTH_URL`: the address readers reach this installation on, for copy-paste snippets. */
   publicUrl: z.string().min(1).optional(),
+  /** Whether the email/password routes mount here, so the password section shows. */
+  emailPasswordEnabled: z.boolean(),
 });
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
@@ -99,6 +114,11 @@ export const authBrowserConfig = defineBrowserConfig({
     return {
       passkeys: config.passkeysEnabled,
       identityFrontDoor: true,
+      emailPasswordEnabled: isEmailPasswordEnabled({
+        authProvider: authProvider ?? "email",
+        isSaas: config.isSaas,
+        localPasswords: config.localPasswords,
+      }),
       ...(authProvider ? { authProvider } : {}),
       ...(publicUrl ? { publicUrl } : {}),
     };

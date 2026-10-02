@@ -26,7 +26,7 @@ Project-specific Claude Code configuration for LangWatch.
 │   ├── chakra-ui-refactor/   # Review and convert UI code to Chakra UI v3
 │   ├── design-system/        # Where LangWatch's components, tokens and Chakra setup live
 │   ├── feature-map/          # Claude-specific feature-map workflow
-│   ├── haven-setup/          # Haven environment setup workflow
+│   ├── haven/          # Haven environment setup workflow
 │   ├── langwatch-kanban/     # Manage LangWatch GitHub project board
 │   ├── lint-rule/            # Add or change a langwatch oxlint rule
 │   ├── mail-template/        # Add or change a transactional email

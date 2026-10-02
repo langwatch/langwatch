@@ -2,9 +2,9 @@ import type {
   AnalyticsEvaluationUpsertInput,
   AnalyticsEvaluationRollupAppendInput,
 } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationRunData, UpsertEvaluationRunCommand } from "@langwatch/evaluation-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { EvaluationRunProjectionRepository } from "../../repositories/evaluation-run-projection.repository.ts";

@@ -21,12 +21,12 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
-    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "motion": "catalog:",
     "react-router": "catalog:"

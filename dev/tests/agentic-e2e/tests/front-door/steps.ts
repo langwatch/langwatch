@@ -12,11 +12,10 @@ import { confirmAddressOf, findSignUpVerificationToken } from "./db";
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
 /**
- * better-auth's origin-check refuses a cookie-bearing POST with no trusted
- * `Origin`/`Referer`; `page.request` sends neither, so a bare call reads as
- * a silent 403, not a sign-out. tRPC endpoints skip this check.
+ * Origin headers for the origin-gated endpoints: `/api/auth/*`, `auth.requestSignUpVerification`
+ * and `user.register`. `page.request` sends no `Origin`/`Referer`, so a bare POST there is a 403.
  */
-export function betterAuthRequestHeaders(): Record<string, string> {
+export function originGatedRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
   return { Origin: new URL(baseURL).origin };
 }
@@ -87,24 +86,20 @@ export async function findSignUpTokenFor(email: string): Promise<string> {
   }
 }
 
-const signUpVerificationBodySchema = z.tuple([
-  z.object({
-    result: z.object({
-      data: z.union([
-        z.object({ sent: z.literal(false), addressProof: z.string().min(1) }),
-        z.object({ sent: z.literal(true) }),
-      ]),
-    }),
+const signUpVerificationBodySchema = z.object({
+  result: z.object({
+    data: z.union([
+      z.object({ sent: z.literal(false), addressProof: z.string().min(1) }),
+      z.object({ sent: z.literal(true) }),
+    ]),
   }),
-]);
+});
 
-const confirmedAddressSchema = z.tuple([
-  z.object({
-    result: z.object({
-      data: z.object({ addressProof: z.string().min(1), email: z.string().email() }),
-    }),
+const confirmedAddressSchema = z.object({
+  result: z.object({
+    data: z.object({ addressProof: z.string().min(1), email: z.string().email() }),
   }),
-]);
+});
 
 /**
  * An address proof for `email` through the same public endpoints as the sign-up UI. An
@@ -115,8 +110,9 @@ export async function requestSignUpAddressProof(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
-  const response = await request.post("/api/trpc/auth.requestSignUpVerification?batch=1", {
-    data: { "0": { email } },
+  const response = await request.post("/api/trpc/auth.requestSignUpVerification", {
+    headers: originGatedRequestHeaders(),
+    data: { email },
   });
   const body: unknown = await response.json().catch(() => null);
   const parsed = signUpVerificationBodySchema.safeParse(body);
@@ -125,17 +121,16 @@ export async function requestSignUpAddressProof(
       `requestSignUpVerification failed for ${email}: ${response.status()} ${JSON.stringify(body).slice(0, 300)}`,
     );
   }
-  const answer = parsed.data[0].result.data;
+  const answer = parsed.data.result.data;
   if (!answer.sent) return answer.addressProof;
 
   const token = await findSignUpTokenFor(email);
-  const confirmationResponse = await request.post(
-    "/api/trpc/auth.completeSignUpVerification?batch=1",
-    { data: { "0": { token } } },
-  );
+  const confirmationResponse = await request.post("/api/trpc/auth.completeSignUpVerification", {
+    data: { token },
+  });
   const confirmationBody: unknown = await confirmationResponse.json().catch(() => null);
   const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
-  const confirmed = confirmation.success ? confirmation.data[0].result.data : null;
+  const confirmed = confirmation.success ? confirmation.data.result.data : null;
   if (!confirmationResponse.ok() || !confirmed || confirmed.email !== email) {
     throw new Error(
       `completeSignUpVerification failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
@@ -163,8 +158,9 @@ export async function registerConfirmedAccount(
   { email, password, name }: { email: string; password: string; name?: string },
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(request, email);
-  const response = await request.post("/api/trpc/user.register?batch=1", {
-    data: { "0": { addressProof, email, password, ...(name ? { name } : {}) } },
+  const response = await request.post("/api/trpc/user.register", {
+    headers: originGatedRequestHeaders(),
+    data: { addressProof, email, password, ...(name ? { name } : {}) },
   });
   if (!response.ok()) {
     throw new Error(
@@ -215,32 +211,27 @@ export async function thenIAmSignedInWithNoSecondPrompt(page: Page, email: strin
  */
 export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
   const getAll = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": {} })),
+    "/api/trpc/organization.getAll?input=" + encodeURIComponent(JSON.stringify({})),
   );
   const data = (await getAll.json().catch(() => null)) as {
-    "0"?: {
-      result?: {
-        data?: { teams?: { projects?: unknown[] }[] }[];
-      };
+    result?: {
+      data?: { teams?: { projects?: unknown[] }[] }[];
     };
   } | null;
-  const orgs = data?.["0"]?.result?.data ?? [];
+  const orgs = data?.result?.data ?? [];
   const hasProject = orgs.some((o) => (o.teams ?? []).some((t) => (t.projects ?? []).length > 0));
   if (hasProject) return;
 
-  const response = await page.request.post("/api/trpc/onboarding.initializeOrganization?batch=1", {
+  const response = await page.request.post("/api/trpc/onboarding.initializeOrganization", {
     data: {
-      "0": {
-        orgName: "Front Door Test Org",
-        projectName: "Front Door Test Project",
-        language: "other",
-        framework: "other",
-      },
+      orgName: "Front Door Test Org",
+      projectName: "Front Door Test Project",
+      language: "other",
+      framework: "other",
     },
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok() || (result as { "0"?: { error?: unknown } })?.["0"]?.error) {
+  if (!response.ok() || (result as { error?: unknown } | null)?.error) {
     throw new Error(
       `initializeOrganization failed: ${response.status()} ${JSON.stringify(result).slice(0, 300)}`,
     );
@@ -398,11 +389,14 @@ export async function whenISignInWithPassword(
  * sign-in/sign-out cycle to exactly the two requests the rate limit counts.
  */
 export async function whenISignOut(page: Page): Promise<void> {
+  // Leave the app first: an open app tab that sees its session end redirects to the sign-in
+  // screen itself, and that redirect aborts the next step's own navigation there.
+  await page.goto("about:blank");
   // An empty JSON body, because better-auth answers a bodiless POST with 415
   // (`Content-Type is required`) — `data: {}` is what makes Playwright send
   // `application/json`.
   const response = await page.request.post("/api/auth/sign-out", {
-    headers: betterAuthRequestHeaders(),
+    headers: originGatedRequestHeaders(),
     data: {},
   });
   if (!response.ok()) {

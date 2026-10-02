@@ -4,7 +4,6 @@
  * first real trace. `isRealFirstIngest` guards a re-delivered first trace.
  */
 
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import type { TraceProjectMetadata } from "../app/trace.members.ts";
+import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
 
@@ -33,8 +33,8 @@ export interface ProjectMetadataSubscriberDeps {
   // ADR-051: reconciliation path ensures topic clustering runs daily; safe
   // to call repeatedly as it's rate-limited.
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
-  /** Told the first trace (§9); a failure is logged, never fatal to the ingest path. */
-  nurturing: Pick<NurturingApi, "recordSignal">;
+  /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
+  milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
   /**
    * Marks the project active for the day of this trace, once a day. Injected
    * so trace never imports billing's process package (structurally typed).
@@ -62,18 +62,16 @@ async function trackFirstTraceIntegrated({
   if (!userId) return;
 
   try {
-    await deps.nurturing.recordSignal({
-      kind: "first_trace_integrated",
-      sourceEventId: source.id,
+    await deps.milestones.recordFirstTrace({
       tenantId,
-      occurredAt: source.occurredAt,
-      userId,
       projectId: tenantId,
+      userId,
       sdkLanguage: attrs["sdk.language"] ?? "unknown",
       sdkFramework: attrs["langwatch.sdk.framework"] ?? "unknown",
+      occurredAt: source.occurredAt,
     });
   } catch (error) {
-    logger.error({ tenantId, error }, "Failed to tell nurturing the first trace (non-fatal)");
+    logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");
   }
 }
 
@@ -94,16 +92,14 @@ async function trackTraceReceived({
     const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
     if (!userId) return;
 
-    await deps.nurturing.recordSignal({
-      kind: "trace_received",
-      sourceEventId: source.id,
+    await deps.milestones.recordTraceReceived({
       tenantId,
-      occurredAt: source.occurredAt,
-      userId,
       projectId: tenantId,
+      userId,
+      occurredAt: source.occurredAt,
     });
   } catch (error) {
-    logger.error({ tenantId, error }, "Failed to tell nurturing about a later trace (non-fatal)");
+    logger.error({ tenantId, error }, "Failed to record a later trace (non-fatal)");
   }
 }
 

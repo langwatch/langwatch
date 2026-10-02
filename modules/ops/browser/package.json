@@ -7,29 +7,11 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/ops.web.ts",
       "types": "./dist/ops.web.d.ts",
       "default": "./src/ops.web.ts"
-    },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./surfaces/impersonation": {
-      "types": "./dist/ui/sections/impersonation/index.d.ts",
-      "default": "./src/ui/sections/impersonation/index.ts"
-    },
-    "./drawers": {
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
-    },
-    "./ops": {
-      "types": "./dist/ops.d.ts",
-      "default": "./src/ops.ts"
     }
   },
   "scripts": {
@@ -42,15 +24,17 @@
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-client": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/prompt-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",

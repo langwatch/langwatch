@@ -26,3 +26,9 @@ export {
   renderConversationSteps,
   renderToolLine,
 } from "./conversation-steps.ts";
+export {
+  type FlattenableMessage,
+  flattenMessages,
+  groupIntoTurns,
+  type StreamingPart,
+} from "./flatten-messages.ts";

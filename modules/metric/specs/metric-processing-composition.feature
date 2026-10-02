@@ -18,7 +18,7 @@ Feature: Composing durable metric processing
     Given a process that can route a tenant to its ClickHouse instance
     When it composes durable metric processing
     Then the pipeline is built without an organization-keyed client
-    And it registers the same commands, projections and subscriber the App registers
+    And it registers the same commands and projections the App registers
 
   @unit
   Scenario: The append surface offers no read
@@ -37,20 +37,6 @@ Feature: Composing durable metric processing
     Given the full metric repository and the append-only one
     When each is asked to store the same canonical point
     Then the same append path runs for both
-
-  @unit
-  Scenario: The ADR-056 edge is mounted rather than declared missing
-    Given a worker graph composed from its own substrate
-    When the graph is composed
-    Then both pipelines mount their coding-agent dispatch subscriber
-    And nothing is reported at boot about a missing Coding Agent pipeline
-
-  @unit
-  Scenario: Each received metric point is forwarded to coding-agent once per point
-    Given the coding-agent dispatch on the metric pipeline
-    When the same received metric point is delivered twice
-    Then each delivery forwards the point to coding-agent unchanged
-    And both deliveries share one deduplication identity, apart from any other point
 
   @unit
   Scenario: The metric capability is installed by the process that boots it

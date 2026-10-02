@@ -13,7 +13,7 @@ import { createFixtureWorkspace } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { roles: { contract: {}, process: {}, browser: {} } },
+    agent: { roles: { contract: {}, process: {}, browser: {}, "query-language": {} } },
   },
 });
 
@@ -72,6 +72,14 @@ const CASES = [
     expected: { role: "process", kind: "process", isPrismaSeam: true, isServiceModule: false },
   },
   {
+    path: "modules/agent/process/src/features/billing/services/billing.service.ts",
+    expected: { role: "process", layer: "services", isServiceModule: true },
+  },
+  {
+    path: "modules/agent/process/src/features/billing/repositories/prisma/prisma.billing.repository.ts",
+    expected: { role: "process", layer: "repositories", isPrismaSeam: true },
+  },
+  {
     path: "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
     expected: { role: "process", isPrismaSeam: false, layer: undefined },
   },
@@ -80,8 +88,21 @@ const CASES = [
     expected: { role: "process", layer: "channels", module: "agent", moduleEnterprise: false },
   },
   {
-    path: "modules/agent/browser-kit/src/agent-card.tsx",
-    expected: { role: "browser-kit", module: "agent", layer: undefined, strictSource: undefined },
+    path: "modules/agent/query-language/src/parse.ts",
+    expected: {
+      role: "library",
+      kind: "library",
+      feature: "agent",
+      module: "agent",
+      relative: "src/parse.ts",
+      sourcePath: "parse.ts",
+      layer: undefined,
+      strictSource: undefined,
+    },
+  },
+  {
+    path: "modules/agent/specs/agent.feature",
+    expected: { role: "other", kind: undefined, module: undefined },
   },
   {
     path: "modules/agent/process/vitest.config.ts",
@@ -170,9 +191,9 @@ describe("given the one classification every rule gates on", () => {
   });
 
   describe("when it is asked for the workspace's module packages", () => {
-    it("finds every role's package by name, the kit and the enterprise mirror included", () => {
+    it("finds every role's package by name, the enterprise mirror included", () => {
       const fixture = createFixtureWorkspace({
-        features: { trace: { roles: { contract: {}, "browser-kit": {} } } },
+        features: { trace: { roles: { contract: {}, browser: {}, "query-language": {} } } },
         files: {
           "enterprise/modules/sso/process/package.json": JSON.stringify({
             name: "@langwatch/enterprise-sso-process",
@@ -183,11 +204,11 @@ describe("given the one classification every rule gates on", () => {
       resetClassificationCache();
 
       try {
-        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-browser-kit")?.pkg).toMatchObject({
+        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-browser")?.pkg).toMatchObject({
           enterprise: false,
           module: "trace",
-          role: "browser-kit",
-          root: "modules/trace/browser-kit",
+          role: "browser",
+          root: "modules/trace/browser",
         });
         expect(
           modulePackageOf(fixture.cwd, "@langwatch/enterprise-sso-process/testing"),
@@ -195,13 +216,19 @@ describe("given the one classification every rule gates on", () => {
           pkg: { enterprise: true, module: "sso", role: "process" },
           subpath: "./testing",
         });
+        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-query-language")?.pkg).toMatchObject({
+          module: "trace",
+          role: "library",
+          root: "modules/trace/query-language",
+        });
         expect(modulePackageOf(fixture.cwd, "zod")).toBeUndefined();
         expect(
           [...modulePackages(fixture.cwd).keys()].toSorted((a, b) => a.localeCompare(b)),
         ).toEqual([
           "@langwatch/enterprise-sso-process",
-          "@langwatch/trace-browser-kit",
+          "@langwatch/trace-browser",
           "@langwatch/trace-contract",
+          "@langwatch/trace-query-language",
         ]);
       } finally {
         fixture.cleanup();

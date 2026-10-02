@@ -15,6 +15,8 @@ import {
   ssoDomainStanding,
   SsoSetupAddressMismatchError,
   SsoSignInRefusedError,
+  type SsoUserResolution,
+  type SsoUserResolutionInput,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -26,6 +28,7 @@ import type {
   SsoDomainReproofRequest,
   SsoRegistrantReads,
 } from "../rules/sso-assertion-contract.rules.ts";
+import type { SsoUserResolutionService } from "./sso-user-resolution.service.ts";
 
 const logger = createLogger("langwatch:identity:sso-assertion");
 
@@ -88,6 +91,8 @@ export interface SsoAssertionServiceDeps {
    * direction for an unwired dependency to fail in is closed.
    */
   breakGlass?: SsoBreakGlassBindingRepository;
+  /** Absent in the suites that only ask `decide`; asking `resolveUser` then throws. */
+  resolution?: SsoUserResolutionService;
 }
 
 /**
@@ -101,6 +106,12 @@ export class SsoAssertionService {
   }
 
   private constructor(private readonly deps: SsoAssertionServiceDeps) {}
+
+  /** Which existing person an assertion `decide` admitted signs in as. */
+  resolveUser(input: SsoUserResolutionInput): Promise<SsoUserResolution> {
+    if (!this.deps.resolution) throw new Error("single sign-on user resolution is not composed");
+    return this.deps.resolution.resolveUser(input);
+  }
 
   /**
    * Two questions: a LIVE connection may only assert addresses on domains it

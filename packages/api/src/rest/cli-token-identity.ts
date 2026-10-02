@@ -1,21 +1,18 @@
 /**
  * The door for a CLI device-session bearer (ARCHITECTURE.md §8, 2026-09-25): it reads the bearer,
  * asks the owning module who holds it, and puts that person, their organization and the session
- * on the request, so no handler reads the header. The module's verifier throws its own refusals.
+ * beside them on the request; a route parses the session against its own declared schema.
  */
-import type { Actor, CliSession } from "@langwatch/actor";
+import type { CliTokenActor } from "@langwatch/authorization";
 
 import { OrganizationMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
-import type { RestCaller, RestIdentity } from "./runtime.ts";
-
-/** A caller the CLI token door let in: always a person, carrying the session it presented. */
-export type CliTokenActor = Extract<Actor, { type: "user" }> & Readonly<{ cliSession: CliSession }>;
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 /** What the caller presented: the whole `Authorization` header, whose format the owner reads. */
 export type CliTokenPresented = Readonly<{ authorization: string }>;
 
-/** Who the owning module says holds the bearer, and the session behind it. */
-export type CliTokenHolder = Readonly<{ userId: string; organizationId: string }> & CliSession;
+/** Who the owning module says holds the bearer; the whole holder is handed on as the session. */
+export type CliTokenHolder = Readonly<{ userId: string; organizationId: string }>;
 
 export class CliTokenIdentity implements RestIdentity {
   readonly #verify: (presented: CliTokenPresented) => Promise<CliTokenHolder>;
@@ -51,16 +48,8 @@ export class CliTokenIdentity implements RestIdentity {
     }
 
     const holder = await this.#verify({ authorization });
-    const actor: CliTokenActor = {
-      type: "user",
-      id: holder.userId,
-      cliSession: {
-        tokenKey: holder.tokenKey,
-        ...(holder.cliApiKeyId === undefined ? {} : { cliApiKeyId: holder.cliApiKeyId }),
-        ...(holder.clientInfo === undefined ? {} : { clientInfo: holder.clientInfo }),
-      },
-    };
+    const actor: CliTokenActor = { type: "user", id: holder.userId };
 
-    return { actor, scope: { tier: "organization", id: holder.organizationId } };
+    return { actor, scope: { tier: "organization", id: holder.organizationId }, session: holder };
   }
 }

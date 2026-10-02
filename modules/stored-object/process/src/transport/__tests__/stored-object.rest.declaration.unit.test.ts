@@ -4,7 +4,7 @@
  * @see modules/stored-object/specs/stored-objects.feature
  */
 import { ForbiddenError } from "@langwatch/api/rest";
-import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 import { describe, expect, it, vi } from "vitest";
 
 import { storedObjectRest } from "../stored-object.rest.ts";

@@ -3,16 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/traces/trace-export.feature — "Streaming Download and Progress" section
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ExportProgress } from "../export-progress.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const defaultProps = {
   exported: 0,
@@ -28,9 +24,7 @@ describe("<ExportProgress/>", () => {
 
   describe("when isExporting is true", () => {
     it("shows progress text with exported and total counts", () => {
-      render(<ExportProgress {...defaultProps} exported={0} total={500} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} exported={0} total={500} />);
 
       expect(
         screen.getByText(
@@ -41,9 +35,7 @@ describe("<ExportProgress/>", () => {
     });
 
     it("renders a progress bar", () => {
-      render(<ExportProgress {...defaultProps} exported={250} total={500} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} exported={250} total={500} />);
 
       const progressbar = screen.getByRole("progressbar");
       expect(progressbar).toBeInTheDocument();
@@ -52,9 +44,9 @@ describe("<ExportProgress/>", () => {
 
   describe("when progress updates", () => {
     it("updates the text to reflect new exported count", () => {
-      const { rerender } = render(<ExportProgress {...defaultProps} exported={100} total={500} />, {
-        wrapper: Wrapper,
-      });
+      const { rerender } = renderWithDesignSystem(
+        <ExportProgress {...defaultProps} exported={100} total={500} />,
+      );
 
       expect(
         screen.getByText(
@@ -63,11 +55,7 @@ describe("<ExportProgress/>", () => {
         ),
       ).toBeInTheDocument();
 
-      rerender(
-        <Wrapper>
-          <ExportProgress {...defaultProps} exported={300} total={500} />
-        </Wrapper>,
-      );
+      rerender(<ExportProgress {...defaultProps} exported={300} total={500} />);
 
       expect(
         screen.getByText(
@@ -80,9 +68,7 @@ describe("<ExportProgress/>", () => {
 
   describe("when export completes", () => {
     it("shows completion text", () => {
-      render(<ExportProgress {...defaultProps} exported={500} total={500} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} exported={500} total={500} />);
 
       expect(screen.getByText("Exported 500 traces")).toBeInTheDocument();
     });
@@ -90,9 +76,8 @@ describe("<ExportProgress/>", () => {
 
   describe("when isExporting is false", () => {
     it("renders nothing", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ExportProgress exported={0} total={500} isExporting={false} />,
-        { wrapper: Wrapper },
       );
 
       expect(container.textContent).toBe("");
@@ -101,9 +86,7 @@ describe("<ExportProgress/>", () => {
 
   describe("when onCancel is provided", () => {
     it("shows a cancel button", () => {
-      render(<ExportProgress {...defaultProps} onCancel={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} onCancel={vi.fn()} />);
 
       expect(screen.getByText("Cancel")).toBeInTheDocument();
     });
@@ -112,9 +95,7 @@ describe("<ExportProgress/>", () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
 
-      render(<ExportProgress {...defaultProps} onCancel={onCancel} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} onCancel={onCancel} />);
 
       await user.click(screen.getByText("Cancel"));
       expect(onCancel).toHaveBeenCalledOnce();
@@ -123,7 +104,7 @@ describe("<ExportProgress/>", () => {
 
   describe("when onCancel is not provided", () => {
     it("does not show a cancel button", () => {
-      render(<ExportProgress {...defaultProps} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ExportProgress {...defaultProps} />);
 
       expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
     });

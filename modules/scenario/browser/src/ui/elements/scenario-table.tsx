@@ -1,6 +1,6 @@
-import { HStack, IconButton, Table, Text } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
+import { HStack, IconButton, Table, Text } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import {
   type ColumnFiltersState,

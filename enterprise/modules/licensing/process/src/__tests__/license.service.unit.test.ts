@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -168,6 +170,16 @@ describe("LicenseService", () => {
     expect(repository.listCalls).toBe(0);
   });
 
+  it("names the permitting licence by its hash alone, and nothing where no licence permits", async () => {
+    const [digest] = await serviceWithInstanceKey(VALID_LICENSE_KEY).findPlatformLicenseDigests();
+
+    expect(digest).toBe(`sha256:${createHash("sha256").update(VALID_LICENSE_KEY).digest("hex")}`);
+    expect(digest).not.toContain(VALID_LICENSE_KEY);
+    await expect(
+      serviceWithInstanceKey(TAMPERED_LICENSE_KEY).findPlatformLicenseDigests(),
+    ).resolves.toEqual([]);
+  });
+
   /** @scenario "Inspect platform access for another feature" */
   it("scans organization licenses after an invalid instance candidate and accepts a signed expired license", async () => {
     repository.stored.set(ORGANIZATION_ID, {
@@ -291,18 +303,43 @@ describe("LicenseService", () => {
       await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
     });
 
-    /** @scenario "The license gate still freezes at startup" */
-    it("keeps answering unlicensed after a license is stored mid-process", async () => {
-      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+    /** @scenario "The license gate re-reads a deny after a minute" */
+    it("keeps a deny for a minute, then reads a license another replica stored", async () => {
+      let now = Temporal.Instant.from("2026-01-02T03:04:05.000Z");
+      const clocked = LicenseService.create({
+        repository,
+        cryptography: NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY }),
+        logger,
+        configuration: LicenseServiceConfiguration.create({ now: () => now }),
+      });
+      await expect(clocked.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
 
       repository.stored.set(ORGANIZATION_ID, {
         licenseKey: VALID_LICENSE_KEY,
         expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
         validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
       });
-
-      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      now = now.add({ seconds: 59 });
+      await expect(clocked.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
       expect(repository.listCalls).toBe(1);
+
+      now = now.add({ seconds: 1 });
+      await expect(clocked.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+      expect(repository.listCalls).toBe(2);
+    });
+
+    it("reads a license this process stored at once, and keeps an allow", async () => {
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+
+      await service.validateAndStoreLicense({
+        organizationId: ORGANIZATION_ID,
+        licenseKey: VALID_LICENSE_KEY,
+      });
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+
+      await service.removeLicense(ORGANIZATION_ID);
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+      expect(repository.listCalls).toBe(2);
     });
 
     it("counts the deployment's own instance license without scanning", async () => {

@@ -4,6 +4,8 @@
  * a membership change cannot half-apply; archiving leaves for the list.
  */
 
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
   Card,
@@ -15,9 +17,7 @@ import {
   Spinner,
   Text,
   VStack,
-} from "@chakra-ui/react";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "@langwatch/design-system/primitives";
 import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
@@ -253,6 +253,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
             duration: 2000,
           });
           void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
         },
         onError: reportTeamSaveFailure,
       },

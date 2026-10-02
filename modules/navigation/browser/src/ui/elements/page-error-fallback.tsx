@@ -1,4 +1,13 @@
-import { Box, Button, Center, Code, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  Code,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { AlertTriangle, Check, Copy, Home, RotateCcw } from "lucide-react";
 import { useState } from "react";
 

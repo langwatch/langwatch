@@ -1,5 +1,13 @@
-import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type {
   CustomModelEntry,
   ModelProviderEditorValue as MaybeStoredModelProvider,

@@ -1,4 +1,12 @@
-import { Button, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 
 import { jobMatchesFilter } from "../../model/queue-job-context.ts";

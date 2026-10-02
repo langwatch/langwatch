@@ -69,6 +69,13 @@ export type DatasetServiceOptions = {
  */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
+/** Archiving appends `-archived-<id>` to the slug; the live slug is what precedes the last one. */
+function liveSlugOf(slug: string): string {
+  const suffixAt = slug.lastIndexOf("-archived-");
+
+  return suffixAt === -1 ? slug : slug.slice(0, suffixAt);
+}
+
 export class DatasetService {
   private readonly generateId: () => string;
 
@@ -104,20 +111,13 @@ export class DatasetService {
         slugOrId: parsed.datasetId,
       });
       this.assertReady(existing);
-      const conflict = await this.options.repository.findBySlug({
-        projectId: parsed.projectId,
-        slug,
-        excludeId: existing.id,
-      });
-      if (conflict) {
-        throw new DatasetNameTakenError();
-      }
+      await this.refuseRenameCollision({ projectId: parsed.projectId, dataset: existing, name });
 
       const update: DatasetUpdateInput = {
         id: existing.id,
         projectId: parsed.projectId,
         name,
-        slug,
+        slug: existing.slug,
         columnTypes: parsed.columnTypes,
       };
       if (
@@ -129,7 +129,7 @@ export class DatasetService {
           dataset: existing,
           projectId: parsed.projectId,
           name,
-          slug,
+          slug: existing.slug,
           columnTypes: parsed.columnTypes,
         });
       }
@@ -171,6 +171,27 @@ export class DatasetService {
     }
 
     return created;
+  }
+
+  /**
+   * A rename keeps the slug (SDK and API callers address the dataset by it), but a
+   * new name whose slug another dataset already holds is still refused.
+   * See specs/datasets/dataset-slug-stability.feature.
+   */
+  private async refuseRenameCollision(input: {
+    projectId: string;
+    dataset: Dataset;
+    name: string;
+  }): Promise<void> {
+    if (input.name === input.dataset.name) return;
+    const conflict = await this.options.repository.findBySlug({
+      projectId: input.projectId,
+      slug: datasetSlugOf(input.name),
+      excludeId: input.dataset.id,
+    });
+    if (conflict) {
+      throw new DatasetNameTakenError();
+    }
   }
 
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
@@ -282,6 +303,7 @@ export class DatasetService {
     return { id: dataset.id, archived: true };
   }
 
+  /** Undo restores the slug the dataset had before archiving, not one re-derived from its name. */
   async restoreDataset(input: {
     datasetId: string;
     projectId: string;
@@ -298,21 +320,28 @@ export class DatasetService {
     await this.options.repository.restore({
       id: dataset.id,
       projectId: input.projectId,
-      slug: datasetSlugOf(dataset.name),
+      slug: liveSlugOf(dataset.slug),
     });
 
     return { success: true };
   }
 
-  /** Archives the dataset, or restores it when the caller undoes the archive. */
+  /** Archives the dataset, or restores it on undo; archiving twice keeps the first archive. */
   async archiveOrRestoreDataset(input: DatasetApiDeleteInput): Promise<{ success: true }> {
+    const dataset = await this.options.repository.findById({
+      id: input.datasetId,
+      projectId: input.projectId,
+      includeArchived: true,
+    });
+    if (!dataset) return { success: true };
     if (input.undo) {
-      await this.restoreDataset({ datasetId: input.datasetId, projectId: input.projectId });
+      await this.restoreDataset({ datasetId: dataset.id, projectId: input.projectId });
 
       return { success: true };
     }
+    if (dataset.archivedAt) return { success: true };
 
-    await this.archiveDataset({ slugOrId: input.datasetId, projectId: input.projectId });
+    await this.archiveDataset({ slugOrId: dataset.id, projectId: input.projectId });
 
     return { success: true };
   }

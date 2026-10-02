@@ -1,5 +1,4 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { computeRelativeWindow } from "@langwatch/analytics-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 /**
@@ -8,7 +7,7 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
  * @see specs/suites/test-suites.feature
  */
 import { Temporal } from "@langwatch/time";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +16,7 @@ import {
   orderSuitesDefaultFirst,
   type TestSuiteEntry,
 } from "../../../../../model/agent-testing/cases/test-cases.ts";
+import { computeRelativeWindow } from "../../../../elements/analytics/period-selector.tsx";
 import { SuiteNameDialog } from "../suite-name-dialog.tsx";
 import { SuiteRail } from "../suite-rail.tsx";
 import type { SuiteLastRun } from "../use-test-cases-data.ts";
@@ -31,7 +31,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
@@ -49,20 +49,21 @@ const suitesGetAllQuery = vi.fn();
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    scenarios: {
-      getSuiteRunData: {
-        useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),
-      },
-    },
     suites: {
       getAll: { useQuery: (...args: unknown[]) => suitesGetAllQuery(...args) },
     },
   },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      getSuiteRunData: {
+        useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),
+      },
+    },
+  },
+}));
 
 const THIRTY_DAYS = computeRelativeWindow("30d", Temporal.Now.instant());
 
@@ -114,7 +115,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof SuiteRail>> =
     setRelativePeriod: vi.fn(),
     ...overrides,
   };
-  const view = render(<SuiteRail {...props} />, { wrapper: Wrapper });
+  const view = renderWithDesignSystem(<SuiteRail {...props} />);
   return { props, view };
 }
 
@@ -509,7 +510,7 @@ describe("the test suites rail", () => {
         onConfirm: vi.fn(),
         ...overrides,
       };
-      render(<SuiteNameDialog {...props} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteNameDialog {...props} />);
       return { props };
     }
 

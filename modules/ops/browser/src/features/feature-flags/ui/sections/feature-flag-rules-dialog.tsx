@@ -4,16 +4,6 @@
  */
 
 import {
-  Button,
-  createListCollection,
-  Field,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
   closestCenter,
   DndContext,
   KeyboardSensor,
@@ -30,6 +20,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Dialog } from "@langwatch/design-system/dialog";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";

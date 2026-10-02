@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/features/onboarding/guided-onboarding-variant.feature
@@ -8,6 +7,7 @@ import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
 } from "@langwatch/onboarding-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { onboardingRest, onboardingRestCredential } from "../onboarding.rest.ts";

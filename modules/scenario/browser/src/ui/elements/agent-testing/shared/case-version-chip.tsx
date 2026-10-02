@@ -1,7 +1,7 @@
 /**
  * The version of a scenario, as a chip: "v3".
  */
-import { Badge } from "@chakra-ui/react";
+import { Badge } from "@langwatch/design-system/primitives";
 
 export type CaseVersionChipProps = {
   version?: number | null;

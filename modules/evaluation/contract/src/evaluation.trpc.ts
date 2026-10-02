@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the surface has always called.
  * @see specs/evaluators/azure-safety-byok-gating.feature
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   customEvaluatorSchema,

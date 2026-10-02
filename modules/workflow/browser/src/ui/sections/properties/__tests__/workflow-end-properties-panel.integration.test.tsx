@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { End } from "@langwatch/workflow-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -50,14 +50,12 @@ const stubVariables = ({ variables, canAddRemove, title }: WorkflowVariablesProp
 
 const renderPanel = (node: Node<End>) => {
   currentNode = node;
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EndPropertiesPanel
-        node={node}
-        renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
-        renderVariables={stubVariables}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <EndPropertiesPanel
+      node={node}
+      renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
+      renderVariables={stubVariables}
+    />,
   );
 };
 

@@ -2,6 +2,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type * as observability from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -14,7 +15,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import type { ScenarioTabStore } from "../../app/scenario.app.ts";
-import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
@@ -28,7 +28,7 @@ async function buildEventFamily(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
-    redis?: Partial<ScenarioEventBroadcastPublisher>;
+    presence?: Partial<PresenceApi>;
     extractInlineMedia?: (input: {
       event: unknown;
       projectId: string;
@@ -44,7 +44,7 @@ async function buildEventFamily(
   const world = await createScenarioRestTestApp({
     simulations: options.simulations,
     tabs: options.tabs,
-    redis: options.redis,
+    presence: options.presence,
     plans: options.plans,
     featureFlags: options.featureFlags,
     traces: {
@@ -295,10 +295,10 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "Nothing is parked when no tab was listening" */
     it("reports undelivered without parking or broadcasting", async () => {
       const setPending = vi.fn();
-      const publish = vi.fn(async () => 1);
+      const publishProjectEvent = vi.fn(async () => {});
       const family = await buildEventFamily({
         tabs: { countAfter: async () => 0, setPending },
-        redis: { publish },
+        presence: { publishProjectEvent },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -307,7 +307,7 @@ describe("the scenario-events REST declaration", () => {
       });
       await expect(response.json()).resolves.toMatchObject({ delivered: false });
       expect(setPending).not.toHaveBeenCalled();
-      expect(publish).not.toHaveBeenCalled();
+      expect(publishProjectEvent).not.toHaveBeenCalled();
     });
 
     /** @scenario "The handoff is delivered when a tab is listening" */
@@ -316,13 +316,12 @@ describe("the scenario-events REST declaration", () => {
       const setPending = vi.fn(async () => {
         calls.push("park");
       });
-      const publish = vi.fn(async () => {
+      const publishProjectEvent = vi.fn(async () => {
         calls.push("broadcast");
-        return 1;
       });
       const family = await buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
-        redis: { publish },
+        presence: { publishProjectEvent },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -336,7 +335,7 @@ describe("the scenario-events REST declaration", () => {
         url: "https://app.langwatch.test/scenario-rest-project/simulations/checkout/batch-a",
       });
       expect(setPending).toHaveBeenCalledTimes(1);
-      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publishProjectEvent).toHaveBeenCalledTimes(1);
       expect(calls).toEqual(["park", "broadcast"]);
     });
 
@@ -373,10 +372,10 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "The handoff URL must belong to this LangWatch instance" */
     it("ignores a caller-supplied URL and broadcasts this instance's URL", async () => {
       const setPending = vi.fn(async () => {});
-      const publish = vi.fn(async () => 1);
+      const publishProjectEvent = vi.fn(async () => {});
       const family = await buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
-        redis: { publish },
+        presence: { publishProjectEvent },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -394,7 +393,7 @@ describe("the scenario-events REST declaration", () => {
           url: "https://app.langwatch.test/scenario-rest-project/simulations/default/batch-a",
         }),
       );
-      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publishProjectEvent).toHaveBeenCalledTimes(1);
     });
   });
 

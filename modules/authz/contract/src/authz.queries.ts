@@ -1,17 +1,19 @@
+import {
+  authzDenialReasonSchema,
+  authzPermissionSchema,
+  organizationRoleSchema,
+} from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
-  authzDenialReasonSchema,
+  authzCanScopeRefSchema,
   authzDecisionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
   collectedGrantsSchema,
-  declaredScopeIdSchema,
-  organizationRoleSchema,
-  roleBindingScopeTypeSchema,
+  grantScopeTierSchema,
   teamUserRoleSchema,
 } from "./authz.ts";
-import { authzPermissionSchema } from "./registry.ts";
 
 export const authzCheckInputSchema = z
   .object({
@@ -21,6 +23,11 @@ export const authzCheckInputSchema = z
   })
   .strict();
 export type AuthzCheckInput = z.infer<typeof authzCheckInputSchema>;
+/** `can` alone also answers at the platform, from PLATFORM-tier grants only. */
+export const authzCanInputSchema = z
+  .object({ ...authzCheckInputSchema.shape, scope: authzCanScopeRefSchema })
+  .strict();
+export type AuthzCanInput = z.infer<typeof authzCanInputSchema>;
 export const authzCheckOutputSchema = authzDecisionSchema;
 export type AuthzCheckOutput = z.infer<typeof authzCheckOutputSchema>;
 export const authzCanOutputSchema = z.boolean();
@@ -58,15 +65,6 @@ export const authzCheckByIdsInputSchema = authzScopeIdsSchema.safeExtend({
   ceiling: z.boolean().optional(),
 });
 export type AuthzCheckByIdsInput = z.infer<typeof authzCheckByIdsInputSchema>;
-
-export const permissionDecisionSchema = z
-  .object({
-    permitted: z.boolean(),
-    organizationRole: organizationRoleSchema.nullable(),
-    denialReason: authzDenialReasonSchema.optional(),
-  })
-  .strict();
-export type PermissionDecision = z.infer<typeof permissionDecisionSchema>;
 
 export const authzCheckByIdsOutputSchema = z
   .object({
@@ -153,24 +151,6 @@ export const authzExplainDecisionInputSchema = z.object({ decision: authzDecisio
 export type AuthzExplainDecisionInput = z.infer<typeof authzExplainDecisionInputSchema>;
 export const authzExplainDecisionOutputSchema = z.array(z.string());
 export type AuthzExplainDecisionOutput = z.infer<typeof authzExplainDecisionOutputSchema>;
-
-export const authzGetDecisionInputSchema = z
-  .object({
-    userId: z.string(),
-    permission: authzPermissionSchema,
-    scope: declaredScopeIdSchema,
-  })
-  .strict();
-export type AuthzGetDecisionInput = z.infer<typeof authzGetDecisionInputSchema>;
-
-export const authzGetProjectAnyDecisionInputSchema = z
-  .object({
-    userId: z.string(),
-    projectId: z.string(),
-    permissions: z.array(authzPermissionSchema).readonly(),
-  })
-  .strict();
-export type AuthzGetProjectAnyDecisionInput = z.infer<typeof authzGetProjectAnyDecisionInputSchema>;
 
 export const authzPermissionByIdsInputSchema = z
   .object({
@@ -290,7 +270,7 @@ export const authzAccessBindingSchema = z
     apiKeyId: z.string().nullable(),
     role: teamUserRoleSchema,
     customRoleId: z.string().nullable(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     createdAt: z.date(),
     expiresAt: z.date().nullable().optional(),
@@ -318,7 +298,7 @@ export type AuthzTeamMemberBinding = z.infer<typeof authzTeamMemberBindingSchema
 export const authzBindingForSynthesisSchema = z
   .object({
     organizationId: z.string(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     role: teamUserRoleSchema,
     customRoleId: z.string().nullable(),
@@ -353,7 +333,7 @@ export type AuthzListUserAndGroupBindingsInput = z.infer<
 export const authzListScopeBindingsInputSchema = z
   .object({
     organizationId: z.string(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeIds: z.array(z.string()).readonly(),
   })
   .strict();

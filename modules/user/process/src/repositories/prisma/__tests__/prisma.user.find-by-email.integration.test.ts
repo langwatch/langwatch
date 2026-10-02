@@ -43,13 +43,30 @@ describe.skipIf(!databaseUrl)("given an account stored with capitals in its addr
     it("finds that account", async () => {
       const users = PrismaUserRepository.create({ prisma: connection.client });
 
-      await expect(users.findByEmail(STORED.toLowerCase())).resolves.toMatchObject({ id: userId });
+      await expect(users.findByEmail(STORED.toLowerCase())).resolves.toMatchObject([
+        { id: userId },
+      ]);
     });
 
     it("finds nobody for an address nobody holds", async () => {
       const users = PrismaUserRepository.create({ prisma: connection.client });
 
-      await expect(users.findByEmail(`nobody@${RUN}.example.test`)).resolves.toBeNull();
+      await expect(users.findByEmail(`nobody@${RUN}.example.test`)).resolves.toEqual([]);
+    });
+  });
+
+  describe("when a case-twin of that address is stored beside it", () => {
+    /** The unique index is case-sensitive, so case-twins can both be stored. */
+    it("answers both accounts, oldest first, so none is picked at random", async () => {
+      const twin = await connection.client.user.create({
+        data: { name: "Twin", email: STORED.toLowerCase() },
+      });
+      const users = PrismaUserRepository.create({ prisma: connection.client });
+
+      await expect(users.findByEmail(STORED.toUpperCase())).resolves.toMatchObject([
+        { id: userId },
+        { id: twin.id },
+      ]);
     });
   });
 });

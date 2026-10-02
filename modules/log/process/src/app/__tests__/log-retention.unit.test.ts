@@ -1,20 +1,19 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { LOG_PROCESSING_PIPELINE_NAME } from "@langwatch/log-contract";
+import { createApp } from "@langwatch/process";
 /**
  * @vitest-environment node
  * log_processing declares each tenant's retention from data retention (ARCHITECTURE §9).
  * Spec: packages/eventing/specs/pipeline-retention.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp } from "@langwatch/kernel";
-import { LOG_PROCESSING_PIPELINE_NAME } from "@langwatch/log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { logServer } from "../../log.server.ts";
+import { logProcessModule } from "../../log.module.ts";
 
 const RETAINED = { traces: 365, scenarios: 30, experiments: 30 };
 
@@ -27,14 +26,13 @@ describe("log app installation", () => {
         processStore: InMemoryProcessStore.createForTesting(),
       });
       const runtime = await createApp({ role: "worker" })
-        .withModules([logServer])
+        .withModules([logProcessModule])
         .withAnalytical(createApiFixture<ClickHouseQueryClient>())
         .withConfig({ log: { processingShards: void 0 } })
         .withEventing(eventing)
         .provide({
           "data-privacy": createApiFixture<DataPrivacyApi>({}),
           trace: createApiFixture<TraceApi>({}),
-          "coding-agent": createApiFixture<CodingAgentApi>({}),
           "data-retention": createApiFixture<DataRetentionApi>({
             getResolvedForProject: async () => RETAINED,
           }),

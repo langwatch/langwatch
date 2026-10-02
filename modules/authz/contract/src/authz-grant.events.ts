@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
@@ -61,11 +62,6 @@ export const GRANT_EVENT_SOURCES = [
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
 
-export const grantsLedgerActorSchema = z
-  .object({ type: z.enum(["user", "system"]), id: z.string().nullable() })
-  .strict();
-export type GrantsLedgerActor = z.infer<typeof grantsLedgerActorSchema>;
-
 export const resourceGrantTermsSchema = z
   .object({
     kind: z.enum(["trace", "thread"]),
@@ -116,7 +112,7 @@ export const grantAttachedPayloadSchema = z
     /** When a binding stops granting; absent on every grant that never ends. */
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     /** Present on live USER grants; absent on imported history. */
     membershipStamp: z.string().min(1).optional(),
     /** Founder-only marker for a membership created in the same transaction. */
@@ -138,7 +134,7 @@ export const grantRoleChangedPayloadSchema = z
     grantId: z.string().min(1),
     from: z.string().min(1).nullable(),
     to: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type GrantRoleChangedPayload = z.infer<typeof grantRoleChangedPayloadSchema>;
@@ -147,7 +143,7 @@ export const grantRevokedPayloadSchema = z
   .object({
     grantId: z.string().min(1),
     reason: z.string().min(1).optional(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type GrantRevokedPayload = z.infer<typeof grantRevokedPayloadSchema>;
@@ -159,7 +155,7 @@ export const roleDefinedPayloadSchema = z
     description: z.string().optional(),
     permissions: z.array(z.string().min(1)),
     kind: z.enum(["custom", "system_api_key"]),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type RoleDefinedPayload = z.infer<typeof roleDefinedPayloadSchema>;
@@ -168,7 +164,7 @@ export const rolePermissionsChangedPayloadSchema = z
   .object({
     roleId: z.string().min(1),
     permissions: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type RolePermissionsChangedPayload = z.infer<typeof rolePermissionsChangedPayloadSchema>;
@@ -176,7 +172,7 @@ export type RolePermissionsChangedPayload = z.infer<typeof rolePermissionsChange
 export const roleDeletedPayloadSchema = z
   .object({
     roleId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type RoleDeletedPayload = z.infer<typeof roleDeletedPayloadSchema>;

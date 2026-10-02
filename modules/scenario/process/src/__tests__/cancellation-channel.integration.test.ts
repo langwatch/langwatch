@@ -2,11 +2,11 @@
 import { RedisConnectionService, type RedisConnection } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { type CancellationMessage } from "../app/scenario.app.ts";
 import {
   RedisScenarioCancellationPublisherChannel,
   RedisScenarioCancellationSubscriberChannel,
-  type CancellationMessage,
-} from "../index.ts";
+} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 
 let connection: RedisConnection;
 

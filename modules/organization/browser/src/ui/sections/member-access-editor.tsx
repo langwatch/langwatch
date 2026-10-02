@@ -1,7 +1,17 @@
 /** What one member can reach, and the one save that changes it. */
 
-import { Badge, Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,22 +19,18 @@ import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
 import {
   api,
   type OrganizationApiMap,
-  type RoleBindingReading,
+  type RouterOutputs,
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../../model/prisma-types.ts";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { IdentityChip } from "../elements/identity-row.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
 import {
-  BindingInputRow,
-  type BindingInputRowHandle,
-  type PendingBinding,
+  GrantInputRow,
+  type GrantInputRowHandle,
+  type PendingGrant,
   toggled,
-} from "./group-binding-input-row.tsx";
+} from "./group-grant-input-row.tsx";
 
 type MemberGroup = OrganizationApiMap["group"]["listForMember"]["query"]["output"][number];
 
@@ -36,13 +42,13 @@ function listTeamNames(names: string[]): string {
 }
 
 /** What makes two access rows the same grant, regardless of which row it is. */
-function bindingKey(binding: {
+function grantKey(grant: {
   role: string;
   customRoleId?: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
 }): string {
-  return `${binding.role}:${binding.customRoleId ?? ""}:${binding.scopeType}:${binding.scopeId}`;
+  return `${grant.role}:${grant.customRoleId ?? ""}:${grant.scopeType}:${grant.scopeId}`;
 }
 
 /** "Organization", "Team Platform", "Project Checkout"; an unresolved name says its kind. */
@@ -50,11 +56,11 @@ function scopeLabel({
   scopeType,
   scopeName,
 }: {
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeName?: string | null;
 }): string {
-  if (scopeType === RoleBindingScopeType.ORGANIZATION) return "Organization";
-  const kind = scopeType === RoleBindingScopeType.TEAM ? "Team" : "Project";
+  if (scopeType === GrantScopeTier.ORGANIZATION) return "Organization";
+  const kind = scopeType === GrantScopeTier.TEAM ? "Team" : "Project";
   return scopeName ? `${kind} ${scopeName}` : kind;
 }
 
@@ -68,16 +74,16 @@ function roleTone(role: string): string {
 
 /** A Lite Member seat allows Viewer only, so a staged row above it snaps down. */
 function constrainToSeat({
-  binding,
+  grant,
   organizationRole,
 }: {
-  binding: PendingBinding;
+  grant: PendingGrant;
   organizationRole: OrganizationUserRole;
-}): PendingBinding {
-  if (organizationRole !== OrganizationUserRole.EXTERNAL) return binding;
-  if (!binding.customRoleId && binding.role === TeamUserRole.VIEWER) return binding;
+}): PendingGrant {
+  if (organizationRole !== OrganizationUserRole.EXTERNAL) return grant;
+  if (!grant.customRoleId && grant.role === TeamUserRole.VIEWER) return grant;
   return {
-    ...binding,
+    ...grant,
     role: TeamUserRole.VIEWER,
     roleValue: TeamUserRole.VIEWER,
     customRoleId: undefined,
@@ -86,18 +92,18 @@ function constrainToSeat({
 }
 
 /** A staged row the member already holds, or the same row staged twice, adds nothing. */
-function newBindingAdditions({
+function newGrantAdditions({
   staged,
   held,
   removals,
 }: {
-  staged: PendingBinding[];
-  held: readonly (Parameters<typeof bindingKey>[0] & { id: string })[];
+  staged: PendingGrant[];
+  held: readonly (Parameters<typeof grantKey>[0] & { id: string })[];
   removals: ReadonlySet<string>;
-}): PendingBinding[] {
-  const heldKeys = new Set(held.filter((row) => !removals.has(row.id)).map(bindingKey));
-  return staged.filter((binding) => {
-    const key = bindingKey(binding);
+}): PendingGrant[] {
+  const heldKeys = new Set(held.filter((row) => !removals.has(row.id)).map(grantKey));
+  return staged.filter((grant) => {
+    const key = grantKey(grant);
     if (heldKeys.has(key)) return false;
     heldKeys.add(key);
     return true;
@@ -107,35 +113,33 @@ function newBindingAdditions({
 /** Staged once: the same grant staged again changes nothing. */
 function withStaged({
   staged,
-  binding,
+  grant,
 }: {
-  staged: PendingBinding[];
-  binding: PendingBinding;
-}): PendingBinding[] {
-  const key = bindingKey(binding);
-  return staged.some((row) => bindingKey(row) === key) ? staged : [...staged, binding];
+  staged: PendingGrant[];
+  grant: PendingGrant;
+}): PendingGrant[] {
+  const key = grantKey(grant);
+  return staged.some((row) => grantKey(row) === key) ? staged : [...staged, grant];
 }
 
 /** A Lite Member seat drops organization rows, snaps the rest to Viewer, collapses duplicates. */
-function stagedRowsForLiteSeat(staged: PendingBinding[]): PendingBinding[] {
+function stagedRowsForLiteSeat(staged: PendingGrant[]): PendingGrant[] {
   return staged
-    .filter((binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION)
-    .map((binding) => constrainToSeat({ binding, organizationRole: OrganizationUserRole.EXTERNAL }))
-    .reduce<PendingBinding[]>((kept, binding) => withStaged({ staged: kept, binding }), []);
+    .filter((grant) => grant.scopeType !== GrantScopeTier.ORGANIZATION)
+    .map((grant) => constrainToSeat({ grant, organizationRole: OrganizationUserRole.EXTERNAL }))
+    .reduce<PendingGrant[]>((kept, grant) => withStaged({ staged: kept, grant }), []);
 }
 
 /** The organization row mirroring the seat belongs to the seat selector, not to this list. */
 function mirrorsSeat({
-  binding,
+  grant,
   seat,
 }: {
-  binding: { role: string; customRoleId?: string | null; scopeType: RoleBindingScopeType };
+  grant: { role: string; customRoleId?: string | null; scopeType: GrantScopeTier };
   seat: OrganizationUserRole;
 }): boolean {
   return (
-    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-    !binding.customRoleId &&
-    binding.role === seat
+    grant.scopeType === GrantScopeTier.ORGANIZATION && !grant.customRoleId && grant.role === seat
   );
 }
 
@@ -202,22 +206,20 @@ export function MemberAccessEditor({
             Role assignments
           </Text>
           <DirectAssignments
-            directBindings={editor.directBindings}
-            staged={editor.pendingBindingAdditions}
-            removals={editor.pendingBindingRemovals}
+            directGrants={editor.directGrants}
+            staged={editor.pendingGrantAdditions}
+            removals={editor.pendingGrantRemovals}
             seat={memberRole}
-            onToggle={(id) =>
-              editor.setPendingBindingRemovals((prev) => toggled({ set: prev, id }))
-            }
+            onToggle={(id) => editor.setPendingGrantRemovals((prev) => toggled({ set: prev, id }))}
             onUndo={(index) =>
-              editor.setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== index))
+              editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
             }
           />
-          <BindingInputRow
-            ref={editor.bindingInputRef}
+          <GrantInputRow
+            ref={editor.grantInputRef}
             organizationId={organizationId}
             onAdd={editor.stageAddition}
-            onReadyChange={editor.setHasDraftBinding}
+            onReadyChange={editor.setHasDraftGrant}
             organizationRole={editor.pendingRole}
             buttonLabel="Assign role"
           />
@@ -266,7 +268,7 @@ function AssignmentBadges({
 }: {
   role: string;
   customRoleName?: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeName?: string | null;
   struck?: boolean;
 }) {
@@ -286,30 +288,30 @@ function AssignmentBadges({
 
 /** Held rows strike through until Save, so Cancel never restores a row the admin forgot about. */
 function DirectAssignments({
-  directBindings,
+  directGrants,
   staged,
   removals,
   seat,
   onToggle,
   onUndo,
 }: {
-  directBindings: QueryReading<RoleBindingReading[]>;
-  staged: PendingBinding[];
+  directGrants: QueryReading<RouterOutputs["authz"]["listMemberGrants"]>;
+  staged: PendingGrant[];
   removals: ReadonlySet<string>;
   seat: OrganizationUserRole;
-  onToggle: (bindingId: string) => void;
+  onToggle: (grantId: string) => void;
   onUndo: (index: number) => void;
 }) {
-  if (directBindings.isError) {
+  if (directGrants.isError) {
     return (
       <HandledErrorAlert
-        error={directBindings.error}
+        error={directGrants.error}
         fallbackTitle="Couldn't read their role assignments"
       />
     );
   }
-  if (directBindings.isLoading) return <Spinner size="sm" />;
-  const held = directBindings.data ?? [];
+  if (directGrants.isLoading) return <Spinner size="sm" />;
+  const held = directGrants.data ?? [];
   if (held.length === 0 && staged.length === 0) {
     return (
       <Text fontSize="sm" color="fg.muted" fontStyle="italic">
@@ -322,7 +324,7 @@ function DirectAssignments({
       {held.map((b) => {
         const marked = removals.has(b.id);
         const removable =
-          b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsSeat({ binding: b, seat });
+          b.scopeType !== GrantScopeTier.PROJECT && !mirrorsSeat({ grant: b, seat });
         return (
           <HStack
             key={b.id}
@@ -352,7 +354,7 @@ function DirectAssignments({
       })}
       {staged.map((b, i) => (
         <HStack
-          key={bindingKey(b)}
+          key={grantKey(b)}
           px={3}
           py={2}
           bg="bg.muted"
@@ -401,7 +403,7 @@ function MemberGroups({
   return (
     <VStack gap={2} align="stretch">
       {memberGroups.data.map((group) =>
-        group.bindings.length === 0 ? (
+        group.grants.length === 0 ? (
           <HStack
             key={group.id}
             px={3}
@@ -427,7 +429,7 @@ function MemberGroups({
             </Link>
           </HStack>
         ) : (
-          group.bindings.map((b) => (
+          group.grants.map((b) => (
             <HStack key={b.id} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
               <AssignmentBadges {...b} />
               {appliesAsViewer({ role: b.role, organizationRole: pendingRole }) && (
@@ -467,69 +469,70 @@ function useMemberAccessEditor({
   const queryClient = api.useUtils();
 
   const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(memberRole);
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
+  const [pendingGrantRemovals, setPendingGrantRemovals] = useState<Set<string>>(new Set());
+  const [pendingGrantAdditions, setPendingGrantAdditions] = useState<PendingGrant[]>([]);
   // A complete draft never added still counts as a change; the save flushes it.
-  const [hasDraftBinding, setHasDraftBinding] = useState(false);
+  const [hasDraftGrant, setHasDraftGrant] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const bindingInputRef = useRef<BindingInputRowHandle>(null);
+  const grantInputRef = useRef<GrantInputRowHandle>(null);
 
   const reset = () => {
     setPendingRole(memberRole);
-    setPendingBindingRemovals(new Set());
-    setPendingBindingAdditions([]);
-    setHasDraftBinding(false);
+    setPendingGrantRemovals(new Set());
+    setPendingGrantAdditions([]);
+    setHasDraftGrant(false);
   };
   // Staged rows belong to the member they were staged for, never the next one opened.
   useEffect(reset, [userId, memberRole]);
 
-  const directBindings = api.roleBinding.listForUser.useQuery(
+  const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
     { enabled: canManage },
   );
   const memberGroups = api.group.listForMember.useQuery({ organizationId, userId });
   const updateOrgRole = api.organization.updateMemberRole.useMutation();
-  const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
+  const applyMemberGrants = api.authz.applyMemberGrants.useMutation();
 
   const roleChanged = pendingRole !== memberRole;
   const hasChanges =
-    pendingBindingRemovals.size > 0 ||
-    pendingBindingAdditions.length > 0 ||
+    pendingGrantRemovals.size > 0 ||
+    pendingGrantAdditions.length > 0 ||
     roleChanged ||
-    hasDraftBinding;
+    hasDraftGrant;
 
-  const stageAddition = (incoming: PendingBinding) => {
-    const [addition] = newBindingAdditions({
-      staged: [constrainToSeat({ binding: incoming, organizationRole: pendingRole })],
-      held: directBindings.data ?? [],
-      removals: pendingBindingRemovals,
+  const stageAddition = (incoming: PendingGrant) => {
+    const [addition] = newGrantAdditions({
+      staged: [constrainToSeat({ grant: incoming, organizationRole: pendingRole })],
+      held: directGrants.data ?? [],
+      removals: pendingGrantRemovals,
     });
     if (addition === undefined) return;
-    setPendingBindingAdditions((prev) => withStaged({ staged: prev, binding: addition }));
+    setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: addition }));
   };
 
   useEffect(() => {
     if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
-    setPendingBindingAdditions(stagedRowsForLiteSeat);
+    setPendingGrantAdditions(stagedRowsForLiteSeat);
   }, [pendingRole]);
 
   // A role change moves the member between full and Lite seats, so seat usage is re-read too.
   const refreshAccessQueries = () =>
     Promise.all([
-      queryClient.roleBinding.listForUser.invalidate(),
-      queryClient.roleBinding.listForOrg.invalidate(),
+      queryClient.authz.listMemberGrants.invalidate(),
+      queryClient.authz.listManagedGrants.invalidate(),
       queryClient.organization.getMemberById.invalidate(),
       queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
       queryClient.organization.getAll.invalidate(),
+      queryClient.organization.getScopeGraph.invalidate(),
       queryClient.limits.getUsage.invalidate(),
     ]);
 
   const handleSave = async () => {
-    const uncommitted = bindingInputRef.current?.flush() ?? null;
-    const additions = newBindingAdditions({
-      staged: uncommitted ? [...pendingBindingAdditions, uncommitted] : pendingBindingAdditions,
-      held: directBindings.data ?? [],
-      removals: pendingBindingRemovals,
+    const uncommitted = grantInputRef.current?.flush() ?? null;
+    const additions = newGrantAdditions({
+      staged: uncommitted ? [...pendingGrantAdditions, uncommitted] : pendingGrantAdditions,
+      held: directGrants.data ?? [],
+      removals: pendingGrantRemovals,
     });
 
     setIsSaving(true);
@@ -544,11 +547,11 @@ function useMemberAccessEditor({
         // Defaulted: an older server answers without the field, after the save succeeded.
         teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
       }
-      if (pendingBindingRemovals.size > 0 || additions.length > 0) {
-        await applyMemberBindings.mutateAsync({
+      if (pendingGrantRemovals.size > 0 || additions.length > 0) {
+        await applyMemberGrants.mutateAsync({
           organizationId,
           userId,
-          bindingIdsToDelete: [...pendingBindingRemovals],
+          bindingIdsToDelete: [...pendingGrantRemovals],
           bindingsToCreate: additions.map((b) => ({
             role: b.role,
             customRoleId: b.customRoleId,
@@ -577,14 +580,14 @@ function useMemberAccessEditor({
   return {
     pendingRole,
     setPendingRole,
-    pendingBindingRemovals,
-    setPendingBindingRemovals,
-    pendingBindingAdditions,
-    setPendingBindingAdditions,
-    setHasDraftBinding,
-    bindingInputRef,
+    pendingGrantRemovals,
+    setPendingGrantRemovals,
+    pendingGrantAdditions,
+    setPendingGrantAdditions,
+    setHasDraftGrant,
+    grantInputRef,
     reset,
-    directBindings,
+    directGrants,
     memberGroups,
     hasChanges,
     isSaving,

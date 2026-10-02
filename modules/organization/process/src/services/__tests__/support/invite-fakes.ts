@@ -1,5 +1,4 @@
-import type { LedgerActor } from "@langwatch/actor";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { LedgerActor } from "@langwatch/authorization";
 /**
  * In-memory fakes for the ports the invite services are composed from. Each
  * stores real state (a Map, a Set) rather than counting calls, so a test
@@ -12,6 +11,7 @@ import type {
   AuthzAttachBindingsOutput,
   AuthzRevokeBindingsWhereInput,
   AuthzRevokeBindingsWhereOutput,
+  GrantScopeTier,
 } from "@langwatch/authz-contract";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";
 import {
@@ -21,9 +21,9 @@ import {
   type OrganizationInvite,
   type OrganizationUser,
   type OrganizationUserRole,
-  type RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
@@ -51,7 +51,7 @@ export type FakeBinding = {
   userId: string;
   role: string;
   customRoleId: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   actor: LedgerActor;
 };
@@ -133,10 +133,7 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     return removed;
   }
 
-  attach = unsupported<AuthzGrantsService["attach"]>("attach");
-  update = unsupported<AuthzGrantsService["update"]>("update");
   revoke = unsupported<AuthzGrantsService["revoke"]>("revoke");
-  replace = unsupported<AuthzGrantsService["replace"]>("replace");
   offboard = unsupported<AuthzGrantsService["offboard"]>("offboard");
   invalidateOrganization =
     unsupported<AuthzGrantsService["invalidateOrganization"]>("invalidateOrganization");

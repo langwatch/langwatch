@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { SchedulerContent } from "../../../features/event-store/ui/sections/scheduler-panel.tsx";
 import { UpcomingWorkCard } from "../../../features/event-store/ui/sections/upcoming-work-panel.tsx";

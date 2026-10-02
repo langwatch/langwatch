@@ -1,8 +1,8 @@
 // I/O cells: redacted content shows "Redacted" marker, empty content shows
 // em-dash.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -77,19 +77,11 @@ function cellContext(row: TraceListItem): CellRenderContext<TraceListItem> {
 }
 
 function renderInput(over: Partial<TraceListItem>) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {InputCell.render(cellContext(row(over)))}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(InputCell.render(cellContext(row(over))));
 }
 
 function renderOutput(over: Partial<TraceListItem>) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {OutputCell.render(cellContext(row(over)))}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(OutputCell.render(cellContext(row(over))));
 }
 
 afterEach(cleanup);

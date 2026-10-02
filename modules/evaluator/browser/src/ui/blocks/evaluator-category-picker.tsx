@@ -1,5 +1,5 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UiEvaluatorCategoryId } from "@langwatch/browser-host/drawer";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   Brain,
   CheckSquare,

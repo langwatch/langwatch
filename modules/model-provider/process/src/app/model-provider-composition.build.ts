@@ -55,7 +55,7 @@ class RedisModelProviderRateLimit extends ModelProviderRateLimit {
   }
 }
 
-/** What this process hands `ModelProviderApp` at boot. */
+/** What this process hands `ModelProviderModule` at boot. */
 export function buildModelProviderInfrastructure(input: {
   members: Readonly<{ redis: RedisConnection }>;
   config: ModelProviderBuildConfig;
@@ -70,6 +70,7 @@ export function buildModelProviderInfrastructure(input: {
   const probe = HttpModelProviderCredentialProbeService.create({
     egress,
     environment: config.environment,
+    deployedBaseUrls: config.probeBaseUrls,
   });
 
   return {

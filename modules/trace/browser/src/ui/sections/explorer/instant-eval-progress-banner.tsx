@@ -10,8 +10,8 @@ import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../../../behavior/instant-eval-run.store.ts";
-import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useCancelInstantEval } from "../../../behavior/writes/use-trace-writes.ts";
 import { InstantEvalProgressBar } from "../../elements/explorer/instant-eval-progress.tsx";
 import { useInstantEvalRuns } from "./hooks/use-instant-eval-runs.ts";
 
@@ -22,7 +22,7 @@ export function InstantEvalProgressBanner() {
   const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
   const settled = useInstantEvalRunStore((s) => s.settled);
   const markStopped = useInstantEvalRunStore((s) => s.markStopped);
-  const cancel = api.traces.instantEval.cancel.useMutation();
+  const cancel = useCancelInstantEval();
 
   // The last chip typed is the one being judged; an earlier chip's run has
   // already settled, and a settled run has no bar.

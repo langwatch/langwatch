@@ -1,8 +1,13 @@
-import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  httpAgentTestInputSchema,
+  type HttpAuth,
+  type HttpHeader,
+  type HttpMethod,
+} from "@langwatch/agent-contract";
 import { useCallback } from "react";
 
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project.ts";
+import { workflowApi } from "../../workflow-api.ts";
 
 export function useHttpTest({
   url,
@@ -12,6 +17,7 @@ export function useHttpTest({
   outputPath,
   bodyTemplate,
   timeoutMs,
+  agentId,
 }: {
   url: string;
   method: HttpMethod;
@@ -20,9 +26,11 @@ export function useHttpTest({
   outputPath: string;
   bodyTemplate: string;
   timeoutMs?: number;
+  /** A saved agent's id, so the server fills its stored credentials for the test. */
+  agentId?: string;
 }) {
   const { project } = useOrganizationTeamProject();
-  const mutation = api.httpProxy.execute.useMutation();
+  const mutation = workflowApi.httpProxy.execute.useMutation();
 
   const handleTest = useCallback(
     async (templateVariables: Record<string, unknown>) => {
@@ -30,9 +38,16 @@ export function useHttpTest({
         return { success: false, error: "No project selected" };
       }
 
+      const variables =
+        httpAgentTestInputSchema.shape.templateVariables.safeParse(templateVariables);
+      if (!variables.success) {
+        return { success: false, error: "Template variables must be valid JSON values" };
+      }
+
       try {
         const result = await mutation.mutateAsync({
           projectId: project.id,
+          agentId,
           url,
           method,
           headers: headers.map((header) => ({
@@ -41,7 +56,7 @@ export function useHttpTest({
           })),
           auth,
           bodyTemplate,
-          templateVariables,
+          templateVariables: variables.data,
           outputPath,
           timeoutMs,
         });
@@ -66,7 +81,18 @@ export function useHttpTest({
         };
       }
     },
-    [auth, bodyTemplate, headers, method, mutation, outputPath, project?.id, timeoutMs, url],
+    [
+      agentId,
+      auth,
+      bodyTemplate,
+      headers,
+      method,
+      mutation,
+      outputPath,
+      project?.id,
+      timeoutMs,
+      url,
+    ],
   );
 
   return { handleTest, isPending: mutation.isPending };

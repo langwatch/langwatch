@@ -4,8 +4,8 @@
  * See modules/experiment/specs/experiment-entry-redirects.feature.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NewExperimentWorkbench from "../new-workbench.screen.tsx";
@@ -39,18 +39,15 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "test-project" } }),
 }));
 
-vi.mock("@langwatch/workflow-browser-kit", () => ({
+vi.mock("../../../elements/workflow/studio-host/errors.tsx", () => ({
   HandledErrorAlert: ({ error, fallbackTitle }: { error: unknown; fallbackTitle: string }) => {
     alertMock(error);
     return <div role="alert">{fallbackTitle}</div>;
   },
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    datasetRecord: {
-      getAll: { useQuery: () => ({ data: datasetState.data }) },
-    },
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     experiments: {
       saveEvaluationsV3: {
         useMutation: () => ({
@@ -69,15 +66,18 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
     },
   },
 }));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    datasetRecord: {
+      getAll: { useQuery: () => ({ data: datasetState.data }) },
+    },
+  },
+}));
 
-const Page = () => (
-  <ChakraProvider value={defaultSystem}>
-    <NewExperimentWorkbench />
-  </ChakraProvider>
-);
+const Page = () => <NewExperimentWorkbench />;
 
 const renderRepeatedly = () => {
-  const view = render(<Page />);
+  const view = renderWithDesignSystem(<Page />);
   for (let i = 0; i < 4; i++) view.rerender(<Page />);
   return view;
 };

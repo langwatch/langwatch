@@ -11,11 +11,20 @@ import type { AutomationRunawayNotice } from "../../channels/automation-runaway-
 import { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
 
+const pausedRow = (action = "SEND_EMAIL") => ({
+  id: "trigger-1",
+  name: "Every trace",
+  action,
+  actionParams: { slackIntegrationId: "slack-1", slackChannelId: "C1" },
+  deleted: false,
+});
+
 class TestRunawaySignals
   extends AutomationRunawayRepository
   implements AutomationRunawayNotice, AutomationRunawaySignals
 {
-  readonly paused = vi.fn();
+  pausedAction = "SEND_EMAIL";
+  readonly paused = vi.fn(async () => pausedRow(this.pausedAction));
   readonly emailed = vi.fn<
     (input: { kind: "ceiling_reached" | "paused"; nextStep?: unknown }) => Promise<void>
   >(async () => undefined);
@@ -91,7 +100,12 @@ function breach(overrides: Partial<AutomationPersistCapBreach> = {}): Automation
   };
 }
 
-function runtime(signals = new TestRunawaySignals()): {
+const noSlackClaims = { updateConnectionClaim: async () => {} };
+
+function runtime(
+  signals = new TestRunawaySignals(),
+  slackConnections: typeof noSlackClaims = noSlackClaims,
+): {
   signals: TestRunawaySignals;
   service: RunawayContainmentService;
 } {
@@ -99,6 +113,7 @@ function runtime(signals = new TestRunawaySignals()): {
     runaway: signals,
     triggers: { update: signals.paused } as never,
     clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
+    slackConnections,
   });
   return { signals, service };
 }
@@ -280,11 +295,13 @@ describe("runaway containment policy", () => {
     const failThenSucceed = vi.fn(async () => {
       writes += 1;
       if (writes === 1) throw new Error("db write failed");
+      return pausedRow();
     });
     const service = RunawayContainmentService.create({
       runaway: signals,
       triggers: { update: failThenSucceed } as never,
       clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
+      slackConnections: noSlackClaims,
     });
 
     await service.handle(breach());
@@ -306,6 +323,32 @@ describe("runaway containment policy", () => {
     expect(signals.emailed).toHaveBeenCalledTimes(1);
   });
 
+  it("releases a runaway-paused Slack automation's connection claim", async () => {
+    const signals = new TestRunawaySignals();
+    signals.pausedAction = "SEND_SLACK_MESSAGE";
+    const claims = { updateConnectionClaim: vi.fn(async () => {}) };
+    const { service } = runtime(signals, claims);
+
+    await service.handle(breach());
+
+    const actionParams = pausedRow().actionParams;
+    expect(claims.updateConnectionClaim).toHaveBeenCalledWith({
+      projectId: "project-1",
+      trigger: { id: "trigger-1", name: "Every trace" },
+      before: { actionParams, active: true },
+      after: { actionParams, active: false },
+    });
+  });
+
+  it("leaves claims alone when a non-Slack automation is paused", async () => {
+    const claims = { updateConnectionClaim: vi.fn(async () => {}) };
+    const { service } = runtime(new TestRunawaySignals(), claims);
+
+    await service.handle(breach());
+
+    expect(claims.updateConnectionClaim).not.toHaveBeenCalled();
+  });
+
   /** @scenario "A paused automation stops recording matches" */
   it("drops the trigger from the active set the same write that pauses it", async () => {
     const signals = new TestRunawaySignals();
@@ -318,9 +361,11 @@ describe("runaway containment policy", () => {
       triggers: {
         update: async (input: { id: string; active: boolean }) => {
           if (!input.active) active.delete(input.id);
+          return pausedRow();
         },
       } as never,
       clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
+      slackConnections: noSlackClaims,
     });
 
     expect(active).toContain("trigger-1");

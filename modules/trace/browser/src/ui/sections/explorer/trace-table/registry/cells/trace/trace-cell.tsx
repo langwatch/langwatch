@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 
 import { TracePresenceAvatars } from "../../../../../../elements/presence/trace-presence-avatars.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

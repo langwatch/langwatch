@@ -5,8 +5,9 @@
  * Specs: specs/api-keys/{unified-api-keys,scope-filter,project-key-rotation}.feature
  */
 
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import type * as scopeChipPickerModule from "@langwatch/design-system/scope-chip-picker";
+import type * as scopeFilterModule from "@langwatch/design-system/scope-filter";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,9 +20,8 @@ const { state } = vi.hoisted(() => ({
   state: {
     keys: [] as Record<string, unknown>[],
     members: [] as Record<string, unknown>[],
-    regenerate: { apiKey: "sk-rotated-9999" },
     createToken: "sk-lw-mintedtokenvalue0001",
-    regenerateFails: false,
+    legacyKey: undefined as { present: boolean } | undefined,
   },
 }));
 
@@ -29,7 +29,6 @@ const mutations = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   revoke: vi.fn(),
-  regenerate: vi.fn(),
 }));
 
 vi.mock("../../../behavior/api-key-api.ts", () => ({
@@ -80,26 +79,12 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
       },
     },
     project: {
-      regenerateApiKey: {
-        useMutation: () => ({
-          isPending: false,
-          mutate: (
-            input: unknown,
-            handlers: {
-              onSuccess: (r: { apiKey: string }) => void;
-              onError: (e: unknown) => void;
-            },
-          ) => {
-            mutations.regenerate(input);
-            if (state.regenerateFails) {
-              handlers.onError({ data: { error: { code: "insufficient_permissions" } } });
-              return;
-            }
-            handlers.onSuccess(state.regenerate);
-          },
+      getHasFirstMessage: { useQuery: () => ({ data: void 0 }) },
+      getLegacyKeyStatus: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
+          data: options?.enabled ? state.legacyKey : void 0,
         }),
       },
-      getHasFirstMessage: { useQuery: () => ({ data: void 0 }) },
     },
     organization: { getAll: { useQuery: () => ({ data: [] }) } },
   },
@@ -108,9 +93,9 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // The picker and the filter are `@langwatch/authz-browser`'s and have their own
 // suites; what this file is about is what the SCREEN does with the value they
 // hand back, so the filter is replaced by buttons that call `onChange`.
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
+  const actual = await vi.importActual<typeof scopeChipPickerModule>(
+    "@langwatch/design-system/scope-chip-picker",
   );
   return {
     ...actual,
@@ -121,6 +106,15 @@ vi.mock("@langwatch/authz-browser-kit", async () => {
         scopes
       </button>
     ),
+  };
+});
+
+vi.mock("@langwatch/design-system/scope-filter", async () => {
+  const actual = await vi.importActual<typeof scopeFilterModule>(
+    "@langwatch/design-system/scope-filter",
+  );
+  return {
+    ...actual,
     ScopeFilter: ({ onChange }: { onChange: (next: unknown) => void }) => (
       <div>
         <button
@@ -174,7 +168,7 @@ function keyRow(overrides: Record<string, unknown> = {}) {
     ingestSourceType: null,
     ingestionTemplateId: null,
     createdByDeviceLabel: null,
-    roleBindings: [
+    grants: [
       {
         id: "rb-1",
         role: "ADMIN",
@@ -193,10 +187,9 @@ function keyRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   state.keys = [];
   state.members = [];
-  state.regenerateFails = false;
+  state.legacyKey = void 0;
   mutations.create.mockClear();
   mutations.revoke.mockClear();
-  mutations.regenerate.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -274,7 +267,7 @@ describe("given keys bound at different scopes", () => {
       keyRow({
         id: "key-other",
         name: "Growth key",
-        roleBindings: [
+        grants: [
           {
             id: "rb-2",
             role: "ADMIN",
@@ -362,15 +355,17 @@ describe("given keys bound at different scopes", () => {
   describe("when the filter narrows everything away", () => {
     /** @scenario Filter with zero matches shows a plain empty state */
     it("says so, and says something different when there are simply no keys", () => {
+      // A reader who cannot manage the project sees no Project API Key row to fill the table.
+      const grants = new Set(["organization:view"]);
       state.keys = [];
-      const { unmount } = renderWithApiKeyHost(<ApiKeysScreen />);
+      const { unmount } = renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost({ grants }));
       expect(screen.getByText("No API keys. Create one to get started.")).toBeInTheDocument();
       unmount();
 
-      state.keys = [keyRow({ roleBindings: [] })];
+      state.keys = [keyRow({ grants: [] })];
       renderWithApiKeyHost(
         <ApiKeysScreen />,
-        new FakeApiKeyHost({ query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),
+        new FakeApiKeyHost({ grants, query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),
       );
       expect(screen.getByText(/No keys match the current scope/)).toBeInTheDocument();
     });
@@ -378,87 +373,64 @@ describe("given keys bound at different scopes", () => {
 });
 
 describe("given the legacy project key exists", () => {
-  const withProjectKey = (grants?: ReadonlySet<string>) =>
-    new FakeApiKeyHost({
-      scope: { projectApiKey: "sk-legacy-projectkey-abcd" },
-      ...(grants ? { grants } : {}),
-    });
-
   describe("when the reader can manage the project", () => {
-    /** @scenario An admin rotates the base key and sees the new key once */
-    /** @scenario Legacy project key row names its project */
-    it("shows only the last four characters of the key, on a row naming its project", () => {
-      renderWithApiKeyHost(<ApiKeysScreen />, withProjectKey());
-      expect(screen.getByText("sk-…abcd")).toBeInTheDocument();
-      expect(screen.queryByText(/sk-legacy-projectkey/)).toBeNull();
-      // The row is fixed to ONE project, and says which - the same named scope
-      // chip the user-scoped rows carry.
-      expect(screen.getByText("Web App")).toBeInTheDocument();
+    /** @scenario The legacy project key can no longer be found on the keys page */
+    it("shows no project key row, and offers no copy or rotation control", () => {
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+      expect(screen.queryByText("Project API Key")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Copy secret key" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Rotate Project API Key" })).toBeNull();
+    });
+  });
+});
+
+describe("given the project still has a legacy key", () => {
+  describe("when an organization admin opens the keys page", () => {
+    /** @scenario A banner tells an admin that legacy project keys are going away */
+    it("warns that legacy project keys are going away and offers no action", () => {
+      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
+      state.legacyKey = { present: true };
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      const banner = screen.getByTestId("legacy-project-key-banner");
+      expect(banner).toHaveTextContent("Legacy project keys are going away");
+      expect(banner).toHaveTextContent("Use personal access tokens instead.");
+      expect(within(banner).queryByRole("button")).toBeNull();
     });
 
-    /** @scenario An admin rotates the base key and sees the new key once */
-    it("copies the FULL key, not the four characters it renders", async () => {
-      const user = userEvent.setup();
-      const host = withProjectKey();
-      renderWithApiKeyHost(<ApiKeysScreen />, host);
-      await user.click(screen.getByRole("button", { name: "Copy secret key" }));
-      expect(host.copies).toEqual([
-        {
-          text: "sk-legacy-projectkey-abcd",
-          succeeded: { title: "API key copied to clipboard" },
-        },
-      ]);
-    });
+    it("shows no banner once the legacy key is gone", () => {
+      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
+      state.legacyKey = { present: false };
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
-    /** @scenario An admin rotates the base key and sees the new key once */
-    it("confirms before rotating, then reveals the new key once", async () => {
-      const user = userEvent.setup();
-      renderWithApiKeyHost(<ApiKeysScreen />, withProjectKey());
-      await user.click(screen.getByRole("button", { name: "Rotate Project API Key" }));
-      expect(await screen.findByText("Regenerate API Key?")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Regenerate Key" }));
-      expect(mutations.regenerate).toHaveBeenCalledWith({ projectId: "proj-1" });
-      expect(await screen.findByText("Token Created")).toBeInTheDocument();
-    });
-
-    /** @scenario An admin rotates the base key and sees the new key once */
-    /** @scenario A failed rotation leaves the previous base key working */
-    it("tells the reader when the rotation is refused, and leaves the old key on the row", async () => {
-      state.regenerateFails = true;
-      const user = userEvent.setup();
-      const host = withProjectKey();
-      renderWithApiKeyHost(<ApiKeysScreen />, host);
-      await user.click(screen.getByRole("button", { name: "Rotate Project API Key" }));
-      await user.click(await screen.findByRole("button", { name: "Regenerate Key" }));
-      // The RAW error travels, never a sentence the screen composed: the wire
-      // message of a handled error is its code slug.
-      expect(host.failures).toHaveLength(1);
-      expect(host.failures[0]!.fallbackTitle).toBe("Couldn't rotate the project API key");
-      expect(host.successes).toEqual([]);
-      // Nothing was minted, so nothing is revealed and the row still shows the
-      // key that is still working.
-      expect(screen.queryByText("Token Created")).toBeNull();
-      expect(screen.getByText("sk-…abcd")).toBeInTheDocument();
-    });
-
-    /** @scenario The base key keeps working until it is explicitly rotated */
-    it("rotates only on an explicit confirmation, never on opening the dialog", async () => {
-      const user = userEvent.setup();
-      renderWithApiKeyHost(<ApiKeysScreen />, withProjectKey());
-      await user.click(screen.getByRole("button", { name: "Rotate Project API Key" }));
-      expect(await screen.findByText("Regenerate API Key?")).toBeInTheDocument();
-      expect(mutations.regenerate).not.toHaveBeenCalled();
-      expect(screen.getByText("sk-…abcd")).toBeInTheDocument();
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
     });
   });
 
-  describe("when the reader cannot manage the project", () => {
-    /** @scenario Rotation requires permission to manage the project */
-    it("offers no rotation control at all", () => {
-      renderWithApiKeyHost(<ApiKeysScreen />, withProjectKey(new Set(["organization:view"])));
-      expect(screen.queryByRole("button", { name: "Rotate Project API Key" })).toBeNull();
-      // The copy action is not a mutation and stays.
-      expect(screen.getByRole("button", { name: "Copy secret key" })).toBeInTheDocument();
+  describe("when a reader who cannot manage the project opens the keys page", () => {
+    /** @scenario A reader who cannot manage the project sees no banner and no error */
+    it("never asks for the status, so shows no banner and no error", () => {
+      state.members = [];
+      // The status would show a banner if it were read; the fake answers only an enabled read.
+      state.legacyKey = { present: true };
+      renderWithApiKeyHost(
+        <ApiKeysScreen />,
+        new FakeApiKeyHost({ grants: new Set(["organization:view"]) }),
+      );
+
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+
+  describe("when a project admin who is not an organization admin opens the keys page", () => {
+    /** @scenario A banner tells an admin that legacy project keys are going away */
+    it("shows the banner, since the server answered the status read", () => {
+      state.members = [];
+      state.legacyKey = { present: true };
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      expect(screen.getByTestId("legacy-project-key-banner")).toBeInTheDocument();
     });
   });
 });

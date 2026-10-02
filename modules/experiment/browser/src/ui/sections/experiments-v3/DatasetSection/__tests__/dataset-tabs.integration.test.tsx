@@ -3,18 +3,13 @@
  * being icon-only, so they are easy to find.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { DatasetTabs } from "../dataset-tabs.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const handlers = {
   onSelectExisting: vi.fn(),
@@ -37,7 +32,7 @@ describe("DatasetTabs", () => {
     describe("when the header controls are shown", () => {
       /** @scenario Dataset header add and edit controls show text labels */
       it("labels the add and edit-columns controls with text, not icons alone", () => {
-        render(<DatasetTabs {...handlers} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<DatasetTabs {...handlers} />);
 
         expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Edit columns" })).toBeInTheDocument();
@@ -47,7 +42,7 @@ describe("DatasetTabs", () => {
     describe("when the edit-columns control is clicked", () => {
       it("invokes the edit-dataset handler", async () => {
         const user = userEvent.setup();
-        render(<DatasetTabs {...handlers} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<DatasetTabs {...handlers} />);
 
         await user.click(screen.getByRole("button", { name: "Edit columns" }));
 

@@ -1,7 +1,7 @@
 /**
- * Monaco IntelliSense for the dashboard-widget editor's `LW` global — this
- * file never runs; the real object is built by `bridge/shimSource.ts`. Keep
- * this in sync with that file's `LW` object and with `bridge/bridgeProtocol.ts`.
+ * Monaco IntelliSense for the widget editor's `LW` global; never runs. The real object
+ * is the contract's `chart-frame-shim-source.ts`, and a unit test fails when it adds
+ * a member not declared here.
  */
 
 export const LW_GLOBAL_DTS = `
@@ -56,10 +56,21 @@ interface LwQueryColumn {
   readonly type: string;
 }
 
+/**
+ * Row shape per declared query name. Empty here; each widget's editor merges
+ * the columns of the query's last run into it (see the generated row types).
+ */
+interface LwQueryRowMap {}
+
+/** The row a query named \`N\` yields: its last-run columns, else an unknown record. */
+type LwRow<N extends string> = N extends keyof LwQueryRowMap
+  ? LwQueryRowMap[N]
+  : Record<string, unknown>;
+
 /** What a resolved \`LW.query(...)\` (and \`useChartQuery\`'s \`data\`) carries. */
-interface LwQueryResult {
+interface LwQueryResult<Row = Record<string, unknown>> {
   readonly columns: readonly LwQueryColumn[];
-  readonly rows: readonly Record<string, unknown>[];
+  readonly rows: readonly Row[];
   readonly statistics: Record<string, unknown>;
   readonly diagnostics: readonly Record<string, unknown>[];
   readonly followsTimeWindow: boolean;
@@ -81,9 +92,9 @@ type LwLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 type LwNavigableTarget = "traces" | "trace";
 
 /** Return shape of \`LW.useChartQuery\`, matching TanStack Query's \`useQuery\` naming. */
-interface LwChartQueryState {
+interface LwChartQueryState<Row = Record<string, unknown>> {
   /** \`result.rows\` once loaded, else \`null\`. */
-  readonly data: readonly Record<string, unknown>[] | null;
+  readonly data: readonly Row[] | null;
   /** True only on the first load (no data yet), not on background refetches. */
   readonly isLoading: boolean;
   /** True for the initial load AND every refetch (dashboard context change, manual \`refetch()\`). */
@@ -126,10 +137,10 @@ interface LwApi {
    * are bound automatically from \`LW.dashboardContext\` and should not be
    * passed here.
    */
-  query: (
-    queryName: string,
+  query: <N extends string>(
+    queryName: N,
     params?: Readonly<Record<string, LwQueryParamValue>>,
-  ) => Promise<LwQueryResult>;
+  ) => Promise<LwQueryResult<LwRow<N>>>;
 
   /**
    * The recommended way to fetch: wraps \`LW.query\` in a React hook with the
@@ -139,10 +150,10 @@ interface LwApi {
    * \`LW.onDashboardContextChange\` — a widget using this hook stays live
    * without touching that API directly.
    */
-  useChartQuery: (
-    queryName: string,
+  useChartQuery: <N extends string>(
+    queryName: N,
     params?: Readonly<Record<string, LwQueryParamValue>>,
-  ) => LwChartQueryState;
+  ) => LwChartQueryState<LwRow<N>>;
 
   /**
    * Requests the frame's iframe be resized to \`px\` (clamped to the host's
@@ -188,4 +199,8 @@ interface LwApi {
 }
 
 declare const LW: LwApi;
+
+interface Window {
+  readonly LW: LwApi;
+}
 `;

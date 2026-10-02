@@ -3,6 +3,11 @@
  * out. Prose goes to stderr, so stdout never has to tell the two apart.
  */
 
+export type ColorScheme = "light" | "dark";
+
+/** ColorSchemeChoice is what a run asks for: one scheme, or `both` (a pass of each). */
+export type ColorSchemeChoice = ColorScheme | "both";
+
 export interface Viewport {
   width: number;
   height: number;
@@ -79,6 +84,8 @@ export interface Plan {
   concurrency?: Concurrency;
   /** check photographs a flow only at its expects and its failure, and times each flow. */
   check?: boolean;
+  /** colorScheme is light (the default), dark, or both: a pass of each, dark keyed `<key>@dark`. */
+  colorScheme?: ColorSchemeChoice;
 }
 
 export interface Concurrency {

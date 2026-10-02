@@ -205,41 +205,12 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     # switch projects non-interactively (field report).
 
   @bdd @cli @login @project @slug @integration
-  Scenario: `langwatch login --project <slug>` resolves the key through the device session, no browser
-    Given the user has a valid device session in ~/.langwatch/config.json
-    And a shared project with the given slug exists in the session's organization
-    And the user has write access to that project
-    When the user runs `langwatch login --project <slug>` (TTY or not)
-    Then the CLI calls POST /api/auth/cli/project-key with the slug and its bearer token
-    And the server returns that project's existing API key (nothing new is minted)
-    And the CLI writes LANGWATCH_API_KEY to $CWD/.env
-    And no browser opens and no prompt fires
-
-  @bdd @cli @login @project @slug @integration
   Scenario: `--project <slug>` without a device session fails with actionable guidance
     Given no device session exists in ~/.langwatch/config.json
     When the user runs `langwatch login --project some-slug`
     Then the CLI exits 1 without a browser
     And stderr says a device login is needed first (`langwatch login` in a browser-able
       terminal) or to use `--api-key <key>` instead
-
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses a project the caller cannot manage
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names a project the user cannot write to
-    Then the server responds 403 and no key is returned
-
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint returns the caller's own personal project key
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names the caller's own personal project slug
-    Then the server returns the personal project's API key
-
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses another user's personal project
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names another user's personal project slug
-    Then the server responds 400 personal_project_not_allowed
 
   @bdd @cli @login @agent-aware @fake-tty
   Scenario: agent-hint banner is shown EVEN when stdin reports as TTY (fake-TTY agents)

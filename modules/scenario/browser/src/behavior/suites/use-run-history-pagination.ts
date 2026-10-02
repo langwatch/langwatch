@@ -1,22 +1,14 @@
 /**
- * Cursor-based pagination for suite run history.
+ * Cursor-based pagination for suite run history, on tRPC's infinite query.
  *
- * Manages cursor, accumulated pages, period resets, and data fetching.
+ * The input minus the cursor keys the query, so a period change starts over by itself.
  */
 
-import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
+import { useCallback, useMemo } from "react";
 
-import { api } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { useSuiteRunFreshness } from "./use-suite-run-freshness.ts";
-
-type PageData = {
-  runs: ScenarioRunData[];
-  scenarioSetIds: Record<string, string>;
-  hasMore: boolean;
-  nextCursor?: string;
-};
 
 interface UseRunHistoryPaginationOptions {
   scenarioSetId?: string;
@@ -26,7 +18,8 @@ interface UseRunHistoryPaginationOptions {
 }
 
 /**
- * Deliberately sends no upper bound.
+ * Deliberately sends no upper bound and no `sinceTimestamp`, so the server never
+ * answers `changed: false`; a page that did would carry no runs and is skipped.
  */
 export function useRunHistoryPagination({
   scenarioSetId,
@@ -34,57 +27,31 @@ export function useRunHistoryPagination({
   sseConnected = false,
 }: UseRunHistoryPaginationOptions) {
   const { project } = useOrganizationTeamProject();
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [pages, setPages] = useState<PageData[]>([]);
-  const prevCursorRef = useRef<string | undefined>(undefined);
 
-  // Reset pagination when period changes
-  useEffect(() => {
-    setCursor(undefined);
-    setPages([]);
-  }, [startDateMs]);
+  const { data, isLoading, error, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    scenarioClient.scenarios.getSuiteRunData.useInfiniteQuery(
+      {
+        projectId: project?.id ?? "",
+        scenarioSetId,
+        limit: 20,
+        startDate: startDateMs,
+      },
+      {
+        enabled: !!project,
+        getNextPageParam: (last) => (last.changed && last.hasMore ? last.nextCursor : undefined),
+        // No timer on the heavy query: SSE invalidations and the freshness
+        // probe below drive refetches, so quiet sets never re-download runs.
+      },
+    );
 
-  const {
-    data: runDataResult,
-    isLoading,
-    error,
-    refetch,
-  } = api.scenarios.getSuiteRunData.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scenarioSetId,
-      limit: 20,
-      cursor,
-      startDate: startDateMs,
-    },
-    {
-      enabled: !!project,
-      // No timer on the heavy query: SSE invalidations and the freshness
-      // probe below drive refetches, so quiet sets never re-download runs.
-      trpc: { context: { skipBatch: true } },
-    },
-  );
-
-  // Accumulate pages as data arrives
-  useEffect(() => {
-    if (!runDataResult?.changed) return;
-
-    if (cursor === undefined) {
-      setPages([runDataResult]);
-    } else if (cursor !== prevCursorRef.current) {
-      setPages((prev) => [...prev, runDataResult]);
-    }
-    prevCursorRef.current = cursor;
-  }, [runDataResult, cursor]);
+  const pages = useMemo(() => data?.pages.flatMap((p) => (p.changed ? [p] : [])) ?? [], [data]);
 
   // Stored status is the only truth: stalled runs are finished ERROR by the
   // process-manager stall watchdog and arrive here via the event broadcast
   // refetch, so no client-side stall re-check is needed.
   const allRuns = useMemo(() => pages.flatMap((p) => p.runs), [pages]);
 
-  // Cheap freshness probe replaces the old 30s heavy re-fetch. Matches the
-  // previous auto-refresh scope: only while the user hasn't paginated deeper
-  // (accumulated pages beyond the first are not auto-refreshed).
+  // Cheap freshness probe, only while the user hasn't paginated past the first page.
   useSuiteRunFreshness({
     scenarioSetId,
     startDateMs,
@@ -95,25 +62,18 @@ export function useRunHistoryPagination({
 
   const allScenarioSetIds = useMemo(() => {
     const merged: Record<string, string> = {};
-    for (const page of pages) {
-      Object.assign(merged, page.scenarioSetIds);
-    }
+    for (const page of pages) Object.assign(merged, page.scenarioSetIds);
     return merged;
   }, [pages]);
 
-  const hasMore = pages.length > 0 ? (pages[pages.length - 1]?.hasMore ?? false) : false;
-
   const loadMore = useCallback(() => {
-    const lastPage = pages[pages.length - 1];
-    if (lastPage?.nextCursor) {
-      setCursor(lastPage.nextCursor);
-    }
-  }, [pages]);
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return {
     allRuns,
     allScenarioSetIds,
-    hasMore,
+    hasMore: hasNextPage ?? false,
     loadMore,
     isLoading: isLoading && pages.length === 0,
     error,

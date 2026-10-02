@@ -44,3 +44,10 @@ Feature: Browser session lifecycle
     When the signed-in users are counted for that organization's members
     Then each member with a live session counts once
     And nobody outside the organization is counted
+
+  @unit
+  Scenario: A run nobody started acts as the system actor at the door
+    Given an ownerless key minted for a run nobody started, such as a monitor's
+    When the run calls a project route with it
+    Then the handler's actor is the system acting for an unattended run
+    And never the creator of the monitor, nor nobody

@@ -72,6 +72,20 @@ describe("startNavigationSpan", () => {
       });
     });
 
+    describe("when the page is a share link", () => {
+      /** @scenario "Browser telemetry names a share link by its route" */
+      it("names the share path /share/:id from the moment the span starts", () => {
+        startNavigationSpan({ toPath: "/share/abc123def", fromPath: "/share/old456ghi" });
+        // A successor supersedes it, so it is exported under the name it started with.
+        startNavigationSpan({ toPath: "/acme/home" }).end();
+
+        const span = exported("navigation /share/:id");
+        expect(span?.attributes[ATTR_URL_PATH]).toBe("/share/:id");
+        expect(span?.attributes[ATTR_NAVIGATION_FROM_PATH]).toBe("/share/:id");
+        expect(span?.attributes[ATTR_NAVIGATION_SUPERSEDED]).toBe(true);
+      });
+    });
+
     describe("when the page it opens calls the server", () => {
       /** scenario "Navigating between pages is visible as work" */
       it("puts the call beneath the navigation, across the async gap", async () => {

@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -13,11 +13,7 @@ afterEach(cleanup);
 const LONG_SLUG = "issue1234-a-very-long-worktree-branch-name-that-cannot-fit-in-the-top-bar";
 
 function renderBadge(label?: string) {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <DevBadge label={label} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<DevBadge label={label} />);
 }
 
 describe("given a development build on a haven stack", () => {

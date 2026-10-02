@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   LICENSE_ERRORS,
@@ -11,6 +13,7 @@ import {
   type PlatformLicenseInspection,
   type RemoveLicenseResult,
   type StoreLicenseResult,
+  DENIED_SSO_GATE_TTL_MS,
 } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { licenseResourceCounts } from "@langwatch/plans";
@@ -93,6 +96,11 @@ export class LicenseService extends LicensingServiceContract {
    */
   private readonly plans: LicensePlanSourceService;
   private platformSsoGate: Promise<boolean> | undefined;
+  /** When the memo resolved to a deny; an allow is kept for the process. */
+  private platformSsoDeniedAt: number | undefined;
+  private platformSsoAllowedForProcess = false;
+  /** Bumped by every license this process stores or removes. */
+  private storedRevision = 0;
   private readonly instanceLicenseKey: string | undefined;
 
   private constructor(options: LicenseServiceOptions) {
@@ -115,45 +123,74 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async inspectPlatformAccess(): Promise<PlatformLicenseAccess> {
+    return (await this.scanPlatformLicenses()).access;
+  }
+
+  /** `sha256:` of the licence key that permits the platform, empty where none does: the
+   *  evidence a licence-proved domain records, so the key itself never leaves licensing. */
+  async findPlatformLicenseDigests(): Promise<string[]> {
+    const { permitting } = await this.scanPlatformLicenses();
+    if (permitting === undefined) return [];
+    return [`sha256:${createHash("sha256").update(permitting).digest("hex")}`];
+  }
+
+  /** The instance key first, then every stored one, until one permits the platform. */
+  private async scanPlatformLicenses(): Promise<{
+    access: PlatformLicenseAccess;
+    permitting?: string;
+  }> {
     const inspections: PlatformLicenseInspection[] = [];
-    if (this.instanceLicenseKey) {
-      const inspection = this.inspectPlatformLicense(this.instanceLicenseKey, {
-        source: "instance",
-      });
+    const permits = (
+      licenseKey: string,
+      source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
+    ): boolean => {
+      const inspection = this.inspectPlatformLicense(licenseKey, source);
       inspections.push(inspection);
-      if (inspection.valid) {
-        return { allowed: true, inspections };
-      }
+      return inspection.valid;
+    };
+    if (this.instanceLicenseKey && permits(this.instanceLicenseKey, { source: "instance" })) {
+      return { access: { allowed: true, inspections }, permitting: this.instanceLicenseKey };
     }
 
     const candidates = await this.repository.findOrganizationsWithLicense();
     for (const candidate of candidates) {
-      const inspection = this.inspectPlatformLicense(candidate.licenseKey, {
-        source: "organization",
-        organizationId: candidate.organizationId,
-      });
-      inspections.push(inspection);
-      if (inspection.valid) {
-        return { allowed: true, inspections };
+      const source = { source: "organization" as const, organizationId: candidate.organizationId };
+      if (permits(candidate.licenseKey, source)) {
+        return { access: { allowed: true, inspections }, permitting: candidate.licenseKey };
       }
     }
 
-    return { allowed: false, inspections };
+    return { access: { allowed: false, inspections } };
   }
 
   /**
    * Whether a signed license anywhere on this deployment permits platform single
-   * sign-on. Decided once per process; a failed scan is not remembered (ADR-027).
+   * sign-on (ADR-027 v9). An allow is kept for the process, a deny is read again
+   * after `DENIED_SSO_GATE_TTL_MS` or a store here, and a failed scan is not kept.
    */
   async isPlatformSsoLicensed({ isSaas }: { isSaas: boolean }): Promise<boolean> {
     if (isSaas) return true;
-    this.platformSsoGate ??= this.inspectPlatformAccess().then(
-      (access) => access.allowed,
-      (error: unknown) => {
-        this.platformSsoGate = undefined;
-        throw error;
-      },
-    );
+    const deniedAt = this.platformSsoDeniedAt;
+    if (deniedAt !== undefined && this.nowMs() - deniedAt >= DENIED_SSO_GATE_TTL_MS) {
+      this.invalidatePlatformSsoGate();
+    }
+    if (!this.platformSsoGate) {
+      const pending: Promise<boolean> = this.inspectPlatformAccess().then(
+        (access) => {
+          // An invalidation while this scan was in flight already replaced the memo.
+          if (this.platformSsoGate === pending) {
+            this.platformSsoDeniedAt = access.allowed ? undefined : this.nowMs();
+            this.platformSsoAllowedForProcess = access.allowed;
+          }
+          return access.allowed;
+        },
+        (error: unknown) => {
+          if (this.platformSsoGate === pending) this.platformSsoGate = undefined;
+          throw error;
+        },
+      );
+      this.platformSsoGate = pending;
+    }
     try {
       return await this.platformSsoGate;
     } catch (error) {
@@ -163,6 +200,22 @@ export class LicenseService extends LicensingServiceContract {
       );
       return false;
     }
+  }
+
+  /** Changes on every license this process stores or removes. */
+  licenseRevision(): number {
+    return this.storedRevision;
+  }
+
+  /** Forgets a deny so the next request reads the store; an allow is kept. */
+  invalidatePlatformSsoGate(): void {
+    if (this.platformSsoAllowedForProcess) return;
+    this.platformSsoGate = undefined;
+    this.platformSsoDeniedAt = undefined;
+  }
+
+  private nowMs(): number {
+    return this.configuration.now().epochMilliseconds;
   }
 
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
@@ -206,6 +259,9 @@ export class LicenseService extends LicensingServiceContract {
       validatedAt: this.configuration.now(),
     });
     await this.provisionMissingRetentionPolicies(organizationId);
+    // This process sees the license at once; other replicas within the deny TTL.
+    this.storedRevision += 1;
+    this.invalidatePlatformSsoGate();
 
     return { success: true, planInfo: result.planInfo };
   }
@@ -259,6 +315,7 @@ export class LicenseService extends LicensingServiceContract {
     }
 
     await this.repository.removeLicense(organizationId);
+    this.storedRevision += 1;
 
     return { removed: true };
   }

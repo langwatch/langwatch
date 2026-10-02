@@ -4,11 +4,10 @@
  * the scenario with its suite fields, and the trace.
  * @see specs/features/agent-testing/suite-editor.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { scenarioMappingSources } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -25,10 +24,6 @@ import {
   EvaluatorEditorFooter,
   type EvaluatorGateConfig,
 } from "../evaluator-editor-shared.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const SUITE_FIELDS = [
   { identifier: "golden_sql", type: "text" as const },
@@ -166,9 +161,9 @@ describe("the evaluator editor on a scenario attachment", () => {
       /** @scenario "The evaluator editor offers the conversation, the scenario and the trace as sources" */
       it("lists Conversation, Scenario and Trace, and the suite fields under Scenario", async () => {
         const user = userEvent.setup();
-        render(<Harness gate={{ required: true, canRequire: true }} required={true} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <Harness gate={{ required: true, canRequire: true }} required={true} />,
+        );
 
         await user.click(screen.getByTestId("mapping-input-expected_output"));
         await waitFor(() => expect(screen.getByText("Conversation")).toBeInTheDocument());
@@ -188,13 +183,12 @@ describe("the evaluator editor on a scenario attachment", () => {
       it("writes a trace.spans mapping and renders its chip as spans", async () => {
         const user = userEvent.setup();
         const onMappingChange = vi.fn();
-        render(
+        renderWithDesignSystem(
           <Harness
             gate={{ required: true, canRequire: true }}
             required={true}
             onMappingChange={onMappingChange}
           />,
-          { wrapper: Wrapper },
         );
 
         await user.click(screen.getByTestId("mapping-input-expected_output"));

@@ -4,22 +4,26 @@
  * rows arrive pre-masked and only the editor drawer accepts a key.
  */
 
-import { Box, Button, Card, HStack, Skeleton, Spacer, Table, Text, VStack } from "@chakra-ui/react";
-import {
-  ProviderScopeChips,
-  ScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Skeleton,
+  Spacer,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { BrainCircuit, Edit, MoreVertical, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -30,6 +34,11 @@ import {
   useModelProviderConnectionTest,
   type ConnectionTestState,
 } from "../../behavior/use-model-provider-connection-test.ts";
+import {
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   MODEL_PROVIDER_MANAGE_PERMISSION,
   MODEL_PROVIDER_SCOPE_QUERY_KEY,
@@ -396,9 +405,8 @@ export default function ModelProvidersScreen() {
 
   useEffect(() => {
     if (isProviderDrawerOpen) return;
-    // Refetch the providers and the organization graph when the editor closes.
+    // Refetch the providers when the editor closes.
     void refetch();
-    void utils.organization.getAll.invalidate();
     // And forget every connection verdict. A row's id does not change when its
     // credential does, so a verdict left standing here is a statement about a
     // key that may have just been replaced - including a green one, which is

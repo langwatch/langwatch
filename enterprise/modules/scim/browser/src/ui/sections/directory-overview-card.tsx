@@ -1,11 +1,11 @@
+import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How accounts arrive, beside how people sign in: how much of the membership
  * the directory owns, whether it is still running, and what it sent. Declared
  * through `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Settings2 } from "lucide-react";

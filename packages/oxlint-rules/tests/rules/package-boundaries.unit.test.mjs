@@ -10,7 +10,8 @@ const workspace = createFixtureWorkspace({
         contract: {},
         process: {},
         browser: { exports: ["./declaration"] },
-        "browser-kit": {},
+        "query-language": {},
+        client: {},
       },
     },
     project: {
@@ -18,7 +19,7 @@ const workspace = createFixtureWorkspace({
         contract: {},
         process: { exports: [".", "./testing"] },
         browser: { exports: ["./declaration", "./surfaces/project-picker"] },
-        "browser-kit": {},
+        "query-language": {},
       },
     },
     scenario: {
@@ -56,12 +57,12 @@ function ids(filename, code) {
 const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 const SERVICE_TEST = "modules/agent/process/src/services/__tests__/agent.integration.test.ts";
 const BROWSER = "modules/agent/browser/src/behavior/agent-list.ts";
-const KIT = "modules/agent/browser-kit/src/agent-card.tsx";
+const LIBRARY = "modules/agent/query-language/src/parse.ts";
 
 describe("given package-boundaries", () => {
   describe("when a browser package imports another module's browser package", () => {
     /** @scenario "A browser package importing another module's browser package is reported as crossModuleBrowser" */
-    it("reports crossModuleBrowser at the specifier and names the owner's kit", () => {
+    it("reports crossModuleBrowser at the specifier and names where shared things go", () => {
       const found = report(
         BROWSER,
         'import { z } from "zod";\nimport { Picker } from "@langwatch/project-browser/surfaces/project-picker";',
@@ -71,42 +72,10 @@ describe("given package-boundaries", () => {
       expect(found[0]).toMatchObject({ line: 2, messageId: "crossModuleBrowser" });
       expect(found[0].message).toBe(
         "`@langwatch/project-browser/surfaces/project-picker` is `project`'s browser package, which is closed to every other module." +
-          " Move what this needs into `@langwatch/project-browser-kit` and import it from there; where fewer than" +
-          " two modules share it, inline it here instead (the kit law, ARCHITECTURE.md §3.4).",
+          " Move what this needs out of `project`'s browser package: pure domain logic into the owner's contract," +
+          " shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`." +
+          " Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
       );
-    });
-
-    /** @scenario "A browser package importing another module's kit is left alone" */
-    it("leaves an import of the owner's kit alone", () => {
-      expect(report(BROWSER, 'import { Card } from "@langwatch/project-browser-kit";')).toEqual([]);
-    });
-  });
-
-  describe("when a browser kit imports a browser package", () => {
-    /** @scenario "A browser kit importing a browser package or another kit is reported as kitLeaf" */
-    it("reports kitLeaf for its own module's browser package and for another kit", () => {
-      expect(ids(KIT, 'import { x } from "@langwatch/agent-browser/declaration";')).toEqual([
-        "kitLeaf",
-      ]);
-      expect(ids(KIT, 'import { Card } from "@langwatch/project-browser-kit";')).toEqual([
-        "kitLeaf",
-      ]);
-    });
-
-    /** @scenario "A browser kit importing a browser package or another kit is reported as kitLeaf" */
-    it("leaves contracts, the design system and the host alone", () => {
-      const code = [
-        'import type { Agent } from "@langwatch/project-contract";',
-        'import { Button } from "@langwatch/design-system";',
-        'import { useSession } from "@langwatch/browser-host";',
-      ].join("\n");
-
-      expect(report(KIT, code)).toEqual([]);
-    });
-
-    /** @scenario "A browser kit that fetches is reported as kitFetches" */
-    it("reports kitFetches for the tRPC client", () => {
-      expect(ids(KIT, 'import { client } from "@langwatch/browser-trpc";')).toEqual(["kitFetches"]);
     });
   });
 
@@ -125,7 +94,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A test installs a peer module or reads its test seam" */
     it("leaves a test's peer installer and the declared ./testing seam alone", () => {
       expect(
-        report(SERVICE_TEST, 'import { projectServer } from "@langwatch/project-process";'),
+        report(SERVICE_TEST, 'import { projectProcessModule } from "@langwatch/project-process";'),
       ).toEqual([]);
       expect(
         report(SERVICE_TEST, 'import { fixture } from "@langwatch/project-process/testing";'),
@@ -173,10 +142,13 @@ describe("given package-boundaries", () => {
   describe("when a process package imports a browser package", () => {
     /** @scenario "A process package importing a browser package is reported as processImportsBrowser" */
     it("reports processImportsBrowser with the specifier", () => {
-      const found = report(SERVICE, 'import { Card } from "@langwatch/project-browser-kit";');
+      const found = report(
+        SERVICE,
+        'import { Card } from "@langwatch/project-browser/declaration";',
+      );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["processImportsBrowser"]);
-      expect(found[0].data.specifier).toBe("@langwatch/project-browser-kit");
+      expect(found[0].data.specifier).toBe("@langwatch/project-browser/declaration");
     });
   });
 
@@ -197,13 +169,71 @@ describe("given package-boundaries", () => {
     });
   });
 
+  describe("when a module library imports a runtime or an implementation package", () => {
+    /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
+    it("reports libraryRuntime for node, react, framework and implementation packages", () => {
+      for (const specifier of [
+        "node:fs",
+        "react",
+        "@langwatch/process",
+        "@langwatch/agent-process",
+        "@langwatch/agent-browser/declaration",
+        "@langwatch/project-contract",
+      ]) {
+        expect(ids(LIBRARY, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+      }
+    });
+
+    /** @scenario "A module client may take react for generic hooks and nothing else of the browser" */
+    it("lets a module client import react, and still reports react-dom and chakra", () => {
+      const client = "modules/agent/client/src/use-agents.ts";
+      expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
+      expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
+      for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
+        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+      }
+    });
+
+    /** @scenario "A module library importing its own contract and other libraries is left alone" */
+    it("leaves its own contract, another library and a framework-free package alone", () => {
+      const code = [
+        'import type { Agent } from "@langwatch/agent-contract";',
+        'import { parse } from "@langwatch/project-query-language";',
+        'import { z } from "zod";',
+      ].join("\n");
+
+      expect(report(LIBRARY, code)).toEqual([]);
+    });
+  });
+
+  describe("when a package imports a module library", () => {
+    /** @scenario "Process, browser and application code may import any module's library" */
+    it("leaves process, browser and application imports alone", () => {
+      const code = 'import { parse } from "@langwatch/project-query-language";';
+
+      for (const filename of [SERVICE, BROWSER, "apps/api/src/main.ts"]) {
+        expect(report(filename, code)).toEqual([]);
+      }
+    });
+
+    /** @scenario "A contract importing its module's library is reported as contractRuntime" */
+    it("reports contractRuntime when the contract imports it", () => {
+      expect(
+        ids(
+          "modules/agent/contract/src/agent.commands.ts",
+          'import { parse } from "@langwatch/agent-query-language";',
+        ),
+      ).toEqual(["contractRuntime"]);
+    });
+  });
+
   describe("when a core module imports an enterprise module's process package", () => {
     /** @scenario "Core code importing an enterprise implementation is reported as coreImportsEnterprise" */
     it("reports coreImportsEnterprise", () => {
       expect(
         ids(
           SERVICE,
-          'import { governanceServer } from "@langwatch/enterprise-governance-process";',
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
         ),
       ).toContain("coreImportsEnterprise");
     });

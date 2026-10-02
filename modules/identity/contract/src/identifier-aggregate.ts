@@ -1,3 +1,5 @@
+import type { LedgerActor } from "@langwatch/authorization";
+
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
@@ -15,7 +17,6 @@ import {
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
 } from "./facts.ts";
-import type { IdentityActor } from "./vocabulary.ts";
 
 /**
  * An identifier is an aggregate — the rules one identifier's own stream folds
@@ -244,7 +245,7 @@ export function primaryChangeFacts({
 }: {
   heads: IdentityHeads;
   identifierId: string;
-  actor: IdentityActor;
+  actor: LedgerActor;
 }): IdentityFactInputOf<typeof PRIMARY_CHANGED_EVENT_TYPE>[] {
   const standing = Object.values(heads.identifiers)
     .filter((head) => head.state === "PRIMARY")
@@ -274,7 +275,7 @@ export function userErasureFacts({
 }: {
   heads: IdentityHeads;
   userId: string;
-  actor: IdentityActor;
+  actor: LedgerActor;
 }): IdentityFactInputOf<typeof USER_ERASED_EVENT_TYPE>[] {
   return [
     {

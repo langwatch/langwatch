@@ -1,8 +1,8 @@
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
-  useDrawerStore,
-} from "../../../../behavior/drawer.store.ts";
+} from "../../../../behavior/drawer-chrome.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { Drawer } from "../../drawer.tsx";
 import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights.tsx";
 import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help.tsx";
@@ -39,6 +39,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     spanTree,
     selectedSpan,
     isLoading,
+    isPlaceholder,
     headerQuery,
     spanTreeQuery,
     canGoBack,
@@ -47,10 +48,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     drawerContentRef,
   } = useTraceDrawerScaffold();
 
-  const widthPx = useDrawerStore((s) => s.widthPx);
-  const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
-  const pinned = useDrawerStore((s) => s.pinned);
-  const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+  const widthPx = useTraceDrawer((s) => s.widthPx);
+  const shortcutsOpen = useTraceDrawer((s) => s.shortcutsOpen);
+  const pinned = useTraceDrawer((s) => s.pinned);
+  const setShortcutsOpen = useTraceDrawer((s) => s.setShortcutsOpen);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s `<TraceDrawerMount>`)
   // only mounts this shell while the drawer store holds a `traceId`. Click → store
@@ -79,7 +80,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   }
 
   // The drawer width is driven by the operator's drag (persisted in
-  // drawerStore.widthPx).
+  // drawerChrome.widthPx).
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
   const isCompactViewport = viewportWidth < 768;
   const effectiveWidthPx = Math.min(widthPx ?? DRAWER_DEFAULT_WIDTH_PX, viewportWidth);
@@ -159,6 +160,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             spanTree={spanTree}
             selectedSpan={selectedSpan}
             isLoading={isLoading}
+            isPlaceholder={isPlaceholder}
             isSpansLoading={spanTreeQuery.isLoading}
             onClose={handleClose}
           />

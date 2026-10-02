@@ -9,7 +9,7 @@ import type {
   AuthzDenialReason,
   AuthzPermission,
   PermissionDecision,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";

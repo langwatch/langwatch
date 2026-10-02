@@ -3,8 +3,8 @@
  * Naming a code block: its id and Python class are derived from the name.
  * @see specs/studio/rename-code-blocks.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import type React from "react";
@@ -30,7 +30,7 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../elements/studio-drawer-footer.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInsideDrawer: () => false,
 }));
@@ -72,12 +72,10 @@ const codeNode = (): Node => ({
 });
 
 const renderPanel = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WorkflowNodeHostProvider value={nodeHost}>
-        <BasePropertiesPanel node={codeNode()} />
-      </WorkflowNodeHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <WorkflowNodeHostProvider value={nodeHost}>
+      <BasePropertiesPanel node={codeNode()} />
+    </WorkflowNodeHostProvider>,
   );
 
 afterEach(() => {
@@ -126,12 +124,10 @@ describe("given a code block selected in the studio", () => {
     /** @scenario "Rename a code block via the properties panel" */
     it("keeps the block as it was rather than writing a name nothing can address", async () => {
       const user = userEvent.setup();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WorkflowNodeHostProvider value={nodeHost}>
-            <BasePropertiesPanel node={codeNode()} />
-          </WorkflowNodeHostProvider>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <WorkflowNodeHostProvider value={nodeHost}>
+          <BasePropertiesPanel node={codeNode()} />
+        </WorkflowNodeHostProvider>,
       );
 
       await user.click(screen.getByText("code1"));

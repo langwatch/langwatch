@@ -1,4 +1,4 @@
-import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
+import { createListCollection, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo } from "react";
 

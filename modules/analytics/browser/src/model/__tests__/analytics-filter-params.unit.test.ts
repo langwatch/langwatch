@@ -11,6 +11,7 @@ import {
   filterOutEmptyFilters,
   isFilterQueryKey,
   readFiltersFromQuery,
+  readSavedViewFilters,
 } from "../analytics-filter-params.ts";
 
 describe("the analytics filter params", () => {
@@ -87,6 +88,44 @@ describe("the analytics filter params", () => {
       it("leaves the page's own parameters alone", () => {
         expect(isFilterQueryKey("period")).toBe(false);
         expect(isFilterQueryKey("dashboard")).toBe(false);
+      });
+    });
+  });
+
+  describe("given a saved view selected for the project", () => {
+    const stored: Record<string, string> = {
+      "langwatch-saved-views-selected-p1": "view-1",
+      "langwatch-saved-views-cache-p1": JSON.stringify([
+        { id: "view-1", filters: { "traces.origin": ["api"], "no.such.field": ["x"] } },
+      ]),
+    };
+    const readStorage = (key: string) => stored[key];
+
+    describe("when the address narrows nothing", () => {
+      it("uses the view's filters, keeping only fields the registry knows", () => {
+        expect(readSavedViewFilters({ queryParams: {}, projectId: "p1", readStorage })).toEqual({
+          "traces.origin": ["api"],
+        });
+      });
+    });
+
+    describe("when the address already carries a filter or a search", () => {
+      it("leaves the view out", () => {
+        expect(
+          readSavedViewFilters({ queryParams: { origin: "web" }, projectId: "p1", readStorage }),
+        ).toEqual({});
+        expect(
+          readSavedViewFilters({ queryParams: { query: "hi" }, projectId: "p1", readStorage }),
+        ).toEqual({});
+      });
+    });
+
+    describe("when the cache is corrupt", () => {
+      it("reads as no view rather than failing", () => {
+        const corrupt = (key: string) => (key.includes("cache") ? "{" : stored[key]);
+        expect(
+          readSavedViewFilters({ queryParams: {}, projectId: "p1", readStorage: corrupt }),
+        ).toEqual({});
       });
     });
   });

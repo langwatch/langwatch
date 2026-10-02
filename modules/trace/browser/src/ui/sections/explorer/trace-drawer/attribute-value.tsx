@@ -1,6 +1,14 @@
-import { Box, chakra, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
+import {
+  Box,
+  chakra,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ChatMessage } from "@langwatch/trace-contract/transcript";
 import { useCallback, useEffect, useMemo, useState } from "react";

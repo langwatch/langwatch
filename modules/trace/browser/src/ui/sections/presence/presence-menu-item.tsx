@@ -3,12 +3,13 @@
  * States its own disabled treatment when presence is off at the organization or project.
  */
 
-import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { resolvePresenceAvailability } from "@langwatch/presence-contract";
 import { Eye, EyeOff } from "lucide-react";
 
 import { usePresencePreferencesStore } from "../../../behavior/presence/presence-preferences-store.ts";
-import { resolvePresenceAvailability } from "../../../model/presence/presence-availability.ts";
 
 /**
  * The two switches the row reads, in the shape the application's own workspace

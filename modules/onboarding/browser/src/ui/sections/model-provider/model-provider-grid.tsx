@@ -4,9 +4,8 @@
  * name, so assistive technology hears the recommendation sighted readers see.
  */
 
-import { HStack, Text, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
-import { SelectableIconCard } from "@langwatch/onboarding-browser-kit";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import type React from "react";
 import { useMemo } from "react";
 
@@ -14,6 +13,7 @@ import {
   onboardingModelProviders,
   type OnboardingModelProvider,
 } from "../../../model/onboarding-model-providers.ts";
+import { SelectableIconCard } from "../../elements/shared/selectable-icon-card.tsx";
 
 export const ONBOARDING_MODEL_PROVIDER_DESCRIPTION =
   "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.";

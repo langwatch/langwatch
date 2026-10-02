@@ -1,5 +1,5 @@
-import type { ServerRole } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
+import type { ServerRole } from "@langwatch/process";
 
 import {
   openVoicePublicUrlTunnel,

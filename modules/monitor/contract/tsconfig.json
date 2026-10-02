@@ -11,9 +11,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -23,7 +20,7 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     }
   ]
 }

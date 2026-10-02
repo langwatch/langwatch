@@ -31,9 +31,6 @@
       "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../browser-trpc/tsconfig.build.json"
-    },
-    {
       "path": "../config/tsconfig.build.json"
     },
     {
@@ -49,9 +46,6 @@
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
-      "path": "../error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
@@ -65,6 +59,9 @@
     },
     {
       "path": "../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../module/tsconfig.build.json"
     },
     {
       "path": "../observability/tsconfig.build.json"

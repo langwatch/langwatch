@@ -18,6 +18,7 @@ import {
   ModelProviderNotFoundError,
   PLATFORM_PROVIDER_ID_PREFIX,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
@@ -41,7 +42,17 @@ import {
 } from "../rules/gateway-config-wire.rules.ts";
 import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import type { GatewayTraceExportKeyService } from "./gateway-trace-export-key.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it ships the stored
+ * spend instead. Well under the gateway's 10s config fetch timeout, so a slow replica costs
+ * budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 /** The one model-provider read the bundle needs. */
 export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
@@ -64,6 +75,7 @@ export class GatewayConfigMaterialiserService {
   private readonly assembly: GatewayConfigAssembly;
   private readonly langyMirrorProjectId: string | undefined;
   private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
+  private readonly traceExportKeys: GatewayTraceExportKeyService | undefined;
 
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
@@ -76,6 +88,7 @@ export class GatewayConfigMaterialiserService {
       assembly,
       langyMirrorProjectId,
       connectUpstream,
+      traceExportKeys,
     }: {
       scopeResolution: GatewayScopeResolutionService;
       projects: ProjectApi;
@@ -85,6 +98,7 @@ export class GatewayConfigMaterialiserService {
       assembly: GatewayConfigAssembly;
       langyMirrorProjectId: string | undefined;
       connectUpstream: GatewayConnectUpstreamService | undefined;
+      traceExportKeys: GatewayTraceExportKeyService | undefined;
     },
   ) {
     this.scopeResolution = scopeResolution;
@@ -95,6 +109,7 @@ export class GatewayConfigMaterialiserService {
     this.assembly = assembly;
     this.langyMirrorProjectId = langyMirrorProjectId;
     this.connectUpstream = connectUpstream;
+    this.traceExportKeys = traceExportKeys;
   }
 
   static create(input: {
@@ -108,6 +123,8 @@ export class GatewayConfigMaterialiserService {
     /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
     langyMirrorProjectId?: string | undefined;
     connectUpstream?: GatewayConnectUpstreamService | undefined;
+    /** Absent only in tests: the bundle then carries no export token. */
+    traceExportKeys?: GatewayTraceExportKeyService | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService({
       scopeResolution: input.scopeResolution,
@@ -118,6 +135,7 @@ export class GatewayConfigMaterialiserService {
       assembly: input.assembly,
       langyMirrorProjectId: input.langyMirrorProjectId,
       connectUpstream: input.connectUpstream,
+      traceExportKeys: input.traceExportKeys,
     });
   }
 
@@ -164,7 +182,24 @@ export class GatewayConfigMaterialiserService {
    * drifting apart is what lets a 304 confirm a stale bundle.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const token = await this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const keyIds =
+      vk.traceProjectId && this.traceExportKeys
+        ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
+        : [];
+    return [token, ...keyIds].join(".");
+  }
+
+  /** The trace project's export token; never `Project.apiKey`. */
+  private async traceExportToken(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string } | null,
+  ): Promise<string | null> {
+    if (!traceProject || !this.traceExportKeys) return null;
+    return this.traceExportKeys.tokenFor({
+      organizationId: vk.organizationId,
+      projectId: traceProject.id,
+    });
   }
 
   /** The organization's hosted provider on a connected install, if licensing wrote one. */
@@ -213,6 +248,7 @@ export class GatewayConfigMaterialiserService {
         guardrailIds: [...attachment.guardrailIds],
       })),
     });
+    const otlpToken = await this.traceExportToken(vk, traceProject);
 
     return {
       revision: vk.revision.toString(),
@@ -221,7 +257,7 @@ export class GatewayConfigMaterialiserService {
       display_prefix: vk.displayPrefix,
       organization_id: vk.organizationId,
       project_id: traceProject?.id ?? null,
-      project_otlp_token: traceProject?.apiKey ?? null,
+      project_otlp_token: otlpToken,
       team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
       // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the
@@ -283,9 +319,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * ClickHouse spend rollup, best-effort: it falls back to the Postgres column when ClickHouse is
-   * not wired. The tenant set is every project under the key's org, so org, team and principal
-   * budgets see ledger rows under whichever project emitted the trace.
+   * ClickHouse spend, falling back to the Postgres column when ClickHouse is not wired or slower
+   * than CONFIG_SPEND_READ_TIMEOUT_MS. Tenants are every project in the key's org, so org, team
+   * and principal budgets see rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
     vk: VirtualKeyWithScopes,
@@ -306,9 +342,10 @@ export class GatewayConfigMaterialiserService {
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
-      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
-        budgets
+        budgets: budgets
           // Templates have no single bucket to read; their per-user spend
           // is fetched request-side through the bucket-spend endpoint.
           .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
@@ -320,14 +357,20 @@ export class GatewayConfigMaterialiserService {
             match: "exact" as const,
             periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
           })),
-      );
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
 
       return out;
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
       return new Map();
     }
   }
@@ -356,3 +399,26 @@ export class GatewayConfigMaterialiserService {
 // config keys are stripped post bug-7 step (iv), so the fallback is always
 // empty and the RP read becomes source of truth once routingPolicyId is set.
 // Empty-rules normalize to the wire-contracted shape regardless of DB content.
+
+/** Resolves with `work`, or rejects with the signal's reason once it aborts. */
+async function settleBefore<T>({
+  work,
+  signal,
+}: {
+  work: Promise<T>;
+  signal: AbortSignal;
+}): Promise<T> {
+  // A late rejection from abandoned work has nobody waiting for it.
+  work.catch(() => undefined);
+  signal.throwIfAborted();
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}

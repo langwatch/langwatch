@@ -1,11 +1,11 @@
-/** @see modules/model-provider/specs/model-provider.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+/** @see modules/model-provider/specs/model-provider.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestApp } from "./model-provider.fixture.ts";
 
-describe("ModelProviderApp.platformProviderChain", () => {
+describe("ModelProviderModule.platformProviderChain", () => {
   /** @scenario "The platform chain borrows the Google credential from data privacy" */
   it("offers vertex_ai under the credential data privacy lends, on the read", async () => {
     const lent: string[] = [];

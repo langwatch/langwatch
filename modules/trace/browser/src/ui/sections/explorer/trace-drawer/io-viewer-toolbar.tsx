@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon } from "@chakra-ui/react";
+import { Box, Flex, HStack, Icon } from "@langwatch/design-system/primitives";
 import type { ChatLayout } from "@langwatch/trace-contract/transcript";
 import { useMemo, useRef } from "react";
 

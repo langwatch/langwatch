@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { getItemKey, type ListItem } from "../../model/command-icon-info.ts";
 import { CommandItem } from "../elements/command-item.tsx";

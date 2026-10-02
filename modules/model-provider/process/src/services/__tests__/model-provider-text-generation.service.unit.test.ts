@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Plain-text feature generation: the feature's model, the caller's knobs, typed failures.
  * @vitest-environment node
  */
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LanguageModel } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

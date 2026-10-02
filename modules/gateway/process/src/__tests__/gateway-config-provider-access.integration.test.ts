@@ -1,23 +1,29 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant, toDate } from "@langwatch/time";
 /**
  * @vitest-environment node
- * Real Postgres. Three rules narrow a key's provider bundle: routing policy, allowlist, and
- * safety-type providers. Spec: specs/ai-gateway/governance/vk-provider-access.feature
+ * Real Postgres. Routing policy, allowlist and safety type narrow a key's providers; a slow spend
+ * read ships the stored spend. Specs: governance/vk-provider-access.feature, budgets.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
-import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import {
+  CONFIG_SPEND_READ_TIMEOUT_MS,
+  GatewayConfigMaterialiserService,
+} from "../services/gateway-config-materialisation.service.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
@@ -31,12 +37,30 @@ const prisma = connection?.client as PrismaClient;
 
 /** The destination reads the materialiser makes, answered from seeded rows. */
 class SuiteProjectService extends TestProjectApi {
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
+  }
+
   override async findTraceDestination(
     projectId: string,
   ): ReturnType<ProjectApi["findTraceDestination"]> {
     return prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -45,7 +69,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -92,28 +116,30 @@ const MODEL_PROVIDER_IDS = [
 
 let gateway: GatewayService;
 
-const materialiser = () =>
+const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
   GatewayConfigMaterialiserService.create({
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects: new SuiteProjectService(),
     }),
     projects: new SuiteProjectService(),
-    chRepo: null,
+    chRepo,
     budgetDecisions: gateway,
     modelProviders: seededCustomKeys(prisma),
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects: new SuiteProjectService(),
     }),
   });
 
-async function bundleFor(keyId: string) {
+async function bundleFor(keyId: string, chRepo: GatewayBudgetSpend | null = null) {
   const vk = await PrismaGatewayVirtualKeyRepository.create(prisma).findById({
     id: keyId,
     organizationId: ORG_ID,
   });
-  return materialiser().materialise(vk!);
+  return materialiser(chRepo).materialise(vk!);
 }
 
 async function createProvider({
@@ -144,6 +170,7 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
   beforeAll(async () => {
     gateway = PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: organizationApiOver(prisma),
       projects: new SuiteProjectService(),
       evaluators: {} as never,
       monitors: {} as never,
@@ -370,6 +397,70 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
         MP_SAFETY_ID,
       );
       expect(bundle.routing_policy_name).toBe(`mat-rp-${suffix}`);
+    });
+  });
+
+  describe("when the ClickHouse spend read does not answer", () => {
+    const BUDGET_ID = `bdg-mat-slow-${suffix}`;
+
+    beforeAll(async () => {
+      await prisma.gatewayBudget.create({
+        data: {
+          id: BUDGET_ID,
+          name: `Slow spend ${suffix}`,
+          organizationId: ORG_ID,
+          scopeType: "ORGANIZATION",
+          scopeId: ORG_ID,
+          window: "MONTH",
+          limitUsd: "100.00",
+          spentUsd: "12.34",
+          onBreach: "BLOCK",
+          createdById: USER_ID,
+          resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.gatewayBudget.deleteMany({ where: { id: BUDGET_ID } });
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend even when the read ignores its signal", async () => {
+      const ignoresSignal = createApiFixture<GatewayBudgetSpend>({
+        getSpendForBudgetsAcrossTenantsUntil: () => new Promise(() => undefined),
+      });
+      const startedAt = nowInstant().epochMilliseconds;
+
+      const bundle = await bundleFor(VK_NO_RP_ID, ignoresSignal);
+
+      expect(nowInstant().epochMilliseconds - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend within the deadline and cancels the read", async () => {
+      let readSignal: AbortSignal | undefined;
+      const hangingSpendRead = createApiFixture<GatewayBudgetSpend>({
+        getSpendForBudgetsAcrossTenantsUntil: ({ signal }) =>
+          new Promise((_resolve, reject) => {
+            readSignal = signal;
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          }),
+      });
+      const startedAt = nowInstant().epochMilliseconds;
+
+      const bundle = await bundleFor(VK_NO_RP_ID, hangingSpendRead);
+
+      expect(nowInstant().epochMilliseconds - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+      expect(readSignal?.aborted).toBe(true);
     });
   });
 });

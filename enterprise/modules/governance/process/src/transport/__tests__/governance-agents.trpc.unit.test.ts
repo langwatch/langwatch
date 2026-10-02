@@ -1,14 +1,14 @@
+import {
+  AgentListingUnavailableError,
+  type GovernanceRestApi,
+} from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * `governanceAgents.*` over the real tRPC runtime, pinned to main's wire
  * (platform/app/ee/governance/routers/governanceAgents.ts on origin/main).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  AgentListingUnavailableError,
-  type GovernanceRestApi,
-} from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { governanceAgentsTrpcTransport } from "../governance-agents.trpc.ts";

@@ -4,7 +4,7 @@
  * the canonical envelope. Spec: packages/api/specs/transport-conventions.feature.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -14,7 +14,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import type { RestProtocolRefusal } from "../response-kind.ts";
-import type { RestIdentity } from "../runtime.ts";
+import type { RestIdentity } from "../../hosting/api-door.ts";
 
 const PROTOCOL = "application/example+json";
 const BECAUSE = "the directory protocol's wire is its own, not ours";
@@ -59,7 +59,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withNamespace("directory")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
-  .withCredential("scimToken")
+  .withCredential("scim_token")
 
   .post("/directory/Users", "directoryCreateUser")
   .withInput(z.object({ userName: z.string() }))
@@ -137,9 +137,9 @@ function mounted() {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: door,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: door,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

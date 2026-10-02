@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type {
   GatewayConnectUpstream,
   SpendUsage,
@@ -160,6 +160,12 @@ export interface GatewayBudgetSpend {
     budgets: GatewayBudgetSpendRecord[] | BudgetSpendTarget[],
     now?: Instant,
   ): Promise<ScopeSpend[]>;
+  /** The same read, abandoned (retries included) when `signal` aborts. */
+  getSpendForBudgetsAcrossTenantsUntil(input: {
+    tenantIds: string[];
+    budgets: GatewayBudgetSpendRecord[] | BudgetSpendTarget[];
+    signal: AbortSignal;
+  }): Promise<ScopeSpend[]>;
 
   getSpendForTargetsAcrossTenants(
     tenantIds: string[],
@@ -249,6 +255,8 @@ export type GatewayClickHouseClient = {
     unscoped?: { reason: string };
     /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
     tenantIds?: readonly string[];
+    /** Abandons the read, retries included, once it aborts. */
+    signal?: AbortSignal;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
   insert(input: {
     table: string;

@@ -4,14 +4,13 @@
  * nothing here constructs a transport error. Spec: modules/project/specs/project-service.feature.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import type { AuthzPermission } from "@langwatch/authorization";
+import { moduleApi } from "@langwatch/module";
 import {
   ProjectCreateDeniedError,
   ProjectCreateTargetMissingError,
   TraceSharingDeniedError,
   projectTrpc,
-  type Project,
   type ProjectApi,
   type TopicClusteringRequest,
 } from "@langwatch/project-contract";
@@ -59,29 +58,16 @@ export interface ProjectBrowserApi {
     projectId: string;
     by: Readonly<{ id: string }>;
   }): Promise<ProjectFieldProtections>;
-  /**
-   * Mints Langy's gateway virtual key for a freshly created project. Best
-   * effort by contract: a failure is reported and never fails the creation,
-   * because the credential service re-attempts on the first chat call.
-   */
-  provisionLangyVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void>;
-  /**
-   * The deployment's audit trail for the key rotation. Best effort: an audit
-   * failure must not stop the new key reaching the caller who rotated it.
-   */
-  recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void>;
-  /** The project, or `ProjectNotFoundError`. */
-  getProject(input: { projectId: string }): Promise<Project>;
   /** Archives a project other than the one the caller is in, after probing it on its own. */
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }>;
+  /** Whether the legacy project key still authenticates; never the key. */
+  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
+  /** Revokes the legacy project key for good, audited; no key is returned. */
+  revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
   /** Requests a clustering run, reporting a request that did not land. */
   triggerTopicClustering(input: {
     projectId: string;
@@ -131,23 +117,8 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
         actor,
       );
 
-      await app.provisionLangyVirtualKey({
-        projectId: project.id,
-        organizationId: input.organizationId,
-        actorUserId: actor.id,
-      });
-
       return { success: true as const, projectSlug: project.slug };
     })
-
-    /**
-     * The base key authenticates every ingestion call, so revealing it is
-     * gated like rotating it. `project:update` (a contributor permission) used
-     * to hand out a credential that outlives membership and can't be attributed back.
-     */
-    .procedure("getProjectAPIKey")
-    .withPermission("project:manage")
-    .handle(({ app, input }) => app.getProject({ projectId: input.projectId }))
 
     .procedure("getHasFirstMessage")
     .withPermission("project:view")
@@ -157,18 +128,16 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       return { firstMessage: project?.firstMessage ?? false };
     })
 
-    .procedure("regenerateApiKey")
+    .procedure("getLegacyKeyStatus")
+    .withPermission("project:manage")
+    .handle(({ app, input }) => app.getLegacyKeyStatus({ projectId: input.projectId }))
+
+    .procedure("revokeProjectApiKey")
     .withPermission("project:manage")
     .handle(async ({ app, input, actor }) => {
-      const apiKey = await app.projects().regenerateLegacyProjectKey({
-        projectId: input.projectId,
-      });
+      await app.revokeProjectApiKey({ projectId: input.projectId, by: actor });
 
-      // Audit the security-critical action; non-fatal, so an audit failure
-      // cannot prevent returning the new key to the caller.
-      await app.recordApiKeyRegenerated({ userId: actor.id, projectId: input.projectId });
-
-      return { apiKey };
+      return { revoked: true as const };
     })
 
     /**
@@ -191,9 +160,14 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
         userLinkTemplate: input.userLinkTemplate,
         s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
         s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
-        s3SecretAccessKey: input.s3SecretAccessKey
-          ? app.encryptProjectSecret(input.s3SecretAccessKey)
-          : null,
+        // A blank secret beside an endpoint leaves the stored one unchanged.
+        ...(input.s3SecretAccessKey || !input.s3Endpoint
+          ? {
+              s3SecretAccessKey: input.s3SecretAccessKey
+                ? app.encryptProjectSecret(input.s3SecretAccessKey)
+                : null,
+            }
+          : {}),
         s3Bucket: input.s3Bucket,
       });
 

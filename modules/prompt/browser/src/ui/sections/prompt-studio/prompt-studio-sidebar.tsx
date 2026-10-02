@@ -1,4 +1,4 @@
-import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
 

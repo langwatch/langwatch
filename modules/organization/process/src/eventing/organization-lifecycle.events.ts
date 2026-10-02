@@ -1,9 +1,13 @@
-import {
-  integrationMethodSelectionSchema,
-  nurturingSignUpDataSchema,
-} from "@langwatch/enterprise-nurturing-contract";
 import { EventSchema } from "@langwatch/eventing";
 import {
+  INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
+  integrationMethodChosenEventDataSchema,
+  INVITE_ACCEPTED_EVENT_TYPE,
+  inviteAcceptedEventDataSchema,
+  MEMBERS_INVITED_EVENT_TYPE,
+  membersInvitedEventDataSchema,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  organizationSignedUpEventDataSchema,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
@@ -14,11 +18,6 @@ export const ORGANIZATION_LIFECYCLE_PIPELINE_NAME = "organization_lifecycle" as 
 export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
 export const ORGANIZATION_LIFECYCLE_EVENT_VERSION = "2026-09-29" as const;
 
-export const ORGANIZATION_SIGNED_UP_EVENT_TYPE = "lw.organization.signed_up" as const;
-export const MEMBERS_INVITED_EVENT_TYPE = "lw.organization.members_invited" as const;
-export const INVITE_ACCEPTED_EVENT_TYPE = "lw.organization.invite_accepted" as const;
-export const INTEGRATION_METHOD_CHOSEN_EVENT_TYPE =
-  "lw.organization.integration_method_chosen" as const;
 export const RECORD_SIGNED_UP_COMMAND_TYPE = "lw.organization.record_signed_up" as const;
 export const RECORD_MEMBERS_INVITED_COMMAND_TYPE =
   "lw.organization.record_members_invited" as const;
@@ -29,49 +28,21 @@ export const RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE =
 export const RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE =
   "lw.organization.record_personal_workspace_provisioned" as const;
 
-const envelope = {
-  tenantId: z.string().min(1),
-  organizationId: z.string().min(1),
-  userId: z.string().min(1),
-  occurredAt: z.number().int().nonnegative(),
-};
-
 /** Somebody finished onboarding by creating this organization. */
-export const recordSignedUpCommandDataSchema = z.object({
-  ...envelope,
-  organizationName: z.string(),
-  signUpData: nurturingSignUpDataSchema.nullish(),
-  primaryIntent: z.string().nullish(),
-});
+export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
 export type RecordSignedUpCommandData = z.infer<typeof recordSignedUpCommandDataSchema>;
 
 /** One invitation batch: a role per invite, and the members plus pending invites counting it. */
-export const recordMembersInvitedCommandDataSchema = z.object({
-  ...envelope,
-  inviteIds: z.array(z.string().min(1)).min(1),
-  roles: z.array(z.string()).min(1),
-  teamMemberCount: z.number().int().nonnegative(),
-});
+export const recordMembersInvitedCommandDataSchema = membersInvitedEventDataSchema;
 export type RecordMembersInvitedCommandData = z.infer<typeof recordMembersInvitedCommandDataSchema>;
 
 /** An invitation was accepted by the person it named. */
-export const recordInviteAcceptedCommandDataSchema = z.object({
-  ...envelope,
-  inviteId: z.string().min(1),
-  organizationName: z.string(),
-});
+export const recordInviteAcceptedCommandDataSchema = inviteAcceptedEventDataSchema;
 export type RecordInviteAcceptedCommandData = z.infer<typeof recordInviteAcceptedCommandDataSchema>;
 
-/**
- * Somebody picked how they will integrate. The onboarding screen names only the person, so the
- * event is theirs: tenant and aggregate are the user id.
- */
-export const recordIntegrationMethodChosenCommandDataSchema = z.object({
-  tenantId: z.string().min(1),
-  userId: z.string().min(1),
-  occurredAt: z.number().int().nonnegative(),
-  selection: integrationMethodSelectionSchema,
-});
+/** Somebody picked how they will integrate; tenant and aggregate are the user id. */
+export const recordIntegrationMethodChosenCommandDataSchema =
+  integrationMethodChosenEventDataSchema;
 export type RecordIntegrationMethodChosenCommandData = z.infer<
   typeof recordIntegrationMethodChosenCommandDataSchema
 >;

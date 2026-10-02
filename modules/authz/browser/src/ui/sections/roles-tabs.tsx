@@ -1,10 +1,10 @@
+import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * Roles & access: what a role can do, and who holds one where. The Access tab keeps
  * the `?tab=assignments` address the old Role Bindings page forwards onto.
  * Spec: specs/rbac/roles-and-access-ui.feature
  */
-import { Tabs, Text, VStack } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { AUTHZ_MANAGE_PERMISSION, type AuthzHostApi } from "../../model/authz-host.ts";

@@ -1,6 +1,6 @@
-import { chakra } from "@chakra-ui/react";
 import { isInternalHref } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { chakra } from "@langwatch/design-system/primitives";
 import type { ComponentPropsWithoutRef, MouseEvent } from "react";
 
 /**

@@ -4,8 +4,9 @@
  * Menu renders presence row when host offers it, none otherwise.
  */
 
-import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,18 +30,16 @@ const PRESENCE_ROW = (
 );
 
 function renderMenu(readings: Partial<StubNavigationReadings>) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          currentUser: { id: "user-1", name: "Ada", email: "ada@example.com", image: null },
-          organization: { id: "org-1", name: "Acme", teams: [] },
-          ...readings,
-        }}
-      >
-        <AppHeaderUserMenu />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        currentUser: { id: "user-1", name: "Ada", email: "ada@example.com", image: null },
+        organization: { id: "org-1", name: "Acme", teams: [] },
+        ...readings,
+      }}
+    >
+      <AppHeaderUserMenu />
+    </WithStubNavigationHost>,
   );
 }
 

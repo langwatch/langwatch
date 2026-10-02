@@ -3,10 +3,16 @@
  * branded card as the sign-in doors: centred on a wide screen, full bleed on a phone.
  */
 
-import { Button, Field, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { type ProjectFormData, TechStackSelector } from "@langwatch/onboarding-browser-kit";
+import {
+  Button,
+  Field,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
@@ -16,6 +22,7 @@ import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { getSafeReturnToPath } from "../../../model/get-safe-return-to-path.ts";
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 import ErrorPage from "../../../ui/elements/compat/next-error.tsx";
+import { type ProjectFormData, TechStackSelector } from "../../blocks/tech-stack.tsx";
 
 /** The sign-in doors' label voice: small mono capitals. Reaches the tech stack's labels too. */
 const FIELD_LABELS = {
@@ -65,10 +72,8 @@ export default function ProjectOnboarding() {
     },
     { enabled: !!organization },
   );
-  const teams = api.team.getTeamsWithMembers.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
-  );
+  const graph = api.organization.getScopeGraph.useQuery({});
+  const teams = graph.data?.find((candidate) => candidate.id === organization?.id)?.teams;
   const safeReturnToPath = getSafeReturnToPath(router.query.return_to);
 
   useEffect(() => {
@@ -97,6 +102,7 @@ export default function ProjectOnboarding() {
           // The cached graph predates the project; unrefreshed, its address
           // resolves to the previously open project instead.
           await utils.organization.getAll.invalidate();
+          await utils.organization.getScopeGraph.invalidate();
           if (safeReturnToPath) {
             void router.push(safeReturnToPath);
             return;
@@ -141,7 +147,7 @@ export default function ProjectOnboarding() {
                 {...form.register("name", { required: true })}
               />
             </Field.Root>
-            {teams.data?.some((team) => team.projects.length > 0) && (
+            {teams?.some((team) => team.projects.length > 0) && (
               <>
                 <Field.Root>
                   <Field.Label>Team</Field.Label>
@@ -151,7 +157,7 @@ export default function ProjectOnboarding() {
                       borderRadius="10px"
                       {...form.register("teamId", { required: true })}
                     >
-                      {teams.data?.map((team) => (
+                      {teams?.map((team) => (
                         <option key={team.id} value={team.id}>
                           {team.name}
                         </option>

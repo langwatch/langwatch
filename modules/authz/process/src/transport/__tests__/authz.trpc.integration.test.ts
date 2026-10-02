@@ -34,7 +34,9 @@ function harness(
   const effectivePermissions = vi.fn(
     overrides.effectivePermissions ?? (async () => ["project:view" as const]),
   );
-  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions } });
+  // Nobody here holds the platform grant, so the answer carries no ops permissions.
+  const can = vi.fn(async () => false);
+  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions, can } });
 
   const procedures: Record<string, Procedure> = {};
   const accesses: string[] = [];
@@ -126,6 +128,9 @@ describe("the application's AuthZ tRPC adapter", () => {
         "createGrant",
         "changeGrantRole",
         "revokeGrant",
+        "listManagedGrants",
+        "listMemberGrants",
+        "applyMemberGrants",
       ];
 
       expect(Object.keys(authzTrpc.members)).toEqual(declared);
@@ -141,7 +146,7 @@ describe("the application's AuthZ tRPC adapter", () => {
       const { accesses } = harness();
 
       // The grant procedures beside it sit at organization:manage.
-      expect(accesses).toEqual(["service-authorized", ...Array(4).fill("permission")]);
+      expect(accesses).toEqual(["service-authorized", ...Array(7).fill("permission")]);
     });
   });
 });

@@ -4,8 +4,8 @@
  * Regression test for #5454: inactive Prompt Playground tabs stayed mounted
  * instead of unmounting (Tabs.Root needs `lazyMount`/`unmountOnExit`).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DraggableTabsBrowser } from "../draggable-tabs-browser.tsx";
@@ -17,31 +17,29 @@ describe("DraggableTabsBrowser", () => {
 
   describe("when a window has multiple tabs and one is inactive", () => {
     function renderTwoTabWindow() {
-      return render(
-        <ChakraProvider value={defaultSystem}>
-          <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
-            <DraggableTabsBrowser.Window
-              windowId="window-1"
-              activeTabId="tab-1"
-              onTabChange={vi.fn()}
-            >
-              <DraggableTabsBrowser.TabBar tabIds={["tab-1", "tab-2"]}>
-                <DraggableTabsBrowser.Tab id="tab-1">
-                  <DraggableTabsBrowser.Trigger value="tab-1">Tab 1</DraggableTabsBrowser.Trigger>
-                </DraggableTabsBrowser.Tab>
-                <DraggableTabsBrowser.Tab id="tab-2">
-                  <DraggableTabsBrowser.Trigger value="tab-2">Tab 2</DraggableTabsBrowser.Trigger>
-                </DraggableTabsBrowser.Tab>
-              </DraggableTabsBrowser.TabBar>
-              <DraggableTabsBrowser.Content value="tab-1">
-                <div data-testid="tab-1-content">Tab 1 content</div>
-              </DraggableTabsBrowser.Content>
-              <DraggableTabsBrowser.Content value="tab-2">
-                <div data-testid="tab-2-content">Tab 2 content</div>
-              </DraggableTabsBrowser.Content>
-            </DraggableTabsBrowser.Window>
-          </DraggableTabsBrowser.Root>
-        </ChakraProvider>,
+      return renderWithDesignSystem(
+        <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
+          <DraggableTabsBrowser.Window
+            windowId="window-1"
+            activeTabId="tab-1"
+            onTabChange={vi.fn()}
+          >
+            <DraggableTabsBrowser.TabBar tabIds={["tab-1", "tab-2"]}>
+              <DraggableTabsBrowser.Tab id="tab-1">
+                <DraggableTabsBrowser.Trigger value="tab-1">Tab 1</DraggableTabsBrowser.Trigger>
+              </DraggableTabsBrowser.Tab>
+              <DraggableTabsBrowser.Tab id="tab-2">
+                <DraggableTabsBrowser.Trigger value="tab-2">Tab 2</DraggableTabsBrowser.Trigger>
+              </DraggableTabsBrowser.Tab>
+            </DraggableTabsBrowser.TabBar>
+            <DraggableTabsBrowser.Content value="tab-1">
+              <div data-testid="tab-1-content">Tab 1 content</div>
+            </DraggableTabsBrowser.Content>
+            <DraggableTabsBrowser.Content value="tab-2">
+              <div data-testid="tab-2-content">Tab 2 content</div>
+            </DraggableTabsBrowser.Content>
+          </DraggableTabsBrowser.Window>
+        </DraggableTabsBrowser.Root>,
       );
     }
 

@@ -1,5 +1,13 @@
-import { Box, Button, Circle, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
 import {

@@ -74,14 +74,14 @@ Feature: tRPC framework boundary
   Scenario: The process policy logs and spans a busy database as a handled 503
     Given a procedure behind the process policy whose store could not get a Postgres connection in time
     When the client calls that procedure
-    Then it is answered as the handled 503 service_unavailable
+    Then it is answered as the handled 503 database_busy
     And it is not reported to the exception reporter as an unhandled fault
 
   @unit
   Scenario: A live subscription whose store has no connection to give ends with the handled 503
     Given a subscription whose store could not get a Postgres connection in time
     When the stream is being served
-    Then the error frame carries the handled service_unavailable, marked retryable
+    Then the error frame carries the handled database_busy, marked retryable
     And the failure is logged with that handled code as a platform fault
 
   @unit
@@ -168,3 +168,10 @@ Feature: tRPC framework boundary
     When an entry is written to the stream
     Then the frame is plain JSON
     And the subscription input was encoded as plain JSON too
+
+  @unit
+  Scenario: A handled error that renders its own body carries it on data.cause
+    Given a procedure throws a handled error that renders its own cause body
+    When the client calls that procedure
+    Then the tRPC error's data.cause is that body
+    And the process names no module error to put it there

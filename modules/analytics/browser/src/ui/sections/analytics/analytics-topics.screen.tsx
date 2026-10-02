@@ -1,4 +1,4 @@
-import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
+import { Card, GridItem, Heading, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
 import { BarChart2 } from "react-feather";
 
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";

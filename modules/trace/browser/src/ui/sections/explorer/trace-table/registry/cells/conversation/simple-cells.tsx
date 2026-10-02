@@ -1,6 +1,6 @@
-import { chakra, HStack, Text } from "@chakra-ui/react";
+import { formatTokens } from "@langwatch/design-system/display-formatters";
+import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTokens } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";

@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, Grid, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { MAX_REPEAT_COUNT } from "@langwatch/suite-contract";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

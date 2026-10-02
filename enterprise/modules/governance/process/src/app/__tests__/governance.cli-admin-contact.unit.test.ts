@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { createSupportContactOrganizations } from "../../__tests__/testing.ts";
 import { OrganizationSupportContactRepository } from "../../repositories/organization-support-contact.repository.ts";
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service.ts";
 import type { CliAdminContactReader } from "../governance.members.ts";
@@ -17,7 +18,7 @@ class StubSupportContacts extends OrganizationSupportContactRepository {
   constructor(
     private readonly admins: readonly string[],
     private readonly emails: ReadonlyMap<string, string | null>,
-    private readonly configured: string | null,
+    readonly configured: string | null,
   ) {
     super();
   }
@@ -37,10 +38,6 @@ class StubSupportContacts extends OrganizationSupportContactRepository {
         .map((userId) => [userId, this.emails.get(userId) ?? null]),
     );
   }
-
-  async findConfiguredSupportContact(): Promise<string | null> {
-    return this.configured;
-  }
 }
 
 /**
@@ -52,8 +49,11 @@ class StubSupportContacts extends OrganizationSupportContactRepository {
 type FindAdminEmail = (organizationId: string) => Promise<string | null>;
 
 /** Exactly the wiring the App performs for `cliContacts`, typed against the port. */
-function cliContactsOver(repository: OrganizationSupportContactRepository): CliAdminContactReader {
-  const supportContacts = OrganizationSupportContactService.create({ repository });
+function cliContactsOver(repository: StubSupportContacts): CliAdminContactReader {
+  const supportContacts = OrganizationSupportContactService.create({
+    repository,
+    organizations: createSupportContactOrganizations(repository.configured),
+  });
   const findAdminEmail: FindAdminEmail = (organizationId) =>
     supportContacts.findSupportContact({ organizationId });
 

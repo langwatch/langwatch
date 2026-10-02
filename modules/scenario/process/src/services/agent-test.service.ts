@@ -12,6 +12,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -53,12 +54,15 @@ import {
 import { ConnectedTargetService } from "./connected-target.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
+import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
 export type AgentTestServiceOptions = {
   agents: AgentApi;
   projects: ProjectApi;
+  /** Mints the run key the test's child calls LangWatch with. */
+  apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   workflows: WorkflowApi;
   prompts: PromptApi;
   secrets: SecretApi;
@@ -114,6 +118,7 @@ export class AgentTestService {
       options,
       targetPrefetch,
       ConnectedTargetService.create(options.agents),
+      ScenarioRunKeyService.create({ apiKeys: options.apiKeys }),
     );
   }
 
@@ -121,6 +126,7 @@ export class AgentTestService {
     private readonly options: AgentTestServiceOptions,
     private readonly targetPrefetch: ScenarioTargetPrefetchService,
     private readonly connectedTargets: ConnectedTargetService,
+    private readonly runKeys: ScenarioRunKeyService,
   ) {}
 
   /** The target a test points at, with a connected agent's ownership already
@@ -163,7 +169,7 @@ export class AgentTestService {
       return { success: false, error: `Project ${projectId} was not found` };
     }
 
-    return { success: true, data: { apiKey: project.apiKey, organizationId: null } };
+    return { success: true, data: { organizationId: null } };
   }
 
   private async readAdapter(input: {
@@ -209,6 +215,13 @@ export class AgentTestService {
         project: () => this.readProject(input.projectId),
         adapter: () => this.readAdapter({ projectId: input.projectId, target }),
         agentName: () => Promise.resolve(input.agent.name),
+        runKey: (adapter) =>
+          this.runKeys.tokenFor({
+            projectId: input.projectId,
+            adapter,
+            startedByUserId: input.actor?.id,
+            startedByApiKeyId: input.actor?.apiKeyId,
+          }),
       },
       config: this.options.config,
     });
@@ -300,6 +313,13 @@ export class AgentTestService {
         project: () => this.readProject(input.projectId),
         adapter: () => this.readAdapter({ projectId: input.projectId, target: queueableTarget }),
         agentName: () => Promise.resolve(input.agent.name),
+        runKey: (adapter) =>
+          this.runKeys.tokenFor({
+            projectId: input.projectId,
+            adapter,
+            startedByUserId: input.actor?.id,
+            startedByApiKeyId: input.actor?.apiKeyId,
+          }),
       },
       config: this.options.config,
     });

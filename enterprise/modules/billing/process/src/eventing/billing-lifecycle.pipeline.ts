@@ -12,7 +12,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { BillingApp } from "../app/billing.app.ts";
+import type { BillingModule } from "../app/billing.app.ts";
 import {
   RecordCheckoutCompletedCommand,
   RecordSubscriptionChangedCommand,
@@ -46,6 +46,6 @@ export function buildBillingLifecyclePipeline(): BillingLifecyclePipeline {
 
 export const billingLifecycleEventing = defineEventingModule({
   pipeline: BILLING_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, BillingApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<never, BillingModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Plus } from "lucide-react";
 import type { ComponentProps } from "react";

@@ -3,74 +3,20 @@
  * a second permission question is asked with, the scope a handler reads back, and the person
  * a personal-workspace key stands for.
  */
+import type {
+  PrincipalRef,
+  RestCredentialPrincipal,
+  RestKeyCredentialPrincipal,
+  RestOrganizationCredentialPrincipal,
+  RestProjectCredentialPrincipal,
+  RestProjectIdentity,
+  RestResolvedOrganizationCredential,
+  RestResolvedProjectCredential,
+} from "@langwatch/authorization";
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context, ErrorHandler } from "hono";
 
 import type { EndpointVariables, ServiceContext } from "./response.ts";
-
-// The project and the credential a REST request arrives with. These are the
-// project and API-key contracts' own values — described rather than imported to
-// avoid a declaration cycle. The structural check is field for field.
-
-/**
- * Who a project is, and nothing about how it is configured — the value the
- * project contract publishes as its identity. A handler that needs
- * configuration asks the project service for it.
- */
-export type RestProjectIdentity = {
-  id: string;
-  name: string;
-  slug: string;
-  teamId: string;
-  organizationId: string;
-  /** Whether the workspace belongs to exactly one person. */
-  isPersonal: boolean;
-  /** That person, when the workspace is personal. */
-  ownerUserId: string | null;
-};
-
-/**
- * The credential a project-scoped door resolved: a scoped API key, or the
- * legacy project key, which predates RBAC and carries full project access by
- * its class alone.
- */
-export type RestResolvedProjectCredential =
-  | {
-      type: "legacyProjectKey";
-      project: RestProjectIdentity;
-    }
-  | {
-      type: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-      ingestSourceType: string | null;
-      ingestionTemplateId: string | null;
-      /** Set when the key belongs to an agent session rather than a person. */
-      isLangySessionKey?: boolean;
-      project: RestProjectIdentity;
-    };
-
-/**
- * The credential an organization-scoped door resolved. It names no project: a
- * permission asked of it is asked at organization, team or route-project scope.
- */
-export type RestResolvedOrganizationCredential = {
-  type: "apiKey-org";
-  apiKeyId: string;
-  userId: string | null;
-  organizationId: string;
-};
-
-/**
- * The credential a deployment-secret door resolved. It names no tenant — the secret belongs
- * to the deployment, not a customer — so it carries no scope and no actor, only WHICH secret
- * admitted the request, by name and never by value, so an admitting door is reviewable.
- */
-export type RestResolvedInternalCredential = Readonly<{
-  type: "internalSecret";
-  secretName: string;
-}>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request context a scoped family sees, written by the process's own
@@ -108,48 +54,20 @@ export type AppRestOrganizationVariables = {
   orgResolvedToken: RestResolvedOrganizationCredential;
 };
 
-// The credential a REST request arrived with. Handlers that ask secondary permission
-// questions ("may this caller also see costs?") need to ask them about the resolved
-// credential, not the declared permission checked before the handler runs.
-
-/**
- * The credential a project-scoped door resolved: a scoped key, or the legacy project key
- * carrying full project access by its class alone. `isLangySessionKey` rides along because
- * an agent's write is labelled apart from a person's, and that fact lives on the key.
- */
-export type RestProjectCredentialPrincipal =
-  | Readonly<{
-      kind: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-      projectId: string;
-      teamId: string;
-      isLangySessionKey?: boolean;
-    }>
-  | Readonly<{ kind: "legacyProjectKey" }>;
-
-/**
- * The credential an organization-scoped door resolved. Its own arm rather than
- * the project one with blank ids: an organization key names no project, and a
- * permission asked of it is asked at organization, team or route-project scope.
- */
-export type RestOrganizationCredentialPrincipal = Readonly<{
-  kind: "organizationApiKey";
-  apiKeyId: string;
-  userId: string | null;
-  organizationId: string;
-}>;
-
-export type RestCredentialPrincipal =
-  | RestProjectCredentialPrincipal
-  | RestOrganizationCredentialPrincipal;
-
 /** The principal a resolved token stands for. */
 export function credentialPrincipalOfToken(
   resolved: RestResolvedProjectCredential,
 ): RestProjectCredentialPrincipal {
-  if (resolved.type !== "apiKey") return { kind: "legacyProjectKey" };
+  if (resolved.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+  if (resolved.type === "cliAccessToken") {
+    return {
+      kind: "cliAccessToken",
+      userId: resolved.userId,
+      organizationId: resolved.organizationId,
+      projectId: resolved.project.id,
+      teamId: resolved.project.teamId,
+    };
+  }
 
   return {
     kind: "apiKey",
@@ -162,6 +80,20 @@ export function credentialPrincipalOfToken(
       ? {}
       : { isLangySessionKey: resolved.isLangySessionKey }),
   };
+}
+
+/**
+ * Who authz checks a project credential as: a project-bound access token is its user, a project
+ * key or legacy access token its own key row. None for a legacy API key, which predates RBAC
+ * and carries full project access by its class alone.
+ */
+export function principalOfCredential(
+  credential: RestResolvedProjectCredential,
+): PrincipalRef | null {
+  if (credential.type === "legacyProjectKey") return null;
+  if (credential.type === "cliAccessToken") return { type: "user", id: credential.userId };
+
+  return { type: "apiKey", id: credential.apiKeyId };
 }
 
 /** The principal a resolved organization token stands for. */
@@ -228,20 +160,6 @@ export type RestResolvedScimCredential = Readonly<{
   organizationId: string;
   connectionId: string | null;
 }>;
-
-/**
- * What the key door resolved (#8085): a legacy project key IS its project; any other key reaches
- * its organization, and names the project it resolved to when the request selected one.
- */
-export type RestKeyCredentialPrincipal =
-  | Readonly<{ kind: "project"; projectId: string }>
-  | Readonly<{
-      kind: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-      resolvedProject?: Readonly<{ id: string; teamId: string }>;
-    }>;
 
 const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
 const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
@@ -525,83 +443,4 @@ export function resolvePersonalCaller({
   }
 
   return project.ownerUserId;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// The session a request carries, READ and never enforced.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Who a verified browser cookie stands for, as anything reading one sees it. */
-export type SessionCaller = Readonly<{
-  /** The signed-in person, absent for a verified cookie with no live session. */
-  userId?: string | undefined;
-  email?: string | undefined;
-  name?: string | null | undefined;
-  image?: string | null | undefined;
-  /** Who is acting as them, where somebody is. */
-  impersonator?:
-    | Readonly<{
-        id?: string | undefined;
-        name?: string | null | undefined;
-        email?: string | null | undefined;
-        image?: string | null | undefined;
-      }>
-    | undefined;
-  /** The project a key-credentialled caller stands for, where one did. */
-  apiKeyProjectId?: string | undefined;
-  /** The live session's own id, where the deployment tracks one. */
-  sessionId?: string | undefined;
-  /** The RAW verified auth-session id, before any live-session lookup. */
-  authSessionId?: string | undefined;
-}>;
-
-/**
- * The half of session verification no module can do — reading and verifying
- * this deployment's own cookie — joined to the half only the auth module can.
- * Composed once; nothing holds either half on its own.
- */
-export type SessionVerification = (request: Request) => Promise<SessionCaller | null>;
-
-/**
- * Reads the session a request carries, answering `SessionCaller` or `null`. It refuses, redirects
- * and gates nobody: every enforcement path decides for itself from that answer.
- */
-export class SessionReader {
-  /** A deployment that composed a verifier. */
-  static create(options: { verify: SessionVerification }): SessionReader {
-    return new SessionReader(options.verify);
-  }
-
-  /**
-   * A deployment that composed none. Every read answers `null`, and each
-   * reader takes its own branch — the routes still exist and refuse, rather
-   * than an unverified caller being let through.
-   */
-  static unverified(): SessionReader {
-    return new SessionReader(void 0);
-  }
-
-  /**
-   * One answer per request, however many readers ask: some routes resolve
-   * nobody and still need a session, and verifying once avoids four round
-   * trips to the session store for one request.
-   */
-  readonly #answers = new WeakMap<Request, Promise<SessionCaller | null>>();
-
-  private constructor(private readonly verify: SessionVerification | undefined) {}
-
-  /** Whether this deployment composed anything at all behind the cookie. */
-  get verifies(): boolean {
-    return this.verify !== void 0;
-  }
-
-  read(request: Request): Promise<SessionCaller | null> {
-    const already = this.#answers.get(request);
-    if (already) return already;
-
-    const answering = this.verify?.(request) ?? Promise.resolve(null);
-    this.#answers.set(request, answering);
-
-    return answering;
-  }
 }

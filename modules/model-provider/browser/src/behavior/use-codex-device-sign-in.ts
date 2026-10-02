@@ -154,10 +154,7 @@ export function useCodexDeviceSignIn({
   // cancelled attempt must never write its result over a newer one.
   const attemptRef = useRef(0);
 
-  const status = api.modelProvider.codexStatus.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
+  const status = api.modelProvider.codexStatus.useQuery({ projectId }, { enabled: !!projectId });
   const start = api.modelProvider.codexSignInStart.useMutation();
   const poll = api.modelProvider.codexSignInPoll.useMutation();
   const deleteProvider = api.modelProvider.delete.useMutation();

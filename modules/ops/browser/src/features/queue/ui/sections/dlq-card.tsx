@@ -1,5 +1,15 @@
-import { Badge, Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Input,
+  Spacer,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -255,14 +265,10 @@ export function DlqRow({
 
 export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
-    refetchInterval: 10000,
-  });
+  const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {});
   /** Process-manager intents that retired. Different mechanism from a DLQ
    *  group, same question for the reader: what has permanently stopped. */
-  const processDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
+  const processDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {});
 
   const [filterText, setFilterText] = useState("");
   const [canaryCount, setCanaryCount] = useState(5);

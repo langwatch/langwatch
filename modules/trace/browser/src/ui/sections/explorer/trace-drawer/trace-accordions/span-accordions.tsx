@@ -1,9 +1,17 @@
-import { Box, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Icon,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import {
   logEventTone,
@@ -70,7 +78,7 @@ export function SpanAccordions({
 }) {
   const detailQuery = useSpanDetail();
   const detail = detailQuery.data;
-  const isEditing = useDrawerStore((s) => s.isEditing);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
   // What a stored correction changed about this span, and the span exactly as
   // captured, so each corrected field can show what it replaced.
   const { changedFields, captured } = useSpanCorrection(span.spanId);

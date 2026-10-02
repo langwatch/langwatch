@@ -12,6 +12,11 @@ const overlayRow = vi.hoisted(() => ({
   current: null as { traceId: string; patch: TraceEditOverlayPatch } | null,
 }));
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     traceEditOverlay: {
@@ -22,10 +27,6 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../context/shared-trace-context.tsx", () => ({
-  useSharedTrace: () => null,
-}));
-
 vi.mock("../use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({
     isReady: true,
@@ -33,7 +34,7 @@ vi.mock("../use-trace-query-args.ts", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
 import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../use-trace-edit-overlay.ts";
 
@@ -47,7 +48,9 @@ beforeEach(() => {
   openTraceId.current = "trace-2";
   overlayRow.current = null;
   useTraceEditStore.getState().setOverlayView("edited");
-  useDrawerStore.getState().setIsEditing(false);
+  setWindowAddress({
+    url: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-2",
+  });
 });
 
 describe("given the drawer moved on to another trace", () => {

@@ -4,7 +4,7 @@
  * the Queries tab's own standalone Run button (`useDashboardWidgetExecutor`).
  */
 
-import { Box, Table, Text } from "@chakra-ui/react";
+import { Box, Table, Text } from "@langwatch/design-system/primitives";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import { formatNumber } from "../../model/format.ts";

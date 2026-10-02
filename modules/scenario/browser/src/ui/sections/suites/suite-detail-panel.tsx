@@ -2,9 +2,17 @@
  * Suite detail panel showing header, stats bar, and run results.
  */
 
-import { Box, Button, Center, EmptyState, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import {
+  Box,
+  Button,
+  Center,
+  EmptyState,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
 import {
   BarChart3,
@@ -24,6 +32,7 @@ import { useState } from "react";
 import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useNow } from "../../../behavior/use-now.ts";
+import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel.tsx";
 
 type SuiteDetailPanelProps = {

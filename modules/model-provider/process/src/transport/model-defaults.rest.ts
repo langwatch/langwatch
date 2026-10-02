@@ -9,7 +9,9 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
+import { principalRefSchema } from "@langwatch/authorization";
 import {
+  ModelDefaultScopeForbiddenError,
   apiResponseConfigCreatedSchema,
   apiResponseModelDefaultsSchema,
   createModelDefaultConfigInputSchema,
@@ -22,6 +24,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import { modelDefaultWritePermission } from "../rules/model-default-write-permission.rules.ts";
+
 const logger = createLogger("langwatch:api:model-defaults");
 
 /** Ceiling on the project a key resolved to. Every scope a write NAMES is checked separately. */
@@ -32,14 +36,14 @@ const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
 // from the method and the path. Renaming them renames an SDK method.
 
 /**
- * The credential this request arrived on, as the process resolves one. Null
- * for a credential that names no key row — a legacy project key.
+ * The credential this request arrived on: its principal (a key row, or a person for a
+ * project-bound access token). Null for a legacy API key, which has no principal.
  */
 export const modelDefaultsRestCredential = defineRestMiddleware(
   "modelDefaultsRestCredential",
   z
     .object({
-      apiKeyId: z.string(),
+      principal: principalRefSchema,
       userId: z.string().nullable(),
       organizationId: z.string(),
     })
@@ -102,7 +106,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .handle(async ({ app, input, scope }, credential) => {
     const author = keyOwner(credential);
 
-    await authorizeRequestedScopes({ app, credential, scopes: input.scopes });
+    await authorizeRequestedScopes({ app, credential, scopes: input.scopes, projectId: scope.id });
 
     const saved = await app.saveDefaultConfig(
       { config: input.config, scopes: input.scopes },
@@ -131,7 +135,13 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .handle(async ({ app, input, scope }, credential) => {
     const author = keyOwner(credential);
 
-    await authorizeRequestedScopes({ app, credential, scopes: input.scopes });
+    await authorizeConfigWrite({
+      app,
+      credential,
+      id: input.id,
+      scopes: input.scopes,
+      projectId: scope.id,
+    });
 
     await app.saveDefaultConfig(
       { id: input.id, config: input.config, scopes: input.scopes },
@@ -156,6 +166,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .handle(async ({ app, input, scope }, credential) => {
     const author = keyOwner(credential);
 
+    await authorizeConfigWrite({ app, credential, id: input.id, scopes: [], projectId: scope.id });
     await app.deleteDefaultConfig({ id: input.id }, author);
 
     logger.info(
@@ -181,6 +192,34 @@ function keyOwner(credential: ModelDefaultsCredential): { id: string } {
 }
 
 /**
+ * A write by id reaches the config's EXISTING scopes as well as any it names, so both are
+ * checked: an update or delete never touches a config outside the credential's reach.
+ */
+async function authorizeConfigWrite({
+  app,
+  credential,
+  id,
+  scopes,
+  projectId,
+}: {
+  app: Pick<ModelProviderApi, "assertApiKeyMayWriteDefaultScopes" | "findDefaultConfig">;
+  credential: ModelDefaultsCredential;
+  id: string;
+  scopes: ModelDefaultScope[] | undefined;
+  projectId: string;
+}): Promise<void> {
+  if (!credential) return;
+
+  const existing = await app.findDefaultConfig({ id });
+  await authorizeRequestedScopes({
+    app,
+    credential,
+    scopes: [...(existing?.scopes ?? []), ...(scopes ?? [])],
+    projectId,
+  });
+}
+
+/**
  * The scopes a write NAMES, checked against the credential — not its
  * owner, which the application checks already. Skip this and a
  * project-restricted key could write org defaults with the admin's grants.
@@ -189,12 +228,27 @@ async function authorizeRequestedScopes({
   app,
   credential,
   scopes,
+  projectId,
 }: {
   app: Pick<ModelProviderApi, "assertApiKeyMayWriteDefaultScopes">;
   credential: ModelDefaultsCredential;
   scopes: ModelDefaultScope[] | undefined;
+  projectId: string;
 }): Promise<void> {
   if (!credential || !scopes?.length) return;
 
-  await app.assertApiKeyMayWriteDefaultScopes({ apiKey: credential, scopes });
+  const { principal, userId, organizationId } = credential;
+  if (principal.type === "user") {
+    // A project-bound access token is the person, capped at its project (ARCHITECTURE.md §1830).
+    const outside = scopes.find((s) => s.scopeType !== "PROJECT" || s.scopeId !== projectId);
+    if (!outside) return;
+    throw new ModelDefaultScopeForbiddenError({
+      scopeType: outside.scopeType,
+      requiredPermission: modelDefaultWritePermission(outside.scopeType),
+    });
+  }
+  await app.assertApiKeyMayWriteDefaultScopes({
+    apiKey: { apiKeyId: principal.id, userId, organizationId },
+    scopes,
+  });
 }

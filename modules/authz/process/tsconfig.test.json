@@ -13,10 +13,10 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/actor/tsconfig.build.json"
+      "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
+      "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -28,10 +28,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -43,6 +46,9 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
@@ -50,6 +56,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

@@ -4,7 +4,7 @@
  * runs, their live stream, cancellation, Results and configuration history.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { MAX_ATOM_PAGE } from "./result-atoms.ts";
@@ -28,6 +28,10 @@ import {
 } from "./scenario.responses.ts";
 import { scenarioSchema } from "./scenario.ts";
 import { scenarioVersionDetailSchema } from "./scenario.version.ts";
+import {
+  SIMULATION_RUN_EVENT_TYPES,
+  SIMULATION_SET_EVENT_TYPES,
+} from "./simulation-event.constants.ts";
 import { simulationTargetSchema } from "./simulation-target.ts";
 import {
   simulationAllSuitesRunDataSchema,
@@ -286,9 +290,18 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
 
   /**
    * A cheap freshness probe: the latest update across the project's runs in the
-   * window. Clients poll this and invalidate the run reads when it advances.
+   * window. Clients re-read it on a hint and invalidate the run reads when it advances.
    */
-  .query("getSuiteRunFreshness")
+  .query("getSuiteRunFreshness", {
+    invalidatedBy: [
+      SIMULATION_RUN_EVENT_TYPES.QUEUED,
+      SIMULATION_RUN_EVENT_TYPES.STARTED,
+      SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+      SIMULATION_RUN_EVENT_TYPES.DELETED,
+    ],
+  })
   .withInput(
     z.object({ ...projectSchema.shape, scenarioSetId: z.string().optional(), ...dateRangeFields }),
   )
@@ -331,7 +344,9 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   )
   .withOutput(simulationBatchHistorySchema)
 
-  .query("getBatchRunData")
+  .query("getBatchRunData", {
+    invalidatedBy: [SIMULATION_RUN_EVENT_TYPES.QUEUED, SIMULATION_RUN_EVENT_TYPES.STARTED],
+  })
   .withInput(
     z.object({
       ...projectSchema.shape,
@@ -343,7 +358,14 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   )
   .withOutput(simulationBatchRunDataSchema)
 
-  .query("getExternalSetSummaries")
+  .query("getExternalSetSummaries", {
+    invalidatedBy: [
+      SIMULATION_RUN_EVENT_TYPES.QUEUED,
+      SIMULATION_RUN_EVENT_TYPES.STARTED,
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+    ],
+  })
   .withInput(z.object({ ...projectSchema.shape, ...dateRangeFields }))
   .withOutput(simulationExternalSetSummarySchema.array())
 
@@ -391,7 +413,14 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withInput(windowSchema)
   .withOutput(runTargetSchema.array())
 
-  .query("getResultsOverview")
+  .query("getResultsOverview", {
+    invalidatedBy: [
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+      SIMULATION_RUN_EVENT_TYPES.DELETED,
+      SIMULATION_SET_EVENT_TYPES.ARCHIVED,
+    ],
+  })
   .withInput(
     z.object({
       ...resultsFilterSchema.shape,
@@ -401,7 +430,14 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withOutput(resultsOverviewSchema)
 
   /** One page of atoms, newest first: the drill-down, never a total. */
-  .query("getResultAtoms")
+  .query("getResultAtoms", {
+    invalidatedBy: [
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+      SIMULATION_RUN_EVENT_TYPES.DELETED,
+      SIMULATION_SET_EVENT_TYPES.ARCHIVED,
+    ],
+  })
   .withInput(
     z.object({
       ...resultsFilterSchema.shape,

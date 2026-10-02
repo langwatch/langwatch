@@ -1,7 +1,7 @@
 /** Frame for /ops/event-sourcing/* pages; title bar, section rail and content column. */
 
-import { Badge, HStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, HStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -91,7 +91,6 @@ export function EventSourcingLayout({
  */
 function DeadLetterBadge() {
   const counts = api.ops.listDeadLetterCounts.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const total = (counts.data ?? []).reduce((sum, row) => sum + row.count, 0);
   if (total === 0) return null;

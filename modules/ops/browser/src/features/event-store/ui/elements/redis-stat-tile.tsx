@@ -1,4 +1,5 @@
-import { HStack, Stat, Text, VStack } from "@chakra-ui/react";
+import { Stat } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 import { formatBytes } from "../../../../model/ops-formatters.ts";

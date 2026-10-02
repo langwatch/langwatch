@@ -1,10 +1,10 @@
+import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * /settings/directory: who is here, how they got here, and which system says so.
  * Members, Teams and Groups are its tabs; their old addresses forward onto them.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Tabs, Text, VStack } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { Suspense } from "react";
 
 import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";

@@ -9,8 +9,8 @@
  * Renders the real Chakra menu — mocking it would hide exactly the
  * open/disabled semantics these scenarios exist to pin.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -35,17 +35,15 @@ function renderMenu({
   disabledReason?: string;
   onPick?: (sourceType: string) => void;
 }) {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AddIngestionSourceMenu
-        isEnterprise={isEnterprise}
-        hint={hint}
-        disabledReason={disabledReason}
-        onPick={onPick}
-      >
-        <button type="button">Add source</button>
-      </AddIngestionSourceMenu>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AddIngestionSourceMenu
+      isEnterprise={isEnterprise}
+      hint={hint}
+      disabledReason={disabledReason}
+      onPick={onPick}
+    >
+      <button type="button">Add source</button>
+    </AddIngestionSourceMenu>,
   );
   return { onPick };
 }

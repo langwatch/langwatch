@@ -799,11 +799,17 @@ Feature: The Results tab
     And a placeholder entry for the new run appears in that other plan
 
   @integration
-  Scenario: When the live connection drops the results still update
+  Scenario: When the live connection drops the results set no timer
     Given a run is streaming into the page
     When the live connection is lost
-    Then the results keep updating at the fallback cadence
+    Then the results set no refetch timer
     And nothing tells the person to reload
+
+  @integration @unimplemented
+  Scenario: When the live connection drops the results update on their server event
+    Given a run is streaming into the page
+    When the live connection is lost
+    Then the results update when the run's server event arrives, with no timer
 
   # --- Stopping ---
 

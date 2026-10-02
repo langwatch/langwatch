@@ -3,16 +3,15 @@
  * with data already in the cache instead of a loading state.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useCallback } from "react";
-
-import { api } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 const PREFETCH_STALE_TIME_MS = 5000;
 
 export function usePrefetchRunState() {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
 
   return useCallback(
     (scenarioRunId: string) => {

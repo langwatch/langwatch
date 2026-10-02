@@ -1,5 +1,5 @@
-import { Button, Input, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
 /** Shared destructive-action confirmation for app-owned feature composition. */

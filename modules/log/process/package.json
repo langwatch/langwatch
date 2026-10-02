@@ -23,15 +23,15 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
-    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
@@ -41,7 +41,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

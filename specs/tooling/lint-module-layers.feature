@@ -50,6 +50,12 @@ Feature: The module-layers lint rule
     And it passes the interface
 
   @unit
+  Scenario: A nested service is held to the same layers as a top-level one
+    Given a service under features/<concern>/services/ importing a repository interface and a Prisma backend
+    When the module-layers rule runs over it
+    Then it reports serviceNamesABackend for the backend and passes the interface
+
+  @unit
   Scenario: A test composing a layer is not this rule's business
     Given a repository unit test that imports a service
     When the module-layers rule runs over it

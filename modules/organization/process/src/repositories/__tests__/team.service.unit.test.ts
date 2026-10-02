@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  AuthzAccessBinding,
-  AuthzApi,
-  AuthzTeamMemberBinding,
+import {
+  permissionsConferred,
+  type AuthzAccessBinding,
+  type AuthzApi,
+  type AuthzTeamMemberBinding,
 } from "@langwatch/authz-contract";
 import {
   CannotRemoveSelfAsLastAdminError,
@@ -12,6 +12,7 @@ import {
   type OrganizationGroupMember,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -181,6 +182,8 @@ function buildService(options?: {
   accessBindings?: AuthzAccessBinding[];
   memberBindings?: AuthzTeamMemberBinding[];
   groups?: MemoryGroups;
+  /** What authz answers the caller lacks for each grant the save would write. */
+  beyondCaller?: string[];
 }) {
   const teams = new MemoryTeams();
   const groups = options?.groups ?? new MemoryGroups();
@@ -188,6 +191,7 @@ function buildService(options?: {
     attach: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
     change: vi.fn().mockResolvedValue(undefined),
     revoke: vi.fn().mockResolvedValue(undefined),
+    beyondCaller: vi.fn().mockResolvedValue(options?.beyondCaller ?? []),
   };
   const authz = {
     listScopeBindings: () => Promise.resolve(options?.accessBindings ?? []),
@@ -199,6 +203,8 @@ function buildService(options?: {
     attachBindings: calls.attach,
     changeBindingRole: calls.change,
     revokeBindings: calls.revoke,
+    findPermissionsBeyondCaller: calls.beyondCaller,
+    findRolePermissions: () => Promise.resolve([]),
   };
   const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
   const service = OrganizationService.create({
@@ -273,12 +279,109 @@ describe("OrganizationService team membership", () => {
         { userId: "user", role: "VIEWER" },
         { userId: "admin", role: "ADMIN" },
       ],
+      caller: { type: "user", id: "admin" },
       actor: { type: "user", id: "admin" },
     });
     expect(calls.change).toHaveBeenCalledWith(
       expect.objectContaining({ bindingId: "member", role: "VIEWER" }),
     );
     expect(calls.revoke).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Saving a team's members with a role above the caller is refused */
+  it("asks the caller's ceiling for every add and change, and writes none when one exceeds it", async () => {
+    const { service, calls } = buildService({
+      accessBindings: [
+        accessBinding({ id: "member", userId: "user", role: "MEMBER" }),
+        accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+      ],
+      beyondCaller: ["team:manage"],
+    });
+
+    await expect(
+      service.updateTeamWithMembers({
+        teamId: team.id,
+        name: "Renamed",
+        members: [
+          { userId: "newcomer", role: "MEMBER" },
+          { userId: "user", role: "ADMIN" },
+          { userId: "admin", role: "ADMIN" },
+        ],
+        caller: { type: "user", id: "lead" },
+        actor: { type: "user", id: "lead" },
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+
+    expect(calls.beyondCaller).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org_1",
+        caller: { type: "user", id: "lead" },
+        scope: { type: "team", id: team.id },
+        // The first grant asked is the newcomer's: what a team MEMBER role confers there.
+        permissions: [
+          ...permissionsConferred({ role: "MEMBER", scopeType: "TEAM", customPermissions: [] }),
+        ],
+      }),
+    );
+    expect(calls.attach).not.toHaveBeenCalled();
+    expect(calls.change).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Creating a staffed team is bounded by its creator, who still becomes its admin */
+  it("makes the creator its admin as part of creating it, and bounds everyone else by the creator", async () => {
+    const { service, teams, calls } = buildService();
+    vi.spyOn(teams, "getBySlug").mockRejectedValue(new TeamNotFoundError("new"));
+
+    await service.createTeamWithMembers({
+      organizationId: "org_1",
+      name: "New",
+      members: [
+        { userId: "lead", role: "ADMIN" },
+        { userId: "newcomer", role: "MEMBER" },
+      ],
+      caller: { type: "user", id: "lead" },
+      actor: { type: "user", id: "lead" },
+    });
+
+    // The team does not exist yet, so the creator's holdings are read at the organization.
+    expect(calls.beyondCaller).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      caller: { type: "user", id: "lead" },
+      scope: { type: "organization", id: "org_1" },
+      permissions: [
+        ...permissionsConferred({ role: "MEMBER", scopeType: "TEAM", customPermissions: [] }),
+      ],
+    });
+    expect(
+      calls.attach.mock.calls.map(([input]) => [
+        input.caller,
+        input.bindings.map((b: { principal: unknown }) => b.principal),
+      ]),
+    ).toEqual([
+      [{ type: "system" }, [{ userId: "lead" }]],
+      [{ type: "user", id: "lead" }, [{ userId: "newcomer" }]],
+    ]);
+  });
+
+  /** @scenario Creating a staffed team is bounded by its creator, who still becomes its admin */
+  it("refuses a member above the creator before the team exists", async () => {
+    const { service, teams, calls } = buildService({ beyondCaller: ["team:manage"] });
+    const create = vi.spyOn(teams, "create");
+
+    await expect(
+      service.createTeamWithMembers({
+        organizationId: "org_1",
+        name: "New",
+        members: [
+          { userId: "lead", role: "MEMBER" },
+          { userId: "other", role: "ADMIN" },
+        ],
+        caller: { type: "user", id: "lead" },
+        actor: { type: "user", id: "lead" },
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(create).not.toHaveBeenCalled();
+    expect(calls.attach).not.toHaveBeenCalled();
   });
 
   it("refuses removal of the last effective admin before fencing or revoking", async () => {
@@ -328,6 +431,7 @@ describe("OrganizationService team membership", () => {
         teamId: team.id,
         name: team.name,
         members: [{ userId: "admin", role: "MEMBER" }],
+        caller: { type: "user", id: "admin" },
         actor: { type: "user", id: "admin" },
       }),
     ).rejects.toBeInstanceOf(TeamLastAdminRequiredError);
@@ -368,6 +472,7 @@ describe("given a team a seat correction left with no team admin at all", () => 
         teamId: team.id,
         name: team.name,
         members: [{ userId: "member", role: "ADMIN" }],
+        caller: { type: "user", id: "org_admin" },
         actor: { type: "user", id: "org_admin" },
       });
 
@@ -422,6 +527,7 @@ describe("given a shared team whose only admin is one of its members", () => {
           { userId: "admin", role: "VIEWER" },
           { userId: "member", role: "ADMIN" },
         ],
+        caller: { type: "user", id: "admin" },
         actor: { type: "user", id: "admin" },
       });
 
@@ -452,6 +558,7 @@ describe("given a group holds the Admin role on a team", () => {
         teamId: team.id,
         name: team.name,
         members: [{ userId: "admin", role: "VIEWER" }],
+        caller: { type: "user", id: "group_admin" },
         actor: { type: "user", id: "group_admin" },
       });
 
@@ -477,6 +584,7 @@ describe("given a group holds the Admin role on a team", () => {
           teamId: team.id,
           name: team.name,
           members: [{ userId: "admin", role: "VIEWER" }],
+          caller: { type: "user", id: "org_admin" },
           actor: { type: "user", id: "org_admin" },
         }),
       ).rejects.toMatchObject({

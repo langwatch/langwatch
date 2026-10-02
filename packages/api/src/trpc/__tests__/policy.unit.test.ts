@@ -7,18 +7,18 @@ import {
   type AuthzGetProjectAnyDecisionInput,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
-  findAuthzDeclaration,
   BlankScopeIdError,
   type PermissionDecision,
   PermissionDeniedError,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
+import type { Authorize } from "../../access/access.ts";
+import { findAuthzDeclaration } from "../../access/declared-middleware.ts";
 import {
   createDeclaredAuthzMiddlewares,
   createScopeLineageGuard,
-  type TrpcAuthorizationDecisions,
   type TrpcAuthorization,
   type TrpcDeclaredAuthzContext,
   type TrpcDeclaredAuthzMembers,
@@ -40,7 +40,7 @@ function makePorts(
     >;
   } = {},
 ): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
-  decisions: { [K in keyof TrpcAuthorizationDecisions]-?: Mock<TrpcAuthorizationDecisions[K]> };
+  decisions: { [K in keyof Authorize]-?: Mock<Authorize[K]> };
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";
 
@@ -427,7 +427,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // The tRPC adapter for the lineage guard: it hands the input to the
 // authorization port's `checkScopeLineage` and shapes the refusal. The lineage
-// DECISION itself is `@langwatch/authz-contract`'s own business.
+// DECISION itself is the authz module's own business.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function lineagePorts(

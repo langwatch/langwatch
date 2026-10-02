@@ -1,8 +1,9 @@
-import { List, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { List, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { CheckCircle, Circle } from "react-feather";
 
+import { automationApi } from "../../behavior/automation-api.ts";
 import { api } from "../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
@@ -47,9 +48,8 @@ export const useIntegrationChecks = () => {
     {
       enabled: !!project,
       // Onboarding checklist: staleTime: Infinity is fine here because
-      // refetchOnWindowFocus picks up out-of-band changes (first message
-      // synced, first workflow created, etc.) when the user returns to the tab.
-      refetchOnWindowFocus: true,
+      // read hints pick up out-of-band changes (first message synced, first
+      // workflow created, etc.).
       refetchOnMount: false,
       staleTime: Infinity,
     },
@@ -67,6 +67,10 @@ export const IntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
   const integrationChecks = useIntegrationChecks();
   const checks = integrationChecks.data;
+  const automations = automationApi.automation.getTriggers.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchOnMount: false, staleTime: Infinity },
+  );
 
   return (
     <VStack align="start" fontSize="15px">
@@ -94,7 +98,7 @@ export const IntegrationChecks = () => {
         <IntegrationCheckItem
           href="https://docs.langwatch.ai/features/automations"
           isExternal
-          done={checks?.triggers}
+          done={(automations.data?.length ?? 0) > 0}
         >
           Set up an alert
         </IntegrationCheckItem>

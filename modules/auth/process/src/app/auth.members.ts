@@ -29,14 +29,20 @@ export abstract class AuthDirectory {
     projectId: string;
     organizationId: string;
   }): Promise<AuthDirectoryProject>;
+
+  /** An unarchived project of the organization by id, else slug; throws `ProjectNotFoundError`. */
+  abstract getLiveProjectByRef(params: {
+    projectRef: string;
+    organizationId: string;
+  }): Promise<AuthDirectoryProject>;
 }
 
-/** The project fields a device grant mints or names a key from. */
+/** The project fields a device grant binds a session to. */
 export type AuthDirectoryProject = {
   id: string;
   slug: string;
   name: string;
-  apiKey: string;
+  teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;
 };

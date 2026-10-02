@@ -1,3 +1,6 @@
+import { NO_FAILED_ATTEMPTS } from "@langwatch/auth-contract";
+import type { Plan } from "@langwatch/entitlement-contract";
+import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  * The administrator's side of the two sign-in security rules, over the
@@ -5,10 +8,7 @@
  * @see specs/identity/org-account-lockout.feature
  * @see specs/identity/org-session-lifetime.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { NO_FAILED_ATTEMPTS } from "@langwatch/auth-contract";
-import { EnterprisePlanRequiredError } from "@langwatch/entitlement-contract";
-import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -45,13 +45,10 @@ function harness({
     sessionBound: fixture.sessionBound,
     now,
   });
-  const plan = {
-    assertEntitled: vi.fn(async () => {
-      if (!entitled)
-        throw new EnterprisePlanRequiredError(
-          "Sign-in security controls require an Enterprise plan",
-        );
-    }),
+  const entitlements = {
+    getActivePlan: vi.fn(async () =>
+      createApiFixture<Plan>({ type: entitled ? "ENTERPRISE" : "FREE" }),
+    ),
   };
   const released = vi.fn(async () => undefined);
   for (const userId of members) fixture.settings.join({ userId, organizationId: "acme" });
@@ -59,7 +56,7 @@ function harness({
   return {
     fixture,
     memory,
-    plan,
+    entitlements,
     released,
     service: SignInSecuritySettingsService.create({
       settings: fixture.settings,
@@ -68,7 +65,7 @@ function harness({
         findMemberUserIds: async () => members,
         isMember: async ({ userId }) => members.includes(userId),
       },
-      plan,
+      entitlements,
       evidence: { released },
       sessions,
     }),
@@ -86,7 +83,7 @@ describe("SignInSecuritySettingsService", () => {
 
   describe("when a window whose maximum is shorter than its idle timeout is saved", () => {
     it("refuses before asking the plan or writing anything", async () => {
-      const { service, plan } = harness();
+      const { service, entitlements } = harness();
 
       await expect(
         service.save({
@@ -96,7 +93,7 @@ describe("SignInSecuritySettingsService", () => {
           sessionMaxLifetimeMinutes: 30,
         }),
       ).rejects.toMatchObject({ code: "identity_session_max_lifetime_too_short" });
-      expect(plan.assertEntitled).not.toHaveBeenCalled();
+      expect(entitlements.getActivePlan).not.toHaveBeenCalled();
       await expect(service.get({ organizationId: "acme" })).resolves.toEqual(OFF);
     });
   });
@@ -148,16 +145,18 @@ describe("SignInSecuritySettingsService", () => {
 
   describe("given a rule is already active", () => {
     it("adjusts the numbers and turns everything off without asking the plan again", async () => {
-      const { service, plan } = harness({ entitled: false });
+      const { service, entitlements } = harness({ entitled: false });
       const active = { organizationId: "acme", ...OFF, lockoutAfterFailedAttempts: 5 };
-      plan.assertEntitled.mockResolvedValueOnce(undefined);
+      entitlements.getActivePlan.mockResolvedValueOnce(
+        createApiFixture<Plan>({ type: "ENTERPRISE" }),
+      );
       await service.save(active);
-      plan.assertEntitled.mockClear();
+      entitlements.getActivePlan.mockClear();
 
       await service.save({ ...active, lockoutAfterFailedAttempts: 3 });
       await service.save({ organizationId: "acme", ...OFF });
 
-      expect(plan.assertEntitled).not.toHaveBeenCalled();
+      expect(entitlements.getActivePlan).not.toHaveBeenCalled();
       await expect(service.get({ organizationId: "acme" })).resolves.toEqual(OFF);
     });
   });

@@ -1,16 +1,24 @@
 /**
  * Tool-call activity for an assistant turn. Everything here is a CARD.
  */
-import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+  keyframes,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
-import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";
 import { cliToolResultPayload, cliToolResultSchema, parseCliJson } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import {
   type CapabilityCommand,
@@ -49,7 +57,7 @@ import {
   LangyCapabilityRenderer,
   toolResultForCapability,
 } from "./capabilities/langy-capability-renderer.tsx";
-import { LangyPlanLimitCard } from "./langy-plan-limit-card.tsx";
+import { isReaderDecision, LangyFailedStepCard } from "./langy-failed-step-card.tsx";
 import { LangyToolErrorCard } from "./langy-tool-error-card.tsx";
 
 const dotPulse = keyframes`
@@ -1147,22 +1155,15 @@ function FailedToolCallRow({
   recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // A plan limit is never folded: it is not a step that failed, it is a
-  // decision the reader can change, and its card is the way to change it.
-  if (recovered && !presentation.limit) {
+  // A decision the reader can make is never folded: its card is the way to
+  // make it (LangyFailedStepCard).
+  if (recovered && !isReaderDecision({ call, presentation })) {
     return <RecoveredToolFailureRow presentation={presentation} />;
   }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
-        {/* A plan limit is not a broken step, it is a decision the reader can
-            change — so it gets the upgrade card, INSTEAD of the failure card,
-            never beside it. */}
-        {presentation.limit ? (
-          <LangyPlanLimitCard presentation={presentation} />
-        ) : (
-          <LangyToolErrorCard presentation={presentation} />
-        )}
+        <LangyFailedStepCard call={call} presentation={presentation} />
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
             <RawDataToggle isOpen={open} onToggle={() => setOpen((value) => !value)} />

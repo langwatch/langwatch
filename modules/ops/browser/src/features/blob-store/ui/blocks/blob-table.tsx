@@ -1,4 +1,4 @@
-import { Box, Table } from "@chakra-ui/react";
+import { Box, Table } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 import { BlobRow } from "./blob-row.tsx";

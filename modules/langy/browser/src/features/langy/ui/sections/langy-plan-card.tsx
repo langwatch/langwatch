@@ -1,9 +1,16 @@
 /**
  * The plan checklist — what a multi-step turn said it would do, and where it is.
  */
-import { Box, chakra, HStack, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
-import { useReducedMotion, LangyCard } from "@langwatch/langy-browser-kit";
+import {
+  Box,
+  chakra,
+  HStack,
+  Text,
+  VisuallyHidden,
+  VStack,
+  keyframes,
+} from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 
@@ -13,6 +20,7 @@ import type {
   LangyPlanItemStatus,
 } from "../../../../model/langy-plan.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

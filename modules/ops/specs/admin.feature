@@ -3,13 +3,21 @@ Feature: Platform administration package boundary
 
   @unit
   Scenario: Admin email matching is normalized
-    Given an allow-list with mixed case, spaces, and blanks
-    When platform-admin access checks an email
-    Then matching is case-insensitive and blanks are ignored
+    Given an identity that names only an email address, in mixed case with spaces or blank
+    When platform-admin access checks it
+    Then the address is resolved to its account before authz is asked, and a blank address is not an admin
+
+  @unit
+  Scenario: Operator gates ask the platform-operator grant
+    Given authz answers ops:view and ops:manage at the platform tier per user
+    When a read gate, a write gate, the staff gate and the operator scope are asked
+    Then reads need ops:view and writes need ops:manage
+    And an impersonating operator is read by the impersonator's own grant
+    And a caller who holds nothing is refused, or answered as no scope
 
   @unit
   Scenario: An admin cannot impersonate another admin
-    Given the target email is in the platform-admin allow-list
+    Given the target account holds the platform-operator grant
     When an admin starts impersonation
     Then the service reports cannot_impersonate_admin without changing session state
 
@@ -112,3 +120,24 @@ Feature: Platform administration package boundary
     When an operator starts a replay
     Then replay_start_failed reports the existing 409 safe operator message
     And the original failure remains available for platform logging
+
+  @unit
+  Scenario: The Back office refuses user writes the user module does not serve
+    Given an operator holding the manage grant
+    When they bulk-update, delete or bulk-delete users through the Back office
+    Then the write is refused with validation_error
+    And no user row is written and nothing is audited
+
+  @unit
+  Scenario: An impersonating operator cannot deactivate or reactivate an account from the back office
+    Given an operator holding the manage grant who is impersonating an account
+    When they write a user's deactivation through the Back office
+    Then the write is refused with ops_impersonated_operator_refused
+    And user is never asked to deactivate or reactivate the account
+
+  @unit
+  Scenario: The Back office creates an account only as active
+    Given an operator holding the manage grant, impersonating or not
+    When they create a user through the Back office with a deactivation value
+    Then the write is refused with validation_error
+    And no user row is written and nothing is audited

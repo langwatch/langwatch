@@ -8,12 +8,9 @@
  * membership. Reading the list, and the connections a token can be minted
  * against, is seeing rather than managing, so both take `sso:view`.
  *
- * The Enterprise plan gate is NOT declared here, and it is not gone: it ran
- * SECOND, after the permission check, so that a caller who does not belong to
- * the organization is told that rather than told what the organization has not
- * bought. Neither runtime has a seam for a gate that is not an RBAC
- * permission, so the process applies it at the mount, over
- * `ScimApi.isEnterpriseEntitled`.
+ * The Enterprise plan gate is declared on list, generate and revoke, as main
+ * asked it; the framework asks it after access, so a caller who may not do
+ * this is told that rather than told what the organization has not bought.
  *
  * @see enterprise/modules/scim/specs/scim.feature
  */
@@ -23,6 +20,7 @@ import { ScimApi, scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
 export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimTokenTrpc> =
   defineTrpcRouter(ScimApi, scimTokenTrpc)
     .procedure("list")
+    .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("sso:view")
     .handle(({ app, input }) => app.listTokens({ organizationId: input.organizationId }))
 
@@ -31,17 +29,23 @@ export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimT
     .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
 
     .procedure("generate")
+    .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("sso:manage")
-    .handle(({ app, input }) =>
-      app.generateToken({
-        organizationId: input.organizationId,
-        connectionId: input.connectionId,
-        description: input.description,
-        secret: input.secret,
-      }),
+    .handle(({ app, input, actor }) =>
+      app.generateToken(
+        {
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          description: input.description,
+          secret: input.secret,
+        },
+        // Only a full organization admin may mint: the token hands on directory group grants.
+        { id: actor.id },
+      ),
     )
 
     .procedure("revoke")
+    .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("sso:manage")
     .handle(({ app, input }) =>
       app.revokeToken({ organizationId: input.organizationId, tokenId: input.tokenId }),

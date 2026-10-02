@@ -5,11 +5,12 @@
  * reaches the row. A row with no origin shows a plain badge.
  * @see specs/traces-v2/origin-badge-filter.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useExplorerStore } from "../../../../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
 import { useDensityTokens } from "../../../../../hooks/use-density-tokens.ts";
@@ -48,11 +49,7 @@ const Cell: React.FC<{ item: TraceListItem; onRowClick: () => void }> = ({ item,
 
 function renderCell(item: TraceListItem) {
   const onRowClick = vi.fn();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Cell item={item} onRowClick={onRowClick} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<Cell item={item} onRowClick={onRowClick} />);
   return onRowClick;
 }
 

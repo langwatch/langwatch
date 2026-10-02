@@ -1,5 +1,5 @@
-import { chakra, Text, VStack } from "@chakra-ui/react";
-import { LangyMark } from "@langwatch/langy-browser-kit";
+import { LangyMark } from "@langwatch/design-system/langy-mark";
+import { chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { LuArrowRight } from "react-icons/lu";
 
 /**

@@ -15,7 +15,7 @@ Feature: The /api/projects door is served by the application the composition bui
   # generic "unknown" answer.
   #
   # These scenarios are therefore bound to tests that mount the REAL
-  # ProjectApp, over its own repository interface, through that same proxy.
+  # ProjectModule, over its own repository interface, through that same proxy.
 
   Scenario: the management door reaches the application the composition built
     Given an organization credential that reaches every project

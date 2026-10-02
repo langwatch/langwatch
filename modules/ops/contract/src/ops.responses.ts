@@ -43,7 +43,7 @@ export const opsOperatorSchema = z.object({
   email: z.string().nullable().optional(),
   impersonator: z
     .object({
-      /** Absent on a door that reads only the address the allow-list matches. */
+      /** Absent on a door that reads only the address; the account holding it is looked up. */
       id: z.string().optional(),
       email: z.string().nullable().optional(),
     })

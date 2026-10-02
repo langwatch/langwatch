@@ -1,11 +1,12 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { DiscoverDescriptors } from "./discover-cache.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
+
+type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
 
 export interface FilteredTraceFacetsResult {
   /** Descriptors counted under the active query, or none until the first lands. */
@@ -42,11 +43,7 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
     },
     {
       enabled: !!projectId && !isSamplePreview,
-      staleTime: 60_000,
       placeholderData: keepPreviousData,
-      // The list is the slow read on heavy projects; batching the two would
-      // make the sidebar wait on it.
-      trpc: { context: { skipBatch: true } },
     },
   );
 

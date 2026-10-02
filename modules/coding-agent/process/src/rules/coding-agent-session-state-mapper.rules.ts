@@ -1,13 +1,19 @@
-import {
-  contextUsageKey,
-  type MetricSeriesFact,
-  type SessionTitleSource,
-  sessionTitleSourceSchema,
-} from "../eventing/coding-agent-session-state.projection.ts";
+import { z } from "zod";
+
+import type { MetricSeriesFact } from "../eventing/coding-agent-session-state.projection.ts";
 import type {
   CodingAgentSessionRow,
   CodingAgentSessionState,
 } from "../eventing/coding-agent-session.projection.ts";
+import { contextUsageKey } from "./coding-agent-session-usage-key.rules.ts";
+
+/**
+ * Who set the session's `title`, in rank order: harness session name beats
+ * generated conversation title beats prompt-derived name. A schema, not a
+ * bare union, since the value also decodes back from a row column at runtime.
+ */
+const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
+export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
 
 /**
  * The title-source column decodes into its union; anything else — the empty

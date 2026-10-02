@@ -1,10 +1,12 @@
-import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
+import { Cloud } from "lucide-react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { HOSTED_SERVICES, type HostedService } from "../../model/hosted-services.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { SettingsBlock } from "../elements/settings-block.tsx";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
 
 /** Every service starts off, and what it sends is on the page before the switch is touched. */
@@ -26,10 +28,11 @@ export function ConnectServicesSection({
   const entitled = status.entitledServices;
 
   return (
-    <SettingsBlock
+    <SettingsSection
+      icon={<Cloud size={18} />}
       title="Hosted services"
-      description="Choose which LangWatch-hosted services this install may call."
-      testId="connect-services"
+      hint="Choose which LangWatch-hosted services this install may call."
+      data-testid="connect-services"
     >
       <VStack width="full" align="stretch" gap={3}>
         {HOSTED_SERVICES.map((service) => (
@@ -46,7 +49,7 @@ export function ConnectServicesSection({
           />
         ))}
       </VStack>
-    </SettingsBlock>
+    </SettingsSection>
   );
 }
 
@@ -66,55 +69,37 @@ function ServiceRow({
   onToggle: (next: boolean) => void;
 }) {
   return (
-    <HStack
-      width="full"
-      gap={4}
-      align="start"
-      paddingX={4}
-      paddingY={3}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="10px"
+    <SettingsCard
+      title={service.name}
+      hint={service.description}
+      badge={
+        <HStack gap={3}>
+          <ServiceBadge isOn={isOn} isEntitled={isEntitled} />
+          <Switch
+            checked={isOn}
+            disabled={!canManage || !isEntitled || isSaving}
+            aria-label={service.name}
+            inputProps={{ "data-testid": `connect-service-switch-${service.id}` }}
+            onCheckedChange={(event) => onToggle(event.checked)}
+          />
+        </HStack>
+      }
       data-testid={`connect-service-${service.id}`}
     >
-      <VStack align="start" gap={1} flex={1}>
-        <HStack gap={2}>
-          <Text fontWeight="medium">{service.name}</Text>
-          <ServiceBadge isOn={isOn} isEntitled={isEntitled} />
-        </HStack>
-        <Text fontSize="sm" color="fg.muted">
-          {service.description}
-        </Text>
-        <VStack align="start" gap={0.5} paddingTop={1}>
-          {service.dataStatements.map((statement) => (
-            <Text key={statement} fontSize="sm" color="fg.muted">
-              {statement}
-            </Text>
-          ))}
-        </VStack>
+      <VStack align="start" gap={0.5}>
+        {service.dataStatements.map((statement) => (
+          <Text key={statement} fontSize="sm" color="fg.muted">
+            {statement}
+          </Text>
+        ))}
       </VStack>
-      <Switch
-        checked={isOn}
-        disabled={!canManage || !isEntitled || isSaving}
-        aria-label={service.name}
-        inputProps={{ "data-testid": `connect-service-switch-${service.id}` }}
-        onCheckedChange={(event) => onToggle(event.checked)}
-      />
-    </HStack>
+    </SettingsCard>
   );
 }
 
 function ServiceBadge({ isOn, isEntitled }: { isOn: boolean; isEntitled: boolean }) {
-  if (!isEntitled) {
-    return (
-      <Badge colorPalette="orange" size="sm" variant="surface">
-        Not included in your license
-      </Badge>
-    );
-  }
+  if (!isEntitled) return <StatusChip label="Not included in your license" tone="warning" />;
   return (
-    <Badge colorPalette={isOn ? "green" : "gray"} size="sm" variant="surface">
-      {isOn ? "On" : "Available, switched off"}
-    </Badge>
+    <StatusChip label={isOn ? "On" : "Available, switched off"} tone={isOn ? "good" : "neutral"} />
   );
 }

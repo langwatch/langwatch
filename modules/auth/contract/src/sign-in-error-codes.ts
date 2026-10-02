@@ -52,6 +52,11 @@ export const STABLE_AUTH_ERRORS = [
   "sso_setup_address_mismatch",
   "sso_domain_not_verified",
   "sso_domain_proof_lapsed",
+  // An unconfirmed account holds the address and this sign-in cannot vouch for it: a domain
+  // proof or the provider's claim has to change (sso-link-unconfirmed-local-account.feature).
+  "sso_existing_account_unconfirmed",
+  // The ID token's issuer is not the connection's: the connection's issuer has to change.
+  "sso_issuer_mismatch",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

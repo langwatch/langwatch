@@ -3,7 +3,7 @@
  * The memory twin answers the same questions as the Prisma one, so the app can
  * be driven without a database.
  */
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryEvaluatorRepositories } from "./memory/memory.evaluator.repositories.ts";
 import { PostgresEvaluatorRepositories } from "./prisma/prisma.evaluator.repositories.ts";

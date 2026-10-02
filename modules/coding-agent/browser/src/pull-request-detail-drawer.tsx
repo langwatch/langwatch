@@ -1,13 +1,15 @@
-import { Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import {
-  ModelsSection,
-  MISSING_VALUE,
-  type DetailPayload,
-  formatShortDate,
-} from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { GitHubIcon } from "@langwatch/design-system/icons";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import type React from "react";
@@ -15,9 +17,13 @@ import type React from "react";
 import { codingAgentApi as api } from "./coding-agent-api.ts";
 import { ContributorsSection } from "./contributors-section.tsx";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
+import { type DetailPayload } from "./model/pull-request-detail.ts";
+import { formatShortDate } from "./model/short-date.ts";
 import { SessionsSection } from "./pull-request-sessions-section.tsx";
 import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
 import { derivePullRequestStatus } from "./pull-request-status.ts";
+import { MISSING_VALUE } from "./ui/elements/cells/missing-value.tsx";
+import { ModelsSection } from "./ui/elements/models-section.tsx";
 
 /** PR detail: cost, contributors, model breakdown, sessions; facts only, no content. */
 

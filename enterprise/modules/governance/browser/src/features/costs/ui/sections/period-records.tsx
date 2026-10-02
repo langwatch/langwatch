@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { GovernanceCostDayRecord } from "@langwatch/enterprise-governance-contract";
 
 import { api } from "../../../../behavior/governance-api.ts";

@@ -1,12 +1,12 @@
 import { once } from "node:events";
 import { createServer, type Server, type Socket } from "node:net";
 
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { notificationServer } from "../../notification.server.ts";
+import { notificationProcessModule } from "../../notification.module.ts";
 
 /** A relay that speaks just enough SMTP to accept messages, recording each with its envelope. */
 async function startRelay(): Promise<{ server: Server; port: number; received: string[] }> {
@@ -54,7 +54,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
     role: "worker",
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(notificationServer)])
+    .withModules([withMemoryRepositories(notificationProcessModule)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
     .withConfig({

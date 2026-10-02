@@ -8,6 +8,7 @@ import {
   opsBugReportTrpc,
   opsDashboardTrpc,
   opsEventLogTrpc,
+  opsOperatorsTrpc,
   opsPlatformTrpc,
   opsProcessTrpc,
   opsQueueTrpc,
@@ -17,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { opsBugReportTrpcTransport } from "../ops-bug-report.trpc.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
+import { opsOperatorsTrpcTransport } from "../ops-operators.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsProcessTrpcTransport } from "../ops-process.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
@@ -75,6 +77,7 @@ const OPS_CONTRACTS = [
   opsProcessTrpc,
   opsEventLogTrpc,
   opsPlatformTrpc,
+  opsOperatorsTrpc,
 ] as const;
 
 const OPS_TRANSPORTS = [
@@ -83,6 +86,7 @@ const OPS_TRANSPORTS = [
   opsProcessTrpcTransport,
   opsEventLogTrpcTransport,
   opsPlatformTrpcTransport,
+  opsOperatorsTrpcTransport,
 ] as const;
 
 /** Every `ops.*` procedure name the browser calls, with its kind. */
@@ -180,13 +184,16 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   runSystemMigrationPass: "mutation",
   assertSystemMigrationLegacyWritersDrained: "mutation",
   rollBackSystemMigrationTenant: "mutation",
+  listPlatformOperators: "query",
+  grantPlatformOperator: "mutation",
+  revokePlatformOperator: "mutation",
 };
 
 /** The one procedure that answers a non-operator instead of refusing them. */
 const ANSWERING_PROBE = "getScope";
 
 describe("the ops tRPC declarations", () => {
-  describe("given the five parts of the ops namespace", () => {
+  describe("given the six parts of the ops namespace", () => {
     it("declares every procedure the operator surfaces call, once", () => {
       const declared = OPS_CONTRACTS.flatMap((contract) => Object.keys(contract.members));
 
@@ -196,6 +203,7 @@ describe("the ops tRPC declarations", () => {
 
     it("mounts every one of them under the same wire namespace", () => {
       expect(OPS_CONTRACTS.map((contract) => contract.namespace)).toEqual([
+        "ops",
         "ops",
         "ops",
         "ops",
@@ -281,7 +289,7 @@ describe("the ops tRPC declarations", () => {
 
     /**
      * A bug report carries no tenant, so there is no scope to check: the
-     * declaration says so in words, and the application checks the staff list.
+     * declaration says so in words, and the application asks for the platform grant.
      */
     it("declares both reads as deliberately unchecked, on the operator fact", () => {
       expect(boundAccess(opsBugReportTrpcTransport)).toEqual({

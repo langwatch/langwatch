@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { RetentionAndUsageCard } from "../retention-and-usage-card.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 const effective = { traces: 49, scenarios: 49, experiments: 49 };

@@ -1,7 +1,7 @@
 /** Organization control (top bar). Uses NavigationOrganization; localStorage through host. */
 
-import { Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";

@@ -1,7 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
-import type { Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { AdminBackofficeRepository } from "../../repositories/admin-backoffice.repository.ts";
@@ -24,10 +21,6 @@ class RecordingRepository extends AdminBackofficeRepository {
     this.log.push(["repository.findUserById", id]);
     return { data: { id } };
   }
-
-  async setUserDeactivatedAt(id: string, value: Instant): Promise<void> {
-    this.log.push(["repository.setUserDeactivatedAt", id, value.toString()]);
-  }
 }
 
 class RecordingAudit extends AdminAuditSink {
@@ -45,26 +38,17 @@ async function updateUser(data: Record<string, unknown>) {
   const service = AdminBackofficeService.create({
     repository: new RecordingRepository(log),
     users: new TestUserApi({
-      reactivate: async ({ id }) => {
-        log.push(["users.reactivate", id]);
+      reactivate: async ({ id, actor }) => {
+        log.push(["users.reactivate", id, actor]);
         return { ...backofficeOperator, id };
       },
-      deactivate: async ({ id }) => {
-        log.push(["users.deactivate", id]);
+      deactivate: async ({ id, actor }) => {
+        log.push(["users.deactivate", id, actor]);
         return { ...backofficeOperator, id };
-      },
-      findById: async ({ id }) => {
-        log.push(["users.findById", id]);
-        return { ...backofficeOperator, id, email: "same@example.com" };
       },
       updateProfile: async ({ id, email }) => {
         log.push(["users.updateProfile", id, email]);
         return { ...backofficeOperator, id, email: email ?? null };
-      },
-    }),
-    auth: createApiFixture<AuthApi>({
-      revokeAllBrowserSessions: async ({ userId }) => {
-        log.push(["auth.revokeAllBrowserSessions", userId]);
       },
     }),
     audit: new RecordingAudit(log),
@@ -83,14 +67,88 @@ describe("AdminBackofficeService user update", () => {
   it.each([
     ["reactivates on a null deactivation", { deactivatedAt: null }],
     ["reactivates on a blank deactivation and saves the rest", { deactivatedAt: "", name: "X" }],
-    ["deactivates at a picked date", { deactivatedAt: "2026-01-02T03:04:05.000Z" }],
-    ["deactivates without an unreadable picked date", { deactivatedAt: "not a date" }],
-    ["passes an unrecognised deactivation value through", { deactivatedAt: 5 }],
-    ["changes the email and revokes sessions", { email: " New@Example.com " }],
-    ["keeps sessions when the email is unchanged", { email: "SAME@example.com" }],
+    [
+      "deactivates through user, as the operator, keeping no picked date",
+      { deactivatedAt: "2026-01-02T03:04:05.000Z" },
+    ],
+    [
+      "deactivates on an unreadable picked date as on a readable one",
+      { deactivatedAt: "not a date" },
+    ],
+    ["changes the email through user", { email: " New@Example.com " }],
+    ["normalises the email before handing it to user", { email: "SAME@example.com" }],
     ["saves plain fields only", { name: "Only" }],
     ["combines every side effect", { deactivatedAt: null, email: "a@b.c", name: "N" }],
   ])("%s", async (_label, data) => {
     expect(await updateUser(data)).toMatchSnapshot();
   });
+
+  it("refuses an unrecognised deactivation value with validation_error and writes nothing", async () => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+    const params = { id: "user-1", data: { deactivatedAt: 5, name: "X" } };
+
+    await expect(
+      service.execute({
+        resource: "user",
+        method: "update",
+        params,
+        actorId: "olive",
+        req: { headers: {} },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([]);
+  });
+});
+
+describe("AdminBackofficeService user writes past the user module", () => {
+  /** @scenario "The Back office refuses user writes the user module does not serve" */
+  it.each<[AdminOperationInput["method"], AdminOperationInput["params"]]>([
+    ["updateMany", { ids: ["user-1"], data: { deactivatedAt: null } }],
+    ["delete", { id: "user-1" }],
+    ["deleteMany", { ids: ["user-1"] }],
+  ])("refuses %s with validation_error and writes nothing", async (method, params) => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await expect(
+      service.execute({ resource: "user", method, params, actorId: "olive", req: { headers: {} } }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([]);
+  });
+});
+
+describe("AdminBackofficeService user create", () => {
+  /** @scenario "The Back office creates an account only as active" */
+  it.each([null, "2026-01-02T03:04:05.000Z", 5])(
+    "refuses a deactivation value of %s with validation_error and writes nothing",
+    async (deactivatedAt) => {
+      const log: unknown[] = [];
+      const service = AdminBackofficeService.create({
+        repository: new RecordingRepository(log),
+        users: new TestUserApi({}),
+        audit: new RecordingAudit(log),
+      });
+      const params = { data: { email: "new@example.com", deactivatedAt } };
+
+      await expect(
+        service.execute({
+          resource: "user",
+          method: "create",
+          params,
+          actorId: "olive",
+          req: { headers: {} },
+        }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(log).toEqual([]);
+    },
+  );
 });

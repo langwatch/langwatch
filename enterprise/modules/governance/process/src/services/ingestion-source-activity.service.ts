@@ -12,14 +12,32 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type { ActivityMonitorRepository } from "../app/governance.members.ts";
 
 export class ActivityMonitorService {
-  private constructor(private readonly repository: ActivityMonitorRepository) {}
+  private constructor(
+    private readonly repository: ActivityMonitorRepository,
+    private readonly projects: Pick<ProjectApi, "findInternal">,
+  ) {}
 
-  static create(repository: ActivityMonitorRepository): ActivityMonitorService {
-    return new ActivityMonitorService(repository);
+  static create({
+    repository,
+    projects,
+  }: {
+    repository: ActivityMonitorRepository;
+    projects: Pick<ProjectApi, "findInternal">;
+  }): ActivityMonitorService {
+    return new ActivityMonitorService(repository, projects);
+  }
+
+  private async findGovProjectId(organizationId: string): Promise<string | null> {
+    const project = await this.projects.findInternal({
+      organizationId,
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+    });
+    return project?.id ?? null;
   }
 
   sourceDataCoverage(input: {
@@ -30,51 +48,60 @@ export class ActivityMonitorService {
     return this.repository.sourceDataCoverage(input);
   }
 
-  summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary> {
-    return this.repository.summary(input);
+  async summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary> {
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.summary({ ...input, govProjectId });
   }
 
-  spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]> {
-    return this.repository.spendByUser(input);
+  async spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]> {
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.spendByUser({ ...input, govProjectId });
   }
 
-  spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]> {
-    return this.repository.spendByTeam(input);
+  async spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]> {
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.spendByTeam({ ...input, govProjectId });
   }
 
   spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]> {
     return this.repository.spendByDepartment(input);
   }
 
-  spendOverTime(input: {
+  async spendOverTime(input: {
     organizationId: string;
     windowDays: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeResult> {
-    return this.repository.spendOverTime(input);
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.spendOverTime({ ...input, govProjectId });
   }
 
   recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]> {
     return this.repository.recentAnomalies(input);
   }
 
-  ingestionSourcesHealth(input: { organizationId: string }): Promise<IngestionSourceHealthRow[]> {
-    return this.repository.ingestionSourcesHealth(input);
+  async ingestionSourcesHealth(input: {
+    organizationId: string;
+  }): Promise<IngestionSourceHealthRow[]> {
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.ingestionSourcesHealth({ ...input, govProjectId });
   }
 
-  eventsForSource(input: {
+  async eventsForSource(input: {
     organizationId: string;
     sourceId: string;
     limit?: number;
     beforeIso?: string;
   }): Promise<ActivityEventDetailRow[]> {
-    return this.repository.eventsForSource(input);
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.eventsForSource({ ...input, govProjectId });
   }
 
-  sourceHealthMetrics(input: {
+  async sourceHealthMetrics(input: {
     organizationId: string;
     sourceId: string;
   }): Promise<SourceHealthMetrics> {
-    return this.repository.sourceHealthMetrics(input);
+    const govProjectId = await this.findGovProjectId(input.organizationId);
+    return this.repository.sourceHealthMetrics({ ...input, govProjectId });
   }
 }

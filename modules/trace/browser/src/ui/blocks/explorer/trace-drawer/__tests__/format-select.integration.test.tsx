@@ -3,7 +3,7 @@
  * in the menu it opens. See specs/traces-v2/io-toolbar.feature.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LuCode, LuEye } from "react-icons/lu";
@@ -13,7 +13,7 @@ import "@testing-library/jest-dom/vitest";
 import { FormatSelect } from "../format-select.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 afterEach(cleanup);

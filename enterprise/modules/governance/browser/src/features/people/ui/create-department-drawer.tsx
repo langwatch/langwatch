@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, Field, HStack, Input, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -10,10 +10,8 @@ import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/gover
 /**
  * Creating a department from the People page's header button.
  *
- * Main's People page opened this from a URL-routed drawer singleton
- * (`openDrawer("addDepartment")` plus a `?add=1` deep link) that this branch
- * has no host for — see the merge handoff. Local open/close state instead,
- * matching `DepartmentEditDrawer`'s own pattern.
+ * Opened by local state on the People page, which also honours the `?add=1`
+ * deep link (`useAddDepartmentDeepLink`).
  *
  * Spec: specs/ai-governance/dashboard/people-tabs.feature
  */

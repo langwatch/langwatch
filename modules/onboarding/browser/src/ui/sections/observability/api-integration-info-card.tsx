@@ -1,26 +1,26 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { CLOUD_ENDPOINT, useActiveProject } from "@langwatch/onboarding-browser-kit";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
+import { CLOUD_ENDPOINT } from "../../../model/shared/build-mcp-config.ts";
 import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
+import { useActiveProject } from "../active-project-context.tsx";
+import { ProjectTokenBanner } from "./project-token-banner.tsx";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
   const host = useOnboardingHost();
-  const { project } = useActiveProject();
+  const { freshToken, minting } = useActiveProject();
   const { appBaseUrl } = useUiDeployment();
 
-  const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = appBaseUrl;
 
+  const apiKey = freshToken ?? API_KEY_PLACEHOLDER;
+
   async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
-    // The clipboard is a browser singleton and the confirmation is the
-    // application's, so the host owns both ends: it writes, confirms, and
-    // reports a refusal through the same feedback capability every other
-    // failure in this package travels on.
     await host.copyToClipboard({
-      text: withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
+      text: withBashPrefix ? `LANGWATCH_API_KEY=${apiKey}` : apiKey,
       succeeded: { title: "Copied", description: "API key copied to clipboard" },
     });
   }
@@ -39,15 +39,14 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
           Your LangWatch Integration Info
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          {"You can access your API key again anytime in the project's settings "}
-          {"page."}
+          {"A personal access token is shown once. Create a new one anytime."}
         </Text>
       </VStack>
+      {minting ? <ProjectTokenBanner minting={minting} /> : null}
       <CopyableInputWithPrefix
         prefix="LANGWATCH_API_KEY="
-        value={effectiveApiKey}
+        value={apiKey}
         ariaLabel="Your API key"
-        showVisibilityToggle={true}
         onCopy={copyApiKey}
       />
 

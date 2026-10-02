@@ -239,6 +239,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision carries the reason code "sole_active_connection"
 
   @unit
+  Scenario: A self-serve connection that went live is the sole connection
+    Given a self-hosted installation whose only connection is a self-serve one that went live
+    When the sign-in page is requested
+    Then the decision redirects to that connection's own provider
+    And the decision carries the reason code "sole_active_connection"
+
+  @unit
   Scenario: The break-glass path always reaches a local sign-in
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested with the break-glass parameter
@@ -422,10 +429,11 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then that provider is not one of the offered methods
 
   @unit
-  Scenario: The license gate still freezes at startup
-    Given the license gate resolved at startup
-    When a license is activated mid-process
-    Then routing decisions do not change until the next restart
+  Scenario: The license gate re-reads a deny after a minute
+    Given the license gate denied federation
+    When another replica stores a license
+    Then routing decisions do not change for up to one minute
+    And then federation is offered without a restart
 
   # ── Callback linking ───────────────────────────────────────────────────
 

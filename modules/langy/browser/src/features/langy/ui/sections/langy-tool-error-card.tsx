@@ -1,8 +1,8 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { LangyCard } from "@langwatch/langy-browser-kit";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertCircle, BookOpen, ExternalLink, ScrollText } from "lucide-react";
 
 import { LangyFailureReference } from "../../../../ui/elements/langy-failure-reference.tsx";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
 
 /**

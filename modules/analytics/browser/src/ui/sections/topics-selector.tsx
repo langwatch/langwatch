@@ -1,13 +1,17 @@
-import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Delayed } from "@langwatch/design-system/delayed";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+import {
+  EmptyState,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import React, { useEffect, useRef, useState } from "react";
 
-import {
-  analyticsApi,
-  type AnalyticsSubtopicCount,
-  type AnalyticsTopicCount,
-} from "../../behavior/analytics-api.ts";
-import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useTopicCounts } from "../../behavior/use-filter-options.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import {
   orderByCountThenName,
@@ -16,47 +20,13 @@ import {
   toggleTopic,
   toListParam,
 } from "../../model/topic-selection.ts";
-import { Delayed } from "../elements/delayed.tsx";
-import { OverflownTextWithTooltip } from "../elements/overflown-text.tsx";
-
-type TopicCounts = {
-  topicCounts: AnalyticsTopicCount[];
-  subtopicCounts: AnalyticsSubtopicCount[];
-};
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const host = useAnalyticsHost();
   const { query } = host.route();
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
-  const { filterParams, queryOpts } = useFilterParams();
-
-  useEffect(() => {
-    setSelectedTopics(readListParam(query.topics));
-  }, [query.topics]);
-
-  useEffect(() => {
-    setSelectedSubtopics(readListParam(query.subtopics));
-  }, [query.subtopics]);
-
-  const topicCountsQuery = analyticsApi.traces.getTopicCounts.useQuery(
-    {
-      ...filterParams,
-      filters: {
-        ...filterParams.filters,
-        "topics.topics": [],
-        "topics.subtopics": [],
-      },
-    },
-    {
-      ...queryOpts,
-      // Keeps the previous answer on screen while the next one loads. The
-      // React Query sentinel would mean importing the query library, which a
-      // governed screen may not; the identity function is what that sentinel
-      // does.
-      placeholderData: (previous?: TopicCounts) => previous,
-    },
-  );
+  const selectedTopics = readListParam(query.topics);
+  const selectedSubtopics = readListParam(query.subtopics);
+  const topicCountsQuery = useTopicCounts();
 
   const handleTopicChange = (topicId: string, checked: boolean) => {
     const next = toggleTopic({
@@ -65,8 +35,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       checked,
       subtopicCounts: topicCountsQuery.data?.subtopicCounts,
     });
-    setSelectedTopics(next.topics);
-    setSelectedSubtopics(next.subtopics);
     host.setQuery({
       ...query,
       topics: toListParam(next.topics),
@@ -76,7 +44,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
 
   const handleSubtopicChange = (subtopicId: string, checked: boolean) => {
     const newSubtopics = toggleSubtopic({ subtopics: selectedSubtopics, subtopicId, checked });
-    setSelectedSubtopics(newSubtopics);
     host.setQuery({ ...query, subtopics: toListParam(newSubtopics) });
   };
 

@@ -360,13 +360,13 @@ export function documentedPathOf(honoPath: string): string {
 export const CREDENTIAL_CLASS_BY_DOOR = {
   project: "project_api_key",
   organization: "organization_api_key",
-  apiKey: "project_api_key",
-  scimToken: "scim_token",
-  "instance-admin": "instance_admin_api_key",
-  sessionKey: "project_api_key",
-  cliToken: "cli_access_token",
+  api_key: "project_api_key",
+  scim_token: "scim_token",
+  instance_admin: "instance_admin_api_key",
+  session_key: "project_api_key",
+  cli_token: "cli_access_token",
   browser: "session",
-  internalSecret: "internal_secret",
+  internal_secret: "internal_secret",
   public: "none",
 } as const satisfies Record<RestDoorCredential | "public", CredentialClass>;
 

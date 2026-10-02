@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { useMemo } from "react";
 

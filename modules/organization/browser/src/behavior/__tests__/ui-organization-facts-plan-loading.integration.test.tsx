@@ -52,7 +52,7 @@ class StubRpc extends UiRpc {
   }
 
   query(path: string): Promise<unknown> {
-    return path === "limits.getUsage" ? this.planQuery() : Promise.resolve([]);
+    return path === "plan.getActivePlan" ? this.planQuery() : Promise.resolve([]);
   }
 
   mutate(): Promise<unknown> {
@@ -110,7 +110,7 @@ describe("given a plan question that has not answered yet", () => {
     await waitFor(() => expect(result.current.isPlanLoading).toBe(true));
     expect(result.current.isEnterprise).toBe(false);
 
-    resolvePlan({ activePlan: { type: "ENTERPRISE" } });
+    resolvePlan({ type: "ENTERPRISE" });
     await waitFor(() => expect(result.current.isEnterprise).toBe(true));
     expect(result.current.isPlanLoading).toBe(false);
   });

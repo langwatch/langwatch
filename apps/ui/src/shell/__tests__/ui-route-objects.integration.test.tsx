@@ -1,4 +1,4 @@
-import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
+import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";

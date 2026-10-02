@@ -1,18 +1,21 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceAgentData, VoiceTransport } from "@langwatch/scenario-contract";
 
-import { elevenLabsConvaiTransport } from "./http/http.elevenlabs-voice-transport.channel.ts";
+import { createElevenLabsConvaiTransport } from "./http/http.elevenlabs-voice-transport.channel.ts";
 import {
   createPhoneTransport,
   type PhoneTransportEnvironment,
 } from "./http/http.phone-voice-transport.channel.ts";
 import type { VoiceTransportRunner } from "./voice-transport.channel.ts";
 
+/** `allowLoopbackVoiceProviders` is the dev loopback switch; absent is off. */
 export function createVoiceTransportRegistry(
-  environment: PhoneTransportEnvironment,
+  environment: PhoneTransportEnvironment & { readonly allowLoopbackVoiceProviders?: boolean },
 ): Record<VoiceTransport, VoiceTransportRunner> {
   return {
-    elevenlabs_convai: elevenLabsConvaiTransport,
+    elevenlabs_convai: createElevenLabsConvaiTransport({
+      allowLoopback: environment.allowLoopbackVoiceProviders ?? false,
+    }),
     phone: createPhoneTransport({ environment }),
   };
 }

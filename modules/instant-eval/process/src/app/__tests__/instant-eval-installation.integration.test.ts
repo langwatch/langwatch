@@ -10,7 +10,6 @@ import type {
   LangWatchQLJudgementCall,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -23,7 +22,7 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,
@@ -31,11 +30,12 @@ import {
   projectWithTeamSchema,
 } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalServer } from "../../instant-eval.server.ts";
+import { instantEvalProcessModule } from "../../instant-eval.module.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -86,7 +86,7 @@ function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
   return (owner, declared) => resolver.scopeTo(owner, declared);
 }
 
-const instantEval = withMemoryRepositories(instantEvalServer);
+const instantEval = withMemoryRepositories(instantEvalProcessModule);
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
 
@@ -193,10 +193,10 @@ function installation({
           isLangWatchQLAvailable: () => true,
           langWatchQLDatabase: () => "analytics",
           resolveApiKeyRunCaller: async () => ({ id: PROJECT, lwqlKey: "key" }),
-          resolveApiKeyProtections: async () => ({}),
+          resolveApiKeyProtections: async () => ({ catalogue: { permissions: [] } }),
           resolveRunCaller: async () => ({
             project: { id: PROJECT, lwqlKey: "key" },
-            protections: {},
+            protections: { catalogue: { permissions: [] } },
           }),
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],

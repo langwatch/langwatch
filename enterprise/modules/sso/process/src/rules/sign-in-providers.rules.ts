@@ -7,6 +7,7 @@
 import {
   findConfiguredGenericOAuthProviders,
   findConfiguredSocialProviders,
+  MICROSOFT_LEGACY_CALLBACK_ID,
   PLAIN_OIDC_PROVIDERS,
   type GenericOAuthConfiguration,
   type SocialProviderConfiguration,
@@ -82,6 +83,9 @@ const samlSubjectImplementation = {
 
 type SocialProviders = NonNullable<BetterAuthOptions["socialProviders"]>;
 
+/** `baseUrl` pins the Microsoft redirect; the unit tests that only read which providers mount omit it. */
+type SocialProviderBuildConfiguration = SocialProviderConfiguration & { baseUrl?: string };
+
 /** What a social provider calls out to while a sign-in is in flight. */
 export type SocialProviderHooks = Readonly<{
   /** Given the Microsoft id token claims before better-auth's lookup; a throw stops the sign-in. */
@@ -90,7 +94,10 @@ export type SocialProviderHooks = Readonly<{
 
 /** Each configured social provider, with the profile fields its API names. */
 const socialProviderImplementation = {
-  execute(configuration: SocialProviderConfiguration, hooks: SocialProviderHooks): SocialProviders {
+  execute(
+    configuration: SocialProviderBuildConfiguration,
+    hooks: SocialProviderHooks,
+  ): SocialProviders {
     const socialProviders: SocialProviders = {};
     for (const provider of findConfiguredSocialProviders(configuration)) {
       if (provider.key === "google") {
@@ -128,6 +135,15 @@ const socialProviderImplementation = {
           clientId: provider.clientId,
           clientSecret: provider.clientSecret,
           tenantId: provider.tenantId,
+          // The redirect URI Azure app registrations list; the door routes it to `microsoft`.
+          ...(configuration.baseUrl
+            ? {
+                redirectURI: callbackUrlImplementation.build({
+                  baseUrl: configuration.baseUrl,
+                  providerId: MICROSOFT_LEGACY_CALLBACK_ID,
+                }),
+              }
+            : {}),
           mapProfileToUser: async (profile) => {
             await hooks.onMicrosoftProfile?.({ ...profile });
             return {
@@ -418,7 +434,7 @@ export function isSamlSub(sub: unknown): boolean {
 }
 
 export function buildSocialProviders(
-  configuration: SocialProviderConfiguration,
+  configuration: SocialProviderBuildConfiguration,
   hooks: SocialProviderHooks = {},
 ): NonNullable<BetterAuthOptions["socialProviders"]> {
   return socialProviderImplementation.execute(configuration, hooks);

@@ -59,6 +59,11 @@ describe("isTransientModelFailure", () => {
     ])("retries %s", (message) => {
       expect(isTransientModelFailure(failed(message))).toBe(true);
     });
+
+    it("retries a 503 whose help text links to the billing page", () => {
+      const message = "503 Service unavailable. See Plans & Billing for your usage.";
+      expect(isTransientModelFailure(failed(message))).toBe(true);
+    });
   });
 
   describe("when the failure is a refusal", () => {
@@ -288,10 +293,14 @@ describe("TurnEventMapper", () => {
         { type: "retry_settled", turnId: "t1" },
       ]);
     });
+  });
 
-    it("leaves a failed end to the turn's error terminal", () => {
+  describe("when the retries end without an answer", () => {
+    it("settles the retry so the line does not stay beside the error", () => {
       const mapper = new TurnEventMapper("t1");
-      expect(mapper.map({ type: "auto_retry_end", success: false, attempt: 5 })).toEqual([]);
+      expect(mapper.map({ type: "auto_retry_end", success: false, attempt: 5 })).toEqual([
+        { type: "retry_settled", turnId: "t1" },
+      ]);
     });
   });
 });

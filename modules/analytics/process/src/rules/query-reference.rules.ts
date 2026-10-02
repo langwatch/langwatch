@@ -24,7 +24,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { LWQL_EXAMPLE_DATABASE, LWQL_EXAMPLES } from "./langwatch-ql-examples.rules.ts";
-import { heldFieldProtections, type FieldProtection } from "./lwql-field-protection.rules.ts";
+import { heldLwqlGates, publishedLwqlGates, type LwqlGate } from "./lwql-gate.rules.ts";
 
 /**
  * One worked trace filter query, as the filter language publishes it. Structural
@@ -163,10 +163,7 @@ export function describeDynamicPrefixes(): readonly QueryReferenceDynamicPrefix[
   }));
 }
 
-function isAvailable(input: {
-  gates: readonly FieldProtection[];
-  held: ReadonlySet<FieldProtection>;
-}): boolean {
+function isAvailable(input: { gates: readonly LwqlGate[]; held: ReadonlySet<LwqlGate> }): boolean {
   return input.gates.every((gate) => input.held.has(gate));
 }
 
@@ -182,7 +179,7 @@ function qualify(input: { sql: string; database: string }): string {
 }
 
 function describeExamples(input: {
-  held: ReadonlySet<FieldProtection>;
+  held: ReadonlySet<LwqlGate>;
   lwqlEnabled: boolean;
   database: string;
   traceFilterExamples: readonly QueryReferenceTraceFilterExample[];
@@ -196,7 +193,7 @@ function describeExamples(input: {
     tags: example.tags,
     text: qualify({ sql: example.sql, database }),
     parameters: example.parameters,
-    requires: { gates: example.gates, functions: [] },
+    requires: { gates: publishedLwqlGates(example.gates), functions: [] },
     // Two ways a SQL example is not runnable here: a column it reads is
     // withheld from this caller, or the caller reaches no LangWatchQL at all.
     available: lwqlEnabled && isAvailable({ gates: example.gates, held }),
@@ -259,7 +256,7 @@ export function buildQueryReference(input: {
       endpoints: TRACE_FILTER_ENDPOINTS,
     },
     examples: describeExamples({
-      held: heldFieldProtections(protections),
+      held: heldLwqlGates(protections),
       lwqlEnabled,
       database,
       traceFilterExamples,

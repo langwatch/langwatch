@@ -31,8 +31,8 @@ describe("SCIM transport characterization", () => {
   });
 
   it("keeps Users and Groups list operations bearer-protected", () => {
-    expect(protocol.credential).toBe("scimToken");
-    expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
+    expect(protocol.credential).toBe("scim_token");
+    expect(securityRequirement("scim_token")).toEqual([{ scim_bearer: [] }]);
 
     const listUsers = protocol.routes.find((route) => route.operation === "scimListUsers");
     const listGroups = protocol.routes.find((route) => route.operation === "scimListGroups");

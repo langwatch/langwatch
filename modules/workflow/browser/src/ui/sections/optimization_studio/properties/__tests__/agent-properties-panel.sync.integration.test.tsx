@@ -3,8 +3,8 @@
  * The agent node's three-way sync (drawer editor, DSL node, library record).
  * Pins regressions: Save reverting code, template overwriting code, lost params.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -25,8 +25,8 @@ vi.mock("../../../../../behavior/studio-host/use-organization-team-project.ts", 
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({
       agents: { getById: { setData: mockSetData } },
     }),
@@ -57,7 +57,7 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),
 }));
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../elements/studio-drawer-footer.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRegisterDrawerFooter: (content: ReactNode) => {
     footerHolder.content = content;
@@ -86,7 +86,7 @@ vi.mock("../../../../../behavior/lent-agent.tsx", () => ({
   HttpConfigEditor: () => null,
 }));
 
-vi.mock("@langwatch/prompt-browser-kit", () => ({
+vi.mock("../../../prompt/variables/variables-section.tsx", () => ({
   VariablesSection: () => null,
 }));
 
@@ -139,17 +139,9 @@ const agentNode = (
 });
 
 function renderPanel(node: Node<AgentComponent>) {
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentPropertiesPanel node={node} />
-    </ChakraProvider>,
-  );
+  const utils = renderWithDesignSystem(<AgentPropertiesPanel node={node} />);
   const rerenderPanel = (nextNode: Node<AgentComponent>) =>
-    utils.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <AgentPropertiesPanel node={nextNode} />
-      </ChakraProvider>,
-    );
+    utils.rerender(<AgentPropertiesPanel node={nextNode} />);
   return { ...utils, rerenderPanel };
 }
 
@@ -163,7 +155,7 @@ function nodeWithLastPatch(node: Node<AgentComponent>): Node<AgentComponent> {
 }
 
 function renderFooter() {
-  return render(<ChakraProvider value={defaultSystem}>{footerHolder.content}</ChakraProvider>);
+  return renderWithDesignSystem(footerHolder.content);
 }
 
 describe("given a code agent node in a workflow", () => {
@@ -344,6 +336,59 @@ describe("given a code agent node in a workflow", () => {
       expect(setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value).toBe(
         "print('saved')",
       );
+    });
+  });
+
+  describe("when a saved HTTP agent's node carries credential values in its snapshot and draft", () => {
+    const CREDENTIAL_VALUE = "value-that-must-not-travel";
+
+    /** @scenario Saving a Studio node never sends credential values */
+    it("sends and persists none of them", () => {
+      mockAgentQuery.current = {
+        data: {
+          id: "agent-1",
+          name: "http agent",
+          type: "http" as const,
+          config: {
+            name: "HTTP",
+            url: "https://example.test/run",
+            method: "POST",
+            outputPath: "",
+            bodyTemplate: "{}",
+            headers: [{ key: "X-Tenant", value: "" }],
+            auth: { type: "bearer", token: "" },
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        },
+        isLoading: false,
+      };
+      mockMutate.mockImplementation((_input, opts) => opts?.onSuccess?.());
+      renderPanel(
+        agentNode("", {
+          agentType: "http",
+          parameters: [
+            { identifier: "agent_type", type: "str", value: "http" },
+            { identifier: "url", type: "str", value: "https://example.test/run" },
+            { identifier: "auth_type", type: "str", value: "bearer" },
+            { identifier: "auth_token", type: "str", value: CREDENTIAL_VALUE },
+            { identifier: "headers", type: "dict", value: { "X-Tenant": CREDENTIAL_VALUE } },
+          ],
+          localConfig: {
+            settings: {
+              url: "https://example.test/edited",
+              headers: [{ key: "X-Tenant", value: CREDENTIAL_VALUE }],
+              auth: { type: "bearer", token: CREDENTIAL_VALUE },
+            },
+          },
+        }),
+      );
+
+      fireEvent.click(renderFooter().getByTestId("agent-save-button"));
+
+      expect(mockMutate).toHaveBeenCalled();
+      expect(JSON.stringify(mockMutate.mock.calls.at(-1)![0])).not.toContain(CREDENTIAL_VALUE);
+      expect(JSON.stringify(mockSetNode.mock.calls)).not.toContain(CREDENTIAL_VALUE);
     });
   });
 });

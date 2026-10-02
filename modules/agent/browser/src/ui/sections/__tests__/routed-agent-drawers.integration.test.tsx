@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 const drawer = vi.hoisted(() => ({ closeDrawer: vi.fn(), goBack: vi.fn(), canGoBack: false }));
 const stack = vi.hoisted(() => ({ entries: [] as { drawer: string }[] }));
 const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
+const fetched = vi.hoisted(() => ({ agent: undefined as unknown, workflow: undefined as unknown }));
 const calls = vi.hoisted(() => ({
   navigate: [] as string[],
   workflowCreated: [] as unknown[],
@@ -39,7 +40,7 @@ vi.mock("../../../behavior/agent-api.ts", () => {
       useUtils: () => ({ agents: { getAll: { invalidate: () => Promise.resolve() } } }),
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
-        getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
+        getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
         testTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
         create: mutation((input) => {
           calls.agentCreated.push(input);
@@ -49,6 +50,9 @@ vi.mock("../../../behavior/agent-api.ts", () => {
       },
       httpProxy: { execute: mutation(() => Promise.resolve({ success: true })) },
       workflow: {
+        getById: {
+          useQuery: () => ({ data: fetched.workflow, isLoading: false, isError: false }),
+        },
         create: mutation((input) => {
           calls.workflowCreated.push(input);
           return Promise.resolve({ workflow: { id: "workflow_new" } });
@@ -58,11 +62,23 @@ vi.mock("../../../behavior/agent-api.ts", () => {
   };
 });
 
-vi.mock("@langwatch/workflow-browser-kit", () => ({
+vi.mock("../../../model/workflow/templates/blank.template.ts", () => ({
   blankTemplate: { name: "Blank", nodes: [] },
+}));
+
+vi.mock("../../../model/workflow/random-workflow-icon.ts", () => ({
   getRandomWorkflowIcon: () => "🧩",
+}));
+
+vi.mock("../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx", () => ({
   EmojiPickerModal: () => null,
+}));
+
+vi.mock("../workflow/code/render-code.tsx", () => ({
   RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
+}));
+
+vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
 
@@ -95,18 +111,22 @@ afterAll(() => {
 const {
   RoutedAgentCodeEditorDrawer,
   RoutedAgentHttpEditorDrawer,
+  RoutedAgentWorkflowEditorDrawer,
+  RoutedAgentWorkflowTargetEditorDrawer,
   RoutedConnectFromCodeDrawer,
   RoutedConnectedAgentDrawer,
   RoutedWorkflowSelectorDrawer,
 } = await import("../routed-agent-drawers.tsx");
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 afterEach(() => {
   cleanup();
   listed.rows = [];
+  fetched.agent = undefined;
+  fetched.workflow = undefined;
   drawer.closeDrawer.mockReset();
   drawer.goBack.mockReset();
   drawer.canGoBack = false;
@@ -241,5 +261,41 @@ describe("the HTTP editor chosen in the agent type selector", () => {
 
     await vi.waitFor(() => expect(drawer.closeDrawer).toHaveBeenCalled());
     expect(drawer.goBack).not.toHaveBeenCalled();
+  });
+});
+
+const workflowAgent = {
+  id: "agent_wf",
+  name: "Workflow agent",
+  type: "workflow",
+  workflowId: "workflow_1",
+  config: { name: "Workflow agent", isCustom: true, workflow_id: "workflow_1" },
+};
+
+describe("the workflow agent editor opened by address", () => {
+  it("reads the agent its address names and draws its form", () => {
+    fetched.agent = workflowAgent;
+    render(<RoutedAgentWorkflowEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    expect(screen.getByText("Edit Workflow Agent")).toBeTruthy();
+    expect(screen.getByTestId("agent-name-input")).toHaveProperty("value", "Workflow agent");
+  });
+});
+
+describe("the workflow agent target editor opened by address", () => {
+  it("opens from the address alone and closes itself", async () => {
+    fetched.agent = workflowAgent;
+    render(<RoutedAgentWorkflowTargetEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    expect(screen.getByText("Workflow Agent")).toBeTruthy();
+    await userEvent.setup().click(screen.getByTestId("close-drawer-button"));
+    expect(drawer.closeDrawer).toHaveBeenCalled();
+  });
+
+  it("says the lookup failed when the agent names no workflow", () => {
+    fetched.agent = { ...workflowAgent, workflowId: null, config: { name: "Workflow agent" } };
+    render(<RoutedAgentWorkflowTargetEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    expect(screen.getByTestId("workflow-lookup-error")).toBeTruthy();
   });
 });

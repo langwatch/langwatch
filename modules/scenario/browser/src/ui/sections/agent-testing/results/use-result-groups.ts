@@ -3,7 +3,8 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period, PeriodMode } from "@langwatch/analytics-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type {
   CodeScenario,
   ResultAtomResponse as ResultAtom,
@@ -17,10 +18,10 @@ import { splitTargetKey } from "@langwatch/suite-contract";
 import { useMemo } from "react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
+import type { Period, PeriodMode } from "../../../elements/analytics/period-selector.tsx";
 import type { PlanRowModel } from "./plan-rows-table.tsx";
 import {
   codeTargetNames,
@@ -35,11 +36,6 @@ import {
   toResultRows,
 } from "./result-atoms.ts";
 import type { ResultsFilterOption } from "./results-filter-menu.tsx";
-
-/**
- * How often the reads refresh while the live stream is down.
- */
-const RESULTS_POLL_MS = 10_000;
 
 /** How many atoms one drill-down page holds. The server caps it at 500. */
 const ATOM_PAGE = 300;
@@ -171,7 +167,6 @@ function useResultsReads({
   filters,
   openedKeys,
   isEnabled,
-  isSseConnected,
 }: {
   scope: ResultsScope;
   grouping: ResultGrouping;
@@ -180,11 +175,11 @@ function useResultsReads({
   isEnabled: boolean;
   isSseConnected: boolean;
 }) {
-  const refetchInterval = isSseConnected ? false : RESULTS_POLL_MS;
-
-  const overview = api.scenarios.getResultsOverview.useQuery(
+  const overview = scenarioClient.scenarios.getResultsOverview.useQuery(
     { ...scope, groupBy: grouping },
-    { enabled: isEnabled, refetchInterval },
+    {
+      enabled: isEnabled,
+    },
   );
 
   const isDrilling =
@@ -195,9 +190,11 @@ function useResultsReads({
     [scope, grouping, openedKeys, filters],
   );
 
-  const atomPage = api.scenarios.getResultAtoms.useQuery(
+  const atomPage = scenarioClient.scenarios.getResultAtoms.useQuery(
     { ...drillScope, limit: ATOM_PAGE },
-    { enabled: isEnabled && isDrilling, refetchInterval },
+    {
+      enabled: isEnabled && isDrilling,
+    },
   );
 
   return { overview, atomPage };
@@ -504,17 +501,17 @@ export function useResultGroups({
     isSseConnected,
   });
 
-  const { data: scenarios } = api.scenarios.getAll.useQuery({ projectId }, { enabled: !!project });
+  const { data: scenarios } = useScenarios({ projectId });
 
   // Read over the window alone, never through the filters: a scenario filter
   // already in force must not hide the options that undo it.
-  const { data: codeScenarios } = api.scenarios.getCodeScenarios.useQuery(
+  const { data: codeScenarios } = scenarioClient.scenarios.getCodeScenarios.useQuery(
     { projectId, startDate: scope.startDate, endDate: scope.endDate },
     { enabled: !!project },
   );
 
   // Read over the window alone, for the same reason.
-  const { data: codeTargets } = api.scenarios.getRunTargets.useQuery(
+  const { data: codeTargets } = scenarioClient.scenarios.getRunTargets.useQuery(
     { projectId, startDate: scope.startDate, endDate: scope.endDate },
     { enabled: !!project },
   );

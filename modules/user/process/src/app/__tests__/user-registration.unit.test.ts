@@ -4,6 +4,7 @@
  * owns the `signed_up` milestone - and a rejected registration tracks nothing.
  * @see specs/licensing/sso-license-gating.feature
  */
+import { InvalidAuthOriginError } from "@langwatch/auth-contract";
 import {
   EmailAlreadyRegisteredError,
   UserRegistrationNotAvailableError,
@@ -29,6 +30,8 @@ function register(
     password,
     addressProof,
     callerAddress: "127.0.0.1",
+    origin: "http://localhost:5560",
+    referer: null,
   });
 }
 
@@ -63,6 +66,26 @@ describe("registering a credential account", () => {
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
       expect(trackServerEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the browser is on a web address the installation is not set up for", () => {
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("refuses with the invalid origin code before the proof is spent or the account written", async () => {
+      const auth = createUserTestAuth();
+      auth.assertSignUpOrigin.mockRejectedValueOnce(new InvalidAuthOriginError());
+      const app = createUserTestApp({ dependencies: { auth } });
+
+      await expect(register(app, "sam@acme.com")).rejects.toMatchObject({
+        code: "auth_invalid_origin",
+      });
+      expect(auth.assertSignUpOrigin).toHaveBeenCalledWith({
+        origin: "http://localhost:5560",
+        referer: null,
+      });
+      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
+      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
+      await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
     });
   });
 

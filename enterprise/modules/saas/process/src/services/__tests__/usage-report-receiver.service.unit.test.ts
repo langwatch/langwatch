@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.product-analytics.channel.ts";

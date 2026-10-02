@@ -1,7 +1,8 @@
-import { usePageVisibility, useFilterStore } from "@langwatch/trace-browser-kit";
+import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { useEffect } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { getPresetById } from "../../../../behavior/time-range-presets.ts";
 
 // Each tick rolls the live time range forward, which invalidates every
@@ -16,7 +17,7 @@ export function useRollingTimeRange(): void {
   // While the drawer is open the user is reading a single trace — rolling
   // the table's window underneath them just costs network and re-renders
   // they can't see.
-  const drawerOpen = useDrawerStore((s) => s.isOpen);
+  const drawerOpen = useTraceDrawer((s) => s.isOpen);
 
   useEffect(() => {
     if (!isVisible || drawerOpen) return;

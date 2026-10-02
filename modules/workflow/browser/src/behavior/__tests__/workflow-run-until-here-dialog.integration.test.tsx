@@ -1,10 +1,10 @@
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component, Entry } from "@langwatch/workflow-contract";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -87,15 +87,13 @@ function renderDialog({
   _useWorkflowStore.getState().setNodes([makeEntryNode(entryData), targetNode]);
   _useWorkflowStore.getState().setEdges([]);
 
-  const result = render(
-    <ChakraProvider value={defaultSystem}>
-      <WorkflowRunUntilHereDialog
-        datasetRows={rows}
-        datasetColumns={rows.length > 0 ? datasetColumns : []}
-        onStartWorkflowExecution={startWorkflowExecution}
-        renderDatasetPreview={(props) => <DatasetPreview {...props} />}
-      />
-    </ChakraProvider>,
+  const result = renderWithDesignSystem(
+    <WorkflowRunUntilHereDialog
+      datasetRows={rows}
+      datasetColumns={rows.length > 0 ? datasetColumns : []}
+      onStartWorkflowExecution={startWorkflowExecution}
+      renderDatasetPreview={(props) => <DatasetPreview {...props} />}
+    />,
   );
 
   act(() => {

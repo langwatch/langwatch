@@ -34,8 +34,6 @@ export function useEvalInputs({
     },
     {
       enabled: needLazy,
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
     },
   );
 

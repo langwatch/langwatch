@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Seat correction caps scopes and reports back teams that lost their only admin.
@@ -17,6 +16,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -206,6 +206,7 @@ describe.skipIf(!DB_URL)(
 
       beforeAll(async () => {
         result = await repository.updateMemberRole({
+          caller: { type: "system" },
           organizationId,
           userId: memberUserId,
           role: OrganizationUserRole.EXTERNAL,

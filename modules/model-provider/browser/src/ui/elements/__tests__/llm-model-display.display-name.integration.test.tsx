@@ -2,15 +2,15 @@
  * @vitest-environment jsdom
  * @see specs/model-providers/custom-model-display-name.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -41,11 +41,7 @@ import { LLMModelDisplay } from "../llm-model-display.tsx";
 afterEach(() => cleanup());
 
 function renderDisplay(model: string) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <LLMModelDisplay model={model} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<LLMModelDisplay model={model} />);
 }
 
 describe("<LLMModelDisplay/>", () => {

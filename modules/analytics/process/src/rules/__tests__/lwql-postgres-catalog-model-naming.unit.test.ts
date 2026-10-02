@@ -1,15 +1,8 @@
-/**
- * The Postgres catalog builder's naming and type-mapping helpers: model name → view name, field
- * name → column name, Prisma type → ClickHouse type.
- */
+/** The Postgres catalog builder's type mapping: Prisma type → ClickHouse type. */
 
 import { describe, expect, it } from "vitest";
 
-import {
-  toClickHouseType,
-  exposedColumnName,
-  postgresDatasetName,
-} from "../lwql-postgres-catalog-model.rules.ts";
+import { toClickHouseType } from "../lwql-postgres-catalog-model.rules.ts";
 import type { PrismaField } from "../lwql-prisma-schema.rules.ts";
 
 const scalarField = (over: Partial<PrismaField>): PrismaField => ({
@@ -23,43 +16,7 @@ const scalarField = (over: Partial<PrismaField>): PrismaField => ({
   ...over,
 });
 
-describe("given the Postgres catalog naming helpers", () => {
-  describe("when a model name becomes a view name", () => {
-    it("snake-cases acronym-aware and pluralises the last word", () => {
-      expect(postgresDatasetName("CustomLLMModelCost")).toBe("custom_llm_model_costs");
-      expect(postgresDatasetName("Topic")).toBe("topics");
-      expect(postgresDatasetName("RoutingPolicy")).toBe("routing_policies");
-      expect(postgresDatasetName("Analytics")).toBe("analytics");
-      expect(postgresDatasetName("AnnotationQueue")).toBe("annotation_queues");
-    });
-  });
-
-  describe("when a field name becomes a column name", () => {
-    it("maps the primary key `id` to `<Model>Id` and PascalCases the rest", () => {
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "id",
-          primaryKey: ["id"],
-        }),
-      ).toBe("TopicId");
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "embeddings_model",
-          primaryKey: ["id"],
-        }),
-      ).toBe("EmbeddingsModel");
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "p95Distance",
-          primaryKey: ["id"],
-        }),
-      ).toBe("P95Distance");
-    });
-  });
-
+describe("given the Postgres catalog type mapping", () => {
   describe("when a Prisma type becomes a ClickHouse type", () => {
     it("maps each scalar, wraps lists and optionals, strips binary", () => {
       expect(toClickHouseType(scalarField({ type: "String" }))).toBe("String");

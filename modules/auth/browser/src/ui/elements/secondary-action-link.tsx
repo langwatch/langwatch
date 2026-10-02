@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { Box } from "@langwatch/design-system/primitives";
 
 import { SHAPE } from "../../model/front-door-theme.ts";
 

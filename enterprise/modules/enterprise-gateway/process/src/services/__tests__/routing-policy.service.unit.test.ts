@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
@@ -9,6 +7,8 @@ import {
 } from "@langwatch/enterprise-gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { RoutingPolicyRepository } from "../../repositories/routing-policy.repository.ts";

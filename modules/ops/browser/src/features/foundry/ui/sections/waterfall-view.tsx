@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";

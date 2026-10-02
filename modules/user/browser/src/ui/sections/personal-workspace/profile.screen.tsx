@@ -4,8 +4,8 @@
  * Spec: specs/settings/profile.feature
  */
 
-import { Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
 import { PersonalApiKeysSummary } from "../personal-api-keys-summary.tsx";

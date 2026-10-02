@@ -1,9 +1,10 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { governanceWeb } from "../governance.web.ts";
+import { readSampleChoice, writeSampleChoice } from "../ui/elements/governance-sample-mode.ts";
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -40,11 +41,28 @@ describe("given a browser that installs governance", () => {
       ["pages/governance/teams"],
       ["pages/governance/teams/[id]"],
       ["pages/governance/users/[id]"],
-    ] as const)("answers with a component for %s", async (page) => {
-      const screen = governanceWeb.installation.screens[page];
-      const loaded = await screen?.load?.();
+    ] as const)(
+      "answers with a component for %s",
+      async (page) => {
+        const screen = governanceWeb.installation.screens[page];
+        const loaded = await screen?.load?.();
 
-      expect(loaded).toHaveProperty("default");
+        expect(loaded).toHaveProperty("default");
+      },
+      30_000,
+    );
+  });
+
+  describe("when the guided tour shows and then hides sample data", () => {
+    it("writes the sample choice every governance page reads", () => {
+      const { sampleChoice } = governanceWeb.installation.capabilities;
+
+      sampleChoice.setSampleChoice(true);
+      expect(readSampleChoice()).toBe(true);
+
+      sampleChoice.setSampleChoice(false);
+      expect(readSampleChoice()).toBe(false);
+      writeSampleChoice(null);
     });
   });
 });

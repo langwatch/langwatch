@@ -1,15 +1,15 @@
-/**
- * The workbench's saved versions, as a list.
- */
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+/**
+ * The workbench's saved versions, as a list.
+ */
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs, type TimeInput } from "@langwatch/time";
 import { useState } from "react";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 interface VersionEntry {
@@ -59,11 +59,11 @@ const useVersionRestore = ({
   onSettled: () => void;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
+  const utils = experimentApi.useUtils();
   const loadState = useEvaluationsV3Store((state) => state.loadState);
   const setWorkbenchVersion = useEvaluationsV3Store((state) => state.setWorkbenchVersion);
   const setStaleWorkbench = useEvaluationsV3Store((state) => state.setStaleWorkbench);
-  const restoreVersion = api.experiments.restoreWorkbenchVersion.useMutation();
+  const restoreVersion = experimentApi.experiments.restoreWorkbenchVersion.useMutation();
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
 
   const restore = async (entry: VersionEntry) => {
@@ -213,7 +213,7 @@ export function VersionList({
     onSettled: () => setConfirmingVersion(null),
   });
 
-  const versionsQuery = api.experiments.listWorkbenchVersions.useQuery(
+  const versionsQuery = experimentApi.experiments.listWorkbenchVersions.useQuery(
     { projectId: project?.id ?? "", experimentId },
     { enabled: !!project?.id && !!experimentId },
   );

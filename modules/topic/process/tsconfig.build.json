@@ -27,16 +27,10 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -45,10 +39,16 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"

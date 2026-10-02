@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { EvalCard } from "./eval-card.tsx";
 import { EvalHistoryStack } from "./eval-history-stack.tsx";

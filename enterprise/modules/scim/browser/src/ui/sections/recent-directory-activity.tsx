@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What the directory did on one connection, newest first, read only while open (ADR-126). */
-import { Badge, Box, Button, Collapsible, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Collapsible,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { ChevronRight } from "lucide-react";
 

@@ -26,11 +26,12 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
@@ -39,7 +40,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@trpc/server": "catalog:",

@@ -5,12 +5,12 @@
  * @see specs/lwql/saved-charts.feature
  */
 
-import { Box } from "@chakra-ui/react";
 import {
   type LangWatchQLDatasetColumn,
   LWQL_QUERY_RESULT_DATASET,
   starterVegaLiteSpec,
 } from "@langwatch/analytics-contract/visualization";
+import { Box } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { ThemedLangWatchQLVegaLiteChart } from "./themed-langwatch-ql-vega-lite-chart.tsx";
