@@ -19,16 +19,6 @@ import type { WorkflowRepository } from "../../repositories/workflow.repository.
 import { WorkflowModule, type NlpLambdaArnCache } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 const existingEvaluator: Evaluator = {
   id: "evaluator_1",
   projectId: "project_1",
@@ -56,7 +46,6 @@ async function appWith({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,

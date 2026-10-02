@@ -26,16 +26,6 @@ import type { WorkflowRepositories } from "../../repositories/workflow-repositor
 import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 async function appAt({
   nlpServiceUrl,
   repositories = MemoryWorkflowRepositories.create(),
@@ -49,7 +39,6 @@ async function appAt({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl,
       publicBaseUrl: void 0,

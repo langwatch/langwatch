@@ -27,16 +27,6 @@ import { WorkflowModule, type NlpLambdaArnCache, type NlpLambdaFleet } from "../
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 /** Decrypts nothing a test named - the sweep never reaches it. */
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 /**
  * The App reads nothing off a setup but its members, so a test builds the one
  * it cares about rather than booting a process to reach one method.
@@ -48,7 +38,6 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowModule> {
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,

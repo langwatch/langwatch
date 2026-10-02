@@ -24,16 +24,6 @@ import {
 } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 async function appWith(
   overrides: Partial<WorkflowInfrastructure>,
   authz: AuthzApi = createApiFixture<AuthzApi>({}, "AuthzApi"),
@@ -44,7 +34,6 @@ async function appWith(
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,

@@ -379,7 +379,7 @@ type WorkflowProcessFacts = Readonly<{
 
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowModule.dependencies,
-  WorkflowHostMembers & MembersRead<readonly ["prisma", "encryption"]> & WorkflowProcessFacts,
+  WorkflowHostMembers & MembersRead<readonly ["prisma"]> & WorkflowProcessFacts,
   WorkflowServerConfig,
   WorkflowRepositories
 >;
@@ -628,7 +628,6 @@ export class WorkflowModule implements WorkflowApi {
   /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */
   static readonly reads = [
     "prisma",
-    "encryption",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
     "publicBaseUrl",

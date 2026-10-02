@@ -75,16 +75,6 @@ const fleet = {
   security_group_ids: ["sg-1"],
 };
 
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 function appWith({
   fleetSecret,
   repositories = MemoryWorkflowRepositories.create(),
@@ -98,7 +88,6 @@ function appWith({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: "http://engine.test:5561",
       publicBaseUrl: "https://app.test",

@@ -27,23 +27,12 @@ import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-
 import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
-class NoopTestEncryption {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
   const members = createWorkflowTestInfrastructure();
   const app = await WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: new NoopTestEncryption(),
       nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,
