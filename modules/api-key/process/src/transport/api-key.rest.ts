@@ -249,11 +249,10 @@ const isIngestionShape = ({
 };
 
 /**
- * The one shape a person's project session may mint as its project key: personal, their own, one
- * ADMIN binding to that project, every permission. It reaches what the project key reached on
- * main, capped at the person's own access to that project.
+ * The one shape a person's project session may mint as its full-access key: personal, their own, one
+ * ADMIN binding to that project, every permission, capped at the person's own access there.
  */
-const isProjectKeyShape = ({
+const isFullAccessShape = ({
   input,
   projectId,
   callerUserId,
@@ -278,8 +277,8 @@ const isProjectKeyShape = ({
   );
 };
 
-/** The person a project key is minted for, or the refusal: a person's session, the one shape. */
-const projectKeyOwner = ({
+/** The person a full-access key is minted for, or the refusal: a person's session, the one shape. */
+const fullAccessKeyOwner = ({
   principal,
   input,
   projectId,
@@ -289,11 +288,11 @@ const projectKeyOwner = ({
   projectId: string;
 }): string => {
   if (principal?.type !== "user") {
-    throw new ApiKeyScopeViolationError("Only a person's sign-in session mints a project API key");
+    throw new ApiKeyScopeViolationError("Only a person's sign-in session mints a full-access key");
   }
-  if (!isProjectKeyShape({ input, projectId, callerUserId: principal.id })) {
+  if (!isFullAccessShape({ input, projectId, callerUserId: principal.id })) {
     throw new ApiKeyScopeViolationError(
-      "A project API key is personal, bound to this one project, with every permission there",
+      "A full-access key is personal, bound to this one project, with every permission there",
     );
   }
 
@@ -601,8 +600,8 @@ export const apiKeyRest: Readonly<{
   })
 
   // `langwatch login --project` mints the key it writes to .env here: the person's own key with
-  // full access to the project their sign-in is bound to, behind project:manage as on main.
-  .post("/project", "createProjectApiKey")
+  // full access to the project their sign-in is bound to, behind project:manage.
+  .post("/full-access", "createFullAccessApiKey")
   .withCredential("project")
   .withInput(apiKeyRestCreateSchema)
   .withPermission("project:manage")
@@ -610,7 +609,7 @@ export const apiKeyRest: Readonly<{
   .withStatus(201)
   .withDocs({
     tags: API_KEY_TAGS,
-    summary: "Create a project API key",
+    summary: "Create a full-access API key",
     description:
       'Mint the caller\'s own API key for the project their sign-in session is bound to, as `langwatch login --project` does: it can do everything the caller can do in that project (prompts, datasets, evaluations, simulations, traces). Only one shape is accepted: keyType "personal", owned by the caller, one ADMIN binding to that project and permissionMode "all". Name it after the machine; omit expiresAt for a key that never expires. Requires a person\'s project session holding project:manage; an API key cannot mint one.',
     errors: [
@@ -625,7 +624,7 @@ export const apiKeyRest: Readonly<{
   })
   .withMiddleware(apiKeyIngestionCaller)
   .handle(async ({ app, input, scope }, caller) => {
-    const userId = projectKeyOwner({ principal: caller.principal, input, projectId: scope.id });
+    const userId = fullAccessKeyOwner({ principal: caller.principal, input, projectId: scope.id });
 
     const result = await app.create({
       name: input.name,

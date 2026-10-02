@@ -55,7 +55,7 @@ import { runUnifiedLoginFlow } from "../login-flow";
 
 const PROJECT = { id: "p1", slug: "demo", name: "Demo" };
 
-function controlPlane({ projectKeyStatus }: { projectKeyStatus: number }) {
+function controlPlane({ fullAccessStatus }: { fullAccessStatus: number }) {
   const paths: string[] = [];
   const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
     const pathname = new URL(input instanceof Request ? input.url : input).pathname;
@@ -65,10 +65,10 @@ function controlPlane({ projectKeyStatus }: { projectKeyStatus: number }) {
         status,
         headers: { "Content-Type": "application/json" },
       });
-    if (pathname === "/api/v1/api-keys/project") {
-      return projectKeyStatus === 201
+    if (pathname === "/api/v1/api-keys/full-access") {
+      return fullAccessStatus === 201
         ? json(201, { token: "sk-lw-project", apiKey: { id: "k1", name: "n" } })
-        : json(projectKeyStatus, { error: "forbidden" });
+        : json(fullAccessStatus, { error: "forbidden" });
     }
     if (pathname === "/api/v1/api-keys/ingestion") {
       return json(201, { token: "sk-lw-ingest", apiKey: { id: "k2", name: "n" } });
@@ -105,14 +105,14 @@ describe("runUnifiedLoginFlow (project pick in the browser)", () => {
     vi.restoreAllMocks();
   });
 
-  /** @scenario The browser project pick writes the same full project key */
-  it("writes the full project key minted with the picked project's session, then ends it", async () => {
-    const { paths, fetchImpl } = controlPlane({ projectKeyStatus: 201 });
+  /** @scenario The browser project pick writes the same full-access key */
+  it("writes the full-access key minted with the picked project's session, then ends it", async () => {
+    const { paths, fetchImpl } = controlPlane({ fullAccessStatus: 201 });
     vi.stubGlobal("fetch", fetchImpl);
 
     await runUnifiedLoginFlow({ kind: "project_api_key", browser: "none" });
 
-    expect(paths).toContain("/api/v1/api-keys/project");
+    expect(paths).toContain("/api/v1/api-keys/full-access");
     expect(paths).not.toContain("/api/v1/api-keys/ingestion");
     expect(paths.at(-1)).toBe("/api/auth/cli/logout");
     expect(fs.readFileSync(path.join(dir, ".env"), "utf8")).toContain(
@@ -120,9 +120,9 @@ describe("runUnifiedLoginFlow (project pick in the browser)", () => {
     );
   });
 
-  /** @scenario The browser project pick writes the same full project key */
+  /** @scenario The browser project pick writes the same full-access key */
   it("writes the ingestion key for a person who cannot manage the picked project", async () => {
-    const { paths, fetchImpl } = controlPlane({ projectKeyStatus: 403 });
+    const { paths, fetchImpl } = controlPlane({ fullAccessStatus: 403 });
     vi.stubGlobal("fetch", fetchImpl);
 
     await runUnifiedLoginFlow({ kind: "project_api_key", browser: "none" });

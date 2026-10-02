@@ -215,11 +215,11 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   # The key `--project` writes does project work beyond tracing: versioning prompts,
   # reading datasets, running evaluations and simulations (founder, 2026-10-02).
   @bdd @cli @login @project @slug @unit
-  Scenario: `langwatch login --project <slug>` writes a full project key
+  Scenario: `langwatch login --project <slug>` writes a full-access key
     Given a device session and a project the person manages
     When the user runs `langwatch login --project <slug>`
     Then the CLI forks a session bound to that project and mints the person's own key
-      with every permission there, through `POST /api/v1/api-keys/project`
+      with every permission there, through `POST /api/v1/api-keys/full-access`
     And it ends the forked session and writes the key to `$CWD/.env`
     And it prints "API key for project <name> saved to .env"
 
@@ -231,10 +231,10 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And it prints that the key only sends traces, and how to get one that does more
 
   @bdd @cli @login @project @unit
-  Scenario: The browser project pick writes the same full project key
+  Scenario: The browser project pick writes the same full-access key
     Given the user picked a project on the /cli/auth page in an interactive project login
     When the CLI receives the project-bound session
-    Then it mints the full project key with it, or the ingestion key for a person who
+    Then it mints the full-access key with it, or the ingestion key for a person who
       cannot manage the project, and ends the session
 
   @bdd @cli @login @agent-aware @fake-tty

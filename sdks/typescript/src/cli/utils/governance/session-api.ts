@@ -188,10 +188,10 @@ export async function mintProjectIngestionKey(
 
 /**
  * `langwatch login --project <slug>`: forks a child session capped at the project from the device
- * session, mints this machine's full project key with it (the ingestion key for a person who
+ * session, mints this machine's full-access key with it (the ingestion key for a person who
  * cannot manage the project), then ends the child. The device session itself is left as it was.
  */
-export async function mintProjectApiKey(
+export async function mintProjectFullAccessKey(
   cfg: GovernanceConfig,
   slug: string,
   opts: SessionApiOptions = {},

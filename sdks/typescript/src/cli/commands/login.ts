@@ -13,7 +13,7 @@ import {
 import { printIngestionKeyNotice } from "@/cli/utils/governance/ingestion-key-notice";
 import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
-import { mintProjectApiKey, SessionApiError } from "@/cli/utils/governance/session-api";
+import { mintProjectFullAccessKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -128,7 +128,7 @@ const failFastHeadlessProjectLogin = (): never => {
 };
 
 /**
- * Non-interactive project login: mints this machine's project key for the named project from
+ * Non-interactive project login: mints this machine's full-access key for the named project from
  * the device session and writes it to $CWD/.env. No browser, no prompts, works headless.
  */
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
@@ -144,10 +144,10 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     process.exit(1);
   }
   try {
-    const result = await mintProjectApiKey(cfg, slug);
+    const result = await mintProjectFullAccessKey(cfg, slug);
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
-    const written = result.kind === "project" ? "API key" : "Ingestion key";
+    const written = result.kind === "full-access" ? "API key" : "Ingestion key";
     console.log(
       chalk.green(`✓ ${written} for project ${chalk.bold(result.project.name)} saved to .env`),
     );

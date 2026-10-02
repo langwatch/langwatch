@@ -259,7 +259,7 @@ async function completeDeviceSession({
 
 /**
  * The key a project login writes: an older server's `api_key` verbatim, or this machine's
- * project key minted with the project session (the ingestion key for a person who cannot
+ * full-access key minted with the project session (the ingestion key for a person who cannot
  * manage the project), which then ends (only the key is kept).
  */
 async function projectKeyOf({
@@ -269,7 +269,7 @@ async function projectKeyOf({
   baseUrl: string;
   result: ProjectKeyResult;
 }): Promise<{ token: string; kind: ProjectLoginKeyKind }> {
-  if (result.kind === "api_key") return { token: result.api_key, kind: "project" };
+  if (result.kind === "api_key") return { token: result.api_key, kind: "full-access" };
   try {
     return await createProjectLoginKey(
       { baseUrl },

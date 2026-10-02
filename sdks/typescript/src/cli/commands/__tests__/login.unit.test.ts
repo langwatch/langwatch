@@ -35,8 +35,8 @@ vi.mock("@/cli/utils/governance/config", () => ({
   isLoggedIn: (cfg: { access_token?: string } | undefined) => !!cfg?.access_token,
 }));
 
-// The slug path's server boundary: a forked project session minting the project key.
-const mintProjectApiKey = vi.fn();
+// The slug path's server boundary: a forked project session minting the full-access key.
+const mintProjectFullAccessKey = vi.fn();
 vi.mock("@/cli/utils/governance/session-api", async () => {
   const actual = await vi.importActual<typeof sessionApiModule>(
     "@/cli/utils/governance/session-api",
@@ -44,7 +44,7 @@ vi.mock("@/cli/utils/governance/session-api", async () => {
   return {
     SessionApiError: actual.SessionApiError,
     fetchPersonalProject: vi.fn(),
-    mintProjectApiKey: (...args: unknown[]) => mintProjectApiKey(...args),
+    mintProjectFullAccessKey: (...args: unknown[]) => mintProjectFullAccessKey(...args),
   };
 });
 
@@ -146,9 +146,9 @@ describe("loginCommand", () => {
           control_plane_url: "https://app.langwatch.ai",
           access_token: "lw_at_x",
         } as never);
-        mintProjectApiKey.mockResolvedValue({
+        mintProjectFullAccessKey.mockResolvedValue({
           api_key: "sk-lw-project",
-          kind: "project",
+          kind: "full-access",
           project: { id: "p1", slug: "checkout", name: "Checkout" },
         });
       });
@@ -163,7 +163,7 @@ describe("loginCommand", () => {
         try {
           await loginCommand({ project: "checkout" });
 
-          expect(mintProjectApiKey).toHaveBeenCalledWith(
+          expect(mintProjectFullAccessKey).toHaveBeenCalledWith(
             expect.objectContaining({ access_token: "lw_at_x" }),
             "checkout",
           );
@@ -178,7 +178,7 @@ describe("loginCommand", () => {
         }
       });
 
-      /** @scenario `langwatch login --project <slug>` writes a full project key */
+      /** @scenario `langwatch login --project <slug>` writes a full-access key */
       it("says it saved the project's API key", async () => {
         const cwd = process.cwd();
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-login-"));
@@ -199,7 +199,7 @@ describe("loginCommand", () => {
 
       /** @scenario A person who cannot manage the project gets an ingestion key and is told so */
       it("says an ingestion key only sends traces, and how to get one that does more", async () => {
-        mintProjectApiKey.mockResolvedValue({
+        mintProjectFullAccessKey.mockResolvedValue({
           api_key: "sk-lw-ingest",
           kind: "ingestion",
           project: { id: "p1", slug: "checkout", name: "Checkout" },
@@ -237,7 +237,7 @@ describe("loginCommand", () => {
 
         await expect(loginCommand({ project: "checkout" })).rejects.toThrow("process.exit(1)");
 
-        expect(mintProjectApiKey).not.toHaveBeenCalled();
+        expect(mintProjectFullAccessKey).not.toHaveBeenCalled();
         const printed = errorSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("langwatch login");
         expect(printed).toContain("--api-key");
@@ -285,7 +285,7 @@ describe("loginCommand", () => {
       );
 
       expect(runDeviceFlowLogin).not.toHaveBeenCalled();
-      expect(mintProjectApiKey).not.toHaveBeenCalled();
+      expect(mintProjectFullAccessKey).not.toHaveBeenCalled();
     });
   });
 

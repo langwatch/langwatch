@@ -1157,7 +1157,7 @@ describe("the api-keys REST family", () => {
       expect(create).not.toHaveBeenCalled();
     });
   });
-  describe("when a project session asks POST /api/api-keys/project for a key", () => {
+  describe("when a project session asks POST /api/api-keys/full-access for a key", () => {
     const PROJECT_KEY_SHAPE = {
       name: "laptop / my-project",
       keyType: "personal",
@@ -1165,7 +1165,7 @@ describe("the api-keys REST family", () => {
       bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }],
     };
 
-    function mountProjectKey(options: { granted?: readonly string[] } = {}) {
+    function mountFullAccessKey(options: { granted?: readonly string[] } = {}) {
       const create = vi.fn(async () => ({
         token: "sk-lw-project",
         apiKey: apiKey({ id: "project-key", name: PROJECT_KEY_SHAPE.name }),
@@ -1174,11 +1174,11 @@ describe("the api-keys REST family", () => {
       return { ...mounted, create };
     }
 
-    /** @scenario A person's project session mints its own project API key */
+    /** @scenario A person's project session mints its own full-access key */
     it("mints the person's own key with full access to the session's project", async () => {
-      const { send, create } = mountProjectKey();
+      const { send, create } = mountFullAccessKey();
 
-      const response = await send("/api/api-keys/project", {
+      const response = await send("/api/api-keys/full-access", {
         method: "POST",
         body: PROJECT_KEY_SHAPE,
         as: AS_SESSION,
@@ -1198,7 +1198,7 @@ describe("the api-keys REST family", () => {
       });
     });
 
-    /** @scenario The project API key route refuses any other shape */
+    /** @scenario The full-access key route refuses any other shape */
     it.each([
       ["a service key", { keyType: "service" }],
       ["another member's key", { assignedToUserId: OTHER_USER_ID }],
@@ -1225,9 +1225,9 @@ describe("the api-keys REST family", () => {
         { bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       ],
     ])("refuses %s", async (_shape, change) => {
-      const { send, create } = mountProjectKey();
+      const { send, create } = mountFullAccessKey();
 
-      const response = await send("/api/api-keys/project", {
+      const response = await send("/api/api-keys/full-access", {
         method: "POST",
         body: { ...PROJECT_KEY_SHAPE, ...change },
         as: AS_SESSION,
@@ -1238,11 +1238,11 @@ describe("the api-keys REST family", () => {
       expect(create).not.toHaveBeenCalled();
     });
 
-    /** @scenario A person without project:manage cannot mint a project API key */
+    /** @scenario A person without project:manage cannot mint a full-access key */
     it("refuses a session that holds traces:create but not project:manage", async () => {
-      const { send, create } = mountProjectKey({ granted: ["traces:create"] });
+      const { send, create } = mountFullAccessKey({ granted: ["traces:create"] });
 
-      const response = await send("/api/api-keys/project", {
+      const response = await send("/api/api-keys/full-access", {
         method: "POST",
         body: PROJECT_KEY_SHAPE,
         as: AS_SESSION,
@@ -1252,11 +1252,11 @@ describe("the api-keys REST family", () => {
       expect(create).not.toHaveBeenCalled();
     });
 
-    /** @scenario An API key cannot mint a project API key */
+    /** @scenario An API key cannot mint a full-access key */
     it("refuses a caller presenting an API key", async () => {
-      const { send, create } = mountProjectKey();
+      const { send, create } = mountFullAccessKey();
 
-      const response = await send("/api/api-keys/project", {
+      const response = await send("/api/api-keys/full-access", {
         method: "POST",
         body: PROJECT_KEY_SHAPE,
       });

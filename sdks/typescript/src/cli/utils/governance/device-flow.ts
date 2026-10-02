@@ -449,34 +449,34 @@ export async function createIngestionKey(
 }
 
 /**
- * The project key a project session mints for this machine: personal, every permission in that
+ * The full-access key a project session mints for this machine: personal, every permission in that
  * one project, capped at what the person holds there. Refused (403) to a person without
  * project:manage, and missing (404) on a server older than the route: both read as "denied".
  */
-export async function createProjectApiKey(
+export async function createFullAccessApiKey(
   opts: DeviceFlowOptions,
   { accessToken, project }: { accessToken: string; project: ExchangeProject },
 ): Promise<string> {
   return mintProjectSessionKey(opts, {
     accessToken,
-    path: "/api/v1/api-keys/project",
+    path: "/api/v1/api-keys/full-access",
     body: {
       name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
       keyType: "personal",
       permissionMode: "all",
       bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: project.id }],
     },
-    refused: `cannot get a project key for "${project.slug}"`,
-    failed: "project key failed",
+    refused: `cannot get a full-access key for "${project.slug}"`,
+    failed: "full-access key failed",
     missingIsRefusal: true,
   });
 }
 
 /** Which key a project login wrote to .env. */
-export type ProjectLoginKeyKind = "project" | "ingestion";
+export type ProjectLoginKeyKind = "full-access" | "ingestion";
 
 /**
- * The key `langwatch login --project` writes: the full project key, or the ingestion key when the
+ * The key `langwatch login --project` writes: the full-access key, or the ingestion key when the
  * person cannot get the full one (no project:manage there, or a server without the route).
  */
 export async function createProjectLoginKey(
@@ -484,7 +484,7 @@ export async function createProjectLoginKey(
   session: { accessToken: string; project: ExchangeProject },
 ): Promise<{ token: string; kind: ProjectLoginKeyKind }> {
   try {
-    return { token: await createProjectApiKey(opts, session), kind: "project" };
+    return { token: await createFullAccessApiKey(opts, session), kind: "full-access" };
   } catch (error) {
     if (!(error instanceof DeviceFlowError) || error.kind !== "denied") throw error;
     return { token: await createIngestionKey(opts, session), kind: "ingestion" };
