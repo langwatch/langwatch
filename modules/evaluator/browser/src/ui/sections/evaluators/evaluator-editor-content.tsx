@@ -7,10 +7,10 @@ import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
 
-import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
 import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+import { EvaluatorMappingsSection } from "./evaluator-mappings-section.tsx";
 
 /**
  * Props for the evaluator editor content.

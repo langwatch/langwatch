@@ -24,8 +24,8 @@ import { LuArrowLeft } from "react-icons/lu";
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { getRandomWorkflowIcon } from "../../../model/workflow/random-workflow-icon.ts";
 import { customEvaluatorTemplate } from "../../../model/workflow/templates/custom-evaluator.template.ts";
-import { EmojiPickerModal } from "../../sections/workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
-import { FormServerError } from "../workflow/studio-host/errors.tsx";
+import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
+import { EmojiPickerModal } from "../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = UiWorkflowSelectorForEvaluatorDrawerProps;
 

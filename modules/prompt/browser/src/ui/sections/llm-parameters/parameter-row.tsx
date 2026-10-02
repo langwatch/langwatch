@@ -6,7 +6,7 @@
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 
-import { getParameterIcon, type ParameterConfig } from "./parameter-config.ts";
+import { getParameterIcon, type ParameterConfig } from "../../../model/parameter-config.ts";
 import { ParameterPopoverContent } from "./parameter-popover-content.tsx";
 
 // ============================================================================

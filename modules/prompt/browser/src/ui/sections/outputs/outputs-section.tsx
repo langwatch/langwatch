@@ -23,12 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
-import { FieldTypeSelect } from "../../sections/variables/variable-type/field-type-select.tsx";
-import {
-  TYPE_LABELS,
-  VariableTypeIcon,
-} from "../../sections/variables/variable-type/variable-type-icon.tsx";
-import { WorkflowCodeEditor } from "../workflow/code/workflow-code-editor.tsx";
+import { WorkflowCodeEditor } from "../../elements/workflow/code/workflow-code-editor.tsx";
+import { FieldTypeSelect } from "../variables/variable-type/field-type-select.tsx";
+import { TYPE_LABELS, VariableTypeIcon } from "../variables/variable-type/variable-type-icon.tsx";
 
 // ============================================================================
 // Types

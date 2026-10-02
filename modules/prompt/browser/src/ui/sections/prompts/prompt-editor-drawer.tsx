@@ -36,16 +36,16 @@ import {
   inputTypeForField,
   missingMappingIdsFor,
 } from "../../../model/prompts/prompt-editor-values.ts";
-import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { SaveVersionDialog } from "../../elements/prompts/forms/save-version-dialog.tsx";
 import { VersionBadge } from "../../elements/version-badge.tsx";
 import { useRegisterDrawerFooter } from "../../elements/workflow/studio-drawer-footer.tsx";
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
-import { PromptMessagesField } from "../prompt-studio/fields/prompt-messages-field.tsx";
-import { FormVariablesSection } from "../variables/form-variables-section.tsx";
+import { FormOutputsSection } from "../outputs/form-outputs-section.tsx";
 import { ChangeHandleDialog } from "../prompt-studio/dialogs/change-handle-dialog.tsx";
-import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
+import { PromptMessagesField } from "../prompt-studio/fields/prompt-messages-field.tsx";
 import { PromptEditorHeader } from "../prompt-studio/prompt-editor-header.tsx";
+import { FormVariablesSection } from "../variables/form-variables-section.tsx";
+import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 
 export type PromptEditorDrawerProps = UiPromptEditorDrawerProps;
 

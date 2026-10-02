@@ -10,7 +10,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
-import { toInternalKey } from "../../sections/prompt/llm-parameters/parameter-config.ts";
+import { toInternalKey } from "../prompt/llm-parameters/parameter-config.ts";
 
 /**
  * LLM config parameter keys that the popover can read/write.

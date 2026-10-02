@@ -54,10 +54,10 @@ import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
 } from "../../elements/evaluator-editor-chrome.tsx";
-import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
 import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
+import { EvaluatorMappingsSection } from "./evaluator-mappings-section.tsx";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
 // re-syncs its draft whenever this `value` prop's REFERENCE changes, so a fresh

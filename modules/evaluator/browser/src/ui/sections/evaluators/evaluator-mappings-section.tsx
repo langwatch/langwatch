@@ -11,8 +11,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectSpanNames } from "../../../behavior/use-project-span-names.ts";
-import { VariablesSection } from "../../sections/prompt/variables/variables-section.tsx";
-import { renderSourceTypeIcon } from "../workflow/workflow-icons.tsx";
+import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
+import { VariablesSection } from "../prompt/variables/variables-section.tsx";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

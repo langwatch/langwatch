@@ -6,8 +6,8 @@
 
 import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 
-import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
 import type { LLMConfigValues } from "./llm-config-values.types.ts";
+import { getMaxTokenLimit } from "./max-token-limit.ts";
 import { parameterRegistry as defaultRegistry } from "./parameter-registry.ts";
 
 /**

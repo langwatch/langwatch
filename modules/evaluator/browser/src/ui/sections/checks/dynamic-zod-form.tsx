@@ -35,8 +35,8 @@ import { type ZodType, z } from "zod";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
-import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
+import { EvaluatorLLMConfigField } from "./evaluator-llm-config-field.tsx";
 
 const EvaluatorModelSelector = ({
   selectorOptions,

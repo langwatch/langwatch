@@ -54,7 +54,7 @@ export const evaluatorWeb = defineBrowserModule("evaluator")
     workflowSelectorForEvaluator: {
       load: async () => ({
         default: (
-          await import("./ui/elements/evaluators/workflow-selector-for-evaluator-drawer.tsx")
+          await import("./ui/sections/evaluators/workflow-selector-for-evaluator-drawer.tsx")
         ).WorkflowSelectorForEvaluatorDrawer,
       }),
     },
@@ -71,7 +71,7 @@ export const evaluatorWeb = defineBrowserModule("evaluator")
     },
     guardrails: {
       load: async () => ({
-        default: (await import("./ui/elements/evaluations/guardrails-drawer.tsx")).GuardrailsDrawer,
+        default: (await import("./ui/sections/evaluations/guardrails-drawer.tsx")).GuardrailsDrawer,
       }),
     },
   })

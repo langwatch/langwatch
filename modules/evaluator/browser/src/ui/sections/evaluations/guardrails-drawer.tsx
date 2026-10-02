@@ -8,8 +8,8 @@ import type { Evaluator } from "@langwatch/evaluator-contract";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { RenderCode } from "../../sections/workflow/code/render-code.tsx";
-import { EvaluatorSelectionBox } from "./evaluator-selection-box.tsx";
+import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
+import { RenderCode } from "../workflow/code/render-code.tsx";
 
 export type GuardrailsDrawerProps = {
   open?: boolean;

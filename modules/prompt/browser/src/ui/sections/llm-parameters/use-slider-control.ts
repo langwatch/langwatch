@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 
-import type { SliderParameterConfig } from "./parameter-config.ts";
+import type { SliderParameterConfig } from "../../../model/parameter-config.ts";
 
 // ============================================================================
 // Types

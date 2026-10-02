@@ -1,18 +1,15 @@
 import { computeClampedMaxTokens } from "@langwatch/model-provider-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { type LLMConfigValues } from "../model/llm-config-values.types.ts";
 import { getMaxTokenLimit } from "../model/max-token-limit.ts";
-import { type LLMConfigValues } from "../ui/sections/llm-parameters/llm-config-values.types.ts";
-import {
-  buildModelChangeValues,
-  normalizeMaxTokens,
-} from "../ui/sections/llm-parameters/max-tokens.utils.ts";
+import { buildModelChangeValues, normalizeMaxTokens } from "../model/max-tokens.utils.ts";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
   toFormKey,
-} from "../ui/sections/llm-parameters/parameter-config.ts";
-import { getParamValue } from "../ui/sections/llm-parameters/parameter-value.utils.ts";
+} from "../model/parameter-config.ts";
+import { getParamValue } from "../model/parameter-value.utils.ts";
 import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
 
 /** The one output a prompt has when structured outputs are off. */

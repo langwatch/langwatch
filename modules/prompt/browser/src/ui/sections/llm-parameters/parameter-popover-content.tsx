@@ -11,7 +11,7 @@ import type {
   ParameterConfig,
   SelectParameterConfig,
   SliderParameterConfig,
-} from "./parameter-config.ts";
+} from "../../../model/parameter-config.ts";
 import { useSliderControl } from "./use-slider-control.ts";
 
 // ============================================================================
