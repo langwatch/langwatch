@@ -819,15 +819,19 @@ function UsageSection({
                     <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--chakra-colors-border-subtle)"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="day"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(d: string) => d.slice(5)}
                   minTickGap={24}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(v: number) => `$${v.toFixed(2)}`}
                   width={56}
                 />

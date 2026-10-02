@@ -633,7 +633,7 @@ export function VirtualKeyEditDrawer({
                 placeholder="e.g. tier=enterprise, team=ml"
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              {tagsNotice && <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>}
+              {tagsNotice && <Field.HelperText color="orange.fg">{tagsNotice}</Field.HelperText>}
             </Field.Root>
 
             {vk && (

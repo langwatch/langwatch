@@ -181,7 +181,7 @@ export function VirtualKeyProviderAccessSection({
           gap={1}
           width="full"
           borderWidth="1px"
-          borderColor="orange.200"
+          borderColor="orange.muted"
           borderRadius="md"
           background="orange.subtle"
           padding={3}
@@ -227,7 +227,7 @@ export function VirtualKeyProviderAccessSection({
             />
           ))}
           {invalidReason && (
-            <Text fontSize="xs" color="red.600" data-testid="vk-providers-invalid">
+            <Text fontSize="xs" color="fg.error" data-testid="vk-providers-invalid">
               {invalidReason}
             </Text>
           )}

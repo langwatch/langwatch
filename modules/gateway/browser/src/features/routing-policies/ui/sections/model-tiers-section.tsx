@@ -161,7 +161,7 @@ function TierRow({
           </NativeSelect.Field>
         </NativeSelect.Root>
         {value && !isKnownOption && (
-          <Text fontSize="xs" color="orange.600">
+          <Text fontSize="xs" color="orange.fg">
             This model is not in the catalog. It still routes, but check the name.
           </Text>
         )}

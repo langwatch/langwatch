@@ -25,7 +25,7 @@ export function GatewayErrorPanel({
       <EmptyState.Root>
         <EmptyState.Content>
           <EmptyState.Indicator>
-            <AlertTriangle size={32} color="var(--chakra-colors-red-500)" />
+            <AlertTriangle size={32} color="var(--chakra-colors-fg-error)" />
           </EmptyState.Indicator>
           <VStack gap={2} textAlign="center" maxWidth="420px">
             <EmptyState.Title>{title}</EmptyState.Title>

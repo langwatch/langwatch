@@ -130,7 +130,7 @@ export function GuardrailAttachmentsSection({
         <Text fontSize="sm" color="fg.muted">
           No guardrails defined in this project yet.{" "}
           {projectSlug ? (
-            <Link href="/gateway/guardrails" color="blue.500" fontWeight="medium">
+            <Link href="/gateway/guardrails" color="orange.fg" fontWeight="medium">
               Create one
             </Link>
           ) : (
@@ -229,7 +229,7 @@ export function GuardrailAttachmentsSection({
         <HStack justifyContent="flex-end">
           <Button
             size="sm"
-            colorPalette="blue"
+            colorPalette="orange"
             data-testid="gateway-guardrail-attach-save"
             disabled={!canAttach || !dirty}
             loading={updateMutation.isPending}

@@ -240,7 +240,7 @@ function ApplicableBudgetsList({
             {b.scopeLabel}
           </Text>
           {b.providerLabel && (
-            <Badge variant="subtle" colorPalette="blue" fontSize="2xs">
+            <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
               {b.providerLabel} only
             </Badge>
           )}

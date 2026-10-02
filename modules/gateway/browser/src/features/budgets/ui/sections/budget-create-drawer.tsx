@@ -306,7 +306,7 @@ function BudgetScopeField({
         </Text>
       )}
       {scopeKind === "GROUP" && groupsFailed && (
-        <Text fontSize="xs" color="red.600" marginTop={1}>
+        <Text fontSize="xs" color="fg.error" marginTop={1}>
           Groups could not be loaded.
         </Text>
       )}

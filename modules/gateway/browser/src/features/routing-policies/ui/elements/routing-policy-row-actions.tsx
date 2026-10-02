@@ -58,7 +58,7 @@ export function RoutingPolicyRowActions({
         <Menu.Item
           value="delete"
           data-testid="gateway-routing-policy-row-delete"
-          color="red.500"
+          color="fg.error"
           onClick={(event) => {
             event.stopPropagation();
             onDelete();

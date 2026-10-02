@@ -209,7 +209,7 @@ function PolicyRow({
             {policy.name}
           </Text>
           {policy.isDefault && (
-            <Badge colorPalette="blue" size="sm" variant="surface">
+            <Badge colorPalette="orange" size="sm" variant="surface">
               default
             </Badge>
           )}

@@ -215,7 +215,7 @@ export function EligibleModelProvidersPreview({
         align="stretch"
         gap={2}
         borderWidth="1px"
-        borderColor="orange.200"
+        borderColor="orange.muted"
         borderRadius="md"
         background="orange.subtle"
         padding={3}

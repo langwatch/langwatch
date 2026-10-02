@@ -539,7 +539,7 @@ function ScopeCell({
       )}
       {providerLabel && (
         <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
-          <Badge colorPalette="blue" variant="subtle" data-testid="budget-provider-badge">
+          <Badge colorPalette="gray" variant="subtle" data-testid="budget-provider-badge">
             {providerLabel} only
           </Badge>
         </Tooltip>
