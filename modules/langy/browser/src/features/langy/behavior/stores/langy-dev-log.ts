@@ -1,3 +1,4 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -7,7 +8,6 @@ import {
   seedLangyTurnProjection,
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { create } from "zustand";
 
 import type { LangyStreamWireEntry } from "../../../../behavior/langy-api.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
@@ -95,92 +95,95 @@ interface LangyDevLogState {
   clear: () => void;
 }
 
-export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
-  const append = (make: (seq: number) => LangyDevLogRecord): void => {
-    if (!get().recording) return;
-    set((state) => {
-      const seq = state.nextSeq;
-      const appended = [...state.records, make(seq)];
-      const overflow = Math.max(0, appended.length - DEV_LOG_CAPACITY);
-      return {
-        records: overflow > 0 ? appended.slice(overflow) : appended,
-        dropped: state.dropped + overflow,
-        nextSeq: seq + 1,
-      };
-    });
-  };
-  /**
-   * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's own
-   * attribution when it has one, otherwise the store's active conversation.
-   */
-  const attributed = (explicit?: string | null): string | null =>
-    explicit ?? useLangyStore.getState().activeConversationId;
-  return {
-    recording: false,
-    records: [],
-    dropped: 0,
-    nextSeq: 1,
-    scrubSeq: null,
-    setScrub: (scrubSeq) => set({ scrubSeq }),
-    // Disarming also snaps back to live: a closed drawer must never leave the
-    // panel frozen in the past.
-    setRecording: (recording) => set(recording ? { recording } : { recording, scrubSeq: null }),
-    record: (entry, turnId) =>
-      append((seq) => ({
-        seq,
-        atMs: nowInstant().epochMilliseconds,
-        conversationId: attributed(),
-        lane: "stream",
-        turnId,
-        entry,
-      })),
-    recordOutbound: (kind, label, detail) =>
-      append((seq) => ({
-        seq,
-        atMs: nowInstant().epochMilliseconds,
-        // The send/stop callers put the conversation in the detail payload;
-        // read it from there so the tag survives even when the store has not
-        // adopted the conversation yet (a stop raced against a fresh send).
-        conversationId: attributed(
-          typeof (detail as { conversationId?: unknown } | null)?.conversationId === "string"
-            ? (detail as { conversationId: string }).conversationId
-            : undefined,
-        ),
-        lane: "outbound",
-        kind,
-        label,
-        detail,
-      })),
-    recordDurableEvent: (event) =>
-      append((seq) => ({
-        seq,
-        atMs: nowInstant().epochMilliseconds,
-        // Every wire event names its conversation — the fold's identity.
-        conversationId: attributed(event.data.conversationId),
-        lane: "durable",
-        source: "tail",
-        event,
-      })),
-    recordSnapshot: ({ conversationId, cursor, currentTurnId }) =>
-      append((seq) => ({
-        seq,
-        atMs: nowInstant().epochMilliseconds,
-        conversationId,
-        lane: "durable",
-        source: "snapshot",
-        cursor,
-        currentTurnId,
-      })),
-    recordSignal: ({ conversationId, cursor }) =>
-      append((seq) => ({
-        seq,
-        atMs: nowInstant().epochMilliseconds,
-        conversationId,
-        lane: "signal",
-        cursor,
-      })),
-    clear: () => set({ records: [], dropped: 0 }),
-  };
+export const useLangyDevLog = defineSlice<LangyDevLogState>({
+  name: "langy:dev-log",
+  create: (set, get) => {
+    const append = (make: (seq: number) => LangyDevLogRecord): void => {
+      if (!get().recording) return;
+      set((state) => {
+        const seq = state.nextSeq;
+        const appended = [...state.records, make(seq)];
+        const overflow = Math.max(0, appended.length - DEV_LOG_CAPACITY);
+        return {
+          records: overflow > 0 ? appended.slice(overflow) : appended,
+          dropped: state.dropped + overflow,
+          nextSeq: seq + 1,
+        };
+      });
+    };
+    /**
+     * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's own
+     * attribution when it has one, otherwise the store's active conversation.
+     */
+    const attributed = (explicit?: string | null): string | null =>
+      explicit ?? useLangyStore.getState().activeConversationId;
+    return {
+      recording: false,
+      records: [],
+      dropped: 0,
+      nextSeq: 1,
+      scrubSeq: null,
+      setScrub: (scrubSeq) => set({ scrubSeq }),
+      // Disarming also snaps back to live: a closed drawer must never leave the
+      // panel frozen in the past.
+      setRecording: (recording) => set(recording ? { recording } : { recording, scrubSeq: null }),
+      record: (entry, turnId) =>
+        append((seq) => ({
+          seq,
+          atMs: nowInstant().epochMilliseconds,
+          conversationId: attributed(),
+          lane: "stream",
+          turnId,
+          entry,
+        })),
+      recordOutbound: (kind, label, detail) =>
+        append((seq) => ({
+          seq,
+          atMs: nowInstant().epochMilliseconds,
+          // The send/stop callers put the conversation in the detail payload;
+          // read it from there so the tag survives even when the store has not
+          // adopted the conversation yet (a stop raced against a fresh send).
+          conversationId: attributed(
+            typeof (detail as { conversationId?: unknown } | null)?.conversationId === "string"
+              ? (detail as { conversationId: string }).conversationId
+              : undefined,
+          ),
+          lane: "outbound",
+          kind,
+          label,
+          detail,
+        })),
+      recordDurableEvent: (event) =>
+        append((seq) => ({
+          seq,
+          atMs: nowInstant().epochMilliseconds,
+          // Every wire event names its conversation — the fold's identity.
+          conversationId: attributed(event.data.conversationId),
+          lane: "durable",
+          source: "tail",
+          event,
+        })),
+      recordSnapshot: ({ conversationId, cursor, currentTurnId }) =>
+        append((seq) => ({
+          seq,
+          atMs: nowInstant().epochMilliseconds,
+          conversationId,
+          lane: "durable",
+          source: "snapshot",
+          cursor,
+          currentTurnId,
+        })),
+      recordSignal: ({ conversationId, cursor }) =>
+        append((seq) => ({
+          seq,
+          atMs: nowInstant().epochMilliseconds,
+          conversationId,
+          lane: "signal",
+          cursor,
+        })),
+      clear: () => set({ records: [], dropped: 0 }),
+    };
+  },
 });
 
 /**

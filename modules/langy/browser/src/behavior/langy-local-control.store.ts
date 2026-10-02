@@ -2,7 +2,7 @@
  * The live half of local control (ADR-129): wait cards and folder state as the OPEN stream
  * reports them, before the durable tail lands and `langyLocalWaits` merges the two.
  */
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import { type LangyLiveWait, mergeLangyWaitStatus } from "../model/langy-local-waits.ts";
 
@@ -68,71 +68,74 @@ function isForeign(
   return !!conversationId && state.conversationId !== conversationId;
 }
 
-export const useLangyLocalControlStore = create<LangyLocalControlState>((set, get) => ({
-  conversationId: null,
-  waits: {},
-  workspace: null,
-  workspaceConnected: null,
-  workspaceRevision: 0,
+export const useLangyLocalControlStore = defineSlice<LangyLocalControlState>({
+  name: "langy:local-control",
+  create: (set, get) => ({
+    conversationId: null,
+    waits: {},
+    workspace: null,
+    workspaceConnected: null,
+    workspaceRevision: 0,
 
-  recordWait: ({ conversationId, wait }) => {
-    const state = get();
-    if (isForeign(state, conversationId)) return;
-    // The live stream is replayed from its start on every attach, so the
-    // `pending` entry that raised a card arrives again after the card was
-    // answered. A card only ever moves forward.
-    const known = state.waits[wait.waitId];
-    const status = mergeLangyWaitStatus({
-      durable: known?.status,
-      live: wait.status,
-    });
-    set({ waits: { ...state.waits, [wait.waitId]: { ...wait, status } } });
-  },
+    recordWait: ({ conversationId, wait }) => {
+      const state = get();
+      if (isForeign(state, conversationId)) return;
+      // The live stream is replayed from its start on every attach, so the
+      // `pending` entry that raised a card arrives again after the card was
+      // answered. A card only ever moves forward.
+      const known = state.waits[wait.waitId];
+      const status = mergeLangyWaitStatus({
+        durable: known?.status,
+        live: wait.status,
+      });
+      set({ waits: { ...state.waits, [wait.waitId]: { ...wait, status } } });
+    },
 
-  recordWorkspace: ({ conversationId, workspace }) => {
-    const state = get();
-    if (isForeign(state, conversationId)) return;
-    set({
-      workspace,
-      workspaceRevision: state.workspaceRevision + 1,
-    });
-  },
+    recordWorkspace: ({ conversationId, workspace }) => {
+      const state = get();
+      if (isForeign(state, conversationId)) return;
+      set({
+        workspace,
+        workspaceRevision: state.workspaceRevision + 1,
+      });
+    },
 
-  recordWorkspaceState: ({ conversationId, connected }) => {
-    const state = get();
-    if (isForeign(state, conversationId)) return;
-    if (state.workspaceConnected === connected) return;
-    // The first read is not a change, it is the starting point: the queries
-    // watching the revision are fetching their own first answer anyway.
-    const first = state.workspaceConnected === null;
-    set({
-      workspaceConnected: connected,
-      workspaceRevision: first ? state.workspaceRevision : state.workspaceRevision + 1,
-    });
-  },
+    recordWorkspaceState: ({ conversationId, connected }) => {
+      const state = get();
+      if (isForeign(state, conversationId)) return;
+      if (state.workspaceConnected === connected) return;
+      // The first read is not a change, it is the starting point: the queries
+      // watching the revision are fetching their own first answer anyway.
+      const first = state.workspaceConnected === null;
+      set({
+        workspaceConnected: connected,
+        workspaceRevision: first ? state.workspaceRevision : state.workspaceRevision + 1,
+      });
+    },
 
-  settleWait: ({ waitId, kind = "permission", status, decision, source }) => {
-    const state = get();
-    const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
-    set({
-      waits: {
-        ...state.waits,
-        [waitId]: {
-          ...wait,
-          status,
-          ...(decision === undefined ? {} : { decision }),
-          ...(source === undefined ? {} : { source }),
+    settleWait: ({ waitId, kind = "permission", status, decision, source }) => {
+      const state = get();
+      const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
+      set({
+        waits: {
+          ...state.waits,
+          [waitId]: {
+            ...wait,
+            status,
+            ...(decision === undefined ? {} : { decision }),
+            ...(source === undefined ? {} : { source }),
+          },
         },
-      },
-    });
-  },
+      });
+    },
 
-  reset: (conversationId) =>
-    set({
-      conversationId,
-      waits: {},
-      workspace: null,
-      workspaceConnected: null,
-      workspaceRevision: 0,
-    }),
-}));
+    reset: (conversationId) =>
+      set({
+        conversationId,
+        waits: {},
+        workspace: null,
+        workspaceConnected: null,
+        workspaceRevision: 0,
+      }),
+  }),
+});

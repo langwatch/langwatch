@@ -66,9 +66,9 @@ import {
 } from "../../../guided-onboarding/model/guided-conversation.ts";
 import { guidedKickoffPartOf } from "../../../guided-onboarding/model/kickoff.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
-import { LangyGuidedPrCard } from "../elements/github/langy-guided-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
+import { LangyGuidedPrCard } from "./github/langy-guided-pr-card.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
 import { type LangyProposal, ProposalCard } from "./langy-proposal-card.tsx";
