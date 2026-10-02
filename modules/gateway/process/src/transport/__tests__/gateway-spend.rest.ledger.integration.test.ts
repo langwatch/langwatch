@@ -11,7 +11,7 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayEndUserCapsAdapter } from "../../app/gateway-composition.build.ts";
 import {
@@ -120,7 +120,7 @@ function buildApp(): void {
   repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
   budgets = new GatewayBudgetClickHouseRepository(async () => client);
   const scope = GatewaySpendScopeService.create({
-    projects: new TraceDestinationProjectService(prisma),
+    projects: createTraceDestinationProjects(prisma),
     virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
   });
   const refuse = () => {

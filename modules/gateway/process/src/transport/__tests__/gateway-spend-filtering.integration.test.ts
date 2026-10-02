@@ -9,7 +9,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
@@ -144,7 +144,7 @@ describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
     scope = GatewaySpendScopeService.create({
-      projects: new TraceDestinationProjectService(prisma),
+      projects: createTraceDestinationProjects(prisma),
       virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
     });
 

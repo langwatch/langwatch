@@ -1,6 +1,7 @@
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Real Postgres: what create stores, what update means, a past date, what's published after.
  * @vitest-environment node
@@ -12,17 +13,22 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
-import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "./support/trace-destination-project-service.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 /** A trace destination lookup that answers no archived projects, for keys created without one. */
-class NoTraceDestinationsProjectService extends TestProjectApi {
-  listTraceDestinations(): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return Promise.resolve([]);
-  }
+function createNoTraceDestinationsProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      listTraceDestinations(): ReturnType<ProjectApi["listTraceDestinations"]> {
+        return Promise.resolve([]);
+      },
+      listIdsByOrganization: async () => [],
+    },
+    "NoTraceDestinationsProjectService",
+  );
 }
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -47,10 +53,7 @@ function codeOf(error: unknown): string | null {
 }
 
 describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
-  const service = createVirtualKeyServiceForTest(
-    prisma,
-    new TraceDestinationProjectService(prisma),
-  );
+  const service = createVirtualKeyServiceForTest(prisma, createTraceDestinationProjects(prisma));
 
   beforeAll(async () => {
     await prisma.organization.create({
@@ -124,7 +127,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
       const dto = virtualKeyDtos.toVirtualKeySnakeDto({
         virtualKey: await service.findById(vk.id, ORG_ID).then((k) => k!),
         facts: await virtualKeyDtos.loadTraceDestinationFacts({
-          projects: new NoTraceDestinationsProjectService(),
+          projects: createNoTraceDestinationsProjects(),
           virtualKeys: [vk],
         }),
       });

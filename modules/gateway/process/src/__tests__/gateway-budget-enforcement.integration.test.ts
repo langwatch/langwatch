@@ -3,6 +3,7 @@
 import { NANO_USD_PER_USD } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Real Postgres + real ClickHouse. Regression for #6141.
  * @see specs/ai-gateway/budgets.feature
@@ -20,7 +21,6 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -46,37 +46,42 @@ const COST_PER_REQUEST = 0.001;
  * organization's spend can land in, and where each key's traces go. Both are
  * answered from the rows this suite writes.
  */
-class SuiteProjectService extends TestProjectApi {
-  override async listNamesByIds(
-    input: Parameters<ProjectApi["listNamesByIds"]>[0],
-  ): ReturnType<ProjectApi["listNamesByIds"]> {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: input.projectIds } },
-      include: { team: { select: { organizationId: true } } },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      teamId: row.teamId,
-      organizationId: row.team.organizationId,
-      isPersonal: false,
-      ownerUserId: null,
-    }));
-  }
+function createSuiteProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      async listNamesByIds(
+        input: Parameters<ProjectApi["listNamesByIds"]>[0],
+      ): ReturnType<ProjectApi["listNamesByIds"]> {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: input.projectIds } },
+          include: { team: { select: { organizationId: true } } },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+        }));
+      },
 
-  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return [PROJECT_ID, IDLE_PROJECT_ID];
-  }
+      async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        return [PROJECT_ID, IDLE_PROJECT_ID];
+      },
 
-  override async listTraceDestinations(
-    projectIds: string[],
-  ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+      async listTraceDestinations(
+        projectIds: string[],
+      ): ReturnType<ProjectApi["listTraceDestinations"]> {
+        return prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, teamId: true, archivedAt: true },
+        });
+      },
+    },
+    "SuiteProjectService",
+  );
 }
 
 let chRepo: GatewayBudgetClickHouseRepository;
@@ -193,7 +198,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
       service = PrismaGatewayAdapter.create({
         database: prisma,
         organizations: organizationApiOver(prisma),
-        projects: new SuiteProjectService(),
+        projects: createSuiteProjects(),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,
@@ -293,7 +298,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
         const withoutLedger = PrismaGatewayAdapter.create({
           database: prisma,
           organizations: organizationApiOver(prisma),
-          projects: new SuiteProjectService(),
+          projects: createSuiteProjects(),
           evaluators: {} as never,
           monitors: {} as never,
           changes: {} as never,

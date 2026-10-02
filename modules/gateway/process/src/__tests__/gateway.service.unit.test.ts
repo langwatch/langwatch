@@ -2,6 +2,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -15,7 +16,6 @@ import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.re
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 class FakeBudgetRepository extends GatewayBudgetRepository {
   input: GatewayBudgetCheckReadInput | null = null;
@@ -158,7 +158,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
   repository: FakeBudgetRepository;
 } {
   const repository = new FakeBudgetRepository(result);
-  const projects = new TestProjectApi();
+  const projects = createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] });
   return {
     service: GatewayService.create({
       repository,
@@ -185,7 +185,7 @@ function serviceOverCatalogues({
   cacheRules: unknown[];
   guardrails: { id: string }[];
 }): GatewayService {
-  const projects = new TestProjectApi();
+  const projects = createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] });
   const cacheRuleRepository = new EmptyCacheRuleRepository();
   const guardrailRepository = new EmptyGuardrailRepository();
   cacheRuleRepository.findEnabledForOrganization = (async () => cacheRules) as never;

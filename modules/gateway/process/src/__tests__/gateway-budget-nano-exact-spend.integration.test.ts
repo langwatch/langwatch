@@ -32,6 +32,7 @@ function toBudgetRow<
 import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -45,7 +46,6 @@ import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/cl
 import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -74,28 +74,33 @@ const ROUNDED_FIRST_NANO = 75_000;
 const LOOSE_LIMIT_USD = "5";
 
 /** The org's one project: the tenant every debit here lands in. */
-class SuiteProjectService extends TestProjectApi {
-  override async listNamesByIds(
-    input: Parameters<ProjectApi["listNamesByIds"]>[0],
-  ): ReturnType<ProjectApi["listNamesByIds"]> {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: input.projectIds } },
-      include: { team: { select: { organizationId: true } } },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      teamId: row.teamId,
-      organizationId: row.team.organizationId,
-      isPersonal: false,
-      ownerUserId: null,
-    }));
-  }
+function createSuiteProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      async listNamesByIds(
+        input: Parameters<ProjectApi["listNamesByIds"]>[0],
+      ): ReturnType<ProjectApi["listNamesByIds"]> {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: input.projectIds } },
+          include: { team: { select: { organizationId: true } } },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+        }));
+      },
 
-  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return [PROJECT_ID];
-  }
+      async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        return [PROJECT_ID];
+      },
+    },
+    "SuiteProjectService",
+  );
 }
 
 let service: GatewayService;
@@ -262,7 +267,7 @@ describe.skipIf(!databaseUrl || !chUrl)("nano-exact budget totals (real PG + rea
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

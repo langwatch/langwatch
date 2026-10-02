@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "./support/trace-destination-project-service.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
@@ -63,7 +63,7 @@ const GOVARCH_DELETED_APP_ID = `proj-vktp-govarch-app-${suffix}`;
 const USER_ID = `usr-vktp-${suffix}`;
 
 describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (real PG)", () => {
-  const projects = new TraceDestinationProjectService(prisma);
+  const projects = createTraceDestinationProjects(prisma);
   const service = createVirtualKeyServiceForTest(prisma, projects);
 
   beforeAll(async () => {

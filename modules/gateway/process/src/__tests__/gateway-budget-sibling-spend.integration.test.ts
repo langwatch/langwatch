@@ -31,6 +31,7 @@ function toBudgetRow<
 import { budgetAppliesToProvider, NANO_USD_PER_USD } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -43,7 +44,6 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -67,7 +67,7 @@ const USER_ID = `usr-sib-${suffix}`;
  * onto the contract fake rather than subclassed, because the fake's stand-in
  * for this method is typed by its own empty answer.
  */
-const projects: ProjectApi = Object.assign(new TestProjectApi(), {
+const projects: ProjectApi = createApiFixture<ProjectApi>({
   listIdsByOrganization: () => Promise.resolve([PROJECT_ID]),
 });
 

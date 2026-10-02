@@ -12,7 +12,7 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "./support/trace-destination-project-service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -107,7 +107,7 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
-      projects: new TraceDestinationProjectService(prisma),
+      projects: createTraceDestinationProjects(prisma),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

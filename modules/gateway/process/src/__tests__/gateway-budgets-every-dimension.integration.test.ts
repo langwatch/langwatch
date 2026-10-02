@@ -56,7 +56,6 @@ import { GatewayConfigMaterialiserService } from "../services/gateway-config-mat
 import type { GatewayService } from "../services/gateway.service.ts";
 import type { VirtualKeyService } from "../services/virtual-key.service.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
@@ -87,62 +86,68 @@ const prisma = connection?.client as PrismaClient;
  * landing, scope reachability, spend tenants), all answered from rows the
  * suite itself writes.
  */
-class SuiteProjectService extends TestProjectApi {
-  override async listNamesByIds(
-    input: Parameters<ProjectApi["listNamesByIds"]>[0],
-  ): ReturnType<ProjectApi["listNamesByIds"]> {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: input.projectIds } },
-      include: { team: { select: { organizationId: true } } },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      teamId: row.teamId,
-      organizationId: row.team.organizationId,
-      isPersonal: false,
-      ownerUserId: null,
-    }));
-  }
+function createSuiteProjects(): ProjectApi {
+  const projects = createApiFixture<ProjectApi>(
+    {
+      async listNamesByIds(
+        input: Parameters<ProjectApi["listNamesByIds"]>[0],
+      ): ReturnType<ProjectApi["listNamesByIds"]> {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: input.projectIds } },
+          include: { team: { select: { organizationId: true } } },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+        }));
+      },
 
-  override async findTraceDestination(
-    projectId: string,
-  ): ReturnType<ProjectApi["findTraceDestination"]> {
-    return prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+      async findTraceDestination(
+        projectId: string,
+      ): ReturnType<ProjectApi["findTraceDestination"]> {
+        return prisma.project.findUnique({
+          where: { id: projectId },
+          select: { id: true, teamId: true, archivedAt: true },
+        });
+      },
 
-  override async listTraceDestinations(
-    projectIds: string[],
-  ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+      async listTraceDestinations(
+        projectIds: string[],
+      ): ReturnType<ProjectApi["listTraceDestinations"]> {
+        return prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, teamId: true, archivedAt: true },
+        });
+      },
 
-  /** The spend tenants a bundle reads its budgets' current spend across. */
-  override async listIdsByOrganization(
-    input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
-  ): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    const projects = await prisma.project.findMany({
-      where: { team: { organizationId: input.organizationId } },
-      select: { id: true },
-    });
-    return projects.map((project) => project.id);
-  }
+      /** The spend tenants a bundle reads its budgets' current spend across. */
+      async listIdsByOrganization(
+        input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+      ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        const projects = await prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        return projects.map((project) => project.id);
+      },
 
-  override async resolveTraceDestination(
-    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
-  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
-    const projectId = input.traceProjectId ?? input.projectScopeIds[0];
-    if (!projectId) return { outcome: "no_destination" };
-    const project = await this.findTraceDestination(projectId);
-    return project ? { outcome: "resolved", project } : { outcome: "unknown" };
-  }
+      async resolveTraceDestination(
+        input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+      ): ReturnType<ProjectApi["resolveTraceDestination"]> {
+        const projectId = input.traceProjectId ?? input.projectScopeIds[0];
+        if (!projectId) return { outcome: "no_destination" };
+        const project = await projects.findTraceDestination(projectId);
+        return project ? { outcome: "resolved", project } : { outcome: "unknown" };
+      },
+    },
+    "SuiteProjectService",
+  );
+  return projects;
 }
 
 const suffix = nanoid(8);
@@ -181,16 +186,16 @@ const materialiser = (spend: GatewayBudgetClickHouseRepository | null) =>
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
     }),
-    projects: new SuiteProjectService(),
+    projects: createSuiteProjects(),
     chRepo: spend,
     budgetDecisions: gateway,
     modelProviders: seededCustomKeys(prisma),
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
     }),
   });
 
@@ -222,7 +227,7 @@ async function seedProviders() {
 describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + real CH)", () => {
   beforeAll(async () => {
     chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
-    const projects = new SuiteProjectService();
+    const projects = createSuiteProjects();
     const composition = {
       database: prisma,
       organizations: organizationApiOver(prisma),

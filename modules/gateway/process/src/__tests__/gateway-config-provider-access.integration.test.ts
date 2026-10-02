@@ -25,7 +25,6 @@ import { GatewayScopeResolutionService } from "../services/gateway-scope-resolut
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const noPlatformProviders = createApiFixture<ModelProviderApi>({
   platformProviderChain: () => Promise.resolve([]),
@@ -36,51 +35,58 @@ const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) 
 const prisma = connection?.client as PrismaClient;
 
 /** The destination reads the materialiser makes, answered from seeded rows. */
-class SuiteProjectService extends TestProjectApi {
-  override async listNamesByIds(
-    input: Parameters<ProjectApi["listNamesByIds"]>[0],
-  ): ReturnType<ProjectApi["listNamesByIds"]> {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: input.projectIds } },
-      include: { team: { select: { organizationId: true } } },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      teamId: row.teamId,
-      organizationId: row.team.organizationId,
-      isPersonal: false,
-      ownerUserId: null,
-    }));
-  }
+function createSuiteProjects(): ProjectApi {
+  const projects = createApiFixture<ProjectApi>(
+    {
+      async listNamesByIds(
+        input: Parameters<ProjectApi["listNamesByIds"]>[0],
+      ): ReturnType<ProjectApi["listNamesByIds"]> {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: input.projectIds } },
+          include: { team: { select: { organizationId: true } } },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+        }));
+      },
 
-  override async findTraceDestination(
-    projectId: string,
-  ): ReturnType<ProjectApi["findTraceDestination"]> {
-    return prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+      async findTraceDestination(
+        projectId: string,
+      ): ReturnType<ProjectApi["findTraceDestination"]> {
+        return prisma.project.findUnique({
+          where: { id: projectId },
+          select: { id: true, teamId: true, archivedAt: true },
+        });
+      },
 
-  override async listTraceDestinations(
-    projectIds: string[],
-  ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+      async listTraceDestinations(
+        projectIds: string[],
+      ): ReturnType<ProjectApi["listTraceDestinations"]> {
+        return prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, teamId: true, archivedAt: true },
+        });
+      },
 
-  override async resolveTraceDestination(
-    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
-  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
-    const projectId = input.traceProjectId ?? input.projectScopeIds[0];
-    if (!projectId) return { outcome: "no_destination" };
-    const project = await this.findTraceDestination(projectId);
-    return project ? { outcome: "resolved", project } : { outcome: "unknown" };
-  }
+      async resolveTraceDestination(
+        input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+      ): ReturnType<ProjectApi["resolveTraceDestination"]> {
+        const projectId = input.traceProjectId ?? input.projectScopeIds[0];
+        if (!projectId) return { outcome: "no_destination" };
+        const project = await projects.findTraceDestination(projectId);
+        return project ? { outcome: "resolved", project } : { outcome: "unknown" };
+      },
+      listIdsByOrganization: async () => [],
+    },
+    "SuiteProjectService",
+  );
+  return projects;
 }
 
 const suffix = nanoid(8);
@@ -121,16 +127,16 @@ const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
     }),
-    projects: new SuiteProjectService(),
+    projects: createSuiteProjects(),
     chRepo,
     budgetDecisions: gateway,
     modelProviders: seededCustomKeys(prisma),
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
     }),
   });
 
@@ -171,7 +177,7 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
     gateway = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

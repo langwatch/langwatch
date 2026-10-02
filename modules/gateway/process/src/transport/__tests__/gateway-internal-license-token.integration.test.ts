@@ -10,7 +10,7 @@ import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
+import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
@@ -92,7 +92,7 @@ async function licensedKey({
 
 describe.skipIf(!databaseUrl)("a license token on resolve-key (real PG + internal route)", () => {
   beforeAll(async () => {
-    const projects = new TraceDestinationProjectService(prisma);
+    const projects = createTraceDestinationProjects(prisma);
     service = PostgresVirtualKeyAdapter.createVirtualKeyServiceForTest(prisma, projects);
     app = mountGatewayInternalRest({
       virtualKeys: service,

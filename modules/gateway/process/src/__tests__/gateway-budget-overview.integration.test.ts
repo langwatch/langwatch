@@ -40,7 +40,6 @@ import {
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 import { TestOrganizationService } from "./support/test-organization-service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -48,35 +47,40 @@ const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) 
 const prisma = connection?.client as PrismaClient;
 
 /** The organization's projects, and the labels the scope targets carry. */
-class SuiteProjectService extends TestProjectApi {
-  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return TENANTS;
-  }
-
-  override async listNamesByIds({
-    projectIds,
-  }: {
-    projectIds: string[];
-  }): ReturnType<ProjectApi["listNamesByIds"]> {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        teamId: true,
-        isPersonal: true,
-        ownerUserId: true,
-        team: { select: { organizationId: true } },
+function createSuiteProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        return TENANTS;
       },
-    });
 
-    // A project carries its organization through its team, not on its own row.
-    return rows.map(({ team, ...project }) => ({
-      ...project,
-      organizationId: team.organizationId,
-    }));
-  }
+      async listNamesByIds({
+        projectIds,
+      }: {
+        projectIds: string[];
+      }): ReturnType<ProjectApi["listNamesByIds"]> {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            teamId: true,
+            isPersonal: true,
+            ownerUserId: true,
+            team: { select: { organizationId: true } },
+          },
+        });
+
+        // A project carries its organization through its team, not on its own row.
+        return rows.map(({ team, ...project }) => ({
+          ...project,
+          organizationId: team.organizationId,
+        }));
+      },
+    },
+    "SuiteProjectService",
+  );
 }
 
 /** Membership and the personal workspace: the two reads the overview makes. */
@@ -145,7 +149,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
     budgetDecisions = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
-      projects: new SuiteProjectService(),
+      projects: createSuiteProjects(),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

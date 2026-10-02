@@ -197,7 +197,6 @@ export {
   type LegacyVirtualKeyConfig,
   type VirtualKeyConfigBackfillOutcome,
 } from "./tasks/virtual-key-config-backfill.task.ts";
-export { PrismaGatewayVirtualKeyConfigBackfillRepository } from "./repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts";
 export type {
   VirtualKeyRow,
   VirtualKeyScopeRow,
@@ -211,7 +210,6 @@ export {
   type TraceDestinationReport,
   type TraceDestinationResolution,
 } from "./tasks/trace-destination-report.task.ts";
-export { PrismaGatewayTraceDestinationReportRepository } from "./repositories/prisma/prisma.gateway-trace-destination-report.repository.ts";
 export type {
   TraceDestinationKeyRow,
   TraceDestinationProjectRow,

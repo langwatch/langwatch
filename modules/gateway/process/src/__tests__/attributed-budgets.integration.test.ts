@@ -6,6 +6,8 @@ import {
   type GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * Real Postgres + real ClickHouse; "reset" moves the window, it does not wipe the counter.
@@ -25,7 +27,6 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
  * A month cycle phased to the 17th at 09:00 UTC: far enough in the past
@@ -150,7 +151,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
-      projects: new TestProjectApi(),
+      projects: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,
