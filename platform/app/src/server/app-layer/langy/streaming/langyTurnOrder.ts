@@ -20,6 +20,7 @@
  * Everything else on the stream — status, progress, reasoning, plan, navigate,
  * ui — is live-only signal and holds no place in the record.
  */
+import type { LangyFinalToolCall } from "../langy-final-parts";
 import type { LangyStreamEntry } from "./langyTokenBuffer";
 
 /** One thing the turn did, in the order it did it. */
@@ -59,6 +60,72 @@ export function turnOrderFromStream(
   return order;
 }
 
+/**
+ * Everything a turn put on its stream that the record keeps: its ordered
+ * account, the calls that returned, and the paragraph it ended on.
+ *
+ * A turn that finished hands the record its calls and reply itself. A turn
+ * that failed hands over nothing, so this is the only account of the plan it
+ * wrote and the calls it ran before the failure.
+ */
+export interface LangyTurnAccount {
+  order: LangyTurnSegment[];
+  toolCalls: LangyFinalToolCall[];
+  /** The paragraph the turn ended on, or "" when it ended on a call. */
+  closingText: string;
+}
+
+/**
+ * Fold a turn's stream entries into its account. A call is kept once it
+ * returned: its `start` carries the name and input, its `end` the result. A
+ * call still running when the turn ended has no result to show and is left
+ * out.
+ */
+export function turnAccountFromStream(
+  entries: readonly LangyStreamEntry[],
+): LangyTurnAccount {
+  const order = turnOrderFromStream(entries);
+  const calls = new Map<string, ToolCallInProgress>();
+  for (const entry of entries) {
+    if (entry.type !== "tool") continue;
+    calls.set(entry.id, withToolEntry(calls.get(entry.id), entry));
+  }
+  const toolCalls = [...calls.values()]
+    .filter((call) => call.returned)
+    .map(({ returned: _returned, ...call }) => call);
+  const last = order.at(-1);
+  return {
+    order,
+    toolCalls,
+    closingText: last?.kind === "text" ? last.text : "",
+  };
+}
+
+type ToolStreamEntry = Extract<LangyStreamEntry, { type: "tool" }>;
+type ToolCallInProgress = LangyFinalToolCall & { returned: boolean };
+
+/** A call, with one more of its stream entries applied. */
+function withToolEntry(
+  call: ToolCallInProgress | undefined,
+  entry: ToolStreamEntry,
+): ToolCallInProgress {
+  const next: ToolCallInProgress = call
+    ? { ...call }
+    : { id: entry.id, name: entry.name, returned: false };
+  if (entry.name) next.name = entry.name;
+  if (entry.input !== undefined) next.input = entry.input;
+  if (entry.local === true) next.local = true;
+  if (entry.phase !== "end") return next;
+  return {
+    ...next,
+    returned: true,
+    ...(entry.output !== undefined ? { output: entry.output } : {}),
+    ...(entry.isError !== undefined ? { isError: entry.isError } : {}),
+    ...(entry.digest !== undefined ? { digest: entry.digest } : {}),
+    ...(entry.result !== undefined ? { result: entry.result } : {}),
+  };
+}
+
 /** The live edge, as the order read needs it: the whole turn, from the start. */
 export interface LangyTurnStreamTail {
   readTail(a: { conversationId: string; turnId: string }): Promise<{
@@ -77,6 +144,11 @@ export interface LangyTurnOrderReader {
     conversationId: string;
     turnId: string;
   }): Promise<LangyTurnSegment[]>;
+  /** The whole account, for a turn that failed before handing one over. */
+  readTurnAccount?(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnAccount>;
 }
 
 export function createLangyTurnOrderReader(
@@ -86,6 +158,10 @@ export function createLangyTurnOrderReader(
     async readTurnOrder(at) {
       const { reads } = await buffer.readTail(at);
       return turnOrderFromStream(reads.map(({ entry }) => entry));
+    },
+    async readTurnAccount(at) {
+      const { reads } = await buffer.readTail(at);
+      return turnAccountFromStream(reads.map(({ entry }) => entry));
     },
   };
 }

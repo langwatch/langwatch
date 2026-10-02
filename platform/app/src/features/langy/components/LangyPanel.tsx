@@ -1274,7 +1274,7 @@ function LangyPanel({
     stop,
     status,
     error,
-    regenerate,
+    retryTurn: retryEngineTurn,
     resumeStream,
     applyHistoryToEngine,
     resetEngine,
@@ -2311,14 +2311,14 @@ function LangyPanel({
   // RE-DRIVE the turn; never RE-POST the message. The user's message was
   // persisted server-side before the turn ran, so the old `send(lastUserText)`
   // retry appended a SECOND copy of the same question — visibly in the
-  // transcript, and durably as a second `message_sent` event. `regenerate`
-  // truncates the dead assistant message, leaves the user's message where it is,
-  // and POSTs with `trigger: "regenerate-message"`, which the chat route reads
-  // to skip `recordUserMessage`.
+  // transcript, and durably as a second `message_sent` event. The engine's
+  // retry leaves the user's message where it is, keeps the failed reply on
+  // screen, and POSTs with `trigger: "regenerate-message"`, which the chat
+  // route reads to skip `recordUserMessage`.
   const retryTurn = useCallback(() => {
     if (messages.length === 0) return;
-    void regenerate();
-  }, [regenerate, messages.length]);
+    retryEngineTurn();
+  }, [retryEngineTurn, messages.length]);
 
   // The history card's own retry. Deliberately NOT `onErrorAction`: that one
   // re-drives the last TURN, and nothing about a failed history read means a
