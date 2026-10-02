@@ -112,6 +112,7 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
+import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
@@ -133,7 +134,6 @@ import { LangyLocalControlTerminalService } from "../services/langy-local-contro
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
-import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
 import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
 import { LangyNavigateResourceLocatorService } from "../services/langy-navigate-resource-locator.service.ts";
@@ -550,13 +550,13 @@ export class LangyModule implements LangyApiContract {
   maintenanceEventingPipeline(
     deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
   ): StaticPipelineDefinition<never> {
-    return LangyMaintenanceService.create({
+    return buildLangyMaintenancePipeline({
       sessionKeyReap: {
         reap: () => this.dependencies.sessionKeyReap.reap(),
         deleteDispatchedBefore: deps.deleteDispatchedBefore,
       },
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
-    }).buildProcessing();
+    });
   }
 
   get internalDoor(): RestIdentity {

@@ -33,9 +33,9 @@ describe("the Langy internal control plane", () => {
     /** @scenario "Every route answers behind the deployment's own bearer" */
     it("puts every route behind the shared secret and asks no permission of it", () => {
       expect(routes.map((route) => [route.credential, route.access?.kind])).toEqual([
-        ["internalSecret", "authenticated"],
-        ["internalSecret", "authenticated"],
-        ["internalSecret", "authenticated"],
+        ["internal_secret", "authenticated"],
+        ["internal_secret", "authenticated"],
+        ["internal_secret", "authenticated"],
       ]);
     });
 

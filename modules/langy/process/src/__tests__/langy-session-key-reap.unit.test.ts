@@ -6,7 +6,7 @@ import {
 } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
+import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import { LANGY_SESSION_KEYS_METRIC_NAME } from "../services/langy-session-key-metrics-otel.service.ts";
 
 const wakeContext = (at: number) => ({
@@ -90,13 +90,13 @@ describe("langySessionKeyReap process", () => {
   describe("given the pipeline is built", () => {
     describe("when its shape is inspected", () => {
       it("registers the reap as a scheduled process and appends no events", () => {
-        const pipeline = LangyMaintenanceService.create({
+        const pipeline = buildLangyMaintenancePipeline({
           sessionKeyReap: {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
           virtualKeyProvisioning: { provisionCreated: async () => undefined },
-        }).buildProcessing();
+        });
 
         const pm = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
         expect(pm).toBeDefined();
@@ -118,13 +118,13 @@ describe("the Langy maintenance pipeline's frozen twin", () => {
     describe("when either graph registers it", () => {
       /** @scenario "The session-key sweep keeps one set of routing keys across both graphs" */
       it("names the pipeline the twin names", () => {
-        const pipeline = LangyMaintenanceService.create({
+        const pipeline = buildLangyMaintenancePipeline({
           sessionKeyReap: {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
           virtualKeyProvisioning: { provisionCreated: async () => undefined },
-        }).buildProcessing();
+        });
 
         expect(pipeline.metadata.name).toBe("langy_maintenance");
       });
