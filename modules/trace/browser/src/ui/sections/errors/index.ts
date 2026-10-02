@@ -6,8 +6,6 @@
 // it themselves, and a consumer that wants the row on its own deep-imports
 // `../../elements/errors/error-actions`.
 export { FormServerError } from "./form-server-error.tsx";
-export type { HandledErrorAlertProps } from "./handled-error-alert.tsx";
-export { HandledErrorAlert } from "./handled-error-alert.tsx";
 export type { HandledErrorStateProps } from "./handled-error-state.tsx";
 export { HandledErrorState } from "./handled-error-state.tsx";
 export {
