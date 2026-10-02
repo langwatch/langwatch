@@ -176,6 +176,24 @@
       },
     },
     {
+      // The route table decides which pages draw a large title; pages never size their own (Alex, 2026-10-02).
+      "files": ["modules/*/browser/src/**", "enterprise/modules/*/browser/src/**", "apps/ui/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/design-system/page-layout",
+                "importNames": ["PageHeadingSizeProvider"],
+                "message": "Mark the route heading: \"account\" in the route table; the shell sizes the title.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       // Customer-configured Slack never uses our own notice templates (Alex, 2026-09-28).
       "files": ["modules/automation/**"],
       "rules": {
