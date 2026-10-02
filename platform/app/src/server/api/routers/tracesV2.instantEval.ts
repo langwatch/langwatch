@@ -17,7 +17,6 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
-import { INSTANT_EVALS_ENABLE_AUDIT_ACTION } from "~/server/api/auditLogExemptions";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import {
@@ -132,6 +131,13 @@ const runIdSchema = z.object({
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 
+/**
+ * The action the switch's audit row is filed under: its own procedure path,
+ * which `auditLogExemptions.ts` also names so the generic middleware stands
+ * down and the row is written once.
+ */
+const INSTANT_EVALS_ENABLE_AUDIT_ACTION = "tracesV2.instantEval.enable";
+
 export const tracesV2InstantEvalRouter = createTRPCRouter({
   /**
    * Whether the project may be offered a judgement, and what the popover
@@ -203,27 +209,31 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
           args: { projectId: input.projectId },
           error,
           req: ctx.req,
-          targetKind: "organization",
-          targetId: organizationId,
+          ...(organizationId
+            ? { targetKind: "organization", targetId: organizationId }
+            : {}),
           metadata: impersonatorId ? { impersonatorId } : undefined,
         });
+      let result: Awaited<ReturnType<typeof switchInstantEvalsOn>>;
       try {
         organizationId = await organizationOfProject({
           prisma: ctx.prisma,
           projectId: input.projectId,
         });
-        const result = await switchInstantEvalsOn({
+        result = await switchInstantEvalsOn({
           prisma: ctx.prisma,
           organizationId,
           userId: ctx.session.user.id,
           user: ctx.session.user,
         });
-        await record();
-        return result;
       } catch (error) {
-        await record(error instanceof Error ? error : undefined);
+        await record(error instanceof Error ? error : new Error(String(error)));
         throw error;
       }
+      // Outside the try, so a failed write of this row is never recorded
+      // as a failed switch: the switch is already on by then.
+      await record();
+      return result;
     }),
 
   estimate: protectedProcedure
