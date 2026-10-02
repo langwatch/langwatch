@@ -217,7 +217,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_scope_violation",
+        code: "api_key_scope_violation",
       });
     });
 
@@ -240,7 +240,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_reserved_name",
+        code: "api_key_reserved_name",
       });
     });
 
@@ -291,7 +291,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "personal_workspace_not_managed_here",
+        code: "personal_workspace_not_managed_here",
       });
     });
   });
@@ -312,7 +312,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_admin_required",
+        code: "api_key_admin_required",
       });
       expect(create).not.toHaveBeenCalled();
       expect(isOrgAdmin).toHaveBeenCalledWith({
@@ -508,7 +508,7 @@ describe("the api-keys REST family", () => {
       });
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_admin_required" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_admin_required" });
       expect(create).not.toHaveBeenCalled();
       expect(isOrgAdminApiKey).toHaveBeenCalledWith({
         apiKeyId: API_KEY_ID,
@@ -598,7 +598,7 @@ describe("the api-keys REST family", () => {
       const response = await send("/api/api-keys", { as: AS_SERVICE });
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_permission_denied" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_permission_denied" });
     });
 
     it("returns the org-wide listing to a credential that does hold it", async () => {
@@ -783,7 +783,7 @@ describe("the api-keys REST family", () => {
       const response = await send("/api/api-keys/api-key-missing");
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_not_found" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_not_found" });
     });
 
     /**
@@ -821,7 +821,7 @@ describe("the api-keys REST family", () => {
         unknown.json(),
       ]);
       expect(unreachableBody).toEqual(unknownBody);
-      expect(unreachableBody).toMatchObject({ error: "api_key_not_found" });
+      expect(unreachableBody).toMatchObject({ code: "api_key_not_found" });
     });
   });
 
@@ -922,7 +922,7 @@ describe("the api-keys REST family", () => {
       });
 
       expect(response.status).toBe(422);
-      await expect(response.json()).resolves.toMatchObject({ error: "validation_error" });
+      await expect(response.json()).resolves.toMatchObject({ code: "validation_error" });
       expect(update).not.toHaveBeenCalled();
     });
 
@@ -947,7 +947,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_scope_violation",
+        code: "api_key_scope_violation",
       });
     });
 
@@ -972,7 +972,7 @@ describe("the api-keys REST family", () => {
       });
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_not_found" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_not_found" });
     });
   });
 
@@ -1031,7 +1031,7 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_already_revoked",
+        code: "api_key_already_revoked",
       });
     });
 
@@ -1052,7 +1052,7 @@ describe("the api-keys REST family", () => {
     });
   });
 
-  describe("POST /api/api-keys/ingestion", () => {
+  describe("when a client posts to /api/api-keys/ingestion", () => {
     const INGESTION_SHAPE = {
       name: "laptop / my-project",
       keyType: "personal",
@@ -1103,8 +1103,22 @@ describe("the api-keys REST family", () => {
       ["an organization binding", { bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }] }],
       ["a second binding", { bindings: [...INGESTION_SHAPE.bindings, ...INGESTION_SHAPE.bindings] }],
       ["an extra permission", { permissions: ["traces:create", "traces:view"] }],
-      ["unrestricted access", { permissionMode: "all", permissions: undefined }],
-      ["an admin role", { bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }] }],
+      [
+        "unrestricted access",
+        {
+          permissionMode: "all",
+          permissions: undefined,
+          bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      ],
+      [
+        "an admin role",
+        {
+          permissionMode: "all",
+          permissions: undefined,
+          bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      ],
     ])("refuses %s", async (_shape, change) => {
       const { send, create } = mountIngestion();
 
@@ -1115,7 +1129,7 @@ describe("the api-keys REST family", () => {
       });
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_scope_violation" });
       expect(create).not.toHaveBeenCalled();
     });
 
@@ -1129,7 +1143,7 @@ describe("the api-keys REST family", () => {
       });
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      await expect(response.json()).resolves.toMatchObject({ code: "api_key_scope_violation" });
       expect(create).not.toHaveBeenCalled();
     });
   });

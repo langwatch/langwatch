@@ -1,24 +1,21 @@
 /**
  * The `/api/api-keys` family on a runtime that stands in for the process: one
- * organization door, the credential fact a mount binds, and the flat legacy
- * envelope this family publishes.
+ * organization door, the credential fact a mount binds, and the canonical
+ * error envelope the host answers with.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
-  HttpError,
-  type RestErrorHandler,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
-import { HandledError } from "@langwatch/handled-error";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import type { RestAuditRow } from "@langwatch/api/hosting";
+import type { RestAuditRow, RestIdentity } from "@langwatch/api/hosting";
 
 export const ORGANIZATION_ID = "organization-1";
 export const CALLER_USER_ID = "user-caller";
@@ -49,21 +46,6 @@ function callerOf(request: Request): string | null | undefined {
   return undefined;
 }
 
-/** The flat `{ error, message }` body this family has always published. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  if (error instanceof HttpError) {
-    return c.json({ error: error.error, message: error.message }, error.status);
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
-
 /** The family over one API-key boundary the test may stub method by method. */
 export function mountApiKeyRest(
   options: { apiKeys?: Partial<TestApiKeyService>; granted?: readonly string[] } = {},
@@ -77,32 +59,36 @@ export function mountApiKeyRest(
   // stopped auditing would fail here rather than go quiet in production.
   const audit: RestAuditRow[] = [];
 
+  // One identity answers both the organization door and the ingestion route's project door.
+  const door: RestIdentity = {
+    authenticate: ({ request, permission }) => {
+      const userId = callerOf(request);
+      if (userId === undefined) throw new UnauthorizedError("Invalid credential");
+      if (!granted.has(permission)) throw new ForbiddenError("Missing permission");
+
+      return {
+        actor: userId ? { type: "user", id: userId } : { type: "api_key", id: API_KEY_ID },
+        scope:
+          permission === "traces:create"
+            ? { tier: "project", id: PROJECT_ID }
+            : { tier: "organization", id: ORGANIZATION_ID },
+      };
+    },
+  };
+
   const runtime = createRestRuntime({
     audit: {
       record: (row) => {
         audit.push(row);
       },
     },
-    identity: {
-      authenticate: ({ request, permission }) => {
-        const userId = callerOf(request);
-        if (userId === undefined) throw new UnauthorizedError("Invalid credential");
-        if (!granted.has(permission)) throw new ForbiddenError("Missing permission");
-
-        return {
-          actor: userId ? { type: "user", id: userId } : { type: "api_key", id: API_KEY_ID },
-          scope:
-            permission === "traces:create"
-              ? { tier: "project", id: PROJECT_ID }
-              : { tier: "organization", id: ORGANIZATION_ID },
-        };
-      },
-    },
+    identity: door,
+    doors: { project: door },
   });
 
   const hono = runtime.mount(apiKeyRest.router(), {
     app: () => apiKeys,
-    onError: renderRefusal,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(apiKeyRestCredential, (c) => ({
         apiKeyId: API_KEY_ID,
