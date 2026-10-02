@@ -8,9 +8,12 @@ import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
+import { reportModelFailure } from "./ui/sections/model-failure-interceptor/index.ts";
 
 export const modelProviderWeb = defineBrowserModule("model-provider")
   .withApi(modelProviderApi, { contracts: [modelProviderTrpc] })
+  // specs/model-providers/missing-model-popup.feature
+  .withFailureInterceptors([reportModelFailure])
   .withHosts({
     requires: ["ModelProviderHostApi"],
     mounts: {
