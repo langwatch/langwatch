@@ -59,36 +59,7 @@ export {
   type UiDrawerPropsOf,
   type UiFlowCallbacksStore,
 } from "./model/drawer-map.ts";
-export type {
-  UiAgentEditorDrawerProps,
-  UiAgentListArchiveOptions,
-  UiAgentListDrawerProps,
-  UiAgentTypeSelectorDrawerProps,
-  UiAgentWorkflowEditorDrawerProps,
-  UiAgentWorkflowMappingProps,
-  UiNewAgentType,
-  UiWorkflowAgentEditorOptions,
-  UiWorkflowSelectorDrawerProps,
-} from "./model/agent-drawers.ts";
-export type {
-  UiCodeEvaluatorEditorDrawerProps,
-  UiEvaluatorCategoryId,
-  UiEvaluatorCategorySelectorDrawerProps,
-  UiEvaluatorEditorDrawerProps,
-  UiEvaluatorGateConfig,
-  UiEvaluatorListDrawerProps,
-  UiEvaluatorMappingsConfig,
-  UiOnlineEvaluationDrawerProps,
-  UiWorkflowSelectorForEvaluatorDrawerProps,
-} from "./model/evaluator-drawers.ts";
-export type { UiAutomationDrawerProps } from "./model/automation-drawers.ts";
-export type { UiFoundryDrawerProps } from "./model/ops-drawers.ts";
-export type { UiInviteMemberDrawerProps } from "./model/organization-drawers.ts";
 export type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./model/prompt-drawers.ts";
-export type {
-  UiAgentTestingCaseEditorDrawerProps,
-  UiScenarioRunDetailDrawerProps,
-} from "./model/scenario-drawers.ts";
 export { URL_QS_PARSE_OPTIONS } from "./model/qs-parse-options.ts";
 export {
   CurrentDrawer,

@@ -7,51 +7,13 @@
 import type { ComponentType } from "react";
 
 import type { UiAddOrEditDatasetDrawerProps } from "../../declarations.ts";
-import type {
-  UiAgentEditorDrawerProps,
-  UiAgentListDrawerProps,
-  UiAgentTypeSelectorDrawerProps,
-  UiWorkflowSelectorDrawerProps,
-} from "./agent-drawers.ts";
-import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
-import type {
-  UiCodeEvaluatorEditorDrawerProps,
-  UiEvaluatorCategorySelectorDrawerProps,
-  UiEvaluatorEditorDrawerProps,
-  UiEvaluatorListDrawerProps,
-  UiOnlineEvaluationDrawerProps,
-  UiWorkflowSelectorForEvaluatorDrawerProps,
-} from "./evaluator-drawers.ts";
-import type { UiFoundryDrawerProps } from "./ops-drawers.ts";
-import type { UiInviteMemberDrawerProps } from "./organization-drawers.ts";
 import type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./prompt-drawers.ts";
-import type {
-  UiAgentTestingCaseEditorDrawerProps,
-  UiScenarioRunDetailDrawerProps,
-} from "./scenario-drawers.ts";
 
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
 export type UiDrawerMap = {
   addOrEditDataset: UiAddOrEditDatasetDrawerProps;
-  agentCodeEditor: UiAgentEditorDrawerProps;
-  agentHttpEditor: UiAgentEditorDrawerProps;
-  agentList: UiAgentListDrawerProps;
-  agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
-  agentTypeSelector: UiAgentTypeSelectorDrawerProps;
-  agentWorkflowEditor: UiAgentEditorDrawerProps;
-  automation: UiAutomationDrawerProps;
-  codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
-  evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;
-  evaluatorEditor: UiEvaluatorEditorDrawerProps;
-  evaluatorList: UiEvaluatorListDrawerProps;
-  foundry: UiFoundryDrawerProps;
-  inviteMember: UiInviteMemberDrawerProps;
-  onlineEvaluation: UiOnlineEvaluationDrawerProps;
   promptEditor: UiPromptEditorDrawerProps;
   promptList: UiPromptListDrawerProps;
-  scenarioRunDetail: UiScenarioRunDetailDrawerProps;
-  workflowSelector: UiWorkflowSelectorDrawerProps;
-  workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
 };
 
 /**
