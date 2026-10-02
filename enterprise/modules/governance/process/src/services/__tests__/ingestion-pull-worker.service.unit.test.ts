@@ -7,12 +7,13 @@ import type {
 import type {
   InternalProject,
   InternalProjectQuery,
+  ProjectApi,
   ProjectWithTeam,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import {
   type GovernanceEncryptor,
   type GovernanceOcsfEventSink,
@@ -91,24 +92,23 @@ class FakeSources implements IngestionPullSourceReader {
   }
 }
 
-class FakeProjects extends TestProjectApi {
-  constructor(private readonly traceDestinationProject: ProjectWithTeam | null = null) {
-    super();
-  }
-
-  findInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
-
-  ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
-    id: "gov-project",
-    name: "Governance (internal)",
-    slug: "governance-org",
-    teamId: "team",
-    kind: "internal_governance",
-    archivedAtMs: null,
-    traceSharingEnabled: false,
-  });
-
-  findWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestinationProject;
+function fakeProjects(traceDestinationProject: ProjectWithTeam | null = null): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      findInternal: async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
+      ensureInternal: async (_input: InternalProjectQuery): Promise<InternalProject> => ({
+        id: "gov-project",
+        name: "Governance (internal)",
+        slug: "governance-org",
+        teamId: "team",
+        kind: "internal_governance",
+        archivedAtMs: null,
+        traceSharingEnabled: false,
+      }),
+      findWithTeam: async (): Promise<ProjectWithTeam | null> => traceDestinationProject,
+    },
+    "ProjectApi",
+  );
 }
 
 class FakeSink implements GovernanceOcsfEventSink {
@@ -214,7 +214,7 @@ function worker(input: {
     sources: new FakeSources(input.source === undefined ? ingestionSource() : input.source),
     registry,
     credentials: IngestionCredentialsService.create(new IdentityEncryption()),
-    projects: new FakeProjects(input.traceDestination),
+    projects: fakeProjects(input.traceDestination),
     sink,
     usageEntitlement: entitlement,
     usageRecords: PulledUsageRecordService.create(

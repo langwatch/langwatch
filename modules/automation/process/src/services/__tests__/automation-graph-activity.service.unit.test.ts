@@ -1,12 +1,13 @@
 import { openStores, PipelineParticipation } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import {
   breachingAnalytics,
   createGraphActivityPrismaDouble,
-  FrozenClock,
+  FROZEN_NOW,
   graphTriggerRow,
   OneProject,
   RecordingDelivery,
@@ -98,7 +99,7 @@ function compose(
 ) {
   const secrets = over.crypto ?? crypto;
   const database = createGraphActivityPrismaDouble(seed);
-  const clock = new FrozenClock();
+  const clock = frozenAt(FROZEN_NOW);
   const delivery = over.delivery ?? new RecordingDelivery();
   const logger = new SilentLogger();
   const triggers = PrismaTriggerRepository.create(database.prisma, clock);

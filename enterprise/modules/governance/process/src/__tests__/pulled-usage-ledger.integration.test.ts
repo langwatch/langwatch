@@ -13,11 +13,11 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   GatewayBudgetClickHouseRepository,
   PrismaGatewayAdapter,
-  TestProjectApi,
   type GatewayService,
 } from "@langwatch/gateway-process/testing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -73,19 +73,18 @@ class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
 }
 
 /** The two project reads the decision path makes, answered from this suite's rows. */
-class SuiteProjectService extends TestProjectApi {
-  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return [APP_PROJECT_ID, GOV_PROJECT_ID];
-  }
-
-  override async listTraceDestinations(
-    projectIds: string[],
-  ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, archivedAt: true },
-    });
-  }
+function suiteProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      listIdsByOrganization: async () => [APP_PROJECT_ID, GOV_PROJECT_ID],
+      listTraceDestinations: (projectIds) =>
+        prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, teamId: true, archivedAt: true },
+        }),
+    },
+    "ProjectApi",
+  );
 }
 
 /** One pulled usage item, as the process manager mints it. */
@@ -279,7 +278,7 @@ describe.skipIf(!databaseUrl)(
       budgets = GatewayBudgetClickHouseRepository.create(async () => clickhouse as never);
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
-        projects: new SuiteProjectService(),
+        projects: suiteProjects(),
         organizations: {} as never,
         evaluators: {} as never,
         monitors: {} as never,

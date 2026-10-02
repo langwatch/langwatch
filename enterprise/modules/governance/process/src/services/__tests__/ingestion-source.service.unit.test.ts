@@ -1,11 +1,15 @@
 import { Buffer } from "node:buffer";
 
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectApi,
+} from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import type {
   GovernanceDiagnosticsSink,
   IngestionSourceEntitlements,
@@ -96,20 +100,27 @@ class FakeSourceRepository extends IngestionSourceRepository {
   );
 }
 
-class FakeProjects extends TestProjectApi {
-  findInternal = vi.fn(
-    async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
+function fakeProjects() {
+  const findWithTeam = vi.fn(async () => null);
+  const projects = createApiFixture<ProjectApi>(
+    {
+      findInternal: vi.fn(
+        async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
+      ),
+      ensureInternal: vi.fn(async (_input: InternalProjectQuery): Promise<InternalProject> => ({
+        id: "gov-project",
+        name: "Governance (internal)",
+        slug: "governance-org",
+        teamId: "team",
+        kind: "internal_governance",
+        archivedAtMs: null,
+        traceSharingEnabled: false,
+      })),
+      findWithTeam,
+    },
+    "ProjectApi",
   );
-  ensureInternal = vi.fn(async (_input: InternalProjectQuery): Promise<InternalProject> => ({
-    id: "gov-project",
-    name: "Governance (internal)",
-    slug: "governance-org",
-    teamId: "team",
-    kind: "internal_governance",
-    archivedAtMs: null,
-    traceSharingEnabled: false,
-  }));
-  findWithTeam = vi.fn(async () => null);
+  return { projects, findWithTeam };
 }
 class FakeEntitlements implements IngestionSourceEntitlements {
   enterprise = true;
@@ -136,7 +147,7 @@ function harness() {
   const repository = new FakeSourceRepository();
   const entitlements = new FakeEntitlements();
   const lifecycle = new FakeLifecycle();
-  const projects = new FakeProjects();
+  const { projects, findWithTeam } = fakeProjects();
   const service = IngestionSourceService.create({
     repository,
     projects,
@@ -152,7 +163,7 @@ function harness() {
     diagnostics: new FakeDiagnostics(),
     now: () => NOW,
   });
-  return { service, repository, projects, entitlements, lifecycle };
+  return { service, repository, projects, findWithTeam, entitlements, lifecycle };
 }
 
 describe("IngestionSourceService", () => {
@@ -377,7 +388,7 @@ describe("IngestionSourceService", () => {
   });
 
   it("refuses a foreign or archived trace destination before creating the source", async () => {
-    const { service, repository, projects } = harness();
+    const { service, repository, findWithTeam } = harness();
 
     await expect(
       service.createSource({
@@ -388,7 +399,7 @@ describe("IngestionSourceService", () => {
         traceProjectId: "project-outside-org",
       }),
     ).rejects.toThrow(/destination must be an active project/i);
-    expect(projects.findWithTeam).toHaveBeenCalledWith("project-outside-org");
+    expect(findWithTeam).toHaveBeenCalledWith("project-outside-org");
     expect(repository.create).not.toHaveBeenCalled();
   });
 
@@ -569,10 +580,11 @@ describe("IngestionSourceService", () => {
       // 'archived' for cross-team destinations).
       it("scopes liveness to the organization, not to what this admin can see", async () => {
         const { service, projects } = harness();
-        projects.listActiveByScopes = vi.fn(async () => ({
+        const listActiveByScopes = vi.fn(async () => ({
           data: [{ id: "proj_other_team" }],
           hasMore: false,
-        })) as never;
+        }));
+        projects.listActiveByScopes = listActiveByScopes as never;
 
         const live = await service.liveTraceProjectIds(
           [{ traceProjectId: "proj_other_team" }],
@@ -580,7 +592,7 @@ describe("IngestionSourceService", () => {
         );
 
         expect(live.has("proj_other_team")).toBe(true);
-        expect(projects.listActiveByScopes).toHaveBeenCalledWith({
+        expect(listActiveByScopes).toHaveBeenCalledWith({
           organizationId: "org-1",
           organizationWide: false,
           teamIds: [],

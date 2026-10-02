@@ -7,7 +7,8 @@ import {
   TestEvents,
   TestGithubService,
   TestMetricSeries,
-  TestProjectService,
+  createTestProjects,
+  type TestProjects,
   TestSessions,
   TestTraceSessions,
   pullRequest,
@@ -25,7 +26,7 @@ const HOUR_MS = 60 * 60 * 1000;
 function serviceWith(input: {
   sessions: TestSessions;
   github?: TestGithubService;
-  projects?: TestProjectService;
+  projects?: TestProjects;
 }) {
   return CodingAgentFeatureService.create({
     sessions: input.sessions,
@@ -33,7 +34,7 @@ function serviceWith(input: {
     metricSeries: new TestMetricSeries(),
     sessionEvents: new TestEvents(),
     github: input.github ?? new TestGithubService(),
-    projects: input.projects ?? new TestProjectService(),
+    projects: input.projects ?? createTestProjects(),
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
   });
@@ -240,7 +241,7 @@ describe("Coding Agent sessions list", () => {
   it("keeps session rows when the project has no organization", async () => {
     const sessions = new TestSessions();
     sessions.rows = [session({ repositoryOwner: "acme", repositoryName: "widgets" })];
-    const projects = new TestProjectService();
+    const projects = createTestProjects();
     projects.teamProject = null;
     const service = serviceWith({ sessions, projects });
 
@@ -584,7 +585,7 @@ describe("Coding Agent sessions list", () => {
     it("lists every session with no pull requests", async () => {
       const sessions = new TestSessions();
       sessions.rows = [session({ repositoryOwner: "acme", repositoryName: "widgets" })];
-      const projects = new TestProjectService();
+      const projects = createTestProjects();
       projects.teamProject = null;
       const github = new TestGithubService();
       const service = serviceWith({ sessions, projects, github });

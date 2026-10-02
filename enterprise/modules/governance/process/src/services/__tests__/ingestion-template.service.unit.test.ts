@@ -2,18 +2,12 @@ import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
-  type GovernanceCallSurface,
   type IngestionTemplate,
-  type PlatformIngestionTemplateSeed,
-  type PlatformIngestionTemplateSyncResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  IngestionTemplateRepository,
-  type IngestionTemplateMutationResult,
-  type NewIngestionTemplate,
-} from "../../repositories/ingestion-template.repository.ts";
+import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
+import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
 import { IngestionTemplateService } from "../ingestion-template.service.ts";
 
 function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate {
@@ -33,59 +27,28 @@ function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate
   };
 }
 
-class MemoryIngestionTemplateRepository extends IngestionTemplateRepository {
-  readonly createWithAudit = vi.fn(
-    async (input: {
-      template: NewIngestionTemplate;
-      callerUserId: string;
-      surface: GovernanceCallSurface;
-    }) => template({ ...input.template }),
-  );
-  mutationResult: IngestionTemplateMutationResult = {
-    status: "updated",
-    template: template(),
+function seeded(initial: IngestionTemplate[] = []) {
+  const store = MemoryGovernanceStore.create();
+  store.ingestionTemplates.push(...initial);
+  const repository = MemoryIngestionTemplateRepository.create(store);
+  return {
+    store,
+    repository,
+    createWithAudit: vi.spyOn(repository, "createWithAudit"),
+    syncPlatformCatalog: vi.spyOn(repository, "syncPlatformCatalog"),
   };
-
-  async findUserVisible(): Promise<IngestionTemplate[]> {
-    return [template()];
-  }
-
-  async findAdminVisible(): Promise<IngestionTemplate[]> {
-    return [template()];
-  }
-
-  async findVisible(): Promise<IngestionTemplate | null> {
-    return template();
-  }
-
-  async findPlatform(): Promise<IngestionTemplate | null> {
-    return template({ organizationId: null, platformPublished: true });
-  }
-
-  async updateOttlRulesWithAudit(): Promise<IngestionTemplateMutationResult> {
-    return this.mutationResult;
-  }
-
-  async archiveWithAudit(): Promise<IngestionTemplateMutationResult> {
-    return this.mutationResult;
-  }
-
-  readonly syncPlatformCatalog = vi.fn(
-    async (input: {
-      templates: readonly PlatformIngestionTemplateSeed[];
-      retiredSlugs: readonly string[];
-    }): Promise<PlatformIngestionTemplateSyncResult> => ({
-      created: input.templates.length,
-      updated: 0,
-      archived: input.retiredSlugs.length,
-    }),
-  );
 }
+
+const platformTemplate = template({
+  id: "platform-1",
+  organizationId: null,
+  platformPublished: true,
+});
 
 describe("IngestionTemplateService", () => {
   it("hides OTTL source from the user catalog", async () => {
     const rows = await IngestionTemplateService.create({
-      repository: new MemoryIngestionTemplateRepository(),
+      repository: seeded([template()]).repository,
     }).listForUser({ organizationId: "organization-1" });
 
     expect(rows[0]?.ottlRules).toBe("");
@@ -93,7 +56,7 @@ describe("IngestionTemplateService", () => {
 
   /** @scenario "Ingestion template authoring is tenant safe and auditable" */
   it("validates source type before persistence", async () => {
-    const repository = new MemoryIngestionTemplateRepository();
+    const { store, repository, createWithAudit } = seeded();
     const service = IngestionTemplateService.create({ repository });
 
     await expect(
@@ -104,11 +67,12 @@ describe("IngestionTemplateService", () => {
         displayName: "Invalid",
       }),
     ).rejects.toBeInstanceOf(InvalidSourceTypeError);
-    expect(repository.createWithAudit).not.toHaveBeenCalled();
+    expect(createWithAudit).not.toHaveBeenCalled();
+    expect(store.ingestionTemplates).toHaveLength(0);
   });
 
   it("generates a stable slug and defaults audit attribution", async () => {
-    const repository = new MemoryIngestionTemplateRepository();
+    const { repository, createWithAudit } = seeded();
     const created = await IngestionTemplateService.create({
       repository,
       newSlugSuffix: () => "abc123",
@@ -120,16 +84,16 @@ describe("IngestionTemplateService", () => {
     });
 
     expect(created.slug).toBe("custom_template_abc123");
-    expect(repository.createWithAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ surface: "trpc" }),
-    );
+    expect(createWithAudit).toHaveBeenCalledWith(expect.objectContaining({ surface: "trpc" }));
   });
 
   /** @scenario "Ingestion template authoring is tenant safe and auditable" */
   it("refuses platform mutation without exposing another organization", async () => {
-    const repository = new MemoryIngestionTemplateRepository();
+    const { repository } = seeded([
+      platformTemplate,
+      template({ id: "other-organization-template", organizationId: "organization-2" }),
+    ]);
     const service = IngestionTemplateService.create({ repository });
-    repository.mutationResult = { status: "platform" };
 
     await expect(
       service.updateOttlRules({
@@ -140,7 +104,6 @@ describe("IngestionTemplateService", () => {
       }),
     ).rejects.toBeInstanceOf(PlatformTemplateImmutableError);
 
-    repository.mutationResult = { status: "not_found" };
     await expect(
       service.archiveOrgTemplate({
         id: "other-organization-template",
@@ -151,7 +114,7 @@ describe("IngestionTemplateService", () => {
   });
 
   it("clones platform content into a new organization template", async () => {
-    const repository = new MemoryIngestionTemplateRepository();
+    const { repository, createWithAudit } = seeded([platformTemplate]);
     const cloned = await IngestionTemplateService.create({
       repository,
       newSlugSuffix: () => "abc123",
@@ -167,17 +130,15 @@ describe("IngestionTemplateService", () => {
       displayName: "Custom template (custom)",
       ottlRules: 'set(attributes["x"], "y")',
     });
-    expect(repository.createWithAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ surface: "mcp" }),
-    );
+    expect(createWithAudit).toHaveBeenCalledWith(expect.objectContaining({ surface: "mcp" }));
   });
 
   /** @scenario "An existing platform claude-cowork template is archived by the seeder" */
   it("syncs the platform catalog with claude_cowork among the retired slugs and no new seeds", async () => {
-    const repository = new MemoryIngestionTemplateRepository();
+    const { repository, syncPlatformCatalog } = seeded();
     await IngestionTemplateService.create({ repository }).syncPlatformCatalog();
 
-    expect(repository.syncPlatformCatalog).toHaveBeenCalledWith(
+    expect(syncPlatformCatalog).toHaveBeenCalledWith(
       expect.objectContaining({
         templates: [],
         retiredSlugs: expect.arrayContaining(["claude_cowork"]),

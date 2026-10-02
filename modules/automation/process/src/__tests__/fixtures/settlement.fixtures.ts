@@ -1,7 +1,8 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
-import type { Project } from "@langwatch/project-contract";
-import { TestProjectApi } from "./test-project-api.ts";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { frozenAt } from "@langwatch/test-harness";
 import type {
   DerivedTraceEvent,
   TraceRecord,
@@ -9,7 +10,6 @@ import type {
 } from "@langwatch/trace-contract";
 import { SlackDestinationService } from "../../services/slack-destination.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
-import type { AutomationClock } from "../../app/automation.members.ts";
 import {
   AutomationEmailCapRepository,
   type EmailCapClaim,
@@ -225,47 +225,59 @@ class SettlementAutomationService implements AutomationSettlementLedgerRepositor
   }
 }
 
-export class SettlementProjectService extends TestProjectApi {
-  reads = 0;
-  readonly project: Project = {
-    id: "project-1",
-    name: "Test project",
-    slug: "test-project",
-    apiKey: "api-key",
-    lwqlKey: "lwql-key",
-    teamId: "team-1",
-    language: "typescript",
-    framework: "other",
-    kind: "application",
-    firstMessage: false,
-    integrated: true,
-    createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
-    updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: {},
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-  };
+export interface SettlementProjectReads {
+  reads: number;
+}
 
-  override async getOrganizationId(): Promise<string> {
-    return "organization-1";
-  }
+export type SettlementProjects = ProjectApi & SettlementProjectReads;
 
-  override async findById(id: string): Promise<Project | null> {
-    this.reads += 1;
-    return id === this.project.id ? this.project : null;
-  }
+export const SETTLEMENT_PROJECT: Project = {
+  id: "project-1",
+  name: "Test project",
+  slug: "test-project",
+  apiKey: "api-key",
+  lwqlKey: "lwql-key",
+  teamId: "team-1",
+  language: "typescript",
+  framework: "other",
+  kind: "application",
+  firstMessage: false,
+  integrated: true,
+  createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+  updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: {},
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+};
+
+/** The two ProjectApi reads settlement makes, counting project reads. */
+export function createSettlementProjects(): SettlementProjects {
+  const projects: SettlementProjects = Object.assign<ProjectApi, SettlementProjectReads>(
+    createApiFixture<ProjectApi>(
+      {
+        getOrganizationId: () => Promise.resolve("organization-1"),
+        findById: (id) => {
+          projects.reads += 1;
+          return Promise.resolve(id === SETTLEMENT_PROJECT.id ? SETTLEMENT_PROJECT : null);
+        },
+      },
+      "ProjectApi",
+    ),
+    { reads: 0 },
+  );
+  return projects;
 }
 
 /**
@@ -302,12 +314,6 @@ class SettlementConfirmation implements AutomationSettlementMatchConfirmation {
 
   async confirms(input: { traceId: string }): Promise<boolean> {
     return !this.rejected.has(input.traceId);
-  }
-}
-
-class SettlementClock implements AutomationClock {
-  now(): Instant {
-    return Temporal.Instant.from("2026-01-01T00:00:00.000Z");
   }
 }
 
@@ -395,7 +401,7 @@ class SettlementObservability extends AutomationSettlementObservability {
 export function createSettlementFixture(trigger: TriggerSummary): {
   service: AutomationSettlementDispatchService;
   automation: SettlementAutomationService;
-  projects: SettlementProjectService;
+  projects: SettlementProjects;
   traces: SettlementTraceService;
   confirmation: SettlementConfirmation;
   delivery: SettlementDelivery;
@@ -404,13 +410,13 @@ export function createSettlementFixture(trigger: TriggerSummary): {
   emailCapStore: SettlementEmailCapStore;
 } {
   const automation = new SettlementAutomationService(trigger);
-  const projects = new SettlementProjectService();
+  const projects = createSettlementProjects();
   const traces = new SettlementTraceService();
   const confirmation = new SettlementConfirmation();
   const delivery = new SettlementDelivery();
   const writer = new SettlementWriter();
   const observability = new SettlementObservability();
-  const clock = new SettlementClock();
+  const clock = frozenAt("2026-01-01T00:00:00.000Z");
   const emailCapStore = new SettlementEmailCapStore();
   traces.summaries.set("trace-1", settlementSummary("trace-1"));
   traces.summaries.set("trace-2", settlementSummary("trace-2"));

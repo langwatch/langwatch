@@ -6,10 +6,14 @@ import type {
   CreateGovernanceIngestionSourceCommand,
   GovernanceIngestionSourceType,
 } from "@langwatch/enterprise-governance-contract";
-import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectApi,
+} from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import type {
   GovernanceDiagnosticsSink,
   GovernanceEncryptor,
@@ -44,18 +48,22 @@ class Base64Encryption implements GovernanceEncryptor {
   }
 }
 
-class GovernanceProjects extends TestProjectApi {
-  override async ensureInternal(_input: InternalProjectQuery): Promise<InternalProject> {
-    return {
-      id: "gov-project",
-      name: "Governance (internal)",
-      slug: "governance-org",
-      teamId: "team",
-      kind: "internal_governance",
-      archivedAtMs: null,
-      traceSharingEnabled: false,
-    };
-  }
+function governanceProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      ensureInternal: (_input: InternalProjectQuery): Promise<InternalProject> =>
+        Promise.resolve({
+          id: "gov-project",
+          name: "Governance (internal)",
+          slug: "governance-org",
+          teamId: "team",
+          kind: "internal_governance",
+          archivedAtMs: null,
+          traceSharingEnabled: false,
+        }),
+    },
+    "ProjectApi",
+  );
 }
 
 class Enterprise implements IngestionSourceEntitlements {
@@ -81,7 +89,7 @@ function harness() {
   });
   const service = IngestionSourceService.create({
     repository,
-    projects: new GovernanceProjects(),
+    projects: governanceProjects(),
     entitlements: new Enterprise(),
     lifecycle: new NoLifecycle(),
     credentials,

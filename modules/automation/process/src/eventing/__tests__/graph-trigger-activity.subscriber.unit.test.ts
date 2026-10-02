@@ -1,10 +1,11 @@
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
+import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import {
   breachingAnalytics,
   createGraphActivityPrismaDouble,
-  FrozenClock,
+  FROZEN_NOW,
   graphTriggerRow,
   OneProject,
   RecordingDelivery,
@@ -72,7 +73,7 @@ describe("createGraphTriggerActivityHandler", () => {
     /** @scenario "The two questions the real-time path asks are the whole port" */
     it("is accepted by the handler with nothing else supplied", async () => {
       const database = createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] });
-      const clock = new FrozenClock();
+      const clock = frozenAt(FROZEN_NOW);
       const delivery = new RecordingDelivery();
       const crypto = { encrypt: (value: string) => value, decrypt: (value: string) => value };
       const triggers = PrismaTriggerRepository.create(database.prisma, clock);

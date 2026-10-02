@@ -21,7 +21,7 @@ import { CodingAgentModule } from "#app/coding-agent.app";
 
 import {
   TestGithubService,
-  TestProjectService,
+  createTestProjects,
   pullRequest,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { MemoryCodingAgentRepositories } from "../../repositories/memory/memory.coding-agent.repositories.ts";
@@ -68,15 +68,12 @@ class GithubForRest extends TestGithubService {
   }
 }
 
-class ProjectForRest extends TestProjectService {
-  constructor(organizationProjects: readonly string[]) {
-    super();
-    this.projects = organizationProjects.map((id) => ({ id }));
-  }
-
-  override getOrganizationId(): Promise<string> {
-    return Promise.resolve("organization-1");
-  }
+function projectsForRest(organizationProjects: readonly string[]) {
+  const projects = createTestProjects({
+    getOrganizationId: () => Promise.resolve("organization-1"),
+  });
+  projects.projects = organizationProjects.map((id) => ({ id }));
+  return projects;
 }
 
 /**
@@ -102,7 +99,7 @@ function mount({
   const app = CodingAgentModule.create({
     dependencies: {
       github,
-      projects: new ProjectForRest([...new Set([...reach.key, ...reach.holder])]),
+      projects: projectsForRest([...new Set([...reach.key, ...reach.holder])]),
       traces: createApiFixture<TraceApi>({}),
       retention: createApiFixture<DataRetentionApi>({}),
       authz: createApiFixture<AuthzApi>({

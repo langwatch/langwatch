@@ -3,6 +3,8 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type {
   GovernanceEncryptor,
@@ -23,7 +25,6 @@ import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
-import { TestProjectApi as CompleteTestProjectService } from "./test-project-api.ts";
 
 export class TestHttp implements GovernanceHttpClient {
   constructor(
@@ -161,19 +162,23 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
   registry.register(doubles.adapter);
   const pricing = PulledUsagePricingService.create(new TestRate());
   const diagnostics = silentIngestionPullDiagnostics;
-  const projects = new CompleteTestProjectService();
-  projects.ensureInternal = async (input) => {
-    const project = await doubles.ensureProject(input);
-    return {
-      id: project.id,
-      name: "test",
-      slug: "test",
-      teamId: "test-team",
-      kind: "internal_governance",
-      archivedAtMs: null,
-      traceSharingEnabled: false,
-    };
-  };
+  const projects = createApiFixture<ProjectApi>(
+    {
+      ensureInternal: async (input) => {
+        const project = await doubles.ensureProject(input);
+        return {
+          id: project.id,
+          name: "test",
+          slug: "test",
+          teamId: "test-team",
+          kind: "internal_governance",
+          archivedAtMs: null,
+          traceSharingEnabled: false,
+        };
+      },
+    },
+    "ProjectApi",
+  );
   const encryption: GovernanceEncryptor = {
     encrypt(value: string): string {
       return value;

@@ -26,11 +26,12 @@ import {
 } from "@langwatch/github-contract";
 import {
   type PaginatedProjects,
+  type ProjectApi,
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { type Instant, Temporal } from "@langwatch/time";
-import { TestProjectApi } from "./test-project-api.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { CodingAgentBillingPolicy, CodingAgentClock } from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
@@ -737,74 +738,79 @@ function projectRow(id: string): PaginatedProjects["data"][number] {
   };
 }
 
-export class TestProjectService extends TestProjectApi {
-  projects: { id: string }[] = [];
-  sessionActivity: { projectId: string; at: Instant }[] = [];
-  sessionActivityError: Error | null = null;
-  organizationId = "organization-1";
-  teamProject: ProjectWithTeam | null = projectWithTeamSchema.parse({
-    id: "project-1",
-    name: "Project",
-    slug: "project",
-    apiKey: "key",
-    lwqlKey: "lwql",
-    teamId: "team-1",
-    language: "typescript",
-    framework: "",
-    kind: "application",
-    firstMessage: false,
-    integrated: false,
+export interface TestProjectState {
+  projects: { id: string }[];
+  readonly sessionActivity: { projectId: string; at: Instant }[];
+  teamProject: ProjectWithTeam | null;
+}
+
+export type TestProjects = ProjectApi & TestProjectState;
+
+/** The ProjectApi reads coding-agent makes; a suite adds any other it needs. */
+export function createTestProjects(overrides: Partial<ProjectApi> = {}): TestProjects {
+  const projects: TestProjects = Object.assign<ProjectApi, TestProjectState>(
+    createApiFixture<ProjectApi>(
+      {
+        findWithTeam: () => Promise.resolve(projects.teamProject),
+        listByOrganization: (): Promise<PaginatedProjects> =>
+          Promise.resolve({
+            data: projects.projects.map(({ id }) => projectRow(id)),
+            pagination: { page: 1, limit: projects.projects.length, total: projects.projects.length },
+          }),
+        touchCodingAgentSessionSeen: (input) => {
+          projects.sessionActivity.push(input);
+          return Promise.resolve();
+        },
+        ...overrides,
+      },
+      "ProjectApi",
+    ),
+    {
+      projects: [],
+      sessionActivity: [],
+      teamProject: projectWithTeamSchema.parse({
+  id: "project-1",
+  name: "Project",
+  slug: "project",
+  apiKey: "key",
+  lwqlKey: "lwql",
+  teamId: "team-1",
+  language: "typescript",
+  framework: "",
+  kind: "application",
+  firstMessage: false,
+  integrated: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: true,
+  ownerUserId: "user-1",
+  personalFeatures: {},
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+  team: {
+    id: "team-1",
+    name: "Team",
+    slug: "team",
+    organizationId: "organization-1",
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
     archivedAt: null,
     isPersonal: true,
     ownerUserId: "user-1",
-    personalFeatures: {},
     departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    team: {
-      id: "team-1",
-      name: "Team",
-      slug: "team",
-      organizationId: "organization-1",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-      archivedAt: null,
-      isPersonal: true,
-      ownerUserId: "user-1",
-      departmentId: null,
+  },
+}),
     },
-  });
-
-  override async findWithTeam(): Promise<ProjectWithTeam | null> {
-    return this.teamProject;
-  }
-
-  /** The contract's shape, not a convenient subset. */
-  override async listByOrganization(): Promise<PaginatedProjects> {
-    return {
-      data: this.projects.map(({ id }) => projectRow(id)),
-      pagination: { page: 1, limit: this.projects.length, total: this.projects.length },
-    };
-  }
-
-  override async touchCodingAgentSessionSeen(input: {
-    projectId: string;
-    at: Instant;
-  }): Promise<void> {
-    if (this.sessionActivityError) {
-      throw this.sessionActivityError;
-    }
-
-    this.sessionActivity.push(input);
-  }
+  );
+  return projects;
 }

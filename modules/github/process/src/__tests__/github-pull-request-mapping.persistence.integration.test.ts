@@ -22,7 +22,7 @@ import { GithubModule } from "../app/github.app.ts";
 import { PostgresGithubRepositories } from "../repositories/prisma/prisma.github.repositories.ts";
 import {
   TestOrganizationService,
-  TestProjectService,
+  createTestProjects,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { unansweredRedisRepositories } from "./support/github-unanswered-redis.support.ts";
@@ -170,7 +170,7 @@ function webhook(input: {
 function harness(input: { host?: string } = {}) {
   const http = new GithubHttpFixture();
   vi.stubGlobal("fetch", http.fetch.bind(http));
-  const projects = new TestProjectService(organizationId);
+  const projects = createTestProjects({ organizationId: organizationId });
   return {
     http,
     projects,

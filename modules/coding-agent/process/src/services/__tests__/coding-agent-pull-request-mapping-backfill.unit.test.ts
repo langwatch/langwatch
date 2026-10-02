@@ -7,7 +7,8 @@ import {
   TestEvents,
   TestGithubService,
   TestMetricSeries,
-  TestProjectService,
+  createTestProjects,
+  type TestProjects,
   TestSessions,
   TestTraceSessions,
   session,
@@ -22,7 +23,7 @@ import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 function serviceWith(input: {
   sessions: TestSessions;
   github: TestGithubService;
-  projects: TestProjectService;
+  projects: TestProjects;
 }) {
   return CodingAgentFeatureService.create({
     sessions: input.sessions,
@@ -78,7 +79,7 @@ describe("Coding Agent installation backfill", () => {
         gitBranch: "",
       }),
     ]);
-    const projects = new TestProjectService();
+    const projects = createTestProjects();
     projects.projects = [{ id: "project-a" }, { id: "project-b" }];
     const github = new TestGithubService();
     const service = serviceWith({ sessions, projects, github });
@@ -121,7 +122,7 @@ describe("Coding Agent installation backfill", () => {
         gitBranch: "feature",
       }),
     ];
-    const projects = new TestProjectService();
+    const projects = createTestProjects();
     projects.projects = [{ id: "project-1" }];
     const github = new TestGithubService();
     github.mappingError = new Error("GitHub rate limited");

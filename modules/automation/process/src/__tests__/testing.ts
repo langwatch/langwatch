@@ -47,7 +47,6 @@ export {
   breachingAnalytics,
   createGraphActivityPrismaDouble,
   customGraphRow,
-  FrozenClock,
   FROZEN_NOW,
   graphTriggerRow,
   OneProject,

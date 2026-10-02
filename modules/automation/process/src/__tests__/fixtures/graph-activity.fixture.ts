@@ -1,13 +1,13 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AutomationClock,AutomationProjectDirectory } from "../../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../../app/automation.members.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {
   AutomationDispatchError,
   AutomationLogger,
 } from "../../app/automation.members.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
-import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { Temporal, toDate } from "@langwatch/time";
 
 // Strict Prisma double for graph-alert vertical; fails on queries it should not
 // need.
@@ -18,12 +18,6 @@ export const FROZEN_NOW = Temporal.Instant.from("2026-09-02T12:00:00.000Z");
 
 /** The same moment as a stored column hands it back, for the row doubles. */
 const FROZEN_ROW_AT = toDate(FROZEN_NOW);
-
-export class FrozenClock implements AutomationClock {
-  now(): Instant {
-    return FROZEN_NOW;
-  }
-}
 
 export class SilentLogger extends AutomationLogger {
   readonly errors: [Record<string, unknown>, string][] = [];

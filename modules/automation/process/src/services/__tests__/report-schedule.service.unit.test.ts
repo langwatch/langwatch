@@ -3,10 +3,10 @@ import {
   InMemoryProcessStore,
   type ProcessEvolution,
 } from "@langwatch/eventing";
-import { type Instant, Temporal } from "@langwatch/time";
+import { frozenAt } from "@langwatch/test-harness";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { AutomationClock } from "../../app/automation.members.ts";
 import { reportDispatchIntentSchema } from "../../eventing/report-schedule.intent.ts";
 import {
   INITIAL_REPORT_SCHEDULE_STATE,
@@ -23,12 +23,6 @@ import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigge
 import { ReportScheduleService } from "../report-schedule.service.ts";
 
 const NOW = Temporal.Instant.from("2026-01-01T08:00:00Z");
-
-class Clock implements AutomationClock {
-  now(): Instant {
-    return NOW;
-  }
-}
 
 type Handler<Data> = (
   state: ReportScheduleState,
@@ -74,7 +68,11 @@ function processBackedSchedules(triggers: MemoryTriggerRepository) {
     close: async () => {},
     waitUntilReady: async () => {},
   });
-  const service = ReportScheduleService.create({ clock: new Clock(), triggers, instances: store });
+  const service = ReportScheduleService.create({
+    clock: frozenAt(NOW),
+    triggers,
+    instances: store,
+  });
   service.connect({
     commands: {
       recordTriggerMatch: sender("recordTriggerMatch", () => {

@@ -34,7 +34,7 @@ import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  SettlementProjectService,
+  createSettlementProjects,
   settlementContext,
   settlementSummary,
   settlementTrace,
@@ -250,7 +250,7 @@ async function settlingWorker(installed: Installed) {
   AutomationPersistCapService.resetPlanCache();
   const eventing = eventingFor("worker");
   const runtime = await process("worker", eventing, {
-    project: new SettlementProjectService(),
+    project: createSettlementProjects(),
     ...installed,
   }).boot();
   const intents = eventing.definitions
@@ -572,7 +572,7 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
 async function reportingWorker() {
   const eventing = eventingFor("worker");
   const runtime = await process("worker", eventing, {
-    project: new SettlementProjectService(),
+    project: createSettlementProjects(),
   }).boot();
   const automations = runtime.service(AutomationApi);
   await automations.create(

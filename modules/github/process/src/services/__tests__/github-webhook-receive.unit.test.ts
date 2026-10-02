@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GithubModule } from "../../app/github.app.ts";
 import { MemoryGithubRepositories } from "../../repositories/memory/memory.github.repositories.ts";
-import { TestOrganizationService, TestProjectService } from "./fixtures/github-services.fixture.ts";
+import { TestOrganizationService, createTestProjects } from "./fixtures/github-services.fixture.ts";
 
 const rawBody = JSON.stringify({ zen: "Keep it logically awesome." });
 
@@ -23,7 +23,7 @@ function harness({ webhookSecret }: { webhookSecret: string }) {
       signingKey: "test-signing-key",
     },
     organization: new TestOrganizationService().api,
-    project: new TestProjectService("org-1"),
+    project: createTestProjects({ organizationId: "org-1" }),
   });
   const apply = vi.spyOn(github, "applyWebhookPayload");
 

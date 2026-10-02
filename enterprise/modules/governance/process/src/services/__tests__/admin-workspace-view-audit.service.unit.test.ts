@@ -4,11 +4,14 @@ import {
   type OrganizationTeam,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
-import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectApi,
+} from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import type { GovernanceOcsfEventWriter } from "../../app/governance.members.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
 
@@ -18,19 +21,24 @@ class RecordingAuditLog implements Pick<AuditLogApi, "record" | "hasRecordedSinc
   record = vi.fn(async () => ({ id: "audit", occurredAt: 1_700_000_000_000 }));
 }
 
-class StubProjects extends TestProjectApi {
-  findInternal = (_input: InternalProjectQuery): Promise<InternalProject | null> =>
-    Promise.resolve(null);
-  ensureInternal = (_input: InternalProjectQuery): Promise<InternalProject> =>
-    Promise.resolve({
-      id: "governance-project",
-      name: "Governance (internal)",
-      slug: "governance-org",
-      teamId: "team",
-      kind: "internal_governance",
-      archivedAtMs: null,
-      traceSharingEnabled: false,
-    });
+function stubProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      findInternal: (_input: InternalProjectQuery): Promise<InternalProject | null> =>
+        Promise.resolve(null),
+      ensureInternal: (_input: InternalProjectQuery): Promise<InternalProject> =>
+        Promise.resolve({
+          id: "governance-project",
+          name: "Governance (internal)",
+          slug: "governance-org",
+          teamId: "team",
+          kind: "internal_governance",
+          archivedAtMs: null,
+          traceSharingEnabled: false,
+        }),
+    },
+    "ProjectApi",
+  );
 }
 
 class StubOcsf implements GovernanceOcsfEventWriter {
@@ -100,7 +108,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: repository,
       teams: teams.api(),
-      projects: new StubProjects(),
+      projects: stubProjects(),
       events: ocsf,
     });
 
@@ -202,7 +210,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: repository,
       teams: teams.api(),
-      projects: new StubProjects(),
+      projects: stubProjects(),
       events: ocsf,
       diagnostics,
     });

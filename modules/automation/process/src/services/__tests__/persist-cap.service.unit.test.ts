@@ -7,7 +7,7 @@ const planMock = vi.hoisted(() => ({
 }));
 import { Temporal } from "@langwatch/time";
 
-import { SettlementProjectService } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { createSettlementProjects } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 
@@ -16,7 +16,7 @@ const TRIGGER_ID = "trig-1";
 const DAY_ONE = Temporal.Instant.from("2026-08-09T12:00:00.000Z");
 const DAY_TWO = Temporal.Instant.from("2026-08-10T00:00:01.000Z");
 
-const projects = new SettlementProjectService();
+const projects = createSettlementProjects();
 const persistCapDependencies = {
   projects,
   planProvider: {

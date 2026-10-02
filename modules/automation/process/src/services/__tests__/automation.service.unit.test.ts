@@ -8,6 +8,7 @@ import {
   type TriggerSummary,
 } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
+import { frozenAt } from "@langwatch/test-harness";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -16,7 +17,6 @@ import {
   createAutomationTestRuntime,
   createTestSlackConnections,
 } from "../../__tests__/testing.ts";
-import type { AutomationClock } from "../../app/automation.members.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
 import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
@@ -122,11 +122,6 @@ class Names extends EmailSuppressionNameRepository {
 class Verifier extends UnsubscribeTokenVerifier {
   findVerifiedPayload() {
     return null;
-  }
-}
-class Clock implements AutomationClock {
-  now() {
-    return Temporal.Instant.from("2026-01-01T00:00:00Z");
   }
 }
 class Triggers extends TriggerRepository {
@@ -241,7 +236,7 @@ const makeService = (
   history = new Fires(),
   webhookDeliveries = new EmptyWebhookDeliveries(),
   reportSchedules = ReportScheduleService.create({
-    clock: new Clock(),
+    clock: frozenAt("2026-01-01T00:00:00Z"),
     triggers,
     instances: InMemoryProcessStore.createForTesting(),
   }),
@@ -249,7 +244,7 @@ const makeService = (
 ): AutomationService =>
   (() => {
     const runtime = createAutomationTestRuntime();
-    const clock = new Clock();
+    const clock = frozenAt("2026-01-01T00:00:00Z");
     const customGraphs = new EmptyCustomGraphs();
     const graph = AutomationGraphService.create({
       triggers,
@@ -482,7 +477,7 @@ describe("AutomationService email suppression", () => {
       new Fires(),
       new EmptyWebhookDeliveries(),
       ReportScheduleService.create({
-        clock: new Clock(),
+        clock: frozenAt("2026-01-01T00:00:00Z"),
         triggers: new Triggers(),
         instances: InMemoryProcessStore.createForTesting(),
       }),

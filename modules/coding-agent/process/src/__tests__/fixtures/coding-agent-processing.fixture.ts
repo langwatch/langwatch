@@ -16,7 +16,7 @@ import {
 import { MemoryCodingAgentSessionFoldCacheRepository } from "../../repositories/memory/memory.coding-agent-session-fold-cache.repository.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import type { CodingAgentCostMetrics } from "../../app/coding-agent.members.ts";
-import { TestClock, TestProjectService } from "./coding-agent.fixture.ts";
+import { TestClock, createTestProjects } from "./coding-agent.fixture.ts";
 
 class NoopCostMetrics implements CodingAgentCostMetrics {
   recordComputed(): void {}
@@ -309,7 +309,7 @@ export function buildTestCodingAgentProcessingPipeline(
     modelProviders: new TestModelProviderService(),
     costMetrics: new NoopCostMetrics(),
     projections: new NoopCodingAgentProjectionPersistence(),
-    projects: new TestProjectService(),
+    projects: createTestProjects(),
     clock: new TestClock(),
     defaultRetentionDays: () => 365,
     sessionContextMemo: MemorySessionContextMemoRepository.create(),

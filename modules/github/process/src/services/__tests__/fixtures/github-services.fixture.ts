@@ -1,6 +1,6 @@
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TestProjectApi } from "./test-project-api.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 function unsupported(): never {
@@ -186,27 +186,28 @@ export class TestOrganizationService extends OrganizationService {
   }
 }
 
-export class TestProjectService extends TestProjectApi {
-  readonly pullRequestActivity: { projectId: string; at: Instant }[] = [];
-  pullRequestActivityError: Error | null = null;
+export interface ProjectActivity {
+  readonly pullRequestActivity: { projectId: string; at: Instant }[];
+  pullRequestActivityError: Error | null;
+}
 
-  constructor(private readonly organizationId: string) {
-    super();
-  }
-
-  override getOrganizationId(): Promise<string> {
-    return Promise.resolve(this.organizationId);
-  }
-
-  override touchCodingAgentPullRequestSeen(input: {
-    projectId: string;
-    at: Instant;
-  }): Promise<void> {
-    if (this.pullRequestActivityError) {
-      return Promise.reject(this.pullRequestActivityError);
-    }
-
-    this.pullRequestActivity.push(input);
-    return Promise.resolve();
-  }
+/** Answers only the two ProjectApi reads GitHub makes; any other call throws. */
+export function createTestProjects({ organizationId }: { organizationId: string }) {
+  const projects: ProjectApi & ProjectActivity = Object.assign<ProjectApi, ProjectActivity>(
+    createApiFixture<ProjectApi>(
+      {
+        getOrganizationId: () => Promise.resolve(organizationId),
+        touchCodingAgentPullRequestSeen: (input) => {
+          if (projects.pullRequestActivityError) {
+            return Promise.reject(projects.pullRequestActivityError);
+          }
+          projects.pullRequestActivity.push(input);
+          return Promise.resolve();
+        },
+      },
+      "ProjectApi",
+    ),
+    { pullRequestActivity: [], pullRequestActivityError: null },
+  );
+  return projects;
 }

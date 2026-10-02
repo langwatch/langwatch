@@ -8,7 +8,7 @@ import {
   TestEvents,
   TestGithubService,
   TestMetricSeries,
-  TestProjectService,
+  createTestProjects,
   TestSessions,
   TestTraceSessions,
   session,
@@ -35,7 +35,7 @@ function serviceWith(input: {
     metricSeries: input.metricSeries ?? new TestMetricSeries(),
     sessionEvents: input.events ?? new TestEvents(),
     github: new TestGithubService(),
-    projects: new TestProjectService(),
+    projects: createTestProjects(),
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
   });

@@ -15,7 +15,7 @@ import {
   TestEvents,
   TestGithubService,
   TestMetricSeries,
-  TestProjectService,
+  createTestProjects,
   TestSessions,
   TestTraceSessions,
   branchSession,
@@ -199,7 +199,7 @@ function serviceWith({
     metricSeries: new TestMetricSeries(),
     sessionEvents: events,
     github,
-    projects: new TestProjectService(),
+    projects: createTestProjects(),
     billing,
     clock: new TestClock(NOW),
   });
@@ -292,7 +292,7 @@ function personalServiceWith({
     metricSeries: new TestMetricSeries(),
     sessionEvents: events,
     github,
-    projects: new TestProjectService(),
+    projects: createTestProjects(),
     billing: new FunctionBillingPolicy(async ({ sourceType }) =>
       isSourceNonBillable({ organizationId: "org-1", sourceType }),
     ),

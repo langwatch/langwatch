@@ -28,9 +28,22 @@
  *     (single trace store, reserved namespaces)
  */
 import {
+  type ActivityEventDetailRow,
+  type ActivityMonitorSummary,
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
+  type GovernanceSortDirection,
+  type IngestionSourceHealthRow,
+  type RecentAnomalyRow,
   resolveTraceDepartmentId,
+  type SourceHealthMetrics,
+  type SpendByDepartmentRow,
+  type SpendByTeamRow,
+  type SpendByUserRow,
+  type SpendOverTimeBucket,
+  type SpendOverTimeGroupBy,
+  type SpendOverTimeResult,
+  type SpendSortField,
   UNASSIGNED_DEPARTMENT,
 } from "@langwatch/enterprise-governance-contract";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
@@ -43,117 +56,6 @@ import {
   type GovernanceClickHouseClient,
   type GovernanceClickHouseResolver,
 } from "../../app/governance.members.ts";
-
-interface SummaryResult {
-  spentThisWindowUsd: number;
-  windowOverPreviousPct: number;
-  /**
-   * False when the previous-window spend was zero (no baseline data
-   * to compare against). UI mutes the trend subline rather than
-   * rendering '↑ 100% vs previous' on every brand-new org. Same
-   * semantics as `SpendByTeamRow.hasPriorBaseline`.
-   */
-  hasPriorBaseline: boolean;
-  activeUsersThisWindow: number;
-  newUsersThisWindow: number;
-  openAnomalyCount: number;
-  anomalyBreakdown: { critical: number; warning: number; info: number };
-}
-
-interface SpendByUserRow {
-  actor: string;
-  spendUsd: string;
-  requests: number;
-  lastActivityIso: string;
-  trendVsPreviousPct: number;
-  /**
-   * False when the previous-window spend was zero (no baseline data).
-   * UI mutes the trend cell rather than rendering a misleading
-   * percentage on first-window users. Currently always `false` until
-   * the per-user prior-window CTE lands (paired with `trendVsPreviousPct`,
-   * which still hard-zeros today).
-   */
-  hasPriorBaseline: boolean;
-  mostUsedTarget: string | null;
-}
-
-interface SpendByTeamRow {
-  /** Team.id, or null for sources that aren't team-scoped (org-wide). */
-  teamId: string | null;
-  /** Team.name, or "Org-wide" for non-team-scoped sources. */
-  teamName: string;
-  spendUsd: string;
-  requestCount: number;
-  /**
-   * Spend change vs the previous equal-length window (e.g. last 30
-   * days vs the 30 days before that). 0 when previous window had no
-   * spend AND current is also empty; 100 when previous was zero and
-   * current is non-zero (matches `summary.windowOverPreviousPct`).
-   * UI should consult `hasPriorBaseline` before rendering this as a
-   * percentage - `100` is overloaded (real doubling vs zero-baseline
-   * artifact).
-   */
-  deltaPctVsPriorWindow: number;
-  /**
-   * False when the previous-window spend was zero (no baseline data
-   * to compare against). UI mutes the trend cell to '-' rather than
-   * showing a misleading +100% on every brand-new team.
-   */
-  hasPriorBaseline: boolean;
-  lastActivityIso: string | null;
-  /** Number of distinct ingestion sources rolled up under this team. */
-  sourceCount: number;
-}
-
-interface SpendByDepartmentRow {
-  /** Department.id, or null for the synthetic "Unassigned" bucket. */
-  departmentId: string | null;
-  /** Department.name, or "Unassigned". */
-  departmentName: string;
-  spendUsd: string;
-  requestCount: number;
-  lastActivityIso: string | null;
-}
-
-interface IngestionSourceHealthRow {
-  id: string;
-  name: string;
-  sourceType: string;
-  status: string;
-  lastEventIso: string | null;
-  eventsLast24h: number;
-}
-
-/** One bucket-major entry in the spend-over-time time series. */
-interface SpendOverTimeBucket {
-  /** Day-aligned ISO timestamp (UTC midnight). */
-  bucketIso: string;
-  /**
-   * One point per group-key with non-zero spend in this bucket. Empty
-   * array when nothing spent on this day across any group; the bucket
-   * is still emitted so the chart's X axis has no gaps.
-   */
-  points: {
-    /**
-     * Stable group identifier - teamId, user_id, or model name. Used
-     * for color-derivation (name-hash) + click-through scope params.
-     */
-    key: string;
-    /** Human-readable label for legend / tooltip. */
-    label: string;
-    spendUsd: string;
-  }[];
-}
-
-interface SpendOverTimeResult {
-  buckets: SpendOverTimeBucket[];
-}
-
-export type SpendOverTimeGroupBy = "team" | "user" | "model";
-
-/** Sort field accepted by `spendByUser` / `spendByTeam`. */
-export type SpendSortField = "spend" | "requests" | "lastActivity";
-export type SortDir = "asc" | "desc";
 
 /**
  * Whitelist mapping from external sort field names to the aggregate
@@ -183,48 +85,7 @@ const TEAM_ROW_SORT_KEYS: Record<
   lastActivity: (r) => r.lastActivityMs,
 };
 
-interface ActivityEventDetailRow {
-  eventId: string;
-  eventType: string;
-  actor: string;
-  action: string;
-  target: string;
-  costUsd: string;
-  tokensInput: number;
-  tokensOutput: number;
-  eventTimestampIso: string;
-  ingestedAtIso: string;
-  rawPayload: string;
-}
-
-interface RecentAnomalyRow {
-  id: string;
-  ruleId: string;
-  ruleName: string;
-  ruleType: string;
-  severity: "critical" | "warning" | "info";
-  triggerWindowStartIso: string;
-  triggerWindowEndIso: string;
-  triggerSpendUsd: number | null;
-  triggerEventCount: number | null;
-  detectedAtIso: string;
-  state: string;
-  currentState: "open" | "acknowledged" | "resolved";
-  detail: Record<string, unknown>;
-  /** Back-compat alias - same as `ruleName`, used by the iter-10 dashboard renderer. */
-  rule: string;
-  /** Best-effort source label pulled from `detail` for the dashboard row. */
-  sourceLabel: string;
-}
-
-interface SourceHealthMetrics {
-  events24h: number;
-  events7d: number;
-  events30d: number;
-  lastSuccessIso: string | null;
-}
-
-const EMPTY_SUMMARY: SummaryResult = {
+const EMPTY_SUMMARY: ActivityMonitorSummary = {
   spentThisWindowUsd: 0,
   windowOverPreviousPct: 0,
   hasPriorBaseline: false,
@@ -385,7 +246,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
 
   async summary(
     input: { organizationId: string; windowDays: number } & ActivityMonitorTenant,
-  ): Promise<SummaryResult> {
+  ): Promise<ActivityMonitorSummary> {
     const anomalyBreakdown = await this.openAnomalyBreakdown(input.organizationId);
     const openAnomalyCount =
       anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
@@ -486,7 +347,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       limit?: number;
       offset?: number;
       sortBy?: SpendSortField;
-      sortDir?: SortDir;
+      sortDir?: GovernanceSortDirection;
     } & ActivityMonitorTenant,
   ): Promise<SpendByUserRow[]> {
     const { govProjectId } = input;
@@ -824,7 +685,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       limit?: number;
       offset?: number;
       sortBy?: SpendSortField;
-      sortDir?: SortDir;
+      sortDir?: GovernanceSortDirection;
     } & ActivityMonitorTenant,
   ): Promise<SpendByTeamRow[]> {
     const { govProjectId } = input;

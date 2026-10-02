@@ -10,7 +10,7 @@ import {
   TestClickHouseEndpoint,
   TestClock,
   TestGithubService,
-  TestProjectService,
+  createTestProjects,
   session,
   sessionEventRecord,
 } from "./fixtures/coding-agent.fixture.ts";
@@ -36,7 +36,7 @@ async function runtime() {
     service: CodingAgentFeatureService.create({
       ...repositories,
       github: new TestGithubService(),
-      projects: new TestProjectService(),
+      projects: createTestProjects(),
       billing: new TestBillingPolicy(),
       clock: new TestClock(),
     }),

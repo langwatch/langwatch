@@ -5,7 +5,12 @@ import { Buffer } from "node:buffer";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectApi,
+} from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -26,7 +31,6 @@ import {
 } from "../services/ingestion-source-secret.service.ts";
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
@@ -75,17 +79,20 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
   const service = () =>
     IngestionSourceService.create({
       repository: PrismaIngestionSourceRepository.create(prisma),
-      projects: new (class extends TestProjectApi {
-        ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
-          id: `gov-project-${ns}`,
-          name: "Governance (internal)",
-          slug: `governance-${ns}`,
-          teamId: `team-${ns}`,
-          kind: "internal_governance",
-          archivedAtMs: null,
-          traceSharingEnabled: false,
-        });
-      })(),
+      projects: createApiFixture<ProjectApi>(
+        {
+          ensureInternal: async (_input: InternalProjectQuery): Promise<InternalProject> => ({
+            id: `gov-project-${ns}`,
+            name: "Governance (internal)",
+            slug: `governance-${ns}`,
+            teamId: `team-${ns}`,
+            kind: "internal_governance",
+            archivedAtMs: null,
+            traceSharingEnabled: false,
+          }),
+        },
+        "ProjectApi",
+      ),
       entitlements: new NoopEntitlements(),
       lifecycle: new NoopLifecycle(),
       credentials: IngestionCredentialsService.create(new AesEncryption()),

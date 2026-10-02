@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
 import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import type { GithubHost } from "../github-host.service.ts";
-import { TestProjectService } from "./fixtures/github-services.fixture.ts";
+import { createTestProjects } from "./fixtures/github-services.fixture.ts";
 
 const REQUEST = {
   tenantId: "project-1",
@@ -62,7 +62,7 @@ class RecordingMapping {
   }
 }
 
-function demand(found: number, project = new TestProjectService("organization-1")) {
+function demand(found: number, project = createTestProjects({ organizationId: "organization-1" })) {
   const mapping = new RecordingMapping(found);
   const service = GithubBranchDemandService.create({
     mapping,
@@ -120,7 +120,7 @@ describe("GitHub branch demand", () => {
   describe("given the project activity write fails", () => {
     /** @scenario "A failed project-activity write does not fail the mapping" */
     it("still completes the request", async () => {
-      const project = new TestProjectService("organization-1");
+      const project = createTestProjects({ organizationId: "organization-1" });
       project.pullRequestActivityError = new Error("project gone");
       const { service } = demand(1, project);
 

@@ -1,3 +1,8 @@
+import type {
+  GovernanceSortDirection as SortDir,
+  SpendOverTimeGroupBy,
+  SpendSortField,
+} from "@langwatch/enterprise-governance-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,11 +12,6 @@ import type {
   GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
 } from "../../../app/governance.members.ts";
-import type {
-  SortDir,
-  SpendOverTimeGroupBy,
-  SpendSortField,
-} from "../prisma.ingestion-source-activity.repository.ts";
 
 type ClickHouseQuery = {
   query: string;
