@@ -15,6 +15,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   WebhookApi,
@@ -170,9 +171,9 @@ type WebhookDeliveryParts = Readonly<{
 
 export class WebhookModule implements WebhookApiContract {
   static readonly contract = WebhookApi;
-  /** The entitlement peer this app's own plan gate reads, composed in
-   *  {@link WebhookModule.create} (`WebhookAccessService`). */
-  static readonly dependencies = { entitlement: EntitlementApi };
+  /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
+   *  and the project peer naming an organization's tenants for the events listing. */
+  static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
   /** The test-fire door's per-organization counter. */
   static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
@@ -207,7 +208,7 @@ export class WebhookModule implements WebhookApiContract {
     const app = new WebhookModule({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
-        tenants: input.repositories.tenants,
+        projects: input.dependencies.projects,
         events: input.repositories.events,
         envelopes: WebhookEnvelopeService.create(),
       }),

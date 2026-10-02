@@ -22,15 +22,9 @@ import {
   PrismaWebhookRetentionRepository,
   type WebhookRetentionDatabase,
 } from "./prisma.webhook-retention.repository.ts";
-import {
-  PrismaWebhookTenantsRepository,
-  type WebhookTenantsDatabase,
-} from "./prisma.webhook-tenants.repository.ts";
 
 /** Every model the live tier's Postgres repositories read, and nothing else. */
-export type WebhookLiveDatabase = WebhookEndpointDatabase &
-  WebhookRetentionDatabase &
-  WebhookTenantsDatabase;
+export type WebhookLiveDatabase = WebhookEndpointDatabase & WebhookRetentionDatabase;
 
 /** The endpoint identifier this deployment mints, in the module's own format. */
 class LiveWebhookIds implements WebhookId {
@@ -79,7 +73,6 @@ export class PostgresWebhookRepositories {
       }),
       events: WebhookEventsClickHouseRepository.forRoutedClickHouse(members.clickhouse),
       retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
-      tenants: PrismaWebhookTenantsRepository.create(members.prisma),
     };
   }
 }

@@ -6,7 +6,6 @@ import { MemoryWebhookDispatchCapRepository } from "./memory.webhook-dispatch-ca
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
 import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repository.ts";
 import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
-import { MemoryWebhookTenantsRepository } from "./memory.webhook-tenants.repository.ts";
 import { MemoryWebhookDatabase } from "./memory.webhook.database.ts";
 
 class MemoryWebhookIds implements WebhookId {
@@ -41,7 +40,6 @@ export class MemoryWebhookRepositories {
       }),
       events: MemoryWebhookEventsRepository.create(),
       retention: MemoryWebhookRetentionRepository.create({ database }),
-      tenants: MemoryWebhookTenantsRepository.create(),
     };
   }
 }

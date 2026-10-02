@@ -3,6 +3,7 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * The worker installed over memory stores delivers a gateway request end to end: the
@@ -71,6 +72,7 @@ function worker() {
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,
       }),
+      project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }
 

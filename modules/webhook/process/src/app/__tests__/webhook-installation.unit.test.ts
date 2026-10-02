@@ -6,6 +6,7 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -61,6 +62,7 @@ function process(role: "api" | "worker") {
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,
       }),
+      project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }
 

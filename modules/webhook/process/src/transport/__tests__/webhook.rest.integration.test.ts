@@ -24,7 +24,6 @@ import {
   WebhookEventsRepository,
   type WebhookEventsPage,
 } from "../../repositories/webhook-events.repository.ts";
-import { WebhookTenantsRepository } from "../../repositories/webhook-tenants.repository.ts";
 import { WebhookEnvelopeService } from "../../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../../services/webhook-events.service.ts";
 import { mountWebhookRest, ORGANIZATION_ID } from "./webhook-rest.harness.ts";
@@ -105,12 +104,6 @@ class FakeWebhookEventsRepository extends WebhookEventsRepository {
   }
 }
 
-class FakeWebhookTenantsRepository extends WebhookTenantsRepository {
-  async tenantIdsForOrganization(_organizationId: string): Promise<string[]> {
-    return [PROJECT_ID];
-  }
-}
-
 function spendRow(overrides: Partial<WebhookSpendEventRow>): WebhookSpendEventRow {
   return {
     tenantId: PROJECT_ID,
@@ -151,7 +144,7 @@ function spendRow(overrides: Partial<WebhookSpendEventRow>): WebhookSpendEventRo
 function eventsDependencies(rows: WebhookSpendEventRow[]): Pick<WebhookAppDependencies, "events"> {
   return {
     events: WebhookEventsService.create({
-      tenants: new FakeWebhookTenantsRepository(),
+      projects: { listIdsByOrganization: async () => [PROJECT_ID] },
       events: new FakeWebhookEventsRepository(rows),
       envelopes: WebhookEnvelopeService.create(),
     }),

@@ -1,3 +1,4 @@
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ListWebhookEventsQuery,
   type ListWebhookEventsResult,
@@ -5,11 +6,10 @@ import {
 } from "@langwatch/webhook-contract";
 
 import type { WebhookEventsRepository } from "../repositories/webhook-events.repository.ts";
-import type { WebhookTenantsRepository } from "../repositories/webhook-tenants.repository.ts";
 import type { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
 export type WebhookEventsServiceOptions = {
-  tenants: WebhookTenantsRepository;
+  projects: Pick<ProjectApi, "listIdsByOrganization">;
   events: WebhookEventsRepository;
   envelopes: WebhookEnvelopeService;
 };
@@ -30,7 +30,9 @@ export class WebhookEventsService {
     id: string;
   }): Promise<WebhookEnvelope | null> {
     const row = await this.options.events.findEmittedEventById({
-      tenantIds: await this.options.tenants.tenantIdsForOrganization(input.organizationId),
+      tenantIds: await this.options.projects.listIdsByOrganization({
+        organizationId: input.organizationId,
+      }),
       id: input.id,
     });
 
@@ -39,7 +41,9 @@ export class WebhookEventsService {
 
   async getEmittedEvents(query: ListWebhookEventsQuery): Promise<ListWebhookEventsResult> {
     const page = await this.options.events.readEmittedEventsPage({
-      tenantIds: await this.options.tenants.tenantIdsForOrganization(query.organizationId),
+      tenantIds: await this.options.projects.listIdsByOrganization({
+        organizationId: query.organizationId,
+      }),
       fromMs: query.fromMs,
       toMs: query.toMs,
       cursor: query.cursor ?? null,
