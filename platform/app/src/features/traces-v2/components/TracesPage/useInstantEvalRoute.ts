@@ -374,19 +374,25 @@ function bailUnreleased({
   outcome.setRefusal({ kind: "unreleased" });
 }
 
-/** The offers a self-hosted install is refused with, each its own popover. */
-const SELF_HOSTED_OFFERS: ReadonlySet<string> =
-  new Set<SelfHostedInstantEvalOffer>([
-    "not_in_license",
-    "switched_off",
-    "not_connected",
-    "ask_operator",
-  ]);
+/**
+ * The offers a self-hosted install is refused with, each its own popover.
+ *
+ * Keyed by the server's type rather than imported from it, because the
+ * module that declares it is server code: a record over the union makes the
+ * typecheck fail on an offer added there and not here, or kept here and
+ * dropped there.
+ */
+const SELF_HOSTED_OFFERS: Record<SelfHostedInstantEvalOffer, true> = {
+  not_in_license: true,
+  switched_off: true,
+  not_connected: true,
+  ask_operator: true,
+};
 
 function isSelfHostedOffer(
   offer: InstantEvalOptInOffer | undefined,
 ): offer is SelfHostedInstantEvalOffer {
-  return offer !== undefined && SELF_HOSTED_OFFERS.has(offer);
+  return offer !== undefined && Object.hasOwn(SELF_HOSTED_OFFERS, offer);
 }
 
 /** Confirms or abandons the run sitting in the dialog. */
