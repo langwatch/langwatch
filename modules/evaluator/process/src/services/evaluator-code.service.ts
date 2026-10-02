@@ -70,7 +70,7 @@ export class EvaluatorCodeService {
       if (!evaluator) throw new EvaluatorNotFoundError(input.evaluatorId);
 
       if (evaluator.type !== "code") {
-        throw new Error(`Code evaluator not found: ${input.evaluatorId}`);
+        throw new EvaluatorNotFoundError(input.evaluatorId);
       }
 
       const config = codeEvaluatorConfigSchema.parse(evaluator.config);

@@ -5,6 +5,7 @@ import {
 } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
+  ProjectCreateTargetMissingError,
   activeProjectsByScopesInputSchema,
   createProjectInputSchema,
   internalProjectKindSchema,
@@ -292,7 +293,7 @@ export class ProjectService {
     framework: string;
   }): Promise<Project> {
     if (!input.teamId && !input.newTeamName) {
-      throw new Error("Either teamId or newTeamName must be provided");
+      throw new ProjectCreateTargetMissingError();
     }
 
     let teamId = input.teamId;

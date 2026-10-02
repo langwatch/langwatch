@@ -1,4 +1,7 @@
-import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import {
+  ModelProviderScopesRequiredError,
+  type ModelDefaultScope,
+} from "@langwatch/model-provider-contract";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
@@ -117,7 +120,7 @@ export class ModelProviderScopeService {
 
   async getOrganizationIdForScopes(scopes: ModelDefaultScope[]): Promise<string> {
     if (scopes.length === 0) {
-      throw new Error("At least one Model Provider scope is required");
+      throw new ModelProviderScopesRequiredError();
     }
 
     const organizationIds = await Promise.all(

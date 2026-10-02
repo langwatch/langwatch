@@ -1,7 +1,11 @@
 /**
  * The rule that turns an SDK's `experiment_slug` into an experiment row.
  */
-import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
+import {
+  ExperimentNotFoundError,
+  type Experiment,
+  type ExperimentType,
+} from "@langwatch/experiment-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import originalSlugify from "slugify";
@@ -80,7 +84,7 @@ export class ExperimentFindOrCreateService {
     }
 
     if (!experiment) {
-      throw new Error("Experiment not found");
+      throw new ExperimentNotFoundError(input.experimentId ?? input.experimentSlug ?? "");
     }
 
     // A name or a workflow sent with an EXISTING experiment updates it; the
