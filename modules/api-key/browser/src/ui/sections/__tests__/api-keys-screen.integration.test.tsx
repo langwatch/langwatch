@@ -90,7 +90,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
   },
 }));
 
-// The picker and the filter are `@langwatch/authz-browser`'s and have their own
+// The picker and the filter are `@langwatch/design-system`'s and have their own
 // suites; what this file is about is what the SCREEN does with the value they
 // hand back, so the filter is replaced by buttons that call `onChange`.
 vi.mock("@langwatch/design-system/scope-chip-picker", async () => {

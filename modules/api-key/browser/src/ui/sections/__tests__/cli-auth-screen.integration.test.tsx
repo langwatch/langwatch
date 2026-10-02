@@ -44,7 +44,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
   },
 }));
 
-// The picker is `@langwatch/authz-browser`'s and has its own suite; what this file
+// The picker is `@langwatch/design-system`'s and has its own suite; what this file
 // is about is which scopes the SCREEN preselects and sends, so the picker
 // renders its value and offers one way to change it.
 vi.mock("@langwatch/design-system/scope-chip-picker", () => ({

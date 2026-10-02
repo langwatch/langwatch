@@ -1,6 +1,6 @@
 /**
  * The page's scope filter, read off the address and applied to rows. The URL contract and
- * ambient resolution live in `@langwatch/authz-browser`; this module adds only the fan over rows
+ * ambient resolution live in `@langwatch/design-system`; this module adds only the fan over rows
  * that carry several scopes, which a provider row and a default-model config both do.
  */
 
