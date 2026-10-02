@@ -106,11 +106,18 @@ fi
 # LANGWATCH_ENDPOINT is the address the app hands out as itself (the Langy
 # worker callback, scenario child processes, setup snippets), so it follows
 # the same port for the same reason.
+#
+# LANGWATCH_API_URL is where the ui's Vite proxy sends /api, so it follows
+# API_PORT; a copied `.env` naming 5560 would otherwise route to another stack.
 if [ -n "${PORT:-}" ]; then
   export BASE_HOST="http://localhost:${PORT}"
   export NEXTAUTH_URL="http://localhost:${PORT}"
   export LANGWATCH_ENDPOINT="http://localhost:${PORT}"
+  api_scheme=http
+  [ "${LANGWATCH_DEV_HTTP2:-}" = "1" ] && api_scheme=https
+  export LANGWATCH_API_URL="${api_scheme}://localhost:${API_PORT}"
   echo "  ✓ BASE_HOST=NEXTAUTH_URL=LANGWATCH_ENDPOINT=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+  echo "  ✓ LANGWATCH_API_URL=${LANGWATCH_API_URL} (auto-aligned to API_PORT=${API_PORT})"
 fi
 
 # AI Gateway port + URL derivation. Each variable is set only when unset, so an

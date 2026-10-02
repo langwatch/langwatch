@@ -1,7 +1,11 @@
 /** Input schemas for the `user.*` tRPC surface. Secrets never stored here. */
 import { z } from "zod";
 
-import { userProfileNameSchema } from "./user.ts";
+import {
+  userNotificationChoiceSchema,
+  userNotificationTopicSchema,
+  userProfileNameSchema,
+} from "./user.ts";
 
 /**
  * The procedures that take no arguments still declare a parser, because tRPC
@@ -9,6 +13,15 @@ import { userProfileNameSchema } from "./user.ts";
  * policy is applied after it.
  */
 export const userApiEmptyInputSchema = z.object({});
+
+/** The caller's own choice for one notification topic. */
+export const userApiNotificationTopicInputSchema = z.object({ topic: userNotificationTopicSchema });
+
+/** The caller turns one notification topic on or off. */
+export const userApiSetNotificationPreferenceInputSchema = z.object({
+  topic: userNotificationTopicSchema,
+  choice: userNotificationChoiceSchema,
+});
 
 /** A blank name is refused here, not trimmed down to nothing and stored. */
 export const userApiUpdateNameInputSchema = z.object({ name: userProfileNameSchema });

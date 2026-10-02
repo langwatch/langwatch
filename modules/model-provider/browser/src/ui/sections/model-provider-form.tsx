@@ -574,10 +574,27 @@ function isGuidedKeyTyped(
   );
 }
 
+/** Guided saves once a key is typed or the server holds one; settings saves any edit. */
+function isSaveable({
+  guided,
+  state,
+  isUsingEnvVars,
+  isAdvancedDirty,
+}: {
+  guided: boolean;
+  state: ReturnType<typeof useModelProviderForm>[0];
+  isUsingEnvVars: boolean;
+  isAdvancedDirty: boolean;
+}): boolean {
+  if (guided) return isGuidedKeyTyped(state, isUsingEnvVars);
+  return state.isDirty || isAdvancedDirty;
+}
+
 /** Settings shows headers, routing and custom models; guided shows the one model to use. */
 function ProviderModelArea({
   actions,
   guidedSave,
+  isBusy,
   isLlmProvider,
   isOAuthDeviceProvider,
   provider,
@@ -586,6 +603,7 @@ function ProviderModelArea({
 }: {
   actions: ReturnType<typeof useModelProviderForm>[1];
   guidedSave: ReturnType<typeof useGuidedSave> | undefined;
+  isBusy: boolean;
   isLlmProvider: boolean;
   isOAuthDeviceProvider: boolean;
   provider: ModelProviderEditorValue;
@@ -600,6 +618,7 @@ function ProviderModelArea({
         guidedModels={guidedSave.models}
         pickedModel={guidedSave.chatModel}
         onPick={guidedSave.pick}
+        locked={isBusy || guidedSave.connected}
         provider={provider}
         providerName={providerName}
         state={state}
@@ -984,6 +1003,9 @@ export const EditModelProviderForm = ({
     clearApiKeyError,
   ]);
 
+  const isBusy = state.isSaving || isValidatingApiKey;
+  const providerName = providerDefinition?.name ?? provider.provider;
+
   return (
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
@@ -1040,16 +1062,17 @@ export const EditModelProviderForm = ({
         <GuidedServerKeyHint
           guided={guided}
           isUsingEnvVars={isUsingEnvVars}
-          providerName={providerDefinition?.name ?? provider.provider}
+          providerName={providerName}
         />
 
         <ProviderModelArea
           actions={actions}
           guidedSave={guided ? guidedSave : undefined}
+          isBusy={isBusy}
           isLlmProvider={isLlmProvider}
           isOAuthDeviceProvider={isOAuthDeviceProvider}
           provider={provider}
-          providerName={providerDefinition?.name ?? provider.provider}
+          providerName={providerName}
           state={state}
         />
 
@@ -1075,10 +1098,8 @@ export const EditModelProviderForm = ({
         {!(guided && isOAuthDeviceProvider) && (
           <SaveProviderButton
             canResolveTarget={!cannotResolveTarget}
-            isDirty={
-              guided ? isGuidedKeyTyped(state, isUsingEnvVars) : state.isDirty || isAdvancedDirty
-            }
-            isBusy={state.isSaving || isValidatingApiKey}
+            isDirty={isSaveable({ guided, state, isUsingEnvVars, isAdvancedDirty })}
+            isBusy={isBusy}
             label={guided && probeRequired ? "Connect" : saveLabel}
             onSave={handleSave}
             {...(guided ? { guided: { connected: guidedSave.connected } } : {})}

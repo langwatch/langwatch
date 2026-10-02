@@ -9,6 +9,7 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
+import { ModelProviderKeysService } from "../model-provider-keys.service.ts";
 
 function serviceWith(
   options: {
@@ -61,6 +62,7 @@ function serviceWith(
       catalog,
       ids,
       onboardingDefaults,
+      credentialPolicy: ModelProviderKeysService.create(),
     } as never),
   };
 }

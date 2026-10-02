@@ -4,12 +4,12 @@
  *
  * @see specs/langy/langy-guided-onboarding.feature
  */
+import { GUIDED_ONBOARDING_KICKOFF_PART_TYPE } from "@langwatch/onboarding-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   buildGuidedKickoffBrief,
   buildGuidedKickoffParts,
-  GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
   type GuidedKickoffInput,
   guidedKickoffPartOf,
   guidedKickoffStateFactsOf,

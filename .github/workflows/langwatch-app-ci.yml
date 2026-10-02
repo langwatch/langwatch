@@ -573,10 +573,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          # langyworker is not a dependency of any application, and its tests
-          # and typecheck run on this job's platform-api leg, so it needs its
-          # own install root.
-          install: "@langwatch/platform-api... @langwatch/worker... @langwatch/ui... @langwatch/langyworker..."
+          # langyworker and the scenario child are not dependencies of any
+          # application, and their tests run on this job's platform-api leg,
+          # so each needs its own install root for its dev dependencies.
+          install: "@langwatch/platform-api... @langwatch/worker... @langwatch/ui... @langwatch/langyworker... @langwatch/scenario-child..."
 
       - uses: ./.github/actions/prepare-generated-files
 

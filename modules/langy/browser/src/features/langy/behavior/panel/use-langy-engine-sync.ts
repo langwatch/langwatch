@@ -11,7 +11,7 @@ import {
   shouldResumeAdoptedTurn,
 } from "../../model/logic/adopted-turn-resume.ts";
 import type { LangyMessagesResult } from "../data/use-langy-messages.ts";
-import { catchUpConversationFold } from "../logic/langy-durable-catch-up.ts";
+import { catchUpToSnapshot } from "../logic/langy-durable-catch-up.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
 type HistoryMessages = LangyMessagesResult["messages"];
@@ -39,11 +39,11 @@ export function useLangyTurnProjectionSeed({
       store.seedTurnProjection({ cursor: eventCursor, currentTurnId });
     } else if (projectId && eventCursor) {
       // A failed catch-up is retried by the next poll or signal; the fold never moved.
-      catchUpConversationFold({
+      catchUpToSnapshot({
         utils,
         projectId,
         conversationId: activeConversationId,
-        targetCursor: eventCursor,
+        snapshot: { cursor: eventCursor, currentTurnId },
       }).catch(() => undefined);
     }
     useLangyDevLog.getState().recordSnapshot({

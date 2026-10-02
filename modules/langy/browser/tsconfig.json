@@ -92,6 +92,9 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]

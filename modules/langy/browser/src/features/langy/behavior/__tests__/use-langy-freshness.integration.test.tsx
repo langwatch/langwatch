@@ -22,6 +22,7 @@ const listInvalidate = vi.fn(() => Promise.resolve());
 const listCancel = vi.fn(() => Promise.resolve());
 const eventsAfterFetch = vi.fn();
 const recordInvalidate = vi.fn(() => Promise.resolve());
+const workspaceInvalidate = vi.fn(() => Promise.resolve());
 
 // The callback the coordinator hands the SSE listener — driving it is how a
 // test delivers a freshness signal through the real hook logic.
@@ -37,6 +38,7 @@ vi.mock("../../../../behavior/langy-api.ts", () => ({
       langy: {
         messages: { invalidate: messagesInvalidate },
         localRecord: { invalidate: recordInvalidate },
+        getLocalWorkspace: { invalidate: workspaceInvalidate },
         list: { cancel: listCancel, invalidate: listInvalidate },
         conversationEventsAfter: { fetch: eventsAfterFetch },
       },
@@ -467,6 +469,12 @@ describe("the open conversation's catch-up from the recorded tail", () => {
             conversationId: CONVERSATION_ID,
           }),
         );
+        // The code access card reads the folder off the workspace query, which a
+        // tab that never attached to the turn's stream hears about only here.
+        expect(workspaceInvalidate).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
+          conversationId: CONVERSATION_ID,
+        });
         expect(messagesInvalidate).not.toHaveBeenCalled();
       });
     });

@@ -70,7 +70,10 @@ echo "GATEWAY_PORT=\${GATEWAY_PORT:-}"
  * Runs the launcher with a `pnpm` that reports rather than runs. What comes
  * back is exactly what the lanes would have been started with.
  */
-function launchWithStubbedPnpm(): { argv: string[]; env: Record<string, string> } {
+function launchWithStubbedPnpm({ extraEnv = {} }: { extraEnv?: Record<string, string> } = {}): {
+  argv: string[];
+  env: Record<string, string>;
+} {
   const bin = path.join(scratch, "bin");
   execFileSync("mkdir", ["-p", bin]);
   const stub = path.join(bin, "pnpm");
@@ -116,6 +119,7 @@ function launchWithStubbedPnpm(): { argv: string[]; env: Record<string, string> 
       PORT: String(SLOT),
       NODE_ENV: "development",
       NO_COLOR: "1",
+      ...extraEnv,
     },
     maxBuffer: 8 * 1024 * 1024,
   });
@@ -152,6 +156,15 @@ describe("given a dev launcher deriving its ports from PORT", () => {
         expect(goLane).toContain("aigateway");
       },
     );
+
+    /** @scenario "The browser application's api proxy follows the derived api port" */
+    it("points the ui's api proxy at the derived api port", { timeout: 90_000 }, () => {
+      const { env } = launchWithStubbedPnpm({
+        extraEnv: { LANGWATCH_API_URL: "http://localhost:5560", LANGWATCH_DEV_HTTP2: "0" },
+      });
+
+      expect(env.LANGWATCH_API_URL).toBe(`http://localhost:${SLOT + 1000}`);
+    });
 
     /** @scenario "The pre-flight reserves all three Node ports" */
     it(

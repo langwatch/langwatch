@@ -210,9 +210,23 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "Item 3 is one step: the two lines below, each said with `say`, verbatim, then the run in the same step.",
       );
-      expect(rendered).toContain("Needs the code_access, question, say and secret_snippet tools");
+      expect(rendered).toContain(
+        "Needs the code_access, question, say, secret_snippet, offer_notifications and notify tools",
+      );
       expect(rendered).not.toContain("Say, verbatim:");
       expect(rendered).not.toContain("Then say, verbatim");
+    });
+
+    it("offers notifications as step 2 opens and notifies once the path is complete", () => {
+      const step2 = rendered.slice(rendered.indexOf("### 2. Read the code and wire it"));
+      expect(step2.slice(0, 400)).toContain(
+        "The first call of this step, on the turn the folder connected and before any read, is `offer_notifications`",
+      );
+      const closing = rendered.indexOf("langwatch onboarding complete-path llmops");
+      const notify = rendered.indexOf('call `notify` with the title "Your project is ready"');
+      const closingLine = rendered.indexOf(VERBATIM_LINES["the closing line"], closing);
+      expect(notify).toBeGreaterThan(closing);
+      expect(closingLine).toBeGreaterThan(notify);
     });
 
     /** @scenario "The governance path ends with one line" */

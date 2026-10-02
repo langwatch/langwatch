@@ -11,6 +11,7 @@ import {
   LOCAL_TOOL_NAMES,
   SANDBOX_FILE_TOOL_NAMES,
 } from "./tools/local-workspace.js";
+import { NOTIFY_TOOL_NAME, OFFER_NOTIFICATIONS_TOOL_NAME } from "./tools/notify.js";
 import { ANSWERED_CONTINUE_LINE, QUESTION_TOOL_NAME } from "./tools/question.js";
 import { SAY_TOOL_NAME } from "./tools/say.js";
 import { SKILL_TOOL_NAME } from "./tools/skill.js";
@@ -85,13 +86,15 @@ const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 const WRITING_TOOL_NAMES = new Set(["write", "edit", "local_write", "local_edit"]);
 
 /**
- * The calls the ender reads through: plan writes, skill loads and
- * read-only lookups say nothing, so a turn ending on these ended on
+ * The calls the ender reads through: plan writes, skill loads, read-only lookups and the
+ * notification tools say nothing to the turn's reply, so a turn ending on these ended on
  * whatever came before them (`langwatch navigate` is the one exception).
  */
 export const TRANSPARENT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
+  NOTIFY_TOOL_NAME,
+  OFFER_NOTIFICATIONS_TOOL_NAME,
   ...SANDBOX_FILE_TOOL_NAMES.filter((name) => !WRITING_TOOL_NAMES.has(name)),
   ...LOCAL_TOOL_NAMES.filter(
     (name) => !WRITING_TOOL_NAMES.has(name) && !SHELL_TOOL_NAMES.has(name),

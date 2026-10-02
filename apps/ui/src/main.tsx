@@ -1,5 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
+import { createUi } from "@langwatch/browser";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import type {
   UiDeployment,
@@ -7,22 +8,17 @@ import type {
   UiSessionCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/feature-flag-overrides";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
-import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
-import { browserModules } from "@langwatch/installed-web-modules";
-import { createUi } from "@langwatch/browser";
 import { createUiApplication, type UiApplication } from "@langwatch/browser/application";
 import { UiApplicationShell } from "@langwatch/browser/application-shell";
 import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { GraphicsQualityProvider } from "@langwatch/browser/graphics-quality-provider";
 import { installedModuleApis } from "@langwatch/browser/module-apis";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
-import {
-  installedModuleHostMounts,
-  type UiModuleHostMount,
-} from "@langwatch/browser/module-hosts";
+import { installedModuleHostMounts, type UiModuleHostMount } from "@langwatch/browser/module-hosts";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
 import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
@@ -33,6 +29,8 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser/transport";
+import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
+import { browserModules } from "@langwatch/installed-web-modules";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
@@ -214,6 +212,8 @@ class BrowserUiShell extends UiShell {
   }
 
   prepare(): void {
+    // Before the first render, so a `?ff_` link opens straight onto the screen it names.
+    applyFeatureFlagOverridesFromSearch(window.location.search);
     registerChunkReloadListener();
   }
 

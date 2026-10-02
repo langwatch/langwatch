@@ -18,6 +18,8 @@ import {
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
   type UserProfile,
+  type UserNotificationChoice,
+  type UserNotificationTopic,
   type UserTourPreference,
   type UserCodeAccessPreference,
   type UserUsageCount,
@@ -226,6 +228,22 @@ export class MemoryUserRepository implements UserRepository {
     });
   }
 
+  async findNotificationPreferences(id: string): Promise<Record<string, UserNotificationChoice>> {
+    return { ...this.#require(id).notificationPreferences };
+  }
+
+  async setNotificationPreference(input: {
+    id: string;
+    topic: UserNotificationTopic;
+    choice: UserNotificationChoice;
+  }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({
+      ...row,
+      notificationPreferences: { ...row.notificationPreferences, [input.topic]: input.choice },
+    });
+  }
+
   async setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void> {
     const row = this.#require(input.id);
     this.#database.writeUser({ ...row, lastLoginAt: input.lastLoginAt });
@@ -312,6 +330,7 @@ export class MemoryUserRepository implements UserRepository {
       passkeyNudgeDismissedAt: null,
       twoFactorEnabled: false,
       joinOfferDismissedDomains: [],
+      notificationPreferences: {},
     };
     this.#database.writeUser(row);
 

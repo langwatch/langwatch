@@ -25,6 +25,7 @@ import {
   commandOfToolCall,
 } from "../../../../model/langy-capability-digest.ts";
 import { isCodeAccessToolPart } from "../../../../model/langy-code-access-tool.ts";
+import { isNotificationToolPart } from "../../../../model/langy-notifications.ts";
 import { isPlanToolPart } from "../../../../model/langy-plan.ts";
 import {
   isQuestionToolPart,
@@ -395,37 +396,42 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
  */
 export const toActivityGroups = memoizeOnParts(readActivityGroups);
 
+/** A tool part another surface draws (a card, a said line, the plan), so it is no activity row. */
+function isDrawnAsItsOwnCard(part: ToolPartLike): boolean {
+  // The plan tool (`todowrite`/`todoread`) is NEVER an activity card — it is
+  // the checklist itself (LangyPlanCard), so it must not also collapse into a
+  // shimmering "Planning…" row.
+  if (isPlanToolPart(part)) return true;
+  // The `say` tool is a line of Langy's own words, drawn as reply prose where
+  // the call happened (message-content); an activity row for it would only
+  // say a line was said.
+  if (isSayToolPart(part)) return true;
+  // The `question` tool is the interactive choices card (ADR-060 §6, rendered
+  // by MessageContent), never a raw activity card. It waits on the USER, so as
+  // an activity it read as a dead "Question…" stuck in-flight forever. Only a
+  // payload the choices contract can actually render is excluded — a broken
+  // one stays here, where raw honesty belongs.
+  const rendersAsAChoicesCard = isQuestionToolPart(part) && questionToolCardParts(part).length > 0;
+  if (rendersAsAChoicesCard) return true;
+  // The `code_access` tool is the code access card (ADR-129), for the same
+  // reason: it speaks to the person, not to the model, and the card carries
+  // its whole life.
+  if (isCodeAccessToolPart(part)) return true;
+  // The `secret_snippet` tool is the secret snippet card, rendered by message-content: an
+  // activity row for it would only say a card was drawn.
+  if (isSecretSnippetToolPart(part)) return true;
+  // The notification tools say nothing to the reader of the thread: the offer
+  // is its own card, and a notification (or a refused one) belongs outside it.
+  return isNotificationToolPart(part);
+}
+
 function readActivityGroups(message: PartsView): ActivityGroup[] {
   const order: string[] = [];
   const byKey = new Map<string, ActivityGroup>();
 
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
-    // The plan tool (`todowrite`/`todoread`) is NEVER an activity card — it is
-    // the checklist itself (LangyPlanCard), so it must not also collapse into a
-    // shimmering "Planning…" row.
-    if (isPlanToolPart(part)) return;
-    // The `say` tool is a line of Langy's own words, drawn as reply prose where
-    // the call happened (message-content); an activity row for it would only
-    // say a line was said.
-    if (isSayToolPart(part)) return;
-    // The `question` tool is the interactive choices card (ADR-060 §6, rendered
-    // by MessageContent), never a raw activity card. It waits on the USER, so as
-    // an activity it read as a dead "Question…" stuck in-flight forever. Only a
-    // payload the choices contract can actually render is excluded — a broken
-    // one stays here, where raw honesty belongs.
-    const rendersAsAChoicesCard =
-      isQuestionToolPart(part) && questionToolCardParts(part).length > 0;
-    if (rendersAsAChoicesCard) {
-      return;
-    }
-    // The `code_access` tool is the code access card (ADR-129), for the same
-    // reason: it speaks to the person, not to the model, and the card carries
-    // its whole life.
-    if (isCodeAccessToolPart(part)) return;
-    // The `secret_snippet` tool is the secret snippet card, rendered by message-content: an
-    // activity row for it would only say a card was drawn.
-    if (isSecretSnippetToolPart(part)) return;
+    if (isDrawnAsItsOwnCard(part)) return;
     const name = partToolName(part);
     if (!name) return;
 

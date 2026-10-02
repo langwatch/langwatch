@@ -34,6 +34,10 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
+    "./feature-flag-overrides": {
+      "types": "./dist/feature-flag-overrides.d.ts",
+      "default": "./src/feature-flag-overrides.ts"
+    },
     "./analytics": {
       "types": "./dist/analytics.d.ts",
       "default": "./src/analytics.ts"
@@ -41,6 +45,10 @@
     "./use-router": {
       "types": "./dist/use-router.d.ts",
       "default": "./src/use-router.ts"
+    },
+    "./browser-notifications": {
+      "types": "./dist/browser-notifications.d.ts",
+      "default": "./src/browser-notifications.ts"
     },
     "./toaster": {
       "types": "./dist/toaster.d.ts",

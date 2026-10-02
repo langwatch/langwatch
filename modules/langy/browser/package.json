@@ -49,6 +49,7 @@
     "@langwatch/slack-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "ai": "catalog:",
     "lucide-react": "catalog:",

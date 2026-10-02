@@ -124,6 +124,7 @@ import { readSessionKeyCredential } from "../rules/langy-local-control-connect.r
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 import type { LangyConversationDefinition } from "../services/langy-conversation-pipeline.service.ts";
 import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
+import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
@@ -315,6 +316,7 @@ export class LangyModule implements LangyApiContract {
         gateway: setup.dependencies.gateway,
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
+      github: LangyGithubTurnTokenService.create(setup.dependencies.github),
       skillGates: LangySkillGatesService.create(setup.dependencies.featureFlags),
       navigateFallback: LangyNavigateFallbackService.create({
         projects: setup.dependencies.projects,

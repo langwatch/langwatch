@@ -249,6 +249,7 @@ export const prismaModelFieldCatalogue = {
     "langyCodeAccessPreference",
     "passkeyNudgeDismissedAt",
     "joinOfferDismissedDomains",
+    "notificationPreferences",
     "Annotation",
     "shareLinks",
     "Workflow",

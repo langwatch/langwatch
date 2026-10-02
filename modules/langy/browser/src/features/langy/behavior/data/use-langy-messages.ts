@@ -52,6 +52,19 @@ export interface LangyMessagesResult {
   error: unknown;
 }
 
+/** How often the durable turn state is re-checked while a turn is in flight. */
+const TURN_IN_FLIGHT_POLL_MS = 3_000;
+
+/**
+ * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md): while the fold says a
+ * turn is in flight, re-check so the settled state lands even if the freshness signal is lost.
+ */
+export function langyMessagesPollInterval(
+  data: { isTurnInFlight: boolean } | undefined,
+): number | false {
+  return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
+}
+
 /**
  * HEAVY, on-demand message history for one conversation (`langy.messages`).
  */
@@ -68,6 +81,10 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
+      refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
+      // A hidden tab keeps reading a turn in flight: the cards that wait on the person and the
+      // turn to reattach to both follow this read, and they are what a notification is about.
+      refetchIntervalInBackground: true,
     },
   );
 

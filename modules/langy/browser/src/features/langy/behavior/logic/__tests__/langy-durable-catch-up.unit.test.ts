@@ -8,7 +8,7 @@ import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import { catchUpConversationFold } from "../langy-durable-catch-up.ts";
+import { catchUpConversationFold, catchUpToSnapshot } from "../langy-durable-catch-up.ts";
 
 type Utils = Parameters<typeof catchUpConversationFold>[0]["utils"];
 
@@ -306,6 +306,45 @@ describe("catchUpConversationFold", () => {
         projectId: "p1",
         conversationId: "conv-1",
       });
+    });
+  });
+
+  describe("when the event tail stops short of the target cursor", () => {
+    beforeEach(() => {
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 100, eventId: "e1" },
+        currentTurnId: null,
+      });
+    });
+
+    /** @scenario "An event tail that stops short of the signal re-reads the snapshot" */
+    it("re-reads the transcript snapshot", async () => {
+      const { utils, invalidate } = utilsWith({ cursor: { acceptedAt: 100, eventId: "e1" } });
+
+      await catchUpConversationFold({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        targetCursor: { acceptedAt: 300, eventId: "e3" },
+      });
+
+      expect(invalidate).toHaveBeenCalledWith({ projectId: "p1", conversationId: "conv-1" });
+    });
+
+    it("seeds the fold from a snapshot ahead of it, adopting the turn it names", async () => {
+      const { utils } = utilsWith({ cursor: { acceptedAt: 100, eventId: "e1" } });
+
+      await catchUpToSnapshot({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        snapshot: { cursor: { acceptedAt: 300, eventId: "e3" }, currentTurnId: "turn-2" },
+      });
+
+      const state = useLangyStore.getState();
+      expect(state.turnProjection.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
+      expect(state.activeTurnId).toBe("turn-2");
+      expect(state.turnPhase).toBe("active");
     });
   });
 });

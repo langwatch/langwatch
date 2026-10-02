@@ -17,7 +17,10 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "../rules/langy-conversation-memory.rules.ts";
-import { placeholderTitleOf } from "../rules/langy-conversation-title.rules.ts";
+import {
+  placeholderTitleOf,
+  startsWithGuidedKickoff,
+} from "../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
@@ -386,8 +389,8 @@ export class LangyTurnPreparationService {
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
     mintedRunToken: string | null,
   ) {
-    const title =
-      placeholderTitleOf(args.messages.find((message) => message.role === "user")?.parts) || null;
+    const firstUserParts = args.messages.find((message) => message.role === "user")?.parts;
+    const title = placeholderTitleOf(firstUserParts) || null;
     try {
       await this.deps.conversations.acceptTurn({
         projectId: args.projectId,
@@ -399,7 +402,7 @@ export class LangyTurnPreparationService {
           ? {
               conversationStart: {
                 userId: args.userId,
-                title,
+                title: startsWithGuidedKickoff(firstUserParts) ? title : null,
                 ...(mintedRunToken ? { runToken: mintedRunToken } : {}),
               },
             }

@@ -13,6 +13,7 @@ export function GuidedChatModelField({
   guidedModels,
   pickedModel,
   onPick,
+  locked,
   provider,
   providerName,
   state,
@@ -21,6 +22,8 @@ export function GuidedChatModelField({
   guidedModels: string[];
   pickedModel: string | undefined;
   onPick: (model: string) => void;
+  /** While the key is checked or saved, and once connected, the pick stays as it is. */
+  locked: boolean;
   provider: CustomModelProps["provider"];
   providerName: string;
   state: CustomModelProps["state"];
@@ -56,6 +59,7 @@ export function GuidedChatModelField({
               type="button"
               aria-pressed={picked}
               onClick={() => onPick(model)}
+              disabled={locked}
               display="flex"
               alignItems="center"
               gap={1.5}
@@ -70,10 +74,11 @@ export function GuidedChatModelField({
               px={2.5}
               py={1}
               cursor="pointer"
+              _disabled={{ cursor: "default" }}
             >
               {picked && <Sparkles size={11} />}
               {model}
-              {index === 0 && (
+              {index === 0 && picked && (
                 <Text as="span" fontFamily="body" fontSize="9.5px" fontWeight="500" opacity={0.7}>
                   recommended
                 </Text>

@@ -176,6 +176,37 @@ describe("the shared provider form in its guided presentation", () => {
     });
   });
 
+  describe("when another chat model pill is picked before connecting", () => {
+    /** @scenario "The picked chat model pill is the model the connection uses" */
+    it("connects with the picked model and locks the pills once connected", async () => {
+      const { onSaved } = renderGuided("openai");
+      const [recommended, other] = findRecommendedChatModels({ provider: "openai", limit: 4 });
+      if (!recommended || !other) throw new Error("OpenAI offers fewer than two chat models");
+      const user = userEvent.setup();
+      const group = screen.getByRole("group", { name: "Default chat model" });
+
+      await user.click(within(group).getByRole("button", { name: other }));
+      expect(within(group).getByRole("button", { name: other })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(within(group).getByRole("button", { name: recommended })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+
+      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ chatModel: other }));
+      expect(assignRole).toHaveBeenCalledWith(
+        expect.objectContaining({ model: `openai/${other}` }),
+      );
+      for (const pill of within(group).getAllByRole("button")) expect(pill).toBeDisabled();
+    });
+  });
+
   describe("when the provider refuses the typed key", () => {
     const refusal = { code: "provider_key_invalid" };
     let user: ReturnType<typeof userEvent.setup>;
