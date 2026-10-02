@@ -6,6 +6,7 @@
 
 import { AgentNotFoundError, type Agent } from "@langwatch/agent-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
@@ -14,9 +15,6 @@ import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-da
 import type { ExecutionDataServices, LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:target-loading");
-
-/** The sentinel a loader returns instead of a value when a named target is gone. */
-type LoadFailure = { error: string; status: number };
 
 interface TargetForLoading {
   type: string;
@@ -46,7 +44,7 @@ export class ExperimentTargetLoadingService {
     projectId,
     targets,
     services,
-  }: LoadArgs): Promise<Map<string, VersionedPrompt> | LoadFailure> {
+  }: LoadArgs): Promise<Map<string, VersionedPrompt>> {
     const loaded = new Map<string, VersionedPrompt>();
     for (const target of targets) {
       if (target.type !== "prompt" || !target.promptId) {
@@ -61,32 +59,34 @@ export class ExperimentTargetLoadingService {
       const versionInfo = target.promptVersionNumber
         ? ` version ${target.promptVersionNumber}`
         : "";
-      try {
-        const prompt = await services.prompts.findByIdOrHandle({
+      const prompt = await services.prompts
+        .findByIdOrHandle({
           idOrHandle: target.promptId,
           projectId,
           version: target.promptVersionNumber ?? undefined,
+        })
+        .catch((promptError: unknown) => {
+          logger.error(
+            {
+              error: promptError,
+              promptId: target.promptId,
+              version: target.promptVersionNumber,
+            },
+            "Failed to load prompt for target",
+          );
+          const message = promptError instanceof Error ? promptError.message : String(promptError);
+          throw new ExperimentEvaluationInputError({
+            status: 404,
+            reason: `Failed to load prompt "${target.promptId}"${versionInfo}: ${message}`,
+          });
         });
-        if (!prompt) {
-          return { error: `Prompt "${target.promptId}"${versionInfo} not found`, status: 404 };
-        }
-
-        loaded.set(key, prompt);
-      } catch (promptError) {
-        logger.error(
-          {
-            error: promptError,
-            promptId: target.promptId,
-            version: target.promptVersionNumber,
-          },
-          "Failed to load prompt for target",
-        );
-
-        return {
-          error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
+      if (!prompt) {
+        throw new ExperimentEvaluationInputError({
           status: 404,
-        };
+          reason: `Prompt "${target.promptId}"${versionInfo} not found`,
+        });
       }
+      loaded.set(key, prompt);
     }
 
     return loaded;
@@ -94,13 +94,9 @@ export class ExperimentTargetLoadingService {
 
   /**
    * Every agent an agent target names. `getById` throws rather than returning a nullable, so a
-   * deleted agent is translated into the same sentinel shape the other loaders return.
+   * deleted agent is refused the same way the other loaders refuse a missing target.
    */
-  async loadAgents({
-    projectId,
-    targets,
-    services,
-  }: LoadArgs): Promise<Map<string, Agent> | LoadFailure> {
+  async loadAgents({ projectId, targets, services }: LoadArgs): Promise<Map<string, Agent>> {
     const loaded = new Map<string, Agent>();
     for (const target of targets) {
       if (target.type !== "agent" || !target.dbAgentId) {
@@ -114,7 +110,10 @@ export class ExperimentTargetLoadingService {
         );
       } catch (error) {
         if (error instanceof AgentNotFoundError) {
-          return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
+          throw new ExperimentEvaluationInputError({
+            status: 404,
+            reason: `Agent "${target.dbAgentId}" not found`,
+          });
         }
 
         throw error;
@@ -136,7 +135,7 @@ export class ExperimentTargetLoadingService {
     loadedAgents,
   }: LoadArgs & {
     loadedAgents: Map<string, Agent>;
-  }): Promise<Map<string, LoadedWorkflow> | LoadFailure> {
+  }): Promise<Map<string, LoadedWorkflow>> {
     const loaded = new Map<string, LoadedWorkflow>();
     for (const request of this.workflowRequests({
       targets,
@@ -152,10 +151,6 @@ export class ExperimentTargetLoadingService {
         services,
         ...request,
       });
-      if ("error" in result) {
-        return result;
-      }
-
       loaded.set(key, result);
     }
 
@@ -203,7 +198,7 @@ export class ExperimentTargetLoadingService {
     services,
   }: LoadArgs & {
     evaluators: { dbEvaluatorId?: string }[];
-  }): Promise<Map<string, Evaluator> | LoadFailure> {
+  }): Promise<Map<string, Evaluator>> {
     const ids = new Set<string>();
     for (const evaluator of evaluators) {
       if (evaluator.dbEvaluatorId) {
@@ -230,7 +225,10 @@ export class ExperimentTargetLoadingService {
       // and stop, rather than silently running with fewer evaluators than
       // configured.
       if (!dbEvaluator) {
-        return { error: `Evaluator "${evaluatorId}" not found`, status: 404 };
+        throw new ExperimentEvaluationInputError({
+          status: 404,
+          reason: `Evaluator "${evaluatorId}" not found`,
+        });
       }
 
       loaded.set(evaluatorId, dbEvaluator);
@@ -249,23 +247,29 @@ export class ExperimentTargetLoadingService {
     services: ExecutionDataServices;
     workflowId: string;
     workflowVersionId?: string;
-  }): Promise<LoadedWorkflow | LoadFailure> {
+  }): Promise<LoadedWorkflow> {
     const workflow = await services.workflows.findWorkflow({ projectId, workflowId });
     if (!workflow) {
-      return { error: `Workflow "${workflowId}" not found`, status: 404 };
+      throw new ExperimentEvaluationInputError({
+        status: 404,
+        reason: `Workflow "${workflowId}" not found`,
+      });
     }
 
     const versionId = workflowVersionId ?? workflow.publishedId;
     if (!versionId) {
-      return {
-        error: `Workflow "${workflowId}" has no committed version to evaluate`,
+      throw new ExperimentEvaluationInputError({
         status: 400,
-      };
+        reason: `Workflow "${workflowId}" has no committed version to evaluate`,
+      });
     }
 
     const dsl = await services.workflows.findVersionDsl({ projectId, workflowId, versionId });
     if (!dsl) {
-      return { error: `Workflow version "${versionId}" not found`, status: 404 };
+      throw new ExperimentEvaluationInputError({
+        status: 404,
+        reason: `Workflow version "${versionId}" not found`,
+      });
     }
 
     return {

@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -39,7 +40,7 @@ function services(tier: "free" | "paid" | "enterprise" = "free") {
 const load = (
   tier: "free" | "paid" | "enterprise",
   rowCount: number,
-): Promise<Awaited<ReturnType<ExperimentExecutionDataService["loadExecutionData"]>>> =>
+): ReturnType<ExperimentExecutionDataService["loadExecutionData"]> =>
   ExperimentExecutionDataService.create().loadExecutionData({
     projectId: PROJECT_ID,
     dataset: { type: "inline", columns: [] },
@@ -57,28 +58,23 @@ describe("loadExecutionData row bound", () => {
   ] as const)(
     "refuses %i rows to a %s-tier caller with the tier number in the error",
     async (tier, count, bound) => {
-      const result = await load(tier, count);
-
-      if (!("error" in result)) throw new Error("expected a refusal");
-      expect(result.status).toBe(422);
-      expect(result.error).toContain(`${count}`);
-      expect(result.error).toContain(`${bound}`);
+      const refusal = load(tier, count);
+      await expect(refusal).rejects.toBeInstanceOf(ExperimentEvaluationInputError);
+      await expect(refusal).rejects.toMatchObject({
+        httpStatus: 422,
+        message: expect.stringMatching(new RegExp(`${count}.*${bound}`)),
+      });
     },
   );
 
   it("loads exactly the tier number of rows", async () => {
     const result = await load("paid", 2000);
-
-    if ("error" in result) throw new Error(`expected a load, got: ${result.error}`);
     expect(result.datasetRows).toHaveLength(2000);
   });
 
   it("refuses rows the transport schema allowed: 3000 rows read as a free caller", async () => {
     // 3000 parses under the enterprise ceiling of 4000; a free plan still
     // refuses it at the load. This is the seam the schema cannot see.
-    const result = await load("free", 3000);
-
-    if (!("error" in result)) throw new Error("expected a refusal");
-    expect(result.status).toBe(422);
+    await expect(load("free", 3000)).rejects.toMatchObject({ httpStatus: 422 });
   });
 });

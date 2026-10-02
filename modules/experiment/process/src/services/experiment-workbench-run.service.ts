@@ -167,10 +167,6 @@ export class ExperimentWorkbenchRunService {
         parameters: runInputs.parameters,
       },
     });
-    if ("error" in prepared) {
-      throw new ExperimentEvaluationInputError({ status: prepared.status, reason: prepared.error });
-    }
-
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
@@ -212,13 +208,6 @@ export class ExperimentWorkbenchRunService {
       services: runs.services,
       inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
     });
-    if ("error" in dataResult) {
-      throw new ExperimentEvaluationInputError({
-        status: dataResult.status,
-        reason: dataResult.error,
-      });
-    }
-
     const state = workbenchRunState(input);
 
     const experimentId = input.experimentId ?? "";

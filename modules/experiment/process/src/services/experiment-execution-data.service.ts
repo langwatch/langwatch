@@ -6,6 +6,7 @@ import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
 import {
@@ -170,7 +171,7 @@ export class ExperimentExecutionDataService {
     dataset: DatasetInput,
     projectId: string,
     datasets: DatasetApi,
-  ): Promise<LoadedDataset | { error: string; status: number }> {
+  ): Promise<LoadedDataset> {
     let rows: Record<string, unknown>[];
     let columns: { id: string; name: string; type: string }[];
 
@@ -211,7 +212,10 @@ export class ExperimentExecutionDataService {
       );
       rows = parseJsonColumns(rows, jsonColumns);
     } else {
-      return { error: "Invalid dataset configuration", status: 400 };
+      throw new ExperimentEvaluationInputError({
+        status: 400,
+        reason: "Invalid dataset configuration",
+      });
     }
 
     return { rows, columns };
@@ -219,8 +223,9 @@ export class ExperimentExecutionDataService {
 
   /**
    * Everything a run needs before its first row: the dataset it evaluates and every prompt, agent,
-   * workflow and evaluator its targets name. A missing target is reported as the sentinel error
-   * shape rather than run around, so a deleted target stops the run instead of emptying a column.
+   * workflow and evaluator its targets name. A missing target is refused with an
+   * ExperimentEvaluationInputError rather than run around, so a deleted target stops the run
+   * instead of emptying a column.
    */
   async loadExecutionData({
     projectId,
@@ -236,16 +241,13 @@ export class ExperimentExecutionDataService {
     evaluators: EvaluatorForLoading[];
     services: ExecutionDataServices;
     inputs?: ExecutionDataInputs;
-  }): Promise<LoadedExecutionData | { error: string; status: number }> {
+  }): Promise<LoadedExecutionData> {
     const baseDataset = await this.resolveBaseDataset({
       projectId,
       dataset,
       services,
       inputs,
     });
-    if ("error" in baseDataset) {
-      return baseDataset;
-    }
 
     // The row bound the caller's plan answers, enforced at the load so it
     // holds for inline data a transport let through and for saved datasets
@@ -253,10 +255,10 @@ export class ExperimentExecutionDataService {
     // reports success over the wrong rows.
     const rowBound = await this.resolveRowBound(projectId, services);
     if (baseDataset.rows.length > rowBound) {
-      return {
-        error: `The dataset has ${baseDataset.rows.length} rows; this plan allows at most ${rowBound} per run. Reduce the rows or run against a saved dataset.`,
+      throw new ExperimentEvaluationInputError({
         status: 422,
-      };
+        reason: `The dataset has ${baseDataset.rows.length} rows; this plan allows at most ${rowBound} per run. Reduce the rows or run against a saved dataset.`,
+      });
     }
 
     // Caller parameters become constant columns across every row, and a single
@@ -273,18 +275,12 @@ export class ExperimentExecutionDataService {
       targets,
       services,
     });
-    if ("error" in loadedPrompts) {
-      return loadedPrompts;
-    }
 
     const loadedAgents = await targetLoading.loadAgents({
       projectId,
       targets,
       services,
     });
-    if ("error" in loadedAgents) {
-      return loadedAgents;
-    }
 
     const loadedWorkflows = await targetLoading.loadWorkflows({
       projectId,
@@ -292,9 +288,6 @@ export class ExperimentExecutionDataService {
       services,
       loadedAgents,
     });
-    if ("error" in loadedWorkflows) {
-      return loadedWorkflows;
-    }
 
     const loadedEvaluators = await targetLoading.loadEvaluators({
       projectId,
@@ -302,9 +295,6 @@ export class ExperimentExecutionDataService {
       evaluators,
       services,
     });
-    if ("error" in loadedEvaluators) {
-      return loadedEvaluators;
-    }
 
     return {
       datasetRows,
@@ -347,7 +337,7 @@ export class ExperimentExecutionDataService {
     dataset: DatasetInput;
     services: ExecutionDataServices;
     inputs?: ExecutionDataInputs;
-  }): Promise<LoadedDataset | { error: string; status: number }> {
+  }): Promise<LoadedDataset> {
     if (inputs?.data) {
       return rowsFromInlineData(inputs.data);
     }

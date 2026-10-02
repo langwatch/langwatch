@@ -95,8 +95,6 @@ type LoadedCellRun = {
   sandboxApiKey?: string;
 };
 
-type LoadFailure = { error: string; status: number };
-
 /** What every step of one cell reads. */
 type CellScope = {
   request: ExperimentCellRequest;
@@ -111,14 +109,10 @@ const stopped = (results: ExperimentCellResult[] = []): ExperimentCellExecution 
 });
 
 /** A target, prompt or evaluator removed since the run started fails the cell, not the run. */
-const failedToLoad = (failure: LoadFailure): ExperimentCellExecution => ({
-  outcome: "failed",
-  error: new ExperimentEvaluationInputError({
-    status: failure.status,
-    reason: failure.error,
-  }).serialize(),
-  results: [],
-});
+const failedToLoad = (error: unknown): ExperimentCellExecution => {
+  if (!(error instanceof ExperimentEvaluationInputError)) throw error;
+  return { outcome: "failed", error: error.serialize(), results: [] };
+};
 
 type ExperimentRunCellDeps = {
   folds: ExperimentRunFoldRepository;
@@ -174,14 +168,17 @@ export class ExperimentRunCellService {
     cell: ExperimentRunTargetCell;
   }): Promise<ExperimentCellExecution> {
     const executionCell = targetCellOf({ plan, cell });
-    const loaded = await this.load({
-      projectId: request.projectId,
-      userId: plan.actor?.userId ?? null,
-      targets: [executionCell.targetConfig],
-      evaluators: executionCell.evaluatorConfigs,
-    });
-    if ("error" in loaded) return failedToLoad(loaded);
-
+    let loaded: LoadedCellRun;
+    try {
+      loaded = await this.load({
+        projectId: request.projectId,
+        userId: plan.actor?.userId ?? null,
+        targets: [executionCell.targetConfig],
+        evaluators: executionCell.evaluatorConfigs,
+      });
+    } catch (error) {
+      return failedToLoad(error);
+    }
     const traceIds = new Map<string, string>();
     if (executionCell.traceId) traceIds.set(runCellKey(executionCell), executionCell.traceId);
 
@@ -203,14 +200,17 @@ export class ExperimentRunCellService {
   }): Promise<ExperimentCellExecution> {
     const targets = pinnedTargetsOf(plan);
     if (cell.setupSkip) {
-      const loadedEvaluators = await targetLoading.loadEvaluators({
-        projectId: request.projectId,
-        targets,
-        evaluators: plan.evaluators,
-        services: this.services,
-      });
-      if ("error" in loadedEvaluators) return failedToLoad(loadedEvaluators);
-
+      let loadedEvaluators: Map<string, Evaluator>;
+      try {
+        loadedEvaluators = await targetLoading.loadEvaluators({
+          projectId: request.projectId,
+          targets,
+          evaluators: plan.evaluators,
+          services: this.services,
+        });
+      } catch (error) {
+        return failedToLoad(error);
+      }
       return this.skip({
         scope: { request, plan, traceIds: new Map() },
         reason: { ...cell, ...cell.setupSkip },
@@ -219,14 +219,17 @@ export class ExperimentRunCellService {
     }
 
     const progress = await this.getPhaseOneProgress(request);
-    const loaded = await this.load({
-      projectId: request.projectId,
-      userId: plan.actor?.userId ?? null,
-      targets,
-      evaluators: plan.evaluators,
-    });
-    if ("error" in loaded) return failedToLoad(loaded);
-
+    let loaded: LoadedCellRun;
+    try {
+      loaded = await this.load({
+        projectId: request.projectId,
+        userId: plan.actor?.userId ?? null,
+        targets,
+        evaluators: plan.evaluators,
+      });
+    } catch (error) {
+      return failedToLoad(error);
+    }
     const scope = { request, plan, traceIds: new Map(Object.entries(progress.traceIds)) };
     const planned = ExperimentComparisonPlanService.create({
       loadedPrompts: loaded.loadedPrompts,
@@ -489,13 +492,11 @@ export class ExperimentRunCellService {
     userId: string | null;
     targets: TargetConfig[];
     evaluators: { dbEvaluatorId?: string }[];
-  }): Promise<LoadedCellRun | LoadFailure> {
+  }): Promise<LoadedCellRun> {
     const services = this.services;
     const loadedPrompts = await targetLoading.loadPrompts({ projectId, targets, services });
-    if ("error" in loadedPrompts) return loadedPrompts;
 
     const loadedAgents = await targetLoading.loadAgents({ projectId, targets, services });
-    if ("error" in loadedAgents) return loadedAgents;
 
     const loadedWorkflows = await targetLoading.loadWorkflows({
       projectId,
@@ -503,7 +504,6 @@ export class ExperimentRunCellService {
       services,
       loadedAgents,
     });
-    if ("error" in loadedWorkflows) return loadedWorkflows;
 
     const loadedEvaluators = await targetLoading.loadEvaluators({
       projectId,
@@ -511,7 +511,6 @@ export class ExperimentRunCellService {
       evaluators,
       services,
     });
-    if ("error" in loadedEvaluators) return loadedEvaluators;
 
     const sandboxApiKey = await sandboxKey.findRunSandboxApiKey({
       sandboxCredentials: this.collaborators.sandboxCredentials,

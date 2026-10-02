@@ -25,10 +25,7 @@ export type {
   RunResultsPersistence,
   RunResultsWriter,
 } from "./services/experiment-run-results-writer.service.ts";
-export type {
-  SavedStateExecution,
-  SavedStateExecutionRefusal,
-} from "./services/experiment-saved-state-execution.service.ts";
+export type { SavedStateExecution } from "./services/experiment-saved-state-execution.service.ts";
 export type {
   ExecutionDataInputs,
   ExecutionDataServices,

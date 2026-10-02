@@ -3,7 +3,6 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type EvaluationsV3State,
-  ExperimentEvaluationInputError,
   ExperimentRunLoopUnavailableError,
   extractPersistedState,
   findOrCreateWorkflowExperimentInputSchema,
@@ -297,13 +296,6 @@ export class WorkflowEvaluationService {
       services: this.dependencies.services,
       inputs: { data, datasetId: resolvedDatasetId, parameters },
     });
-    if ("error" in dataResult) {
-      throw new ExperimentEvaluationInputError({
-        status: dataResult.status,
-        reason: dataResult.error,
-      });
-    }
-
     const state = WorkflowEvaluationService.evaluationState({
       workflowName: workflow.name,
       target,

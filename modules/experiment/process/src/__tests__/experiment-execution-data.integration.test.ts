@@ -297,10 +297,6 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         services: { ...services(), agents: agentApi(agentService) },
       });
 
-      if ("error" in result) {
-        throw new Error(`loadExecutionData failed: ${result.error}`);
-      }
-
       const loadedWorkflow = result.loadedWorkflows.get(workflowLoadKey({ workflowId }));
       expect(loadedWorkflow).toBeDefined();
       expect(loadedWorkflow?.id).toBe(workflowId);
@@ -337,7 +333,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await ExperimentExecutionDataService.create().loadExecutionData({
+      const result = ExperimentExecutionDataService.create().loadExecutionData({
         projectId: PROJECT_ID,
         dataset: {
           type: "inline",
@@ -349,8 +345,9 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         services: { ...services(), agents: agentApi(agentService) },
       });
 
-      if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
-      expect(result.error).toContain("no committed version");
+      await expect(result).rejects.toMatchObject({
+        message: expect.stringContaining("no committed version"),
+      });
     });
   });
 
@@ -360,7 +357,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing agent", async () => {
         const missingAgentId = `test_agent_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.create().loadExecutionData({
+        const result = ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,
           dataset: {
             type: "inline",
@@ -372,9 +369,10 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
           services: services(),
         });
 
-        if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
-        expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
-        expect(result.status).toBe(404);
+        await expect(result).rejects.toMatchObject({
+          message: `Agent "${missingAgentId}" not found`,
+          httpStatus: 404,
+        });
       });
     });
   });
@@ -415,10 +413,6 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
           services: { ...services(), prompts: promptService },
         });
 
-        if ("error" in result) {
-          throw new Error(`loadExecutionData failed: ${result.error}`);
-        }
-
         const first = result.loadedPrompts.get(
           promptLoadKey({
             promptId: created.id,
@@ -446,7 +440,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing evaluator", async () => {
         const missingEvaluatorId = `test_eval_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.create().loadExecutionData({
+        const result = ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,
           dataset: {
             type: "inline",
@@ -458,9 +452,10 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
           services: services(),
         });
 
-        if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
-        expect(result.error).toBe(`Evaluator "${missingEvaluatorId}" not found`);
-        expect(result.status).toBe(404);
+        await expect(result).rejects.toMatchObject({
+          message: `Evaluator "${missingEvaluatorId}" not found`,
+          httpStatus: 404,
+        });
       });
     });
   });

@@ -48,11 +48,6 @@ export interface SavedStateExecution {
   loadedWorkflows: LoadedExecutionData["loadedWorkflows"];
 }
 
-export interface SavedStateExecutionRefusal {
-  error: string;
-  status: number;
-}
-
 /**
  * Everything a run started from the SAVED workbench state goes through: what
  * the run reuses, what it carries over, and the load that resolves it all.
@@ -147,8 +142,8 @@ export class ExperimentSavedStateExecutionService {
   }
 
   /**
-   * Loads orchestrator input from saved state. Throws standard validation errors;
-   * loader refusals returned as {error, status}.
+   * Loads orchestrator input from saved state. Throws standard validation errors and
+   * the loader's ExperimentEvaluationInputError refusals.
    */
   async prepareSavedStateExecution({
     experiments,
@@ -163,12 +158,8 @@ export class ExperimentSavedStateExecutionService {
     projectId: string;
     slug: string;
     runInputs?: ExecutionDataInputs;
-  }): Promise<SavedStateExecution | SavedStateExecutionRefusal> {
+  }): Promise<SavedStateExecution> {
     const saved = await readSavedWorkbench({ experiments, projectId, slug });
-    if ("error" in saved) {
-      return saved;
-    }
-
     const { experimentId, workbenchState, dataset } = saved;
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
@@ -179,10 +170,6 @@ export class ExperimentSavedStateExecutionService {
       services,
       inputs: runInputs ?? {},
     });
-    if ("error" in dataResult) {
-      return { error: dataResult.error, status: dataResult.status };
-    }
-
     return {
       experiment: { id: experimentId, slug },
       workbenchState,
@@ -215,7 +202,7 @@ async function readSavedWorkbench({
   experiments: ExperimentService;
   projectId: string;
   slug: string;
-}): Promise<SavedWorkbench | SavedStateExecutionRefusal> {
+}): Promise<SavedWorkbench> {
   const experiment = await experiments.findBySlugAndType({
     projectId,
     slug,
@@ -238,7 +225,7 @@ async function readSavedWorkbench({
     (candidate) => candidate.id === workbenchState.activeDatasetId,
   );
   if (!dataset) {
-    return { error: "No dataset configured", status: 400 };
+    throw new ExperimentEvaluationInputError({ status: 400, reason: "No dataset configured" });
   }
 
   return { experimentId: experiment.id, workbenchState, dataset };

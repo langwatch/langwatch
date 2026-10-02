@@ -1,5 +1,6 @@
 import { agentSchema, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -81,12 +82,17 @@ async function load({
   agents?: Agent[];
 }) {
   const { calls, services } = servicesOver(catalogue);
-  const result = await ExperimentTargetLoadingService.create().loadWorkflows({
-    projectId: PROJECT_ID,
-    targets,
-    services,
-    loadedAgents: new Map(agents.map((agent) => [agent.id, agent])),
-  });
+  const result = await ExperimentTargetLoadingService.create()
+    .loadWorkflows({
+      projectId: PROJECT_ID,
+      targets,
+      services,
+      loadedAgents: new Map(agents.map((agent) => [agent.id, agent])),
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof ExperimentEvaluationInputError)) throw error;
+      return { error: error.message, status: error.httpStatus };
+    });
   const loaded =
     result instanceof Map
       ? [...result.entries()].map(([key, workflow]) => [key, workflow.id, workflow.versionId])
