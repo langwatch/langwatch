@@ -17,14 +17,13 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import {
   instantEvalsReleased,
   organizationOfProject,
 } from "~/server/app-layer/instant-evals/access";
-import { instantEvalJudgeRoute } from "~/server/app-layer/instant-evals/classifier";
+import { isSelfHostedJudgingThroughConnect } from "~/server/app-layer/instant-evals/classifier";
 import {
   instantEvalOptInOffer,
   switchInstantEvalsOn,
@@ -182,8 +181,7 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
       ]);
       // A self-hosted install that judges through LangWatch: what the
       // "can't run right now" popover adds the two addresses it needs for.
-      const viaConnect =
-        env.IS_SAAS !== true && instantEvalJudgeRoute() === "connect";
+      const viaConnect = isSelfHostedJudgingThroughConnect();
       return { released, offer, viaConnect };
     }),
 

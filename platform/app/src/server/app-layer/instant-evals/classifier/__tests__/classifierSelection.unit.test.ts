@@ -18,6 +18,7 @@ import {
   isInstantEvalClassifierAvailableForOrganization,
   isInstantEvalClassifierConfigured,
   isInstantEvalLicensedForOrganization,
+  isSelfHostedJudgingThroughConnect,
   resetInstantEvalClassifier,
 } from "../index";
 import { JevInstantEvalClassifier } from "../jev.client";
@@ -123,6 +124,25 @@ describe("given an install that judges through LangWatch", () => {
         isInstantEvalLicensedForOrganization("licensed-organization"),
       ).resolves.toBe(true);
       expect(available).toHaveBeenCalledWith("licensed-organization");
+      available.mockRestore();
+    });
+  });
+});
+
+describe("given the hosted service with no judge key of its own", () => {
+  describe("when the access read asks whether the license releases Instant Evals", () => {
+    it("answers no without reading the organization, since the hosted service has no license", async () => {
+      env.IS_SAAS = true;
+      const available = vi.spyOn(
+        ConnectInstantEvalClassifier.prototype,
+        "isAvailableForOrganization",
+      );
+
+      expect(isSelfHostedJudgingThroughConnect()).toBe(false);
+      await expect(
+        isInstantEvalLicensedForOrganization("any-organization"),
+      ).resolves.toBe(false);
+      expect(available).not.toHaveBeenCalled();
       available.mockRestore();
     });
   });

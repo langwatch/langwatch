@@ -92,9 +92,19 @@ export function isInstantEvalClassifierConfigured(): boolean {
 }
 
 /**
+ * Whether this is a self-hosted install that judges through LangWatch. The
+ * hosted service is never one, whatever its environment holds, so the license
+ * check and the popover's host sentence rest on the deployment and not on the
+ * hosted service happening to set a judge key.
+ */
+export function isSelfHostedJudgingThroughConnect(): boolean {
+  return env.IS_SAAS !== true && instantEvalJudgeRoute() === "connect";
+}
+
+/**
  * Whether the organization's license is what releases Instant Evals to it:
- * the install judges through LangWatch, and the organization's license names
- * hosted judging that no admin switched off.
+ * a self-hosted install that judges through LangWatch, and the organization's
+ * license names hosted judging that no admin switched off.
  *
  * The license is signed by the customer, which makes it the organization's
  * agreement to the data flow in the same way the hosted service's own switch
@@ -105,7 +115,7 @@ export function isInstantEvalClassifierConfigured(): boolean {
 export async function isInstantEvalLicensedForOrganization(
   organizationId: string,
 ): Promise<boolean> {
-  if (instantEvalJudgeRoute() !== "connect") return false;
+  if (!isSelfHostedJudgingThroughConnect()) return false;
   return await isInstantEvalClassifierAvailableForOrganization(organizationId);
 }
 
@@ -137,20 +147,28 @@ export function getInstantEvalClassifier(): InstantEvalClassifier {
   return (cached ??= createInstantEvalClassifier());
 }
 
+/**
+ * Built from `instantEvalJudgeRoute()`, so the classifier this process judges
+ * with and the route the popover reports are the same answer.
+ */
 function createInstantEvalClassifier(): InstantEvalClassifier {
-  if (env.INSTANT_EVAL_CLASSIFIER === "null") {
-    return new NullInstantEvalClassifier();
-  }
-
+  const route = instantEvalJudgeRoute();
   const apiKey = env.JEV_API_KEY;
-  if (!apiKey) {
-    const config = readConnectConfig();
-    if (config.permitted) {
-      return new ConnectInstantEvalClassifier({ prisma, config });
+
+  if (route === "connect") {
+    return new ConnectInstantEvalClassifier({
+      prisma,
+      config: readConnectConfig(),
+    });
+  }
+  // The key is read again only so the type narrows: the route is `own_key`
+  // exactly when it is set.
+  if (route !== "own_key" || !apiKey) {
+    if (route === "disconnected") {
+      logger.info(
+        "No Instant Evals classifier is configured; judged columns will be skipped",
+      );
     }
-    logger.info(
-      "No Instant Evals classifier is configured; judged columns will be skipped",
-    );
     return new NullInstantEvalClassifier();
   }
 
