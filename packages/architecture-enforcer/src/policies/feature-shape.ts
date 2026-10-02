@@ -137,7 +137,7 @@ function pascalCase(feature: string): string {
 }
 
 /**
- * Every `<x>Server` identifier the generated server list installs, so "installer
+ * Every `<x>ProcessModule` (or older `<x>Server`) the generated list installs, so "installer
  * not booted" means the checked-in list is stale relative to the catalogue.
  */
 function bootedInstallers(root: string): Set<string> {
@@ -155,7 +155,12 @@ function isBooted(feature: string, booted: ReadonlySet<string>): boolean {
   const pascal = pascalCase(feature);
   const camel = pascal.charAt(0).toLowerCase() + pascal.slice(1);
 
-  return [...booted].some((name) => name === `${camel}Server` || name.endsWith(`${pascal}Server`));
+  return [...booted].some(
+    (name) =>
+      [`${camel}ProcessModule`, `${camel}Server`].includes(name) ||
+      name.endsWith(`${pascal}ProcessModule`) ||
+      name.endsWith(`${pascal}Server`),
+  );
 }
 
 function compareEntries(left: FeatureShapeKey, right: FeatureShapeKey): number {

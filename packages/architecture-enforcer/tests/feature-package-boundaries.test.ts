@@ -453,7 +453,25 @@ describe("feature package boundary lint", () => {
   });
 
   /** @scenario Core packages cannot import enterprise implementations */
-  it("rejects enterprise dependencies from core", () => {
+  it("rejects enterprise implementation dependencies from core", () => {
+    featurePackage({
+      feature: "billing",
+      role: "process",
+      name: "@langwatch/enterprise-billing-process",
+      enterprise: true,
+    });
+    featurePackage({
+      feature: "entitlement",
+      role: "process",
+      dependencies: { "@langwatch/enterprise-billing-process": "workspace:*" },
+      source:
+        'import type { value } from "@langwatch/enterprise-billing-process"; export type Value = typeof value;',
+    });
+    expect(policies()).toContain("enterprise-direction");
+  });
+
+  /** @scenario Core packages import enterprise contracts like a peer's */
+  it("accepts an enterprise contract dependency from core", () => {
     featurePackage({
       feature: "billing",
       role: "contract",
@@ -467,7 +485,26 @@ describe("feature package boundary lint", () => {
       source:
         'import type { value } from "@langwatch/enterprise-billing-contract"; export type Value = typeof value;',
     });
-    expect(policies()).toContain("enterprise-direction");
+    expect(policies()).not.toContain("enterprise-direction");
+  });
+
+  /** @scenario Applications install enterprise modules beside core ones */
+  it("accepts an enterprise process dependency from an application", () => {
+    featurePackage({
+      feature: "billing",
+      role: "process",
+      name: "@langwatch/enterprise-billing-process",
+      enterprise: true,
+    });
+    write(
+      "apps/api/package.json",
+      JSON.stringify({
+        name: "@langwatch/platform-api",
+        private: true,
+        dependencies: { "@langwatch/enterprise-billing-process": "workspace:*" },
+      }),
+    );
+    expect(policies()).not.toContain("enterprise-direction");
   });
 
   /** @scenario Wildcard exports are forbidden for feature packages */

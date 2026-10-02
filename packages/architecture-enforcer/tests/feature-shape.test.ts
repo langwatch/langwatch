@@ -59,7 +59,7 @@ function generatedModuleList(identifiers: readonly string[] = []): void {
 
 /** The annotation reference shape, reduced to the paths the policy reads. */
 function referenceFeature(): void {
-  generatedModuleList(["widgetServer"]);
+  generatedModuleList(["widgetProcessModule"]);
   write("modules/widget/contract/src/widget.api.ts");
   write("modules/widget/process/src/widget.module.ts");
   write("modules/widget/process/src/app/widget.app.ts");

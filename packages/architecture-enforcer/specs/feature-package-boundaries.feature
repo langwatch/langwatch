@@ -131,9 +131,22 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: Core packages cannot import enterprise implementations
-    Given a core package imports an enterprise package
+    Given a core module package imports an enterprise process or browser package
     When architecture lint checks the importer
     Then the enterprise dependency is rejected
+    And the diagnostic names the enterprise contract as the allowed dependency
+
+  @unit @architecture
+  Scenario: Core packages import enterprise contracts like a peer's
+    Given a core module package imports an enterprise contract package
+    When architecture lint checks the importer
+    Then the enterprise dependency is accepted
+
+  @unit @architecture
+  Scenario: Applications install enterprise modules beside core ones
+    Given an application package depends on an enterprise process package
+    When architecture lint checks the application
+    Then the enterprise dependency is accepted
 
   @unit @architecture
   Scenario: Only composition roots import feature server installers

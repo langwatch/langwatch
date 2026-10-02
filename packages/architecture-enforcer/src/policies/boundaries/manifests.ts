@@ -366,14 +366,10 @@ const enterpriseRootTargetCheck: DependencyCheck = (pkg, target, dependency) => 
   };
 };
 
+/** Apps carry both tiers; a core module imports an enterprise contract like a peer's (record §11). */
 const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
-  const isMatchingApplicationComposition =
-    pkg.kind === "application" &&
-    target.kind === "enterprise-composition" &&
-    matchingEnterpriseComposition(pkg, target);
-
-  const crossesIntoEnterprise =
-    !pkg.enterprise && target.enterprise && !isMatchingApplicationComposition;
+  const isAllowedEdge = pkg.kind === "application" || target.kind === "contract";
+  const crossesIntoEnterprise = !pkg.enterprise && target.enterprise && !isAllowedEdge;
 
   if (!crossesIntoEnterprise) return undefined;
 
@@ -381,7 +377,8 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
     policy: "enterprise-direction",
     file: pkg.manifestPath,
     specifier: dependency,
-    message: "A core package cannot depend on an enterprise package.",
+    message: "A core package cannot depend on an enterprise implementation package.",
+    allowed: "Depend on the enterprise module's contract package.",
   };
 };
 
