@@ -7,6 +7,7 @@ import {
   type ProjectionAnnotationRow,
   type UpdateAnnotationInput,
 } from "./annotation.repository";
+import { AnnotationNotFoundError } from "./errors";
 import { syncAnnotationToTrace } from "./syncAnnotationToTrace";
 
 export class AnnotationService {
@@ -39,6 +40,9 @@ export class AnnotationService {
 
   async delete(input: DeleteAnnotationInput): Promise<Annotation> {
     const annotation = await this.repository.delete(input);
+    if (!annotation) {
+      throw new AnnotationNotFoundError({ annotationId: input.id });
+    }
     await syncAnnotationToTrace({
       action: "remove",
       projectId: annotation.projectId,

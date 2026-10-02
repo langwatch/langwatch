@@ -131,4 +131,51 @@ describe("Annotations REST API → trace sync", () => {
       );
     });
   });
+
+  describe("when the annotation id does not exist in the project", () => {
+    const PRISMA_PROSE =
+      "An operation failed because it depends on one or more records that were required but not found.";
+
+    beforeEach(() => {
+      mockAnnotationDelete.mockRejectedValue(
+        Object.assign(new Error(PRISMA_PROSE), { code: "P2025" }),
+      );
+    });
+
+    it("answers 404 annotation_not_found without database prose", async () => {
+      const res = await app.request("/api/annotations/ann-missing", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(404);
+      const body = await res.text();
+      // The documented 404 schema, and the clients generated from it, pin
+      // `error` to the code itself rather than a status phrase.
+      expect(JSON.parse(body).error).toBe("annotation_not_found");
+      expect(body).not.toContain(PRISMA_PROSE);
+    });
+
+    it("leaves the trace untouched", async () => {
+      await app.request("/api/annotations/ann-missing", { method: "DELETE" });
+
+      expect(mockRemoveAnnotation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the delete fails for another reason", () => {
+    beforeEach(() => {
+      mockAnnotationDelete.mockRejectedValue(
+        new Error("connection to db-host:5432 refused"),
+      );
+    });
+
+    it("answers a generic 500 that does not echo the database error", async () => {
+      const res = await app.request("/api/annotations/ann-1", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(500);
+      expect(await res.text()).not.toContain("db-host");
+    });
+  });
 });
