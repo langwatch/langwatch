@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 export interface ExecutionLogEntry {
   id: string;
@@ -24,35 +24,38 @@ interface ExecutionStore {
   clearLog: () => void;
 }
 
-export const useExecutionStore = create<ExecutionStore>((set) => ({
-  batchCount: 1,
-  staggerMs: 0,
-  running: false,
-  log: [],
+export const useExecutionStore = defineSlice<ExecutionStore>({
+  name: "ops:foundry-execution",
+  create: (set) => ({
+    batchCount: 1,
+    staggerMs: 0,
+    running: false,
+    log: [],
 
-  setBatchCount(count) {
-    set({ batchCount: Math.max(1, Math.min(100, count)) });
-  },
+    setBatchCount(count) {
+      set({ batchCount: Math.max(1, Math.min(100, count)) });
+    },
 
-  setStaggerMs(ms) {
-    set({ staggerMs: Math.max(0, ms) });
-  },
+    setStaggerMs(ms) {
+      set({ staggerMs: Math.max(0, ms) });
+    },
 
-  setRunning(running) {
-    set({ running });
-  },
+    setRunning(running) {
+      set({ running });
+    },
 
-  addLogEntry(entry) {
-    set((state) => ({ log: [entry, ...state.log].slice(0, 50) }));
-  },
+    addLogEntry(entry) {
+      set((state) => ({ log: [entry, ...state.log].slice(0, 50) }));
+    },
 
-  updateLogEntry(id, partial) {
-    set((state) => ({
-      log: state.log.map((e) => (e.id === id ? { ...e, ...partial } : e)),
-    }));
-  },
+    updateLogEntry(id, partial) {
+      set((state) => ({
+        log: state.log.map((e) => (e.id === id ? { ...e, ...partial } : e)),
+      }));
+    },
 
-  clearLog() {
-    set({ log: [] });
-  },
-}));
+    clearLog() {
+      set({ log: [] });
+    },
+  }),
+});

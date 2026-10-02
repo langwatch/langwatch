@@ -3,7 +3,7 @@ import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities"
 import { useRef } from "react";
 
 import { useShowErrorToast } from "../../../behavior/ops-feedback.ts";
-import { useFoundryProjectStore } from "./foundry-project.store.ts";
+import { heldFoundryToken, holdFoundryToken } from "./foundry-project.store.ts";
 import { useTargetProject } from "./use-target-project.ts";
 
 /** The target project and an ingestion-only token for it, minted once per project and user. */
@@ -18,11 +18,11 @@ export function useTargetProjectKey() {
 
   async function mintApiKey(): Promise<string | undefined> {
     if (!project || !scopeKey) return void 0;
-    const store = useFoundryProjectStore.getState();
     // Held as a promise, so a second send while the first mint is in flight joins it.
+    const current = heldFoundryToken();
     const held =
-      store.heldToken?.scopeKey === scopeKey
-        ? store.heldToken
+      current?.scopeKey === scopeKey
+        ? current
         : {
             scopeKey,
             token: mutateAsync(
@@ -35,12 +35,12 @@ export function useTargetProjectKey() {
               .then((answer) => answer.token)
               .finally(() => reset()),
           };
-    store.holdToken(held);
+    holdFoundryToken({ held });
     try {
       const token = await held.token;
       return currentScope.current === scopeKey ? token : void 0;
     } catch (error) {
-      if (useFoundryProjectStore.getState().heldToken === held) store.holdToken(null);
+      if (heldFoundryToken() === held) holdFoundryToken({ held: null });
       showErrorToast({ error, fallbackTitle: "Couldn't create the personal access token" });
       return void 0;
     }

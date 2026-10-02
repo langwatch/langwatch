@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import type { SpanConfig, SpanType, TraceConfig } from "../model/foundry-types.ts";
 import { shortId } from "../model/foundry-types.ts";
@@ -200,79 +200,84 @@ function insertDuplicate(spans: SpanConfig[], id: string): string | null {
   return duplicate.id;
 }
 
-export const useTraceStore = create<TraceStore>((set) => ({
-  trace: createDefaultTrace(),
-  selectedSpanId: null,
+export const useTraceStore = defineSlice<TraceStore>({
+  name: "ops:foundry-trace",
+  create: (set) => ({
+    trace: createDefaultTrace(),
+    selectedSpanId: null,
 
-  setTrace(trace) {
-    set({ trace, selectedSpanId: null });
-  },
+    setTrace(trace) {
+      set({ trace, selectedSpanId: null });
+    },
 
-  updateTrace(partial) {
-    set((state) => ({ trace: { ...state.trace, ...partial } }));
-  },
+    updateTrace(partial) {
+      set((state) => ({ trace: { ...state.trace, ...partial } }));
+    },
 
-  selectSpan(id) {
-    set({ selectedSpanId: id });
-  },
+    selectSpan(id) {
+      set({ selectedSpanId: id });
+    },
 
-  addSpan(parentId, type) {
-    const newSpan = createDefaultSpan(type);
-    set((state) => ({
-      trace: {
-        ...state.trace,
-        spans: addSpanToTree(state.trace.spans, parentId, newSpan),
-      },
-      selectedSpanId: newSpan.id,
-    }));
-  },
+    addSpan(parentId, type) {
+      const newSpan = createDefaultSpan(type);
+      set((state) => ({
+        trace: {
+          ...state.trace,
+          spans: addSpanToTree(state.trace.spans, parentId, newSpan),
+        },
+        selectedSpanId: newSpan.id,
+      }));
+    },
 
-  removeSpan(id) {
-    set((state) => ({
-      trace: {
-        ...state.trace,
-        spans: removeSpanFromTree(state.trace.spans, id),
-      },
-      selectedSpanId: state.selectedSpanId === id ? null : state.selectedSpanId,
-    }));
-  },
+    removeSpan(id) {
+      set((state) => ({
+        trace: {
+          ...state.trace,
+          spans: removeSpanFromTree(state.trace.spans, id),
+        },
+        selectedSpanId: state.selectedSpanId === id ? null : state.selectedSpanId,
+      }));
+    },
 
-  updateSpan(id, partial) {
-    set((state) => ({
-      trace: {
-        ...state.trace,
-        spans: updateSpanInTree(state.trace.spans, id, (span) => ({
-          ...span,
-          ...partial,
-        })),
-      },
-    }));
-  },
+    updateSpan(id, partial) {
+      set((state) => ({
+        trace: {
+          ...state.trace,
+          spans: updateSpanInTree(state.trace.spans, id, (span) => ({
+            ...span,
+            ...partial,
+          })),
+        },
+      }));
+    },
 
-  moveSpan(id, direction) {
-    set((state) => withEditedSpans(state, (spans) => moveAmongSiblings({ spans, id, direction })));
-  },
+    moveSpan(id, direction) {
+      set((state) =>
+        withEditedSpans(state, (spans) => moveAmongSiblings({ spans, id, direction })),
+      );
+    },
 
-  indentSpan(id) {
-    set((state) => withEditedSpans(state, (spans) => indentUnderPreviousSibling(spans, id)));
-  },
+    indentSpan(id) {
+      set((state) => withEditedSpans(state, (spans) => indentUnderPreviousSibling(spans, id)));
+    },
 
-  outdentSpan(id) {
-    set((state) => withEditedSpans(state, (spans) => outdentBesideParent(spans, id)));
-  },
+    outdentSpan(id) {
+      set((state) => withEditedSpans(state, (spans) => outdentBesideParent(spans, id)));
+    },
 
-  duplicateSpan(id) {
-    set((state) => {
-      const spans = structuredClone(state.trace.spans);
-      const duplicateId = insertDuplicate(spans, id);
-      if (duplicateId === null) return state;
-      return { trace: { ...state.trace, spans }, selectedSpanId: duplicateId };
-    });
-  },
+    duplicateSpan(id) {
+      set((state) => {
+        const spans = structuredClone(state.trace.spans);
+        const duplicateId = insertDuplicate(spans, id);
+        if (duplicateId === null) return state;
+        return { trace: { ...state.trace, spans }, selectedSpanId: duplicateId };
+      });
+    },
 
-  resetTrace() {
-    set({ trace: createDefaultTrace(), selectedSpanId: null });
-  },
-}));
+    resetTrace() {
+      set({ trace: createDefaultTrace(), selectedSpanId: null });
+    },
+  }),
+});
 
 export { createDefaultSpan, createDefaultTrace };

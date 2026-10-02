@@ -1,28 +1,12 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import { builtInPresets } from "../model/foundry-presets.ts";
 import type { Preset, TraceConfig } from "../model/foundry-types.ts";
 import { shortId } from "../model/foundry-types.ts";
 
-function loadUserPresets(): Preset[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem("otel-playground:presets");
-    return raw ? (JSON.parse(raw) as Preset[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveUserPresets(presets: Preset[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("otel-playground:presets", JSON.stringify(presets));
-}
-
 interface PresetStore {
   builtIn: Preset[];
   userPresets: Preset[];
-  allPresets: Preset[];
   savePreset(name: string, description: string, config: TraceConfig): void;
   deletePreset(id: string): void;
   duplicatePreset(id: string): void;
@@ -32,12 +16,15 @@ interface PresetStore {
   getPreset(id: string): Preset | undefined;
 }
 
-export const usePresetStore = create<PresetStore>((set, get) => {
-  const userPresets = loadUserPresets();
-  return {
+const allPresets = ({ builtIn, userPresets }: PresetStore) => [...builtIn, ...userPresets];
+
+/** User presets persist per reader (record §10.2); built-ins always come from code. */
+export const usePresetStore = defineSlice<PresetStore>({
+  name: "ops:foundry-presets",
+  persist: { partialize: ({ userPresets }) => ({ userPresets }) },
+  create: (set, get) => ({
     builtIn: builtInPresets,
-    userPresets,
-    allPresets: [...builtInPresets, ...userPresets],
+    userPresets: [],
 
     savePreset(name, description, config) {
       const preset: Preset = {
@@ -49,27 +36,19 @@ export const usePresetStore = create<PresetStore>((set, get) => {
       };
       set((state) => {
         const updated = [...state.userPresets, preset];
-        saveUserPresets(updated);
-        return {
-          userPresets: updated,
-          allPresets: [...state.builtIn, ...updated],
-        };
+        return { userPresets: updated };
       });
     },
 
     deletePreset(id) {
       set((state) => {
         const updated = state.userPresets.filter((p) => p.id !== id);
-        saveUserPresets(updated);
-        return {
-          userPresets: updated,
-          allPresets: [...state.builtIn, ...updated],
-        };
+        return { userPresets: updated };
       });
     },
 
     duplicatePreset(id) {
-      const preset = get().allPresets.find((p) => p.id === id);
+      const preset = allPresets(get()).find((p) => p.id === id);
       if (!preset) return;
       const dup: Preset = {
         id: shortId(),
@@ -80,27 +59,19 @@ export const usePresetStore = create<PresetStore>((set, get) => {
       };
       set((state) => {
         const updated = [...state.userPresets, dup];
-        saveUserPresets(updated);
-        return {
-          userPresets: updated,
-          allPresets: [...state.builtIn, ...updated],
-        };
+        return { userPresets: updated };
       });
     },
 
     renamePreset(id, name) {
       set((state) => {
         const updated = state.userPresets.map((p) => (p.id === id ? { ...p, name } : p));
-        saveUserPresets(updated);
-        return {
-          userPresets: updated,
-          allPresets: [...state.builtIn, ...updated],
-        };
+        return { userPresets: updated };
       });
     },
 
     exportPreset(id) {
-      const preset = get().allPresets.find((p) => p.id === id);
+      const preset = allPresets(get()).find((p) => p.id === id);
       return preset ? JSON.stringify(preset, null, 2) : "{}";
     },
 
@@ -111,11 +82,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
         preset.builtIn = false;
         set((state) => {
           const updated = [...state.userPresets, preset];
-          saveUserPresets(updated);
-          return {
-            userPresets: updated,
-            allPresets: [...state.builtIn, ...updated],
-          };
+          return { userPresets: updated };
         });
       } catch {
         // Invalid JSON, ignore
@@ -123,7 +90,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
     },
 
     getPreset(id) {
-      return get().allPresets.find((p) => p.id === id);
+      return allPresets(get()).find((p) => p.id === id);
     },
-  };
+  }),
 });
