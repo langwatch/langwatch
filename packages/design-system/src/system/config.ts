@@ -73,8 +73,9 @@ export const designSystemConfig = defineConfig({
       },
       // A toast card rising into the stack and sinking out of it. It runs on
       // `transform`, so it composes with the stack's own translate and scale.
+      // No scale on the way in: the stack measures a card's height as it opens.
       "toast-rise": {
-        from: { transform: "translateY(24px) scale(0.94)", opacity: 0, filter: "blur(4px)" },
+        from: { transform: "translateY(24px)", opacity: 0, filter: "blur(4px)" },
         to: { transform: "none", opacity: 1, filter: "none" },
       },
       "toast-sink": {
@@ -1258,6 +1259,10 @@ export const designSystemConfig = defineConfig({
               transformOrigin: "top center",
               "&:not([data-first]) > *": { opacity: 0 },
             },
+            // The stack measures a card unscaled, before it mounts: the last
+            // card measured sizes every card behind the front, so a back card
+            // measured at its 0.85 would shrink them all. It scales on mount.
+            "&:not([data-mounted])": { scale: "1" },
             // Cards glide when the stack fans out, collapses or moves up.
             transitionProperty: "translate, scale, opacity, height, box-shadow",
             transitionDuration: "450ms",

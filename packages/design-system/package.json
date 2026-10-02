@@ -419,7 +419,8 @@
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@langwatch/time": "workspace:*",
@@ -441,6 +442,7 @@
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/design-system-internal": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@storybook/addon-a11y": "^10.5.10",
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/react-vite": "^10.5.10",
@@ -450,7 +452,9 @@
     "@types/numeral": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "storybook": "^10.5.10",

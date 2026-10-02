@@ -31,3 +31,26 @@ Feature: Shared components sit cleanly on the page
     When the reader looks at the empty state
     Then it stretches across the container's full width
     And its title and description are centred
+
+  @integration @browser
+  Scenario: The peeking cards of a dark toast stack measure evenly in a real browser
+    Given dark mode and four toasts raised in a collapsed stack
+    When the stack has settled
+    Then the top edges of the front card and the two behind it are one equal step apart
+    And every visible card is centred on the front card
+    And the count of waiting toasts ends at or above the front card's top edge
+
+  @integration @browser
+  Scenario: The marker of a dark segmented control measures evenly in a real browser
+    Given dark mode and a segmented control of three options with the middle one selected
+    When the marker has settled
+    Then it sits inside the control as far from the top edge as from the bottom
+    And the options sit as far from the left and right edges as the marker from the top
+    And the marker covers the selected option
+
+  @integration @browser
+  Scenario: A dark empty state measures as wide as its start-aligned container
+    Given dark mode and an empty state inside an 800px column that aligns its children to the start
+    When the reader looks at the empty state
+    Then it is exactly as wide as the column
+    And its title's centre lines up with the column's centre
