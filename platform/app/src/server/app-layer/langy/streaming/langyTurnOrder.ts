@@ -91,8 +91,8 @@ export function turnAccountFromStream(
     calls.set(entry.id, withToolEntry(calls.get(entry.id), entry));
   }
   const toolCalls = [...calls.values()]
-    .filter((call) => call.returned)
-    .map(({ returned: _returned, ...call }) => call);
+    .filter((call) => call.hasReturned)
+    .map(({ hasReturned: _hasReturned, ...call }) => call);
   const last = order.at(-1);
   return {
     order,
@@ -102,7 +102,7 @@ export function turnAccountFromStream(
 }
 
 type ToolStreamEntry = Extract<LangyStreamEntry, { type: "tool" }>;
-type ToolCallInProgress = LangyFinalToolCall & { returned: boolean };
+type ToolCallInProgress = LangyFinalToolCall & { hasReturned: boolean };
 
 /** A call, with one more of its stream entries applied. */
 function withToolEntry(
@@ -111,14 +111,14 @@ function withToolEntry(
 ): ToolCallInProgress {
   const next: ToolCallInProgress = call
     ? { ...call }
-    : { id: entry.id, name: entry.name, returned: false };
+    : { id: entry.id, name: entry.name, hasReturned: false };
   if (entry.name) next.name = entry.name;
   if (entry.input !== undefined) next.input = entry.input;
   if (entry.local === true) next.local = true;
   if (entry.phase !== "end") return next;
   return {
     ...next,
-    returned: true,
+    hasReturned: true,
     ...(entry.output !== undefined ? { output: entry.output } : {}),
     ...(entry.isError !== undefined ? { isError: entry.isError } : {}),
     ...(entry.digest !== undefined ? { digest: entry.digest } : {}),
@@ -145,7 +145,7 @@ export interface LangyTurnOrderReader {
     turnId: string;
   }): Promise<LangyTurnSegment[]>;
   /** The whole account, for a turn that failed before handing one over. */
-  readTurnAccount?(a: {
+  readTurnAccount(a: {
     conversationId: string;
     turnId: string;
   }): Promise<LangyTurnAccount>;

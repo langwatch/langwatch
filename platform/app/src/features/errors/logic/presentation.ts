@@ -292,17 +292,14 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The provider refused the request itself as malformed: a 400 or 422 status,
- * or the provider's own code for it (Bedrock's "ValidationException", the
- * OpenAI and Anthropic "invalid_request_error"). Deterministic: the same
- * request is refused the same way on every try, so the fix is another model,
- * not a retry.
+ * The provider refused the request itself as malformed: Bedrock's
+ * "ValidationException", or a 422 status. Deterministic, so the fix is another
+ * model, not a retry. The broad "invalid_request_error" and bare 400 are left
+ * out: Anthropic files a spent balance under them, and that one can pass.
  */
 export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
-  "upstream_bad_request",
   "upstream_unprocessable_entity",
   "ValidationException",
-  "invalid_request_error",
 ]);
 
 /**

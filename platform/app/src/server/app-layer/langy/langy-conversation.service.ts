@@ -1256,18 +1256,6 @@ export class LangyConversationService {
   }
 
   /**
-   * The turn's own account of what happened when, folded off its live stream.
-   *
-   * Read here rather than by the caller because two paths finalize a turn — the
-   * relay's terminal frame and the agent's own HTTP post — and whichever lands
-   * first is the one the record keeps. Reading in one place is what makes the
-   * two produce the same parts.
-   *
-   * Best effort by design: a turn long enough to outlive its buffer, or one
-   * whose read fails, records the shape it always did rather than failing a
-   * finalize that is otherwise complete.
-   */
-  /**
    * The parts a failed turn left on its live stream. Best effort like the
    * order read: a lapsed buffer or a failed read records the failure without
    * a message, which is what a failed turn always recorded.
@@ -1276,7 +1264,7 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
   }): Promise<LangyMessagePart[]> {
-    if (!this.turnOrder?.readTurnAccount) return [];
+    if (!this.turnOrder) return [];
     try {
       const account = await this.turnOrder.readTurnAccount(at);
       const saidSomething = account.order.some(
@@ -1297,6 +1285,18 @@ export class LangyConversationService {
     }
   }
 
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Read here rather than by the caller because two paths finalize a turn — the
+   * relay's terminal frame and the agent's own HTTP post — and whichever lands
+   * first is the one the record keeps. Reading in one place is what makes the
+   * two produce the same parts.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose read fails, records the shape it always did rather than failing a
+   * finalize that is otherwise complete.
+   */
   private async readTurnOrder(at: {
     conversationId: string;
     turnId: string;

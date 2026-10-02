@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go"
+	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -90,6 +91,7 @@ func TestWrapBedrockError(t *testing.T) {
 	})
 
 	t.Run("when the SDK refuses to send a request missing a required field", func(t *testing.T) {
+		/** @scenario "A request the SDK refuses to send is a bad request" */
 		t.Run("it is a bad request, not a retryable provider error", func(t *testing.T) {
 			err := wrapBedrockError(context.Background(), &smithy.InvalidParamsError{Context: "ConverseInput"})
 			if !herr.IsCode(err, domain.ErrBadRequest) {
@@ -110,6 +112,7 @@ func TestWrapBedrockError(t *testing.T) {
 
 func TestBedrockStreamError(t *testing.T) {
 	t.Run("when the stream ends with a typed Bedrock exception", func(t *testing.T) {
+		/** @scenario "A mid-stream Bedrock exception names its type and status" */
 		t.Run("the exception name rides as the error type", func(t *testing.T) {
 			err := bedrockStreamError(&smithy.GenericAPIError{
 				Code:    "ThrottlingException",
@@ -121,6 +124,25 @@ func TestBedrockStreamError(t *testing.T) {
 			}
 			if ue.ErrorType != "ThrottlingException" || ue.Message != "Too many tokens, please wait before trying again." {
 				t.Errorf("got %q %q", ue.ErrorType, ue.Message)
+			}
+			if ue.StatusCode != http.StatusTooManyRequests {
+				t.Errorf("status: got %d, want 429 so the trace reads it as a rate limit", ue.StatusCode)
+			}
+		})
+	})
+
+	t.Run("when the Responses lane carries it to an Anthropic client", func(t *testing.T) {
+		t.Run("the frame keeps the exception name and reads as a rate limit", func(t *testing.T) {
+			berr := bedrockStreamBifrostError(bedrockStreamError(&smithy.GenericAPIError{
+				Code:    "ThrottlingException",
+				Message: "Too many tokens, please wait before trying again.",
+			}))
+			if berr.Error.Message != "ThrottlingException: Too many tokens, please wait before trying again." {
+				t.Errorf("message: got %q", berr.Error.Message)
+			}
+			body := anthropicErrorFromBifrost(berr).Body
+			if got := gjson.GetBytes(body, "error.type").String(); got != "rate_limit_error" {
+				t.Errorf("anthropic error type: got %q, want rate_limit_error", got)
 			}
 		})
 	})

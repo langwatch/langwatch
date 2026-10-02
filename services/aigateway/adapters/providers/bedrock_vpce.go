@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -879,12 +880,13 @@ func bedrockLLMUsage(usage *brtypes.TokenUsage) *bfschemas.BifrostLLMUsage {
 // else never got an answer and stays a retryable provider_error.
 func wrapBedrockError(ctx context.Context, err error) error {
 	var respErr *smithyhttp.ResponseError
-	if errors.As(err, &respErr) && respErr.Response != nil && respErr.Response.StatusCode > 0 {
+	if errors.As(err, &respErr) && respErr.Response != nil && respErr.Response.Response != nil &&
+		respErr.Response.StatusCode > 0 {
 		ue := &domain.UpstreamError{
 			StatusCode: respErr.Response.StatusCode,
 			Message:    err.Error(),
 			Provider:   string(domain.ProviderBedrock),
-			Headers:    forwardableUpstreamHeaders(bedrockResponseHeaders(respErr)),
+			Headers:    forwardableUpstreamHeaders(bedrockResponseHeaders(respErr.Response.Header)),
 		}
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
@@ -910,8 +912,9 @@ func wrapBedrockError(ctx context.Context, err error) error {
 // bedrockStreamError is the error a ConverseStream ends with mid-stream.
 // Bedrock reports these as typed exception events (ThrottlingException,
 // ValidationException, ModelStreamErrorException) on a stream already answered
-// 200, so there is no status to forward; the exception name rides as the error
-// type so the SSE error frame names it.
+// 200. The exception name rides as the error type so the SSE error frame names
+// it, and the status Bedrock gives that exception on a plain call rides as the
+// status so the trace classifies it.
 func bedrockStreamError(err error) error {
 	var apiErr smithy.APIError
 	if !errors.As(err, &apiErr) {
@@ -922,22 +925,30 @@ func bedrockStreamError(err error) error {
 		msg = err.Error()
 	}
 	return &domain.UpstreamError{
-		Message:   msg,
-		ErrorType: apiErr.ErrorCode(),
-		ErrorCode: apiErr.ErrorCode(),
-		Provider:  string(domain.ProviderBedrock),
+		StatusCode: bedrockExceptionStatus[apiErr.ErrorCode()],
+		Message:    msg,
+		ErrorType:  apiErr.ErrorCode(),
+		ErrorCode:  apiErr.ErrorCode(),
+		Provider:   string(domain.ProviderBedrock),
 	}
+}
+
+// bedrockExceptionStatus is the HTTP status Bedrock Runtime answers each
+// ConverseStream exception with when it is not inside a stream.
+var bedrockExceptionStatus = map[string]int{
+	"ValidationException":         http.StatusBadRequest,
+	"ThrottlingException":         http.StatusTooManyRequests,
+	"ServiceUnavailableException": http.StatusServiceUnavailable,
+	"ModelStreamErrorException":   http.StatusServiceUnavailable,
+	"InternalServerException":     http.StatusInternalServerError,
 }
 
 // bedrockResponseHeaders flattens the HTTP response headers of a Bedrock SDK
 // error for forwardableUpstreamHeaders.
-func bedrockResponseHeaders(respErr *smithyhttp.ResponseError) map[string]string {
-	if respErr.Response == nil || respErr.Response.Response == nil {
-		return nil
-	}
-	out := make(map[string]string, len(respErr.Response.Header))
-	for k := range respErr.Response.Header {
-		out[k] = respErr.Response.Header.Get(k)
+func bedrockResponseHeaders(header http.Header) map[string]string {
+	out := make(map[string]string, len(header))
+	for k := range header {
+		out[k] = header.Get(k)
 	}
 	return out
 }
