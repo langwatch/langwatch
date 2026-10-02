@@ -1,5 +1,6 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 
+import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
 import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
@@ -24,4 +25,6 @@ export interface OrganizationRepositories {
   readonly membership: (grants: AuthzGrantsService) => OrganizationMembershipRepository;
   readonly personalTeamScope: PersonalTeamScopeReader;
   readonly scopeGraph: OrganizationScopeGraphReader;
+  /** The fixed-window counter both invitation throttles spend. */
+  readonly inviteRateLimit: OrganizationInviteRateLimit;
 }

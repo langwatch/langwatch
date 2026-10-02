@@ -11,7 +11,11 @@ import { PrismaTeamRepository } from "./prisma.team.repository.ts";
 /** Postgres-backed provider for organization, team, group, and workspace repositories. */
 export const PostgresOrganizationRepositories = {
   requires: ["prisma"] as const,
-  create: ({ prisma }: { prisma: PrismaClient }): OrganizationRepositories => ({
+  create: ({
+    prisma,
+  }: {
+    prisma: PrismaClient;
+  }): Omit<OrganizationRepositories, "inviteRateLimit"> => ({
     organization: PrismaOrganizationRepository.create(prisma),
     team: PrismaTeamRepository.create(prisma),
     group: PrismaGroupRepository.create(prisma),

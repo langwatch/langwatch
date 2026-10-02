@@ -1,4 +1,4 @@
-/** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
+/** Builds OrganizationInfrastructure from prisma, encryption, logger, invite counter and config. */
 import type { OrganizationUserRole } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
@@ -22,8 +22,6 @@ import type {
 } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
-import { nowInstant } from "@langwatch/time";
 
 import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
@@ -184,33 +182,6 @@ class EntitlementOrganizationInviteSeatCensus implements OrganizationInviteSeatC
 
   isViewOnlyCustomRole(permissions: string[]): boolean {
     return isViewOnlyCustomRole(permissions);
-  }
-}
-
-/** The process's ONE fixed-window counter, over process Redis, as the invitation throttle
- * spends it: same shape as the model-provider connection limiter's own Redis adapter. */
-class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
-  static create(redis: RedisConnection): RedisOrganizationInviteRateLimit {
-    return new RedisOrganizationInviteRateLimit(redis);
-  }
-
-  private constructor(private readonly redis: RedisConnection) {}
-
-  async limit(
-    input: Readonly<{ key: string; windowSeconds: number; max: number; count?: number }>,
-  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
-    const counter = `organization:invite:rate-limit:${input.key}`;
-    const now = nowInstant().epochMilliseconds;
-    const count = input.count ?? 1;
-    const used =
-      count === 1 ? await this.redis.incr(counter) : await this.redis.incrby(counter, count);
-    if (used === count) await this.redis.expire(counter, input.windowSeconds);
-    if (used <= input.max) {
-      return { allowed: true, resetAt: now + input.windowSeconds * 1000 };
-    }
-
-    const remaining = await this.redis.ttl(counter);
-    return { allowed: false, resetAt: now + Math.max(remaining, 0) * 1000 };
   }
 }
 
@@ -515,7 +486,7 @@ function organizationDirectory(options: {
  */
 function organizationInvitations(input: {
   prisma: ProcessMembers["prisma"];
-  redis: RedisConnection;
+  inviteRateLimit: OrganizationInviteRateLimit;
   notices: Pick<SeatLimitNoticeService, "record">;
   baseHost: string;
   identity: Pick<IdentityApi, "verifiedEmailsOf">;
@@ -525,9 +496,7 @@ function organizationInvitations(input: {
   notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
 }): OrganizationInvitations {
   const repository = PrismaOrganizationInviteRepository.create({ database: input.prisma });
-  const throttle = InviteSendThrottleService.create(
-    RedisOrganizationInviteRateLimit.create(input.redis),
-  );
+  const throttle = InviteSendThrottleService.create(input.inviteRateLimit);
   const invites = InviteService.create({
     invites: repository,
     seats: EntitlementOrganizationInviteSeatCensus.create(
@@ -557,7 +526,8 @@ export function buildOrganizationInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   encryption: { encrypt(value: string): string; decrypt(value: string): string };
   logger: Logger;
-  redis: RedisConnection;
+  /** The invitation counter, chosen by the organization repository registry. */
+  inviteRateLimit: OrganizationInviteRateLimit;
   /** The process's own fact (`BASE_HOST`); absent where it named none. */
   publicBaseUrl: string | undefined;
   /** A process fact, unresolved — see the handoff. */
@@ -601,7 +571,7 @@ export function buildOrganizationInfrastructure(input: {
     seatCounts: PrismaOrganizationSeatRepository.create(prisma),
     invitations: organizationInvitations({
       prisma,
-      redis: input.redis,
+      inviteRateLimit: input.inviteRateLimit,
       notices: seatLimits,
       baseHost,
       identity: dependencies.identity,
@@ -613,7 +583,7 @@ export function buildOrganizationInfrastructure(input: {
     // The sender-scoped creation counter: same fixed-window adapter the
     // resend throttle spends, so both invite limits live behind one port.
     inviteCreationThrottle: InviteCreationThrottleService.create({
-      rateLimit: RedisOrganizationInviteRateLimit.create(input.redis),
+      rateLimit: input.inviteRateLimit,
       plans: dependencies.entitlement,
     }),
     // Identity owns the join-request ledger; this feature serves its door.

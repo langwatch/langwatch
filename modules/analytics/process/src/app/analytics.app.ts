@@ -1,4 +1,4 @@
-import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * The analytics feature's application: what both doors call, holding every service and
  * port as the one typed thing a transport is given. A caller is always an argument,
@@ -67,6 +67,7 @@ import {
   type EvaluationAnalyticsClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
+import { ClickHouseAnalyticsSessionRepository } from "../repositories/clickhouse/clickhouse.analytics-session.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
 import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
@@ -318,48 +319,6 @@ function lwqlProvisioningOperations({
 type AnalyticsSetup = FeatureSetup<AnalyticsDependencies, AnalyticsMembers, AnalyticsServerConfig>;
 
 /**
- * Adapts the process's one routing `clickhouse` member to the per-tenant session
- * shape Analytics' repositories expect. Not a second connection — the member already
- * routes and guards every statement by `tenantId`; this just carries that tenant on.
- */
-class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
-  constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
-    private readonly tenantId: string,
-  ) {}
-
-  async query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
-  }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
-    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params,
-      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-    });
-    return { json: () => Promise.resolve(rows) };
-  }
-
-  async insert(input: {
-    table: string;
-    values: Record<string, unknown>[];
-    format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
-  }): Promise<unknown> {
-    await this.clickhouse.insert({
-      tenantId: this.tenantId,
-      table: input.table,
-      rows: input.values,
-      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-    });
-    return undefined;
-  }
-}
-
-/**
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
  */
@@ -431,7 +390,7 @@ export class AnalyticsModule
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
     const clickhouse = setup.members.clickhouse;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
-      Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
+      Promise.resolve(ClickHouseAnalyticsSessionRepository.create({ clickhouse, tenantId }));
     // `reads = ["clickhouse"]` makes boot refuse before `create()` if none is configured.
     // Data retention owns the default retention days; a second claim refuses the process.
     const analytics = AnalyticsServiceClass.create({

@@ -356,7 +356,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       prisma: setup.members.prisma,
       encryption: setup.members.encryption,
       logger: setup.members.logger,
-      redis: setup.members.redis,
+      inviteRateLimit: setup.repositories.inviteRateLimit,
       publicBaseUrl: setup.members.publicBaseUrl,
       processName: setup.members.processName,
       signupAnnouncements,

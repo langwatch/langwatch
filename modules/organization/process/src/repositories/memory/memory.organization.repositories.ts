@@ -1,5 +1,6 @@
 import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
+import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "./memory.organization-membership.repository.ts";
 import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
@@ -23,6 +24,7 @@ export const MemoryOrganizationRepositories = {
       membership: () => MemoryOrganizationMembershipRepository.create({ memory }),
       personalTeamScope: MemoryPersonalTeamScopeRepository.create({ memory }),
       scopeGraph: MemoryScopeGraphRepository.create({ memory }),
+      inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     };
   },
 };

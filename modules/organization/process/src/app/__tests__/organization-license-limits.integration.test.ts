@@ -10,7 +10,7 @@ import {
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
+import type { OrganizationInviteRateLimit } from "../organization.members.ts";
 /**
  * @vitest-environment node
  *
@@ -48,7 +48,7 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
       prisma,
       encryption: { encrypt: (value) => value, decrypt: (value) => value },
       logger: createApiFixture<Logger>(),
-      redis: createApiFixture<RedisConnection>(),
+      inviteRateLimit: createApiFixture<OrganizationInviteRateLimit>(),
       publicBaseUrl: undefined,
       signupAnnouncements: SignupAnnouncementService.create({
         channel: undefined,
