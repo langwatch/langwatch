@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
@@ -14,19 +14,6 @@ import { onboardingRest, onboardingRestCredential } from "../onboarding.rest.ts"
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
-
-/** A handled error carries its own stable `code` and `httpStatus`; this test asks for both. */
-type CarriesHandledShape = { code: string; httpStatus: number };
-function isHandledShape(error: unknown): error is CarriesHandledShape {
-  return typeof error === "object" && error !== null && "code" in error && "httpStatus" in error;
-}
-
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (isHandledShape(error)) {
-    return c.json({ error: error.code }, error.httpStatus as 403);
-  }
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 type Credential = { organizationId: string; userId: string | null };
 
@@ -46,7 +33,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
   } as never).mount(onboardingRest.router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [bindRestMiddleware(onboardingRestCredential, () => credential)],
   });
 
@@ -60,13 +47,7 @@ describe("given a project API key bound to a user", () => {
   describe("when it reads the guided onboarding state", () => {
     /** @scenario "A bound key reads the organization's guided onboarding state" */
     it("calls the application with the resolved organization and user", async () => {
-      const getGuidedState = vi.fn(async () => ({
-        currentPath: null,
-        paths: [],
-        completedPaths: [],
-        provider: null,
-        variant: null,
-      }));
+      const getGuidedState = vi.fn(async () => ({ paths: [], donePaths: [], variant: null }));
       const { send } = mount({ onboarding: { getGuidedState: getGuidedState as never } });
 
       const response = await send("GET", "/api/onboarding/guided");
@@ -88,6 +69,7 @@ describe("given a project whose organization recorded llmops and gateway", () =>
         paths: ["llmops", "gateway"],
         currentPath: "llmops",
         donePaths: [],
+        variant: null,
       }));
       const { send } = mount({ onboarding: { getGuidedState: getGuidedState as never } });
 
@@ -134,7 +116,7 @@ describe("given a project whose organization recorded llmops and gateway", () =>
 
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({
-        error: "guided_onboarding_path_unknown",
+        code: "guided_onboarding_path_unknown",
       });
     });
   });
@@ -143,7 +125,7 @@ describe("given a project whose organization recorded llmops and gateway", () =>
 describe("given a project API key that names no user", () => {
   describe("when it reads the guided onboarding state", () => {
     it("reads the key's organization with no user, as main does", async () => {
-      const getGuidedState = vi.fn(async () => ({ paths: [], currentPath: null, donePaths: [] }));
+      const getGuidedState = vi.fn(async () => ({ paths: [], donePaths: [], variant: null }));
       const { send } = mount({
         credential: { organizationId: ORGANIZATION, userId: null },
         onboarding: { getGuidedState: getGuidedState as never },

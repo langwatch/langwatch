@@ -29,8 +29,22 @@ import {
   type OnboardingSidebarCapability,
   type OnboardingSuccessNotice,
 } from "../model/onboarding-host.ts";
-import { writeToClipboard } from "./browser-clipboard.ts";
 import { useOnboardingOrganizationGraph } from "./onboarding-organization-graph.ts";
+
+/**
+ * The one DOM ability neither port's capabilities carry: writing to the
+ * clipboard. Mirrors `@langwatch/browser-host`'s own `CopyButton`, which
+ * touches `navigator.clipboard` the same way rather than through a port.
+ */
+async function writeToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** What a composition without Langy reads: nothing to dock, nothing to hand a kickoff to. */
 const INERT_LANGY: OnboardingLangyCapability = {

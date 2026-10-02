@@ -1,7 +1,6 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { PRODUCT_FLOW_CONFIG } from "./product-flow.ts";
 import {
   OnboardingFlowDirection,
   type ProductFlowConfig,
@@ -9,6 +8,14 @@ import {
   type ProductSelection,
 } from "./types.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
+
+const PRODUCT_FLOW_CONFIG: ProductFlowConfig = {
+  variant: "product",
+  visibleScreens: [ProductScreenIndex.SELECTION],
+  first: ProductScreenIndex.SELECTION,
+  last: ProductScreenIndex.SELECTION,
+  total: 1,
+};
 
 /**
  * The screens each flavour walks through after the selection screen.

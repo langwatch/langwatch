@@ -8,6 +8,7 @@ import type { GuidedPath } from "@langwatch/onboarding-contract";
 import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
+import { registerOnboardingExperiment } from "../../../behavior/onboarding-experiment-registration.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { useOnboardingHost, type OnboardingHostApi } from "../../../model/onboarding-host.ts";
 import type { GuidedKickoffTourStatus } from "../model/kickoff.ts";
@@ -24,7 +25,20 @@ import { useGuidedTourStore } from "./guided-tour-store.ts";
 import { queueKickoffOnceScoped } from "./queue-kickoff.ts";
 import { useRegisterTourActions } from "./tour-registry.ts";
 import { useGuidedOnboarding } from "./use-guided-onboarding.ts";
-import { useOnboardingExperimentRegistration } from "./use-onboarding-experiment-registration.ts";
+
+/**
+ * Keeps posthog-js's experiment property in step with the organization the
+ * guided onboarding host is mounted for, so every browser-captured event
+ * carries it the way the server's events do.
+ * @see specs/analytics/posthog-guided-onboarding.feature
+ */
+function useOnboardingExperimentRegistration(): void {
+  const { variant, organizationId } = useGuidedOnboarding();
+
+  useEffect(() => {
+    registerOnboardingExperiment(variant);
+  }, [organizationId, variant]);
+}
 
 /** A release to run when the component unmounts, set by whoever waits. */
 function useReleaseOnUnmount(): MutableRefObject<() => void> {
