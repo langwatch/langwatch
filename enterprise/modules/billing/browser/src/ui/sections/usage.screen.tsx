@@ -5,7 +5,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
@@ -177,6 +177,7 @@ export default function UsageScreen() {
     <>
       <PageLayout.Header>
         <PageLayout.Heading>Usage</PageLayout.Heading>
+        <Spacer />
         {isSaaS !== undefined && actionFor({ href: actionHref, label: actionLabel })}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>

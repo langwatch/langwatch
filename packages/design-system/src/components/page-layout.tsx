@@ -28,7 +28,13 @@ interface ContainerProps extends ChakraContainerProps {
  */
 function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren<ContainerProps>) {
   return (
-    <ChakraContainer maxW={`calc(100vw - ${sidebarWidth}px)`} paddingX={6} paddingY={3} {...props}>
+    <ChakraContainer
+      data-page-container
+      maxW={`calc(100vw - ${sidebarWidth}px)`}
+      paddingX={6}
+      paddingY={3}
+      {...props}
+    >
       {children}
     </ChakraContainer>
   );
@@ -87,7 +93,7 @@ type HeaderButtonProps = ChakraButtonProps;
 
 function HeaderButton({ children, ...props }: PropsWithChildren<HeaderButtonProps>) {
   return (
-    <Button variant="outline" colorPalette="orange" size="sm" {...props}>
+    <Button variant="solid" colorPalette="orange" size="sm" {...props}>
       {children}
     </Button>
   );

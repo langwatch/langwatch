@@ -94,13 +94,14 @@ function measureOf(pathname: string): string {
 }
 
 /**
- * Settings pages are read at a measure, as main's SettingsLayout framed them;
+ * Settings and gateway pages are read at a centred measure, as main's SettingsLayout framed them;
  * authentication's section rail takes the full width, as main's fullBleed did.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
   const isMeasured =
     isPathUnder({ pathname, base: "/settings" }) ||
+    isPathUnder({ pathname, base: "/gateway" }) ||
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
   const measure = measureOf(pathname);
@@ -111,17 +112,17 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       minHeight={0}
       overflowY="auto"
       paddingBottom={16}
-      // The header spans the card like every page's and its title starts where
-      // every page's does; its actions and every block under it stop at the measure.
+      // The header's border spans the card; its title, actions and every block
+      // under it sit in one column of the measure, centred in the card.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
-        "--page-end": `max(var(--chakra-spacing-6), calc(100% - ${measure} + var(--chakra-spacing-6)))`,
-        "& [data-page-header]": { paddingInlineEnd: "var(--page-end)" },
+        "--page-inset": `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`,
+        "& [data-page-header]": { paddingInline: "var(--page-inset)" },
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: "calc(100% - var(--chakra-spacing-6) - var(--page-end))",
-          marginInlineStart: "var(--chakra-spacing-6)",
-          marginInlineEnd: "var(--page-end)",
+          width: "calc(100% - 2 * var(--page-inset))",
+          marginInline: "var(--page-inset)",
         },
+        "& [data-page-container]": { paddingInline: 0 },
       }}
     >
       {children}
