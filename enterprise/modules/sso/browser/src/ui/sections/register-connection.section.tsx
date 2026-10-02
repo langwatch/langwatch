@@ -16,13 +16,13 @@ import {
   Input,
   SimpleGrid,
   Text,
-  Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
 import {
+  consolePathFor,
   identityProvidersIn,
   type IdentityProviderPreset,
   type SsoProtocol,
@@ -35,12 +35,11 @@ import {
 } from "../../model/registration-form.ts";
 import type { ServiceProviderAddresses } from "../../model/service-provider-rows.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
+import { OidcFields, SamlFields, type UpdateField } from "../elements/identity-provider-fields.tsx";
 import { IdentityProviderTile } from "../elements/identity-provider-tile.tsx";
 import { ProtocolChoice } from "../elements/protocol-choice.tsx";
 import { InlineRefusal } from "../elements/refusals.tsx";
 import { ServiceProviderSection } from "./service-provider.section.tsx";
-
-type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
 
 /** What each registration is acknowledged with: the second answers the
  *  question that actually follows a replacement. */
@@ -239,6 +238,8 @@ function ProviderConsoleAct({
   serviceProvider: ServiceProviderAddresses;
   protocol: SsoProtocol;
 }) {
+  const consolePath = consolePathFor({ preset, protocol });
+
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-console">
       <VStack align="stretch" gap={1}>
@@ -246,8 +247,8 @@ function ProviderConsoleAct({
           {preset.group === "protocol" ? "Give it our addresses" : `Set it up in ${preset.name}`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          {preset.consolePath
-            ? `In ${preset.name}, create the app under ${preset.consolePath}, and give it these addresses when it asks.`
+          {consolePath
+            ? `In ${preset.name}, create the app under ${consolePath}, and give it these addresses when it asks.`
             : "Create an app for LangWatch in your identity provider, and give it these addresses when it asks."}
         </Text>
       </VStack>
@@ -319,94 +320,5 @@ function CredentialsAct({
         {submitLabel}
       </Button>
     </VStack>
-  );
-}
-
-function OidcFields({
-  preset,
-  form,
-  update,
-}: {
-  preset: IdentityProviderPreset;
-  form: RegisterForm;
-  update: UpdateField;
-}) {
-  return (
-    <>
-      <Field.Root>
-        <Field.Label>Issuer address</Field.Label>
-        <Input
-          placeholder={preset.issuerExample}
-          data-testid="sso-register-issuer"
-          value={form.issuer}
-          onChange={(event) => update("issuer")(event.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Client id</Field.Label>
-        <Input
-          value={form.clientId}
-          data-testid="sso-register-client-id"
-          onChange={(event) => update("clientId")(event.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Client secret</Field.Label>
-        <Input
-          type="password"
-          data-testid="sso-register-client-secret"
-          value={form.clientSecret}
-          onChange={(event) => update("clientSecret")(event.target.value)}
-        />
-      </Field.Root>
-    </>
-  );
-}
-
-function SamlFields({
-  preset,
-  form,
-  update,
-}: {
-  preset: IdentityProviderPreset;
-  form: RegisterForm;
-  update: UpdateField;
-}) {
-  return (
-    <>
-      <Field.Root>
-        <Field.Label>Sign-in address</Field.Label>
-        <Input
-          placeholder={preset.entryPointExample}
-          value={form.entryPoint}
-          onChange={(event) => update("entryPoint")(event.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Metadata</Field.Label>
-        <Textarea
-          rows={4}
-          placeholder="Paste the XML your identity provider exports"
-          value={form.metadataXml}
-          onChange={(event) => update("metadataXml")(event.target.value)}
-        />
-      </Field.Root>
-      <Text color="fg.muted" fontSize="sm">
-        No metadata to paste? Give us these two instead.
-      </Text>
-      <Field.Root>
-        <Field.Label>Entity id</Field.Label>
-        <Input value={form.entityId} onChange={(event) => update("entityId")(event.target.value)} />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Signing certificate</Field.Label>
-        <Textarea
-          rows={4}
-          placeholder="-----BEGIN CERTIFICATE-----"
-          value={form.certificate}
-          onChange={(event) => update("certificate")(event.target.value)}
-        />
-      </Field.Root>
-    </>
   );
 }

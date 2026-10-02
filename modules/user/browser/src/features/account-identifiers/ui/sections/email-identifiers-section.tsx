@@ -4,12 +4,12 @@
  * Spec: specs/identity/authentication-settings.feature
  */
 
-import { Box, Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
-import { Plus } from "lucide-react";
+import { Box, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useState } from "react";
 
 import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
 import { useEmailIdentifiers } from "../../behavior/use-email-identifiers.ts";
+import { AddAddressButton } from "../elements/add-address-button.tsx";
 import { AddAddressForm } from "../elements/add-address-form.tsx";
 import { AddressConfirmationNotice } from "./address-confirmation-notice.tsx";
 import { AddressRow } from "./address-row.tsx";
@@ -59,16 +59,11 @@ export function EmailIdentifiersSection({
         justify="space-between"
         data-testid="identifier-action-row"
       >
-        <Button
-          size="sm"
-          variant="outline"
-          aria-expanded={isAdding}
-          onClick={isAdding ? closeDraft : () => setIsAdding(true)}
-          data-testid="add-address"
-        >
-          <Plus size={14} />
-          Add email address
-        </Button>
+        <AddAddressButton
+          canSendEmail={identifiers.canSendEmail}
+          isOpen={isAdding}
+          onToggle={isAdding ? closeDraft : () => setIsAdding(true)}
+        />
         {trailingActions ? (
           <HStack gap={4} align="center" flexWrap="wrap">
             <Box
@@ -84,7 +79,7 @@ export function EmailIdentifiersSection({
         ) : null}
       </HStack>
 
-      {isAdding ? (
+      {isAdding && identifiers.canSendEmail ? (
         <AddAddressForm
           address={draft}
           onAddressChange={setDraft}

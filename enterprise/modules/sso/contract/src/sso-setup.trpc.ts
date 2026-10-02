@@ -23,6 +23,7 @@ import {
   ssoSetupArrivalsSchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
+  ssoSetupIdentityProviderViewSchema,
   ssoSetupMigrationProgressSchema,
   ssoSetupMigrationRouteSchema,
   ssoSetupMigrationSchema,
@@ -33,6 +34,7 @@ import {
   ssoSetupRemovalSchema,
   ssoSetupRenameSchema,
   ssoSetupStartMigrationSchema,
+  ssoSetupUpdateIdentityProviderSchema,
 } from "./sso-setup.contract.ts";
 
 export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
@@ -133,6 +135,25 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
    *  who signs in, and an organization whose plan lapsed still reads it. */
   .mutation("rename")
   .withInput(ssoSetupRenameSchema)
+  .withOutput(z.void())
+
+  /**
+   * The connection's current identity provider settings, for the edit form.
+   * `sso:manage` rather than `sso:view`: it carries the client id, which only
+   * the person who may change it needs. Never the client secret. Null for a
+   * grandfathered connection, which has no settings of its own.
+   */
+  .query("identityProvider")
+  .withInput(ssoSetupConnectionSchema)
+  .withOutput(ssoSetupIdentityProviderViewSchema.nullable())
+
+  /**
+   * Replace an existing connection's identity provider settings, keeping its
+   * id and so the redirect address registered at the provider. Gated like
+   * `register`, because these settings decide where sign-ins go.
+   */
+  .mutation("updateIdentityProvider")
+  .withInput(ssoSetupUpdateIdentityProviderSchema)
   .withOutput(z.void())
 
   /** Who this connection admits (ADR-117 §3). Going live waits on an answer,

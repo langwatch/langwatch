@@ -45,8 +45,19 @@ describe("<SignInError/>", () => {
 
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(screen.getByText(/sign out completely and sign in again/i)).toBeTruthy();
-      expect(screen.getByText(/method you used originally/i)).toBeTruthy();
+      expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
+      expect(screen.getByText(/method you used before/i)).toBeTruthy();
+    });
+  });
+
+  describe("when single sign-on meets a confirmed account on a domain the connection has not verified", () => {
+    /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+    it("names the domain proof that is missing, not another sign-in method", () => {
+      renderError("sso_domain_not_verified");
+
+      expect(document.body.textContent).toMatch(/domain verification|verify the domain/i);
+      expect(screen.queryByText("Account already exists")).toBeNull();
+      expect(screen.queryByText(/method you used before/i)).toBeNull();
     });
   });
 

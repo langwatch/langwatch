@@ -97,11 +97,13 @@ describe("given an organization with no connection registered yet", () => {
 
 describe("given a deployment that also configures its own sign-in", () => {
   describe("when the connection is OpenID Connect", () => {
-    it("names the deployment sign-in's redirect address as a second one to register", () => {
+    /** @scenario "The deployment's own sign-in redirect address is named beside the connection's" */
+    it("names the deployment's Microsoft sign-in and its redirect address beside the connection's", () => {
       const { container } = renderSection({ deploymentSignIn: DEPLOYMENT_SIGN_IN });
 
-      expect(container.textContent).toContain("Microsoft sign-in set up by its deployment");
+      expect(screen.getByText(ADDRESSES.redirectUrl)).toBeTruthy();
       expect(screen.getByText(DEPLOYMENT_SIGN_IN.redirectUrl)).toBeTruthy();
+      expect(container.textContent).toMatch(/also offers Microsoft/);
     });
   });
 

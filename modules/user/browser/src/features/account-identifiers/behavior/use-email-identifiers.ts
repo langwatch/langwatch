@@ -133,6 +133,9 @@ export function useEmailIdentifiers() {
     ownAddress,
     ownAddressConfirmed: confirmation.data?.confirmed,
     ownAddressResendable: confirmation.data?.confirmed === false && canSend,
+    /** False where the installation has no email provider, so no address can
+     *  be sent the link that adding one starts. */
+    canSendEmail: canSend,
     isOwnAddressSending: resender.isOwnAddressSending,
     isPending: identifiers.isPending || confirmation.isPending,
     error: identifiers.error,

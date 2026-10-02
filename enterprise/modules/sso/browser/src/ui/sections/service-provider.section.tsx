@@ -55,10 +55,9 @@ export function ServiceProviderSection({
       </VStack>
       {protocol === "oidc" && deploymentSignIn && (
         <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-          This installation also has {deploymentSignIn.name} sign-in set up by its deployment, which
-          the sign-in page offers. That sign-in returns to{" "}
-          <code>{deploymentSignIn.redirectUrl}</code>. If it uses the same application in your
-          identity provider, register both addresses there.
+          The sign-in page also offers {deploymentSignIn.name}, set up by this installation&apos;s
+          deployment. That sign-in returns to <code>{deploymentSignIn.redirectUrl}</code>. If it
+          uses the same application in your identity provider, register both addresses there.
         </Text>
       )}
     </SettingsCard>

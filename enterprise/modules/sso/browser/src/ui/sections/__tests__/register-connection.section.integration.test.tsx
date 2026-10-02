@@ -156,6 +156,28 @@ describe("registering an identity provider", () => {
     });
   });
 
+  describe("when Microsoft Entra ID is picked", () => {
+    /** @scenario "The registration form says where Microsoft Entra ID shows its issuer" */
+    it("says where the issuer is found and points at App registrations", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-entra"));
+
+      expect(screen.getByText(/OpenID Connect metadata document address/)).toBeInTheDocument();
+      expect(screen.getByText(/remove \/\.well-known\/openid-configuration/)).toBeInTheDocument();
+      expect(screen.getByText(/App registrations → New registration/)).toBeInTheDocument();
+    });
+
+    it("points a SAML application at Enterprise applications", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-entra"));
+      fireEvent.click(screen.getByTestId("sso-protocol-saml"));
+
+      expect(screen.getByText(/Enterprise applications → New application/)).toBeInTheDocument();
+    });
+  });
+
   describe("given the boxes each protocol needs", () => {
     /** @scenario "The administrator chooses which kind of provider they have" */
     it("asks for an issuer, a client id and a client secret by default", () => {

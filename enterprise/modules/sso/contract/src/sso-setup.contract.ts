@@ -355,6 +355,60 @@ export const ssoSetupRegisteredSchema = z.object({ connectionId: z.string() }).s
 
 export type SsoSetupRegistered = z.infer<typeof ssoSetupRegisteredSchema>;
 
+/**
+ * An existing connection's identity provider settings, replaced in place so
+ * its id, and the redirect address registered at the provider, stay. A blank
+ * OpenID Connect client secret is null and keeps the stored one: a secret is
+ * never shown back.
+ */
+export const ssoSetupOidcUpdateSchema = z.object({
+  ...ssoSetupOidcRegistrationSchema.shape,
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+
+export const ssoSetupIdentityProviderUpdateSchema = z.discriminatedUnion("protocol", [
+  ssoSetupOidcUpdateSchema,
+  ssoSetupSamlRegistrationSchema,
+]);
+
+export type SsoSetupIdentityProviderUpdate = z.infer<typeof ssoSetupIdentityProviderUpdateSchema>;
+
+export const ssoSetupUpdateIdentityProviderSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  idp: ssoSetupIdentityProviderUpdateSchema,
+});
+
+export type SsoSetupUpdateIdentityProviderInput = z.infer<
+  typeof ssoSetupUpdateIdentityProviderSchema
+>;
+
+/**
+ * A connection's current identity provider settings, as the edit form is
+ * prefilled with them. Never the OpenID Connect client secret: the form says
+ * whether one is stored.
+ */
+export const ssoSetupIdentityProviderViewSchema = z.discriminatedUnion("protocol", [
+  z
+    .object({
+      protocol: z.literal("oidc"),
+      issuer: z.string().nullable(),
+      clientId: z.string().nullable(),
+      hasClientSecret: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      protocol: z.literal("saml"),
+      entryPoint: z.string().nullable(),
+      entityId: z.string().nullable(),
+      metadataXml: z.string().nullable(),
+      certificate: z.string().nullable(),
+    })
+    .strict(),
+]);
+
+export type SsoSetupIdentityProviderView = z.infer<typeof ssoSetupIdentityProviderViewSchema>;
+
 /** Who the connection admits (ADR-117 §3). `policy` is the wire's word. */
 export const ssoSetupArrivalsSchema = z.object({
   ...ssoSetupConnectionSchema.shape,

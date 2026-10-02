@@ -51,6 +51,32 @@ describe("given a browser bundle sharing API sessions", () => {
     expect(verify).toHaveBeenCalledTimes(1);
   });
 
+  describe("when the deployment's public settings change between two page loads", () => {
+    /**
+     * The settings carry the sign-in providers the Connect offers are drawn
+     * from, so a document kept past a restart would offer a removed provider.
+     */
+    /** @scenario A provider the deployment stopped offering leaves the Connect offers on reload */
+    it("projects them again for every document and asks the browser to revalidate it", async () => {
+      let offered = "microsoft";
+      const bundle = BrowserBundle.create({
+        dist: await fixture(),
+        publicConfig: () => `<meta name="public-config" content="${offered}">`,
+        sessionReader: SessionReader.create({ verify: async () => ({ userId: "person" }) }),
+        security: SecurityHeaders.strict(),
+      });
+      const mux = HttpMux.create().route("/", bundle);
+
+      const first = await mux.fetch(new Request("http://localhost/settings/authentication"));
+      offered = "none";
+      const second = await mux.fetch(new Request("http://localhost/settings/authentication"));
+
+      expect(await first.text()).toContain('content="microsoft"');
+      expect(await second.text()).toContain('content="none"');
+      expect(second.headers.get("cache-control")).toBe("no-cache");
+    });
+  });
+
   /** @scenario "A document access policy can redirect before rendering" */
   it("enforces a document policy before projecting config while leaving assets available", async () => {
     const project = vi.fn(() => "must not render");

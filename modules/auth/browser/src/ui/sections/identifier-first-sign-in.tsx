@@ -329,10 +329,18 @@ function signInDepth({
   return "entry";
 }
 
+/** What the log-in door says about an unknown address where no confirmation
+ *  link can be sent: what is missing, and that the address stays unconfirmed. */
+const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
+  title: "There is no account for that email address yet",
+  describe:
+    "This installation cannot send email, so it cannot confirm a new address. Continue to create an account with a password, and the address stays unconfirmed until an administrator has set up an email provider. Or sign in with single sign-on once your organization has it.",
+} as const;
+
 /**
- * The address routed to no account (ADR-117, revision 2026-08-25). Says what
- * happened, offers the sign-up, keeps a mistyped address one click away. It
- * sends the sign-up door's link; no credential is mounted until it returns.
+ * The address routed to no account (ADR-117, revision 2026-08-25). Offers the
+ * sign-up and keeps a mistyped address one click away. It sends the sign-up
+ * door's link, or, without an email provider, says no link can be sent.
  */
 function NoAccountYet({
   email,
@@ -373,10 +381,16 @@ function NoAccountYet({
 
   return (
     <AuthCard
-      title={guidance?.title ?? "Let's create your account"}
+      title={
+        sendsEmail
+          ? (guidance?.title ?? "Let's create your account")
+          : NO_ACCOUNT_WITHOUT_EMAIL_COPY.title
+      }
       intro={
-        guidance?.describe ??
-        "There is no account for that email address yet, so this is a sign-up."
+        sendsEmail
+          ? (guidance?.describe ??
+            "There is no account for that email address yet, so this is a sign-up.")
+          : NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe
       }
       finePrint={<FrontDoorFinePrint />}
     >
