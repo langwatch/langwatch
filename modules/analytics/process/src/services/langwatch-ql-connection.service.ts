@@ -42,7 +42,9 @@ function disagreesWithDerivedServer({
   if (explicitOrigin === derivedOrigin) return false;
   logger.error(
     { derivedOrigin },
-    "LangWatchQL: LWQL_CLICKHOUSE_URL cannot name a ClickHouse other than CLICKHOUSE_URL's own — provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL so it derives from CLICKHOUSE_URL",
+    "LangWatchQL: LWQL_CLICKHOUSE_URL cannot name a ClickHouse other than CLICKHOUSE_URL's " +
+      "own — provisioning would create the access model on one server while queries " +
+      "ran against another. Unset LWQL_CLICKHOUSE_URL so it derives from CLICKHOUSE_URL",
   );
   return true;
 }
@@ -83,7 +85,9 @@ function deriveAdminTarget({
   if (env.LWQL_DATABASE && env.LWQL_DATABASE !== database) {
     logger.error(
       { lwqlDatabase: env.LWQL_DATABASE, adminDatabase: database },
-      "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's own — the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE so it derives from CLICKHOUSE_URL",
+      "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's " +
+        "own — the key-map row policies and the key-map backfill would disagree. Unset " +
+        "LWQL_DATABASE so it derives from CLICKHOUSE_URL",
     );
     return null;
   }
@@ -166,7 +170,9 @@ export class LangWatchQLConnectionService {
     if (explicitDatabase && explicitDatabase !== target.database) {
       logger.error(
         { lwqlDatabase: explicitDatabase, adminDatabase: target.database },
-        "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's own — the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE so it derives from CLICKHOUSE_URL",
+        "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's " +
+          "own — the key-map row policies and the key-map backfill would disagree. Unset " +
+          "LWQL_DATABASE so it derives from CLICKHOUSE_URL",
       );
       return { available: false };
     }

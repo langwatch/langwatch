@@ -23,7 +23,8 @@ export class LwqlSqlModeUnsafeOnClusterError extends Error {
     replicatedDirectoryCount: number;
   }) {
     super(
-      "lwql sql mode refused: the ClickHouse target is a multi-host cluster with no replicated access storage, so the access model would reach one host only. " +
+      "lwql sql mode refused: the ClickHouse target is a multi-host cluster with no " +
+        "replicated access storage, so the access model would reach one host only. " +
         "Point the app at replicated access storage, or set LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true to accept single-node scope",
     );
     this.name = "LwqlSqlModeUnsafeOnClusterError";

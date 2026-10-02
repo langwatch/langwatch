@@ -14,8 +14,21 @@ import { CONTENT_POSTGRES_OVERRIDES } from "./lwql-postgres-content-overrides.ru
 import { CORE_POSTGRES_OVERRIDES } from "./lwql-postgres-core-overrides.rules.ts";
 import { DESCRIPTIONS_POSTGRES_OVERRIDES } from "./lwql-postgres-descriptions-overrides.rules.ts";
 import { PARENTS_POSTGRES_OVERRIDES } from "./lwql-postgres-parents-overrides.rules.ts";
-import { TOPICS_POSTGRES_OVERRIDES } from "./lwql-postgres-topics-overrides.rules.ts";
 import { VISIBILITY_POSTGRES_OVERRIDES } from "./lwql-postgres-visibility-overrides.rules.ts";
+
+/** The `topics` view — the proving slice for the opt-out Postgres catalog. */
+
+/** The topics override, keyed by its Prisma model name. */
+const TOPICS_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {
+  Topic: {
+    description: "One row per topic, with the name a trace's TopicId resolves to.",
+    descriptions: {
+      TopicId: "Topic identifier. Matches `traces.TopicId`.",
+      TopicName: "Display name of the topic.",
+      ParentTopicId: "Parent topic in the hierarchy, null for a top-level topic.",
+    },
+  },
+};
 
 /** Combines two override maps model-by-model, not key-by-key. */
 function mergePostgresOverride(

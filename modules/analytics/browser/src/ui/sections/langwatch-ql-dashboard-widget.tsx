@@ -7,13 +7,13 @@
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { useMemo } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart.tsx";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 

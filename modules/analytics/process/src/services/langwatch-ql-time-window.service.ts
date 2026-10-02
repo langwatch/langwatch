@@ -8,6 +8,7 @@
 import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLGranularityTooFineError,
+  LangWatchQLParameterMissingError,
   LangWatchQLReservedGranularityTypeError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
@@ -414,5 +415,66 @@ export class LangWatchQLTimeWindowService {
       timeWindow,
       onBudgetOverflow,
     });
+  }
+
+  /**
+   * The run-path half of the reserved-parameter contract: resolve what the caller's window and
+   * step mean for this request, then refuse when any declared reserved name would still reach the
+   * database unfilled -- one refusal naming everything the surface forgot, not just the first.
+   */
+  resolveRunGranularityOrRefuseUnfilled({
+    declared,
+    parameters,
+    timeWindow,
+    granularitySeconds,
+    onBudgetOverflow,
+    awaitingTimeWindow,
+  }: {
+    /** Bound parameters the validated statement declares. */
+    readonly declared: readonly LangWatchQLParameter[];
+    /** Values the caller sent. */
+    readonly parameters?: Readonly<Record<string, unknown>>;
+    /** The period the surface is showing, when it has one. */
+    readonly timeWindow?: LangWatchQLTimeWindow;
+    /** The step the caller-owned surface chose, when it offers one. */
+    readonly granularitySeconds?: number;
+    /**
+     * What an overflowing period does. Defaults to refusing, which is what every
+     * caller-owned door wants.
+     */
+    readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+    /**
+     * Reserved window names no window filled — already computed by validate,
+     * joined here so one refusal can name every omission together.
+     */
+    readonly awaitingTimeWindow: readonly string[];
+  }): LangWatchQLGranularityResolution {
+    // Caller-owned doors resolve the granularity contract with refuse on overflow: whoever is
+    // asking picked the step, so coarsening it for them would change the answer they asked
+    // for. A surface that picked the step on the member's behalf rather than at their request
+    // — the dashboard, whose period is dragged around by a control the widget does not own —
+    // passes "coarsen" instead, and reports the substitution rather than hiding it.
+    const granularity = this.resolveGranularity({
+      declared,
+      ...(parameters ? { parameters } : {}),
+      ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+      onBudgetOverflow: onBudgetOverflow ?? "refuse",
+    });
+
+    // Validate lists a declared granularity as awaiting alongside the window
+    // pair; whether it is actually unfilled is this resolver's answer, so the
+    // name is re-derived from the resolution rather than carried over.
+    const unfilledReserved = [
+      ...awaitingTimeWindow.filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER),
+      ...(granularity.followsGranularity && granularity.granularitySeconds === undefined
+        ? [LWQL_PERIOD_GRANULARITY_PARAMETER]
+        : []),
+    ].toSorted();
+    if (unfilledReserved.length > 0) {
+      throw new LangWatchQLParameterMissingError(unfilledReserved);
+    }
+
+    return granularity;
   }
 }

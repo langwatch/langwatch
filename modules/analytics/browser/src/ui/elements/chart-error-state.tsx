@@ -1,7 +1,6 @@
 import { Box, Button, HStack, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { RefreshCw } from "react-feather";
-
-import { HandledErrorAlert } from "./handled-error-alert.tsx";
 
 /**
  * Full-area error state for analytics charts: the registry's copy (headline, remediation,

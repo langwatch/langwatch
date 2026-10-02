@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { toChartQueryResult } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 
@@ -19,7 +20,6 @@ import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
 } from "../model/dashboard-widget-definition.ts";
-import { readHandledError } from "../model/handled-error.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 import { analyticsApi } from "./analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "./frame-bridge.ts";
