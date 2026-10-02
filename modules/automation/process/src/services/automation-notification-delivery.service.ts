@@ -293,7 +293,8 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     if (!this.webhooks) {
       return Promise.reject(
         new Error(
-          "This process composes no outbound webhook sender, so webhook automations cannot be delivered from it. Supply a webhook transport to the delivery adapter.",
+          "This process composes no outbound webhook sender, so webhook automations " +
+            "cannot be delivered from it. Supply a webhook transport to the delivery adapter.",
         ),
       );
     }

@@ -4,9 +4,6 @@ import {
   type AutomationApiTriggerScope,
   type NextFiring,
   type TriggerFirePage,
-  InvalidUnsubscribeTokenError,
-  maskEmail,
-  suppressEmailCommandSchema,
   type CreateTriggerCommand,
   type CustomGraph,
   type CustomGraphNameRef,
@@ -44,6 +41,7 @@ import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { describeNextFiring } from "../rules/next-firing.rules.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
+import { AutomationEmailSuppressionService } from "./automation-email-suppression.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
@@ -52,8 +50,6 @@ import type { AutomationGraphService } from "./trigger-graph.service.ts";
 
 /** The webhook module's log of this module's webhook attempts (ADR-167). */
 type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;
-
-const normalize = (email: string): string => email.trim().toLowerCase();
 
 /**
  * The automation feature's own trigger-and-suppression service, narrowed
@@ -65,9 +61,7 @@ export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;
   private readonly triggers: TriggerRepository;
   private readonly history: TriggerFireHistoryRepository;
-  private readonly suppressions: EmailSuppressionRepository;
-  private readonly names: EmailSuppressionNameRepository;
-  private readonly verifier: UnsubscribeTokenVerifier;
+  private readonly emailSuppressions: AutomationEmailSuppressionService;
   private readonly reportSchedules: ReportScheduleService;
   private readonly clock: AutomationClock;
   private readonly customGraphs: CustomGraphRepository;
@@ -108,9 +102,11 @@ export class AutomationService {
   }) {
     this.triggers = triggers;
     this.history = history;
-    this.suppressions = suppressions;
-    this.names = names;
-    this.verifier = verifier;
+    this.emailSuppressions = AutomationEmailSuppressionService.create({
+      suppressions,
+      names,
+      verifier,
+    });
     this.reportSchedules = reportSchedules;
     this.clock = clock;
     this.customGraphs = customGraphs;
@@ -137,21 +133,7 @@ export class AutomationService {
     persistCaps: AutomationPersistCapService;
     slackConnections: AutomationSlackConnectionService;
   }): AutomationService {
-    return new AutomationService({
-      triggers: deps.triggers,
-      history: deps.history,
-      suppressions: deps.suppressions,
-      names: deps.names,
-      verifier: deps.verifier,
-      reportSchedules: deps.reportSchedules,
-      clock: deps.clock,
-      customGraphs: deps.customGraphs,
-      webhookDeliveries: deps.webhookDeliveries,
-      graph: deps.graph,
-      templates: deps.templates,
-      persistCaps: deps.persistCaps,
-      slackConnections: deps.slackConnections,
-    });
+    return new AutomationService(deps);
   }
 
   countUsage(input: {
@@ -439,87 +421,39 @@ export class AutomationService {
   }
 
   getSuppressions(input: { projectId: string }): Promise<EmailSuppression[]> {
-    return this.suppressions.findAll(input);
+    return this.emailSuppressions.getSuppressions(input);
   }
 
-  async getAllEnriched(input: {
+  getAllEnriched(input: {
     projectId: string;
   }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
-    const rows = await this.suppressions.findAll(input);
-    const ids = [...new Set(rows.flatMap((row) => (row.triggerId ? [row.triggerId] : [])))];
-    const names = await this.names.findTriggerNames({
-      projectId: input.projectId,
-      triggerIds: ids,
-    });
-
-    return rows.map((row) => ({
-      ...row,
-      triggerName: row.triggerId ? (names.get(row.triggerId) ?? null) : null,
-    }));
+    return this.emailSuppressions.getAllEnriched(input);
   }
 
-  async findUnsubscribeView(input: { token: string }): Promise<{
-    projectName: string;
-    triggerName: string | null;
-    email: string;
-  } | null> {
-    const payload = this.verifier.findVerifiedPayload(input.token);
-    if (!payload) {
-      return null;
-    }
-
-    const names = await this.names.findNames(payload);
-    if (!names) {
-      return null;
-    }
-
-    return {
-      projectName: names.projectName,
-      triggerName: names.triggerName,
-      email: maskEmail(payload.email),
-    };
+  findUnsubscribeView(input: {
+    token: string;
+  }): Promise<{ projectName: string; triggerName: string | null; email: string } | null> {
+    return this.emailSuppressions.findUnsubscribeView(input);
   }
 
-  async confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void> {
-    const payload = this.verifier.findVerifiedPayload(input.token);
-    if (!payload) {
-      throw new InvalidUnsubscribeTokenError();
-    }
-
-    await this.suppressEmail({
-      projectId: payload.projectId,
-      email: payload.email,
-      triggerId: input.scope === "project" ? null : payload.triggerId,
-    });
+  confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void> {
+    return this.emailSuppressions.confirmUnsubscribe(input);
   }
 
   suppressEmail(input: SuppressEmailCommand): Promise<EmailSuppression> {
-    const parsed = suppressEmailCommandSchema.parse(input);
-
-    return this.suppressions.create({
-      projectId: parsed.projectId,
-      email: normalize(parsed.email),
-      triggerId: parsed.triggerId,
-      reason: parsed.reason ?? "unsubscribe",
-    });
+    return this.emailSuppressions.suppressEmail(input);
   }
 
   removeSuppression(input: { id: string; projectId: string }): Promise<void> {
-    return this.suppressions.delete(input);
+    return this.emailSuppressions.removeSuppression(input);
   }
 
-  async filterSuppressed(input: {
+  filterSuppressed(input: {
     projectId: string;
     triggerId: string;
     emails: string[];
   }): Promise<string[]> {
-    const rows = await this.suppressions.findMatching({
-      projectId: input.projectId,
-      triggerId: input.triggerId,
-    });
-    const blocked = new Set(rows.map((row) => normalize(row.email)));
-
-    return input.emails.filter((email) => !blocked.has(normalize(email)));
+    return this.emailSuppressions.filterSuppressed(input);
   }
 
   findCustomGraph(input: {

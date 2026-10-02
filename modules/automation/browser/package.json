@@ -28,6 +28,7 @@
     "@langwatch/dataset-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
