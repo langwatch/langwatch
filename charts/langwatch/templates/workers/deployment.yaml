@@ -11,9 +11,17 @@ metadata:
     {{- if .Values.workers.deployment.labels }}
     {{- toYaml .Values.workers.deployment.labels | nindent 4 }}
     {{- end }}
-  {{- with .Values.workers.deployment.annotations }}
+  {{- $serializeUpgrades := eq (include "langwatch.storedObjects.serializeUpgradesActive" .) "true" }}
+  {{- if or .Values.workers.deployment.annotations $serializeUpgrades }}
   annotations:
+    {{- with .Values.workers.deployment.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $serializeUpgrades }}
+    {{- /* Read by the stored-objects upgrade hooks. Metadata only, so a new
+           value never rolls a pod. */}}
+    langwatch.ai/stored-objects-upgrade-fingerprint: {{ include "langwatch.storedObjects.upgradeFingerprint" . | quote }}
+    {{- end }}
   {{- end }}
 spec:
   replicas: {{ .Values.workers.replicaCount }}
