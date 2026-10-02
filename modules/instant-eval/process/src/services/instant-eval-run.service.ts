@@ -5,7 +5,6 @@
  */
 
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   type InstantEvalActor,
   type InstantEvalJudgmentStatus,
@@ -23,7 +22,9 @@ import type { InstantEvalRunRow } from "../repositories/instant-eval-run.reposit
 import { instantEvalRowLimitOrRefuse } from "../rules/instant-eval-caps.rules.ts";
 import { getInstantEvalQueryCapability } from "../rules/instant-eval-query-capability.rules.ts";
 import {
+  compileInstantEvalFilter,
   instantEvalStatementFor,
+  refuseUnsupportedShorthandFilter,
   type InstantEvalStatement,
 } from "../rules/instant-eval-run-input.rules.ts";
 import { instantEvalShorthandWindow } from "../rules/instant-eval-shorthand.rules.ts";
@@ -380,7 +381,7 @@ export class InstantEvalRunService {
       });
     }
 
-    const compiled = this.#compileFilter({
+    const compiled = compileInstantEvalFilter({
       compile: (input) => peers.compileFilter?.(input) ?? { kind: "empty" },
       filter,
     });
@@ -397,10 +398,7 @@ export class InstantEvalRunService {
       case "unsupported":
         // The explorer's own compiler answers what the trace view cannot.
         if (!this.peers.selectTraceIds) {
-          throw new InstantEvalQueryInvalidError({
-            reason: `A shorthand filter cannot ask for "${compiled.field}". It can ask for ${compiled.supportedFields.join(", ")} and for trace.attribute.<key>. Everything else the trace explorer filters on lives outside the trace row, so ask it with a statement instead.`,
-            fields: ["filter"],
-          });
+          refuseUnsupportedShorthandFilter(compiled);
         }
         return instantEvalStatementFor({
           ...base,
@@ -414,27 +412,6 @@ export class InstantEvalRunService {
     if (typeof input.sql === "string" && input.sql.trim() !== "") return undefined;
     const filter = input.shorthand?.filter?.trim();
     return filter === undefined || filter === "" ? undefined : filter;
-  }
-
-  /** The dialect's answer, with syntax it cannot read refused as the shorthand's own. */
-  #compileFilter({
-    compile,
-    filter,
-  }: {
-    compile: NonNullable<InstantEvalRunPeers["compileFilter"]>;
-    filter: string;
-  }): LangWatchQLTraceFilter {
-    try {
-      return compile({ filter });
-    } catch (error) {
-      if (error instanceof HandledError && error.code === "filter_parse_error") {
-        throw new InstantEvalQueryInvalidError({
-          reason: `That filter could not be read: ${error.message}`,
-          fields: ["filter"],
-        });
-      }
-      throw error;
-    }
   }
 
   /** The trace ids a target's filter selects, resolved by the explorer's own compiler. */
@@ -453,7 +430,8 @@ export class InstantEvalRunService {
     if (!this.peers.selectTraceIds || shorthand === undefined) {
       throw new InstantEvalQueryInvalidError({
         reason:
-          "This deployment cannot resolve a target's filter, so the rows it names cannot be judged. Send a statement with the selection written into its WHERE clause instead.",
+          "This deployment cannot resolve a target's filter, so the rows it names cannot be judged. " +
+          "Send a statement with the selection written into its WHERE clause instead.",
         fields: ["filter"],
       });
     }

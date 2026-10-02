@@ -5,36 +5,50 @@
  * @see specs/instant-evals/classifier.feature
  */
 
+import { z } from "zod";
+
 /** What a question asks for, which decides how its answer is read. */
 export const INSTANT_EVAL_QUESTION_KINDS = ["boolean", "score", "category"] as const;
 
 export type InstantEvalQuestionKind = (typeof INSTANT_EVAL_QUESTION_KINDS)[number];
 
 /** A yes-or-no question, answered with a calibrated probability. */
-export interface InstantEvalBooleanQuestion {
-  readonly id: string;
-  readonly kind: "boolean";
-  readonly instructions: string;
-  /** What counts as yes, then what counts as no. A boundary has two sides. */
-  readonly criteria?: readonly [string, string];
-}
+const instantEvalBooleanQuestionSchema = z
+  .object({
+    id: z.string(),
+    kind: z.literal("boolean"),
+    instructions: z.string(),
+    /** What counts as yes, then what counts as no. A boundary has two sides. */
+    criteria: z.tuple([z.string(), z.string()]).readonly().optional(),
+  })
+  .readonly();
+
+export type InstantEvalBooleanQuestion = z.infer<typeof instantEvalBooleanQuestionSchema>;
 
 /** A rating on a whole-numbered scale, answered with a weighted mean. */
-export interface InstantEvalScoreQuestion {
-  readonly id: string;
-  readonly kind: "score";
-  readonly instructions: string;
-  /** Inclusive bounds. Every whole number between them is a level. */
-  readonly range: { readonly min: number; readonly max: number };
-}
+const instantEvalScoreQuestionSchema = z
+  .object({
+    id: z.string(),
+    kind: z.literal("score"),
+    instructions: z.string(),
+    /** Inclusive bounds. Every whole number between them is a level. */
+    range: z.object({ min: z.number(), max: z.number() }).readonly(),
+  })
+  .readonly();
+
+export type InstantEvalScoreQuestion = z.infer<typeof instantEvalScoreQuestionSchema>;
 
 /** One named option out of a closed set. */
-export interface InstantEvalCategoryQuestion {
-  readonly id: string;
-  readonly kind: "category";
-  readonly instructions: string;
-  readonly options: readonly { readonly name: string; readonly description: string }[];
-}
+const instantEvalCategoryQuestionSchema = z
+  .object({
+    id: z.string(),
+    kind: z.literal("category"),
+    instructions: z.string(),
+    options: z.array(z.object({ name: z.string(), description: z.string() }).readonly()).readonly(),
+  })
+  .readonly();
+
+export type InstantEvalCategoryQuestion = z.infer<typeof instantEvalCategoryQuestionSchema>;
 
 export type InstantEvalQuestion =
   | InstantEvalBooleanQuestion

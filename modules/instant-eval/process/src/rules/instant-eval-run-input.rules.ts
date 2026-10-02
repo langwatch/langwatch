@@ -5,6 +5,7 @@
  * @see specs/instant-evals/instant-eval-shorthand.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   InstantEvalQueryInvalidError,
   type InstantEvalRunInput,
@@ -12,6 +13,7 @@ import {
   type InstantEvalShorthandInput,
 } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
+import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 
 import {
   type CompiledInstantEvalFilter,
@@ -126,4 +128,41 @@ export function instantEvalRunInputOf(body: InstantEvalRunInputBody): InstantEva
           },
         }),
   };
+}
+
+/** The dialect's answer, with syntax it cannot read refused as the shorthand's own. */
+export function compileInstantEvalFilter({
+  compile,
+  filter,
+}: {
+  compile: (input: { filter: string }) => LangWatchQLTraceFilter;
+  filter: string;
+}): LangWatchQLTraceFilter {
+  try {
+    return compile({ filter });
+  } catch (error) {
+    if (error instanceof HandledError && error.code === "filter_parse_error") {
+      throw new InstantEvalQueryInvalidError({
+        reason: `That filter could not be read: ${error.message}`,
+        fields: ["filter"],
+      });
+    }
+    throw error;
+  }
+}
+
+/** The refusal for a shorthand filter field the trace view cannot answer. */
+export function refuseUnsupportedShorthandFilter({
+  field,
+  supportedFields,
+}: {
+  field: string;
+  supportedFields: readonly string[];
+}): never {
+  throw new InstantEvalQueryInvalidError({
+    reason:
+      `A shorthand filter cannot ask for "${field}". It can ask for ${supportedFields.join(", ")} and for trace.attribute.<key>. ` +
+      "Everything else the trace explorer filters on lives outside the trace row, so ask it with a statement instead.",
+    fields: ["filter"],
+  });
 }
