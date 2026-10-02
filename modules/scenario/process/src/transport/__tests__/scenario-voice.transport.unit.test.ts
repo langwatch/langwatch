@@ -63,7 +63,7 @@ describe("the voice-session procedures", () => {
   });
 
   describe("given a request with no logged-in user", () => {
-    /** @scenario "An unauthenticated Talk to it request is refused" */
+    /** @scenario "A Talk to it tRPC request with no logged-in user is refused" */
     it("refuses it as unauthenticated and mints no session", async () => {
       const mintVoiceSession = vi.fn<ScenarioApi["mintVoiceSession"]>(async () => mintResult);
       const { caller } = scenarioTrpcCaller({

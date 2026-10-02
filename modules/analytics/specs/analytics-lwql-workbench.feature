@@ -106,6 +106,13 @@ Feature: LangWatchQL query workbench
       Then the statement still reports that it follows the period
       And the declared reserved names are reported as awaited rather than refused
 
+    @unit
+    Scenario: A period-aware statement run with no window is refused naming the unset parameters
+      Given SQL declaring the reserved period parameters
+      When it is run with no time window at all
+      Then it is refused with error code lwql_parameter_missing naming them
+      And validating that same statement is not refused, because the window is the surface's to supply
+
     @integration
     Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
       Given a statement whose first run is refused for an unfilled period_granularity_seconds
@@ -172,9 +179,10 @@ Feature: LangWatchQL query workbench
     @unit
     Scenario: A zero or fractional step is refused as a wrong declaration
       Given SQL declaring period_granularity_seconds as UInt32
-      When the surface supplies a step that is zero, negative, or fractional
+      When the surface supplies a step that is zero, negative, fractional, or not an offered step
       Then the run is refused as a wrong granularity declaration
       And the refusal describes the step rather than claiming the declaration is mistyped
+      And the refusal says the step must be one of the offered steps
 
     @unit
     Scenario: A granularity declared alongside a mistyped period bound is refused at save
@@ -188,6 +196,7 @@ Feature: LangWatchQL query workbench
       Given a statement declaring granularity over a period no offered step can bucket
       When the run is resolved on a surface that would otherwise coarsen
       Then it is refused as too fine for the period rather than coarsened
+      And the refusal names the requested step and the bucket ceiling
 
   Rule: Results preserve transport fields, ordering, and readable states
 
