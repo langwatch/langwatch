@@ -10,10 +10,10 @@ import {
   type BrowserNotificationPermission,
 } from "@langwatch/browser-host/browser-notifications";
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useLangyStore } from "../../../behavior/langy.store.ts";
 import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../behavior/langy.store.ts";
 import {
   langyNotificationFor,
   langyNotificationTag,

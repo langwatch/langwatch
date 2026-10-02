@@ -1,3 +1,6 @@
+import { renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  *
@@ -5,8 +8,6 @@
  * @see specs/langy/langy-notifications.feature
  */
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../behavior/langy-api.ts", () => ({ api: {} }));
 

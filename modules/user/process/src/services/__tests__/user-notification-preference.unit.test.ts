@@ -1,17 +1,33 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * The per-person notification choice, over the memory repository.
  * @see specs/langy/langy-notifications.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import type { UserAvatarStorage } from "../../app/user.members.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
+import { UserLifecycleNoticeService } from "../user-lifecycle-notice.service.ts";
 import { UserService } from "../user.service.ts";
 
 const avatarStorage: UserAvatarStorage = { store: async () => ({ id: "object-1" }) };
+
+function lifecyclePeers() {
+  const lifecycle = UserLifecycleNoticeService.create();
+  lifecycle.connect({
+    recordUserDeactivated: { send: async () => undefined },
+    recordUserReactivated: { send: async () => undefined },
+  });
+
+  return {
+    platformOperators: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
+    lifecycle,
+    cliCredentials: { revokeForUser: async () => undefined },
+  };
+}
 
 async function createPerson() {
   const { users } = MemoryUserRepositories.create();
@@ -21,6 +37,7 @@ async function createPerson() {
     auth: createApiFixture<AuthApi>({}),
     avatarStorage,
     credentialIssuer: "credential",
+    ...lifecyclePeers(),
   });
   const created = await users.createPasskeyUser({
     email: "ada@acme.com",
