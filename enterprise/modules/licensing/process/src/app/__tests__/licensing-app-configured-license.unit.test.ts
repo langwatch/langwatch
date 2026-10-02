@@ -79,15 +79,20 @@ async function bootWithConfiguredValue(value: string) {
         authProviderIsMounted: () => true,
         reportSigningFailure: () => {},
         connect: {
-          organizations: MemoryConnectOrganizationRepository.create([
-            {
-              organizationId: "org-old",
-              license: null,
-              servicesDisabled: [],
-              lastSyncAt: null,
-              lastSyncError: null,
-            },
-          ]),
+          organizations: MemoryConnectOrganizationRepository.create({
+            rows: new Map([
+              [
+                "org-old",
+                {
+                  organizationId: "org-old",
+                  license: null,
+                  servicesDisabled: [],
+                  lastSyncAt: null,
+                  lastSyncError: null,
+                },
+              ],
+            ]),
+          }),
           identity: MemoryInstanceIdentityRepository.create({ seed: { instanceId: "instance-1" } }),
           licenseHost: host,
           instanceLicenseKey: () => undefined,

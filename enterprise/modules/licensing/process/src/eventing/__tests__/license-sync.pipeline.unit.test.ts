@@ -157,7 +157,7 @@ describe("given the license sync's eventing declaration", () => {
           occurredAt: 1,
           organizationName: "ACME",
         },
-        { tenantId: "org-1", aggregateId: "org-1", occurredAt: 1 },
+        { tenantId: "org-1", aggregateId: "org-1", occurredAt: 1, eventId: "evt-1" },
       );
 
       expect(subscriber.eventType).toBe(ORGANIZATION_SIGNED_UP_EVENT_TYPE);
