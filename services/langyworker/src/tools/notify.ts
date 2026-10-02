@@ -1,5 +1,5 @@
 /**
- * `notify` sends a browser notification through the panel, within a limit so a model loop
+ * `notify` asks the server to push a browser notification, within a limit so a model loop
  * cannot spam; `offer_notifications` asks, once per conversation, whether Langy may notify.
  * Spec: specs/langy/langy-notifications.feature
  */
@@ -18,14 +18,14 @@ export const NOTIFY_HOURLY_BUDGET = 5;
 
 const HOUR_MS = 60 * 60_000;
 
-/** Short enough to fit a system notification; the panel cuts anything longer. */
+/** Short enough to fit a system notification; the server cuts anything longer. */
 export const NOTIFY_TITLE_MAX = 80;
 export const NOTIFY_BODY_MAX = 240;
 
 /**
- * What the model reads when the notification went out. The panel decides
- * whether it is shown: never while the person is looking at the tab, and
- * never when they have not turned Langy notifications on.
+ * What the model reads when the notification went out. The server pushes it only when the
+ * person turned Langy notifications on, and their browser skips it on a screen showing this
+ * conversation.
  */
 export const NOTIFY_SENT =
   "Sent. It reaches the person's devices only when they turned Langy notifications on, and not on a screen already showing this conversation; say nothing about it in the reply.";
@@ -113,7 +113,7 @@ export function createNotifyExtension({
       pi.registerTool({
         name: NOTIFY_TOOL_NAME,
         label: "Notify",
-        description: `Send the person a browser notification, for a moment they would want to come back for: the long work they started is done ("Your project is ready"), or it cannot go on without them. It reaches their devices even with the tab closed, only when they turned notifications on, and never on a screen already showing this conversation, so calling it costs nothing when they are watching. Never for progress, a step inside the work, or a line the reply already says. At most one a minute and ${NOTIFY_HOURLY_BUDGET} an hour; a call past that is refused.`,
+        description: `Send the person a browser notification, for a moment they would want to come back for: the long work they started is done ("Your project is ready"), or it cannot go on without them. The server pushes it to each of their devices, even with the tab closed, only when they turned notifications on; a device already showing this conversation skips it, so calling it costs nothing when they are watching. A newer notification for this conversation replaces the earlier one. Never for progress, a step inside the work, or a line the reply already says. At most one every ${NOTIFY_MIN_GAP_MS / 1000} seconds and ${NOTIFY_HOURLY_BUDGET} an hour; a call past that is refused and says when the next may go.`,
         parameters: notifyParams,
         async execute(_toolCallId, params) {
           const title = typeof params.title === "string" ? params.title : "";

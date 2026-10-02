@@ -41,6 +41,18 @@ function registerTools({ ledger, now }: { ledger?: NotifyLedger; now?: () => num
 
 const MINUTE = 60_000;
 
+describe("the notify tool's description", () => {
+  /** @scenario "Langy's notify tool reaches the person through Web Push" */
+  it("says the server pushes it and names both limits", () => {
+    const { notify } = registerTools();
+
+    expect(notify.description).toContain("The server pushes it");
+    expect(notify.description).not.toMatch(/panel/i);
+    expect(notify.description).toContain(`one every ${NOTIFY_MIN_GAP_MS / 1000} seconds`);
+    expect(notify.description).toContain(`${NOTIFY_HOURLY_BUDGET} an hour`);
+  });
+});
+
 describe("notifyRefusal", () => {
   describe("when nothing was sent yet", () => {
     it("lets the first notification through", () => {
