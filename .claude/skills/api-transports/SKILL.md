@@ -112,8 +112,10 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
   Hints carry no data. No timer polling.
 - **Projection-backed reads** declare `{ fromProjection: ["<projection>"] }` instead (never both). The
   cursor is the event id; see `eventing-and-worker` and the "Projection cursor reads" paragraph.
-- `{ cache: { persist: true } }` opts a read into the browser's disk mirror; `revision: n` is bumped only
-  when a read's meaning changes and its shape does not.
+- Every read is mirrored to the browser's disk by default (§10); there is no opt-in and `cache: { persist }`
+  is a deleted spelling (§15). High-traffic reads go on `UI_QUERY_MIRROR_EXCLUDED`
+  (`@langwatch/browser-host/cache-tiers`). `revision: n` is bumped only when a read's meaning changes
+  and its shape does not.
 - Specs: `packages/api/specs/read-hints.feature`, `packages/eventing/specs/projection-cursor-reads.feature`.
 
 ## Traps

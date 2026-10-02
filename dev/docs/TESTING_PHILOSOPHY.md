@@ -24,22 +24,22 @@ Use MDN-style naming for the unit under test:
 | Function  | `name()`    | `describe("transformData()", ...)`  |
 | Class     | `Name`      | `describe("Analytics", ...)`        |
 | Component | `<Name/>`   | `describe("<DatePicker/>", ...)`    |
-| Hook      | `useName()` | `describe("useFeatureFlag()", ...)` |
+| Hook      | `useName()` | `describe("useUiDeployment()", ...)` |
 
 ### Nested Describe for Context
 
 Use nested `describe` blocks to group tests by context/condition. The outer `describe` names the unit under test, inner `describe` blocks specify the "when" condition, and `it` blocks describe the behavior.
 
 ```typescript
-describe("useFeatureFlag()", () => {
-  describe("when flag is enabled", () => {
-    it("returns true", () => {
+describe("useUiDeployment()", () => {
+  describe("when the deployment is SaaS", () => {
+    it("reports isSaaS as true", () => {
       // ...
     });
   });
 
-  describe("when query is loading", () => {
-    it("returns false", () => {
+  describe("when the deployment is self-hosted", () => {
+    it("reports isSaaS as false", () => {
       // ...
     });
   });
@@ -201,7 +201,7 @@ Scenario: Analytics chart shows error state when ClickHouse query fails
 
 ### Binding scenarios to tests
 
-The parity checker (`packages/architecture-enforcer/src/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
+The parity checker (`packages/architecture-enforcer/src/tools/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
 
 ```ts
 /** @scenario Analytics chart shows error state when ClickHouse query fails */

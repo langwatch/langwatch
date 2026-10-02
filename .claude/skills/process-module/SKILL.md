@@ -35,7 +35,8 @@ process/src/
 ```
 
 Also allowed: `channels/` (+ tier folders), `eventing/` (one folder, one
-pipeline), `tasks/*.task.ts`, `migrations/`, `app/<name>.members.ts`.
+pipeline), `tasks/*.task.ts`, `migrations/`. `*.members.ts` files are deleted
+(§3.3, §15); a module's needs are resolved by the container (§5).
 `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`, `domain/`
 are refused (§3.2).
 

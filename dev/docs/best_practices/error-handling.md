@@ -229,7 +229,7 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    every error, and `clickhouse_unavailable`'s "check the status page or
    contact support" never once reached a customer.
 
-   `resolveErrorCopy` (`logic/resolveErrorCopy.ts`) applies that comparison
+   `resolveErrorCopy` (`modules/trace/browser/src/behavior/errors/logic/resolve-error-copy.ts`) applies that comparison
    once, on a normalised form, and both surfaces render its output:
    `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
    the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and
@@ -402,7 +402,7 @@ member input, and constraining its key schema is fine.
 
 Not every transport carries the identical shape yet. Know which one you are on:
 
-- **SSE** (`src/server/routes/sse.ts`) — the error frame is
+- **SSE** (`packages/api/src/trpc/sse.ts`) — the error frame is
   `{ type: "error", message: <code>, error: <serialised handled error> }`. The
   payload key is `error`, not `domainError`. A non-handled stream failure
   degrades to the generic unknown message — never raw error text onto an

@@ -33,7 +33,7 @@ const datasetQuery = api.dataset.getById.useQuery(
 Reference: `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
 (the `getById` poll). The
 functional-`refetchInterval` idiom mirrors
-`src/features/traces-v2/hooks/useTraceFacets.ts`, where the same form drives a
+`modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`, where the same form drives a
 cold-miss backoff poll that stops as soon as the payload settles. Read the
 interval from `data`, not from React state — the scheduler reads it outside the
 render cycle.
@@ -124,9 +124,8 @@ User-facing copy describes what the customer gets, never how the work is done
 
 - Poll + banner + retry + read-gate:
   `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
-- Functional `refetchInterval` idiom: `src/features/traces-v2/hooks/useTraceFacets.ts`
+- Functional `refetchInterval` idiom: `modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`
 - `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
-- Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`, and its
-  package copy `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
+- Gated dependent read: `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
 - Server not-ready mapping: `src/server/api/routers/datasetRecord.ts`
 - Architecture: ADR-032 (`dev/docs/adr/032-datasets-s3-jsonl.md`), Decision 6 / I-READY.
