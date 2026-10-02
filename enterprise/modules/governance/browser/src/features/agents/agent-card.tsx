@@ -14,7 +14,7 @@ import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /**
  * One agent as a card, the page's optional layout. Figures go through `AgentFigure` like the list;
- * unknown is a dash with a reason, never zero. `sample` is required on invented cards.
+ * unknown is "No data" with a reason, never zero. `sample` is required on invented cards.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 export function AgentCard({
@@ -30,9 +30,10 @@ export function AgentCard({
       align="stretch"
       gap={3}
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
-      backgroundColor="bg.panel"
+      borderColor="border.muted"
+      borderRadius="xl"
+      background="bg.panel"
+      boxShadow="md"
       padding={4}
     >
       <HStack gap={2} align="baseline" wrap="wrap">

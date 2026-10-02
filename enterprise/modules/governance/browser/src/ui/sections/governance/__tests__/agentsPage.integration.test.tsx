@@ -528,9 +528,9 @@ describe("the Agents page with the sample agents on screen", () => {
       if (!row) throw new Error("no contract-review row");
       expect(within(row).getByText("contract-review")).toBeInTheDocument();
       expect(within(row).getByText("development")).toBeInTheDocument();
-      const dashes = within(row).getAllByText("—");
+      const dashes = within(row).getAllByText("No data");
       expect(dashes.length).toBeGreaterThanOrEqual(4);
-      for (const dash of dashes) expect(dash).toHaveAttribute("aria-label");
+      for (const dash of dashes) expect(dash.getAttribute("aria-label")).toMatch(/not measured/);
       expect(row.textContent).not.toContain("$0");
     });
 
@@ -603,9 +603,9 @@ describe("the Agents page with the sample agents on screen", () => {
         .getAllByTestId("governance-agent-card")
         .find((c) => c.textContent?.includes("contract-review"));
       if (!card) throw new Error("no contract-review card");
-      const dashes = within(card).getAllByText("—");
+      const dashes = within(card).getAllByText("No data");
       expect(dashes.length).toBeGreaterThanOrEqual(2);
-      for (const dash of dashes) expect(dash).toHaveAttribute("aria-label");
+      for (const dash of dashes) expect(dash.getAttribute("aria-label")).toMatch(/not measured/);
       expect(card.textContent).not.toContain("$0");
     });
   });

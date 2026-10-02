@@ -80,7 +80,7 @@ export function AgentsTable({
             <Table.Cell whiteSpace="nowrap">
               {/* Unclaimed is a fact about the agent, not a figure nobody
                   measured, so it is the badge the card uses and never a
-                  dash. */}
+                  "No data". */}
               {agent.owner === null ? (
                 <Badge size="xs" variant="subtle" colorPalette="orange">
                   Unclaimed
@@ -100,7 +100,7 @@ export function AgentsTable({
 
             <Table.Cell>
               {agent.models.length === 0 ? (
-                <AgentValue value={null} />
+                <AgentValue label="Models" value={null} />
               ) : (
                 <HStack gap={1} wrap="wrap">
                   {agent.models.map((model) => (
@@ -114,27 +114,33 @@ export function AgentsTable({
 
             <Table.Cell whiteSpace="nowrap">
               <AgentValue
+                label="Health"
                 value={agent.health === null ? null : AGENT_HEALTH_LABELS[agent.health]}
               />
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">
               <AgentValue
+                label="Cost · 30 days"
                 value={formatAgentCost(agent)}
                 missingReason={agentCostMissingReason(agent)}
               />
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">
-              <AgentValue value={formatAgentRequests(agent)} />
+              <AgentValue label="Requests · 30 days" value={formatAgentRequests(agent)} />
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">
-              <AgentValue value={formatAgentLastActive(agent)} missingReason={AGENT_NEVER_RUN} />
+              <AgentValue
+                label="Last active"
+                value={formatAgentLastActive(agent)}
+                missingReason={AGENT_NEVER_RUN}
+              />
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">
-              <AgentValue value={formatRegistered(agent.registeredDaysAgo)} />
+              <AgentValue label="Registered" value={formatRegistered(agent.registeredDaysAgo)} />
             </Table.Cell>
           </Table.Row>
         ))}

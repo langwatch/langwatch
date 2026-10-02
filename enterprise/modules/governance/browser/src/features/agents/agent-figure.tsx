@@ -7,17 +7,17 @@ import { formatLastActive } from "./agent-rows";
 
 /**
  * One figure of an agent row and the single way a missing one is drawn, shared by card and table
- * (like the inventory's `ToolCardFigure`). Missing is a dash with a reason, never `$0.00`.
+ * (like the inventory's `ToolCardFigure`). Missing is "No data" with a reason, never `$0.00`.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 
-/** What a dash means when nothing more specific is known about the gap. */
+/** What "No data" means when nothing more specific is known about the gap. */
 export const AGENT_UNMEASURED = "The platform has not measured this yet.";
 
-/** What a dash means where the agent has registered and never been called. */
+/** What "No data" means where the agent has registered and never been called. */
 export const AGENT_NEVER_RUN = "This agent has registered but has never run.";
 
-/** What a dash means in the environment column. */
+/** What "No data" means in the environment column. */
 export const AGENT_ENVIRONMENT_UNDECLARED =
   "This agent has not declared which environment it runs in.";
 
@@ -48,22 +48,28 @@ export function formatAgentLastActive(agent: GovernanceAgentRow): string | null 
 }
 
 /**
- * A value, or the dash that stands in for one. The reason is carried on `aria-label` as well as in
- * the tooltip, so a reader who never hovers — and a reader using a screen reader — still gets the
- * sentence rather than a bare dash.
+ * A value, or a quiet "No data" drawn like the inventory's `ToolCardFigure`. The reason is carried
+ * on `aria-label` as well as in the tooltip, so a reader who never hovers still gets the sentence.
  */
 export function AgentValue({
+  label,
   value,
   missingReason = AGENT_UNMEASURED,
 }: {
+  label: string;
   value: string | null;
   missingReason?: string;
 }) {
   if (value === null) {
     return (
-      <Tooltip content={missingReason}>
-        <Text textStyle="sm" color="fg.muted" aria-label={missingReason}>
-          —
+      <Tooltip content={missingReason} showArrow positioning={{ placement: "top" }}>
+        <Text
+          textStyle="sm"
+          color="fg.subtle"
+          cursor="help"
+          aria-label={`${label} not measured. ${missingReason}`}
+        >
+          No data
         </Text>
       </Tooltip>
     );
@@ -81,7 +87,9 @@ export function AgentValue({
  */
 export function AgentEnvironment({ environment }: { environment: string | null }) {
   if (environment === null) {
-    return <AgentValue value={null} missingReason={AGENT_ENVIRONMENT_UNDECLARED} />;
+    return (
+      <AgentValue label="Environment" value={null} missingReason={AGENT_ENVIRONMENT_UNDECLARED} />
+    );
   }
   return (
     <Text textStyle="sm" color="fg.muted">
@@ -108,7 +116,7 @@ export function AgentFigure({
       <Text textStyle="xs" color="fg.muted">
         {label}
       </Text>
-      <AgentValue value={value} missingReason={missingReason} />
+      <AgentValue label={label} value={value} missingReason={missingReason} />
     </VStack>
   );
 }
