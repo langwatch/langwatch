@@ -168,6 +168,8 @@ LangWatch uses TTL rules to manage data retention and tiered storage in ClickHou
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
+A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
+
 #### Docker Compose
 
 Add to your app and workers environment:

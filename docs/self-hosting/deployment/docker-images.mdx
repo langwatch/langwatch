@@ -133,7 +133,7 @@ images:
     tag: "3.20.1" # x-release-please-version
 ```
 
-Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository` and `cronjobs.image.repository`.
+Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
 
 The chart has no chart-wide `imagePullSecrets` value. If your registry needs credentials, attach the pull secret to the ServiceAccount the pods run as. The NLP, LangEvals, gateway, Langy, PostgreSQL and Redis pods use the namespace `default` ServiceAccount. The app and workers use it too, unless `global.serviceAccount.create` or `global.serviceAccount.name` gives them their own, in which case patch that one as well:
 
@@ -157,3 +157,5 @@ app:
       serializeUpgradesPullSecrets:
         - name: registry-credentials
 ```
+
+The ClickHouse preflight Job (`clickhouse.preflight.enabled`, off by default in this chart) runs `clickhouse.preflight.image` under its own ServiceAccount and has no pull secret value. If you turn it on, mirror that image to a registry that needs no credentials.

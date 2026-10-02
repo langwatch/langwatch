@@ -60754,8 +60754,8 @@ sum by (outcome) (rate(trace_ingestion_spans_total[5m])) * 60
 # Worker queue backlog
 sum by (queue_name) (gq_pending_groups)
 
-# Age of the oldest pending job, in seconds
-max by (queue_name) (gq_oldest_pending_age_milliseconds) / 1000
+# Age of the oldest due job, in seconds, including groups held in retry backoff
+max by (queue_name) (gq_oldest_backlog_age_milliseconds) / 1000
 
 # ClickHouse query p95 latency
 histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_bucket[5m])))
@@ -60835,8 +60835,7 @@ groups:
   - name: langwatch
     rules:
       - alert: WorkerQueueBacklog
-        expr: max by (queue_name) (gq_oldest_pending_age_milliseconds) > 300000
-        for: 5m
+        expr: max by (queue_name) (gq_oldest_backlog_age_milliseconds) > 300000
         labels:
           severity: warning
         annotations:
@@ -61825,7 +61824,7 @@ After the first sync completes, verify the pods are running on the credentials y
 
 ```bash
 kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-app -o wide
-kubectl -n langwatch get pods -l app.kubernetes.io/component=ai-gateway -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-gateway -o wide
 argocd app diff langwatch
 ```
 
@@ -62190,7 +62189,7 @@ images:
     tag: "3.20.1" # x-release-please-version
 ```
 
-Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository` and `cronjobs.image.repository`.
+Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
 
 The chart has no chart-wide `imagePullSecrets` value. If your registry needs credentials, attach the pull secret to the ServiceAccount the pods run as. The NLP, LangEvals, gateway, Langy, PostgreSQL and Redis pods use the namespace `default` ServiceAccount. The app and workers use it too, unless `global.serviceAccount.create` or `global.serviceAccount.name` gives them their own, in which case patch that one as well:
 
@@ -62214,6 +62213,8 @@ app:
       serializeUpgradesPullSecrets:
         - name: registry-credentials
 ```
+
+The ClickHouse preflight Job (`clickhouse.preflight.enabled`, off by default in this chart) runs `clickhouse.preflight.image` under its own ServiceAccount and has no pull secret value. If you turn it on, mirror that image to a registry that needs no credentials.
 
 ---
 
@@ -62767,6 +62768,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ### Two installs in one cluster
 
@@ -63463,7 +63466,7 @@ LangEvals, NLP and the AI Gateway make outbound calls to external LLM providers 
 
 ### Connected agents
 
-A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound WebSocket to the App. Four requirements:
+A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound connection to the App, a WebSocket by default with HTTP long polling as the fallback. The first three requirements apply to the WebSocket transport, the last one to long polling:
 
 - **WebSocket upgrade on `/api/v1/agents/connect`.** The App serves it on its normal HTTP listener, next to `/api/trpc-ws`. An ingress that already passes `/api/trpc-ws` needs no change; one that terminates or rewrites upgrades must pass this path through.
 - **A read timeout above 15 seconds.** The App pings every 15 seconds to keep the connection alive. A shorter idle timeout closes the connection between pings, and the agent flaps between Online and Offline. The `access-ingress.yaml` overlay sets `proxy-read-timeout: 120`.
@@ -65267,7 +65270,7 @@ That fits a small cluster at roughly 2.8 CPU and 6.9 Gi of requests, and generat
 
 Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
 
-`examples/values-local.yaml` is a different thing and is not the one to start with: it pins the app, NLP and LangEvals images to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
+`examples/values-local.yaml` is a different thing and is not the one to start with: it pins the app, NLP and LangEvals images to a `local` tag and sets `pullPolicy: Never` on those and on ClickHouse, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
 Langy, the AI assistant, is part of this install and runs on the node's normal container runtime. To harden it with a sandboxed runtime on EKS, see [installing gVisor on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
@@ -65628,7 +65631,7 @@ spec:
 | App, Workers | NLP | 5561 | HTTP |
 | App, Workers | LangEvals | 5562 | HTTP |
 | NLP, LangEvals | External LLMs | 443 | HTTPS |
-| CronJobs | App | 5560 | HTTP |
+| CronJobs you add under `cronjobs.jobs` | App | 5560 | HTTP |
 
 ## Pod Security
 
@@ -65882,6 +65885,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ## ClickHouse Issues
 
@@ -66222,7 +66227,7 @@ The migration is resilient by design:
 
 - **Safe to re-run**: an interrupted or partial run resumes on the next run
 - **Non-destructive**: PostgreSQL rows are kept as a fallback and are not deleted
-- **Handles concurrent edits**: if someone edits a dataset while it is being migrated, that dataset is skipped. Run the task again to migrate it
+- **Detects most concurrent edits**: a dataset whose records change while it is being copied is skipped, and the next run migrates it. The check is best-effort: an edit in the moment between the final check and the switch can be missed, so run the migration when nobody is editing datasets
 - **Per-dataset failures do not stop the run**: a dataset that fails is logged and stays on PostgreSQL, readable as before
 
 The summary at the end of the output lists how many datasets moved, were skipped or failed.
@@ -66444,6 +66449,8 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
+
+A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
 
 #### Docker Compose
 

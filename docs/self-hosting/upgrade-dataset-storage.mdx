@@ -132,7 +132,7 @@ The migration is resilient by design:
 
 - **Safe to re-run**: an interrupted or partial run resumes on the next run
 - **Non-destructive**: PostgreSQL rows are kept as a fallback and are not deleted
-- **Handles concurrent edits**: if someone edits a dataset while it is being migrated, that dataset is skipped. Run the task again to migrate it
+- **Detects most concurrent edits**: a dataset whose records change while it is being copied is skipped, and the next run migrates it. The check is best-effort: an edit in the moment between the final check and the switch can be missed, so run the migration when nobody is editing datasets
 - **Per-dataset failures do not stop the run**: a dataset that fails is logged and stays on PostgreSQL, readable as before
 
 The summary at the end of the output lists how many datasets moved, were skipped or failed.

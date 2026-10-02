@@ -312,7 +312,7 @@ LangEvals, NLP and the AI Gateway make outbound calls to external LLM providers 
 
 ### Connected agents
 
-A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound WebSocket to the App. Four requirements:
+A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound connection to the App, a WebSocket by default with HTTP long polling as the fallback. The first three requirements apply to the WebSocket transport, the last one to long polling:
 
 - **WebSocket upgrade on `/api/v1/agents/connect`.** The App serves it on its normal HTTP listener, next to `/api/trpc-ws`. An ingress that already passes `/api/trpc-ws` needs no change; one that terminates or rewrites upgrades must pass this path through.
 - **A read timeout above 15 seconds.** The App pings every 15 seconds to keep the connection alive. A shorter idle timeout closes the connection between pings, and the agent flaps between Online and Offline. The `access-ingress.yaml` overlay sets `proxy-read-timeout: 120`.

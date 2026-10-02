@@ -147,7 +147,7 @@ After the first sync completes, verify the pods are running on the credentials y
 
 ```bash
 kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-app -o wide
-kubectl -n langwatch get pods -l app.kubernetes.io/component=ai-gateway -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-gateway -o wide
 argocd app diff langwatch
 ```
 

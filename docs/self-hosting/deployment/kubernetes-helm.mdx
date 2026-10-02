@@ -547,6 +547,8 @@ cronjobs:
       sidecar.istio.io/inject: "false"
 ```
 
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
+
 ### Two installs in one cluster
 
 The bundled Prometheus creates a cluster-scoped ClusterRole named `<release>-prometheus-server`. A second install with the same release name in another namespace, for example a staging `langwatch` beside a production `langwatch`, fails with `ClusterRole "langwatch-prometheus-server" ... exists and cannot be imported into the current release`. Give the second install its own ClusterRole name, or use a different release name:

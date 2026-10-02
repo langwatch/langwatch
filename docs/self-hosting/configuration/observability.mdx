@@ -92,8 +92,8 @@ sum by (outcome) (rate(trace_ingestion_spans_total[5m])) * 60
 # Worker queue backlog
 sum by (queue_name) (gq_pending_groups)
 
-# Age of the oldest pending job, in seconds
-max by (queue_name) (gq_oldest_pending_age_milliseconds) / 1000
+# Age of the oldest due job, in seconds, including groups held in retry backoff
+max by (queue_name) (gq_oldest_backlog_age_milliseconds) / 1000
 
 # ClickHouse query p95 latency
 histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_bucket[5m])))
@@ -173,8 +173,7 @@ groups:
   - name: langwatch
     rules:
       - alert: WorkerQueueBacklog
-        expr: max by (queue_name) (gq_oldest_pending_age_milliseconds) > 300000
-        for: 5m
+        expr: max by (queue_name) (gq_oldest_backlog_age_milliseconds) > 300000
         labels:
           severity: warning
         annotations:
