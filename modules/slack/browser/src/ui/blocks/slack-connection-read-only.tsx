@@ -1,12 +1,11 @@
 import { Field, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-
 import {
   maskedSecret,
   SLACK_CONNECTION_KINDS,
+  type SlackConnection,
   usedByLabel,
-} from "../../model/slack-connection-copy.ts";
-import { type SlackConnection } from "../../model/slack-connection-types.ts";
+} from "@langwatch/slack-contract";
 
 /**
  * A connection the reader may use but not change: everything it says, no inputs, and who can

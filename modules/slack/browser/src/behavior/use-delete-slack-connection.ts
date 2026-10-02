@@ -1,9 +1,9 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
+import type { SlackConnection } from "@langwatch/slack-contract";
 import { useState } from "react";
 
 import { readInUseRefusal, type SlackConnectionInUse } from "../model/slack-connection-refusals.ts";
-import { type SlackConnection } from "../model/slack-connection-types.ts";
 import { slackApi } from "./slack-api.ts";
 
 /**

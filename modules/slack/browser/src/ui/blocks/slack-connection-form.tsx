@@ -10,7 +10,14 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
-import type { SlackConnectionKind, SlackConnectionScopeType } from "@langwatch/slack-contract";
+import {
+  maskedSecret,
+  narrowingConfirmation,
+  SLACK_CONNECTION_KINDS,
+  type SlackConnection,
+  type SlackConnectionKind,
+  type SlackConnectionScopeType,
+} from "@langwatch/slack-contract";
 import type { ReactNode } from "react";
 
 import type { useSaveSlackConnection } from "../../behavior/use-save-slack-connection.ts";
@@ -18,12 +25,6 @@ import {
   type ConnectionScope,
   useSlackConnectionFormState,
 } from "../../behavior/use-slack-connection-form-state.ts";
-import {
-  maskedSecret,
-  narrowingConfirmation,
-  SLACK_CONNECTION_KINDS,
-} from "../../model/slack-connection-copy.ts";
-import { type SlackConnection } from "../../model/slack-connection-types.ts";
 import { SlackAppSetupCallout } from "../elements/slack-app-setup-callout.tsx";
 import { SlackErrorAlert } from "../elements/slack-error-alert.tsx";
 
