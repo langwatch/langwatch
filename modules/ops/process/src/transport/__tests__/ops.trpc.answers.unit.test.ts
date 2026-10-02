@@ -9,6 +9,7 @@ import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,7 +24,7 @@ import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
-import { opsTrpcTestMembers } from "./ops.trpc.harness.ts";
+import type { OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 type OpsAnswersContext = { actor: { id: string }; operator: OpsOperator | null };
 
@@ -44,7 +45,7 @@ function mount<Contract extends TrpcContract>(
   const router = createTrpcRuntime<OpsAnswersContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: opsTrpcTestMembers(),
+    members: trpcTestMembers<OpsTrpcTestContext>(),
   }).mount(declaration, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsAnswersContext) => ctx.operator)],
   });

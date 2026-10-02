@@ -9,7 +9,7 @@ import {
   annotationApiOptimizedQueuesInputSchema,
   type AnnotationApi,
 } from "@langwatch/annotation-contract";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -20,6 +20,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -64,26 +65,7 @@ const CALLER_USER_ID = "test-user-annotation-suggestion";
 function callerFor(app: AnnotationApi) {
   const trpc = initTRPC.context<TestContext>().create();
 
-  const members: TrpcRuntimeMembers<TestContext> = {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async () => ({ permitted: true, organizationRole: null }),
-        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  const members = trpcTestMembers<TestContext>();
 
   return createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, members })
     .mount(annotationTrpcTransport, () => app)

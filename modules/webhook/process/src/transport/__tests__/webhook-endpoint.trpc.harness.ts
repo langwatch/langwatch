@@ -4,6 +4,7 @@
  * decides. Every permission asked is recorded, in the order it was asked.
  */
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 
 /** What a mount reads off the request: the caller, and nothing else. */
 export type WebhookEndpointTrpcTestContext = { actor: { id: string } };
@@ -21,32 +22,12 @@ export function webhookEndpointTrpcTestMembers(
 
   return {
     seenPermissions,
-    members: {
-      identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-      authorization: {
-        forRequest: () => ({
-          getDecision: async ({ permission }) => {
-            seenPermissions.push(permission);
+    members: trpcTestMembers<WebhookEndpointTrpcTestContext>({
+      permits: (permission) => {
+        seenPermissions.push(permission);
 
-            return { permitted: !denied.has(permission), organizationRole: null };
-          },
-          getProjectAnyDecision: async ({ permissions }) => ({
-            permitted: permissions.some((permission) => !denied.has(permission)),
-            organizationRole: null,
-          }),
-          checkScopeLineage: async () => ({ kind: "consistent" }),
-        }),
+        return !denied.has(permission);
       },
-      denials: {
-        membershipDisabled: () => new Error("membership disabled"),
-        liteMemberRestricted: () => new Error("lite member"),
-      },
-      audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-      errors: {
-        report: () => {},
-        asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-        translate: () => undefined,
-      },
-    },
+    }),
   };
 }

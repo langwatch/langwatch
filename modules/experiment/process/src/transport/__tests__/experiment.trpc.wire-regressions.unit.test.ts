@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 import {
   ExperimentDspyStepNotFoundError,
   ExperimentIdOrSlugRequiredError,
@@ -14,6 +14,7 @@ import {
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -75,26 +76,7 @@ const WORKFLOW_DSL = {
 
 function mount(app: ExperimentApi) {
   const trpc = initTRPC.context<TestContext>().create();
-  const members: TrpcRuntimeMembers<TestContext> = {
-    identity: { caller: (context) => ({ actor: { type: "user", id: context.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async () => ({ permitted: true, organizationRole: null }),
-        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member restricted"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  const members = trpcTestMembers<TestContext>();
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,

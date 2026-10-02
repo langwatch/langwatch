@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { LimitCheckResult, OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
@@ -7,6 +7,7 @@ import type { LimitCheckResult, OrganizationApi } from "@langwatch/organization-
  * the clients call, readable by any member, the caller forwarded whole.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -29,29 +30,13 @@ const checkLimit = vi.fn<OrganizationApi["checkLimit"]>();
 const reportLimitBlocked = vi.fn<OrganizationApi["reportLimitBlocked"]>();
 const asked: string[] = [];
 
-const members: TrpcRuntimeMembers<TestContext> = {
-  identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-  authorization: {
-    forRequest: () => ({
-      getDecision: async ({ permission }) => {
-        asked.push(permission);
-        return { permitted: true, organizationRole: null };
-      },
-      getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-      checkScopeLineage: async () => ({ kind: "consistent" }),
-    }),
+const members = trpcTestMembers<TestContext>({
+  permits: (permission) => {
+    asked.push(permission);
+
+    return true;
   },
-  denials: {
-    membershipDisabled: () => new Error("membership disabled"),
-    liteMemberRestricted: () => new Error("lite member"),
-  },
-  audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-  errors: {
-    report: () => {},
-    asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-    translate: () => undefined,
-  },
-};
+});
 
 const app = createApiFixture<OrganizationApi>({ checkLimit, reportLimitBlocked });
 const trpc = initTRPC.context<TestContext>().create();

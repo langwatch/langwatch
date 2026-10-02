@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
@@ -7,6 +7,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
  * Spec: specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,27 +20,9 @@ type TestContext = {
 
 const updateSettings = vi.fn<OrganizationApi["updateSettings"]>();
 
-const members: TrpcRuntimeMembers<TestContext> = {
-  identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-  authorization: {
-    forRequest: () => ({
-      getDecision: async () => ({ permitted: true, organizationRole: null }),
-      getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-      checkScopeLineage: async () => ({ kind: "consistent" }),
-    }),
-  },
-  entitlements: { holds: async () => true },
-  denials: {
-    membershipDisabled: () => new Error("membership disabled"),
-    liteMemberRestricted: () => new Error("lite member"),
-  },
-  audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-  errors: {
-    report: () => {},
-    asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-    translate: () => undefined,
-  },
-};
+const members = trpcTestMembers<TestContext>({
+  overrides: { entitlements: { holds: async () => true } },
+});
 
 const app = createApiFixture<OrganizationApi>({ updateSettings });
 const trpc = initTRPC.context<TestContext>().create();

@@ -10,11 +10,8 @@ import type {
   LangWatchQLExecuteInput,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
-import {
-  createTrpcRuntime,
-  TrpcRootDefinition,
-  type TrpcRuntimeMembers,
-} from "@langwatch/api/trpc";
+import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -42,33 +39,8 @@ const EMPTY_RESULT: LangWatchQLQueryResult = {
   followsGranularity: false,
 };
 
-function membersHolding(held: readonly string[]): TrpcRuntimeMembers<TestContext> {
-  return {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: held.includes(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => held.includes(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+function membersHolding(held: readonly string[]) {
+  return trpcTestMembers<TestContext>({ permits: (permission) => held.includes(permission) });
 }
 
 async function member({ held, enabled = true }: { held: readonly string[]; enabled?: boolean }) {

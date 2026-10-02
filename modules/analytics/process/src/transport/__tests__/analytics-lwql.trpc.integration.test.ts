@@ -1,8 +1,4 @@
-import {
-  createTrpcRuntime,
-  TrpcRootDefinition,
-  type TrpcRuntimeMembers,
-} from "@langwatch/api/trpc";
+import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -19,6 +15,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * @see specs/lwql/workbench.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -31,33 +28,8 @@ type TestContext = { actor: { id: string } };
 
 const PROJECT = { projectId: "project-1" };
 
-function membersHolding(held: readonly string[]): TrpcRuntimeMembers<TestContext> {
-  return {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: held.includes(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => held.includes(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+function membersHolding(held: readonly string[]) {
+  return trpcTestMembers<TestContext>({ permits: (permission) => held.includes(permission) });
 }
 
 const allowEveryRequest: RateLimiter = { check: async () => ({ allowed: true }) };

@@ -1,10 +1,11 @@
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The Explorer's four reads and the Instant Eval runs their chips claim.
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import type { ResolvedInstantEvalRun, TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -56,26 +57,7 @@ function harness() {
   });
 
   const trpc = initTRPC.context<TestContext>().create();
-  const members: TrpcRuntimeMembers<TestContext> = {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async () => ({ permitted: true, organizationRole: null }),
-        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  const members = trpcTestMembers<TestContext>();
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,

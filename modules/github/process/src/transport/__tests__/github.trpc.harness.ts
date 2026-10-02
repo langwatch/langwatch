@@ -4,6 +4,7 @@
  * decides, and a record of every permission the runtime asked for.
  */
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 
 /** What a mount reads off the request: the caller, and nothing else. */
 export type GithubTrpcTestContext = { actor: { id: string } };
@@ -20,32 +21,12 @@ export function githubTrpcTestMembers(permits: GithubTrpcTestDecision = () => tr
 
   return {
     asked,
-    members: {
-      identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-      authorization: {
-        forRequest: () => ({
-          getDecision: async ({ permission }) => {
-            asked.push(permission);
+    members: trpcTestMembers<GithubTrpcTestContext>({
+      permits: (permission) => {
+        asked.push(permission);
 
-            return { permitted: permits(permission), organizationRole: null };
-          },
-          getProjectAnyDecision: async ({ permissions }) => ({
-            permitted: permissions.some((permission) => permits(permission)),
-            organizationRole: null,
-          }),
-          checkScopeLineage: async () => ({ kind: "consistent" }),
-        }),
+        return permits(permission);
       },
-      denials: {
-        membershipDisabled: () => new Error("membership disabled"),
-        liteMemberRestricted: () => new Error("lite member"),
-      },
-      audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-      errors: {
-        report: () => {},
-        asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-        translate: () => undefined,
-      },
-    },
+    }),
   };
 }

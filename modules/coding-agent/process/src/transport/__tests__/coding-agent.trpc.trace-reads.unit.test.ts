@@ -1,4 +1,4 @@
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 /**
@@ -7,6 +7,7 @@ import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/test
  * @see modules/coding-agent/specs/coding-agent-trace-reads.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,26 +28,7 @@ const TRANSCRIPT: CodingAgentTranscript = {
 
 function permittingRuntime() {
   const trpc = initTRPC.context<TestContext>().create();
-  const members: TrpcRuntimeMembers<TestContext> = {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async () => ({ permitted: true, organizationRole: null }),
-        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  const members = trpcTestMembers<TestContext>();
 
   return createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, members });
 }

@@ -8,6 +8,7 @@ import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,7 +19,7 @@ import {
 } from "../../app/__tests__/ops.fixture.ts";
 import { opsBugReportTrpcTransport } from "../ops-bug-report.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
-import { opsTrpcTestMembers } from "./ops.trpc.harness.ts";
+import type { OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 type BugReportTestContext = { actor: { id: string }; operator: OpsOperator | null };
 
@@ -41,7 +42,7 @@ function harness({ cloudOps = true }: { cloudOps?: boolean } = {}) {
   const router = createTrpcRuntime<BugReportTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: opsTrpcTestMembers(),
+    members: trpcTestMembers<OpsTrpcTestContext>(),
   }).mount(opsBugReportTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: BugReportTestContext) => ctx.operator)],
   });

@@ -7,10 +7,11 @@
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
 import type { OpsOperator } from "@langwatch/ops-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { opsTrpcTestMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
+import type { OpsTrpcTestContext } from "../../transport/__tests__/ops.trpc.harness.ts";
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
@@ -75,7 +76,7 @@ function callerFor(operator: OpsOperator) {
   const router = createTrpcRuntime<MigrationTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: opsTrpcTestMembers(),
+    members: trpcTestMembers<OpsTrpcTestContext>(),
   }).mount(opsPlatformTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
   });
