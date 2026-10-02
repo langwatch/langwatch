@@ -90,14 +90,14 @@ describe("user.create.before", () => {
 
   describe("when an organization's own connection governs the address", () => {
     /** @scenario "An address an organization's own SSO connection governs is not restricted" */
-    it("creates the account without asking the policy", async () => {
+    it("creates the account even though the policy refuses the address", async () => {
       const { create, checkSignUp } = userCreateBefore({
         allowed: false,
         governingConnection: { connectionId: "ssoc_acme" },
       });
 
       await expect(create("sam@acme.com")).resolves.not.toBe(false);
-      expect(checkSignUp).not.toHaveBeenCalled();
+      expect(checkSignUp).toHaveBeenCalled();
     });
   });
 

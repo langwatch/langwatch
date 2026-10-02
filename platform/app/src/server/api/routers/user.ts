@@ -306,11 +306,6 @@ export const userRouter = createTRPCRouter({
       // identifier the front door resolves.
       const email = normalizeIdentifierValue(input.email);
 
-      // Who may create an account at all on this installation
-      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). Checked before the address
-      // proof is spent, so a refused visitor keeps it.
-      await signUpPolicy().assertSignUp({ email });
-
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the
       // deployment to email mode (ADR-027 Decision 4), and this tRPC path is
@@ -350,6 +345,12 @@ export const userRouter = createTRPCRouter({
           retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
+
+      // Who may create an account at all on this installation
+      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). After the rate limit, so
+      // probing addresses spends the same budget, and before the address
+      // proof is spent, so a refused visitor keeps it.
+      await signUpPolicy().assertSignUp({ email });
 
       // The mailbox proof is the authority to enrol a credential. It is spent
       // before hashing or writing anything, and is bound to this exact

@@ -84,6 +84,13 @@ Feature: Restricting who can sign up on a self-hosted installation
     And no account is written
 
   @unit
+  Scenario: A refused passkey sign-up creates no account
+    Given the sign-up policy refuses "stranger@example.com"
+    When "stranger@example.com" creates an account with a passkey
+    Then the passkey sign-up is refused with "auth_sign_up_restricted"
+    And no account is written
+
+  @unit
   Scenario: A refused sign-up is told before a confirmation link is sent
     Given the sign-up policy refuses "stranger@example.com"
     When "stranger@example.com" asks for a sign-up confirmation link

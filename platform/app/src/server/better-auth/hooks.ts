@@ -283,13 +283,14 @@ export class BetterAuthDatabaseHooks {
   }): Promise<void> {
     const policy = this.deps.signUpPolicy;
     if (!policy || !user.email) return;
+    if ((await policy.checkSignUp({ email: user.email })).allowed) return;
     const governing = await this.deps.connectionRouting.connectionGoverning({
       email: user.email,
     });
     if (governing) return;
-    if ((await policy.checkSignUp({ email: user.email })).allowed) return;
 
     logger.info(
+      { email: user.email },
       "Refused a new account: the installation's sign-up policy does not admit the address",
     );
     throw APIError.from("FORBIDDEN", {

@@ -86,12 +86,13 @@ export const authRouter = createTRPCRouter({
         "returns enrollment methods only to a visitor holding this address's proof",
     })
     .mutation(async ({ input }) => {
-      // A link minted before the installation closed sign-up is refused here,
-      // where the screen can still say why.
-      await signUpPolicy().assertSignUp({ email: input.email });
       const verification = signUpVerification();
       const proof = { token: input.addressProof, email: input.email };
+      // A link minted before the installation closed sign-up is refused here,
+      // where the screen can still say why. Asked only once the proof checks
+      // out, so only the holder of the address learns the answer.
       if (await verification.validateAddressProof(proof)) {
+        await signUpPolicy().assertSignUp({ email: input.email });
         return localSignUpDecision(input.email);
       }
 
@@ -102,6 +103,7 @@ export const authRouter = createTRPCRouter({
         isEmailUnconfigured() &&
         (await verification.validateUnconfirmedAddressProof(proof))
       ) {
+        await signUpPolicy().assertSignUp({ email: input.email });
         const decision = await localSignUpDecision(input.email);
         return {
           ...decision,

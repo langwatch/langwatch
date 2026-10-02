@@ -196,6 +196,10 @@ describe("userRouter.register()", () => {
       expect(assertSignUpMock).toHaveBeenCalledWith({
         email: "stranger@example.com",
       });
+      // Probing addresses spends the same per-caller budget as signing up.
+      expect(rateLimitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "user.register:198.51.100.11" }),
+      );
       expect(claimAddressProofMock).not.toHaveBeenCalled();
       expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
       expect(registerMock).not.toHaveBeenCalled();

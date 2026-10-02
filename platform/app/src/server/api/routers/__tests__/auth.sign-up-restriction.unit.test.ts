@@ -118,6 +118,19 @@ describe("auth router when the sign-up policy refuses the address", () => {
       ).rejects.toMatchObject({ cause: { code: "auth_sign_up_restricted" } });
       expect(localSignUpDecision).not.toHaveBeenCalled();
     });
+
+    it("tells a caller holding no valid proof nothing about the policy", async () => {
+      validateAddressProof.mockResolvedValue(false);
+      await expect(
+        signedOut().signUpEnrollment({
+          email: "stranger@example.com",
+          addressProof: "forged",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_no_address_to_confirm" },
+      });
+      expect(assertSignUp).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the policy admits the address", () => {

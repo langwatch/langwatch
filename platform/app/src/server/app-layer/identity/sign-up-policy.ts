@@ -28,7 +28,7 @@ import { SignUpRestrictedError } from "~/server/auth/errors";
 
 const logger = createLogger("langwatch:identity:sign-up-policy");
 
-export const SIGN_UP_MODES = ["open", "invite_only"] as const;
+const SIGN_UP_MODES = ["open", "invite_only"] as const;
 export type SignUpMode = (typeof SIGN_UP_MODES)[number];
 
 export interface SignUpPolicyConfig {
@@ -119,7 +119,7 @@ export class SignUpPolicy {
     const verdict = await this.checkSignUp({ email });
     if (verdict.allowed) return;
     logger.info(
-      { reason: verdict.reason },
+      { email, reason: verdict.reason },
       "sign-up refused by the installation's sign-up policy",
     );
     throw new SignUpRestrictedError(verdict.reason);

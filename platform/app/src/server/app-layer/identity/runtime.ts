@@ -1549,15 +1549,14 @@ export function passkeySignUp(): PasskeySignUpRegistration {
   return new PasskeySignUpRegistration({
     eligibility: {
       isAllowed: async (email, method) => {
-        if (!(await signUpPolicy().checkSignUp({ email })).allowed) {
-          return false;
-        }
         const decision = await localSignUpDecision(email);
         return (
           decision.outcome === "enroll" &&
           decision.methodSet.some((candidate) => candidate.kind === method)
         );
       },
+      policyAdmits: async (email) =>
+        (await signUpPolicy().checkSignUp({ email })).allowed,
     },
     directory: identityUsers,
     accounts: {
