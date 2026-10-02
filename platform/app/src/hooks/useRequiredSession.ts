@@ -57,6 +57,7 @@ export const noOrgBouncerRoutes = [
   "/governance/inventory/[id]",
   "/governance/people",
   "/governance/costs",
+  "/governance/dashboards",
   "/governance/billed",
   "/governance/insights",
   "/governance/analytics",

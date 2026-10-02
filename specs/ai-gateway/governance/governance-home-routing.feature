@@ -274,8 +274,8 @@ Feature: Governance home — route, nav promotion, persona detection
     Given a session that belongs to no organization yet
     When it sits on "/governance/inventory", "/governance/inventory/<id>",
       "/governance/people", "/governance/agents", "/governance/costs",
-      "/governance/billed", "/governance/insights", "/governance/analytics"
-      or "/governance/signals"
+      "/governance/dashboards", "/governance/billed", "/governance/insights",
+      "/governance/analytics" or "/governance/signals"
     Then the route is recognized as bouncer-exempt, like every sibling
       governance route, instead of bouncing to "/onboarding/welcome"
     # The bounce fires only for zero-ORG sessions (an org with zero
@@ -514,6 +514,7 @@ Feature: Governance home — route, nav promotion, persona detection
       for the organization
     When the admin looks at the GOVERNANCE rail
     Then "Costs" (/governance/costs) is listed between Overview and Inventory
+    And "Dashboards" (/governance/dashboards) is listed directly after Costs
     And no "Billed" entry is listed
     And "Insights" (/governance/insights), "Analytics"
       (/governance/analytics) and "Signals & Alerts"

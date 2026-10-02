@@ -303,6 +303,13 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/costs")),
       },
       {
+        // Dashboards: four cost widgets written in the repository, drawn on
+        // the shared chart grid. Nothing here is composed by the reader.
+        // Behind the same flag as Costs (the page carries its own guard).
+        path: "/governance/dashboards",
+        ...page(() => import("./pages/governance/dashboards")),
+      },
+      {
         path: "/governance/billed",
         ...page(() => import("./pages/governance/billed")),
       },
