@@ -232,9 +232,12 @@ secured
             }),
           )
           .default([]),
+        // Whether the limit ended the call is derived on the server from
+        // this span against the configured maximum call duration; the body
+        // carries no flag for it, since a flag was only the browser's claim
+        // and could mark a normal call as cut or hide a real cutoff (#8028).
         startedAt: z.number(),
         endedAt: z.number(),
-        isCutAtLimit: z.boolean().default(false),
         // Set for a "Call it myself" run: the scenario the call is written
         // under and scored against (AC23). Absent for a drawer call.
         scenarioId: z.string().trim().min(1).optional(),
@@ -286,7 +289,7 @@ secured
         transcript: body.transcript,
         startedAt: body.startedAt,
         endedAt: body.endedAt,
-        isCutAtLimit: body.isCutAtLimit,
+        maxCallSeconds: voiceCallMaxSeconds(),
         scenarioId: body.scenarioId,
       });
       return c.json(result, 200);

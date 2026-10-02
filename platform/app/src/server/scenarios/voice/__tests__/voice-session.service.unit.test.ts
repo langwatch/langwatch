@@ -91,13 +91,16 @@ const TOKEN: VoiceSessionTokenPayload = {
   exp: 9_999_999_999_999,
 };
 
+/** The configured maximum call duration the route hands the service. */
+const MAX_CALL_SECONDS = 300;
+
 const FINISH_BASE = {
   token: TOKEN,
   projectId: "p1",
   transcript: [{ role: "caller" as const, text: "hi" }],
   startedAt: 1000,
   endedAt: 5000,
-  isCutAtLimit: false,
+  maxCallSeconds: MAX_CALL_SECONDS,
   conversationId: "conv_1",
 };
 
@@ -704,8 +707,9 @@ describe("finishVoiceSession", () => {
       });
     });
 
-    describe("when the limit ended the call", () => {
-      it("carries the cut-at-limit flag onto the written record", async () => {
+    describe("when the call ran for less than the maximum call duration", () => {
+      /** @scenario "A Call it myself finish under the call limit is not marked as cut" */
+      it("writes the record with the cutoff marker off — the span decides, not the body", async () => {
         const runner = fakeRunner();
         const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
           async () => {},
@@ -715,12 +719,79 @@ describe("finishVoiceSession", () => {
         await finishVoiceSession({
           ports,
           ...SCENARIO_FINISH,
-          isCutAtLimit: true,
+          startedAt: 1000,
+          endedAt: 1000 + MAX_CALL_SECONDS * 1000 - 1,
+          // What an older or modified panel would have asserted here is not
+          // part of the input any more (#8028): only the span is read.
         });
 
         const written = writeCallRun.mock.calls[0]?.[0] as {
           record: CallRecord;
         };
+        expect(written.record.isCutAtLimit).toBe(false);
+      });
+    });
+
+    describe("when the call ran for at least the maximum call duration", () => {
+      /** @scenario "A Call it myself finish at or over the call limit is marked as cut" */
+      it("writes the record with the cutoff marker on, from the span alone", async () => {
+        const runner = fakeRunner();
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({ runner, over: { writeCallRun } });
+
+        await finishVoiceSession({
+          ports,
+          ...SCENARIO_FINISH,
+          startedAt: 1000,
+          endedAt: 1000 + MAX_CALL_SECONDS * 1000,
+        });
+
+        const written = writeCallRun.mock.calls[0]?.[0] as {
+          record: CallRecord;
+        };
+        expect(written.record.isCutAtLimit).toBe(true);
+      });
+
+      it("decides from the browser's span even when the provider's record wins", async () => {
+        // The provider reports whole seconds and its own clock; the countdown
+        // that ends a call at the limit runs on the browser's. A provider record
+        // that rounds a cut call down must not clear the marker.
+        const runner = fakeRunner({
+          fetchCallRecord: vi.fn(
+            async (): Promise<CallRecord> => ({
+              conversationId: "conv_1",
+              transport: "elevenlabs_convai",
+              agentExternalId: "agent_xyz",
+              startedAt: 1000,
+              endedAt: 1000 + (MAX_CALL_SECONDS - 1) * 1000,
+              durationMs: (MAX_CALL_SECONDS - 1) * 1000,
+              turns: [
+                { role: "caller", text: "hi", startMs: 0, endMs: 400 },
+                { role: "agent", text: "hello", startMs: 500, endMs: 900 },
+              ],
+              isCutAtLimit: false,
+              source: "provider",
+            }),
+          ),
+        });
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({ runner, over: { writeCallRun } });
+
+        await finishVoiceSession({
+          ports,
+          ...SCENARIO_FINISH,
+          startedAt: 1000,
+          endedAt: 1000 + MAX_CALL_SECONDS * 1000 + 250,
+        });
+
+        const written = writeCallRun.mock.calls[0]?.[0] as {
+          record: CallRecord;
+        };
+        expect(written.record.source).toBe("provider");
         expect(written.record.isCutAtLimit).toBe(true);
       });
     });
