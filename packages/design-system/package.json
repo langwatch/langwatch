@@ -358,6 +358,10 @@
       "types": "./dist/components/stat-tile.d.ts",
       "default": "./src/components/stat-tile.tsx"
     },
+    "./tab-count": {
+      "types": "./dist/components/tab-count.d.ts",
+      "default": "./src/components/tab-count.tsx"
+    },
     "./settings-section": {
       "types": "./dist/components/settings-section.d.ts",
       "default": "./src/components/settings-section.tsx"

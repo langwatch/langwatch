@@ -566,6 +566,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
         projectGroups={projectGroups}
         scopes={scopes}
         placeholder={placeholder ?? "Select an option"}
+        selectedTeamName={parentTeamName({
+          scope: scopes[0],
+          availableTeams,
+          availableProjects,
+        })}
         search={search}
         showSummary={showSummary}
         subjectNoun={subjectNoun}
@@ -769,6 +774,21 @@ function quickPickFor({
   );
 }
 
+/** The team a selected project sits under, shown as the trigger's second line. */
+function parentTeamName({
+  scope,
+  availableTeams,
+  availableProjects,
+}: {
+  scope: ScopeChipPickerEntry | undefined;
+  availableTeams: { id: string; name: string }[] | undefined;
+  availableProjects: { id: string; teamId?: string }[] | undefined;
+}): string | undefined {
+  if (scope?.scopeType !== "PROJECT") return undefined;
+  const teamId = availableProjects?.find((p) => p.id === scope.scopeId)?.teamId;
+  return availableTeams?.find((t) => t.id === teamId)?.name;
+}
+
 /** The selection an option stands for, carrying the personal flag only when set. */
 function entryOf(option: ScopeOption): ScopeChipPickerEntry {
   return {
@@ -810,9 +830,11 @@ function OptionGroup({
     <Select.ItemGroup label={label}>
       {options.map((option) => (
         <Select.Item key={option.value} item={option}>
-          <HStack gap={2} paddingLeft={indent ? 2 : undefined}>
-            {icon}
-            <Text>{option.label}</Text>
+          <HStack gap={2} minWidth={0} paddingLeft={indent ? 2 : undefined}>
+            <Box display="flex" flexShrink={0}>
+              {icon}
+            </Box>
+            <Text truncate>{option.label}</Text>
           </HStack>
         </Select.Item>
       ))}
@@ -874,6 +896,7 @@ function SingleScopeSelect({
   projectGroups,
   scopes,
   placeholder,
+  selectedTeamName,
   search,
   showSummary,
   subjectNoun,
@@ -886,6 +909,7 @@ function SingleScopeSelect({
   projectGroups: ProjectGroups;
   scopes: ScopeChipPickerEntry[];
   placeholder: string;
+  selectedTeamName: string | undefined;
   search: ScopeSearch;
   showSummary: boolean;
   subjectNoun: string;
@@ -909,12 +933,35 @@ function SingleScopeSelect({
         }}
       >
         <Select.Trigger>
-          <Select.ValueText placeholder={placeholder}>
+          <Select.ValueText placeholder={placeholder} lineClamp="none" display="flex" minWidth={0}>
             {() =>
               selectedOption ? (
-                <HStack gap={2}>
-                  <ScopeIcon scopeType={selectedOption.scopeType} />
-                  <Text>{selectedOption.label}</Text>
+                <HStack gap={2} minWidth={0} alignItems="center">
+                  <Box display="flex" flexShrink={0}>
+                    <ScopeIcon scopeType={selectedOption.scopeType} />
+                  </Box>
+                  <VStack align="start" gap={0} minWidth={0}>
+                    <Text
+                      truncate
+                      maxWidth="full"
+                      color="fg"
+                      fontWeight="medium"
+                      lineHeight="shorter"
+                    >
+                      {selectedOption.label}
+                    </Text>
+                    {selectedTeamName && (
+                      <Text
+                        truncate
+                        maxWidth="full"
+                        fontSize="xs"
+                        color="fg.muted"
+                        lineHeight="shorter"
+                      >
+                        {selectedTeamName}
+                      </Text>
+                    )}
+                  </VStack>
                 </HStack>
               ) : (
                 placeholder

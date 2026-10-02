@@ -112,16 +112,16 @@ function LifetimeBar({ lifetime }: { lifetime: number }) {
   );
 }
 
-/** How many toasts wait behind the collapsed stack; hidden once it fans out. */
+/** How many toasts wait behind the collapsed stack, on the peeking cards above the front one. */
 function MoreChip({ count }: { count: number }) {
   return (
     <Box
       data-toast-more=""
       aria-hidden
       position="absolute"
-      top="0"
+      bottom="100%"
+      marginBottom="1"
       insetInlineEnd="10"
-      translate="0 -50%"
       paddingX="2"
       borderRadius="full"
       borderWidth="1px"

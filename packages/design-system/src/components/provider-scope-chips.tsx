@@ -140,6 +140,7 @@ export function ProviderScopeChips({
   system,
   principal,
   size = "sm",
+  tone = "scope",
 }: {
   scopes?: ScopeEntry[];
   fallbackScopeType?: ProviderScopeType;
@@ -156,6 +157,8 @@ export function ProviderScopeChips({
    */
   principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";
+  /** "neutral" greys the scope chips where colour would compete with the row. */
+  tone?: "scope" | "neutral";
 }) {
   const entries = entriesOrFallback({ scopes, fallbackScopeType });
   const iconSize = size === "xs" ? 10 : 12;
@@ -185,7 +188,11 @@ export function ProviderScopeChips({
         const label = entry.name ?? style.fallbackLabel;
         const tooltip = scopeChipTooltip(entry);
         const chip = (
-          <Badge colorPalette={style.colorPalette} variant="subtle" size={size}>
+          <Badge
+            colorPalette={tone === "neutral" ? "gray" : style.colorPalette}
+            variant="subtle"
+            size={size}
+          >
             <HStack gap={1}>
               <Icon size={iconSize} aria-hidden />
               <Text>{label}</Text>

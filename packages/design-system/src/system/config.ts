@@ -1251,8 +1251,12 @@ export const designSystemConfig = defineConfig({
             paddingInlineEnd: "3",
             // Collapsed, the newest card and two behind it show; the rest wait
             // at zero opacity until a dismissal brings them forward.
+            // Scaling from the top edge keeps each card's peek one gap step
+            // above the next whatever its height; behind cards show no content.
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
+              transformOrigin: "top center",
+              "&:not([data-first]) > *": { opacity: 0 },
             },
             // Cards glide when the stack fans out, collapses or moves up.
             transitionProperty: "translate, scale, opacity, height, box-shadow",
