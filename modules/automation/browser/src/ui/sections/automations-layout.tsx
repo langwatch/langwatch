@@ -1,9 +1,10 @@
 /**
- * The automations screen frame and tab navigation (overview, automations,
- * reports), on the design system's shared section rail. The retired alerts
- * path renders the automations tab, so that tab is the one highlighted.
+ * The automations screen frame: the shared section rail runs full height on the
+ * left, the page header and content sit right of it (one header, not two). The
+ * retired alerts path renders the automations tab, so that tab is highlighted.
  */
 
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
@@ -31,10 +32,13 @@ export const AUTOMATION_SECTIONS: readonly {
 ];
 
 export function AutomationsLayout({
+  title,
   basePath,
   section = "overview",
   children,
 }: {
+  /** The page heading, rendered in the content column beside the rail. */
+  title: string;
   basePath: string;
   /** The tab this page is. */
   section?: AutomationSection;
@@ -49,13 +53,16 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" padding={4} paddingBottom={16} data-testid="section-navigation-layout">
+    <Box width="full" paddingX={4} paddingBottom={16} data-testid="section-navigation-layout">
       <SectionNavigationFrame
         label="Automations"
         links={links}
         activeHref={`${basePath}${active?.suffix ?? ""}`}
         onNavigate={(href) => host.navigate(href)}
       >
+        <PageLayout.Header height="auto" paddingX={0} paddingBottom={3} marginBottom={4}>
+          <PageLayout.Heading>{title}</PageLayout.Heading>
+        </PageLayout.Header>
         <Box data-testid="section-navigation-content">{children}</Box>
       </SectionNavigationFrame>
     </Box>

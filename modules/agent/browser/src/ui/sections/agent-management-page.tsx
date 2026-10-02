@@ -164,23 +164,19 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
       })}
 
       {showEmptyState ? (
-        <PageLayout.Container>
-          <PageLayout.Content>
-            <NoDataInfoBlock
-              title="No agents yet"
-              description="Create reusable agents for your evaluations."
-              icon={<Bot size={24} />}
-            >
-              <PageLayout.HeaderButton
-                onClick={() => props.navigation.openTypeSelector()}
-                data-testid="agents-first-agent-create"
-                marginTop={4}
-              >
-                <Plus size={16} /> Create your first agent
-              </PageLayout.HeaderButton>
-            </NoDataInfoBlock>
-          </PageLayout.Content>
-        </PageLayout.Container>
+        <NoDataInfoBlock
+          title="No agents yet"
+          description="Create reusable agents for your evaluations."
+          icon={<Bot size={24} />}
+        >
+          <PageLayout.HeaderButton
+            onClick={() => props.navigation.openTypeSelector()}
+            data-testid="agents-first-agent-create"
+            marginTop={4}
+          >
+            <Plus size={16} /> Create your first agent
+          </PageLayout.HeaderButton>
+        </NoDataInfoBlock>
       ) : (
         <PageLayout.Container>
           <VStack gap={6} width="full" align="start">

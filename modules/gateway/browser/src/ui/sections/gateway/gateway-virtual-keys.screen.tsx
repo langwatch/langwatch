@@ -10,13 +10,13 @@ import {
   Card,
   HStack,
   Spacer,
-  Spinner,
   Table,
   Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { TabCount } from "@langwatch/design-system/tab-count";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
@@ -59,6 +59,7 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {
@@ -255,7 +256,11 @@ function VirtualKeysPage() {
         />
 
         <PageLayout.Container>
-          {listView === "loading" && <Spinner />}
+          <Text color="fg.muted" marginBottom={6}>
+            Keys your apps call the gateway with: each one carries its own scopes, routing and
+            budget.
+          </Text>
+          {listView === "loading" && <ListSkeleton />}
           {listView === "error" && (
             <GatewayErrorPanel
               title="Failed to load virtual keys"
@@ -268,30 +273,21 @@ function VirtualKeysPage() {
           )}
           {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
-              {revokedRows.length > 0 && (
-                <Tabs.Root
-                  value={statusTab}
-                  onValueChange={(d) => setStatusTab(d.value as "active" | "revoked")}
-                  variant="line"
-                  size="sm"
-                  colorPalette="blue"
-                >
-                  <Tabs.List>
-                    <Tabs.Trigger value="active">
-                      Active
-                      <Badge variant="subtle" colorPalette="gray" ml={1.5}>
-                        {activeRows.length}
-                      </Badge>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="revoked">
-                      Revoked
-                      <Badge variant="subtle" colorPalette="gray" ml={1.5}>
-                        {revokedRows.length}
-                      </Badge>
-                    </Tabs.Trigger>
-                  </Tabs.List>
-                </Tabs.Root>
-              )}
+              <Tabs.Root
+                value={statusTab}
+                onValueChange={(d) => setStatusTab(d.value === "revoked" ? "revoked" : "active")}
+                colorPalette="orange"
+                width="full"
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value="active" gap={2}>
+                    Active <TabCount value={activeRows.length} />
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="revoked" gap={2}>
+                    Revoked <TabCount value={revokedRows.length} />
+                  </Tabs.Trigger>
+                </Tabs.List>
+              </Tabs.Root>
               {rows.length === 0 ? (
                 <Card.Root width="full">
                   <Card.Body>
@@ -535,7 +531,7 @@ function VirtualKeyTableRow({
             aria-label={`Usage for ${vk.name}, this month`}
             width="full"
           >
-            <HStack gap={1} justify="space-between" width="full">
+            <HStack gap={1.5}>
               <Text
                 fontSize="sm"
                 fontVariantNumeric="tabular-nums"

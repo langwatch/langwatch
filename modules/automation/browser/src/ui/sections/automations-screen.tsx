@@ -7,7 +7,6 @@ import {
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
@@ -476,77 +475,72 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   };
 
   return (
-    <>
-      <PageLayout.Header>
-        <PageLayout.Heading>{details.title}</PageLayout.Heading>
-      </PageLayout.Header>
-      <AutomationsLayout basePath={basePath} section={section}>
-        <Box width="full">
-          <VStack align="stretch" gap={6} width="full">
-            <Text textStyle="sm" color="fg.muted">
-              {details.description}
-            </Text>
+    <AutomationsLayout title={details.title} basePath={basePath} section={section}>
+      <Box width="full">
+        <VStack align="stretch" gap={6} width="full">
+          <Text textStyle="sm" color="fg.muted">
+            {details.description}
+          </Text>
 
-            {triggers.isLoading ? (
-              <Text textStyle="sm" color="fg.muted">
-                Loading...
-              </Text>
-            ) : (
-              <>
-                {section === "overview" && (
-                  <OverviewSection
-                    overview={overview}
-                    activity={activity.data ?? []}
-                    isActivityLoading={activity.isLoading}
-                    triggers={triggers.data ?? []}
-                    openView={openView}
-                    openCreate={openCreate}
-                  />
-                )}
-                {section === "reports" && (
-                  <ReportsSection
-                    reports={reports}
-                    graphNameById={graphNameById}
-                    scheduleByTriggerId={scheduleByTriggerId}
-                    isScheduleLoading={reportSchedules.isLoading}
-                    openEdit={openEdit}
-                    openCreate={openCreate}
-                    activeCell={activeCell}
-                    rowActionsMenu={rowActionsMenu}
-                  />
-                )}
-                {section === "automations" && (
-                  <AutomationsSection
-                    automations={automations}
-                    openCreate={openCreate}
-                    rowCells={rowCells}
-                  />
-                )}
-              </>
-            )}
-          </VStack>
-        </Box>
-        <ConfirmDialog
-          open={!!pendingDelete}
-          onOpenChange={(open) => {
-            if (!open) setPendingDelete(undefined);
-          }}
-          title={pendingDelete ? `Delete ${triggerNoun(pendingDelete)}` : "Delete"}
-          message={
-            pendingDelete
-              ? `This permanently deletes "${pendingDelete.name}". This action cannot be undone.`
-              : ""
-          }
-          confirmLabel="Delete"
-          tone="danger"
-          loading={deleteTriggerMutation.isPending}
-          onConfirm={() => {
-            if (pendingDelete) deleteTrigger(pendingDelete);
-          }}
-        />
-        {/* Neither editor renders here: `CurrentDrawer` mounts the one the address names. */}
-      </AutomationsLayout>
-    </>
+          {triggers.isLoading ? (
+            <Text textStyle="sm" color="fg.muted">
+              Loading...
+            </Text>
+          ) : (
+            <>
+              {section === "overview" && (
+                <OverviewSection
+                  overview={overview}
+                  activity={activity.data ?? []}
+                  isActivityLoading={activity.isLoading}
+                  triggers={triggers.data ?? []}
+                  openView={openView}
+                  openCreate={openCreate}
+                />
+              )}
+              {section === "reports" && (
+                <ReportsSection
+                  reports={reports}
+                  graphNameById={graphNameById}
+                  scheduleByTriggerId={scheduleByTriggerId}
+                  isScheduleLoading={reportSchedules.isLoading}
+                  openEdit={openEdit}
+                  openCreate={openCreate}
+                  activeCell={activeCell}
+                  rowActionsMenu={rowActionsMenu}
+                />
+              )}
+              {section === "automations" && (
+                <AutomationsSection
+                  automations={automations}
+                  openCreate={openCreate}
+                  rowCells={rowCells}
+                />
+              )}
+            </>
+          )}
+        </VStack>
+      </Box>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(undefined);
+        }}
+        title={pendingDelete ? `Delete ${triggerNoun(pendingDelete)}` : "Delete"}
+        message={
+          pendingDelete
+            ? `This permanently deletes "${pendingDelete.name}". This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteTriggerMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteTrigger(pendingDelete);
+        }}
+      />
+      {/* Neither editor renders here: `CurrentDrawer` mounts the one the address names. */}
+    </AutomationsLayout>
   );
 }
 

@@ -537,7 +537,7 @@ export type UiLlmConfigPopoverProps = {
 
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
-  surface: "simulations" | "simulationRuns" | "connectedAgents" | "prompts";
+  surface: "simulations" | "simulationRuns" | "connectedAgents" | "prompts" | "evaluators";
   size?: "sm" | "md";
 };
 

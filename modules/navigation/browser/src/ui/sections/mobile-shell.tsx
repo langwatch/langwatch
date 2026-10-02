@@ -113,7 +113,7 @@ function MobileTopBar({
     >
       <HStack gap={2} minWidth={0} flex={1} alignItems="center">
         <NavigationLink href="/" display="flex" alignItems="center" flexShrink={0}>
-          <LogoIcon height={LOGO_HEIGHT} />
+          <LogoIcon height={LOGO_HEIGHT} forceColorMode="light" />
         </NavigationLink>
         {activeProductId ? (
           <ProductSwitcherMenu activeProductId={activeProductId} />

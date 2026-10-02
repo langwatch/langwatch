@@ -128,33 +128,29 @@ export default function OnlineEvaluationsScreen() {
         </PageLayout.Container>
       )}
       {listState === "empty" && (
-        <PageLayout.Container>
-          <PageLayout.Content>
-            <NoDataInfoBlock
-              title="No online evaluations yet"
-              description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
-              icon={<Activity size={24} />}
-              docsInfo={
-                <Text>
-                  Learn more in the{" "}
-                  <MonitorLink
-                    href={DOCS_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "inherit", textDecoration: "underline" }}
-                  >
-                    online evaluations documentation
-                  </MonitorLink>
-                  .
-                </Text>
-              }
-            >
-              <HStack marginTop={4}>
-                <HeaderActions canManage={canManage} />
-              </HStack>
-            </NoDataInfoBlock>
-          </PageLayout.Content>
-        </PageLayout.Container>
+        <NoDataInfoBlock
+          title="No online evaluations yet"
+          description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
+          icon={<Activity size={24} />}
+          docsInfo={
+            <Text>
+              Learn more in the{" "}
+              <MonitorLink
+                href={DOCS_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "inherit", textDecoration: "underline" }}
+              >
+                online evaluations documentation
+              </MonitorLink>
+              .
+            </Text>
+          }
+        >
+          <HStack marginTop={4}>
+            <HeaderActions canManage={canManage} />
+          </HStack>
+        </NoDataInfoBlock>
       )}
       {listState === "list" && (
         <FullWidthListPageContent>

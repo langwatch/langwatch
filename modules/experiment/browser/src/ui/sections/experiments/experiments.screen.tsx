@@ -419,34 +419,30 @@ export function ExperimentsPage() {
         </PageLayout.Container>
       )}
       {pageState === "empty" && (
-        <PageLayout.Container>
-          <PageLayout.Content>
-            <NoDataInfoBlock
-              title="No experiments yet"
-              description="Test prompts, models, and agents against a dataset before shipping changes."
-              icon={<LuSquareCheckBig size={24} />}
-              color="green.500"
-              docsInfo={
-                <Text>
-                  To learn more about experiments, visit the{" "}
-                  <Link
-                    color="inherit"
-                    textDecoration="underline"
-                    href="https://langwatch.ai/docs/evaluations/experiments/overview"
-                    isExternal
-                  >
-                    experiments documentation
-                  </Link>
-                  .
-                </Text>
-              }
-            >
-              <HStack marginTop={4} gap={2}>
-                <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
-              </HStack>
-            </NoDataInfoBlock>
-          </PageLayout.Content>
-        </PageLayout.Container>
+        <NoDataInfoBlock
+          title="No experiments yet"
+          description="Test prompts, models, and agents against a dataset before shipping changes."
+          icon={<LuSquareCheckBig size={24} />}
+          color="green.500"
+          docsInfo={
+            <Text>
+              To learn more about experiments, visit the{" "}
+              <Link
+                color="inherit"
+                textDecoration="underline"
+                href="https://langwatch.ai/docs/evaluations/experiments/overview"
+                isExternal
+              >
+                experiments documentation
+              </Link>
+              .
+            </Text>
+          }
+        >
+          <HStack marginTop={4} gap={2}>
+            <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
+          </HStack>
+        </NoDataInfoBlock>
       )}
       {pageState === "list" && (
         <FullWidthListPageContent>

@@ -1,5 +1,4 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { BackLink } from "@langwatch/design-system/back-link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -199,9 +198,6 @@ function BudgetDetailPage() {
     <AiGatewayLayout>
       <>
         <PageLayout.Header>
-          <BackLink href="/gateway/budgets" onNavigate={(href) => router.push(href)}>
-            Budgets
-          </BackLink>
           <PageLayout.Heading>
             {budget?.name ?? "Budget"}
             {isArchived && (

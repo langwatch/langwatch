@@ -114,7 +114,7 @@ export function IconRail({
         alignItems="center"
         marginBottom={2}
       >
-        <LogoIcon height={LOGO_HEIGHT} />
+        <LogoIcon height={LOGO_HEIGHT} forceColorMode="light" />
       </NavigationLink>
 
       {options.map((product) => (

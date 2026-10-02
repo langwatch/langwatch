@@ -53,20 +53,16 @@ export default function WorkflowsScreen() {
       </PageLayout.Header>
 
       {showEmptyState ? (
-        <PageLayout.Container>
-          <PageLayout.Content>
-            <NoDataInfoBlock
-              title="No workflows yet"
-              description="Create reusable workflows with the Optimization Studio."
-              icon={<Workflow size={24} />}
-              color="blue.500"
-            >
-              <PageLayout.HeaderButton onClick={onOpen} marginTop={4}>
-                <Plus size={16} /> Create your first workflow
-              </PageLayout.HeaderButton>
-            </NoDataInfoBlock>
-          </PageLayout.Content>
-        </PageLayout.Container>
+        <NoDataInfoBlock
+          title="No workflows yet"
+          description="Create reusable workflows with the Optimization Studio."
+          icon={<Workflow size={24} />}
+          color="blue.500"
+        >
+          <PageLayout.HeaderButton onClick={onOpen} marginTop={4}>
+            <Plus size={16} /> Create your first workflow
+          </PageLayout.HeaderButton>
+        </NoDataInfoBlock>
       ) : (
         <PageLayout.Container>
           <VStack gap={6} width="full" align="start">

@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 function renderLayout(host = fakeAutomationHost()) {
   return renderWithAutomationHost(
-    <AutomationsLayout basePath="/demo/automations" section="reports">
+    <AutomationsLayout title="Reports" basePath="/demo/automations" section="reports">
       page content
     </AutomationsLayout>,
     { host },

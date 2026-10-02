@@ -110,7 +110,7 @@ function ProductCluster({
       overflow="hidden"
     >
       <NavigationLink href="/" display="flex" alignItems="center" flexShrink={0}>
-        <LogoIcon height={LOGO_HEIGHT} />
+        <LogoIcon height={LOGO_HEIGHT} forceColorMode="light" />
       </NavigationLink>
       {activeProductId ? (
         <ProductSwitcherMenu activeProductId={activeProductId} />

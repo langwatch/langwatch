@@ -6,12 +6,13 @@
 
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Grid, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Grid, HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { evaluatorApi } from "../../behavior/evaluator-api.ts";
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 import { EvaluatorDeleteDialog } from "../blocks/evaluator-delete-dialog.tsx";
 import { EvaluatorGridCard } from "../blocks/evaluator-grid-card.tsx";
@@ -153,19 +154,18 @@ export default function EvaluatorsScreen() {
       </PageLayout.Header>
 
       {showEmptyState ? (
-        <PageLayout.Container>
-          <PageLayout.Content>
-            <NoDataInfoBlock
-              title="No evaluators yet"
-              description="Create reusable scoring functions for experiments, online evaluations, and guardrails."
-              icon={<CheckSquare size={24} />}
-            >
-              <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
-                <Plus size={16} /> Create your first evaluator
-              </PageLayout.HeaderButton>
-            </NoDataInfoBlock>
-          </PageLayout.Content>
-        </PageLayout.Container>
+        <NoDataInfoBlock
+          title="No evaluators yet"
+          description="Create reusable scoring functions for experiments, online evaluations, and guardrails."
+          icon={<CheckSquare size={24} />}
+        >
+          <HStack gap={2}>
+            <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
+              <Plus size={16} /> Create your first evaluator
+            </PageLayout.HeaderButton>
+            <SetupWithAgentButton surface="evaluators" />
+          </HStack>
+        </NoDataInfoBlock>
       ) : (
         <PageLayout.Container>
           <VStack gap={6} width="full" align="start">

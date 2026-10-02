@@ -20,7 +20,7 @@ export const InputGroup = React.forwardRef<HTMLDivElement, InputGroupProps>(
       endElement,
       endElementProps,
       children,
-      startOffset = "6px",
+      startOffset = "2px",
       endOffset = "6px",
       ...rest
     } = props;

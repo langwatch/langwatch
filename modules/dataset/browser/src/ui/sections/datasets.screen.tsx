@@ -361,7 +361,7 @@ export default function DatasetsScreen() {
           </Button>
         </UploadOrCreateDatasetMenu>
       </PageLayout.Header>
-      <PageLayout.Container>
+      <PageLayout.Container paddingY={6}>
         {datasets.data && datasets.data.length === 0 ? (
           <NoDataInfoBlock
             title="No datasets yet"

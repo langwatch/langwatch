@@ -42,7 +42,8 @@ function ResultsHeader({
   executionCount,
   onNewRunPlan,
 }: {
-  executionCount: number;
+  /** Absent while the window is still loading, so no false "0" shows. */
+  executionCount?: number;
   onNewRunPlan: () => void;
 }) {
   return (
@@ -53,9 +54,11 @@ function ResultsHeader({
         <Text fontSize="14px" fontWeight="semibold" color="fg">
           Test Runs
         </Text>
-        <Text fontSize="11.5px" color={FG_MUTED}>
-          {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
-        </Text>
+        {executionCount !== undefined && (
+          <Text fontSize="11.5px" color={FG_MUTED}>
+            {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
+          </Text>
+        )}
       </HStack>
       <Box flex={1} />
       <SmallButton onClick={onNewRunPlan}>
@@ -299,7 +302,10 @@ export function ResultsList({
       columnMaxWidth={CONTENT_COLUMN_WIDE_MAX_WIDTH}
       data-testid="agent-testing-run-plans"
     >
-      <ResultsHeader executionCount={results.totals.executions} onNewRunPlan={onNewRunPlan} />
+      <ResultsHeader
+        executionCount={isLoading ? undefined : results.totals.executions}
+        onNewRunPlan={onNewRunPlan}
+      />
 
       {isLoading && <LoadingRows />}
       {showsNoRunsYet && <NoRunsYet period={period} setRelativePeriod={setRelativePeriod} />}
