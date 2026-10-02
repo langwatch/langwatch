@@ -1,4 +1,5 @@
 import type {
+  CustomModelEntry,
   ModelDefaultScope,
   ModelProvider,
   ModelProviderUsageCount,
@@ -6,6 +7,23 @@ import type {
 
 /** The provider row as it is stored: the contract's own shape, whole. */
 export type ModelProviderRecord = ModelProvider;
+
+/** A row's columns exactly as stored, legacy formats included, for the one-off migrations. */
+export interface ModelProviderLegacyColumns {
+  id: string;
+  provider: string;
+  customKeys: unknown;
+  customModels: unknown;
+  customEmbeddingsModels: unknown;
+}
+
+/** The migrated columns, written verbatim: `customKeys` arrives already encrypted. */
+export interface ModelProviderLegacyColumnsUpdate {
+  id: string;
+  customKeys?: string;
+  customModels?: CustomModelEntry[];
+  customEmbeddingsModels?: CustomModelEntry[];
+}
 
 /**
  * Persistence owned by Model Provider. No caller outside this package receives
@@ -44,4 +62,8 @@ export interface ModelProviderRepository {
   findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]>;
+  /** Every project-scoped row, raw, in one query of this table; never a project listing. */
+  findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]>;
+  /** Writes migrated columns as given, bypassing the credential codec. */
+  updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void>;
 }

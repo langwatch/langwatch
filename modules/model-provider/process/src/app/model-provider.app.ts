@@ -162,7 +162,7 @@ export interface ModelProviderCodexDeviceFlow {
 }
 
 /** The engine address is the process's fact, not this module's env spelling. */
-type ModelProviderMembers = MembersRead<readonly ["redis"]> &
+type ModelProviderMembers = MembersRead<readonly ["redis", "encryption"]> &
   Readonly<{ nlpServiceUrl: string | undefined }>;
 
 type ModelProviderSetup = FeatureSetup<
@@ -244,7 +244,7 @@ export class ModelProviderModule implements ModelProviderApi {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
   } as const;
-  static readonly reads = ["redis", "nlpServiceUrl"] as const;
+  static readonly reads = ["redis", "encryption", "nlpServiceUrl"] as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     return ModelProviderModule.withPlatformChain(

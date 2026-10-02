@@ -33,16 +33,19 @@ function databaseOver(rows: { id: string; customKeys: unknown }[]) {
   const stored = rows.map((row) => ({ ...row }));
 
   const database: ModelProviderMigrationDatabase = {
-    modelProvider: {
-      findMany: async () => stored.map((row) => ({ ...row })),
-      update: async ({ where, data }) => {
-        writes.push({ id: where.id, customKeys: data.customKeys });
-        const row = stored.find((candidate) => candidate.id === where.id);
-        if (row) {
-          row.customKeys = data.customKeys;
-        }
-        return undefined;
-      },
+    findProjectScopedLegacyColumns: async () =>
+      stored.map((row) => ({
+        ...row,
+        provider: "openai",
+        customModels: null,
+        customEmbeddingsModels: null,
+      })),
+    updateLegacyColumns: async ({ id, customKeys }) => {
+      writes.push({ id, customKeys });
+      const row = stored.find((candidate) => candidate.id === id);
+      if (row) {
+        row.customKeys = customKeys;
+      }
     },
   };
 

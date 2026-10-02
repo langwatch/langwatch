@@ -1,4 +1,4 @@
-import { getProviderModelOptions, type CustomModelEntry } from "@langwatch/model-provider-contract";
+import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
@@ -23,55 +23,36 @@ export async function runCustomModelsMigration({
   registryLookup?: typeof getProviderModelOptions;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
-  const rows = await database.modelProvider.findMany({
-    where: { scopes: { some: { scopeType: "PROJECT" } } },
-    select: { id: true, provider: true, customModels: true, customEmbeddingsModels: true },
-  });
+  const rows = await database.findProjectScopedLegacyColumns();
   logger.info({ providers: rows.length }, "Starting custom models migration");
 
   let updated = 0;
   let skipped = 0;
 
   for (const row of rows) {
-    const result = migrations.convertCustomModelsRow({
-      row: row as {
-        id: string;
-        provider: string;
-        customModels: unknown;
-        customEmbeddingsModels: unknown;
-      },
-      registryLookup,
-    });
+    const result = migrations.convertCustomModelsRow({ row, registryLookup });
     if (result === null) {
       skipped += 1;
       continue;
     }
 
-    const data = updateDataFor(result);
-    if (Object.keys(data).length === 0) {
+    if (result.customModels === null && result.customEmbeddingsModels === null) {
       skipped += 1;
       continue;
     }
 
-    await database.modelProvider.update({ where: { id: String(row.id) }, data });
+    await database.updateLegacyColumns({
+      id: row.id,
+      ...(result.customModels === null ? {} : { customModels: result.customModels }),
+      ...(result.customEmbeddingsModels === null
+        ? {}
+        : { customEmbeddingsModels: result.customEmbeddingsModels }),
+    });
     updated += 1;
   }
 
   logger.info({ updated, skipped }, "Custom models migration complete");
   return { updated, skipped };
-}
-
-/** Only the columns the conversion actually changed reach the update. */
-function updateDataFor(result: {
-  customModels: CustomModelEntry[] | null;
-  customEmbeddingsModels: CustomModelEntry[] | null;
-}): Record<string, unknown> {
-  const data: Record<string, unknown> = {};
-  if (result.customModels !== null) data.customModels = result.customModels;
-  if (result.customEmbeddingsModels !== null) {
-    data.customEmbeddingsModels = result.customEmbeddingsModels;
-  }
-  return data;
 }
 
 /**

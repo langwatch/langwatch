@@ -16,10 +16,22 @@ import { describe, expect, it } from "vitest";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { ModelProviderModule } from "../model-provider.app.ts";
+import { ModelProviderCredentialCipher } from "../model-provider.members.ts";
 import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
 } from "./model-provider.fixture.ts";
+
+/** A cipher with the deployment's shape and none of its cryptography. */
+class ReversingCipher extends ModelProviderCredentialCipher {
+  encrypt(value: string): string {
+    return `encrypted:${value}`;
+  }
+
+  decrypt(value: string): string {
+    return value.replace(/^encrypted:/, "");
+  }
+}
 
 function testProject(id: string) {
   return projectWithTeamSchema.parse({
@@ -119,6 +131,7 @@ function createRealModelProviderApp(
     members: {
       redis: fakeRedis(),
       nlpServiceUrl: undefined,
+      encryption: new ReversingCipher(),
     },
     config: {
       blockLocalHttpCalls: true,

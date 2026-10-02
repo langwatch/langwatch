@@ -5,7 +5,8 @@ import { ModelProviderCustomModelsMigrateTask } from "../model-provider-custom-m
 
 function emptyDatabase() {
   return {
-    modelProvider: { findMany: vi.fn(async () => []), update: vi.fn(async () => undefined) },
+    findProjectScopedLegacyColumns: vi.fn(async () => []),
+    updateLegacyColumns: vi.fn(async () => undefined),
   } satisfies ModelProviderMigrationDatabase;
 }
 
@@ -20,10 +21,8 @@ describe("ModelProviderCustomModelsMigrateTask", () => {
       const controller = new AbortController();
       await task.run({ args: [], signal: controller.signal });
 
-      expect(database.modelProvider.findMany).toHaveBeenCalledOnce();
-      expect(database.modelProvider.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { scopes: { some: { scopeType: "PROJECT" } } } }),
-      );
+      expect(database.findProjectScopedLegacyColumns).toHaveBeenCalledOnce();
+      expect(database.updateLegacyColumns).not.toHaveBeenCalled();
     });
   });
 });

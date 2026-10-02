@@ -3,17 +3,13 @@
  * walk and the outcome shape they report. Per-row conversions live in
  * `#services/model-provider-legacy-migration.service`; this is only the walk's vocabulary.
  */
+import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 
-/** Exactly the operations these migrations perform, and nothing else. */
-export type ModelProviderMigrationDatabase = {
-  modelProvider: {
-    findMany(args: {
-      where: { scopes: { some: { scopeType: "PROJECT" } } };
-      select: Record<string, true>;
-    }): Promise<Record<string, unknown>[]>;
-    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>;
-  };
-};
+/** Exactly the repository operations these migrations perform, and nothing else. */
+export type ModelProviderMigrationDatabase = Pick<
+  ModelProviderRepository,
+  "findProjectScopedLegacyColumns" | "updateLegacyColumns"
+>;
 
 /** What one migration did, so the caller can report it and a deploy can read it. */
 export type ModelProviderMigrationOutcome = {

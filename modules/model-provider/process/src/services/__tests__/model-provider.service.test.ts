@@ -65,6 +65,12 @@ function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
 }
 
 class Providers implements ModelProviderRepository {
+  async findProjectScopedLegacyColumns(): Promise<[]> {
+    return [];
+  }
+
+  async updateLegacyColumns(): Promise<void> {}
+
   async countUsage(): Promise<{ providers: string[] }> {
     return { providers: [] };
   }

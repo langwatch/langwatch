@@ -22,29 +22,20 @@ export async function runModelProviderKeysMigration({
   cipher: ModelProviderCredentialCipher;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
-  const rows = await database.modelProvider.findMany({
-    where: { scopes: { some: { scopeType: "PROJECT" } } },
-    select: { id: true, customKeys: true },
-  });
+  const rows = await database.findProjectScopedLegacyColumns();
   logger.info({ providers: rows.length }, "Starting model provider key encryption migration");
 
   let updated = 0;
   let skipped = 0;
 
   for (const row of rows) {
-    const encrypted = migrations.encodeModelProviderKeysRow({
-      row: row as { id: string; customKeys: unknown },
-      cipher,
-    });
+    const encrypted = migrations.encodeModelProviderKeysRow({ row, cipher });
     if (encrypted === null) {
       skipped += 1;
       continue;
     }
 
-    await database.modelProvider.update({
-      where: { id: String(row.id) },
-      data: { customKeys: encrypted },
-    });
+    await database.updateLegacyColumns({ id: row.id, customKeys: encrypted });
     updated += 1;
   }
 

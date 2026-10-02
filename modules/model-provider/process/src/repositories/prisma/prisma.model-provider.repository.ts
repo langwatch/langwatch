@@ -19,7 +19,11 @@ import type {
   CustomKeysRead,
   ModelProviderCredentialCodec,
 } from "../../app/model-provider.members.ts";
-import type { ModelProviderRepository } from "../model-provider.repository.ts";
+import type {
+  ModelProviderLegacyColumns,
+  ModelProviderLegacyColumnsUpdate,
+  ModelProviderRepository,
+} from "../model-provider.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
 
@@ -249,6 +253,42 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       select: { customKeys: true },
     });
     return row?.customKeys !== null && row?.customKeys !== undefined;
+  }
+
+  async findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]> {
+    return this.database.modelProvider.findMany({
+      where: { scopes: { some: { scopeType: "PROJECT" } } },
+      select: {
+        id: true,
+        provider: true,
+        customKeys: true,
+        customModels: true,
+        customEmbeddingsModels: true,
+      },
+    });
+  }
+
+  async updateLegacyColumns({
+    id,
+    customKeys,
+    customModels,
+    customEmbeddingsModels,
+  }: ModelProviderLegacyColumnsUpdate): Promise<void> {
+    await this.database.modelProvider.update({
+      where: { id },
+      data: {
+        ...(customKeys === undefined ? {} : { customKeys }),
+        ...(customModels === undefined
+          ? {}
+          : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),
+        ...(customEmbeddingsModels === undefined
+          ? {}
+          : {
+              customEmbeddingsModels:
+                PrismaModelProviderRepository.toPrismaInputJson(customEmbeddingsModels),
+            }),
+      },
+    });
   }
 
   isRoutingHandleConflict(error: unknown): boolean {

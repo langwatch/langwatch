@@ -52,6 +52,8 @@ import { UnavailableModelProviderCredentialProbeService } from "./services/unava
 import { UnmanagedModelProviderGatewayService } from "./services/unmanaged-model-provider-gateway.service.ts";
 import { VercelAiModelTranslationService } from "./services/vercel-ai-model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterService } from "./services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task.ts";
+import { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task.ts";
 import { ModelRegistrySyncTask } from "./tasks/model-registry-sync.task.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
 import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
@@ -82,10 +84,15 @@ export const modelProviderProcessModule = defineProcessModule("model-provider")
       return { principal, userId: credential.userId, organizationId: credential.organizationId };
     }),
   ])
-  .withTasks(async ({ secrets }) => [
+  .withTasks(async ({ secrets, repositories, members }) => [
     await secrets.into(ModelProviderModule.operationalSecrets.openRouter, (apiKey) =>
       ModelRegistrySyncTask.create({ apiKey: () => apiKey }),
     ),
+    ModelProviderCredentialsMigrateTask.create({
+      database: () => repositories.providers,
+      cipher: () => members.encryption,
+    }),
+    ModelProviderCustomModelsMigrateTask.create({ database: () => repositories.providers }),
   ]);
 
 // Model Provider's composition seam: a process composes the gateway through the factories below

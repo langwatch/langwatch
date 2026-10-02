@@ -6,7 +6,11 @@ import {
   type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 
-import type { ModelProviderRecord, ModelProviderRepository } from "../model-provider.repository.ts";
+import type {
+  ModelProviderLegacyColumns,
+  ModelProviderRecord,
+  ModelProviderRepository,
+} from "../model-provider.repository.ts";
 import type { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
 import { byCreatedAtAscending, matchesAnyScope } from "./memory.model-provider.database.ts";
 
@@ -30,6 +34,13 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
   }
 
   private constructor(private readonly database: MemoryModelProviderDatabase) {}
+
+  /** The twin stores only the current shape, so it never holds a legacy row to migrate. */
+  async findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]> {
+    return [];
+  }
+
+  async updateLegacyColumns(): Promise<void> {}
 
   async countEnabledInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
