@@ -16,3 +16,10 @@ Feature: An organization's spend
     When the spend rollup is taken
     Then the window is read up to the present instant
     And a window that ended earlier is taken exactly as it was asked for
+
+  @unit @integration @entitlements
+  Scenario: Spend rollups never carry project credentials
+    Given a project whose spend is recorded and which holds an API key and storage credentials
+    When a member of its team asks for the organization's spend
+    Then the rollup names the project by its id, name, slug and team
+    And none of the project's credentials appear in the answer
