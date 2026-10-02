@@ -2,7 +2,7 @@
  * Targeting-rules dialog as operator meets it: placement, reordering, adding
  * rules (with dialog wiring to rule-editing).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -20,7 +20,7 @@ afterEach(() => {
 
 function renderDialog(initialRules: FeatureFlagRules) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <FeatureFlagRulesDialog
         open
         onOpenChange={vi.fn()}
@@ -28,7 +28,7 @@ function renderDialog(initialRules: FeatureFlagRules) {
         initialRules={initialRules}
         onSave={vi.fn().mockResolvedValue(void 0)}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -25,9 +25,9 @@ function renderValue({
   onNext?: (paths: string[]) => void;
 } = {}) {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ValueScreen firstName="Rogerio" target={target} fading={false} onNext={onNext} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   act(() => {
     vi.advanceTimersByTime(20_000);

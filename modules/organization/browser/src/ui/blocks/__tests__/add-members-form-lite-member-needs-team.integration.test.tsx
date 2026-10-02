@@ -4,7 +4,7 @@
  * Warning lite invites without team: seat consumed but no access without team assignment.
  * @see specs/members/member-role-team-restrictions.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -28,7 +28,7 @@ const EMAIL = "dana@example.com";
 const renderForm = () => {
   const onSubmit = vi.fn();
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <AddMembersForm
         teamOptions={[TEAM]}
         organizationId="org-1"
@@ -39,7 +39,7 @@ const renderForm = () => {
         isInviterAdmin={true}
         initialEmails=""
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onSubmit };
 };

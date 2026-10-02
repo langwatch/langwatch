@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -62,7 +62,7 @@ function makeMessage(overrides: Partial<DeadLetterMessage> = {}): DeadLetterMess
 }
 
 function renderWithChakra(ui: React.ReactElement) {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return render(<DesignSystemProvider forcedTheme="light">{ui}</DesignSystemProvider>);
 }
 
 function renderAttemptHistory({ id, projectId }: { id: string; projectId: string }) {

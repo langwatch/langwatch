@@ -3,7 +3,7 @@
  * The checklist's alert step asks automation itself, not onboarding's server (ARCHITECTURE §9).
  * Spec: modules/onboarding/specs/integrations-checks.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,9 +42,9 @@ import { IntegrationChecks } from "../integration-checks.tsx";
 
 function alertStep(): HTMLElement {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <IntegrationChecks />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   const step = screen.getByText("Set up an alert").closest("a");
   if (!step) throw new Error("the alert step rendered no link");

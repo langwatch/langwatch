@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,7 +9,7 @@ import { BudgetExceededBanner } from "../budget-exceeded-banner.tsx";
 
 function renderBanner(overrides: Partial<React.ComponentProps<typeof BudgetExceededBanner>> = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <BudgetExceededBanner
         spentUsd={500}
         limitUsd={500}
@@ -17,7 +17,7 @@ function renderBanner(overrides: Partial<React.ComponentProps<typeof BudgetExcee
         scope="user"
         {...overrides}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

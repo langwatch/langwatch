@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -9,7 +9,7 @@ import { ReplayHistorySection } from "../ui/blocks/replay-history-section.tsx";
 import { ProjectionsCard } from "../ui/elements/projections-card.tsx";
 
 const renderWithChakra = (ui: React.ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  render(<DesignSystemProvider forcedTheme="light">{ui}</DesignSystemProvider>);
 
 afterEach(cleanup);
 

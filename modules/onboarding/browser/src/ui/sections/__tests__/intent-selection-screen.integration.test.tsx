@@ -1,13 +1,13 @@
+import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import "@testing-library/jest-dom/vitest";
 /**
  * @vitest-environment jsdom
  * ADR-038: the intent screen's two cards and their copy are load-bearing —
  * Spec: specs/features/onboarding/intent-fork.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import "@testing-library/jest-dom/vitest";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -72,7 +72,7 @@ function renderScreen({
   const host = { route: () => ({ params: {}, query: {} }), navigate: noop };
 
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <UiCapabilityContextProvider value={{ ...createUiCapabilitiesFromHost(host), analytics }}>
         <OnboardingFormProvider
           value={contextValue as Parameters<typeof OnboardingFormProvider>[0]["value"]}
@@ -80,7 +80,7 @@ function renderScreen({
           <IntentSelectionScreen surface={SURFACE} />
         </OnboardingFormProvider>
       </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { setIntent, analytics };
 }

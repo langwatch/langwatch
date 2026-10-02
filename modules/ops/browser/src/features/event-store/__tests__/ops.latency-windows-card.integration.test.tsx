@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -10,7 +10,7 @@ import { LatencyWindowsCard } from "../ui/elements/latency-windows-card.tsx";
 afterEach(cleanup);
 
 const withChakra = (node: React.ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+  render(<DesignSystemProvider forcedTheme="light">{node}</DesignSystemProvider>);
 
 describe("LatencyWindowsCard", () => {
   it("shows each window's percentiles, and a dash for a quiet window", () => {

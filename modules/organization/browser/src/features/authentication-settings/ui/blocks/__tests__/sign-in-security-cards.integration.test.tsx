@@ -4,7 +4,7 @@
  * whole settings object back on save.
  * @see specs/identity/org-session-lifetime.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,7 +15,7 @@ import { SessionLimitCard, SignInLockoutCard } from "../sign-in-security-cards.t
 afterEach(cleanup);
 
 const renderCard = (card: React.ReactNode) =>
-  render(<ChakraProvider value={defaultSystem}>{card}</ChakraProvider>);
+  render(<DesignSystemProvider forcedTheme="light">{card}</DesignSystemProvider>);
 
 describe("the account lockout card", () => {
   describe("given lockout is off", () => {

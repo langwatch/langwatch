@@ -5,7 +5,7 @@
  * @see specs/licensing/seat-type-explained.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -24,13 +24,13 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
 
 const renderInviteForm = () =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <AddMembersForm
         teamOptions={[{ label: "Engineering", value: "team-1" }]}
         organizationId="org-1"
         onSubmit={vi.fn()}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 describe("the seat-type choice", () => {
@@ -77,9 +77,9 @@ describe("the seat-type choice", () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <OrganizationUserRoleField value="MEMBER" onChange={onChange} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       await user.click(screen.getByRole("combobox"));
@@ -109,9 +109,9 @@ describe("the seat-type choice", () => {
     it("carries the same explanation the invite form shows", async () => {
       const user = userEvent.setup();
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <OrganizationUserRoleField value="MEMBER" onChange={vi.fn()} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       await user.click(screen.getByRole("combobox"));

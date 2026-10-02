@@ -3,14 +3,14 @@
  * @see specs/ai-gateway/budget-overview.feature
  * Every budget binds to a labelled row.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type BudgetOverviewItemView, BudgetOverviewList } from "../budget-overview-list.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 function item(overrides: Partial<BudgetOverviewItemView> = {}): BudgetOverviewItemView {

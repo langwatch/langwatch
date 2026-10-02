@@ -3,7 +3,7 @@
  * What the checkup page shows for each verdict, and what the "what we send"
  * section renders. Spec: specs/self-hosting/checkup/checkup.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { CHECK_DEFINITIONS, type CheckRow } from "@langwatch/ops-contract";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,7 +23,7 @@ function rowsWith(overrides: Partial<Record<CheckRow["id"], CheckRow["verdict"]>
 
 function renderRows(rows: CheckRow[]) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <CheckupRows
         rows={rows}
         ranAt="2026-09-21T10:00:00.000Z"
@@ -33,7 +33,7 @@ function renderRows(rows: CheckRow[]) {
         onRunPlanIdChange={() => undefined}
         onRun={() => undefined}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -126,7 +126,7 @@ describe("UsageReportSection", () => {
         user_email_domains: { "acme.com": 14 },
       };
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <UsageReportSection
             report={{
               payload,
@@ -140,7 +140,7 @@ describe("UsageReportSection", () => {
             isSaving={false}
             onSwitch={onSwitch}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       const pretty = JSON.stringify(payload, null, 2);
@@ -177,14 +177,14 @@ describe("given the checkup answered verdicts only", () => {
         })),
       );
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <UsageReportSection
             report={{ payload: { event: "daily_usage_stats", projects: 1 }, schemaVersion: 3 }}
             canManage
             isSaving={false}
             onSwitch={() => undefined}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(screen.getByTestId("checkup-details-withheld-email")).toHaveTextContent(

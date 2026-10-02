@@ -1,9 +1,3 @@
-// @vitest-environment jsdom
-/**
- * Project's lent switcher, as main's `ProjectSelector` drew it beside Add Secret.
- * The graph arrives already narrowed (ARCHITECTURE §10), so it lists what arrives.
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
   UiScope,
@@ -11,6 +5,12 @@ import {
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+// @vitest-environment jsdom
+/**
+ * Project's lent switcher, as main's `ProjectSelector` drew it beside Add Secret.
+ * The graph arrives already narrowed (ARCHITECTURE §10), so it lists what arrives.
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,11 +58,11 @@ function renderSwitcher({ projectId, pathname }: { projectId: string | null; pat
     scope: new TestScope({ organizationId: "org-1", projectId }),
   };
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <UiCapabilityContextProvider value={capabilities}>
         <ProjectSwitcher />
       </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { visited };
 }

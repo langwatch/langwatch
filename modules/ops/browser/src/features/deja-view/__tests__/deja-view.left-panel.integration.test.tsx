@@ -3,7 +3,7 @@
  * DejaView's left rail lists what processes an aggregate's events: event
  * subscribers, the raw-event consumers keyed by the event types they react to.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,14 +29,14 @@ const renderPanel = ({
   onSelectProjection = vi.fn(),
 } = {}) => {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LeftPanel
         projections={projections}
         eventSubscribers={eventSubscribers}
         selectedProjection={selectedProjection}
         onSelectProjection={onSelectProjection}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onSelectProjection };
 };

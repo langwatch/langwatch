@@ -4,7 +4,7 @@
  * GrantInputRow: access policy by seat type; lite seat limits roles offered.
  * @see specs/members/member-access-editing.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
@@ -44,7 +44,7 @@ vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 const Wrapper = ({ children }: { children?: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 function renderRow(overrides: Partial<ComponentProps<typeof GrantInputRow>> = {}) {

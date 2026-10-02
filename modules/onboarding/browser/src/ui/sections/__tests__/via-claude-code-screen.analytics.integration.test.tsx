@@ -4,7 +4,7 @@
  * Analytics for coding-agent screen; allowlist is privacy-critical since
  * commands embed the API key.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -48,7 +48,7 @@ function onlyEmit(): EmitCall {
 
 function renderScreen() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ActiveProjectProvider
         value={{
           project: { id: "project-1", slug: "project-1", name: "Project" },
@@ -62,7 +62,7 @@ function renderScreen() {
       >
         <ViaClaudeCodeScreen />
       </ActiveProjectProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,9 +14,9 @@ type Change = Parameters<NonNullable<PhoneNumberInputProps["onChange"]>>;
 function renderInput(props: Omit<PhoneNumberInputProps, "onChange"> = {}) {
   const changes: Change[] = [];
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <PhoneNumberInput {...props} onChange={(...change) => changes.push(change)} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return {
     changes,

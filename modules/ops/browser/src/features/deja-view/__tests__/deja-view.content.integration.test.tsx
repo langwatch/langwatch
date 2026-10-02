@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -67,9 +67,9 @@ function createProps(overrides: Partial<DejaViewProps> = {}): DejaViewProps {
 
 function view(props: DejaViewProps) {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <DejaView {...props} />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

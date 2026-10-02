@@ -1,10 +1,10 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * Real-Chromium paint-order test for the Langy home's lit block: jsdom paints
  * nothing, so only a browser can say which layer ends up on top of a card.
  * Spec: specs/home/langy-home.feature
  */
 import { Box } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -90,14 +90,14 @@ class StubProjectHomeHost extends ProjectHomeHost {
 function mount(mode: "light" | "dark") {
   document.documentElement.className = mode;
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={new StubProjectHomeHost()}>
         {/* The shell's opaque page fill, which the block's light must stay above. */}
         <Box data-testid="page-fill" background="bg">
           <HomePage />
         </Box>
       </ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see specs/home/guided-onboarding-offer.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -72,9 +72,9 @@ function renderOffer(props: {
   spaceInUse?: boolean | null;
 }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <GuidedOnboardingOffer {...props} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

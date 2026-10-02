@@ -1,10 +1,10 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Covers what an operator is told about a payload's references and who
  * may act on it - the row half of the payload-store scenarios.
  */
 import { Table } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,13 +34,13 @@ const renderRow = ({
   onDelete?: (blob: OpsBlobSummary) => void;
 } = {}) =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Table.Root>
         <Table.Body>
           <BlobRow blob={summary} canManage={canManage} onDelete={onDelete} />
         </Table.Body>
       </Table.Root>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 afterEach(cleanup);

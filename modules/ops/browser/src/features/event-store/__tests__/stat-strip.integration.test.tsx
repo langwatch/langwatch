@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Real StatStrip; latency tiles computed over jobs, not time window.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { DashboardData, PhaseMetrics } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -87,9 +87,9 @@ const makeData = (overrides: Partial<DashboardData> = {}): DashboardData => ({
 
 const renderStrip = (overrides: Partial<DashboardData> = {}) =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <StatStrip data={makeData(overrides)} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 afterEach(cleanup);

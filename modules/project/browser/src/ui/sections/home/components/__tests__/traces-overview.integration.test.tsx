@@ -3,7 +3,7 @@
  * Traces-overview card labels figures with their window; avoids curves with
  * too few daily readings.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -72,9 +72,9 @@ class StubProjectHomeHost extends ProjectHomeHost {
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={new StubProjectHomeHost()}>{ui}</ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

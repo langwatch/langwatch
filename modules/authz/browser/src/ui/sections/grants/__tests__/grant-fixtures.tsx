@@ -1,11 +1,11 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import type { GrantRow } from "../../../../model/grants/grants.ts";
 
 export function renderInChakra(element: ReactElement) {
-  return render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+  return render(<DesignSystemProvider forcedTheme="light">{element}</DesignSystemProvider>);
 }
 
 export function grantRow(over: Partial<GrantRow> = {}): GrantRow {

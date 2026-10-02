@@ -4,7 +4,7 @@
  * `projectSlug` only when the reader asks: no key is on the page before.
  * Spec: specs/features/onboarding/manual-setup-api-key.feature, specs/api-keys/api-keys-v2.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -201,7 +201,7 @@ afterEach(() => {
 function renderManualSetup(host: ProductTestHost) {
   const query = { projectSlug: "acme-agent", step: "manually" };
   const tree = () => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <UiCapabilityContextProvider
         value={{
           ...createUiCapabilitiesFromHost({
@@ -215,7 +215,7 @@ function renderManualSetup(host: ProductTestHost) {
           <ProductScreen />
         </OnboardingHostProvider>
       </UiCapabilityContextProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
   const utils = render(tree());
   return { ...utils, rerenderManualSetup: () => utils.rerender(tree()) };

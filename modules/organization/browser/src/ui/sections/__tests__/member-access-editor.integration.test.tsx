@@ -1,11 +1,11 @@
+import { GrantScopeTier } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * The person drawer's access editor: role/assignment visibility, the staged save, and Cancel.
  * Spec: specs/members/member-access-editing.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { GrantScopeTier } from "@langwatch/authz-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as reactModule from "react";
@@ -218,7 +218,7 @@ vi.mock("../group-grant-input-row.tsx", async () => {
 const { MemberAccessEditor } = await import("../member-access-editor.tsx");
 
 const Wrapper = ({ children }: { children?: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 function renderEditor(overrides: Partial<React.ComponentProps<typeof MemberAccessEditor>> = {}) {

@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PausedCard } from "../ui/sections/paused-card.tsx";
@@ -49,16 +49,14 @@ const renderCard = (
 ) =>
   (() => {
     const schedulesResult = mockPausedSchedules();
-    return render(
-      <ChakraProvider value={defaultSystem}>
-        <PausedCard
-          parkedTenants={props.parkedTenants ?? []}
-          parkedTenantsBound={props.parkedTenantsBound ?? { total: 0, included: 0 }}
-          pausedKeys={props.pausedKeys ?? []}
-          schedules={schedulesResult.data?.schedules ?? []}
-          schedulesTotal={schedulesResult.data?.total ?? 0}
-        />
-      </ChakraProvider>,
+    return renderWithDesignSystem(
+      <PausedCard
+        parkedTenants={props.parkedTenants ?? []}
+        parkedTenantsBound={props.parkedTenantsBound ?? { total: 0, included: 0 }}
+        pausedKeys={props.pausedKeys ?? []}
+        schedules={schedulesResult.data?.schedules ?? []}
+        schedulesTotal={schedulesResult.data?.total ?? 0}
+      />,
     );
   })();
 

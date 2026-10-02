@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,11 +82,11 @@ class StubProjectHomeHost extends ProjectHomeHost {
 
 function renderHero(canAsk = true) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={new StubProjectHomeHost(canAsk)}>
         <LangyHomeHero />
       </ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

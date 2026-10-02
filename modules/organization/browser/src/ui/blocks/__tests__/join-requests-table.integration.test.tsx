@@ -3,7 +3,7 @@
  * The members area's join-requests panel (D12).
  * Spec: specs/identity/join-requests.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -27,7 +27,7 @@ const renderPanel = (
   const onApprove = vi.fn();
   const onReject = vi.fn();
   const result = render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <JoinRequestsTable
         requests={requests}
         isAdmin={isAdmin}
@@ -35,7 +35,7 @@ const renderPanel = (
         onApprove={onApprove}
         onReject={onReject}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { ...result, onApprove, onReject };
 };
@@ -47,7 +47,7 @@ describe("given an organization with a pending request", () => {
     /** @scenario Requests wait beside invitations in the members area */
     it("shows the request beside the invitations, with who asked and when", () => {
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <JoinRequestsTable
             requests={[samsRequest]}
             isAdmin
@@ -75,7 +75,7 @@ describe("given an organization with a pending request", () => {
             onResendInvite={vi.fn()}
             onRevokeInvite={vi.fn()}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       // Both directions, one place: somebody reaching in and the organization

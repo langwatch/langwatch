@@ -3,7 +3,7 @@
  * reason to open this page, and a kill switch is the exception, so Product
  * leads.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -48,7 +48,7 @@ afterEach(cleanup);
 
 function renderView(catalogue: OperatorFeatureFlagCatalogueRead = CATALOGUE) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <OperatorFeatureFlagCatalogueView
         catalogue={catalogue}
         canManage={true}
@@ -56,7 +56,7 @@ function renderView(catalogue: OperatorFeatureFlagCatalogueRead = CATALOGUE) {
         onClear={vi.fn()}
         onSetRules={vi.fn()}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

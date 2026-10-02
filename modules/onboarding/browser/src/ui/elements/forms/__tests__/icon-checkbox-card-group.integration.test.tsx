@@ -4,7 +4,7 @@
  * Integration tests for IconCheckboxCardGroup component.
  * Verifies ARIA roles, selection toggling, and keyboard accessibility.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,7 @@ const items = [
 ];
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 describe("<IconCheckboxCardGroup/>", () => {

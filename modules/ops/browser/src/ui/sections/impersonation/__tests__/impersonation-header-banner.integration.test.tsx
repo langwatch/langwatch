@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
@@ -20,9 +20,9 @@ const IMPERSONATED = { ...TARGET, impersonator: { id: "admin_1", email: "admin@t
 
 function renderBanner(user: typeof TARGET | typeof IMPERSONATED) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ImpersonationHeaderBanner user={user} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,7 +4,7 @@
  * aggregate": triggers, emitted commands, and this aggregate's current
  * position and sent commands.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -32,9 +32,9 @@ const running: DejaViewProcessManager = {
 
 const renderCard = (manager: DejaViewProcessManager) =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ManagerCard manager={manager} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 afterEach(cleanup);

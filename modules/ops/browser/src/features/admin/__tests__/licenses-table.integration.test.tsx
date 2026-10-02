@@ -3,7 +3,7 @@
  * The backoffice licenses list: what an operator reads off a row unopened.
  * Spec: specs/self-hosting/connected-services/license-registry.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -50,7 +50,7 @@ function license(overrides: Partial<License> = {}): License {
 
 function renderTable(licenses: License[]) {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LicensesTable
         licenses={licenses}
         isLoading={false}
@@ -58,7 +58,7 @@ function renderTable(licenses: License[]) {
         onRevoke={vi.fn()}
         onResetBinding={vi.fn()}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

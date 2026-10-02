@@ -1,12 +1,12 @@
+import { uiDeclarations, type UiResourceLimitRowProps } from "@langwatch/browser-host/declarations";
 /**
  * @vitest-environment jsdom
  *
  * Seat counts on member list for per-person reconciliation decisions.
  * @see specs/licensing/seat-reconciliation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { uiDeclarations, type UiResourceLimitRowProps } from "@langwatch/browser-host/declarations";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The row is licensing's to draw; this suite checks what organization asks of it.
@@ -55,11 +55,7 @@ const planWith = ({ maxMembers, maxMembersLite }: { maxMembers: number; maxMembe
   ({ maxMembers, maxMembersLite }) as any;
 
 const renderSeatUsage = (plan: { maxMembers: number; maxMembersLite: number }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />);
 
 describe("given an organization with a seat allowance of each kind", () => {
   afterEach(() => {

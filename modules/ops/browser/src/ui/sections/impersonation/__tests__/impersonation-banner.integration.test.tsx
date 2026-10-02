@@ -2,15 +2,11 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImpersonationBanner } from "../index.ts";
-
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("ImpersonationBanner", () => {
   beforeEach(() => {
@@ -19,9 +15,8 @@ describe("ImpersonationBanner", () => {
 
   describe("when user is not being impersonated", () => {
     it("renders nothing", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ImpersonationBanner onStop={() => {}} user={{ name: "Alice", email: "alice@test.com" }} />,
-        { wrapper },
       );
       expect(container.innerHTML).toBe("");
     });
@@ -39,7 +34,7 @@ describe("ImpersonationBanner", () => {
     };
 
     it("displays the impersonation text and stop action", () => {
-      render(<ImpersonationBanner onStop={() => {}} user={impersonatedUser} />, { wrapper });
+      renderWithDesignSystem(<ImpersonationBanner onStop={() => {}} user={impersonatedUser} />);
       expect(screen.getByText("Impersonating Target User")).not.toBeNull();
       // Chakra renders multiple copies for responsive breakpoints
       const stopLinks = screen.getAllByRole("link", { name: "Stop" });
@@ -47,7 +42,7 @@ describe("ImpersonationBanner", () => {
     });
 
     it("falls back to email when name is null", () => {
-      render(
+      renderWithDesignSystem(
         <ImpersonationBanner
           onStop={() => {}}
           user={{
@@ -55,7 +50,6 @@ describe("ImpersonationBanner", () => {
             name: null,
           }}
         />,
-        { wrapper },
       );
       expect(screen.getByText("Impersonating target@test.com")).not.toBeNull();
     });
@@ -63,7 +57,7 @@ describe("ImpersonationBanner", () => {
     it("asks the mounting feature to stop when Stop is clicked", () => {
       const onStop = vi.fn();
 
-      render(<ImpersonationBanner onStop={onStop} user={impersonatedUser} />, { wrapper });
+      renderWithDesignSystem(<ImpersonationBanner onStop={onStop} user={impersonatedUser} />);
 
       fireEvent.click(screen.getAllByRole("link", { name: "Stop" })[0]!);
 

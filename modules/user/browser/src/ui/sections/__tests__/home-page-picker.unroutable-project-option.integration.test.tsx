@@ -3,7 +3,7 @@
  *
  * Home page picker routing parity test (filtered vs. unfiltered project lists).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -44,9 +44,9 @@ describe("given the resolver excludes the caller's only project as a personal wo
     it("offers no Project home option, even though the unfiltered query names one", () => {
       resolverData.data = { persona: "personal_only", firstProjectSlug: null };
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <HomePagePicker organizationId="org_1" />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(screen.getByText("Auto")).toBeTruthy();
@@ -62,9 +62,9 @@ describe("given the resolver's own project differs from the unfiltered query", (
       stateData.data = { lastHomePath: null, firstProjectSlug: "personal-alex" };
       resolverData.data = { persona: "mixed", firstProjectSlug: "team-prod" };
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <HomePagePicker organizationId="org_1" />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(screen.getByText("Always land on /team-prod/traces")).toBeTruthy();

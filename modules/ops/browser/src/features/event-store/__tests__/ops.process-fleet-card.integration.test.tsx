@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -31,9 +31,9 @@ describe("ProcessFleetCard", () => {
     it("presents the dead count as a failure, and the row leads to its instances", () => {
       const onSelect = vi.fn();
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <ProcessFleetCard rows={[makeRow({ deadMessages: 7 })]} onSelect={onSelect} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       const row = screen.getByTestId("process-row-automations");
       expect(row.textContent).toContain("7");
@@ -48,9 +48,9 @@ describe("ProcessFleetCard", () => {
 
   it("labels a scheduled singleton as scheduled", () => {
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <ProcessFleetCard rows={[makeRow({ scheduled: true })]} onSelect={() => undefined} />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
     expect(screen.getByTestId("process-row-automations").textContent).toContain("scheduled");
   });

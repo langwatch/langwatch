@@ -3,7 +3,7 @@
  * Real GroupDetailContent rendering; vanished-group case (group finishes between
  * table refresh and click).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -59,7 +59,7 @@ function makeJob(overrides: Partial<JobEntry> = {}): JobEntry {
 
 function renderContent(props: Partial<React.ComponentProps<typeof GroupDetailContent>> = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <GroupDetailContent
         detail={null}
         isLoading={false}
@@ -68,7 +68,7 @@ function renderContent(props: Partial<React.ComponentProps<typeof GroupDetailCon
         now={NOW}
         {...props}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

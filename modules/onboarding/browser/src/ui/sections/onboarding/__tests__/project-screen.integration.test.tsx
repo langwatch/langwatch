@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Spec: modules/onboarding/specs/onboarding-project-create.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -89,9 +89,9 @@ import ProjectOnboarding from "../project.screen.tsx";
 
 function renderScreen() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectOnboarding />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

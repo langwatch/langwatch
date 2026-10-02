@@ -1,10 +1,10 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Same recovery vocabulary across queue and outbox substrates (drifted: "Replay"
  * vs "Redrive" for same act).
  */
 import { Table } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -49,7 +49,7 @@ function dlqGroup(overrides: Record<string, unknown> = {}) {
 }
 
 function renderWithChakra(ui: React.ReactElement) {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return render(<DesignSystemProvider forcedTheme="light">{ui}</DesignSystemProvider>);
 }
 
 afterEach(cleanup);

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -41,7 +41,7 @@ const auditEntry: SchedulerAuditEntryView = {
 };
 
 function withChakra(node: React.ReactElement) {
-  return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+  return render(<DesignSystemProvider forcedTheme="light">{node}</DesignSystemProvider>);
 }
 
 afterEach(cleanup);

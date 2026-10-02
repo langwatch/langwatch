@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -40,7 +40,7 @@ import { ProviderScreen } from "../provider-screen.tsx";
 
 function renderScreen(onSkip = vi.fn(), picksCount = 1) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProviderScreen
         picksCount={picksCount}
         organizationId="org_1"
@@ -49,7 +49,7 @@ function renderScreen(onSkip = vi.fn(), picksCount = 1) {
         onConnected={vi.fn()}
         onSkip={onSkip}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -1,9 +1,9 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Real RedisStatTile rendering (Memory, Processor, Connections as one tile).
  */
 import { HStack } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -20,11 +20,11 @@ const renderTile = (
     redisEngineCpuPercent: 12.3,
   };
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <HStack>
         <RedisStatTile data={{ ...defaults, ...overrides }} />
       </HStack>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 };
 

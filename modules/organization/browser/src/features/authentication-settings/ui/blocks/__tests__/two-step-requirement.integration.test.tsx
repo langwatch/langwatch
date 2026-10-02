@@ -5,8 +5,8 @@
  * @see specs/identity/mfa-and-session-shape.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { Table } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { OrganizationMemberFactor } from "@langwatch/identity-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -54,7 +54,7 @@ function renderSurface({
   onChange?: (mfaRequired: boolean) => void;
 }) {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Table.Root>
         <Table.Body>
           {members.map((member) => (
@@ -78,7 +78,7 @@ function renderSurface({
         saving={false}
         onChange={onChange}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onChange };
 }

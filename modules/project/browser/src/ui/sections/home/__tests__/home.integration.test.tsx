@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Tests HomePage composition resolution order and rollout conditions.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -122,11 +122,11 @@ class StubProjectHomeHost extends ProjectHomeHost {
 
 const renderHome = () =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={new StubProjectHomeHost()}>
         <HomePage />
       </ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 afterEach(cleanup);
@@ -296,11 +296,11 @@ class ReturningHomeHost extends StubProjectHomeHost {
 
 function renderHomeRoute(host: ReturningHomeHost) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={host}>
         <HomeScreen />
       </ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

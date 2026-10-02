@@ -4,7 +4,7 @@
  * boundary (mocked) across load / empty / data states.
  * @see specs/coding-agent/personal-usage.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -31,9 +31,9 @@ import { CodingAgentUsageContent } from "../ui/sections/coding-agent-usage-conte
 
 function renderCard() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <CodingAgentUsageContent projectId="p1" />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Spec: specs/features/onboarding/model-provider-step.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -36,9 +36,9 @@ import { ModelProviderStepScreen } from "../model-provider-step-screen.tsx";
 function renderStep() {
   const onContinue = vi.fn();
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ModelProviderStepScreen surface={{ boundary: "model-provider" }} onContinue={onContinue} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onContinue };
 }

@@ -4,7 +4,7 @@
  * a reload resumes from the organization's state.
  * Spec: specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentType, createElement, forwardRef, type ReactNode } from "react";
@@ -203,7 +203,7 @@ afterEach(cleanup);
 
 function renderWelcome() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <UiCapabilityContextProvider
         value={{
           ...createUiCapabilitiesFromHost({
@@ -221,7 +221,7 @@ function renderWelcome() {
           <WelcomeScreen />
         </OnboardingHostProvider>
       </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  *
  * Renders the real drawer body via React Testing Library against an actual
- * ChakraProvider — the queries stay outside, plain data comes in.
+ * DesignSystemProvider — the queries stay outside, plain data comes in.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { ProcessInstanceDetail, ProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -45,7 +45,7 @@ function makeMessage(overrides: Partial<ProcessOutboxMessageView> = {}): Process
 }
 
 const withChakra = (node: React.ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+  render(<DesignSystemProvider forcedTheme="light">{node}</DesignSystemProvider>);
 
 afterEach(cleanup);
 

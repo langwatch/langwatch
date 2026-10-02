@@ -4,7 +4,7 @@
  * organization, and where the reader lands.
  * Spec: specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { GuidedPath } from "@langwatch/onboarding-contract";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -151,7 +151,7 @@ function renderTakeover({
   returnTo?: string | null;
 } = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <OnboardingHostProvider value={new TakeoverTestHost()}>
         <GuidedTakeover
           organizationId="org_1"
@@ -165,7 +165,7 @@ function renderTakeover({
           returnTo={returnTo}
         />
       </OnboardingHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

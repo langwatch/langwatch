@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
- * Renders the real RunCleanupDialog against an actual ChakraProvider. The
+ * Renders the real RunCleanupDialog against an actual DesignSystemProvider. The
  * subject is the typed-confirmation guard: reclaiming deletes payloads
  * irreversibly, so the dialog must fire only on the exact word.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +22,7 @@ const renderDialog = ({
   onClose?: () => void;
 }) => {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <RunCleanupDialog
         value={value}
         onChange={onChange}
@@ -30,7 +30,7 @@ const renderDialog = ({
         onConfirm={onConfirm}
         isLoading={false}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onConfirm, onChange, onClose };
 };

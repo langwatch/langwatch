@@ -3,7 +3,7 @@
  * The home footer's links and where each one lands.
  * Spec: specs/home/learning-resources.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -67,11 +67,11 @@ class StubProjectHomeHost extends ProjectHomeHost {
 function renderFooter() {
   const host = new StubProjectHomeHost();
   const view = render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <ProjectHomeHostProvider value={host}>
         <LearningResources />
       </ProjectHomeHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { host, footer: view.container };
 }

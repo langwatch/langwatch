@@ -4,7 +4,7 @@
  * Spec: specs/automations/slack-connections.feature.
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
@@ -139,9 +139,9 @@ const connection = (overrides: Partial<Connection> = {}): Connection => ({
 
 function renderDrawer(props: ComponentProps<typeof SlackConnectionDrawer>) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <SlackConnectionDrawer {...props} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

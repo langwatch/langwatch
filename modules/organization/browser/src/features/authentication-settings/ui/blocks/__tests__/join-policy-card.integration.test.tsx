@@ -4,7 +4,7 @@
  * @see specs/identity/domain-auto-join.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -30,7 +30,7 @@ function renderCard({
 } = {}) {
   const onSave = vi.fn();
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <JoinPolicyCard
         domainJoin={domainJoin}
         joinDomains={joinDomains}
@@ -40,7 +40,7 @@ function renderCard({
         ssoLive={ssoLive}
         onSave={onSave}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onSave };
 }
