@@ -8,6 +8,8 @@ import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability/browser";
 import { extractRAGTextualContext } from "@langwatch/trace-contract";
 import type {
+  CheckPreconditionRule,
+  CheckPreconditions,
   ElasticSearchTrace,
   ErrorCapture,
   LLMSpan,
@@ -15,8 +17,6 @@ import type {
   Span,
 } from "@langwatch/trace-contract";
 import safe from "safe-regex2";
-
-import type { CheckPreconditionRule, CheckPreconditions } from "./types.ts";
 
 export type { PreconditionTraceData } from "@langwatch/analytics-contract";
 

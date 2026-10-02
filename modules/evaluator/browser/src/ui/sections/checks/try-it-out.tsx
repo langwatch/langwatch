@@ -27,7 +27,7 @@ import {
   type SingleEvaluationResult,
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
-import type { ElasticSearchTrace } from "@langwatch/trace-contract";
+import type { CheckPreconditions, ElasticSearchTrace } from "@langwatch/trace-contract";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
@@ -44,7 +44,6 @@ import {
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
-import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
 import { FilterToggle } from "../analytics/filters/filter-toggle.tsx";
 import { useFilterParams } from "../analytics/use-filter-params.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";

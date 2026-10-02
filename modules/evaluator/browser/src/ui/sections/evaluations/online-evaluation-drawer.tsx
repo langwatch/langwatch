@@ -24,6 +24,11 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
+import type {
+  CheckPrecondition,
+  CheckPreconditionFields,
+  CheckPreconditionRule,
+} from "@langwatch/trace-contract";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
@@ -41,11 +46,6 @@ import { useForm, type UseFormReturn } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { z } from "zod";
 
-import type {
-  CheckPrecondition,
-  CheckPreconditionFields,
-  CheckPreconditionRule,
-} from "../../../model/evaluations/types.ts";
 import {
   DEFAULT_PRECONDITION,
   fieldRequiresKey,

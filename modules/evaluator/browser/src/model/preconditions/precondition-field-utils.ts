@@ -1,11 +1,11 @@
 import type { PreconditionField } from "@langwatch/analytics-contract";
 import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import type { CheckPreconditionFields, CheckPreconditionRule } from "@langwatch/trace-contract";
 
 import {
   getAvailablePreconditionFields,
   PRECONDITION_ALLOWED_RULES,
 } from "../analytics/filters/precondition-matchers.ts";
-import type { CheckPreconditionFields, CheckPreconditionRule } from "../evaluations/types.ts";
 
 /** Human-readable labels for precondition rules */
 export const RULE_LABELS: Record<CheckPreconditionRule, string> = {

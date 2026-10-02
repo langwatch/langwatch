@@ -10,14 +10,14 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { X } from "react-feather";
-import { useFormContext } from "react-hook-form";
-
 import type {
   CheckPrecondition,
   CheckPreconditionFields,
   CheckPreconditionRule,
-} from "../../../model/evaluations/types.ts";
+} from "@langwatch/trace-contract";
+import { X } from "react-feather";
+import { useFormContext } from "react-hook-form";
+
 import {
   fieldRequiresKey,
   getAllowedRulesForField,
