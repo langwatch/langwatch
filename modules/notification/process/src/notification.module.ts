@@ -8,13 +8,16 @@ import type {
 } from "./channels/email-delivery.channel.ts";
 import { emailGatewayOpener } from "./channels/email-gateway-channels.registry.ts";
 import type { SesAwsClientConfiguration } from "./channels/ses/ses.email-gateway.channel.ts";
+import { webPushEventing } from "./eventing/web-push.pipeline.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
 import { EmailDeliveryService } from "./services/email-delivery.service.ts";
+import { notificationTrpcTransport } from "./transport/notification.trpc.ts";
 
 export const notificationProcessModule = defineProcessModule("notification")
   .withRepositories(notificationRepositories)
   .withApi(NotificationModule)
-  .withTransports();
+  .withTransports(notificationTrpcTransport)
+  .withEventing(webPushEventing);
 
 /**
  * What this feature contributes to a process that sends mail: the process

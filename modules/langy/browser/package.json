@@ -41,6 +41,7 @@
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

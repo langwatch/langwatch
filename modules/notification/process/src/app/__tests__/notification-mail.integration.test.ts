@@ -7,6 +7,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { notificationProcessModule } from "../../notification.module.ts";
+import { testEventing } from "./notification.fixture.ts";
 
 /** A relay that speaks just enough SMTP to accept messages, recording each with its envelope. */
 async function startRelay(): Promise<{ server: Server; port: number; received: string[] }> {
@@ -57,6 +58,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
     .withModules([withMemoryRepositories(notificationProcessModule)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
+    .withEventing(testEventing())
     .withConfig({
       notification: {
         defaultFrom: "LangWatch <contact@langwatch.test>",

@@ -1,5 +1,6 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
+import type { ProcessStore } from "@langwatch/eventing";
 import {
   NotificationService as NotificationApi,
   notificationBrowserConfig,
@@ -10,8 +11,13 @@ import {
   type Notification,
   type NotificationRecentQuery,
   type NotificationServerConfig,
+  type RequestWebPushDeliveryCommand,
   type SendEmailCommand,
   sendEmailCommandSchema,
+  type SubscribeWebPushCommand,
+  type UnsubscribeWebPushCommand,
+  type WebPushDeliveryRequested,
+  type WebPushPublicKey,
 } from "@langwatch/notification-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { Secret } from "@langwatch/secrets";
@@ -21,11 +27,19 @@ import {
   resolveDefaultFrom,
 } from "../channels/email-delivery.channel.ts";
 import { emailGatewayOpener } from "../channels/email-gateway-channels.registry.ts";
+import { HttpWebPushGatewayChannel } from "../channels/http/http.web-push-gateway.channel.ts";
 import { emailProxyResolver } from "../channels/ses/ses.email-gateway.channel.ts";
+import {
+  buildWebPushPipeline,
+  OutboxWebPushQueue,
+  type WebPushPipeline,
+} from "../eventing/web-push.pipeline.ts";
 import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
+import type { VapidSettings } from "../rules/web-push.rules.ts";
 import { EmailDeliveryService } from "../services/email-delivery.service.ts";
 import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
+import { WebPushService, type WebPushQueue } from "../services/web-push.service.ts";
 
 /**
  * Process facts: the sender address derives from the public base URL when unnamed,
@@ -59,10 +73,23 @@ export class NotificationModule implements NotificationApiContract {
 
   #notifications: NotificationService;
   #mailDelivery: MailDeliveryService;
+  #webPush: WebPushService;
+  #webPushQueue: WebPushQueue | undefined;
 
-  private constructor(repositories: NotificationRepositories, mailDelivery: MailDeliveryService) {
+  private constructor(
+    repositories: NotificationRepositories,
+    mailDelivery: MailDeliveryService,
+    webPushSettings: VapidSettings,
+  ) {
     this.#notifications = NotificationService.create({ repository: repositories.notifications });
     this.#mailDelivery = mailDelivery;
+    this.#webPush = WebPushService.create({
+      subscriptions: repositories.webPushSubscriptions,
+      vapidKeys: repositories.webPushVapidKeys,
+      gateway: HttpWebPushGatewayChannel.create(),
+      settings: webPushSettings,
+      queue: () => this.#webPushQueue,
+    });
   }
 
   static async create({
@@ -93,7 +120,15 @@ export class NotificationModule implements NotificationApiContract {
     });
     resources.own("Notification mail gateway", () => delivery.close());
     const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
-    return new NotificationModule(repositories, mailDelivery);
+    return new NotificationModule(repositories, mailDelivery, {
+      publicBaseUrl: members.publicBaseUrl,
+    });
+  }
+
+  /** Web Push's pipeline over the kernel's process store, whose outbox holds the sends. */
+  webPushPipeline({ processStore }: { processStore: ProcessStore }): WebPushPipeline {
+    this.#webPushQueue = OutboxWebPushQueue.create(processStore);
+    return buildWebPushPipeline({ webPush: this.#webPush, processStore });
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
@@ -114,6 +149,22 @@ export class NotificationModule implements NotificationApiContract {
 
   sendEmail(input: SendEmailCommand): Promise<void> {
     return this.#mailDelivery.sendEmail(sendEmailCommandSchema.parse(input));
+  }
+
+  getWebPushPublicKey(): Promise<WebPushPublicKey> {
+    return this.#webPush.getPublicKey();
+  }
+
+  subscribeWebPush(input: SubscribeWebPushCommand): Promise<void> {
+    return this.#webPush.subscribe(input);
+  }
+
+  unsubscribeWebPush(input: UnsubscribeWebPushCommand): Promise<void> {
+    return this.#webPush.unsubscribe(input);
+  }
+
+  requestWebPushDelivery(input: RequestWebPushDeliveryCommand): Promise<WebPushDeliveryRequested> {
+    return this.#webPush.request(input);
   }
 }
 

@@ -24,10 +24,19 @@
   ],
   "references": [
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/aws-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -52,6 +61,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     }
   ]
 }

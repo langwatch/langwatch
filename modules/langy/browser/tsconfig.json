@@ -68,6 +68,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../onboarding/contract/tsconfig.build.json"
     },
     {

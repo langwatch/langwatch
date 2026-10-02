@@ -130,6 +130,29 @@ describe("useLangyNotifier", () => {
     });
   });
 
+  describe("given two hidden tabs on a browser without push", () => {
+    describe("when Langy puts up a card that waits for my answer", () => {
+      /** @scenario "Two open tabs show one notification" */
+      it("tags both with the conversation, so the browser keeps one on screen", () => {
+        setAway(true);
+        const first = renderHook((props: Props) => useLangyNotifier(props), { initialProps: base });
+        const second = renderHook((props: Props) => useLangyNotifier(props), {
+          initialProps: base,
+        });
+
+        first.rerender({ ...base, decisionKeys: ["wait-1"] });
+        second.rerender({ ...base, decisionKeys: ["wait-1"] });
+
+        const onScreen = new Map(shown.map((notification) => [notification.tag, notification]));
+        expect(shown.map((notification) => notification.tag)).toEqual([
+          "langy:conv-1",
+          "langy:conv-1",
+        ]);
+        expect(onScreen.size).toBe(1);
+      });
+    });
+  });
+
   describe("given the tab is visible and focused", () => {
     it("shows nothing for a new decision", () => {
       setAway(false);

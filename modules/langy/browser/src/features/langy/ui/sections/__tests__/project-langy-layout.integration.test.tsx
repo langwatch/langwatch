@@ -37,6 +37,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 // "mount once per project", so the tests need to tell a surviving panel apart
 // from a remounted one.
 const sidecarMounts = { count: 0 };
+vi.mock("../../../behavior/use-langy-web-push.ts", () => ({ useLangyWebPush: () => undefined }));
+
 vi.mock("../langy-panel.tsx", () => ({
   LangySidecar: () => <LangySidecarStub />,
 }));

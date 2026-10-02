@@ -29,6 +29,10 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
       create: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
     graphs: { create: { useMutation: () => ({ mutateAsync: vi.fn() }) } },
+    notification: {
+      subscribeWebPush: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      unsubscribeWebPush: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
     user: {
       getNotificationPreference: {
         useQuery: () => ({ data: { topic: "langy", choice: "enabled" }, isLoading: false }),

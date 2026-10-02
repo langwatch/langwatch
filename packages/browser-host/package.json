@@ -50,6 +50,14 @@
       "types": "./dist/browser-notifications.d.ts",
       "default": "./src/browser-notifications.ts"
     },
+    "./web-push": {
+      "types": "./dist/web-push.d.ts",
+      "default": "./src/web-push.ts"
+    },
+    "./push-service-worker": {
+      "types": "./dist/push-service-worker.d.ts",
+      "default": "./src/push-service-worker.ts"
+    },
     "./toaster": {
       "types": "./dist/toaster.d.ts",
       "default": "./src/toaster.ts"

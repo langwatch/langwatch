@@ -84,6 +84,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",

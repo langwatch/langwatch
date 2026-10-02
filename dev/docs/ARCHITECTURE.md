@@ -67,10 +67,10 @@ one.
 
 Named by one rule: **where the code runs, or what it declares.**
 
-|          | core                | runs + declares      | reads                       | wire                   | shares          |
-| -------- | ------------------- | -------------------- | --------------------------- | ---------------------- | --------------- |
-| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`       | contracts       |
-| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/browser`   | `<name>-client` |
+|          | core                | runs + declares      | reads                       | wire                 | shares          |
+| -------- | ------------------- | -------------------- | --------------------------- | -------------------- | --------------- |
+| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`     | contracts       |
+| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/browser` | `<name>-client` |
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
@@ -465,12 +465,12 @@ opens as the owner's drawer by name: ops' SSO import opens sso's register-connec
 "Capability" means exactly these four layers. Each has one owner and one answer; nothing else
 decides it, and no layer, projection or screen re-derives another's answer.
 
-| Layer                   | Question                                                                   | Owner and where it is answered                                                                                                          | How the browser learns it                                                                                                               |
-| ----------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Layer                   | Question                                                                   | Owner and where it is answered                                                                                      | How the browser learns it                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Deployment availability | Does this install have it (email, object storage, langevals, the gateway)? | The owning module, from its own config and secrets, answered once inside the module (§3.3 rule 4; Alex, 2026-10-01) | A public-config boolean projected from that same answer after the module is built; never recomputed from config leaves or secret presence |
-| Entitlement             | May this organization use it (plan, licence)?                              | `EntitlementApi`; routes stay mounted and refuse per organization (§11)                                                                 | An entitlement read through the owner's `*Api`                                                                                          |
-| Permission              | May this user do it?                                                       | authz; the service checks before acting                                                                                                 | The session's `hasPermission` / `hasOrganizationPermission`                                                                             |
-| Release flag            | Is it rolled out here yet?                                                 | Feature flags                                                                                                                           | The flags host service                                                                                                                  |
+| Entitlement             | May this organization use it (plan, licence)?                              | `EntitlementApi`; routes stay mounted and refuse per organization (§11)                                             | An entitlement read through the owner's `*Api`                                                                                            |
+| Permission              | May this user do it?                                                       | authz; the service checks before acting                                                                             | The session's `hasPermission` / `hasOrganizationPermission`                                                                               |
+| Release flag            | Is it rolled out here yet?                                                 | Feature flags                                                                                                       | The flags host service                                                                                                                    |
 
 **Fixed bounds read the registry; per-organization bounds ask entitlement** (Alex, 2026-10-01). A
 bound fixed before any organization is known (a route's body limit at declaration, a default page
@@ -1790,6 +1790,18 @@ Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outb
 producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
 and the outbound proxy are egress's.
 
+Langy's notifications go through Web Push from the server; the tab is never the sender (Rogerio,
+2026-10-02). Web Push is a destination kind, so notification owns it: the browsers a person
+subscribed (`WebPushSubscription`), the installation's VAPID key pair (`WebPushVapidKey`,
+generated on first use and stored encrypted; cloud and self-hosted take the same path, with no env
+var), and the sending, as `send` intents on the `notification_web_push` outbox. Langy reacts to its own
+events (a long turn completing, a card waiting, the `notify` tool) and calls
+`NotificationApi.requestWebPushDelivery` for the conversation's owner when their `langy`
+preference is on, keyed by the event so a redelivery sends nothing new. The service worker skips
+a push a visible tab already shows. The open tab notifies only on a device with no working push
+subscription (no push support, or subscribing failed), never on one that holds a subscription,
+even when a send fails. The panel's reads follow the turn through read hints, not a poll.
+
 Group membership history is organization's fact, not authz's (Alex, 2026-09-30). Organization
 records a member added to a group, a member removed and a group deleted as events on its own
 pipeline, and the history columns on `GroupMembership` and `Group` (`removedAt`, `deletedAt` and
@@ -2576,15 +2588,15 @@ per-app module lists, and `audit-log-null` deleted (their old spellings are in �
 have not landed: code spells the right column until its row lands, and this record's prose names
 the left, the target.
 
-| Target                                                                                   | Today                                                              |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)        |
-| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                |
+| Target                                                                                   | Today                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                         |
+| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                                                                                                                                 |
 | `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | `deployment-facts.ts`, `@langwatch/process`'s `owner.ts` (`baseHost`, `nodeEnvironment`, `outboundProxy`), observability's `serviceVersion`, `rawSocketPort`; handed out as members |
-| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()` |
-| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                   |
-| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                            |
-| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })` |
+| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()`                                                                                                    |
+| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                                                                                                                                    |
+| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                                                                                                                                             |
+| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                           |
 
 `createProcessApp` is no longer a target: the container is (Alex, 2026-10-01). Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,

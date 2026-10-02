@@ -1,3 +1,5 @@
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
@@ -26,5 +28,15 @@ export function createNotificationTestApp(
     },
     resources: new ResourceScope(),
     secrets,
+  });
+}
+
+/** An in-memory eventing runtime for a process that installs notification's pipeline. */
+export function testEventing(): EventSourcing {
+  return new EventSourcing({
+    eventStore: EventStoreMemory.createForTesting(),
+    processStore: InMemoryProcessStore.createForTesting(),
+    executionTarget: "worker",
+    consumersEnabled: true,
   });
 }

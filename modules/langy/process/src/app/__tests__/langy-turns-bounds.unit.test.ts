@@ -25,6 +25,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -131,6 +132,7 @@ async function harness() {
           Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),
       }),
       onboarding: createApiFixture<OnboardingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
