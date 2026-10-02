@@ -7,13 +7,15 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Code,
   Heading,
   HStack,
   Progress,
   Separator,
+  Skeleton,
+  SkeletonText,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -21,7 +23,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type GatewayBudgetDetailResponse } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
-import { Archive, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
+import { Archive, FileClock, Gauge, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
@@ -221,8 +223,17 @@ function BudgetDetailPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          {isLoadingBudget && <Spinner />}
-          {budgetMissing && <Text color="fg.muted">Budget not found.</Text>}
+          <Text color="fg.muted" marginBottom={6}>
+            How much this budget has spent, what it covers, and what happens when it runs out.
+          </Text>
+          {isLoadingBudget && <BudgetDetailSkeleton />}
+          {budgetMissing && (
+            <NoDataInfoBlock
+              title="Budget not found."
+              description="It may have been deleted, or it belongs to another organization."
+              icon={<Gauge size={24} />}
+            />
+          )}
           {!isLoadingBudget && budget && (
             <VStack align="stretch" gap={6}>
               {!budget.spendAvailable && (
@@ -330,45 +341,47 @@ function BudgetDetailPage() {
                     icon={<Receipt size={24} />}
                   />
                 ) : (
-                  <Table.Root size="sm">
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeader>When</Table.ColumnHeader>
-                        <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
-                        <Table.ColumnHeader>Model</Table.ColumnHeader>
-                        <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                        <Table.ColumnHeader>Status</Table.ColumnHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {budget.recentLedger.map((line) => (
-                        <Table.Row key={line.id}>
-                          <Table.Cell>
-                            <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
-                              <Text fontSize="xs" color="fg.muted">
-                                {formatTimeAgo(toEpochMs(line.occurredAt))}
-                              </Text>
-                            </Tooltip>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Link
-                              href={`/gateway/virtual-keys/${line.virtualKeyId}`}
-                              color="orange.600"
-                            >
-                              <Text fontSize="sm">{line.virtualKeyName}</Text>
-                            </Link>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Code fontSize="xs">{line.model}</Code>
-                          </Table.Cell>
-                          <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
-                          <Table.Cell>
-                            <StatusBadge status={line.status} />
-                          </Table.Cell>
+                  <Card.Root width="full" overflow="hidden">
+                    <Table.Root variant="line" size="sm" width="full">
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>When</Table.ColumnHeader>
+                          <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
+                          <Table.ColumnHeader>Model</Table.ColumnHeader>
+                          <Table.ColumnHeader>Amount</Table.ColumnHeader>
+                          <Table.ColumnHeader>Status</Table.ColumnHeader>
                         </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
+                      </Table.Header>
+                      <Table.Body>
+                        {budget.recentLedger.map((line) => (
+                          <Table.Row key={line.id}>
+                            <Table.Cell>
+                              <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
+                                <Text fontSize="xs" color="fg.muted">
+                                  {formatTimeAgo(toEpochMs(line.occurredAt))}
+                                </Text>
+                              </Tooltip>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Link
+                                href={`/gateway/virtual-keys/${line.virtualKeyId}`}
+                                color="orange.fg"
+                              >
+                                <Text fontSize="sm">{line.virtualKeyName}</Text>
+                              </Link>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Code fontSize="xs">{line.model}</Code>
+                            </Table.Cell>
+                            <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
+                            <Table.Cell>
+                              <StatusBadge status={line.status} />
+                            </Table.Cell>
+                          </Table.Row>
+                        ))}
+                      </Table.Body>
+                    </Table.Root>
+                  </Card.Root>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
                   Most recent 20 requests. See Usage for aggregates over the full history.
@@ -413,6 +426,18 @@ function BudgetDetailPage() {
   );
 }
 
+/** The detail page while it loads: the utilization headline, then rows of facts. */
+function BudgetDetailSkeleton() {
+  return (
+    <VStack align="stretch" gap={6} data-testid="budget-detail-skeleton">
+      <Skeleton height="16px" width="120px" />
+      <Skeleton height="32px" width="240px" />
+      <Skeleton height="8px" width="full" />
+      <SkeletonText noOfLines={5} gap={3} />
+    </VStack>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box>
@@ -453,7 +478,7 @@ function ScopeBadge({
     <HStack gap={2} align="baseline">
       <Badge colorPalette="gray">{kindLabel}</Badge>
       {vkHref ? (
-        <Link href={vkHref} color="orange.600">
+        <Link href={vkHref} color="orange.fg">
           <Text fontSize="sm" fontWeight="medium">
             {target.name}
           </Text>

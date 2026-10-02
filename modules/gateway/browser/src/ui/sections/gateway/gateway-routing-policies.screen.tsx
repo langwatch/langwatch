@@ -2,6 +2,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -16,7 +17,6 @@ import {
 } from "../../../features/routing-policies/ui/blocks/routing-policies-table.tsx";
 import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
@@ -73,10 +73,12 @@ export function RoutingPoliciesPage() {
 
           {policiesQuery.isLoading && <ListSkeleton />}
 
-          <HandledErrorAlert
-            error={policiesQuery.error}
-            fallbackTitle="Couldn't load routing policies"
-          />
+          {policiesQuery.error ? (
+            <HandledErrorAlert
+              error={policiesQuery.error}
+              fallbackTitle="Couldn't load routing policies"
+            />
+          ) : null}
 
           {/* "Publish a default policy" is an instruction, so it is only shown
             to whoever can carry it out. */}
@@ -87,20 +89,22 @@ export function RoutingPoliciesPage() {
             />
           )}
 
-          <RoutingPoliciesTable
-            policies={policies}
-            resolveScopeNames={resolveScopeNames}
-            onNew={(level) => openNew(level)}
-            onEdit={(policy) =>
-              host.openDrawer({
-                drawer: ROUTING_POLICY_DRAWER,
-                params: { policyId: policy.id },
-              })
-            }
-            onSetDefault={(policy) => setDefault.mutate({ organizationId, id: policy.id })}
-            onDelete={setPolicyToDelete}
-            canManage={canManage}
-          />
+          {!policiesQuery.isLoading && (
+            <RoutingPoliciesTable
+              policies={policies}
+              resolveScopeNames={resolveScopeNames}
+              onNew={(level) => openNew(level)}
+              onEdit={(policy) =>
+                host.openDrawer({
+                  drawer: ROUTING_POLICY_DRAWER,
+                  params: { policyId: policy.id },
+                })
+              }
+              onSetDefault={(policy) => setDefault.mutate({ organizationId, id: policy.id })}
+              onDelete={setPolicyToDelete}
+              canManage={canManage}
+            />
+          )}
 
           {!canManage && (
             <PermissionRequiredNotice
@@ -232,7 +236,7 @@ function NoDefaultNotice({
       padding={4}
     >
       <HStack alignItems="start" gap={3}>
-        <Box color="orange.600" paddingTop="2px">
+        <Box color="orange.fg" paddingTop="2px">
           <Lightbulb size={18} />
         </Box>
         <VStack align="start" gap={1}>
@@ -251,7 +255,7 @@ function NoDefaultNotice({
             <Link
               href={docsUrl("/ai-gateway/governance/routing-policies")}
               isExternal
-              color="orange.700"
+              color="orange.fg"
               fontSize="xs"
               fontWeight="medium"
             >

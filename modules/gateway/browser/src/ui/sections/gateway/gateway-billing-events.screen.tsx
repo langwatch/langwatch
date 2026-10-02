@@ -2,12 +2,11 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
-  Box,
   Button,
+  Card,
   createListCollection,
   HStack,
   Input,
-  Spacer,
   Table,
   Text,
   VStack,
@@ -212,17 +211,37 @@ function PresetRangeButtons({
   onSelect: (days: number) => void;
 }) {
   return (
-    <HStack gap={2}>
-      {PRESETS.map((preset) => (
-        <Button
-          key={preset.label}
-          size="xs"
-          variant={days === preset.days ? "solid" : "outline"}
-          onClick={() => onSelect(preset.days)}
-        >
-          {preset.label}
-        </Button>
-      ))}
+    <HStack
+      as="fieldset"
+      border="none"
+      margin={0}
+      padding={0}
+      minWidth={0}
+      gap={1}
+      wrap="wrap"
+      aria-label="Time range"
+    >
+      {PRESETS.map((preset) => {
+        const isActive = days === preset.days;
+        return (
+          <Button
+            key={preset.label}
+            size="xs"
+            variant={isActive ? "subtle" : "ghost"}
+            colorPalette={isActive ? "orange" : "gray"}
+            borderRadius="full"
+            borderWidth="1px"
+            borderColor={isActive ? "colorPalette.emphasized" : "transparent"}
+            color={isActive ? "colorPalette.fg" : "fg.muted"}
+            fontWeight={isActive ? "semibold" : "normal"}
+            paddingX={3}
+            aria-pressed={isActive}
+            onClick={() => onSelect(preset.days)}
+          >
+            {preset.label}
+          </Button>
+        );
+      })}
     </HStack>
   );
 }
@@ -376,8 +395,8 @@ function BillingEventsTable({
   projectSlug: string | undefined;
 }) {
   return (
-    <Box width="full" overflowX="auto">
-      <Table.Root size="sm" data-testid="billing-events-table">
+    <Card.Root width="full" overflowX="auto">
+      <Table.Root variant="line" size="sm" width="full" data-testid="billing-events-table">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Time</Table.ColumnHeader>
@@ -401,7 +420,7 @@ function BillingEventsTable({
           ))}
         </Table.Body>
       </Table.Root>
-    </Box>
+    </Card.Root>
   );
 }
 
@@ -418,8 +437,6 @@ function BillingEventsPage() {
     <AiGatewayLayout>
       <PageLayout.Header>
         <PageLayout.Heading>Billing Events</PageLayout.Heading>
-        <Spacer />
-        <PresetRangeButtons days={ledger.days} onSelect={ledger.setDays} />
       </PageLayout.Header>
 
       <PageLayout.Container>
@@ -427,14 +444,19 @@ function BillingEventsPage() {
           <Text color="fg.muted">
             Every billable request the gateway recorded for this project, with its cost.
           </Text>
-          <BillingEventFilters ledger={ledger} />
+          <HStack gap={4} flexWrap="wrap" justify="space-between">
+            <PresetRangeButtons days={ledger.days} onSelect={ledger.setDays} />
+            <BillingEventFilters ledger={ledger} />
+          </HStack>
 
           {ledger.query.isLoading && <ListSkeleton />}
 
           {ledger.query.data?.clickHouseDisabled && (
-            <Text fontSize="sm" color="fg.muted">
-              Billing events need ClickHouse, which is not enabled on this deployment.
-            </Text>
+            <NoDataInfoBlock
+              title="Billing events are off"
+              description="Billing events need ClickHouse, which is not enabled on this deployment."
+              icon={<ReceiptText />}
+            />
           )}
 
           {!ledger.query.isLoading &&

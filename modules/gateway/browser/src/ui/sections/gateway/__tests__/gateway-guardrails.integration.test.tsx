@@ -154,7 +154,7 @@ describe("guardrails page", () => {
       expect(screen.getByText("Post (response)")).toBeInTheDocument();
       expect(screen.getByText("ev-gone")).toBeInTheDocument();
       expect(screen.getByText("Fail open")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /Edit/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /^Actions for/ })).toHaveLength(2);
     });
 
     it("offers no authoring controls without the manage grant", () => {
@@ -162,7 +162,7 @@ describe("guardrails page", () => {
       renderPage({ permissions: [] });
 
       expect(screen.getByText("Block PII")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Edit/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /New guardrail/ })).not.toBeInTheDocument();
     });
   });

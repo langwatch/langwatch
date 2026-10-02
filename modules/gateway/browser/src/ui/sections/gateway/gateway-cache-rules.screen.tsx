@@ -1,4 +1,3 @@
-import { Switch } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -13,6 +12,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Switch } from "@langwatch/design-system/switch";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
@@ -118,10 +118,8 @@ function CacheRulesPage() {
 
         <PageLayout.Container>
           <Text color="fg.muted" marginBottom={6}>
-            Rules are evaluated first-match-wins by priority (highest first). A per-request{" "}
-            <code>X-LangWatch-Cache</code> header always wins over matching rules, and a matched
-            rule always wins over the per-virtual-key default. Changes propagate to the gateway
-            within 30 s via the /changes long-poll.
+            Decide when the gateway answers from its cache instead of calling the model; the
+            highest-priority matching rule wins.
           </Text>
           {isLoadingRules && <ListSkeleton />}
           {showRulesError && (
@@ -254,16 +252,13 @@ function CacheRulesTable({
                   <ActionBadge action={r.action} modeEnum={r.modeEnum} />
                 </Table.Cell>
                 <Table.Cell>
-                  <Switch.Root
+                  <Switch
                     checked={r.enabled}
                     onCheckedChange={() => onToggle(r)}
                     disabled={!canUpdate}
                     size="sm"
                     colorPalette="orange"
-                  >
-                    <Switch.HiddenInput />
-                    <Switch.Control />
-                  </Switch.Root>
+                  />
                 </Table.Cell>
                 <Table.Cell>
                   {(canUpdate || canDelete) && (

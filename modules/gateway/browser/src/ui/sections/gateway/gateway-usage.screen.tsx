@@ -1,4 +1,3 @@
-import { Stat } from "@chakra-ui/react";
 import { neutralizeRows } from "@langwatch/csv";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -6,6 +5,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   chakra,
   Heading,
   HStack,
@@ -14,6 +14,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  StatTile,
+  StatTileFigure,
+  StatTileGrid,
+  StatTileSkeleton,
+} from "@langwatch/design-system/stat-tile";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import {
   formatBudgetUsd,
@@ -302,57 +308,45 @@ function GatewayUsagePage() {
             </Badge>
           )}
           <Spacer />
-          <HStack gap={1}>
-            {PRESETS.map((p) => (
-              <Box
-                key={p.days}
-                as="button"
-                paddingX={3}
-                paddingY={1}
-                borderRadius="md"
-                fontSize="xs"
-                fontWeight={days === p.days ? "semibold" : "normal"}
-                background={days === p.days ? "orange.subtle" : "transparent"}
-                color={days === p.days ? "orange.fg" : "fg.muted"}
-                borderWidth="1px"
-                borderColor={days === p.days ? "orange.muted" : "border.subtle"}
-                onClick={() => setDays(p.days)}
-              >
-                {p.label}
-              </Box>
-            ))}
-            <PageLayout.HeaderButton
-              onClick={exportCsv}
-              disabled={!data || data.totalRequests === 0}
-              marginLeft={2}
-            >
-              <Download size={12} /> Export CSV
-            </PageLayout.HeaderButton>
-          </HStack>
+          <PageLayout.HeaderButton onClick={exportCsv} disabled={!data || data.totalRequests === 0}>
+            <Download size={12} /> Export CSV
+          </PageLayout.HeaderButton>
         </PageLayout.Header>
 
         <PageLayout.Container>
-          <Text color="fg.muted" marginBottom={6}>
-            What your virtual keys spent, by key, model and provider, over the window you pick.
-          </Text>
-          {isLoadingUsage && <ListSkeleton />}
-          {showUsageError && (
-            <GatewayErrorPanel
-              title="Failed to load usage"
-              error={activeQuery.error}
-              onRetry={() => activeQuery.refetch()}
-            />
-          )}
-          {showUsageEmpty && (
-            <NoDataInfoBlock
-              title="No usage in this window"
-              description="Spend shows up here once the gateway has traced its first completed request. Send a few requests against a virtual key, then check back in a couple of minutes."
-              icon={<BarChart3 size={32} />}
-            />
-          )}
-          {showUsage && data && (
-            <UsageBreakdown data={data} showKeys={!virtualKeyId} viewTracesHref={viewTracesHref} />
-          )}
+          <VStack align="stretch" gap={6}>
+            <Text color="fg.muted">
+              What your virtual keys spent, by key, model and provider, over the window you pick.
+            </Text>
+            <RangePills days={days} onSelect={setDays} />
+            {isLoadingUsage && (
+              <>
+                <StatTileSkeleton columns={4} />
+                <ListSkeleton />
+              </>
+            )}
+            {showUsageError && (
+              <GatewayErrorPanel
+                title="Failed to load usage"
+                error={activeQuery.error}
+                onRetry={() => activeQuery.refetch()}
+              />
+            )}
+            {showUsageEmpty && (
+              <NoDataInfoBlock
+                title="No usage in this window"
+                description="Spend shows up here once the gateway has traced its first completed request. Send a few requests against a virtual key, then check back in a couple of minutes."
+                icon={<BarChart3 size={32} />}
+              />
+            )}
+            {showUsage && data && (
+              <UsageBreakdown
+                data={data}
+                showKeys={!virtualKeyId}
+                viewTracesHref={viewTracesHref}
+              />
+            )}
+          </VStack>
         </PageLayout.Container>
       </>
     </AiGatewayLayout>
@@ -371,52 +365,58 @@ function UsageBreakdown({
 }) {
   return (
     <VStack align="stretch" gap={6}>
-      <HStack gap={4} align="stretch">
-        <StatTile label="Total spend" value={formatBudgetUsd(data.totalUsd)} />
-        <StatTile
-          label="Requests"
-          value={data.totalRequests.toLocaleString()}
-          help="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review."
-        />
-        <StatTile label="Avg $/request" value={formatAvgCost(data.avgUsdPerRequest)} />
-        <StatTile
-          label="Blocked by guardrail"
-          value={data.blockedRequests.toLocaleString()}
-          tone={data.blockedRequests > 0 ? "red" : undefined}
-        />
-      </HStack>
+      <StatTileGrid columns={4}>
+        <StatTile label="Total spend">
+          <StatTileFigure>{formatBudgetUsd(data.totalUsd)}</StatTileFigure>
+        </StatTile>
+        <StatTile label="Requests">
+          <UITooltip content="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review.">
+            <StatTileFigure>{data.totalRequests.toLocaleString()}</StatTileFigure>
+          </UITooltip>
+        </StatTile>
+        <StatTile label="Avg $/request">
+          <StatTileFigure>{formatAvgCost(data.avgUsdPerRequest)}</StatTileFigure>
+        </StatTile>
+        <StatTile label="Blocked by guardrail">
+          <Box color={data.blockedRequests > 0 ? "fg.error" : undefined}>
+            <StatTileFigure>{data.blockedRequests.toLocaleString()}</StatTileFigure>
+          </Box>
+        </StatTile>
+      </StatTileGrid>
 
       {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
 
       {showKeys && (
         <VStack align="stretch" gap={2}>
           <Heading size="sm">Top virtual keys</Heading>
-          <Table.Root size="sm">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Key</Table.ColumnHeader>
-                <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                <Table.ColumnHeader>Requests</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {data.byVirtualKey.map((row) => (
-                <Table.Row key={row.virtualKeyId}>
-                  <Table.Cell>
-                    <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>{row.name}</Link>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text fontFamily="mono" fontSize="xs">
-                      {row.displayPrefix}…
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                  <Table.Cell>{row.requests}</Table.Cell>
+          <Card.Root width="full" overflowX="auto">
+            <Table.Root variant="line" size="sm" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Key</Table.ColumnHeader>
+                  <Table.ColumnHeader>Prefix</Table.ColumnHeader>
+                  <Table.ColumnHeader>Spend</Table.ColumnHeader>
+                  <Table.ColumnHeader>Requests</Table.ColumnHeader>
                 </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
+              </Table.Header>
+              <Table.Body>
+                {data.byVirtualKey.map((row) => (
+                  <Table.Row key={row.virtualKeyId}>
+                    <Table.Cell>
+                      <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>{row.name}</Link>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontFamily="mono" fontSize="xs">
+                        {row.displayPrefix}…
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                    <Table.Cell>{row.requests}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Card.Root>
         </VStack>
       )}
 
@@ -432,28 +432,30 @@ function UsageBreakdown({
             </Link>
           )}
         </HStack>
-        <Table.Root size="sm">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Model</Table.ColumnHeader>
-              <Table.ColumnHeader>Spend</Table.ColumnHeader>
-              <Table.ColumnHeader>Requests</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {data.byModel.map((row) => (
-              <Table.Row key={row.model}>
-                <Table.Cell>
-                  <Text fontFamily="mono" fontSize="xs">
-                    {row.model}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                <Table.Cell>{row.requests}</Table.Cell>
+        <Card.Root width="full" overflowX="auto">
+          <Table.Root variant="line" size="sm" width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Model</Table.ColumnHeader>
+                <Table.ColumnHeader>Spend</Table.ColumnHeader>
+                <Table.ColumnHeader>Requests</Table.ColumnHeader>
               </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
+            </Table.Header>
+            <Table.Body>
+              {data.byModel.map((row) => (
+                <Table.Row key={row.model}>
+                  <Table.Cell>
+                    <Text fontFamily="mono" fontSize="xs">
+                      {row.model}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                  <Table.Cell>{row.requests}</Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Card.Root>
       </VStack>
     </VStack>
   );
@@ -493,19 +495,27 @@ function SpendSparkline({
           <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                <stop
+                  offset="0%"
+                  stopColor="var(--chakra-colors-orange-solid)"
+                  stopOpacity={0.35}
+                />
+                <stop offset="100%" stopColor="var(--chakra-colors-orange-solid)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--chakra-colors-border-subtle)"
+              vertical={false}
+            />
             <XAxis
               dataKey="day"
-              tick={{ fontSize: 11, fill: "#64748b" }}
+              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={formatDayTick}
               minTickGap={24}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "#64748b" }}
+              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={(v: number) => `$${v.toFixed(2)}`}
               width={56}
             />
@@ -519,7 +529,7 @@ function SpendSparkline({
             <Area
               type="monotone"
               dataKey="spendUsd"
-              stroke="#f97316"
+              stroke="var(--chakra-colors-orange-solid)"
               strokeWidth={2}
               fill="url(#spendFill)"
               isAnimationActive={false}
@@ -548,27 +558,47 @@ function formatAvgCost(raw: string | number): string {
   return `$${n.toFixed(6)}`;
 }
 
-function StatTile({
-  label,
-  value,
-  tone,
-  help,
+/** The window presets as pills, like Directory's filters; only the chosen one carries colour. */
+function RangePills({
+  days,
+  onSelect,
 }: {
-  label: string;
-  value: string;
-  tone?: "red";
-  help?: string;
+  days: number | "mtd";
+  onSelect: (next: number | "mtd") => void;
 }) {
-  const body = (
-    <Stat.Root>
-      <Stat.Label>{label}</Stat.Label>
-      <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>{value}</Stat.ValueText>
-    </Stat.Root>
-  );
   return (
-    <Box flex={1} borderWidth="1px" borderColor="border.subtle" borderRadius="lg" padding={4}>
-      {help ? <UITooltip content={help}>{body}</UITooltip> : body}
-    </Box>
+    <HStack
+      as="fieldset"
+      border="none"
+      margin={0}
+      padding={0}
+      minWidth={0}
+      gap={1}
+      wrap="wrap"
+      aria-label="Time range"
+    >
+      {PRESETS.map((p) => {
+        const isActive = days === p.days;
+        return (
+          <Button
+            key={p.days}
+            size="xs"
+            variant={isActive ? "subtle" : "ghost"}
+            colorPalette={isActive ? "orange" : "gray"}
+            borderRadius="full"
+            borderWidth="1px"
+            borderColor={isActive ? "colorPalette.emphasized" : "transparent"}
+            color={isActive ? "colorPalette.fg" : "fg.muted"}
+            fontWeight={isActive ? "semibold" : "normal"}
+            paddingX={3}
+            aria-pressed={isActive}
+            onClick={() => onSelect(p.days)}
+          >
+            {p.label}
+          </Button>
+        );
+      })}
+    </HStack>
   );
 }
 

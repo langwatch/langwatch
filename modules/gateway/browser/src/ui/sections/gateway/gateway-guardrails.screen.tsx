@@ -1,16 +1,17 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
+  Card,
   Field,
   HStack,
   Input,
   NativeSelect,
   Spacer,
-  Spinner,
   Table,
   Text,
   Textarea,
@@ -21,7 +22,7 @@ import type {
   GatewayGuardrailFailureMode,
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
-import { Archive, Pencil, Plus, Shield } from "lucide-react";
+import { Archive, MoreVertical, Pencil, Plus, Shield } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
@@ -118,7 +119,9 @@ function GuardrailsPage() {
   if (!organization) {
     return (
       <AiGatewayLayout>
-        <Spinner />
+        <PageLayout.Container>
+          <ListSkeleton />
+        </PageLayout.Container>
       </AiGatewayLayout>
     );
   }
@@ -162,9 +165,8 @@ function GuardrailsPage() {
       <PageLayout.Container>
         <VStack align="stretch" gap={6}>
           <Text color="fg.muted">
-            Project-scoped LangWatch evaluators that run on every gateway request bound to this
-            project. Pick a direction (pre / post / stream_chunk) and a failure mode (default fail
-            closed). The VK opt-in lives in the virtual-key drawer.
+            Check what goes into and comes out of your models, using this project's evaluators on
+            every gateway request.
           </Text>
 
           {isLoadingGuardrails && <ListSkeleton />}
@@ -229,89 +231,93 @@ function GuardrailsTable({
   onArchive: (row: GuardrailRow) => void;
 }) {
   return (
-    <Table.Root size="sm" variant="line">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Name</Table.ColumnHeader>
-          <Table.ColumnHeader>Direction</Table.ColumnHeader>
-          <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
-          <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
-          <Table.ColumnHeader />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {rows.map((row) => {
-          const evaluator = evaluatorById.get(row.evaluatorId);
-          return (
-            <Table.Row key={row.id} data-testid="gateway-guardrail-row">
-              <Table.Cell>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {row.name}
-                  </Text>
-                  {row.description && (
-                    <Text fontSize="xs" color="fg.muted">
-                      {row.description}
-                    </Text>
-                  )}
-                </VStack>
-              </Table.Cell>
-              <Table.Cell>
-                <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
-              </Table.Cell>
-              <Table.Cell>
-                {evaluator ? (
+    <Card.Root width="full" overflowX="auto">
+      <Table.Root size="md" variant="line" width="full">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Name</Table.ColumnHeader>
+            <Table.ColumnHeader>Direction</Table.ColumnHeader>
+            <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
+            <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
+            <Table.ColumnHeader />
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {rows.map((row) => {
+            const evaluator = evaluatorById.get(row.evaluatorId);
+            return (
+              <Table.Row key={row.id} data-testid="gateway-guardrail-row">
+                <Table.Cell>
                   <VStack align="start" gap={0}>
-                    <Text fontSize="sm">{evaluator.name}</Text>
-                    <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
-                      {evaluator.slug}
+                    <Text fontSize="sm" fontWeight="medium">
+                      {row.name}
                     </Text>
+                    {row.description && (
+                      <Text fontSize="xs" color="fg.muted">
+                        {row.description}
+                      </Text>
+                    )}
                   </VStack>
-                ) : (
-                  <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-                    {row.evaluatorId}
-                  </Text>
-                )}
-              </Table.Cell>
-              <Table.Cell>
-                <Badge
-                  variant="surface"
-                  colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
-                >
-                  {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
-                </Badge>
-              </Table.Cell>
-              <Table.Cell>
-                <HStack justify="end" gap={1}>
-                  {canManage && (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      data-testid="gateway-guardrail-edit"
-                      onClick={() => onEdit(row)}
-                    >
-                      <Pencil size={12} /> Edit
-                    </Button>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  {evaluator ? (
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="sm">{evaluator.name}</Text>
+                      <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+                        {evaluator.slug}
+                      </Text>
+                    </VStack>
+                  ) : (
+                    <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                      {row.evaluatorId}
+                    </Text>
                   )}
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge
+                    variant="surface"
+                    colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
+                  >
+                    {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
+                  </Badge>
+                </Table.Cell>
+                <Table.Cell>
                   {canManage && (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorPalette="red"
-                      aria-label={`Archive ${row.name}`}
-                      data-testid="gateway-guardrail-archive"
-                      onClick={() => onArchive(row)}
-                    >
-                      <Archive size={12} />
-                    </Button>
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button size="xs" variant="ghost" aria-label={`Actions for ${row.name}`}>
+                          <MoreVertical size={14} />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="edit"
+                          data-testid="gateway-guardrail-edit"
+                          onClick={() => onEdit(row)}
+                        >
+                          <Pencil size={14} /> Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          value="archive"
+                          color="fg.error"
+                          data-testid="gateway-guardrail-archive"
+                          onClick={() => onArchive(row)}
+                        >
+                          <Archive size={14} /> Archive
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
                   )}
-                </HStack>
-              </Table.Cell>
-            </Table.Row>
-          );
-        })}
-      </Table.Body>
-    </Table.Root>
+                </Table.Cell>
+              </Table.Row>
+            );
+          })}
+        </Table.Body>
+      </Table.Root>
+    </Card.Root>
   );
 }
 

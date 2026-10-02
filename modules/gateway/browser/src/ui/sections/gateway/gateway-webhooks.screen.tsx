@@ -8,8 +8,8 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -308,8 +308,8 @@ function WebhookEndpointsTable({
   ...actions
 }: EndpointListActions & { endpoints: EndpointView[] }) {
   return (
-    <Box width="full" overflowX="auto">
-      <Table.Root size="sm">
+    <Card.Root width="full" overflowX="auto">
+      <Table.Root variant="line" size="md" width="full">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Destination</Table.ColumnHeader>
@@ -325,7 +325,7 @@ function WebhookEndpointsTable({
           ))}
         </Table.Body>
       </Table.Root>
-    </Box>
+    </Card.Root>
   );
 }
 
@@ -553,9 +553,12 @@ export default function WebhooksSettingsPage() {
   if (isPlanLoading) {
     return (
       <AiGatewayLayout>
-        <VStack align="center" justify="center" width="full" height="200px">
-          <Spinner />
-        </VStack>
+        <PageLayout.Header>
+          <PageLayout.Heading>Webhooks</PageLayout.Heading>
+        </PageLayout.Header>
+        <PageLayout.Container>
+          <ListSkeleton />
+        </PageLayout.Container>
       </AiGatewayLayout>
     );
   }

@@ -78,13 +78,7 @@ export function RoutingPoliciesTable({
       {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
         const rows = bucketed.get(level) ?? [];
         return (
-          <Box
-            key={level}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={4}
-          >
+          <Box key={level} borderWidth="1px" borderColor="border" borderRadius="lg" padding={4}>
             <HStack alignItems="start" marginBottom={3}>
               <VStack align="start" gap={0}>
                 <Text fontSize="sm" fontWeight="semibold">
@@ -107,9 +101,9 @@ export function RoutingPoliciesTable({
               )}
             </HStack>
 
-            <VStack align="stretch" gap={2}>
+            <VStack align="stretch" gap={0}>
               {rows.length === 0 && (
-                <Text fontSize="sm" color="fg.muted">
+                <Text fontSize="sm" color="fg.muted" paddingY={2}>
                   No policies here yet.
                 </Text>
               )}
@@ -130,7 +124,7 @@ export function RoutingPoliciesTable({
       })}
 
       {unplaced.length > 0 && (
-        <Box borderWidth="1px" borderColor="orange.300" borderRadius="md" padding={4}>
+        <Box borderWidth="1px" borderColor="orange.muted" borderRadius="lg" padding={4}>
           <VStack align="start" gap={0} marginBottom={3}>
             <Text fontSize="sm" fontWeight="semibold">
               Elsewhere
@@ -140,7 +134,7 @@ export function RoutingPoliciesTable({
               traffic, so they are listed here rather than hidden.
             </Text>
           </VStack>
-          <VStack align="stretch" gap={2}>
+          <VStack align="stretch" gap={0}>
             {unplaced.map((policy) => (
               <PolicyRow
                 key={policy.id}
@@ -203,15 +197,15 @@ function PolicyRow({
 
   return (
     <HStack
-      borderWidth="1px"
-      borderColor={policy.isDefault ? "blue.300" : "border.muted"}
-      borderRadius="sm"
-      padding={3}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingY={3}
       gap={3}
+      data-testid="gateway-routing-policy-row"
     >
       <VStack align="start" gap={1} flex={1} minWidth={0}>
         <HStack gap={2} flexWrap="wrap">
-          <Text fontSize="sm" fontWeight="medium">
+          <Text fontSize="sm" fontWeight="semibold">
             {policy.name}
           </Text>
           {policy.isDefault && (

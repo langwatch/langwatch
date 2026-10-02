@@ -13,8 +13,9 @@ import {
   Heading,
   HStack,
   Separator,
+  Skeleton,
+  SkeletonText,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -488,7 +489,7 @@ function VirtualKeyDetailPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          {detailQuery.isLoading && <Spinner />}
+          {detailQuery.isLoading && <VirtualKeyDetailSkeleton />}
           {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
           {!detailQuery.isLoading && vk && (
             /* One column, facts first, below xl; from xl the facts sit in a narrow right column. */
@@ -762,7 +763,17 @@ function UsageSection({
   if (!data) {
     return (
       <Section title="Usage (last 30 days)" action={action}>
-        <Spinner size="sm" />
+        <VStack align="stretch" gap={4} data-testid="vk-usage-skeleton">
+          <HStack gap={6}>
+            {[0, 1, 2].map((index) => (
+              <VStack key={index} align="start" gap={2}>
+                <Skeleton height="10px" width="72px" />
+                <Skeleton height="24px" width="96px" />
+              </VStack>
+            ))}
+          </HStack>
+          <Skeleton height="120px" borderRadius="lg" />
+        </VStack>
       </Section>
     );
   }
@@ -933,13 +944,36 @@ function UsageSection({
   );
 }
 
+/** The detail page while it loads, in the two-column shape it settles into. */
+function VirtualKeyDetailSkeleton() {
+  return (
+    <Grid
+      templateColumns={{ base: "minmax(0, 1fr)", xl: "minmax(0, 1fr) 380px" }}
+      templateAreas={{ base: `"facts" "main"`, xl: `"main facts"` }}
+      gap={6}
+      alignItems="start"
+      data-testid="vk-detail-skeleton"
+    >
+      <GridItem area="main">
+        <VStack align="stretch" gap={6}>
+          <Skeleton height="200px" borderRadius="lg" />
+          <SkeletonText noOfLines={4} gap={3} />
+        </VStack>
+      </GridItem>
+      <GridItem area="facts">
+        <SkeletonText noOfLines={6} gap={3} />
+      </GridItem>
+    </Grid>
+  );
+}
+
 function VkStat({ label, value, tone }: { label: string; value: string; tone?: "red" }) {
   return (
     <VStack align="start" gap={0}>
       <Text fontSize="2xs" color="fg.muted" textTransform="uppercase">
         {label}
       </Text>
-      <Text fontSize="xl" fontWeight="semibold" color={tone === "red" ? "red.600" : undefined}>
+      <Text fontSize="xl" fontWeight="semibold" color={tone === "red" ? "fg.error" : undefined}>
         {value}
       </Text>
     </VStack>
