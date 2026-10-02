@@ -19,13 +19,23 @@ const DefaultSandboxPython = "python3"
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment                   string        `env:"ENVIRONMENT"`
-	BlockLocalHTTPCalls           bool          `env:"BLOCK_LOCAL_HTTP_CALLS"`
-	RequireHTTPSCustomerEndpoints bool          `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
-	AllowedProxyHosts             string        `env:"ALLOWED_PROXY_HOSTS"`
-	Server                        config.Server `env:"SERVER"`
-	Log                           clog.Config   `env:"LOG"`
-	OTel                          config.OTel   `env:"OTEL"`
+	Environment                   string `env:"ENVIRONMENT"`
+	BlockLocalHTTPCalls           bool   `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool   `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string `env:"ALLOWED_PROXY_HOSTS"`
+	// InternalSecret is the secret shared with the LangWatch app. When set,
+	// every /go/* route requires it in the X-LangWatch-NLP-Secret header, so
+	// nothing but the app can reach the engine. When empty those routes stay
+	// open and Serve says so at startup, which is what lets a self-hosted
+	// install upgrade before its configuration carries the value.
+	//
+	// Spelled without the NLPGO_ prefix because the app reads the same
+	// variable, and in docker compose both read one .env file. One name, one
+	// value, no way for the two sides to disagree.
+	InternalSecret string        `env:"LANGWATCH_NLP_INTERNAL_SECRET"`
+	Server         config.Server `env:"SERVER"`
+	Log            clog.Config   `env:"LOG"`
+	OTel           config.OTel   `env:"OTEL"`
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`

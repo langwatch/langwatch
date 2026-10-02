@@ -135,3 +135,33 @@ func TestResolveStreamIdleTimeout(t *testing.T) {
 		})
 	}
 }
+
+// TestNewRouterDeps_CarriesTheInternalSecret pins
+// LANGWATCH_NLP_INTERNAL_SECRET to the transport option that enforces it.
+// The guard lives in the router, so a value that reaches the config and
+// stops there would leave every /go route open while the operator reads
+// their own configuration and concludes otherwise.
+func TestNewRouterDeps_CarriesTheInternalSecret(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.InternalSecret = "shared-with-the-app"
+
+	got := newRouterDeps(routerDepsInput{App: app.New(), Deps: newTestDeps(t), Cfg: cfg, Version: "test"})
+
+	if got.InternalSecret != "shared-with-the-app" {
+		t.Errorf("InternalSecret = %q; want the configured value to reach the router",
+			got.InternalSecret)
+	}
+}
+
+// TestNewRouterDeps_UnsetInternalSecretStaysUnset keeps the
+// upgrade-compatibility path honest: an install that has not been given the
+// variable must reach the router with an empty secret, which is what leaves
+// its /go routes serving.
+func TestNewRouterDeps_UnsetInternalSecretStaysUnset(t *testing.T) {
+	got := newRouterDeps(routerDepsInput{App: app.New(), Deps: newTestDeps(t), Cfg: defaultConfig(), Version: "test"})
+
+	if got.InternalSecret != "" {
+		t.Errorf("InternalSecret = %q; want empty so an unconfigured install keeps serving",
+			got.InternalSecret)
+	}
+}
