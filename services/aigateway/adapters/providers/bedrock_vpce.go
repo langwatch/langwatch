@@ -62,12 +62,8 @@ func credExtra(cred domain.Credential, keys ...string) string {
 // to the VPC endpoint, using the static AWS credentials carried on the
 // credential's Extra map.
 func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockruntime.Client {
-	region := credExtra(cred, "region", "aws_region_name")
-	if region == "" {
-		region = "us-east-1"
-	}
 	cfg := aws.Config{
-		Region: region,
+		Region: bedrockRegion(cred),
 		Credentials: credentials.NewStaticCredentialsProvider(
 			credExtra(cred, "access_key", "aws_access_key_id"),
 			credExtra(cred, "secret_key", "aws_secret_access_key"),
@@ -131,6 +127,46 @@ func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
 	return endpoint, nil
 }
 
+// bedrockConverseEndpoint decides which Bedrock requests leave bifrost for
+// the SDK Converse lane, and the endpoint that lane dispatches through. A
+// credential carrying a runtime VPC endpoint always goes through it. Without
+// one, OpenAI models (gpt-5.x via the global.openai.* inference profiles,
+// gpt-oss) still take the Converse lane over the public regional runtime
+// host: bifrost sends every model id containing "gpt-" to the separate
+// bedrock-mantle endpoint, which needs the bedrock-mantle:CreateInference
+// permission, while a Bedrock credential is normally granted
+// bedrock:InvokeModel only. Converse serves the same models with that grant.
+// Returns "" to stay on bifrost.
+func bedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
+	endpoint, err := bedrockVPCEEndpoint(cred)
+	if err != nil || endpoint != "" {
+		return endpoint, err
+	}
+	if cred.ProviderID != domain.ProviderBedrock || !bedrockMantleModel(bedrockModelID(model, cred)) {
+		return "", nil
+	}
+	public := "https://bedrock-runtime." + bedrockRegion(cred) + ".amazonaws.com"
+	if err := validateBedrockEndpoint(public); err != nil {
+		return "", err
+	}
+	return public, nil
+}
+
+// bedrockMantleModel mirrors bifrost's isMantleModel: the model ids bifrost
+// routes to the bedrock-mantle endpoint instead of bedrock-runtime.
+func bedrockMantleModel(model string) bool {
+	return strings.Contains(model, "gpt-")
+}
+
+// bedrockRegion is the credential's AWS region, us-east-1 when unset (the
+// same default bifrost applies).
+func bedrockRegion(cred domain.Credential) string {
+	if region := credExtra(cred, "region", "aws_region_name"); region != "" {
+		return region
+	}
+	return "us-east-1"
+}
+
 // bedrockModelID resolves the public model id to the provider-specific
 // deployment / inference-profile id when the credential carries a mapping.
 func bedrockModelID(model string, cred domain.Credential) string {
@@ -188,13 +224,7 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		return nil, err
 	}
 
-	streamInput := &bedrockruntime.ConverseStreamInput{
-		ModelId:         input.ModelId,
-		Messages:        input.Messages,
-		System:          input.System,
-		InferenceConfig: input.InferenceConfig,
-		ToolConfig:      input.ToolConfig,
-	}
+	streamInput := converseStreamInput(input)
 
 	client := newBedrockRuntimeClient(cred, endpoint)
 	out, err := client.ConverseStream(ctx, streamInput)
@@ -208,6 +238,20 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		model:         model,
 		paramsDropped: dropped,
 	}, nil
+}
+
+// converseStreamInput carries a built Converse request onto the streaming
+// API, additional model fields included: they hold the thinking block and the
+// structured-output schema.
+func converseStreamInput(input *bedrockruntime.ConverseInput) *bedrockruntime.ConverseStreamInput {
+	return &bedrockruntime.ConverseStreamInput{
+		ModelId:                      input.ModelId,
+		Messages:                     input.Messages,
+		System:                       input.System,
+		InferenceConfig:              input.InferenceConfig,
+		ToolConfig:                   input.ToolConfig,
+		AdditionalModelRequestFields: input.AdditionalModelRequestFields,
+	}
 }
 
 // buildConverseInput reuses the gateway's existing OpenAI->Bifrost parser and
@@ -231,7 +275,10 @@ func (r *BifrostRouter) buildConverseInput(
 		return nil, nil, err
 	}
 
-	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, model)
+	// The family checks read the id the request is dispatched as, the same
+	// one bedrockConverseEndpoint routed on, so a deployment alias of an
+	// OpenAI model maps like the model itself.
+	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, bedrockModelID(model, cred))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,13 +401,27 @@ func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
 // applyResponseFormat writes the output_config block for a json_schema
 // request, refusing the families this endpoint cannot enforce it for.
 func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
-	schema, _, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
+	schema, name, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
 	if !ok {
+		return nil
+	}
+	if bedrockOpenAIStructuredOutputModel(m.model) {
+		// OpenAI models on Converse take the Responses API shape,
+		// text.format. The chat-completions response_format is ignored by
+		// gpt-5.5 and refused by gpt-6 as an unknown parameter.
+		if name == "" {
+			name = "response"
+		}
+		format := map[string]any{"type": "json_schema", "name": name, "schema": schema}
+		if strict, isBool := jsonSchemaStrict(m.params.ResponseFormat); isBool {
+			format["strict"] = strict
+		}
+		m.fields["text"] = map[string]any{"format": format}
 		return nil
 	}
 	if !bfschemas.IsAnthropicModel(m.model) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: this model does not enforce a json_schema on Bedrock (Anthropic models and OpenAI GPT-5 and later do; gpt-oss does not). Remove it, or use one of those models", m.model),
 			"fault":   "customer",
 		})
 	}
@@ -368,6 +429,23 @@ func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
 	// so the schema name the caller sent has nowhere to go.
 	setOutputConfig(m.fields, "format", map[string]any{"type": "json_schema", "schema": schema})
 	return nil
+}
+
+// bedrockOpenAIStructuredOutputModel reports whether an OpenAI model on
+// Bedrock enforces a json_schema sent as text.format. gpt-oss answers it
+// with free text around the JSON, so it is not one of them.
+func bedrockOpenAIStructuredOutputModel(model string) bool {
+	return bedrockMantleModel(model) && !strings.Contains(model, "gpt-oss")
+}
+
+// jsonSchemaStrict reads json_schema.strict when the caller set it.
+func jsonSchemaStrict(rf *interface{}) (bool, bool) {
+	js, isMap := responseFormatJSONSchema(rf)
+	if !isMap {
+		return false, false
+	}
+	strict, isBool := js["strict"].(bool)
+	return strict, isBool
 }
 
 // anthropicMinimumThinkingBudget and bedrockDefaultCompletionMaxTokens
@@ -397,14 +475,7 @@ func setOutputConfig(fields map[string]any, key string, value any) {
 // absent response_format or other types (json_object never reaches this
 // mapper: the parameter policy refuses it on the bedrock lane).
 func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok bool) {
-	if rf == nil {
-		return nil, "", false
-	}
-	m, isMap := (*rf).(map[string]interface{})
-	if !isMap || m["type"] != "json_schema" {
-		return nil, "", false
-	}
-	js, isMap := m["json_schema"].(map[string]interface{})
+	js, isMap := responseFormatJSONSchema(rf)
 	if !isMap {
 		return nil, "", false
 	}
@@ -414,6 +485,20 @@ func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok 
 		return nil, "", false
 	}
 	return schema, name, true
+}
+
+// responseFormatJSONSchema returns the json_schema object of a json_schema
+// response format.
+func responseFormatJSONSchema(rf *interface{}) (map[string]interface{}, bool) {
+	if rf == nil {
+		return nil, false
+	}
+	m, isMap := (*rf).(map[string]interface{})
+	if !isMap || m["type"] != "json_schema" {
+		return nil, false
+	}
+	js, isMap := m["json_schema"].(map[string]interface{})
+	return js, isMap
 }
 
 // mapBedrockMessages splits the neutral Bifrost message list into Bedrock's

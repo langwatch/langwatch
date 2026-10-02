@@ -88,28 +88,42 @@ export function settledToolOutput(result: unknown): string {
 
 export class TurnEventMapper {
   private readonly toolInputs = new Map<string, unknown>();
+  // A text block ended and no tool has started since. The next text delta
+  // opens a new block of the same paragraph run (GPT-5 on the Responses API
+  // sends a commentary message and a final one), so it gets a paragraph
+  // break instead of running into the previous sentence.
+  private textBlockEnded = false;
+  private textInBlock = false;
 
   constructor(private readonly turnId: string) {}
 
+  private mapMessageUpdate(delta: { type?: string; delta?: string } | undefined): WorkerEvent[] {
+    if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
+      const text = this.textBlockEnded ? `\n\n${delta.delta}` : delta.delta;
+      this.textBlockEnded = false;
+      this.textInBlock = true;
+      return [{ type: "delta", turnId: this.turnId, text: boundText({ text }) }];
+    }
+    if (delta?.type === "text_end") {
+      if (this.textInBlock) this.textBlockEnded = true;
+      this.textInBlock = false;
+      return [];
+    }
+    if (delta?.type === "thinking_delta" && typeof delta.delta === "string" && delta.delta !== "") {
+      return [{ type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+    }
+    return [];
+  }
+
   map(event: SessionEventLike): WorkerEvent[] {
     switch (event.type) {
-      case "message_update": {
-        const delta = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
-        if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
-        }
-        if (
-          delta?.type === "thinking_delta" &&
-          typeof delta.delta === "string" &&
-          delta.delta !== ""
-        ) {
-          return [
-            { type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) },
-          ];
-        }
-        return [];
-      }
+      case "message_update":
+        return this.mapMessageUpdate(
+          event.assistantMessageEvent as { type?: string; delta?: string } | undefined,
+        );
       case "tool_execution_start": {
+        this.textBlockEnded = false;
+        this.textInBlock = false;
         const id = stringField(event.toolCallId);
         const name = stringField(event.toolName);
         this.toolInputs.set(id, event.args);
