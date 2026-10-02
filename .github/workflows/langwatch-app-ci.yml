@@ -1208,8 +1208,13 @@ jobs:
           cache: true
           cache-dependency-path: sdks/go/client/go.sum
 
+      # The default cache glob is **/uv.lock, which walks the installed
+      # node_modules tree; name the workspace lockfile instead.
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Regenerate the clients and the docs copy
         run: make sync-all-openapi
