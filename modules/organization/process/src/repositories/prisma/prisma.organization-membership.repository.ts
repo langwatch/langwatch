@@ -35,6 +35,12 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
+import {
+  isActiveAdmin,
+  isAdminDemotion,
+  isAssignableCustomRole,
+  isLastAdmin,
+} from "../../rules/organization-membership.rules.ts";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
 import {
   customRoleFromRecord,
@@ -292,13 +298,13 @@ async function assertNotDemotingLastAdmin({
   role: OrganizationUserRole;
   currentRole: OrganizationUserRole;
 }): Promise<void> {
-  if (role === OrganizationUserRole.ADMIN || currentRole !== OrganizationUserRole.ADMIN) return;
+  if (!isAdminDemotion({ currentRole, role })) return;
   const adminCount = await tx.organizationUser.count({
     where: { organizationId, role: OrganizationUserRole.ADMIN },
   });
   // Handled for the same reason as the disable guard: the tRPC boundary still maps the 400 to
   // BAD_REQUEST, and the REST surface answers the stable code instead of an unknown 500.
-  if (adminCount <= 1) throw new CannotDemoteLastAdminError();
+  if (isLastAdmin({ adminCount })) throw new CannotDemoteLastAdminError();
 }
 
 /** A team role update's own refusals: the Lite seat's cap, and a custom role that must exist. */
@@ -341,7 +347,7 @@ async function assertTeamRoleUpdateAllowed({
       where: { id: teamRoleUpdate.customRoleId },
       select: { organizationId: true, kind: true },
     });
-    if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
+    if (!isAssignableCustomRole({ customRole, organizationId })) {
       throw new NotFoundError("custom_role_not_found", {
         resource: "CustomRole",
         id: teamRoleUpdate.customRoleId ?? "unknown",
@@ -607,7 +613,7 @@ async function planCustomTeamRole({
     where: { id: customRoleId },
     select: { organizationId: true, permissions: true, kind: true },
   });
-  if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
+  if (!isAssignableCustomRole({ customRole, organizationId })) {
     throw new CustomRoleNotAssignableError(customRoleId);
   }
   if (await holdsLiteSeat({ tx, organizationId, userId })) {
@@ -1597,7 +1603,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     member: { role: OrganizationUserRole; disabledAt: Date | null };
   }): Promise<void> {
-    if (member.role !== OrganizationUserRole.ADMIN || member.disabledAt !== null) {
+    if (!isActiveAdmin(member)) {
       return;
     }
     const activeAdmins = await this.prisma.organizationUser.count({
@@ -1607,7 +1613,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         disabledAt: null,
       },
     });
-    if (activeAdmins <= 1) {
+    if (isLastAdmin({ adminCount: activeAdmins })) {
       throw new CannotRemoveLastAdminError();
     }
   }
@@ -1634,10 +1640,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       throw new MemberNotFoundError(userId);
     }
 
-    if (stillAMember.role === OrganizationUserRole.ADMIN && stillAMember.disabledAt === null) {
+    if (isActiveAdmin(stillAMember)) {
       const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
-      if (activeAdmins.length <= 1) {
+      if (isLastAdmin({ adminCount: activeAdmins.length })) {
         throw new CannotRemoveLastAdminError();
       }
     }
@@ -1717,7 +1723,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       if (disabled && member.role === OrganizationUserRole.ADMIN) {
         const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
-        if (activeAdmins.length <= 1) {
+        if (isLastAdmin({ adminCount: activeAdmins.length })) {
           // Handled rather than a TRPCError: the tRPC boundary maps a 400
           // HandledError to BAD_REQUEST anyway, and the REST surface answers
           // the stable code instead of flattening this refusal to an unknown

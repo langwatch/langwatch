@@ -1,8 +1,10 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
+  CustomRoleNotAssignableError,
   MemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
@@ -16,6 +18,13 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
+import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
+import {
+  isActiveAdmin,
+  isAdminDemotion,
+  isAssignableCustomRole,
+  isLastAdmin,
+} from "../../rules/organization-membership.rules.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -610,7 +619,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!row) throw new MemberNotFoundError(input.userId);
     if (input.disabled && row.role === OrganizationUserRole.ADMIN) {
       const activeAdmins = this.activeAdminCount(input.organizationId);
-      if (activeAdmins <= 1) throw new CannotDisableLastAdminError();
+      if (isLastAdmin({ adminCount: activeAdmins })) throw new CannotDisableLastAdminError();
     }
     row.disabledAt = input.disabled ? nowInstant() : null;
     row.updatedAt = nowInstant();
@@ -673,9 +682,22 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
 
-    if (role !== OrganizationUserRole.ADMIN && row.role === OrganizationUserRole.ADMIN) {
-      if (this.activeAdminCount(organizationId, { includeDisabled: true }) <= 1) {
+    if (isAdminDemotion({ currentRole: row.role, role })) {
+      if (
+        isLastAdmin({
+          adminCount: this.activeAdminCount(organizationId, { includeDisabled: true }),
+        })
+      ) {
         throw new CannotDemoteLastAdminError();
+      }
+    }
+    for (const update of effectiveTeamRoleUpdates) {
+      if (!isCustomRole(update.role) || !update.customRoleId) continue;
+      if (!this.isAssignable({ customRoleId: update.customRoleId, organizationId })) {
+        throw new NotFoundError("custom_role_not_found", {
+          resource: "CustomRole",
+          id: update.customRoleId,
+        });
       }
     }
     row.role = role;
@@ -703,6 +725,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const { teamId, userId, role, customRoleId } = input;
     const team = this.memory.teams.get(teamId);
     if (!team) throw new TeamNotFoundError(teamId);
+    if (customRoleId && !this.isAssignable({ customRoleId, organizationId: team.organizationId })) {
+      throw new CustomRoleNotAssignableError(customRoleId);
+    }
     const teamUser = this.memory.teamUsers.find(
       (candidate) => candidate.teamId === teamId && candidate.userId === userId,
     );
@@ -977,6 +1002,17 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return team;
   }
 
+  private isAssignable({
+    customRoleId,
+    organizationId,
+  }: {
+    customRoleId: string;
+    organizationId: string;
+  }): boolean {
+    const customRole = this.memory.customRoles.get(customRoleId) ?? null;
+    return isAssignableCustomRole({ customRole, organizationId });
+  }
+
   private async assertRemovalKeepsAnActiveAdmin({
     organizationId,
     member,
@@ -984,7 +1020,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     member: { role: OrganizationUserRole; disabledAt: Instant | null };
   }): Promise<void> {
-    if (member.role !== OrganizationUserRole.ADMIN || member.disabledAt !== null) return;
-    if (this.activeAdminCount(organizationId) <= 1) throw new CannotRemoveLastAdminError();
+    if (!isActiveAdmin(member)) return;
+    if (isLastAdmin({ adminCount: this.activeAdminCount(organizationId) })) {
+      throw new CannotRemoveLastAdminError();
+    }
   }
 }
