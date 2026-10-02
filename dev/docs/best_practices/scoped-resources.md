@@ -104,7 +104,7 @@ The grouped row's `id` is a stable hash of its non-scope keys (e.g. `${role}::${
 
 ## UI shape: ScopeChipPicker
 
-`ScopeChipPicker` (`modules/authz/browser/src/ui/sections/scope-picker/scope-chip-picker.tsx`) renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it; until it moves into `@langwatch/design-system`, a module that needs it holds a copy under `ui/sections/authz/scope-picker/`. Don't roll a new picker.
+`ScopeChipPicker` (`packages/design-system/src/components/scope-chip-picker.tsx`) renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it from `@langwatch/design-system`. Don't roll a new picker.
 
 The drawer/form that authors a new rule:
 
@@ -196,9 +196,9 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 
 - **Decision record:** `dev/docs/adr/021-multi-scope-targeting-and-tenancy.md`
 - **Shared contract:** `modules/data-retention/contract/src/data-retention.ts` (`ScopeAssignment`, `retentionScopeTypes`, `resolveScopeChain`)
-- **Storage + read grouping:** `modules/model-provider/process/src/transport/api-trpc/model-provider.api.ts` → `getDefaultModelsForProject`
+- **Storage + read grouping:** `modules/model-provider/process/src/transport/model-provider.trpc.ts` → `getDefaultModelsForProject`
 - **Write per-scope:** `modules/model-provider/process/src/services/model-provider-defaults-write.service.ts`
 - **Multi-scope authz:** `modules/gateway/process/src/app/gateway.app.ts` → `assertCanManageAllScopes`
-- **UI primitive:** `modules/authz/browser/src/ui/sections/scope-picker/scope-chip-picker.tsx`
+- **UI primitive:** `packages/design-system/src/components/scope-chip-picker.tsx`
 - **Cascade-FK variant:** `GatewayBudget` model in `prisma/schema.prisma`
 - **Spec:** `specs/model-providers/role-based-default-models.feature`

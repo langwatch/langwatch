@@ -1,6 +1,6 @@
 ---
 name: backend
-description: "Everything on the Node side of a LangWatch module: composing a process (apps/api, apps/worker, apps/tasks), Server/createApp/boot, a module's process-half shape, the four-way rule for what a module may demand, declaring REST endpoints and tRPC procedures, the worker role (drain order, eventing pipelines, jobs, subscribers, at-least-once/per-aggregate-ordering), building a new process module end to end, and backend testing (colocated __tests__, installation tests through the createApp chain, spec-scenario binding, asserting on error code). Use whenever someone is: composing or wiring a process; writing or extending a module's process/ package; hitting a boot() refusal or a MissingSupply error; adding a REST route or tRPC procedure; adding a scheduled job, subscriber or projection; creating a brand-new module's process half; or writing/reviewing a unit or integration test for backend code."
+description: "Everything on the Node side of a LangWatch module: composing a process (apps/api, apps/worker, apps/tasks), Server/createApp/boot, a module's process-half shape, the four-way rule for what a module may demand, declaring REST endpoints and tRPC procedures, the worker role (drain order, eventing pipelines, jobs, subscribers, at-least-once/per-aggregate-ordering), building a new process module end to end, and backend testing (colocated __tests__, installation tests through the createApp chain, spec-scenario binding, asserting on error code). Use whenever someone is: composing or wiring a process; writing or extending a module's process/ package; hitting a boot() refusal; adding a REST route or tRPC procedure; adding a scheduled job, subscriber or projection; creating a brand-new module's process half; or writing/reviewing a unit or integration test for backend code."
 user-invocable: true
 argument-hint: "<question or backend task>"
 ---
@@ -27,7 +27,7 @@ const stores = await openStores(server.config.stores, server.resources);
 await createApp({ role: "api", server })
   .withModules(processModules)          // generated from modules/catalogue.json
   .withConfig(server.config.modules)
-  .withStores(stores)                   // the one supply call — never per-store with*
+  .withStores(stores)                   // the one store call; never per-store with*
   .withTransportAuth((a) => a.withStaticTokens({...}).withBrowserSession(session))
   .boot();
 await server.serve({ port: server.config.process.port, static: uiBundle() });
@@ -38,9 +38,9 @@ from supplied stores, validate `requires` against what was supplied (refusal
 at boot, **by name**: `"webhook needs clickhouse; none supplied"`), build
 repositories, resolve peers by token, slice config, call
 `<Name>Module.create(...)`, then collect what the role wants (api → REST/tRPC/
-SSE/command senders; worker → jobs/subscriptions/projections). An unsupplied
-declared requirement is `MissingSupply<...>`, a **compile** refusal naming the
-whole outstanding set — never a runtime fallback. The `processModules` list is
+SSE/command senders; worker → jobs/subscriptions/projections). The container
+answers only stores and peers; every other "is it here?" is the module's own
+answer (§3.3 rule 4), never a runtime fallback. The `processModules` list is
 generated (`pnpm generate:modules`) from `modules/catalogue.json`; installing
 a module edits the catalogue, never `main.ts`. **The root never grows** — a
 change that needs it to grow found a gap in the primitives; report the gap.
@@ -79,7 +79,8 @@ implementations, a memory twin, `{ live, memory }` registry), `eventing/`
 (the pipeline, §9), `transport/` (declarations only, §8), `rules/` (pure, no
 I/O). No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
 `domain/`. A raw client crosses into a module in exactly one place — a
-registry or channel factory's `create(members)`.
+registry or channel factory's `create()`, which arrives with its stores
+resolved (record §5). There are no members (§3.3).
 
 ## The four-way rule (record §3.3) — what a module may demand
 
@@ -92,9 +93,10 @@ registry or channel factory's `create(members)`.
    own declared config schema (record §6); the process values the slice.
    Module code never reads `process.env`.
 4. **An availability decision** (a capability this deployment may not have) →
-   a declared supply token the process answers with one `.provide({...})`
-   line, or `boot()` refuses to compile. A module never defaults its own
-   availability.
+   the module decides it from its own config and secrets, and its public
+   config projects the answer to the browser. Off refuses by name with a
+   stable code, or is a visible state; never a silent absence. Nothing
+   outside the module answers it (no supply tokens, no `.provide`).
 
 If a need does not fit one of the four, it is an architecture decision — stop
 and say so; do not invent a fifth path (an optional constructor argument, a

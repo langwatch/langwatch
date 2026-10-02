@@ -48,9 +48,10 @@ When a lower one disagrees with a higher one, the lower one is the defect
 
 A skill marked planned or future may not exist yet (check the skill list). Until it does, `backend`
 and `frontend` still cover that ground (partly stale; the record wins).
-Dependency injection (members, `Secret.load`, supply tokens, capabilities,
-entitlements) is deliberately not taught in wave-1 skills: it is under review.
-Read §3.3 and ADR-147/148 directly and ask before inventing a shape.
+Members and supply tokens are deleted (§3.3, §15): a module class receives
+repositories, channels, peers, config and secrets, and decides its own availability.
+For `Secret.load`, capabilities and entitlements read §3.3 and §6 directly and ask
+before inventing a shape.
 
 ## Rules for using the record
 
@@ -97,7 +98,7 @@ Read §3.3 and ADR-147/148 directly and ask before inventing a shape.
 - **Treating §16's left column as the tree.** It is the target; check the tree.
 - **Copying `app/<f>-composition.build.ts` into a new module.** The grammar
   calls it the ported composition a converted module still carries; it only
-  shrinks. `modules/monitor` and `modules/organization` also keep `app/<f>.app.ts`.
+  shrinks, and §15 lists it as deleted (§5).
 - **Citing a deleted ADR or skill reference.** Composition ADRs before 147/148
   are historical (§17).
 - **Skipping the specs.** If no scenario covers the task, write one first,
@@ -108,10 +109,10 @@ Read §3.3 and ADR-147/148 directly and ask before inventing a shape.
 Prefer the tree for names and the linter for rules; report, do not fix a record
 you do not own. Current list:
 
-- §1 (R4) has each app carry its own generated module list; W5 is landing it, so
-  a tree still holding `installed-*` packages is conversion debt.
-- §4 says an app has no config file; `apps/{api,worker,tasks}/src/config.ts` exist.
-- §3 says each module has a root `feature.json`; none does.
+- §3.2/§5 put the module class in `<f>.module.ts`; most modules still keep it in
+  `app/<f>.app.ts`, the grammar accepts it, and §16 has no row yet (awaiting a ruling).
+- `useReleaseFlag` (§3.4, §10.1) is the target; code spells `useFeatureFlag`, no §16 row.
+- `requestDelivery` (ADR-167, §9) has no code hits and no §16 row naming today's spelling.
 
 ## Links
 

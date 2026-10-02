@@ -127,6 +127,6 @@ User-facing copy describes what the customer gets, never how the work is done
 - Functional `refetchInterval` idiom: `src/features/traces-v2/hooks/useTraceFacets.ts`
 - `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
 - Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`, and its
-  package copy `modules/dataset/browser/src/ui/sections/dataset-editor-table.tsx`
+  package copy `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
 - Server not-ready mapping: `src/server/api/routers/datasetRecord.ts`
 - Architecture: ADR-032 (`dev/docs/adr/032-datasets-s3-jsonl.md`), Decision 6 / I-READY.

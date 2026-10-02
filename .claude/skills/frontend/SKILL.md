@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), capabilities vs components (browser-host vs design-system), where shared code goes now that kits are gone (record §3.4), building a new browser module end to end (defineBrowserModule, screens, drawers, publications, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads session/navigation without importing the router or browser-host directly; sharing a component, hook or data with another module (design system, contract, `<name>-client`); or writing/reviewing a component test."
+description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), host services vs components (browser-host vs design-system), where shared code goes now that kits are gone (record §3.4), building a new browser module end to end (defineBrowserModule, screens, drawers, lends, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads session/navigation without importing the router or browser-host directly; sharing a component, hook or data with another module (design system, contract, `<name>-client`); or writing/reviewing a component test."
 user-invocable: true
 argument-hint: "<question or frontend task>"
 ---
@@ -42,15 +42,15 @@ nests: `features/<name>/` repeats `model/behavior/ui` inside itself, and a
 feature that is one component is a section, not a feature — behaviour lives
 in the feature that owns it, not a package-wide `behavior/` bucket every
 feature reaches into. A screen declares a `*HostApi` (`model/<name>-host.ts`)
-the **shell** implements from `@langwatch/browser-host` capabilities — a
+the **shell** implements from `@langwatch/browser-host` host services — a
 screen component never imports `browser-host` or a router itself, and an
 unmounted `*HostApi` is refused by `createUi` at install, by name, before any
 component renders. The whole half is declared once, with `defineBrowserModule`
-(screens, drawers, publications, mounts, capabilities), and the package's
+(screens, drawers, lends, mounts, capabilities), and the package's
 `exports` map lists that declaration and nothing else — `surfaces/` and
 `screens/` are deleted browser folders (record §15). A module capability the
 composition root needs (not a screen) travels through the same declaration's
-capability slot, never a side-door export. The generated `browserModules`
+`.withCapabilities(...)` entry, never a side-door export. The generated `browserModules`
 list installs the declaration, the same way `processModules` are generated
 for the backend — no hand-written file in `apps/ui` names either list.
 
@@ -63,18 +63,18 @@ that says so until that module's own contract declares it.
 ## Drawers are routed singletons, not local state
 
 Drawers are URL-routed singletons with a navigation stack, opened through the
-host capability and registered through the declaration — never mounted with
+host service and registered through the declaration — never mounted with
 `useState`/`useDisclosure` from inside another drawer. A sub-flow navigates
-(`openDrawer("target", { onSuccess, onClose: goBack })`); pass `onClose`,
+(`openDrawer(Token, { onSuccess, onClose: goBack })`, the token declared once by
+the drawer's owner, §10.1; `navigateToDrawer` is the address door); pass `onClose`,
 never let the target call `closeDrawer` directly (it clears the whole stack);
 keep the caller's draft in a store that survives its own unmount. Full detail:
-`dev/docs/ARCHITECTURE.md` §10 and `dev/docs/best_practices/drawers.md`.
+`dev/docs/ARCHITECTURE.md` §10 and §10.1.
 
-## Capabilities versus components
+## Host services versus components
 
-`browser-host` is capabilities only — session, navigation, storage, feature
-flags, toasts, slots, drawers — the browser analogue of a process's closed
-members; it carries no component. Components live in `design-system`. Read the
+`browser-host` holds host services only (session, navigation, storage,
+toasts, drawers); it carries no component. Components live in `design-system`. Read the
 `design-system` skill and the relevant
 `dev/docs/best_practices/*.md` pattern doc before building any non-trivial
 screen, list, drawer or settings page — extend the existing pattern rather
@@ -82,7 +82,7 @@ than inventing a new one.
 
 The reverse direction — a module's own capability implementation that the
 **composition root** needs, e.g. `apps/ui/src/main.tsx` — is not a side-door
-export (§3.4 shuts that): it travels through the declaration's capability slot.
+export (§3.4 shuts that): it travels through the declaration's `.withCapabilities(...)`.
 
 ## No kits (record §3.4) — when a different module needs a piece of yours
 
@@ -130,7 +130,6 @@ src/testing.tsx             Stub<Name>Host + render harness
 export default defineBrowserModule("<name>")
   .withScreens({ <name>s: () => import("./ui/sections/<name>s-screen.tsx") })
   .withDrawers({ ... })         // if any
-  .withPublications({ ... })    // if another module reads a slot from this one
   .withHosts({ requires: [...], mounts: [...] })  // *HostApi names read/provided —
                                 // an unmounted one is refused by createUi at install
   .withCapabilities({ ... });   // if the composition root needs an impl this module owns

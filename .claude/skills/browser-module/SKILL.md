@@ -75,14 +75,15 @@ secret comes back only from a mutation. A mutation writes the entity with
 
 - **Importing a router, `browser-host` internals or another module's browser
   package from a screen.** Read host services through their tokens
-  (`useLent`, `useUiDeployment`, `useDrawer`) or the module's `*HostApi`, which
+  (`useLent`, `useUiDeployment`, `openDrawer(Token, props)`) or the module's `*HostApi`, which
   the shell implements. An unmounted `*HostApi` is refused at install, by name.
 - **A `queryFn` that re-enters the cache under its own key** hangs the query
   for the life of the page (§10, by-path dispatch).
 - **Sharing by `./surfaces/*` or `./screens/*` exports.** Deleted spellings (§15).
 - **`useFeatureFlag`, slots, `withCapabilities` for a peer lend, `useDrawer`
-  by bare name.** All in §15. Use `useReleaseFlag`, a lent component (§10.1) and
-  the owner's drawer by name. Not all landed in the tree yet: check §16.
+  by bare name.** All in §15. Use a lent component (§10.1), `openDrawer(Token, props)`
+  with the owner's drawer token (`navigateToDrawer` is the address door) and
+  `useReleaseFlag`, a target with no code yet (today `useFeatureFlag`; no §16 row).
 - **Host services are not "capabilities".** §3.5 reserves that word for the
   four layers; §16 renames the browser-host list to host services.
 - **A banner, toast or fatal error built by hand.** Use the design system and

@@ -250,14 +250,13 @@ The service stops trusting its callers and starts requiring proof.
 scope argument typed by the permission's registry tiers — one id, at a tier
 the permission is grantable at, or the call does not compile.
 
-A route or service that only needs one project-scoped permission and does not
-want to depend on the whole `AuthzService` can instead take a narrower
-`requireProjectPermission(args)` / `probeProjectPermission(ctx, id, permission)`
-capability as an injected port — several feature packages' REST/tRPC
-transports do this (e.g. `modules/stored-object/process/src/transport/api-rest/stored-object.api.ts`,
-`modules/dataset/process/src/transport/api-trpc/dataset.api.ts`).
-The composition root wires that port to `authz.authorizeProjectPermission` /
-`authz.hasPermission` — it is the same check, named narrowly at the call site.
+A service that only needs one project-scoped permission takes authz as a
+peer: the `AuthzApi` token in its module's `static dependencies`
+(ARCHITECTURE.md §3.3; `stored-object.app.ts` does this). To refuse, call
+`authorizeProjectPermission`; it throws on denial and mints no witness, so
+use `authorizePermission` where a method takes `Authorized`. `hasPermission`
+is a `probe` (below). Pass the project that owns the resource, never an id
+read from the request alone.
 
 ### `probe*` — the deliberate boolean
 
@@ -332,7 +331,7 @@ Whatever the declaration kind — declared, custom, or opted out — a runtime
 guard in front of it refuses any request whose input carries scope ids that
 do not all resolve to one organization
 (`AuthzService.checkScopeLineage`, adapted by
-`apps/api/src/api-request.policy.ts`). The
+`packages/api/src/access/access.ts` and `packages/api/src/trpc/policy.ts`). The
 declaration sweep closes tier-shadowing
 statically, but only for declarations it can see through; this guard removes
 the exploit's precondition everywhere instead — a check passing on your own
@@ -353,8 +352,8 @@ carrying at most one scope id costs nothing.
   Witness minting is private to the concrete `AuthzService`; application code
   receives witnesses through `authorize`, it never mints them.
 - `packages/api/src/access-policy.ts` — the imperative `requires*` helpers.
-- `apps/api/src/app-trpc/app-trpc.policy.ts` — the API process's own
-  declaration policy chain; `@langwatch/api/trpc` owns generic root creation.
+- `packages/api/src/trpc/policy.ts` — the policy chain every tRPC procedure
+  runs through: declared checks and the scope-lineage guard.
 - `packages/api` — the service framework and its boot checks.
 - `specs/rbac/typed-permission-declarations.feature` — the behavioural
   contract; every guarantee above is a bound scenario.

@@ -1,11 +1,11 @@
 # Testing speed
 
 Every `vitest.config.ts` in the workspace goes through one helper,
-`packages/test-harness/src/vitest-config.ts`. A package's own config says only
+`packages/vitest-config/src/vitest-config.ts`. A package's own config says only
 what is different about that package; the speed options are declared once.
 
 ```ts
-import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vitest-config.ts";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "node",
@@ -150,10 +150,9 @@ to:
 "test:unit": "NODE_COMPILE_CACHE=node_modules/.node-compile-cache vitest run --exclude \"**/*.integration.test.ts\""
 ```
 
-One place is better than 126: setting `NODE_COMPILE_CACHE` once in
-`dev/scripts/check-queue.mjs`'s environment, or in the root `package.json`'s
-`test` fanout, covers every package without touching a manifest. Do not set it
-in a `test:coverage` script.
+One place is better than 126: setting `NODE_COMPILE_CACHE` once in the root
+`package.json`'s `test` fanout covers every package without touching a
+manifest. Do not set it in a `test:coverage` script.
 
 ## Sharding
 

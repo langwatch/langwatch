@@ -27,7 +27,8 @@ component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
   `*HostApi` implemented from `@langwatch/browser-host`, never the router
   directly. The tRPC client is derived from the contract, never hand-written.
 - **Drawers** are URL-routed singletons with a navigation stack. A sub-flow
-  navigates (`openDrawer("target", { onSuccess, onClose: goBack })`); never
+  navigates (`openDrawer(Token, { onSuccess, onClose: goBack })`, the owner's
+  drawer token, §10.1); never
   mount a drawer inside another drawer.
 - **No kits** (§3.4): code repeated within a module stays there; across modules it
   goes to the design system (props or a query result, never fetches), pure domain
