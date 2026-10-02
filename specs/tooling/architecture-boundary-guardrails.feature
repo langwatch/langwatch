@@ -24,3 +24,15 @@ Feature: Architecture repair instructions appear at the failing boundary
     Given a private repository implementation uses a type utility internally
     When architecture lint runs
     Then the signature boundary rule does not report that technical implementation
+
+  @unit
+  Scenario: pnpm's catalog protocol resolves against the workspace catalogue before the retired-runtime check reads it
+    Given a feature package that declares a dependency through pnpm's catalog protocol
+    When the retired-runtime check reads its range
+    Then the range is resolved from the workspace catalogue first
+
+  @unit
+  Scenario: A ratchet whose inventory reached zero becomes a plain refusal
+    Given a service over its ceiling with no per-file inventory left to raise it
+    When the service-ceiling check runs
+    Then the service is refused

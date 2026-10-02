@@ -807,3 +807,9 @@ Feature: Running system migrations across organizations
     When an operator asks for a pass now
     Then the page is told the pass started
     And the failure is logged rather than answered
+
+  @unit
+  Scenario: A finite held migration prevents startup
+    Given a migration that stays held through the bounded startup polls
+    When startup waits for migrations to converge
+    Then startup is refused for lack of progress

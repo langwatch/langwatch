@@ -80,3 +80,8 @@ Feature: The composed-exports lint rule
     Given a contract package exporting a service the applications never build
     When the composed-exports rule runs over the workspace
     Then it reports nothing for that service
+
+  @unit
+  Scenario: A composed-exports finding names a file that exists on disk
+    When the composed-exports rule reports a finding
+    Then the path resolves against the workspace root, not the enforcer's own package

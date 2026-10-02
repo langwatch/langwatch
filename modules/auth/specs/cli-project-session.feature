@@ -80,3 +80,10 @@ Feature: A project login is a person's session capped at one project
     When it issues a project session and later refreshes it
     Then auth mints a session locked to that project and rotates it into a new pair
     And a refresh token auth never issued is answered "invalid_grant"
+
+  @unit
+  Scenario: `langwatch login --project <slug>` resolves the key through the device session, no browser
+    Given a signed-in device session
+    When `langwatch login --project <slug>` runs
+    Then the project's key is resolved through the session and written to .env
+    And no browser is opened

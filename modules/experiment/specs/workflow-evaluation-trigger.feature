@@ -52,3 +52,9 @@ Feature: A workflow evaluation is requested by the api and run by the worker
     When an evaluation is triggered
     Then the request is sent once and the run id answered at once, without waiting for the worker
     And the run's start is recorded with its requested total, so a poll reads it running, not missing
+
+  @unit
+  Scenario: A run's queued payload never carries a resolved secret
+    When a workflow evaluation run is queued
+    Then the queued payload carries the version's id and parameters
+    And never the graph or any secret

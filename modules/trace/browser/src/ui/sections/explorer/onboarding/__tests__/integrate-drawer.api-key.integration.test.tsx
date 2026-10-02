@@ -70,7 +70,7 @@ afterEach(() => {
 
 describe("IntegrateDrawer tokens", () => {
   describe("when the reader creates a token for .env and another on the MCP tab", () => {
-    /** @scenario The traces integrate screens mint an ingestion token for .env and a reads token for MCP */
+    /** @scenario The traces integrate drawer mints an ingestion token for .env and a reads token for MCP */
     it("mints ingestion only for .env and project reads only for the MCP config", async () => {
       renderWithDesignSystem(<IntegrateDrawer open onOpenChange={vi.fn()} />);
 

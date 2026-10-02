@@ -144,3 +144,9 @@ Feature: Shared organization service
     Given a process supplies a named logger to the organization service
     When the service reports a personal-workspace diagnostic
     Then the logger receives the context and the message in its own argument order
+
+  @integration
+  Scenario: A member's organization listing leaves out the hidden governance project
+    Given an organization holding its hidden governance project beside an application project
+    When a member's organizations are listed with their projects
+    Then the governance project is not among them

@@ -289,10 +289,7 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("retired-package-runtime");
   });
 
-  /**
-   * @scenario "pnpm's catalog protocol resolves against the workspace
-   * catalogue before the retired-runtime check reads it"
-   */
+  /** @scenario "pnpm's catalog protocol resolves against the workspace catalogue before the retired-runtime check reads it" */
   it("accepts the repository Zod 4 range declared through pnpm's catalog protocol", () => {
     write("pnpm-workspace.yaml", "catalog:\n  zod: ^4.4.3\n");
     featurePackage({

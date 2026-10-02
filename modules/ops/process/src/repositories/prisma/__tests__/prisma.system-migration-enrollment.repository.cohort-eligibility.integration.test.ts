@@ -147,8 +147,7 @@ describe.skipIf(!DB_URL)("given organizations of every eligibility kind", () => 
       expect(poolIds.has(excludedOrgId)).toBe(false);
     });
 
-    /** @scenario "A later step's cohort samples only organizations enrolled
-     * for the step before it" */
+    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
     it("narrows to the predecessor's enrollment when one is named", async () => {
       const laterStep = `${MIGRATION}-later`;
       // Only the organization already enrolled for MIGRATION (the

@@ -110,3 +110,9 @@ Feature: Model Provider service
     Then the check is refused as having no key, and nothing is sent
     And checking against the saved base URL uses the stored key
     And the deployment's own key is only checked against the provider's default endpoint
+
+  @unit
+  Scenario: A credential probe is refused for a caller who cannot write the tenant
+    Given a caller without write access to the tenant
+    When they ask for a credential probe
+    Then it is refused before anything leaves the process

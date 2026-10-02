@@ -75,3 +75,9 @@ Feature: Enterprise SSO package boundary
     When the server builds its generic OAuth provider
     Then the account issuer is pinned to the provider's stored local namespace
     And not to the issuer the provider's discovery document names
+
+  @unit
+  Scenario: Setting up a SAML connection is not something anybody does themselves yet
+    When a SAML connection is registered through the SSO connection procedure
+    Then the registration is handed to the ledger
+    And the ledger refuses it by name

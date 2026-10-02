@@ -119,3 +119,9 @@ Feature: Projection replay from the operator console
     Given data retention refuses to answer a tenant's retention
     When a replay rebuilds that tenant's rows
     Then the refusal fails the run rather than stamping a default
+
+  @unit
+  Scenario: The api lists the projections and subscribers the worker runs
+    Given the api registers its pipelines for commands only
+    When the projections and subscribers are listed
+    Then the list carries the consume side the worker runs

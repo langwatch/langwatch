@@ -149,7 +149,7 @@ describe.skipIf(!DB_URL)(
         expect(projectIds).toContain(applicationProject.id);
       });
 
-      /** @scenario Lane-B test suite asserts every Project consumer filters */
+      /** @scenario A member's organization listing leaves out the hidden governance project */
       it("filters out the internal_governance project", async () => {
         const orgs = await repository.findAllForUser({
           userId: testUser.id,

@@ -151,3 +151,9 @@ Feature: PostHog product milestones
     Given nurturing composed its PostHog channel
     When two milestones are tracked
     Then the targets were read once, on the first
+
+  @unit
+  Scenario: PostHog signed_up still fires when the signup is unverified
+    Given a sign-up whose address is not yet verified, so organization admission is skipped
+    When the user is created
+    Then signed_up is still tracked

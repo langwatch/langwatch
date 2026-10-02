@@ -19,3 +19,9 @@ Feature: Guided onboarding reads and settles the organization's guided state
     Given a project API key bound to a user
     When it reads the guided onboarding state
     Then the state is read for the key's organization and user
+
+  @unit
+  Scenario: the kickoff greets the reader by their first name
+    Given the reader's full name
+    When the tour kickoff is written
+    Then it greets them by the first word of their name

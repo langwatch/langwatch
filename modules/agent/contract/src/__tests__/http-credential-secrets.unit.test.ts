@@ -162,7 +162,7 @@ describe("a credential typed into an HTTP node", () => {
   });
 
   describe("when a node's parameters are stored", () => {
-    /** @scenario A token typed into an HTTP node is stored as a project secret and never read back */
+    /** @scenario A token typed into an HTTP agent is stored as a project secret and never read back */
     it("replaces each literal credential with a reference to a project secret", async () => {
       const { reference, values } = secretStore();
 
@@ -179,7 +179,9 @@ describe("a credential typed into an HTTP node", () => {
         { identifier: "headers", value: { "X-Env": "prod", "X-Api-Key": "key_literal" } },
       ]);
 
-      expect(read).toEqual([{ identifier: "headers", value: { "X-Env": "prod", "X-Api-Key": "" } }]);
+      expect(read).toEqual([
+        { identifier: "headers", value: { "X-Env": "prod", "X-Api-Key": "" } },
+      ]);
 
       expect(stored).toEqual([
         { identifier: "url", value: "https://partner.example" },
@@ -213,7 +215,7 @@ describe("a credential typed into an HTTP node", () => {
       expect(created).toEqual([]);
     });
 
-    /** @scenario A token typed into an HTTP node is stored as a project secret and never read back */
+    /** @scenario A token typed into an HTTP agent is stored as a project secret and never read back */
     it("stores and blanks the credential inside an auth dict parameter", async () => {
       const { reference, values } = secretStore();
       const parameters = [{ identifier: "auth", value: { type: "bearer", token: "tok_dict_123" } }];

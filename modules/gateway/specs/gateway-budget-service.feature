@@ -53,3 +53,16 @@ Feature: Gateway budget decision service
     Given a budget whose period is reset
     When the reset answers with the row it moved
     Then the answer carries no scope_reach field
+
+  @unit
+  Scenario: A per-member overview refuses a caller outside the organization
+    Given a caller who is not a member of the organization
+    When they ask for the per-member budget overview
+    Then the answer reports no gateway access
+    And the organization's keys and budgets are never read
+
+  @unit
+  Scenario: A member's overview reads only their own organization's budgets
+    Given a member of the organization
+    When they ask for the budget overview
+    Then the answer reports access and the budget read is scoped to that organization

@@ -452,3 +452,9 @@ Feature: Workflow service boundary
     And a graph that names that secret
     When Workflow prepares a Studio run for the project
     Then the run is refused with the handled code secret_unreadable
+
+  @unit
+  Scenario: A workflows-only key cannot start a run it could not read
+    Given a key that can trigger workflows but not read the workflow
+    When it starts a run
+    Then it is refused before the trigger is reached

@@ -284,3 +284,19 @@ Feature: visualdiff boots its stacks through haven
       Given haven has written its own fatal line to a stack's log and does not report the stack live
       When the run waits for that stack
       Then it fails on that line straight away, with the log tail, instead of waiting out the boot timeout
+
+  @unit
+  Scenario: A run allocates two Redis databases that cannot collide with a developer's own stack
+    When a run allocates its Redis databases
+    Then it never picks database zero, a haven-registered database or one holding keys
+
+  @unit
+  Scenario: If haven is not on PATH the registry step is skipped
+    Given haven is not on PATH
+    When a run allocates its Redis databases
+    Then the haven registry is not consulted
+
+  @unit
+  Scenario: A flow's mail step reads the side's own mail sink
+    When a flow's mail step runs against a side
+    Then it reads the mail service on that side's own app hostname

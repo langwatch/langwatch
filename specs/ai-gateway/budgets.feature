@@ -870,3 +870,17 @@ Feature: AI Gateway — Budgets
     Then the config is returned within the spend read deadline plus overhead
     And the budget ships its stored spend
     And the abandoned spend read is cancelled
+
+  # Budget detail page: the scope target and ledger status come off the wire as
+  # read; the page renders what it is given rather than assuming a narrower shape.
+  @integration
+  Scenario: A budget whose scope target cannot be named still opens
+    Given a budget whose scope target is no longer resolvable
+    When a manager opens the budget's detail page
+    Then the page shows the budget's raw scope id in place of the target name
+
+  @integration
+  Scenario: A ledger line with an unrecognised status is still listed
+    Given a budget with a recent debit whose status the page does not know
+    When a manager opens the budget's detail page
+    Then the debit is listed with its status shown as written
