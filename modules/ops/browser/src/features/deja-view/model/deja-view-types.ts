@@ -1,10 +1,6 @@
-export type AggregateResult = {
-  aggregateId: string;
-  aggregateType: string;
-  tenantId: string;
-  eventCount: number;
-  lastEventTime: string;
-};
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
+
+export type AggregateResult = AggregateSearchResult;
 
 export type EventResult = {
   eventId: string;

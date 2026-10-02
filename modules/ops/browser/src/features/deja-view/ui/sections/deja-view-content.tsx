@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { OpsEventSubscriberRegistration } from "@langwatch/ops-contract";
 import { Eye, Info } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -28,12 +29,6 @@ type Projection = {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
-};
-type EventSubscriber = {
-  subscriberName: string;
-  pipelineName: string;
-  aggregateType: string;
-  eventTypes: readonly string[];
 };
 
 /** What stands in for the tape while it loads, fails, or comes back empty. */
@@ -231,7 +226,7 @@ export function DejaView({
   showEventDetail: boolean;
   showDiff: boolean;
   matchingProjections: Projection[];
-  matchingEventSubscribers: EventSubscriber[];
+  matchingEventSubscribers: OpsEventSubscriberRegistration[];
   projectionState: unknown;
   previousProjectionState: unknown;
   projectionStateLoading: boolean;

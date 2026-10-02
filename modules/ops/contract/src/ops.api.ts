@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/module";
 import type { SearchProjectsResult } from "@langwatch/project-contract";
+import type { z } from "zod";
 
 import type {
   AdminImpersonationStarted,
@@ -46,6 +47,7 @@ import type {
   AggregateProcessManager,
   DeadLetterCount,
   DeadOutboxMessageView,
+  opsListProcessInstancesInputSchema,
   OutboxAttemptView,
   ProcessAuditEntryView,
   ProcessFleetSummary,
@@ -56,12 +58,16 @@ import type {
 } from "./ops-process.ts";
 import type {
   OpsBlockedSummary,
+  opsListParkedQueueGroupsInputSchema,
+  opsListQueueGroupJobsInputSchema,
+  opsListQueueGroupsInputSchema,
   OpsParkedGroupsPage,
   OpsParkedTenantsPage,
   OpsQueueDlqGroup,
   OpsQueueDlqGroupWithQueue,
   OpsQueueDrainPreview,
   OpsQueueGroupsPage,
+  opsQueueGroupInputSchema,
   OpsQueueJobsPage,
   OpsQueueReconcileOutcome,
   QueueInfo,
@@ -140,12 +146,7 @@ export type GetDeadLettersResult = {
   byProcess: DeadLetterCount[];
 };
 
-export type GetInstancesInput = {
-  processName?: string;
-  page: number;
-  pageSize: number;
-  search?: string;
-};
+export type GetInstancesInput = z.infer<typeof opsListProcessInstancesInputSchema>;
 
 export type GetInstancesResult = { instances: ProcessInstanceRow[]; total: number };
 
@@ -257,27 +258,13 @@ export type ReadQueuePendingDriftInput = { queueNames: string[] };
 
 export type ListPausedSchedulesResult = { schedules: OpsScheduledJob[]; total: number };
 
-export type ListQueueGroupsInput = {
-  queueName: string;
-  page: number;
-  pageSize: number;
-};
+export type ListQueueGroupsInput = z.infer<typeof opsListQueueGroupsInputSchema>;
 
-export type FindQueueGroupInput = { queueName: string; groupId: string };
+export type FindQueueGroupInput = z.infer<typeof opsQueueGroupInputSchema>;
 
-export type ListQueueGroupJobsInput = {
-  queueName: string;
-  groupId: string;
-  page: number;
-  pageSize: number;
-};
+export type ListQueueGroupJobsInput = z.infer<typeof opsListQueueGroupJobsInputSchema>;
 
-export type ListParkedQueueGroupsInput = {
-  queueName: string;
-  tenantId: string;
-  page: number;
-  pageSize: number;
-};
+export type ListParkedQueueGroupsInput = z.infer<typeof opsListParkedQueueGroupsInputSchema>;
 
 export type UnblockQueueGroupInput = {
   queueName: string;

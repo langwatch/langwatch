@@ -1,5 +1,5 @@
 import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
-import type { OpsScheduledJob } from "@langwatch/ops-contract";
+import type { OpsScheduledJob, ProcessWakeRow } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
@@ -15,12 +15,7 @@ interface TimedWorkRow {
   dueAtMs: number;
 }
 
-export interface UpcomingProcessWake {
-  processName: string;
-  projectId: string;
-  processKey: string;
-  nextWakeAt: number;
-}
+export type UpcomingProcessWake = ProcessWakeRow;
 
 function describeDue(dueAtMs: number, now: number): string {
   const deltaMs = dueAtMs - now;

@@ -1,11 +1,6 @@
-import type { PipelineNode } from "@langwatch/ops-contract";
+import type { OpsEventSubscriberRegistration, PipelineNode } from "@langwatch/ops-contract";
 
-export interface SubscriberMeta {
-  subscriberName: string;
-  pipelineName: string;
-  aggregateType: string;
-  eventTypes: readonly string[];
-}
+export type SubscriberMeta = OpsEventSubscriberRegistration;
 
 export interface SubscriberHealthRow extends SubscriberMeta {
   pending: number;
