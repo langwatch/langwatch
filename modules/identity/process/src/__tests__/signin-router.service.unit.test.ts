@@ -178,6 +178,19 @@ describe("SignInRouterService", () => {
       });
     });
 
+    it("asks about the account when neither side routes the domain", async () => {
+      const { service, findAccountMethods } = build({
+        projectedByDomain: { ...ACME, state: "INACTIVE" },
+        legacyByDomain: null,
+        account: null,
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(findAccountMethods).toHaveBeenCalledWith({ normalizedValue: "sam@acme.com" });
+      expect(decision.outcome).toBe("route_to_signup");
+    });
+
     /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
     /** @scenario An organization signing in through the mounted provider today is still sent to it */
     it("uses the legacy domain when no connection is projected", async () => {
@@ -193,6 +206,21 @@ describe("SignInRouterService", () => {
       expect(findLegacyConnectionForDomain).toHaveBeenCalledWith({
         domain: "acme.com",
       });
+    });
+  });
+
+  describe("when the projected connection is suspended and a legacy row names the domain", () => {
+    it("routes by the suspension and never reads the legacy row", async () => {
+      const { service, findLegacyConnectionForDomain } = build({
+        projectedByDomain: { ...ACME, state: "SUSPENDED" },
+        legacyByDomain: { ...ACME, connectionId: "legacy" },
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(decision.outcome).not.toBe("redirect_to_connection");
+      expect(decision.reasonCode).toBe("connection_suspended");
+      expect(findLegacyConnectionForDomain).not.toHaveBeenCalled();
     });
   });
 

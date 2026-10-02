@@ -211,7 +211,7 @@ export class SignInRouterService {
 
       const legacy = (await this.legacy?.findLegacyConnectionForDomain({ domain })) ?? null;
 
-      return { domainConnection: legacy ?? projected ?? null, activeConnections: [] };
+      return { domainConnection: legacy, activeConnections: [] };
     }
 
     const projectedActive = await this.domains.findActiveConnections();
