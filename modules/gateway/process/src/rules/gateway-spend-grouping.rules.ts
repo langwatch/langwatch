@@ -10,7 +10,7 @@ import {
   type SpendGroupByKey,
 } from "@langwatch/gateway-contract";
 
-import { type GatewaySettlementPolicy } from "../app/gateway.members.ts";
+import type { GatewaySettlementPolicy } from "../app/gateway.members.ts";
 
 /**
  * The keys the fold rewrites after admission. Requested model and provider

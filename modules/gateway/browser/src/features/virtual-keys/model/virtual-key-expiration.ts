@@ -4,9 +4,8 @@
  * stored and computed in UTC.
  */
 
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { type Instant, Temporal, nowInstant, toDate, toEpochMs } from "@langwatch/time";
-
-import { readHandledError } from "../../../model/handled-error.ts";
 
 /** The option a select is currently on. "" is Never, "custom" is a date. */
 export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";

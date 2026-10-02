@@ -43,12 +43,11 @@ import {
   type BudgetListWithHealth,
   type BudgetPageWithHealth,
   type CreateBudgetInput,
-  type GatewayKeyReachCandidate,
   type UpdateBudgetInput,
   type GatewayBudgetScope,
 } from "../repositories/gateway-budget.repository.ts";
 import { isGroupNotFound, isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
-import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
+import { GatewayBudgetScopeReadService } from "./gateway-budget-scope-read.service.ts";
 import type { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import type { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
 
@@ -62,13 +61,12 @@ export type GatewayBudgetOrganizations = Pick<
 
 /** The singular process-owned Gateway service for the full budget lifecycle. */
 export class GatewayService {
-  private readonly reachPolicy = GatewayBudgetScopeReachService.create();
-
   private readonly repository: GatewayBudgetRepository;
   private readonly projects: ProjectApi;
   private readonly organizations: GatewayBudgetOrganizations;
   private readonly cacheRules: GatewayCacheRuleService;
   private readonly guardrails: GatewayGuardrailService;
+  private readonly scopes: GatewayBudgetScopeReadService;
 
   private constructor({
     repository,
@@ -88,6 +86,7 @@ export class GatewayService {
     this.organizations = organizations;
     this.cacheRules = cacheRules;
     this.guardrails = guardrails;
+    this.scopes = GatewayBudgetScopeReadService.create({ repository, projects, organizations });
   }
 
   static create(input: {
@@ -109,7 +108,7 @@ export class GatewayService {
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
     const parsed = gatewayBudgetCheckInputSchema.parse(input);
     const tenantIds = await this.listSpendTenantIds(parsed.organizationId);
-    const memberGroupIds = await this.memberGroupIds(parsed);
+    const memberGroupIds = await this.scopes.memberGroupIds(parsed);
 
     return this.repository.check({ ...parsed, tenantIds, memberGroupIds });
   }
@@ -117,7 +116,7 @@ export class GatewayService {
   /** Compatibility name retained while callers migrate to checkBudget. */
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
-    const memberGroupIds = await this.memberGroupIds(input);
+    const memberGroupIds = await this.scopes.memberGroupIds(input);
 
     return this.repository.check({ ...input, tenantIds, memberGroupIds });
   }
@@ -148,14 +147,14 @@ export class GatewayService {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const result = await this.repository.findWithHealth({ organizationId, tenantIds });
 
-    return this.withScopeReach(result, organizationId);
+    return this.scopes.withScopeReach(result, organizationId);
   }
 
   async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetPageWithHealth> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
     const result = await this.repository.findPageWithHealth({ ...input, tenantIds });
 
-    return this.withScopeReach(result, input.organizationId);
+    return this.scopes.withScopeReach(result, input.organizationId);
   }
 
   async listForProjectWithHealth(projectId: string): Promise<BudgetListWithHealth> {
@@ -177,7 +176,7 @@ export class GatewayService {
       tenantIds,
     });
 
-    return this.withScopeReach(result, project.team.organizationId);
+    return this.scopes.withScopeReach(result, project.team.organizationId);
   }
 
   async findById({
@@ -236,21 +235,8 @@ export class GatewayService {
     return target ? { ...detail, scopeTarget: target } : detail;
   }
 
-  async scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
-    const candidates = await this.reachCandidates({
-      organizationId: input.organizationId,
-      withGroups: input.scope.scopeType === "GROUP",
-    });
-    const projectIds = candidates.flatMap((candidate) =>
-      candidate.traceProjectId ? [candidate.traceProjectId] : [],
-    );
-    const traceProjects = await this.projects.listTraceDestinations(projectIds);
-
-    return this.reachPolicy.resolveScope({
-      candidates,
-      traceProjects,
-      scope: input.scope,
-    });
+  scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
+    return this.scopes.scopeReach(input);
   }
 
   async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
@@ -280,7 +266,7 @@ export class GatewayService {
   async resolveApplicableBudgets(
     input: GatewayBudgetResolutionTarget,
   ): Promise<GatewayResolvedBudget[]> {
-    const memberGroupIds = await this.memberGroupIds(input);
+    const memberGroupIds = await this.scopes.memberGroupIds(input);
 
     return this.repository.resolveApplicableBudgets({ ...input, memberGroupIds });
   }
@@ -293,32 +279,11 @@ export class GatewayService {
     return this.repository.findBucketBoundaries(input);
   }
 
-  async resolveScopeTargets(
+  resolveScopeTargets(
     budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
-    const projectIds = budgets
-      .filter((budget) => budget.scopeType === "PROJECT" || budget.scopeType === "ATTRIBUTED_USER")
-      .map((budget) => budget.scopeId);
-    const virtualKeyIds = budgets
-      .filter((budget) => budget.scopeType === "VIRTUAL_KEY")
-      .map((budget) => budget.scopeId);
-    const virtualKeyProjectScopes = await this.repository.findVirtualKeyProjectScopes({
-      organizationId,
-      virtualKeyIds,
-    });
-    const projects = await this.projects.listNamesByIds({
-      projectIds: [
-        ...new Set([...projectIds, ...virtualKeyProjectScopes.map((scope) => scope.projectId)]),
-      ],
-    });
-
-    return this.repository.resolveScopeTargets({
-      budgets,
-      organizationId,
-      projects,
-      virtualKeyProjectScopes,
-    });
+    return this.scopes.resolveScopeTargets(budgets, organizationId);
   }
 
   listSpendTenantIds(organizationId: string): Promise<string[]> {
@@ -399,83 +364,6 @@ export class GatewayService {
       .filter((attachment) => attachment.guardrailIds.length > 0);
 
     return { cacheRules, guardrails, attachments };
-  }
-
-  private async withScopeReach<Result extends BudgetListWithHealth>(
-    result: Result,
-    organizationId: string,
-  ): Promise<Result> {
-    const candidates = await this.reachCandidates({
-      organizationId,
-      withGroups: result.budgets.some((budget) => budget.scopeType === "GROUP"),
-    });
-    const projectIds = candidates.flatMap((candidate) =>
-      candidate.traceProjectId ? [candidate.traceProjectId] : [],
-    );
-    const traceProjects = await this.projects.listTraceDestinations(projectIds);
-    const scopeReach = this.reachPolicy.resolveBudgets({
-      candidates,
-      traceProjects,
-      budgets: result.budgets,
-    });
-
-    return { ...result, scopeReach };
-  }
-
-  /**
-   * The active keys' reach facts. A key's groups are the organization feature's to
-   * name, and only a GROUP budget's reach reads them, so they are asked for then.
-   */
-  private async reachCandidates({
-    organizationId,
-    withGroups,
-  }: {
-    organizationId: string;
-    withGroups: boolean;
-  }): Promise<GatewayKeyReachCandidate[]> {
-    const rows = await this.repository.findScopeReachCandidates(organizationId);
-    if (!withGroups) {
-      return rows.map((row) => ({ ...row, groupIds: [] }));
-    }
-
-    const principalUserIds = [
-      ...new Set(rows.flatMap((row) => (row.principalUserId ? [row.principalUserId] : []))),
-    ];
-    const groupIdsByPrincipal = new Map(
-      await Promise.all(
-        principalUserIds.map(
-          async (userId) =>
-            [
-              userId,
-              await this.memberGroupIds({ organizationId, principalUserId: userId }),
-            ] as const,
-        ),
-      ),
-    );
-
-    return rows.map((row) => ({
-      ...row,
-      groupIds: row.principalUserId ? (groupIdsByPrincipal.get(row.principalUserId) ?? []) : [],
-    }));
-  }
-
-  /** The groups the principal belongs to in this organization; none for a key with no principal. */
-  private async memberGroupIds({
-    organizationId,
-    principalUserId,
-  }: {
-    organizationId: string;
-    principalUserId?: string | null | undefined;
-  }): Promise<string[]> {
-    if (!principalUserId) {
-      return [];
-    }
-    const groups = await this.organizations.listGroupsForMember({
-      organizationId,
-      userId: principalUserId,
-    });
-
-    return groups.map((group) => group.id);
   }
 
   /** A PRINCIPAL or GROUP scope must name a person or group of the budget's own organization. */

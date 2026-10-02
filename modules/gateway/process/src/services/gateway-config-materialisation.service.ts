@@ -223,20 +223,7 @@ export class GatewayConfigMaterialiserService {
       config.providersAllowed,
     );
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
-    const upstream = await this.upstreamOf(vk.organizationId);
-    const readers = await Promise.all(providers.map((mp) => this.credentialReaderFor(mp)));
-    const ownSlots = providers.map((mp, index) =>
-      buildProviderSlot({
-        mp,
-        index,
-        credentialReader: readers[index] ?? NO_KEYS,
-        assembly: this.assembly,
-      }),
-    );
-    // LangWatch goes last: a customer credential keeps serving the models it serves.
-    const slots = upstream
-      ? [...ownSlots, GatewayConnectUpstreamService.providerSlot(upstream, ownSlots.length)]
-      : ownSlots;
+    const slots = await this.providerSlots({ organizationId: vk.organizationId, providers });
     // The cache-rule bundle, the project's guardrail catalogue and the key's
     // surviving attachments come from the one Gateway service that owns those
     // tables, rather than from a second copy of each query living here.
@@ -300,6 +287,30 @@ export class GatewayConfigMaterialiserService {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
     };
+  }
+
+  /** Dispatch slots: the key's own providers with their credentials, then the upstream. */
+  private async providerSlots({
+    organizationId,
+    providers,
+  }: {
+    organizationId: string;
+    providers: ModelProvider[];
+  }) {
+    const upstream = await this.upstreamOf(organizationId);
+    const readers = await Promise.all(providers.map((mp) => this.credentialReaderFor(mp)));
+    const ownSlots = providers.map((mp, index) =>
+      buildProviderSlot({
+        mp,
+        index,
+        credentialReader: readers[index] ?? NO_KEYS,
+        assembly: this.assembly,
+      }),
+    );
+    // LangWatch goes last: a customer credential keeps serving the models it serves.
+    return upstream
+      ? [...ownSlots, GatewayConnectUpstreamService.providerSlot(upstream, ownSlots.length)]
+      : ownSlots;
   }
 
   /**

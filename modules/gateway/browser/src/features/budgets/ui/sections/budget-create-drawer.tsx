@@ -13,6 +13,7 @@ import {
   VStack,
   Wrap,
 } from "@langwatch/design-system/primitives";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { type Instant, Temporal, currentTimeZone } from "@langwatch/time";
 import { Boxes, Building2, Folder, KeyRound, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -22,7 +23,6 @@ import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import type { GatewayTeam } from "../../../../model/gateway-host.ts";
-import { readHandledError } from "../../../../model/handled-error.ts";
 
 /**
  * A budget on an unreachable scope is refused: it would never spend or

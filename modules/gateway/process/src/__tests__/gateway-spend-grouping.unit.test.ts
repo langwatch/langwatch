@@ -1,5 +1,5 @@
 import { isIanaTimeZone } from "@langwatch/gateway-contract";
-import { FixedGatewaySettlementPolicyService } from "@langwatch/gateway-process";
+import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 /**
  * @vitest-environment node
  */

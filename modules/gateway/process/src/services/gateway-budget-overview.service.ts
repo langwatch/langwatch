@@ -227,26 +227,17 @@ export class BudgetOverviewService {
         : Promise.resolve(undefined),
     ]);
 
-    const items = applicable
-      .map((budget) => {
-        const scopeClass = scopeClassForUser(budget, {
-          personalTeamId: workspace?.team.id ?? null,
-          personalProjectId: workspace?.project.id ?? null,
-          personalVkIds,
-          userId: input.userId,
-        });
-
-        return {
-          ...budget,
-          scopeClass,
-          scopePhrase: scopePhraseFor(scopeClass, budget.scopeLabel),
-          resetsAt: computeResetsAt(budget.window),
-          ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
-        };
-      })
-      .toSorted(byMostBindingFirst);
-
-    return { gatewayAccess: true, budgets: items };
+    const budgets = overviewItemsForUser({
+      applicable,
+      personal: {
+        personalTeamId: workspace?.team.id ?? null,
+        personalProjectId: workspace?.project.id ?? null,
+        personalVkIds,
+        userId: input.userId,
+      },
+      topModels,
+    });
+    return { gatewayAccess: true, budgets };
   }
 
   /**
@@ -349,6 +340,29 @@ export class BudgetOverviewService {
 const TOP_MODELS_LIMIT = 3;
 
 /** From the first of this UTC month to now, the window the personal usage page defaults to. */
+function overviewItemsForUser({
+  applicable,
+  personal,
+  topModels,
+}: {
+  applicable: ApplicableBudget[];
+  personal: Parameters<typeof scopeClassForUser>[1];
+  topModels: BudgetOverviewItem["topModels"];
+}): BudgetOverviewItem[] {
+  return applicable
+    .map((budget) => {
+      const scopeClass = scopeClassForUser(budget, personal);
+      return {
+        ...budget,
+        scopeClass,
+        scopePhrase: scopePhraseFor(scopeClass, budget.scopeLabel),
+        resetsAt: computeResetsAt(budget.window),
+        ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
+      };
+    })
+    .toSorted(byMostBindingFirst);
+}
+
 function currentMonthWindow(): { startMs: number; endMs: number } {
   const now = nowInstant();
   const today = now.toZonedDateTimeISO("UTC");
