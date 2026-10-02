@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { BillingRepositories } from "../billing.repositories.ts";
-import { MemoryBillableEventsMeterRepository } from "./memory.billable-events-meter.repository.ts";
 import { MemoryBillableEventsRepository } from "./memory.billable-events.repository.ts";
 import { MemoryBillingOrganizationRepository } from "./memory.billing-account-facts.repository.ts";
 import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.repository.ts";
@@ -31,7 +30,6 @@ export class MemoryBillingRepositories {
 
     return {
       billableEvents: MemoryBillableEventsRepository.create(store),
-      billableEventsMeter: MemoryBillableEventsMeterRepository.create(store),
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),

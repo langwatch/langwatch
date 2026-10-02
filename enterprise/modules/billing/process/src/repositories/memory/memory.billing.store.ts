@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { BillableEventRecord } from "../billable-events-meter.repository.ts";
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 import type {
   ConnectedBillingAccountRecord,
@@ -24,9 +23,14 @@ export type MemoryBillingOrganization = {
   signupData: Record<string, unknown>;
 };
 
-/** One billable-event row, as the meter writes it to the ClickHouse table. */
-export type MemoryBillableEvent = BillableEventRecord & {
+/** One billable-event row of the ClickHouse table usage's meter writes. */
+export type MemoryBillableEvent = {
   organizationId: string;
+  tenantId: string;
+  eventId: string;
+  eventType: string;
+  deduplicationKey: string;
+  eventTimestamp: number;
 };
 
 /**

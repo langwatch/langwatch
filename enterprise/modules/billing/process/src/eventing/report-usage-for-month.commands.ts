@@ -9,7 +9,10 @@ import { defineCommandSchema } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { BillingCheckpointRepository } from "../repositories/billing-checkpoint.repository.ts";
+import type {
+  BillingCheckpoint,
+  BillingCheckpointRepository,
+} from "../repositories/billing-checkpoint.repository.ts";
 import type { BillingOrganizationCacheRepository } from "../repositories/billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
 import {
@@ -38,6 +41,8 @@ export const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
  */
 interface BillingMeter {
   readonly eventName: string;
+  /** Whether the total is usage's month_counted snapshot, ordered by that event's id. */
+  readonly followsCountedEvent: boolean;
   /** The most this month may report for a capped contract, or null for no cap. */
   readonly ceiling: (args: {
     organizationId: string;
@@ -48,6 +53,7 @@ interface BillingMeter {
   readonly queryTotal: (args: {
     organizationId: string;
     billingMonth: string;
+    billableEvents: number | undefined;
   }) => Promise<BillableEventsTotalResult>;
   /** The delta as the meter event carries it. */
   readonly toValue: (deltaUnits: number) => number;
@@ -73,10 +79,6 @@ export interface ReportUsageForMonthCommandDeps {
   organizations: BillingReportOrganizationRepository;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
-  /** `{ outcome: "unavailable" }` means ClickHouse was unreachable, and the
-   *  caller must skip the month rather than report a total it did not read —
-   *  a distinct outcome from a verified `{ outcome: "counted"; total: 0 }`. */
-  queryBillableEventsTotal: BillableEventsQueryService["queryBillableEventsTotal"];
   /** The Instant Evals meter's total, read off the gateway spend ledger. */
   queryInstantEvalSpendTotal: InstantEvalSpendQueryService["queryInstantEvalSpendTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
@@ -195,16 +197,23 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     this.meters = [
       {
         eventName: BILLABLE_EVENTS_EVENT_NAME,
+        followsCountedEvent: true,
         ceiling: async () => null,
-        queryTotal: (args) => deps.queryBillableEventsTotal(args),
+        // Usage's month_counted total; a command without one leaves this meter untouched.
+        queryTotal: async ({ billableEvents }) =>
+          billableEvents === undefined
+            ? { outcome: "unavailable" }
+            : { outcome: "counted", total: billableEvents },
         toValue: (delta) => delta,
         identifier: billableEventsIdentifier,
       },
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
+        followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
-        queryTotal: (args) => deps.queryInstantEvalSpendTotal(args),
+        queryTotal: ({ organizationId, billingMonth }) =>
+          deps.queryInstantEvalSpendTotal({ organizationId, billingMonth }),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalMeterIdentifier,
       },
@@ -225,7 +234,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   async handle(command: Command<ReportUsageForMonthCommandData>): Promise<never[]> {
-    const { organizationId, billingMonth, tenantId } = command.data;
+    const { organizationId, billingMonth, tenantId, billableEvents, countedEventId } = command.data;
 
     // Assigned on every path that reaches the dispatch below: the catch
     // returns, so there is no third outcome to default to.
@@ -282,6 +291,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
             contract: org.contract,
+            billableEvents,
+            countedEventId,
           })) || shouldSelfDispatch;
       }
     } catch (error) {
@@ -298,13 +309,16 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       return [];
     }
 
-    // 3. Self-dispatch for convergence loop (outside try/catch so failures propagate)
+    // 3. Self-dispatch for convergence (outside try/catch so failures propagate). It
+    // carries this command's event id, so it never stands in for a newer count.
     if (shouldSelfDispatch) {
       await this.deps.selfDispatch({
         organizationId,
         billingMonth,
         tenantId,
         occurredAt: nowInstant().epochMilliseconds,
+        billableEvents,
+        countedEventId,
       });
     }
 
@@ -322,6 +336,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth: string;
     stripeCustomerId: string;
     contract: UsageBillingContract;
+    billableEvents: number | undefined;
+    countedEventId: string | undefined;
   }): Promise<boolean> {
     try {
       return await this.reportForBillingMonth(input);
@@ -357,12 +373,16 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth,
     stripeCustomerId,
     contract,
+    billableEvents,
+    countedEventId,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
     contract: UsageBillingContract;
+    billableEvents: number | undefined;
+    countedEventId: string | undefined;
   }): Promise<boolean> {
     const checkpoint = await this.deps.billingCheckpoints.findCheckpoint({
       organizationId,
@@ -397,55 +417,34 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         "recovering pending checkpoint from previous crash",
       );
     } else {
-      // Normal path: query ClickHouse for deduplicated count.
-      const totalResult = await meter.queryTotal({ organizationId, billingMonth });
-
-      if (totalResult.outcome === "unavailable") {
-        // ClickHouse not available
-        return false;
-      }
-
-      const currentTotal = totalWithinContractCeiling({
-        measured: totalResult.total,
-        ceiling: await meter.ceiling({ organizationId, billingMonth, contract }),
-        organizationId,
-        billingMonth,
+      const next = await this.nextTargetTotal({
         meter,
-      });
-
-      if (currentTotal <= lastReportedTotal) {
-        logger.debug(
-          {
-            organizationId,
-            billingMonth,
-            currentTotal,
-            lastReportedTotal,
-          },
-          "no new billable events, skipping",
-        );
-        return false;
-      }
-
-      targetTotal = currentTotal;
-
-      // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
-      await this.deps.billingCheckpoints.writeIntent({
         organizationId,
         billingMonth,
-        meter: meter.eventName,
+        contract,
+        billableEvents,
+        countedEventId,
+        checkpoint,
         lastReportedTotal,
-        pendingReportedTotal: targetTotal,
       });
+      if (next === undefined) return false;
+      targetTotal = next;
     }
 
     // Compute delta and report to Stripe
     const delta = targetTotal - lastReportedTotal;
-    if (delta <= 0) {
+    if (delta === 0) {
       logger.debug(
         { organizationId, billingMonth, targetTotal, lastReportedTotal },
-        "non-positive delta, skipping Stripe report",
+        "zero delta, skipping Stripe report",
       );
       return false;
+    }
+    if (delta < 0) {
+      logger.info(
+        { organizationId, billingMonth, targetTotal, lastReportedTotal, delta },
+        "lower corrected total, sending a negative adjustment",
+      );
     }
 
     const identifier = meter.identifier({
@@ -557,5 +556,90 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
 
       return true;
     }
+  }
+
+  /**
+   * The total a fresh run reports, its intent written, or undefined when there is
+   * nothing to report: no total, a stale month_counted, or no change.
+   */
+  private async nextTargetTotal({
+    meter,
+    organizationId,
+    billingMonth,
+    contract,
+    billableEvents,
+    countedEventId,
+    checkpoint,
+    lastReportedTotal,
+  }: {
+    meter: BillingMeter;
+    organizationId: string;
+    billingMonth: string;
+    contract: UsageBillingContract;
+    billableEvents: number | undefined;
+    countedEventId: string | undefined;
+    checkpoint: BillingCheckpoint | null;
+    lastReportedTotal: number;
+  }): Promise<number | undefined> {
+    // A count no newer than the one applied is stale or a convergence retry: nothing to do.
+    const cursor = meter.followsCountedEvent ? countedEventId : undefined;
+    const appliedCursor = checkpoint?.lastCountedEventId;
+    if (cursor !== undefined && appliedCursor != null && cursor <= appliedCursor) {
+      logger.debug(
+        { organizationId, billingMonth, countedEventId: cursor, appliedCursor },
+        "month_counted no newer than the one applied, skipping",
+      );
+      return undefined;
+    }
+
+    // Normal path: the meter's total for the month.
+    const totalResult = await meter.queryTotal({ organizationId, billingMonth, billableEvents });
+
+    if (totalResult.outcome === "unavailable") {
+      // No total to report for this meter
+      return undefined;
+    }
+
+    const currentTotal = totalWithinContractCeiling({
+      measured: totalResult.total,
+      ceiling: await meter.ceiling({ organizationId, billingMonth, contract }),
+      organizationId,
+      billingMonth,
+      meter,
+    });
+
+    // A lower total is a correction, sent as a negative meter event (Stripe sums them).
+    if (currentTotal === lastReportedTotal) {
+      logger.debug(
+        {
+          organizationId,
+          billingMonth,
+          currentTotal,
+          lastReportedTotal,
+        },
+        "no change in billable events, skipping",
+      );
+      if (cursor !== undefined) {
+        await this.deps.billingCheckpoints.recordCountedEvent({
+          organizationId,
+          billingMonth,
+          meter: meter.eventName,
+          countedEventId: cursor,
+        });
+      }
+      return undefined;
+    }
+
+    // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
+    await this.deps.billingCheckpoints.writeIntent({
+      organizationId,
+      billingMonth,
+      meter: meter.eventName,
+      lastReportedTotal,
+      pendingReportedTotal: currentTotal,
+      countedEventId: cursor,
+    });
+
+    return currentTotal;
   }
 }

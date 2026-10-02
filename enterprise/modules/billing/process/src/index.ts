@@ -47,78 +47,28 @@ export {
   INVOICE_DAYS_UNTIL_DUE,
 } from "./channels/http/http.connected-invoicing.channel.ts";
 export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
-export {
-  ConnectedBillingRepository,
-  type ConnectedBillingAccountRecord,
-  type ConnectedCreditGrantRecord,
-  type ConnectedInvoiceRecord,
-  type ConnectedSeatChangeRecord,
-  type PendingRenewal,
-} from "./repositories/connected-billing.repository.ts";
-export {
-  PrismaConnectedBillingRepository,
-  type ConnectedBillingDatabase,
-} from "./repositories/prisma/prisma.connected-billing.repository.ts";
-export { MemoryConnectedBillingRepository } from "./repositories/memory/memory.connected-billing.repository.ts";
-export { ConnectedSeatChangeService } from "./services/connected-seat-change.service.ts";
-export {
-  ConnectedBillingService,
-  CREDIT_GRANT_GRACE_DAYS,
-  type ConnectedBillingTerms,
-} from "./services/connected-billing.service.ts";
-export {
-  ConnectedMonthlyStatementService,
-  type CommitDrawdown,
-  type ConnectedCustomer,
-  type ConnectedStatement,
-  type ConnectedStatementSources,
-  type MonthlyStatementRunSummary,
-  type StatementSeats,
-  type StatementSpendLine,
-} from "./services/connected-monthly-statement.service.ts";
+export type { ConnectedBillingAccountRecord, ConnectedCreditGrantRecord, ConnectedInvoiceRecord, ConnectedSeatChangeRecord, PendingRenewal } from "./repositories/connected-billing.repository.ts";
+export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
+export type { ConnectedBillingTerms } from "./services/connected-billing.service.ts";
+export type { CommitDrawdown, ConnectedCustomer, ConnectedStatement, ConnectedStatementSources, MonthlyStatementRunSummary, StatementSeats, StatementSpendLine } from "./services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
 export { MemoryConnectedStatementMailChannel } from "./channels/memory/memory.connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
-export {
-  METER_EVENT_MAX_AGE_DAYS,
-  isMeterEventTooOld,
-  meterEventTimestampSeconds,
-} from "./rules/meter-event-timestamp.rules.ts";
-export {
-  daysBetween,
-  proratedSeatUnitAmountCents,
-  seatInvoiceDescription,
-} from "./rules/connected-seat-proration.rules.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
-export type {
-  BillableEventRecord,
-  BillableEventsMeterRepository,
-} from "./repositories/billable-events-meter.repository.ts";
 export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 /**
  * What a process composes billing's process-side work from. The repositories
  * and services behind these stay private to this feature server.
  */
 export {
-  createBillableEventsMeter,
   createBillableEventsQuery,
   createBillingOrganizationCache,
   createBillingTenantOrganizations,
   createDeploymentPlanSources,
   createStripeUsageReporting,
 } from "./billing.module.ts";
-export { BILLABLE_EVENTS_METER_PROJECTION_NAME } from "./eventing/billable-events-meter.projection.ts";
-export {
-  BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
-  BILLING_METER_DISPATCH_SUPPRESS_MS,
-  BillingMeterDispatchSubscriber,
-} from "./eventing/billing-meter-dispatch.subscriber.ts";
 export type { BillingTenantOrganizationCache } from "./services/tenant-organization.service.ts";
-export {
-  BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
-  BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  type BillingTenantOrganizationCacheRedis,
-} from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
+export type { BillingTenantOrganizationCacheRedis } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export type { BillingSubscriptionRepository } from "./repositories/subscription.repository.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";

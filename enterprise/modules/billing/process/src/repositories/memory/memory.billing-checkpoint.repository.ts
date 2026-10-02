@@ -11,6 +11,7 @@ const UNREPORTED: BillingCheckpoint = {
   lastReportedTotal: 0,
   pendingReportedTotal: null,
   consecutiveFailures: 0,
+  lastCountedEventId: null,
 };
 
 /**
@@ -40,13 +41,25 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
+    countedEventId?: string;
   }): Promise<void> {
     const current = await this.findCheckpoint(params);
     this.write(params, {
       lastReportedTotal: current?.lastReportedTotal ?? params.lastReportedTotal,
       pendingReportedTotal: params.pendingReportedTotal,
       consecutiveFailures: current?.consecutiveFailures ?? UNREPORTED.consecutiveFailures,
+      lastCountedEventId: params.countedEventId,
     });
+  }
+
+  async recordCountedEvent(params: {
+    organizationId: string;
+    billingMonth: string;
+    meter: string;
+    countedEventId: string;
+  }): Promise<void> {
+    const current = (await this.findCheckpoint(params)) ?? UNREPORTED;
+    this.write(params, { ...current, lastCountedEventId: params.countedEventId });
   }
 
   async confirm(params: {
@@ -91,10 +104,18 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     });
   }
 
+  /** Keeps the stored month_counted cursor unless the write names a new one. */
   private write(
     key: { organizationId: string; billingMonth: string; meter: string },
-    checkpoint: BillingCheckpoint,
+    checkpoint: Omit<BillingCheckpoint, "lastCountedEventId"> & {
+      lastCountedEventId?: string | undefined;
+    },
   ): void {
-    this.store.checkpoints.set(MemoryBillingStore.checkpointKey(key), checkpoint);
+    const storeKey = MemoryBillingStore.checkpointKey(key);
+    const lastCountedEventId =
+      checkpoint.lastCountedEventId ??
+      this.store.checkpoints.get(storeKey)?.lastCountedEventId ??
+      null;
+    this.store.checkpoints.set(storeKey, { ...checkpoint, lastCountedEventId });
   }
 }

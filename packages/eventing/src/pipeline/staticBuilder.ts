@@ -185,6 +185,7 @@ export class PipelineBuilder<
             subscriber.handle(subscriber.data.parse(event.data), {
               ...context,
               occurredAt: event.occurredAt,
+              eventId: event.id,
             }),
           options: subscriber.options,
         }),

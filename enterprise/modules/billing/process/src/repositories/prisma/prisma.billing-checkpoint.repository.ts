@@ -40,6 +40,7 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
       lastReportedTotal: row.lastReportedTotal,
       pendingReportedTotal: row.pendingReportedTotal,
       consecutiveFailures: row.consecutiveFailures,
+      lastCountedEventId: row.lastCountedEventId,
     };
   }
 
@@ -49,6 +50,7 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
     meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
+    countedEventId?: string;
   }): Promise<void> {
     await this.prisma.billingMeterCheckpoint.upsert({
       where: {
@@ -64,10 +66,36 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
         meter: params.meter,
         lastReportedTotal: params.lastReportedTotal,
         pendingReportedTotal: params.pendingReportedTotal,
+        lastCountedEventId: params.countedEventId,
       },
       update: {
         pendingReportedTotal: params.pendingReportedTotal,
+        lastCountedEventId: params.countedEventId,
       },
+    });
+  }
+
+  async recordCountedEvent(params: {
+    organizationId: string;
+    billingMonth: string;
+    meter: string;
+    countedEventId: string;
+  }): Promise<void> {
+    await this.prisma.billingMeterCheckpoint.upsert({
+      where: {
+        organizationId_billingMonth_meter: {
+          organizationId: params.organizationId,
+          billingMonth: params.billingMonth,
+          meter: params.meter,
+        },
+      },
+      create: {
+        organizationId: params.organizationId,
+        billingMonth: params.billingMonth,
+        meter: params.meter,
+        lastCountedEventId: params.countedEventId,
+      },
+      update: { lastCountedEventId: params.countedEventId },
     });
   }
 

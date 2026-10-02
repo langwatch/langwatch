@@ -143,25 +143,38 @@ Feature: Usage meters, decisions and who learns them
     Then the event is refused with ERR_PLAN_LIMIT and status 402
     And no usage or entitlement Api is asked
 
-  @unit @billing @unimplemented
+  @unit @billing
   Scenario: Billing reports to Stripe from the month's counted total
     Given a month_counted event for the organization with 5,000 billable events
     And billing's checkpoint for the month stands at 4,000
     When billing's subscriber handles the event
     Then Stripe is sent a quantity of 1,000 for the month
 
-  @unit @billing @unimplemented
+  @unit @billing
   Scenario: A lower corrected total is applied as an explicit adjustment
     Given billing's checkpoint for the month stands at 5,000
     When billing's subscriber handles a month_counted event with 4,500 billable events
     Then billing applies an adjustment of minus 500 for the month and the checkpoint becomes 4,500
     And the lower total is not dropped as a stale reading
 
-  @unit @billing @unimplemented
+  @unit @billing
   Scenario: A redelivered month_counted event applies no second adjustment
     Given billing has applied an adjustment for a month_counted event
     When billing's subscriber handles the same event again
     Then no further adjustment is applied
+
+  @unit @billing
+  Scenario: Billing's monthly report sends a lower corrected total as a negative meter event
+    Given billing's checkpoint for the month stands at 5,000
+    When the month's report reads a corrected total of 4,500
+    Then Stripe is sent a meter event of minus 500, which its sum meter subtracts
+    And the checkpoint becomes 4,500
+
+  @unit @billing
+  Scenario: A redelivered downward correction is applied once
+    Given billing has sent a correction from 5,000 down to 4,500
+    When the month's report runs again, or replays it after a crash
+    Then nothing more is sent, or the replay reuses the correction's Stripe identifier
 
   @unit @trace @unimplemented
   Scenario: Every limit is soft, so ingest is accepted while the limit event is still in flight

@@ -4,7 +4,10 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
-import { buildBillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
+import {
+  buildBillingLifecyclePipeline,
+  type BuildBillingLifecyclePipelineInput,
+} from "../eventing/billing-lifecycle.pipeline.ts";
 
 const logger = createLogger("langwatch:billing:lifecycle");
 
@@ -15,6 +18,8 @@ export type BillingLifecycleAnnouncerDeps = Readonly<{
   organizations: {
     getAllMembers(input: { organizationId: string }): Promise<readonly Readonly<{ id: string }>[]>;
   };
+  /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
+  resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
 }>;
 
 /**
@@ -23,14 +28,16 @@ export type BillingLifecycleAnnouncerDeps = Readonly<{
  * whatever becomes of the record, as main's fire-and-forget hooks were.
  */
 export class BillingLifecycleAnnouncerService {
-  readonly pipeline: BillingLifecyclePipeline = buildBillingLifecyclePipeline();
+  readonly pipeline: BillingLifecyclePipeline;
   #commands: EventingCommands<BillingLifecyclePipeline> | undefined;
 
   static create(deps: BillingLifecycleAnnouncerDeps): BillingLifecycleAnnouncerService {
     return new BillingLifecycleAnnouncerService(deps);
   }
 
-  private constructor(private readonly deps: BillingLifecycleAnnouncerDeps) {}
+  private constructor(private readonly deps: BillingLifecycleAnnouncerDeps) {
+    this.pipeline = buildBillingLifecyclePipeline({ alerts: deps.resourceLimitAlerts });
+  }
 
   /** Binds the lifecycle pipeline's own senders. */
   connect(commands: EventingCommands<BillingLifecyclePipeline>): void {

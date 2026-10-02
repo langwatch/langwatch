@@ -5,7 +5,7 @@ Feature: Billing Meter Dispatch
   # reporting worker (cross-project event aggregation, SaaS-mode skip,
   # crash recovery with two-phase checkpoint, transient-error retry,
   # event deduplication). Backend code lives in
-  # ee/billing/services/usageReportingService and the billingMeterDispatch subscriber;
+  # billing's usage-reporting service and its usageMonthCounted peer subscriber;
   # the integration-test fixture covers happy-path Stripe report submission
   # but not the worker-loop / recovery / dedup paths — all aspirational
   # pending the worker-test harness.
@@ -101,6 +101,25 @@ Feature: Billing Meter Dispatch
     Given an organization on usage-based pricing and another on tiered pricing
     When the billing lookup runs for each of them and for an unused id
     Then it answers usage_billed, not_usage_billed, and not_found respectively
+
+  @unit
+  Scenario: An older month_counted arriving after a newer one changes nothing
+    Given the checkpoint has applied the month_counted event with the newer id
+    When a report carrying an older month_counted event id runs
+    Then no usage is reported and the checkpoint is unchanged
+
+  @unit
+  Scenario: A retry does not overwrite a newer pending total
+    Given a report failed transiently and saved its pending total
+    When its retry and a newer month_counted report are both queued
+    Then the retry carries its own month_counted event id
+    And it does not replace the newer report in the queue
+
+  @unit
+  Scenario: A fractional Instant Evals value reports
+    Given an Instant Evals meter delta of 1.2345 dollars
+    When it is reported to Stripe
+    Then the meter event carries the value "1.2345"
 
   # ============================================================================
   # Known Limitations (v1)

@@ -6,9 +6,8 @@ Feature: What we tell customers is billable matches what we bill
   rest of it on an invoice.
 
   # Cross-references:
-  #   langwatch/src/server/event-sourcing/projections/global/
-  #     orgBillableEventsMeter.mapProjection.ts — the meter, and the only
-  #     authority on what is billable.
+  #   modules/usage: the orgBillableEventsMeter projection, the meter and the
+  #     only authority on what is billable.
   #   docs/pricing/billable-events.mdx — the full list.
   #   docs/pricing.mdx — the short answer, and the FAQ version of it.
   #

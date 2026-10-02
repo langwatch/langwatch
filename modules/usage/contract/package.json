@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/usage-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Usage's events: the month's count and the limit decisions peers react to.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

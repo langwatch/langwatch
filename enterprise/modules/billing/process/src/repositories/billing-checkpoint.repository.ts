@@ -3,6 +3,8 @@ export interface BillingCheckpoint {
   lastReportedTotal: number;
   pendingReportedTotal: number | null;
   consecutiveFailures: number;
+  /** The newest month_counted event id applied; ids are k-sortable, so compare as strings. */
+  lastCountedEventId: string | null;
 }
 
 /**
@@ -23,6 +25,16 @@ export abstract class BillingCheckpointRepository {
     meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
+    /** Recorded with the intent when the total came from a month_counted event. */
+    countedEventId?: string;
+  }): Promise<void>;
+
+  /** Records a month_counted event as applied when its total needed no report. */
+  abstract recordCountedEvent(params: {
+    organizationId: string;
+    billingMonth: string;
+    meter: string;
+    countedEventId: string;
   }): Promise<void>;
 
   abstract confirm(params: {

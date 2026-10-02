@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryBillableEventsMeterRepository } from "../memory.billable-events-meter.repository.ts";
 import { MemoryBillableEventsRepository } from "../memory.billable-events.repository.ts";
 import { MemoryBillingStore } from "../memory.billing.store.ts";
 
@@ -31,7 +30,16 @@ function repositories() {
   const store = MemoryBillingStore.create();
   return {
     store,
-    meter: MemoryBillableEventsMeterRepository.create(store),
+    /** Writes a row as usage's meter writes the shared table. */
+    meter: {
+      insert: async ({
+        record,
+        organizationId,
+      }: {
+        record: ReturnType<typeof event>;
+        organizationId: string;
+      }) => void store.billableEvents.push({ ...record, organizationId }),
+    },
     reader: MemoryBillableEventsRepository.create(store),
   };
 }

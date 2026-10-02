@@ -7,21 +7,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
-import type { TenantOrganizationRepository } from "../../repositories/tenant-organization.repository.ts";
-import {
-  type BillingTenantOrganizationCache,
-  BillingTenantOrganizationService,
-} from "../../services/tenant-organization.service.ts";
 import { BillableEventsMeterProjection } from "../billable-events-meter.projection.ts";
 
 // Repo root containing both `packages/` and `docs/`. `process.cwd()` is this
-// package's own dir when vitest runs, and the package sits four levels down
-// at enterprise/modules/billing/process, so four levels up lands on the root.
-const REPO_ROOT = path.resolve(process.cwd(), "..", "..", "..", "..");
+// package's own dir when vitest runs, and the package sits three levels down
+// at modules/usage/process, so three levels up lands on the root.
+const REPO_ROOT = path.resolve(process.cwd(), "..", "..", "..");
 
 const BILLABLE_EVENTS_DOC = "docs/pricing/billable-events.mdx";
 const PRICING_DOC = "docs/pricing.mdx";
@@ -83,13 +76,8 @@ function pricingFaqAnswer(): string {
   return answer[1]!;
 }
 
-const meteredEventTypes = BillableEventsMeterProjection.create({
-  meter: { insert: vi.fn<BillableEventsMeterRepository["insert"]>() },
-  organizations: BillingTenantOrganizationService.create({
-    organizations: createApiFixture<TenantOrganizationRepository>(),
-    cache: createApiFixture<BillingTenantOrganizationCache>(),
-  }),
-}).build().eventTypes;
+const meteredEventTypes = BillableEventsMeterProjection.create({ append: vi.fn() })
+  .build().eventTypes;
 
 describe("Billable-event documentation", () => {
   describe("given the meter bills spans, evaluations, experiments and simulations", () => {

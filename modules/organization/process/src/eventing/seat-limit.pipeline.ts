@@ -1,4 +1,3 @@
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import {
   defineAggregate,
   defineEventingModule,
@@ -12,7 +11,6 @@ import { RecordSeatLimitReachedCommand } from "./seat-limit.commands.ts";
 import {
   SEAT_LIMIT_AGGREGATE_TYPE,
   SEAT_LIMIT_PIPELINE_NAME,
-  SEAT_LIMIT_REACHED_EVENT_TYPE,
   seatLimitReachedEventSchema,
 } from "./seat-limit.events.ts";
 
@@ -27,30 +25,14 @@ function seatLimitCommands() {
 
 export type SeatLimitDefinition = ReturnType<ReturnType<typeof seatLimitCommands>["build"]>;
 
-/** organization_seat_limit: the api only records; the worker also tells billing (§9). */
-export function buildSeatLimitPipeline(input: {
-  billing?: Pick<BillingApi, "notifyResourceLimitReached">;
-}): SeatLimitDefinition {
-  const billing = input.billing;
-  if (!billing) return seatLimitCommands().build();
-  return seatLimitCommands()
-    .withEventSubscriber("notifyBilling", {
-      events: [SEAT_LIMIT_REACHED_EVENT_TYPE],
-      handler: async (event) => {
-        await billing.notifyResourceLimitReached({
-          organizationId: event.data.organizationId,
-          limitType: event.data.limitType,
-          current: event.data.current,
-          max: event.data.max,
-        });
-      },
-    })
-    .build();
+/** organization_seat_limit: organization records its fact; billing reacts from its side (§9). */
+export function buildSeatLimitPipeline(): SeatLimitDefinition {
+  return seatLimitCommands().build();
 }
 
 export const seatLimitEventing = defineEventingModule({
   pipeline: SEAT_LIMIT_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
-    app.seatLimitPipeline({ participation }),
+  build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
+    app.seatLimitPipeline(),
   connect: ({ app, commands }) => app.connectSeatLimit(commands),
 });

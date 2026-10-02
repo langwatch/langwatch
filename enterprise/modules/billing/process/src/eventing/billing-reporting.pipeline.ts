@@ -11,13 +11,13 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  monthCountedEventDataSchema,
+  USAGE_MONTH_COUNTED_EVENT_TYPE,
+} from "@langwatch/usage-contract";
 
 import type { BillingModule } from "../app/billing.app.ts";
-import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
-import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
-import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
-import { BillingMeterDispatchSubscriber } from "./billing-meter-dispatch.subscriber.ts";
 import {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,
@@ -30,32 +30,24 @@ export type BillingReportingDefinition = StaticPipelineDefinition<
   { name: "reportUsageForMonth"; payload: ReportUsageForMonthCommandData }
 >;
 
-/** The SaaS billable-events meter and the tenant attribution it bills by. */
-export type BillingReportingMeter = Readonly<{
-  meter: BillableEventsMeterRepository;
-  organizations: BillingTenantOrganizationService;
-}>;
+/** The peer subscriber that reports each month usage counts. */
+export const BILLING_MONTH_COUNTED_SUBSCRIBER_NAME = "usageMonthCounted";
 
 /**
  * The monthly roll-up's pipeline. The self-dispatch loop closes at registration,
- * not at first dispatch; on SaaS it also declares the billable-events meter, whose
- * dispatch subscriber reports through the same command (main registered it on SaaS only).
+ * not at first dispatch; usage's month_counted starts each month's report.
  */
 export class BillingReportingPipeline {
-  static create({
-    meter,
-    ...deps
-  }: Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> & {
-    meter?: BillingReportingMeter | undefined;
-  }): BillingReportingPipeline {
-    return new BillingReportingPipeline(deps, meter);
+  static create(
+    deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
+  ): BillingReportingPipeline {
+    return new BillingReportingPipeline(deps);
   }
 
   private send: ((data: ReportUsageForMonthCommandData) => Promise<void>) | undefined;
 
   private constructor(
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
-    private readonly meter: BillingReportingMeter | undefined,
   ) {}
 
   private dispatch(data: ReportUsageForMonthCommandData): Promise<void> {
@@ -77,7 +69,7 @@ export class BillingReportingPipeline {
       selfDispatch: (data) => this.dispatch(data),
     });
 
-    const pipeline = definePipeline({
+    return definePipeline({
       name: BILLING_REPORTING_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: "billing_report",
@@ -91,20 +83,26 @@ export class BillingReportingPipeline {
         options: {
           delay: 300_000, // 5 min delay (initial + re-trigger)
           deduplication: {
-            makeId: (p: { organizationId: string; billingMonth: string }) =>
-              `${p.organizationId}:${p.billingMonth}`,
-            ttlMs: 310_000, // 310s > 300s delay; replace preserves self-dispatch
+            // Keyed by the counted event too: a retry replaces only its own job.
+            makeId: (p: ReportUsageForMonthCommandData) =>
+              [p.organizationId, p.billingMonth, p.countedEventId].filter(Boolean).join(":"),
+            ttlMs: 310_000, // 310s > 300s delay
           },
         },
-      });
-    if (!this.meter) return pipeline.build();
-    return pipeline
-      .withGlobalMapProjection(BillableEventsMeterProjection.create(this.meter).build(), [
-        BillingMeterDispatchSubscriber.create({
-          organizations: this.meter.organizations,
-          getDispatch: () => (data) => this.dispatch(data),
-        }).build(),
-      ])
+      })
+      .withPeerSubscriber(BILLING_MONTH_COUNTED_SUBSCRIBER_NAME, {
+        eventType: USAGE_MONTH_COUNTED_EVENT_TYPE,
+        data: monthCountedEventDataSchema,
+        handle: (data, { eventId }) =>
+          this.dispatch({
+            organizationId: data.organizationId,
+            billingMonth: data.month,
+            tenantId: data.organizationId,
+            occurredAt: data.occurredAt,
+            billableEvents: data.billableEvents,
+            countedEventId: eventId,
+          }),
+      })
       .build();
   }
 

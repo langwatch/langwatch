@@ -96,6 +96,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
         lastReportedTotal: 0,
         pendingReportedTotal: 120,
         consecutiveFailures: 0,
+        lastCountedEventId: null,
       });
 
       await repositories.checkpoints.confirm({ ...month, lastReportedTotal: 120 });
@@ -104,6 +105,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
         lastReportedTotal: 120,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
+        lastCountedEventId: null,
       });
     });
   });

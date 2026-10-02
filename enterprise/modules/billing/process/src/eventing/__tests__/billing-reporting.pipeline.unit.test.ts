@@ -1,21 +1,18 @@
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
-import { createTenantId, type Event, type SubscriberDispatchDefinition } from "@langwatch/eventing";
+import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { nowInstant } from "@langwatch/time";
+import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/usage-contract";
 import { describe, expect, it } from "vitest";
 
 import { BillingModule, type ConnectedBillingPeers } from "../../app/billing.app.ts";
 import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
-import { BillableEventsQueryService } from "../../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../../services/billing-error-reporter.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
-import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import { StripeUsageReportingUnavailable } from "../../services/usage-reporting.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
-import { BILLABLE_EVENTS_METER_PROJECTION_NAME } from "../billable-events-meter.projection.ts";
-import { BILLING_METER_DISPATCH_SUBSCRIBER_NAME } from "../billing-meter-dispatch.subscriber.ts";
 import {
+  BILLING_MONTH_COUNTED_SUBSCRIBER_NAME,
   BillingReportingPipeline,
   billingReportingEventing,
 } from "../billing-reporting.pipeline.ts";
@@ -28,60 +25,59 @@ const peers: ConnectedBillingPeers = {
   gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),
 };
 
-/** The roll-up composed as the app composes it, with the meter where the deployment is SaaS. */
-function rollUp({ isSaas }: { isSaas: boolean }) {
+const MONTH_COUNTED_LANE = `billing_reporting.${BILLING_MONTH_COUNTED_SUBSCRIBER_NAME}`;
+
+/** The roll-up composed as the app composes it. */
+function rollUp() {
   const repositories = MemoryBillingRepositories.create();
   return BillingReportingPipeline.create({
     organizations: repositories.reportOrganizations,
     billingCheckpoints: repositories.checkpoints,
     getUsageReportingService: () => void 0,
-    queryBillableEventsTotal: async () => ({ outcome: "unavailable" }),
     queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,
-    meter: isSaas
-      ? {
-          meter: repositories.billableEventsMeter,
-          organizations: BillingTenantOrganizationService.create({
-            organizations: { findOrganizationForTenant: async () => "org_1" },
-            cache: repositories.tenantOrganizationCache,
-          }),
-        }
-      : void 0,
   });
 }
 
-/** The meter's subscribers, as the runtime's global registry would receive them. */
-function meterSubscribers(pipeline: BillingReportingPipeline) {
+/** The roll-up's peer subscribers, as the runtime's global registry would receive them. */
+function peerSubscribers(pipeline: BillingReportingPipeline) {
   const definition = pipeline.buildProcessing({ participation: "produce" });
-  const subscribers: SubscriberDispatchDefinition<Event>[] = [];
+  const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
     Parameters<NonNullable<typeof definition.globalProjections>[number]["register"]>[0]
   >({
-    registerMapProjection: () => undefined,
-    registerMapSubscriber: (_map, subscriber) => void subscribers.push(subscriber),
+    registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
   });
   for (const projection of definition.globalProjections ?? []) projection.register(registry);
   return { definition, subscribers };
 }
 
-const BILLABLE_EVENT: Event = {
-  id: "evt_1",
-  aggregateId: "trace_1",
-  aggregateType: "trace",
-  tenantId: createTenantId("project_alpha"),
-  createdAt: 0,
-  occurredAt: 0,
-  type: "lw.obs.trace.span_received",
-  version: "2026-01-01",
-  data: {},
-};
+function monthCounted(billableEvents: number): Event {
+  return {
+    id: "evt_1",
+    aggregateId: "org_1",
+    aggregateType: "usage",
+    tenantId: createTenantId("org_1"),
+    createdAt: 0,
+    occurredAt: 1_000,
+    type: USAGE_MONTH_COUNTED_EVENT_TYPE,
+    version: "2026-01-01",
+    data: {
+      organizationId: "org_1",
+      month: "2026-09",
+      occurredAt: 1_000,
+      billableEvents,
+      limit: { allowance: 10_000, planName: "Launch", unit: "events" },
+    },
+  };
+}
 
 describe("the monthly billing roll-up's eventing declaration", () => {
   describe("given a deployment that is not SaaS", () => {
     /** @scenario "The monthly roll-up is registered on every install" */
-    it("still mounts the command-only roll-up, with no meter beside it", () => {
+    it("still mounts the roll-up, with no meter beside it", () => {
       const app = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
@@ -98,7 +94,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       expect(billingReportingEventing.pipeline).toBe("billing_reporting");
       expect(pipeline.metadata.name).toBe("billing_reporting");
       expect(pipeline.foldProjections.size + pipeline.mapProjections.size).toBe(0);
-      expect(pipeline.globalProjections ?? []).toEqual([]);
+      expect(pipeline.globalProjections?.map(({ name }) => name)).toEqual([MONTH_COUNTED_LANE]);
     });
   });
 
@@ -123,52 +119,34 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         "billing_reporting",
       );
     });
-
-    /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
-    it("declares the billable-events meter on the app's roll-up pipeline", () => {
-      const pipeline = composeSaas().reportingPipeline({ participation: "produce" });
-
-      expect(pipeline.globalProjections?.map(({ name }) => name)).toEqual([
-        BILLABLE_EVENTS_METER_PROJECTION_NAME,
-      ]);
-    });
   });
 
-  describe("given the roll-up composed with and without the SaaS meter", () => {
-    /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
-    it("declares the meter and its dispatch subscriber on SaaS only", () => {
-      const saas = meterSubscribers(rollUp({ isSaas: true }));
-      const selfHosted = meterSubscribers(rollUp({ isSaas: false }));
-
-      expect(saas.definition.globalProjections?.map(({ name }) => name)).toEqual([
-        BILLABLE_EVENTS_METER_PROJECTION_NAME,
-      ]);
-      expect(saas.subscribers.map(({ name }) => name)).toEqual([
-        BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
-      ]);
-      expect(selfHosted.definition.globalProjections ?? []).toEqual([]);
-    });
-
-    /** @scenario "A SaaS worker meters only through the pipeline its reports are sent through" */
-    it("reports nothing before registration and the month through reportUsageForMonth after", async () => {
-      const pipeline = rollUp({ isSaas: true });
-      const { subscribers } = meterSubscribers(pipeline);
-      const [dispatch] = subscribers;
-      const context = { tenantId: "project_alpha", aggregateId: "trace_1", foldState: void 0 };
+  describe("given usage records a month's counted total", () => {
+    /** @scenario "Billing reports to Stripe from the month's counted total" */
+    it("subscribes to month_counted and dispatches the month's report with that total", async () => {
+      const pipeline = rollUp();
+      const { definition, subscribers } = peerSubscribers(pipeline);
+      const [subscriber] = subscribers;
       const reported: ReportUsageForMonthCommandData[] = [];
-
-      await dispatch?.handle(BILLABLE_EVENT, context);
-      expect(reported).toEqual([]);
-
       pipeline.connectSelfDispatch(async (data) => void reported.push(data));
-      await dispatch?.handle(BILLABLE_EVENT, context);
 
-      expect(reported).toContainEqual(
-        expect.objectContaining({
+      await subscriber?.handle(monthCounted(5_000), {
+        tenantId: "org_1",
+        aggregateId: "org_1",
+      });
+
+      expect(definition.globalProjections?.map(({ name }) => name)).toEqual([MONTH_COUNTED_LANE]);
+      expect(subscriber?.eventTypes).toEqual([USAGE_MONTH_COUNTED_EVENT_TYPE]);
+      expect(reported).toEqual([
+        {
           organizationId: "org_1",
-          billingMonth: BillableEventsQueryService.getBillingMonth(nowInstant()),
-        }),
-      );
+          billingMonth: "2026-09",
+          tenantId: "org_1",
+          occurredAt: 1_000,
+          billableEvents: 5_000,
+          countedEventId: "evt_1",
+        },
+      ]);
     });
   });
 });

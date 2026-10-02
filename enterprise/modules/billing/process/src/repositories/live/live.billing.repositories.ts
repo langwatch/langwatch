@@ -3,7 +3,6 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type { BillingRepositories } from "../billing.repositories.ts";
-import { BillableEventsMeterClickHouseRepository } from "../clickhouse/clickhouse.billable-events-meter.repository.ts";
 import { BillableEventsClickHouseRepository } from "../clickhouse/clickhouse.billable-events.repository.ts";
 import { PostgresBillingRepositories } from "../prisma/prisma.billing.repositories.ts";
 import {
@@ -31,7 +30,6 @@ export class LiveBillingRepositories {
     return {
       ...PostgresBillingRepositories.create({ prisma }),
       billableEvents: BillableEventsClickHouseRepository.create(clickhouse),
-      billableEventsMeter: BillableEventsMeterClickHouseRepository.create(clickhouse),
       organizationCache: RedisBillingOrganizationCacheRepository.create({ redis }),
       tenantOrganizationCache: RedisBillingTenantOrganizationCacheRepository.create({ redis }),
     };

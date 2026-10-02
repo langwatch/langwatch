@@ -79,6 +79,36 @@ describe("usageReportingService", () => {
       });
     });
 
+    describe("when an Instant Evals value is fractional", () => {
+      /** @scenario "A fractional Instant Evals value reports" */
+      it("sends it to four decimal places", async () => {
+        stripe.billing.meterEvents.create.mockResolvedValue({});
+
+        const results = await service.reportUsageDelta({
+          stripeCustomerId: "cus_abc123",
+          organizationId: "org_1",
+          events: [makeEvent({ eventName: "langwatch_instant_eval_usd", value: 1.2345 })],
+        });
+
+        expect(results[0]?.reported).toBe(true);
+        expect(stripe.billing.meterEvents.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.objectContaining({ value: "1.2345" }),
+          }),
+        );
+      });
+
+      it("refuses a value past four decimal places", async () => {
+        await expect(
+          service.reportUsageDelta({
+            stripeCustomerId: "cus_abc123",
+            organizationId: "org_1",
+            events: [makeEvent({ value: 1.23456 })],
+          }),
+        ).rejects.toThrow(ZodError);
+      });
+    });
+
     describe("when value is zero", () => {
       it("skips and returns reported: false without calling Stripe", async () => {
         const results = await service.reportUsageDelta({
@@ -241,16 +271,6 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             organizationId: "org_1",
             events: [],
-          }),
-        ).rejects.toThrow(ZodError);
-      });
-
-      it("throws ZodError for negative value", async () => {
-        await expect(
-          service.reportUsageDelta({
-            stripeCustomerId: "cus_abc123",
-            organizationId: "org_1",
-            events: [makeEvent({ value: -1 })],
           }),
         ).rejects.toThrow(ZodError);
       });

@@ -1,0 +1,77 @@
+{
+  "extends": [
+    "./tsconfig.json",
+    "../../../tsconfig.emit.json"
+  ],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/usage-process": [
+        "./src/index.ts"
+      ]
+    }
+  },
+  "files": [
+    "./src/index.ts"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
+}

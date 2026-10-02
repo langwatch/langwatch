@@ -1,12 +1,12 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import { SEAT_LIMIT_REACHED_EVENT_TYPE } from "@langwatch/organization-contract";
 
 import {
   RECORD_SEAT_LIMIT_REACHED_COMMAND_TYPE,
   type RecordSeatLimitReachedCommandData,
   recordSeatLimitReachedCommandDataSchema,
   SEAT_LIMIT_AGGREGATE_TYPE,
-  SEAT_LIMIT_REACHED_EVENT_TYPE,
   SEAT_LIMIT_REACHED_EVENT_VERSION,
   type SeatLimitReachedEvent,
 } from "./seat-limit.events.ts";

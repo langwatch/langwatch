@@ -95,7 +95,8 @@ export interface PeerSubscriberDefinition<Data extends z.ZodType> {
   options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn">;
 }
 
-/** A peer subscriber's context: the event's tenant, aggregate and instant. */
+/** A peer subscriber's context: the event's tenant, aggregate, instant and id (a k-sortable cursor). */
 export interface PeerSubscriberContext extends EventSubscriberContext {
   occurredAt: number;
+  eventId: string;
 }

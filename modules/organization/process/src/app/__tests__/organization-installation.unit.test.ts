@@ -1,6 +1,5 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -40,7 +39,6 @@ function process(role: "api" | "worker") {
     .provide({
       "api-key": createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),
-      billing: createApiFixture<BillingApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       identity: createApiFixture<IdentityApi>(),
       notification: createApiFixture<NotificationService>(),
@@ -56,7 +54,9 @@ describe("organization app installation", () => {
     const runtime = await process(role).boot();
 
     try {
-      expect(runtime.service(OrganizationApi)).toBe(runtime.module(organizationProcessModule).provided);
+      expect(runtime.service(OrganizationApi)).toBe(
+        runtime.module(organizationProcessModule).provided,
+      );
     } finally {
       await runtime.stop();
     }

@@ -2042,6 +2042,7 @@ export const prismaModelFieldCatalogue = {
     "lastReportedTotal",
     "pendingReportedTotal",
     "consecutiveFailures",
+    "lastCountedEventId",
     "updatedAt"
   ],
   "VirtualKey": [

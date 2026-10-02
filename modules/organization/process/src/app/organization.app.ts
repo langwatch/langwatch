@@ -7,9 +7,8 @@ import {
   type AuthzAccessBreakdownOutput,
   type AuthzGrantCaller,
 } from "@langwatch/authz-contract";
-import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import type {
@@ -327,8 +326,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     entitlement: EntitlementApi,
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
-    /** Told of a reached seat limit by this module's own subscriber, as §9 rules. */
-    billing: BillingApi,
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
   };
@@ -424,7 +421,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
 
     application.#members = members;
-    application.#billing = setup.dependencies.billing;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
       notices: members.seatLimits,
@@ -574,7 +570,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #memberProvenance!: MemberProvenanceService;
   #licenseLimits!: LicenseLimitService;
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
-  #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
   #visibility!: OrganizationVisibilityService;
   #scopeGraph!: OrganizationScopeGraphService;
   #personalTeamScope!: PersonalTeamScopeService;
@@ -1551,14 +1546,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return { fullMembers, liteMembers };
   }
 
-  /** organization_seat_limit for this role: the worker also tells billing (§9). */
-  seatLimitPipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): SeatLimitDefinition {
-    if (participation === "produce") return buildSeatLimitPipeline({});
-    return buildSeatLimitPipeline({ billing: this.#billing });
+  /** organization_seat_limit: organization records the fact, billing subscribes (§9). */
+  seatLimitPipeline(): SeatLimitDefinition {
+    return buildSeatLimitPipeline();
   }
 
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */

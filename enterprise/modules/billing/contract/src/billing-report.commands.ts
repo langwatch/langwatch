@@ -19,8 +19,8 @@ export type BillingReportingCommandType = (typeof BILLING_REPORTING_COMMAND_TYPE
 export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
 
 /**
- * Command data for reporting usage for a billing month, dispatched by
- * billingMeterDispatch after orgBillableEventsMeter succeeds. Uses
+ * Command data for reporting usage for a billing month, dispatched when usage
+ * records `lw.usage.month_counted`; `billableEvents` is that counted total. Uses
  * organizationId as tenantId — the framework needs it for groupKey only.
  */
 export const reportUsageForMonthCommandDataSchema = z.object({
@@ -28,6 +28,9 @@ export const reportUsageForMonthCommandDataSchema = z.object({
   billingMonth: z.string(),
   tenantId: z.string(),
   occurredAt: z.number(),
+  billableEvents: z.number().int().nonnegative().optional(),
+  /** The month_counted event id the total came from; a k-sortable cursor, compared as a string. */
+  countedEventId: z.string().optional(),
 });
 
 export type ReportUsageForMonthCommandData = z.infer<typeof reportUsageForMonthCommandDataSchema>;

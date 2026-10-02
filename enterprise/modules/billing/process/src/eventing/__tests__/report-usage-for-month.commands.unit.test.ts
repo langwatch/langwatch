@@ -18,7 +18,6 @@ const {
   mockReportUsageDelta,
   mockSelfDispatch,
   mockCaptureException,
-  mockQueryBillableEventsTotal,
   mockQueryInstantEvalSpendTotal,
   mockConnectedUsageCeiling,
   mockLogger,
@@ -26,7 +25,6 @@ const {
   const reportUsageDeltaFn = vi.fn();
   const selfDispatchFn = vi.fn();
   const captureExceptionFn = vi.fn();
-  const queryBillableEventsTotalFn = vi.fn();
   const queryInstantEvalSpendTotalFn = vi.fn();
 
   const createMockLogger = (): Record<string, unknown> => ({
@@ -51,6 +49,7 @@ const {
   const billingCheckpointsPort = {
     findCheckpoint: vi.fn(),
     writeIntent: vi.fn(),
+    recordCountedEvent: vi.fn(),
     confirm: vi.fn(),
     clearPendingAndIncrementFailures: vi.fn(),
     incrementFailures: vi.fn(),
@@ -62,7 +61,6 @@ const {
     mockReportUsageDelta: reportUsageDeltaFn,
     mockSelfDispatch: selfDispatchFn,
     mockCaptureException: captureExceptionFn,
-    mockQueryBillableEventsTotal: queryBillableEventsTotalFn,
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
     mockConnectedUsageCeiling: connectedUsageCeilingFn,
     mockLogger: loggerInstance,
@@ -94,6 +92,11 @@ const errorReporter = { capture: mockCaptureException };
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** The month total as month_counted carries it; unset, the events meter has none. */
+let countedTotal: number | undefined;
+/** The month_counted event id the command carries; unset, no cursor applies. */
+let countedEventId: string | undefined;
+
 function makeCommand(
   organizationId = "org-1",
   billingMonth = "2026-02",
@@ -107,6 +110,8 @@ function makeCommand(
       billingMonth,
       tenantId: organizationId,
       occurredAt: Date.now(),
+      billableEvents: countedTotal,
+      countedEventId,
     },
   };
 }
@@ -162,7 +167,6 @@ async function createHandler() {
       reportUsageSet: vi.fn(),
       getUsageSummary: vi.fn(),
     }),
-    queryBillableEventsTotal: mockQueryBillableEventsTotal,
     queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
@@ -178,6 +182,8 @@ async function createHandler() {
 describe("ReportUsageForMonthCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    countedTotal = undefined;
+    countedEventId = undefined;
     // No spend ledger unless a test says otherwise, so the Instant Evals
     // meter stays out of the way of every assertion about the events one.
     mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
@@ -274,11 +280,11 @@ describe("ReportUsageForMonthCommand", () => {
     });
   });
 
-  describe("given ClickHouse not available", () => {
+  describe("given a command with no counted total", () => {
     it("returns empty events without reporting", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "unavailable" });
+      countedTotal = undefined;
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
@@ -298,13 +304,187 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 100 });
+      countedTotal = 100;
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
 
       expect(result).toEqual([]);
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the month's total was corrected below the checkpoint", () => {
+    /**
+     * @scenario "Billing's monthly report sends a lower corrected total as a negative meter event"
+     * @scenario "A lower corrected total is applied as an explicit adjustment"
+     */
+    it("sends the difference as a negative meter event and lowers the checkpoint", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 5000,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+      });
+      countedTotal = 4500;
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              value: -500,
+              identifier: "org-1:2026-02:from:5000:to:4500",
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_billable_events", lastReportedTotal: 4500 }),
+      );
+    });
+
+    /**
+     * @scenario "A redelivered downward correction is applied once"
+     * @scenario "A redelivered month_counted event applies no second adjustment"
+     */
+    it("sends nothing more once the checkpoint holds the corrected total", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 4500,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+      });
+      countedTotal = 4500;
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A redelivered downward correction is applied once" */
+    it("replays a crash-interrupted correction under the same Stripe identifier", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 5000,
+        pendingReportedTotal: 4500,
+        consecutiveFailures: 0,
+      });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              value: -500,
+              identifier: "org-1:2026-02:from:5000:to:4500",
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
+  describe("given month_counted events ordered by their k-sortable ids", () => {
+    /** @scenario "An older month_counted arriving after a newer one changes nothing" */
+    it("ignores a count whose event id is not newer than the applied one", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 5000,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+        lastCountedEventId: "01K2000000000000000000000B",
+      });
+      countedTotal = 4500;
+      countedEventId = "01K2000000000000000000000A";
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.recordCountedEvent).not.toHaveBeenCalled();
+      expect(mockSelfDispatch).not.toHaveBeenCalled();
+    });
+
+    it("records a newer count's id even when its total needs no report", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 5000,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+        lastCountedEventId: "01K2000000000000000000000A",
+      });
+      countedTotal = 5000;
+      countedEventId = "01K2000000000000000000000B";
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockBillingCheckpoints.recordCountedEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ countedEventId: "01K2000000000000000000000B" }),
+      );
+    });
+
+    /** @scenario "A retry does not overwrite a newer pending total" */
+    it("writes the intent with the event id and retries under that same id", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 100,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+        lastCountedEventId: "01K2000000000000000000000A",
+      });
+      countedTotal = 150;
+      countedEventId = "01K2000000000000000000000B";
+      mockReportUsageDelta.mockRejectedValue(new Error("rate limited"));
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pendingReportedTotal: 150,
+          countedEventId: "01K2000000000000000000000B",
+        }),
+      );
+      expect(mockSelfDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          billableEvents: 150,
+          countedEventId: "01K2000000000000000000000B",
+        }),
+      );
+    });
+
+    it("resumes an interrupted report from its pending total under the same identifier", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 100,
+        pendingReportedTotal: 150,
+        consecutiveFailures: 1,
+        lastCountedEventId: "01K2000000000000000000000B",
+      });
+      countedTotal = 150;
+      countedEventId = "01K2000000000000000000000B";
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({ value: 50, identifier: "org-1:2026-02:from:100:to:150" }),
+          ],
+        }),
+      );
     });
   });
 
@@ -321,7 +501,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
+      countedTotal = 150;
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
@@ -369,7 +549,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("reports each on its own meter, checkpoint and identifier", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
+      countedTotal = 150;
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 12_345 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       const handler = await createHandler();
@@ -414,7 +594,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("still reports the Instant Evals meter, and owes another tick", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockRejectedValue(new Error("ClickHouse is down"));
+      mockBillingCheckpoints.findCheckpoint.mockRejectedValueOnce(new Error("Postgres is down"));
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 20 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       const handler = await createHandler();
@@ -435,7 +615,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("creates checkpoint at reported total", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 50 });
+      countedTotal = 50;
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
@@ -481,9 +661,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      // Does NOT query ClickHouse; uses pending value directly
-      expect(mockQueryBillableEventsTotal).not.toHaveBeenCalled();
-
+      // Uses the pending value, not the command's total
       // Reports delta of 100 (200 - 100)
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -511,7 +689,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
+      countedTotal = 150;
       mockReportUsageDelta.mockResolvedValue([{ reported: false, error: "meter_event_invalid" }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.clearPendingAndIncrementFailures.mockResolvedValue(undefined);
@@ -546,7 +724,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 10 });
+      countedTotal = 10;
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockReportUsageDelta.mockRejectedValue(new Error("Stripe rate limit"));
       mockBillingCheckpoints.incrementFailures.mockResolvedValue(undefined);
@@ -601,8 +779,7 @@ describe("ReportUsageForMonthCommand", () => {
       const result = await handler.handle(makeCommand());
 
       expect(result).toEqual([]);
-      // No ClickHouse query, no Stripe call, no self-dispatch
-      expect(mockQueryBillableEventsTotal).not.toHaveBeenCalled();
+      // No Stripe call, no self-dispatch
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
       expect(mockSelfDispatch).not.toHaveBeenCalled();
     });
@@ -616,7 +793,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 3,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 200 });
+      countedTotal = 200;
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
@@ -676,7 +853,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 0 });
+      countedTotal = 0;
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: measured });
       mockConnectedUsageCeiling.mockResolvedValue(ceiling as never);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);

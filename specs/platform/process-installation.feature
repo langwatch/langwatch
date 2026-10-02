@@ -67,7 +67,7 @@ Feature: Every installed module boots in the process that installs it
   Scenario: A SaaS worker registers the billable-events meter
     Given the worker's installed modules over memory stores on a SaaS deployment
     When the worker process boots
-    Then the monthly roll-up pipeline declares the billable-events meter as a global projection
+    Then the usage pipeline declares the billable-events meter as a global projection
 
   @integration
   Scenario: Two process installations share no state

@@ -53,6 +53,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/usage-contract": "workspace:*",
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "geoip-country": "^5.0.202607010001",

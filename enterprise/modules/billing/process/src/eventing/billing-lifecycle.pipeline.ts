@@ -14,6 +14,10 @@ import {
 
 import type { BillingModule } from "../app/billing.app.ts";
 import {
+  BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
+  seatLimitReachedSubscriber,
+} from "./seat-limit-reached.subscriber.ts";
+import {
   RecordCheckoutCompletedCommand,
   RecordSubscriptionChangedCommand,
 } from "./billing-lifecycle.commands.ts";
@@ -33,7 +37,13 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
 >;
 
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
-export function buildBillingLifecyclePipeline(): BillingLifecyclePipeline {
+export type BuildBillingLifecyclePipelineInput = Readonly<{
+  alerts: Parameters<typeof seatLimitReachedSubscriber>[0]["alerts"];
+}>;
+
+export function buildBillingLifecyclePipeline({
+  alerts,
+}: BuildBillingLifecyclePipelineInput): BillingLifecyclePipeline {
   return definePipeline({
     name: BILLING_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: BILLING_LIFECYCLE_AGGREGATE_TYPE }),
@@ -41,6 +51,10 @@ export function buildBillingLifecyclePipeline(): BillingLifecyclePipeline {
     .withEvents([subscriptionChangedEventSchema, checkoutCompletedEventSchema])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
     .withCommand("recordCheckoutCompleted", RecordCheckoutCompletedCommand)
+    .withPeerSubscriber(
+      BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
+      seatLimitReachedSubscriber({ alerts }),
+    )
     .build();
 }
 

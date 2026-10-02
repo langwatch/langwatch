@@ -4400,6 +4400,8 @@ model BillingMeterCheckpoint {
   lastReportedTotal    Int      @default(0)
   pendingReportedTotal Int? // non-null = in-flight Stripe call
   consecutiveFailures  Int      @default(0)
+  // The newest usage month_counted event id applied (k-sortable); an older one is stale.
+  lastCountedEventId   String?
   updatedAt            DateTime @updatedAt
 
   @@unique([organizationId, billingMonth, meter])

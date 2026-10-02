@@ -103,7 +103,6 @@ import { StripeErrorTranslatorService } from "../services/stripe-error-translato
 import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { BillingSubscriptionService } from "../services/subscription.service.ts";
-import { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -238,6 +237,7 @@ export class BillingModule
         notices,
       }),
     });
+    const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
     return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingModule.assemble({
         members: setup.members,
@@ -247,10 +247,11 @@ export class BillingModule
         stripeSecretKey,
         statementMail: connectedStatementMailChannels.ses.create(mailer),
         usageWarnings: BillingModule.#composeUsageWarnings(setup, notices),
-        resourceLimitAlerts: BillingModule.#composeResourceLimitAlerts(setup, notices),
+        resourceLimitAlerts,
         lifecycle: BillingLifecycleAnnouncerService.create({
           subscriptions: setup.repositories.webhookSubscriptions,
           organizations: setup.dependencies.organizations,
+          resourceLimitAlerts,
         }),
         webhook: {
           signing,
@@ -361,7 +362,6 @@ export class BillingModule
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
-      | "billableEventsMeter"
       | "tenantOrganizations"
       | "tenantOrganizationCache"
     >;
@@ -404,7 +404,6 @@ export class BillingModule
         repositories,
         peers,
         facts,
-        isSaas,
         usageReporting: isSaas
           ? () =>
               StripeUsageReportingBuilder.create({
@@ -827,26 +826,18 @@ export class BillingModule
     repositories,
     peers,
     facts,
-    isSaas,
     usageReporting,
   }: {
     repositories: Pick<
       BillingRepositories,
       | "checkpoints"
       | "reportOrganizations"
-      | "billableEvents"
       | "organizationCache"
-      | "billableEventsMeter"
-      | "tenantOrganizations"
-      | "tenantOrganizationCache"
     >;
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
-    /** Main registered the billable-events meter on SaaS only. */
-    isSaas: boolean;
     usageReporting: (() => UsageReportingService) | undefined;
   }): BillingReportingPipeline {
-    const billableEvents = BillableEventsQueryService.create(repositories.billableEvents);
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
     };
@@ -866,7 +857,6 @@ export class BillingModule
       organizations: repositories.reportOrganizations,
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
-      queryBillableEventsTotal: (input) => billableEvents.queryBillableEventsTotal(input),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
@@ -874,15 +864,6 @@ export class BillingModule
         const answer = await ceiling.getRemaining(input);
         return answer.kind === "capped" ? answer.remainingUnits : null;
       },
-      meter: isSaas
-        ? {
-            meter: repositories.billableEventsMeter,
-            organizations: BillingTenantOrganizationService.create({
-              organizations: repositories.tenantOrganizations,
-              cache: repositories.tenantOrganizationCache,
-            }),
-          }
-        : void 0,
     });
   }
 

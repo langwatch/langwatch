@@ -31,6 +31,7 @@ function announcerOver(input: { remaining: boolean }) {
   const service = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
     organizations: { getAllMembers: async () => [{ id: "user-1" }, { id: "user-2" }] },
+    resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
   });
   service.connect({
     recordSubscriptionChanged: recorder(changed),
@@ -87,6 +88,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null },
       organizations: { getAllMembers: async () => [] },
+      resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     });
 
     await expect(

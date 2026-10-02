@@ -1,16 +1,17 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
+  type MeterWindow,
 } from "../billable-events-meter.repository.ts";
 
 const TABLE_NAME = "billable_events" as const;
 
-/** ClickHouse write side for deduplicated usage counting. */
+type TotalRow = { total: string | number };
+
+/** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -23,8 +24,13 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return new BillableEventsMeterClickHouseRepository(clickhouse);
   }
 
-  async insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void> {
-    const { record, organizationId } = input;
+  async insert({
+    record,
+    organizationId,
+  }: {
+    record: BillableEventRecord;
+    organizationId: string;
+  }): Promise<void> {
     await this.#clickhouse.insert({
       tenantId: record.tenantId,
       organizationId,
@@ -43,5 +49,27 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       ],
       settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
+  }
+
+  async findTotal(input: { organizationId: string } & MeterWindow): Promise<number> {
+    const result = await this.#clickhouse.query<TotalRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT countDistinct(DeduplicationKeyHash) as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND EventTimestamp >= {startDate:DateTime64(3)}
+          AND EventTimestamp < {endDate:DateTime64(3)}
+      `,
+      params: {
+        organizationId: input.organizationId,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      },
+      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+    });
+    const total = result.rows[0]?.total;
+    return typeof total === "number" ? total : Number.parseInt(total ?? "0", 10);
   }
 }

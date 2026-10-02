@@ -9,9 +9,20 @@ import { z } from "zod";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 
+/** Fractional digits a meter value may carry; a dollar meter reports to four places. */
+const METER_VALUE_MAX_DECIMALS = 4;
+
+/** An integer as itself, a fraction to fixed places: a float never reaches Stripe with its tail. */
+function formatMeterValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(METER_VALUE_MAX_DECIMALS);
+}
+
 const meterEventSchema = z.object({
   eventName: z.string().min(1),
-  value: z.number().int().nonnegative(),
+  /** Negative corrects an over-report: Stripe sums meters, and a negative cycle bills as 0. */
+  value: z.number().refine((value) => Number(value.toFixed(METER_VALUE_MAX_DECIMALS)) === value, {
+    message: `value carries at most ${METER_VALUE_MAX_DECIMALS} decimals`,
+  }),
   /** Unix SECONDS since epoch. NOT milliseconds, NOT ISO string. */
   timestamp: z.number().int().positive(),
   /** Caller-constructed idempotency key. 24-hour rolling uniqueness window in Stripe. */
@@ -103,7 +114,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         event_name: eventName,
         payload: {
           stripe_customer_id: stripeCustomerId,
-          value: String(value),
+          value: formatMeterValue(value),
         },
         identifier,
         timestamp,
@@ -175,7 +186,7 @@ export class StripeUsageReportingService implements UsageReportingService {
     const results: MeterEventResult[] = [];
 
     for (const event of validated.events) {
-      if (event.value <= 0) {
+      if (event.value === 0) {
         logger.info(
           {
             organizationId: validated.organizationId,

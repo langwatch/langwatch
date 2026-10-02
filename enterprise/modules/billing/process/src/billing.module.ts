@@ -1,5 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { defineProcessModule as defineProcessModule, instantiateRepositories } from "@langwatch/process";
+import { defineProcessModule, instantiateRepositories } from "@langwatch/process";
 
 /**
  * What a process composes billing's process-side work from: the
@@ -10,7 +10,6 @@ import { BillingModule } from "./app/billing.app.ts";
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
-import type { BillableEventsMeterRepository } from "./repositories/billable-events-meter.repository.ts";
 import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 import {
   billingClickhouseRepositories,
@@ -71,13 +70,6 @@ export function createBillableEventsQuery(options: {
   return BillableEventsQueryService.create(
     liveClickhouseRepositories(options.clickhouse).billableEvents,
   );
-}
-
-/** Where a billable event is metered, over the process's own tenant-keyed endpoint. */
-export function createBillableEventsMeter(options: {
-  clickhouse: ClickHouseQueryClient;
-}): BillableEventsMeterRepository {
-  return liveClickhouseRepositories(options.clickhouse).billableEventsMeter;
 }
 
 function liveClickhouseRepositories(clickhouse: ClickHouseQueryClient) {

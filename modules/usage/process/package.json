@@ -1,0 +1,44 @@
+{
+  "name": "@langwatch/usage-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Usage's counting: the billable-events meter, the month's count and the limit decisions.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/usage-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

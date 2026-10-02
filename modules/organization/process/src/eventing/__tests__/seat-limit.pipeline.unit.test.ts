@@ -1,21 +1,16 @@
-import type {
-  BillingApi,
-  ResourceLimitNotifierInput,
-} from "@langwatch/enterprise-billing-contract";
 import { createTenantId } from "@langwatch/eventing";
 /**
  * @vitest-environment node
  *
- * organization_seat_limit: the api records a reached seat limit; the worker's
- * subscriber on this pipeline tells billing through its Api (ARCHITECTURE §9).
+ * organization_seat_limit: organization records a reached seat limit as a fact;
+ * billing reacts from its side (ARCHITECTURE §9).
  * @see specs/licensing/resource-limit-notifications.feature
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { SEAT_LIMIT_REACHED_EVENT_TYPE } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { RecordSeatLimitReachedCommand } from "../seat-limit.commands.ts";
 import type { RecordSeatLimitReachedCommandData } from "../seat-limit.events.ts";
-import { SEAT_LIMIT_REACHED_EVENT_TYPE } from "../seat-limit.events.ts";
 import { buildSeatLimitPipeline } from "../seat-limit.pipeline.ts";
 
 const REACHED: RecordSeatLimitReachedCommandData = {
@@ -47,28 +42,7 @@ describe("organization's seat-limit pipeline", () => {
     expect(event.data).toEqual(REACHED);
   });
 
-  it("builds no reaction in the api role", () => {
-    expect(buildSeatLimitPipeline({}).eventSubscribers.size).toBe(0);
-  });
-
-  /** @scenario "Organization's seat-limit event tells billing" */
-  it("tells billing the limit type, current and max once the worker handles the event", async () => {
-    const told: ResourceLimitNotifierInput[] = [];
-    const billing = createApiFixture<BillingApi>({
-      notifyResourceLimitReached: async (input) => {
-        told.push(input);
-      },
-    });
-    const subscriber = buildSeatLimitPipeline({ billing }).eventSubscribers.get("notifyBilling");
-
-    await subscriber?.handle(await recordedEvent(), {
-      tenantId: createTenantId("org_acme"),
-      aggregateId: "org_acme",
-    });
-
-    expect(subscriber?.eventTypes).toEqual([SEAT_LIMIT_REACHED_EVENT_TYPE]);
-    expect(told).toEqual([
-      { organizationId: "org_acme", limitType: "members", current: 5, max: 5 },
-    ]);
+  it("holds no subscriber, since peers react from their own side", () => {
+    expect(buildSeatLimitPipeline().eventSubscribers.size).toBe(0);
   });
 });
