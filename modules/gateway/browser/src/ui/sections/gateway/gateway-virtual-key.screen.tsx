@@ -8,6 +8,8 @@ import {
   Button,
   Code,
   chakra,
+  Grid,
+  GridItem,
   Heading,
   HStack,
   Separator,
@@ -20,16 +22,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
-import {
-  ArrowLeft,
-  Bird,
-  FileClock,
-  PauseCircle,
-  Pencil,
-  PlayCircle,
-  RotateCw,
-  Trash2,
-} from "lucide-react";
+import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -476,13 +469,6 @@ function VirtualKeyDetailPage() {
     <AiGatewayLayout>
       <>
         <PageLayout.Header>
-          <HStack>
-            <Link href={`/gateway/virtual-keys`} color="fg.muted" fontSize="sm">
-              <HStack gap={1}>
-                <ArrowLeft size={14} /> Virtual Keys
-              </HStack>
-            </Link>
-          </HStack>
           <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
           <Spacer />
           {vk && (
@@ -505,101 +491,114 @@ function VirtualKeyDetailPage() {
           {detailQuery.isLoading && <Spinner />}
           {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
           {!detailQuery.isLoading && vk && (
-            <VStack align="stretch" gap={6}>
-              <VirtualKeyIdentitySection vk={vk} />
-
-              <VirtualKeyActivitySection vk={vk} />
-
-              <Section title="How to use">
-                <VirtualKeyUsageSnippet model={snippetModel} />
-              </Section>
-
-              <Section title="Scope & routing">
-                <VStack align="stretch" gap={3}>
-                  <VirtualKeyOwnershipReadOnly
-                    scopes={(vk.scopes ?? []).map((s) => ({
-                      scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-                      scopeId: s.scopeId,
-                    }))}
-                    principal={
-                      vk.principalUserId && vk.principalUser
-                        ? {
-                            name: vk.principalUser.name,
-                            email: vk.principalUser.email,
-                          }
-                        : undefined
-                    }
-                    traceProjectId={vk.traceProjectId ?? null}
-                    traceProjectArchived={vk.traceProjectArchived ?? false}
-                    viewTracesHref={viewTracesHref}
-                    ctx={{
-                      organizationName: organization?.name,
-                      availableTeams,
-                      availableProjects,
-                    }}
-                  />
-                  <HStack>
-                    <Text fontSize="sm" color="fg.muted">
-                      Routing policy:
-                    </Text>
-                    <RoutingPolicyValue
-                      routingPolicyId={vk.routingPolicyId}
-                      routingPolicyName={routingPolicyName}
-                    />
-                  </HStack>
-                  <EligibleModelProvidersSummary
-                    scopes={vk.scopes ?? []}
-                    organizationId={orgId}
-                    organizationName={organization?.name}
-                    availableTeams={availableTeams}
-                    availableProjects={availableProjects}
-                    isLoading={orgProvidersQuery.isLoading}
-                    providers={orgProvidersQuery.data ?? []}
-                    providersAllowed={providersAllowed}
-                  />
-                  <Box>
-                    <HStack mb={1.5} alignItems="center" gap={2} justifyContent="space-between">
-                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                        Allowed model providers
-                      </Text>
-                      <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
-                    </HStack>
-                    <EligibleModelProvidersPreview
-                      scopes={vk.scopes ?? []}
-                      organizationId={orgId}
-                      organizationName={organization?.name}
-                      availableTeams={availableTeams}
-                      availableProjects={availableProjects}
-                      isLoading={orgProvidersQuery.isLoading}
-                      providers={orgProvidersQuery.data ?? []}
-                      providersAllowed={providersAllowed}
-                      routingPolicyProviderIds={routingPolicyProviderIds}
-                      selectedModel={snippetModel}
-                      onSelectProviderModel={setSnippetModelOverride}
-                    />
-                  </Box>
+            /* One column, facts first, below xl; from xl the facts sit in a narrow right column. */
+            <Grid
+              templateColumns={{ base: "minmax(0, 1fr)", xl: "minmax(0, 1fr) 380px" }}
+              templateAreas={{ base: `"facts" "main"`, xl: `"main facts"` }}
+              gap={6}
+              alignItems="start"
+            >
+              <GridItem area="facts" minWidth={0}>
+                <VStack align="stretch" gap={6}>
+                  <VirtualKeyIdentitySection vk={vk} />
+                  <VirtualKeyActivitySection vk={vk} />
                 </VStack>
-              </Section>
+              </GridItem>
 
-              <GuardrailAttachmentsSection
-                organizationId={orgId}
-                vkId={vk.id}
-                projectId={guardrailProject?.id ?? null}
-                projectSlug={guardrailProject?.slug ?? null}
-                attachments={guardrailAttachments}
-                canAttach={canAttachGuardrails}
-                onSaved={() => void detailQuery.refetch()}
-              />
+              <GridItem area="main" minWidth={0}>
+                <VStack align="stretch" gap={6}>
+                  <Section title="How to use">
+                    <VirtualKeyUsageSnippet model={snippetModel} />
+                  </Section>
 
-              <ConfigurationSection config={vk.config as VkConfig | null} />
+                  <Section title="Scope & routing">
+                    <VStack align="stretch" gap={3}>
+                      <VirtualKeyOwnershipReadOnly
+                        scopes={(vk.scopes ?? []).map((s) => ({
+                          scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+                          scopeId: s.scopeId,
+                        }))}
+                        principal={
+                          vk.principalUserId && vk.principalUser
+                            ? {
+                                name: vk.principalUser.name,
+                                email: vk.principalUser.email,
+                              }
+                            : undefined
+                        }
+                        traceProjectId={vk.traceProjectId ?? null}
+                        traceProjectArchived={vk.traceProjectArchived ?? false}
+                        viewTracesHref={viewTracesHref}
+                        ctx={{
+                          organizationName: organization?.name,
+                          availableTeams,
+                          availableProjects,
+                        }}
+                      />
+                      <HStack>
+                        <Text fontSize="sm" color="fg.muted">
+                          Routing policy:
+                        </Text>
+                        <RoutingPolicyValue
+                          routingPolicyId={vk.routingPolicyId}
+                          routingPolicyName={routingPolicyName}
+                        />
+                      </HStack>
+                      <EligibleModelProvidersSummary
+                        scopes={vk.scopes ?? []}
+                        organizationId={orgId}
+                        organizationName={organization?.name}
+                        availableTeams={availableTeams}
+                        availableProjects={availableProjects}
+                        isLoading={orgProvidersQuery.isLoading}
+                        providers={orgProvidersQuery.data ?? []}
+                        providersAllowed={providersAllowed}
+                      />
+                      <Box>
+                        <HStack mb={1.5} alignItems="center" gap={2} justifyContent="space-between">
+                          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                            Allowed model providers
+                          </Text>
+                          <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
+                        </HStack>
+                        <EligibleModelProvidersPreview
+                          scopes={vk.scopes ?? []}
+                          organizationId={orgId}
+                          organizationName={organization?.name}
+                          availableTeams={availableTeams}
+                          availableProjects={availableProjects}
+                          isLoading={orgProvidersQuery.isLoading}
+                          providers={orgProvidersQuery.data ?? []}
+                          providersAllowed={providersAllowed}
+                          routingPolicyProviderIds={routingPolicyProviderIds}
+                          selectedModel={snippetModel}
+                          onSelectProviderModel={setSnippetModelOverride}
+                        />
+                      </Box>
+                    </VStack>
+                  </Section>
 
-              <UsageSection
-                data={usageQuery.data ?? null}
-                selectedModel={usageModel}
-                onSelectModel={setUsageModel}
-                viewTracesHref={usageTracesHref}
-              />
-            </VStack>
+                  <GuardrailAttachmentsSection
+                    organizationId={orgId}
+                    vkId={vk.id}
+                    projectId={guardrailProject?.id ?? null}
+                    projectSlug={guardrailProject?.slug ?? null}
+                    attachments={guardrailAttachments}
+                    canAttach={canAttachGuardrails}
+                    onSaved={() => void detailQuery.refetch()}
+                  />
+
+                  <ConfigurationSection config={vk.config as VkConfig | null} />
+
+                  <UsageSection
+                    data={usageQuery.data ?? null}
+                    selectedModel={usageModel}
+                    onSelectModel={setUsageModel}
+                    viewTracesHref={usageTracesHref}
+                  />
+                </VStack>
+              </GridItem>
+            </Grid>
           )}
         </PageLayout.Container>
       </>
@@ -1112,7 +1111,6 @@ function RoutingPolicyValue({
     return (
       <Link
         href={`/gateway/routing-policies?drawer.open=routingPolicy&drawer.policyId=${routingPolicyId}`}
-        color="blue.600"
         fontSize="sm"
         data-testid="vk-routing-policy-link"
       >
