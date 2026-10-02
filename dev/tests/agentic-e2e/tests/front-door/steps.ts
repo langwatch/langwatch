@@ -389,6 +389,9 @@ export async function whenISignInWithPassword(
  * sign-in/sign-out cycle to exactly the two requests the rate limit counts.
  */
 export async function whenISignOut(page: Page): Promise<void> {
+  // Leave the app first: an open app tab that sees its session end redirects to the sign-in
+  // screen itself, and that redirect aborts the next step's own navigation there.
+  await page.goto("about:blank");
   // An empty JSON body, because better-auth answers a bodiless POST with 415
   // (`Content-Type is required`) — `data: {}` is what makes Playwright send
   // `application/json`.
