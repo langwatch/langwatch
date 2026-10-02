@@ -86,6 +86,54 @@ describe("given the deployment has no classifier", () => {
       expect(copy.action?.href).not.toBe(MODEL_PROVIDERS_HREF);
     });
   });
+
+  describe("when the support chat is available", () => {
+    /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+    it("opens the chat and renders no mailto link when Contact us is clicked", () => {
+      crispPolicy.isSupportChatAvailable.mockReturnValue(true);
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "model" }}
+          onClose={() => {}}
+          onEnable={() => {}}
+          isEnabling={false}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Contact us" }));
+      expect(crispPolicy.toggleSupportChat).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByRole("link", { name: "Contact us" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when no support chat is available", () => {
+    /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+    it("links Contact us to the mailto address and runs the phrase search on Skip", () => {
+      const onClose = vi.fn();
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "model" }}
+          onClose={onClose}
+          onEnable={() => {}}
+          isEnabling={false}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+        "href",
+        CONTACT_US_HREF,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(crispPolicy.toggleSupportChat).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("given Instant Evals are off for a self-serve organization", () => {
