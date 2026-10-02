@@ -15,12 +15,12 @@ import {
 } from "@langwatch/eventing";
 
 import {
-  GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-  GOVERNANCE_COST_SOURCE,
 } from "../repositories/governance-cost-rollup.repository.ts";
 import {
+  GOVERNANCE_COST_CURRENCY_USD,
+  GOVERNANCE_COST_SOURCE,
   encodeGovernanceCostRollupKey,
   type GovernanceCostRollupCell,
   type GovernanceCostRollupState,

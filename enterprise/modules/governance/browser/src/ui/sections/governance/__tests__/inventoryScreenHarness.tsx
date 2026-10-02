@@ -79,6 +79,11 @@ const hoistedHarness = vi.hoisted(() => ({
  */
 export const harness = hoistedHarness;
 
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
+}));
+
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const mutationResult = () => ({
     mutate: vi.fn(),

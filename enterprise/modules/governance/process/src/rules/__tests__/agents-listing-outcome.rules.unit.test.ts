@@ -12,7 +12,7 @@
  * and a refusal never picks up a count it does not have.
  */
 
-import { deriveAgentsListingOutcome } from "@langwatch/enterprise-governance-process";
+import { deriveAgentsListingOutcome } from "../agents-listing-outcome.rules.ts";
 import { describe, expect, it } from "vitest";
 
 const row = (outcome: string | null, reason: string | null) => ({

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -30,6 +31,7 @@ import {
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -86,7 +88,6 @@ import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
@@ -353,7 +354,9 @@ function IngestionSourceList({
 
       {isLoading && <Spinner size="sm" />}
 
-      <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
+      {error ? (
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
+      ) : null}
 
       {/* A grey sentence used to sit here, which told a reader the state and
           left them in it. The way out is the page header's own Add source,
@@ -438,13 +441,11 @@ function useIngestionSourceMutations({
   refetch,
   setComposing,
   setComposer,
-  setEditingSourceId,
   setSecretModal,
 }: {
   refetch: () => unknown;
   setComposing: (open: boolean) => void;
   setComposer: (next: ComposerState) => void;
-  setEditingSourceId: (id: string | null) => void;
   setSecretModal: (details: SecretDetails | null) => void;
 }) {
   const toaster = useGovernanceToaster();
@@ -483,15 +484,6 @@ function useIngestionSourceMutations({
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
-  const update = api.ingestionSources.update.useMutation({
-    onSuccess: () => {
-      void refetch();
-      setEditingSourceId(null);
-      toaster.create({ title: "Source updated", type: "success" });
-    },
-    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
-  });
-
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       void refetch();
@@ -504,7 +496,7 @@ function useIngestionSourceMutations({
       }),
   });
 
-  return { create, rotate, update, archive };
+  return { create, rotate, archive };
 }
 
 /**
@@ -655,7 +647,9 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
    * wrong.
    */
   const [invalidFieldKeys, setInvalidFieldKeys] = useState<readonly string[]>([]);
-  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+  const { openDrawer } = useDrawer();
+  const editSource = (sourceId: string) =>
+    openDrawer("editIngestionSource", { urlParams: { sourceId } });
   const [secretModal, setSecretModal] = useState<SecretDetails | null>(null);
   const toaster = useGovernanceToaster();
 
@@ -663,7 +657,6 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
     refetch,
     setComposing,
     setComposer,
-    setEditingSourceId,
     setSecretModal,
   });
 
@@ -732,8 +725,7 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
     composer,
     setComposer: updateComposer,
     invalidFieldKeys,
-    editingSourceId,
-    setEditingSourceId,
+    editSource,
     secretModal,
     setSecretModal,
     mutations,
@@ -1012,7 +1004,7 @@ function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSo
       sources={page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data}
       rotatingId={pendingId(mutations.rotate)}
       archivingId={pendingId(mutations.archive)}
-      onEdit={page.setEditingSourceId}
+      onEdit={page.editSource}
       onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
       onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
       createAction={
@@ -1250,7 +1242,7 @@ function InventoryPage() {
  * mounted at this level rather than beside whatever opened them.
  */
 function InventoryOverlays({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
-  const { orgId, destinationCtx, sourcesQuery, mutations } = page;
+  const { orgId } = page;
   return (
     <>
       <AddEnvironmentDialog
@@ -1273,46 +1265,7 @@ function InventoryOverlays({ page }: { page: ReturnType<typeof useIngestionSourc
         onCancel={() => page.catalog.setPendingDelete(null)}
         onConfirm={page.catalog.confirmDelete}
       />
-
-      <EditingSourceDrawer
-        orgId={orgId}
-        destinationCtx={destinationCtx}
-        editingSourceId={page.editingSourceId}
-        setEditingSourceId={page.setEditingSourceId}
-        sourcesQuery={sourcesQuery}
-        update={mutations.update}
-      />
     </>
-  );
-}
-
-/** The edit drawer, resolved from the id the list put in page state. */
-function EditingSourceDrawer({
-  orgId,
-  destinationCtx,
-  editingSourceId,
-  setEditingSourceId,
-  sourcesQuery,
-  update,
-}: {
-  orgId: string;
-  destinationCtx: DestinationContext;
-  editingSourceId: string | null;
-  setEditingSourceId: (id: string | null) => void;
-  sourcesQuery: ReturnType<typeof useIngestionSourcesPage>["sourcesQuery"];
-  update: ReturnType<typeof useIngestionSourcesPage>["mutations"]["update"];
-}) {
-  return (
-    <SourceEditDrawer
-      organizationId={orgId}
-      destinationCtx={destinationCtx}
-      source={
-        editingSourceId ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null) : null
-      }
-      onClose={() => setEditingSourceId(null)}
-      onSubmit={(input) => update.mutate(input)}
-      isPending={update.isPending}
-    />
   );
 }
 

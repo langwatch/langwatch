@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { Wallet } from "lucide-react";
 import numeral from "numeral";
@@ -19,7 +20,6 @@ import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { Link } from "../../../ui/elements/governance-link.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";

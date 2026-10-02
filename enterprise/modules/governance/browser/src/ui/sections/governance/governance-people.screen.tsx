@@ -16,6 +16,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   Archive,
   Building2,
@@ -35,16 +37,14 @@ import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/gover
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { DepartmentEditDrawer } from "../../../features/departments/ui/sections/department-edit-drawer.tsx";
+import { usePeopleFilters } from "../../../features/people/behavior/use-people-filters.ts";
 import {
   type DepartmentRecord,
   type DepartmentTableRow,
   mergeDepartmentRows,
 } from "../../../features/people/model/department-rows.ts";
 import { groupObservedDepartments } from "../../../features/people/model/observed-departments.ts";
-import {
-  SPEND_WINDOW_DAYS,
-  usePeopleFilters,
-} from "../../../features/people/model/people-filters.ts";
+import { SPEND_WINDOW_DAYS } from "../../../features/people/model/people-filters.ts";
 import {
   departmentsPresent,
   filterByDepartment,
@@ -71,7 +71,6 @@ import {
   providerLabel,
   UnifiedPeopleTable,
 } from "../../../features/people/ui/unified-people-table.tsx";
-import { readHandledError } from "../../../model/handled-error.ts";
 import {
   GovernanceEmptyState,
   GovernanceEmptyStateAction,
@@ -80,7 +79,6 @@ import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
@@ -825,11 +823,15 @@ function PeopleReadIssues({
 
   return (
     <>
-      <HandledErrorAlert error={reads.spend.error} fallbackTitle="Couldn't load people" />
-      <HandledErrorAlert
-        error={reads.people.error}
-        fallbackTitle="Couldn't load the people the providers named"
-      />
+      {reads.spend.error ? (
+        <HandledErrorAlert error={reads.spend.error} fallbackTitle="Couldn't load people" />
+      ) : null}
+      {reads.people.error ? (
+        <HandledErrorAlert
+          error={reads.people.error}
+          fallbackTitle="Couldn't load the people the providers named"
+        />
+      ) : null}
     </>
   );
 }
@@ -952,7 +954,7 @@ function DepartmentsTabPane({
         Spend rolls up by department, including personal AI use.
       </Text>
 
-      <HandledErrorAlert error={error} fallbackTitle="Couldn't load departments" />
+      {error ? <HandledErrorAlert error={error} fallbackTitle="Couldn't load departments" /> : null}
 
       <DepartmentList
         orgId={orgId}

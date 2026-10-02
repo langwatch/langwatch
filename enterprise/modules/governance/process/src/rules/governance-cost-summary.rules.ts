@@ -15,11 +15,11 @@ import {
 import type { Instant } from "@langwatch/time";
 
 import type { GovernanceSeatReportRow } from "../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
+import type { GovernanceCostDayLaneGroup } from "../repositories/governance-cost-rollup.repository.ts";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
-  type GovernanceCostDayLaneGroup,
-} from "../repositories/governance-cost-rollup.repository.ts";
+} from "./governance-cost-rollup-cell.rules.ts";
 
 /** How long a pull's touch keeps a day provisional (main `GOVERNANCE_SETTLING_WINDOW_DAYS`). */
 export const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;

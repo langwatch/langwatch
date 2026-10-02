@@ -28,6 +28,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { HandledErrorAlert } from "@langwatch/error-views";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 import { Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
 import numeral from "numeral";
@@ -53,10 +55,8 @@ import {
 } from "../../../features/source-events/behavior/use-source-events-pager.ts";
 import { type PageRequest } from "../../../features/source-events/model/governance-events-pager.ts";
 import { SourceEventsTable } from "../../../features/source-events/ui/sections/source-events-table.tsx";
-import { readHandledError } from "../../../model/handled-error.ts";
 import { EnterpriseLockedSurface } from "../../../ui/elements/enterprise-locked-surface.tsx";
 import { Link } from "../../../ui/elements/governance-link.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";

@@ -14,15 +14,15 @@ import type {
   AnomalyRuleSeverity,
   AnomalyRuleStatus,
   Department,
+  GovernanceActorWorkspace,
   GovernanceIngestionSourceType,
+  GovernanceWriteAcknowledged,
   IngestionTemplate,
+  OttlStarterTemplate,
   OttlValidationResult,
   QuarantineFillStats,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
-
-// Acknowledgement for writes that return void; `.ok` is the only field read.
-export type GovernanceAcknowledgement = { ok: boolean };
 
 // Wire DTO: adds hasPollerCursor and traceProjectArchived.
 // Named View not Source to avoid confusion with server row.
@@ -69,22 +69,6 @@ export type GovernanceDepartmentView = Omit<Department, "createdAt" | "updatedAt
 export type GovernanceIngestionSourceCreated = {
   source: GovernanceIngestionSourceView;
   ingestSecret: string;
-};
-
-// OTTL starter: enabledSourceTypes typed string[] (unions break .includes() checks).
-export type GovernanceOttlStarter = {
-  enabled: boolean;
-  statements: string[];
-  enabledSourceTypes: string[];
-};
-
-// Actor's workspace link: displayName always filled (falls back through name, email, id).
-export type GovernanceActorWorkspace = {
-  userId: string;
-  displayName: string;
-  teamId: string;
-  projectId: string;
-  projectSlug: string;
 };
 
 /** The organization's session-lifetime policy. Zero days means unbounded. */
@@ -198,13 +182,13 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
       archive: {
         mutation: {
           input: { organizationId: string; id: string };
-          output: GovernanceAcknowledgement;
+          output: GovernanceWriteAcknowledged;
         };
       };
       assignUser: {
         mutation: {
           input: { organizationId: string; userId: string; departmentId: string | null };
-          output: GovernanceAcknowledgement;
+          output: GovernanceWriteAcknowledged;
         };
       };
     };
@@ -293,7 +277,7 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
       ottlStarter: {
         query: {
           input: { organizationId: string; sourceType: string };
-          output: GovernanceOttlStarter;
+          output: OttlStarterTemplate;
         };
       };
       validateOttl: {
@@ -331,7 +315,7 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
       archive: {
         mutation: {
           input: { organizationId: string; id: string };
-          output: GovernanceAcknowledgement;
+          output: GovernanceWriteAcknowledged;
         };
       };
       cloneFromPlatform: {

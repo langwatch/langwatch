@@ -88,4 +88,11 @@ export const governanceWeb = defineBrowserModule("governance")
         default: (await import("./features/agents/register-agent-drawer.tsx")).RegisterAgentDrawer,
       }),
     },
+    /** The inventory source list opens it by address: `?drawer.open=editIngestionSource`. */
+    editIngestionSource: {
+      load: async () => ({
+        default: (await import("./ui/sections/governance/routed-source-edit-drawer.tsx"))
+          .RoutedSourceEditDrawer,
+      }),
+    },
   });

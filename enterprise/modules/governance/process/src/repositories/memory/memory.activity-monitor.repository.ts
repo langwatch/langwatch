@@ -53,19 +53,23 @@ const EMPTY_SNAPSHOT: ActivityMonitorSnapshot = {
 
 /**
  * The activity-monitor twin: an organization with no activity reads as the empty
- * dashboard; a test seeds a snapshot through {@link record} and reads it back paged
+ * dashboard; a test seeds snapshots through `create` and reads them back paged
  * and limited the way `PrismaActivityMonitorRepository` pages its rows.
  */
 export class MemoryActivityMonitorRepository implements ActivityMonitorRepository {
   private readonly snapshots = new Map<string, Partial<ActivityMonitorSnapshot>>();
 
-  static create(): MemoryActivityMonitorRepository {
-    return new MemoryActivityMonitorRepository();
-  }
-
-  /** Test seam: what one organization's dashboard answers. */
-  record(organizationId: string, snapshot: Partial<ActivityMonitorSnapshot>): void {
-    this.snapshots.set(organizationId, { ...this.snapshots.get(organizationId), ...snapshot });
+  /** `seed` is what each organization's dashboard answers, keyed by organization id. */
+  static create({
+    seed = {},
+  }: {
+    seed?: Readonly<Record<string, Partial<ActivityMonitorSnapshot>>>;
+  } = {}): MemoryActivityMonitorRepository {
+    const repository = new MemoryActivityMonitorRepository();
+    for (const [organizationId, snapshot] of Object.entries(seed)) {
+      repository.snapshots.set(organizationId, snapshot);
+    }
+    return repository;
   }
 
   private of(organizationId: string): ActivityMonitorSnapshot {

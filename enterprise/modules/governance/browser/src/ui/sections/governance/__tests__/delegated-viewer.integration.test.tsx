@@ -46,6 +46,10 @@ const harness = vi.hoisted(() => ({
 }));
 
 // jsdom has no canvas for the shader behind the overview's hero.
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
+}));
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 vi.mock("../../../../features/overview/ui/sections/quarantine-fill-panel.tsx", () => ({
   QuarantineFillAlert: () => null,

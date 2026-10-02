@@ -1,14 +1,6 @@
-export type GovernanceOttlValidationError = {
-  statementIndex: number;
-  message: string;
-  line: number;
-  col: number;
-};
+import type { OttlValidationResult } from "@langwatch/enterprise-governance-contract";
 
-export type GovernanceOttlValidationResult =
-  | { status: "valid" }
-  | { status: "invalid"; errors: GovernanceOttlValidationError[] }
-  | { status: "deferred"; reason: string };
+export type GovernanceOttlValidationResult = OttlValidationResult;
 
 export abstract class GovernanceOttlValidationClient {
   abstract validate(input: {

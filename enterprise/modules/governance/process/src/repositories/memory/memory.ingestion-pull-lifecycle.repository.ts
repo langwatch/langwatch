@@ -13,12 +13,14 @@ export class MemoryIngestionPullLifecycleRepository extends IngestionPullLifecyc
     super();
   }
 
-  static create(): MemoryIngestionPullLifecycleRepository {
-    return new MemoryIngestionPullLifecycleRepository();
-  }
-
-  seed(source: IngestionPullLifecycleSource): void {
-    this.sources.set(source.id, source);
+  static create({
+    seed = [],
+  }: {
+    seed?: readonly IngestionPullLifecycleSource[];
+  } = {}): MemoryIngestionPullLifecycleRepository {
+    const repository = new MemoryIngestionPullLifecycleRepository();
+    for (const source of seed) repository.sources.set(source.id, source);
+    return repository;
   }
 
   async findForReconciliation(): Promise<IngestionPullLifecycleSource[]> {

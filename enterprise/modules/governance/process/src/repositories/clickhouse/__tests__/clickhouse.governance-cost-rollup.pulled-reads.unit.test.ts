@@ -10,10 +10,8 @@ import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
 import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
-import {
-  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-  GOVERNANCE_COST_SOURCE,
-} from "../../governance-cost-rollup.repository.ts";
+import { GOVERNANCE_COST_SOURCE } from "../../../rules/governance-cost-rollup-cell.rules.ts";
+import { GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST } from "../../governance-cost-rollup.repository.ts";
 import { memberClickHouseResolver } from "../clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse.governance-cost-rollup.repository.ts";
 

@@ -8,16 +8,15 @@ import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import {
-  type GovernanceDiagnosticsSink,
-  type GovernanceKpiContribution,
-  type GovernanceKpiContributionWriter,
-  type GovernanceOcsfEvent,
-  type GovernanceOcsfEventWriter,
-  type GovernanceTraceSummary,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
+import type {
+  GovernanceDiagnosticsSink,
+  GovernanceKpiContribution,
+  GovernanceKpiContributionWriter,
+  GovernanceOcsfEvent,
+  GovernanceOcsfEventWriter,
+  GovernanceTraceSummary,
 } from "../app/governance.members.ts";
+import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../rules/ocsf-codes.rules.ts";
 import { ocsfActorFields } from "../rules/ocsf-pull-event-mapping.rules.ts";
 
 const HOUR_MS = 60 * 60 * 1_000;

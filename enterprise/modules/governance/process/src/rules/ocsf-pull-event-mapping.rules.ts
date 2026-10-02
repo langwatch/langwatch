@@ -15,11 +15,8 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import {
-  type GovernanceOcsfEventInput,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../app/governance.members.ts";
+import type { GovernanceOcsfEventInput } from "../app/governance.members.ts";
+import { OCSF_ACTIVITY, OCSF_SEVERITY } from "./ocsf-codes.rules.ts";
 
 /**
  * The amount this event carries and the currency it is denominated in.

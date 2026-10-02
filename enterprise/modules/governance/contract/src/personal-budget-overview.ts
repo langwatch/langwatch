@@ -6,33 +6,6 @@ export type GovernanceBudgetOverviewInput = {
   includeTopModels?: boolean;
 };
 
-export type GovernanceBudgetOverviewItem = {
-  id: string;
-  name: string;
-  scopeType: string;
-  scopeId: string;
-  scopeLabel: string;
-  window: string;
-  limitUsd: string;
-  spentUsd: string;
-  onBreach: string;
-  timezone: string | null;
-  providerKey: string | null;
-  providerLabel: string | null;
-  isPerMember: boolean;
-  managedByVirtualKeyId: string | null;
-  scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
-  scopePhrase: string;
-  resetsAt: string | null;
-  topModels?: { model: string; spentUsd: number }[];
-};
-
-export type GovernanceBudgetOverviewForUser = {
-  gatewayAccess: boolean;
-  reason?: "flag_off" | "no_membership";
-  budgets: GovernanceBudgetOverviewItem[];
-};
-
 /**
  * One budget on the /me overview, labelled with the scope it binds. The three
  * money fields are decimal STRINGS: they are read straight off the ledger and
@@ -81,3 +54,7 @@ export const governanceBudgetOverviewForUserSchema = z
     budgets: z.array(governanceBudgetOverviewItemSchema),
   })
   .strict();
+
+export type GovernanceBudgetOverviewItem = z.infer<typeof governanceBudgetOverviewItemSchema>;
+
+export type GovernanceBudgetOverviewForUser = z.infer<typeof governanceBudgetOverviewForUserSchema>;

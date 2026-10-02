@@ -2,10 +2,8 @@
 /** Port of main's `governanceCostRollup.foldProjection.ts` pure half (ADR-128). @see specs/governance/governance-cost-rollup.feature */
 import { Temporal } from "@langwatch/time";
 
-import {
-  GOVERNANCE_COST_CURRENCY_USD,
-  GOVERNANCE_COST_SOURCE,
-} from "../repositories/governance-cost-rollup.repository.ts";
+export const GOVERNANCE_COST_SOURCE = { GATEWAY: "gateway", PULLED: "pulled" } as const;
+export const GOVERNANCE_COST_CURRENCY_USD = "USD";
 
 export type GovernanceCostSource =
   (typeof GOVERNANCE_COST_SOURCE)[keyof typeof GOVERNANCE_COST_SOURCE];

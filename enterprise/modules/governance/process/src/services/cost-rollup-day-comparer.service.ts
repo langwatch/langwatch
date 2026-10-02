@@ -14,15 +14,13 @@ import { Temporal } from "@langwatch/time";
 
 import type { CostRollupDayComparer, CostRollupDayLook } from "../app/governance.members.ts";
 import type { GovernanceCostChargeRepository } from "../repositories/governance-cost-charge.repository.ts";
-import {
-  GOVERNANCE_COST_SOURCE,
-  type GovernanceCostRollupRepository,
-} from "../repositories/governance-cost-rollup.repository.ts";
+import type { GovernanceCostRollupRepository } from "../repositories/governance-cost-rollup.repository.ts";
 import {
   type CostRollupDayComparison,
   compareCostRollupDay,
   deriveCostRollupCells,
 } from "../rules/cost-rollup-day-comparison.rules.ts";
+import { GOVERNANCE_COST_SOURCE } from "../rules/governance-cost-rollup-cell.rules.ts";
 
 export const COST_ROLLUP_MISMATCH_METRIC_NAME = "langwatch_governance_cost_rollup_mismatch_total";
 export const COST_ROLLUP_LAG_METRIC_NAME = "langwatch_governance_cost_rollup_lag_seconds";

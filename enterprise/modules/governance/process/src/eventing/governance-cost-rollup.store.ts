@@ -9,11 +9,11 @@ import { z } from "zod";
 
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-  GOVERNANCE_COST_SOURCE,
   type GovernanceCostRollupRepository,
   type GovernanceCostRollupRow,
 } from "../repositories/governance-cost-rollup.repository.ts";
 import {
+  GOVERNANCE_COST_SOURCE,
   decodeGovernanceCostRollupKey,
   type GovernanceCostRollupState,
   governanceCostRollupTotals,

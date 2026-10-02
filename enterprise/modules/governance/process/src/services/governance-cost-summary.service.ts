@@ -10,12 +10,10 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import {
-  GOVERNANCE_COST_SOURCE,
-  type GovernanceCostRollupRepository,
-} from "../repositories/governance-cost-rollup.repository.ts";
+import type { GovernanceCostRollupRepository } from "../repositories/governance-cost-rollup.repository.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { spenderFigure, trailingCostWindow } from "../rules/governance-cost-figures.rules.ts";
+import { GOVERNANCE_COST_SOURCE } from "../rules/governance-cost-rollup-cell.rules.ts";
 import {
   currencyTotalsFrom,
   gatewayLaneFrom,

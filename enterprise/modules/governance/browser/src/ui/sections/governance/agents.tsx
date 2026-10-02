@@ -6,6 +6,7 @@ import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -41,7 +42,6 @@ import {
   GovernanceEmptyStateAction,
 } from "../../elements/governance-empty-state.tsx";
 import { useSampleMode } from "../../elements/governance-sample-mode.ts";
-import { HandledErrorAlert } from "../../elements/handled-error-alert.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../elements/sample-data-controls.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
@@ -481,7 +481,7 @@ function AgentsPage() {
             for that; what it cannot say is that the emptiness is a failure
             rather than an answer. `useAgentsScreen` has already decided this
             is null under sample mode. */}
-          <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" />
+          {error ? <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" /> : null}
           {/* Under the banner, above the chips. Under the banner because every
             figure on it is invented while sample mode is on, and the banner is
             the page's one claim about the whole screen; above the chips

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { PROVIDER_NAMES } from "./provider-names.ts";
+const PROVIDER_NAMES: Record<string, string> = {
+  openai_admin: "OpenAI",
+  anthropic_admin: "Anthropic",
+  databricks_genie: "Databricks",
+  copilot_studio: "Microsoft Copilot Studio (Purview)",
+  copilot_studio_dataverse: "Microsoft Copilot Studio",
+};
 
 /**
  * The provider's product name, or the raw key when we have never seen it.

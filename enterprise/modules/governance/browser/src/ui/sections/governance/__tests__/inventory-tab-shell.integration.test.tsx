@@ -32,6 +32,11 @@ const NO_SOURCES_READ_PERMISSIONS = ["organization:view", "governance:view"];
 /** The catalog admin plus the sources write grant. */
 const SOURCES_ADMIN_PERMISSIONS = [...CATALOG_ADMIN_PERMISSIONS, "ingestionSources:manage"];
 
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
+}));
+
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const queryResult = () => ({
     data: undefined,

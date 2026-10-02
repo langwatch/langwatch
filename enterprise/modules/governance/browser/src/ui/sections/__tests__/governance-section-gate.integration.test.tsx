@@ -14,6 +14,10 @@ import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.t
 
 const harness = vi.hoisted(() => ({ requested: [] as string[] }));
 
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
+}));
 vi.mock("../../../behavior/governance-api.ts", () => {
   const node = (path: string[]): unknown =>
     new Proxy(

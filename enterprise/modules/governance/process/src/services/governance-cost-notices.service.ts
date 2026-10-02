@@ -2,10 +2,9 @@
 /** Main's `readStaleSources`, `readUnpricedWindow` and `readAzureBillingNote`, over one source read. @see specs/governance/governance-cost-screen.feature */
 import type { GovernanceCostSummary } from "@langwatch/enterprise-governance-contract";
 
-import {
-  GOVERNANCE_COST_SOURCE,
-  type GovernanceCostRollupRepository,
-  type GovernanceCostRollupWindow,
+import type {
+  GovernanceCostRollupRepository,
+  GovernanceCostRollupWindow,
 } from "../repositories/governance-cost-rollup.repository.ts";
 import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
 import { azureBillSourceId } from "../rules/azure-bill-identity.rules.ts";
@@ -15,6 +14,7 @@ import {
   costCaveatsFrom,
   readStoredCostCursor,
 } from "../rules/governance-cost-notices.rules.ts";
+import { GOVERNANCE_COST_SOURCE } from "../rules/governance-cost-rollup-cell.rules.ts";
 
 type Sources = Pick<IngestionSourceRepository, "findAll" | "findUnpricedUsageWindows">;
 

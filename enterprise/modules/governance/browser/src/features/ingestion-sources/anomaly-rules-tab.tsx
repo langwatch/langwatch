@@ -14,6 +14,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -27,7 +28,6 @@ import {
 import { useGovernanceScope } from "../../behavior/governance-session.ts";
 import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
 import { Link } from "../../ui/elements/governance-link.tsx";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
 import { DashboardSelect } from "./dashboard-select.tsx";
 

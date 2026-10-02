@@ -136,14 +136,10 @@ export interface GovernanceProjectCaller {
 }
 
 /** What a template a member may pick is created from. */
-export interface GovernanceTemplateDraft {
-  sourceType: string;
-  displayName: string;
-  description?: string | null;
-  iconAsset?: string | null;
-  credentialSchema?: string | null;
-  ottlRules?: string;
-}
+export type GovernanceTemplateDraft = Pick<
+  CreateIngestionTemplateInput,
+  "sourceType" | "displayName" | "description" | "iconAsset" | "credentialSchema" | "ottlRules"
+>;
 
 /** Who a call is attributed to, and (for a lazy backfill) what to name them. */
 export interface GovernanceCaller {

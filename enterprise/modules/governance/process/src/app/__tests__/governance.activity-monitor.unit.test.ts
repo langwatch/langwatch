@@ -26,7 +26,10 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryActivityMonitorRepository } from "../../repositories/memory/memory.activity-monitor.repository.ts";
+import {
+  type ActivityMonitorSnapshot,
+  MemoryActivityMonitorRepository,
+} from "../../repositories/memory/memory.activity-monitor.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
@@ -47,9 +50,12 @@ function planOfType(type: string): Plan {
   };
 }
 
-async function buildApp(planType: string) {
+async function buildApp(
+  planType: string,
+  seed: Record<string, Partial<ActivityMonitorSnapshot>> = {},
+) {
   const plansAsked: unknown[] = [];
-  const activity = MemoryActivityMonitorRepository.create();
+  const activity = MemoryActivityMonitorRepository.create({ seed });
   const app = await GovernanceModule.create({
     config: void 0,
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
@@ -101,8 +107,9 @@ const user = (actor: string) => ({
 describe("the activity monitor", () => {
   describe("given an organization on the Enterprise plan", () => {
     it("pages its spend by user, resolving the plan as the signed-in person", async () => {
-      const { app, plansAsked, activity } = await buildApp("ENTERPRISE");
-      activity.record("org-1", { spendByUser: [user("a"), user("b"), user("c")] });
+      const { app, plansAsked } = await buildApp("ENTERPRISE", {
+        "org-1": { spendByUser: [user("a"), user("b"), user("c")] },
+      });
 
       const rows = await app.activitySpendByUser(
         { organizationId: "org-1", windowDays: 30, limit: 1, offset: 1 },

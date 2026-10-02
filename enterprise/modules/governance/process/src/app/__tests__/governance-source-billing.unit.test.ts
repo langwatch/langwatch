@@ -27,10 +27,8 @@ import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
 async function buildApp() {
-  const costAttributionPolicies = MemoryCostAttributionPolicyRepository.create();
-  costAttributionPolicies.addEnabledCodingAssistantConfig({
-    organizationId: "org-1",
-    config: { assistantKind: "codex", bundledPlan: false },
+  const costAttributionPolicies = MemoryCostAttributionPolicyRepository.create({
+    seed: [{ organizationId: "org-1", config: { assistantKind: "codex", bundledPlan: false } }],
   });
   return GovernanceModule.create({
     config: void 0,

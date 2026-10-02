@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The cost screen's reads over `governance_cost_rollup_1d` (ADR-128). @see specs/governance/governance-cost-screen.feature */
 
-export const GOVERNANCE_COST_SOURCE = { GATEWAY: "gateway", PULLED: "pulled" } as const;
-export const GOVERNANCE_COST_CURRENCY_USD = "USD";
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
 

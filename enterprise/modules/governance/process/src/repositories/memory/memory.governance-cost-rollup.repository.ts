@@ -1,9 +1,11 @@
 import { Temporal } from "@langwatch/time";
 
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
+} from "../../rules/governance-cost-rollup-cell.rules.ts";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
   GovernanceCostRollupRepository,
   type GovernanceCostCurrencyGroup,
   type GovernanceCostDayCurrencyGroup,

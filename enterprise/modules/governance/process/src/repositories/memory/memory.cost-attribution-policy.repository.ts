@@ -10,18 +10,22 @@ export class MemoryCostAttributionPolicyRepository extends CostAttributionPolicy
     super();
   }
 
-  static create(): MemoryCostAttributionPolicyRepository {
-    return new MemoryCostAttributionPolicyRepository();
+  static create({
+    seed = [],
+  }: {
+    seed?: readonly { organizationId: string; config: unknown }[];
+  } = {}): MemoryCostAttributionPolicyRepository {
+    const repository = new MemoryCostAttributionPolicyRepository();
+    for (const { organizationId, config } of seed) {
+      repository.configs.set(organizationId, [
+        ...(repository.configs.get(organizationId) ?? []),
+        config,
+      ]);
+    }
+    return repository;
   }
 
   async enabledCodingAssistantConfigs(organizationId: string): Promise<unknown[]> {
     return this.configs.get(organizationId) ?? [];
-  }
-
-  addEnabledCodingAssistantConfig(input: { organizationId: string; config: unknown }): void {
-    this.configs.set(input.organizationId, [
-      ...(this.configs.get(input.organizationId) ?? []),
-      input.config,
-    ]);
   }
 }

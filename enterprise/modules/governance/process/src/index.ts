@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-export {
-  PostgresGovernanceAdapter,
-  type PostgresGovernanceServices,
-} from "./app/governance-policy-composition.build.ts";
+export type { PostgresGovernanceServices } from "./app/governance-policy-composition.build.ts";
 export type { DepartmentService } from "./services/department.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
@@ -34,7 +31,6 @@ export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";
 
-export { SEAT_REPORT_ACTION } from "./rules/microsoft-graph-seats.rules.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
 export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
@@ -67,7 +63,6 @@ export {
   findAgentsListings,
 } from "./governance.module.ts";
 export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
-export { deriveAgentsListingOutcome } from "./rules/agents-listing-outcome.rules.ts";
 export type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
@@ -89,7 +84,6 @@ export {
   governanceRestCaller,
   governanceRestSurface,
 } from "./transport/governance.rest.ts";
-export { GovernanceModule } from "./app/governance.app.ts";
 export { governanceProcessModule } from "./governance.module.ts";
 
 // The CLI governance plane: fourteen routes under `/api/auth/cli` that
@@ -129,12 +123,4 @@ export type {
   GovernanceIngestTraceCollection,
 } from "./services/governance-ingest-receiver.service.ts";
 
-/**
- * The governance tools installed on a hosted MCP session. Exported from here, and not from the
- * hosted MCP endpoint, because a core feature package may not depend on an Enterprise one. The
- * process that has both registers these through the endpoint's session-tool seam.
- */
-export {
-  GovernanceMcpToolsService,
-  type GovernanceMcpServer,
-} from "./services/governance-mcp-tools.service.ts";
+export type { GovernanceMcpServer } from "./services/governance-mcp-tools.service.ts";

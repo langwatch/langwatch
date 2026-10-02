@@ -2,10 +2,10 @@
 
 import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Boxes } from "lucide-react";
 
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { asRegisteredTools, buildRegisteredToolCards } from "./registered-tools";
 import { SAMPLE_TOOL_CARDS } from "./sample-tool-cards";
