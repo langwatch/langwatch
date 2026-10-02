@@ -23,6 +23,9 @@ import { DiscordOutlineIcon } from "../elements/discord-outline-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SideMenuItem } from "./side-menu-link.tsx";
 
+/** Icon beside label across the whole row, as main's Chakra Link laid it out. */
+const menuLinkLayout = { display: "flex", alignItems: "center", gap: 2, width: "full" };
+
 export type SupportMenuProps = {
   showLabel?: boolean;
 };
@@ -116,6 +119,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
             )}
             <Menu.Item value="github">
               <NavigationLink
+                {...menuLinkLayout}
                 isExternal
                 href="https://github.com/orgs/langwatch/discussions/categories/support"
               >
@@ -123,19 +127,19 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
               </NavigationLink>
             </Menu.Item>
             <Menu.Item value="discord">
-              <NavigationLink isExternal href="https://discord.gg/kT4PhDS2gH">
+              <NavigationLink {...menuLinkLayout} isExternal href="https://discord.gg/kT4PhDS2gH">
                 <DiscordOutlineIcon /> Discord
               </NavigationLink>
             </Menu.Item>
             <MenuSeparator />
             <Menu.Item value="documentation">
-              <NavigationLink isExternal href="https://docs.langwatch.ai">
+              <NavigationLink {...menuLinkLayout} isExternal href="https://docs.langwatch.ai">
                 <LuBookOpen /> Documentation
               </NavigationLink>
             </Menu.Item>
 
             <Menu.Item value="status">
-              <NavigationLink isExternal href="https://status.langwatch.ai/">
+              <NavigationLink {...menuLinkLayout} isExternal href="https://status.langwatch.ai/">
                 <LuActivity /> Status Page
               </NavigationLink>
             </Menu.Item>
@@ -144,6 +148,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
 
             <Menu.Item value="feature-requests">
               <NavigationLink
+                {...menuLinkLayout}
                 isExternal
                 href="https://github.com/orgs/langwatch/discussions/categories/ideas"
               >
@@ -151,7 +156,11 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
               </NavigationLink>
             </Menu.Item>
             <Menu.Item value="bug-reports">
-              <NavigationLink isExternal href="https://github.com/langwatch/langwatch/issues">
+              <NavigationLink
+                {...menuLinkLayout}
+                isExternal
+                href="https://github.com/langwatch/langwatch/issues"
+              >
                 <LuBug /> Report a Bug
               </NavigationLink>
             </Menu.Item>
