@@ -1,9 +1,9 @@
 import { formatDuration } from "@langwatch/design-system/display-formatters";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import { MeterBar } from "../../../../../../elements/meter-bar.tsx";
 
 interface LatencyBarProps {
   valueMs: number;

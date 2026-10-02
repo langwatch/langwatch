@@ -13,6 +13,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Box, Button, Flex, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -60,7 +61,6 @@ import { AnnotationQueueFilter } from "../elements/annotation-queue-filter.tsx";
 import { PeriodPicker } from "../elements/period-picker.tsx";
 import { RedactedField } from "../elements/redacted-field.tsx";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
-import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
 import { SendToQueueDialog } from "./send-to-queue-dialog.tsx";
 
 /**
