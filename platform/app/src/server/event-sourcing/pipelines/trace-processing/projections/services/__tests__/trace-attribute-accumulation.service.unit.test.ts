@@ -405,6 +405,7 @@ describe("TraceAttributeAccumulationService.accumulateAttributes", () => {
       outputSource: "span",
       inputIsFallback: false,
       outputIsFallback: false,
+      inputSpanStartTimeMs: null,
       inputMediaRefs: null,
       outputMediaRefs: null,
     });

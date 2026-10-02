@@ -233,6 +233,7 @@ export function applySpanToSummary({
     outputSource: io.outputSource,
     inputIsFallback: io.inputIsFallback,
     outputIsFallback: io.outputIsFallback,
+    inputSpanStartTimeMs: io.inputSpanStartTimeMs,
     inputMediaRefs: io.inputMediaRefs,
     outputMediaRefs: io.outputMediaRefs,
   });

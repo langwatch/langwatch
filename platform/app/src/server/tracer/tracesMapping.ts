@@ -417,6 +417,9 @@ export function buildAnnotationRecord({
   };
 }
 
+/** Tracked events store each detail as `event.details.<name>`. */
+const EVENT_DETAILS_PREFIX = "event.details.";
+
 export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithAnnotations) => trace.trace_id,
@@ -735,7 +738,9 @@ export const TRACE_MAPPINGS = {
       );
 
       const eventDetails = events.flatMap((event) =>
-        Object.keys(event.event_details).map((key) => `event_details.${key}`),
+        Object.keys(event.event_details).map(
+          (key) => `event_details.${key.replace(EVENT_DETAILS_PREFIX, "")}`,
+        ),
       );
 
       return Array.from(new Set([...eventMetrics, ...eventDetails])).map(
@@ -762,10 +767,13 @@ export const TRACE_MAPPINGS = {
       if (subkey.startsWith("event_details.")) {
         return trace.events
           ?.filter((event) => event.event_type === key)
-          ?.map(
-            (event) =>
-              event.event_details[subkey.replace("event_details.", "")],
-          );
+          ?.map((event) => {
+            const name = subkey.replace("event_details.", "");
+            return (
+              event.event_details[name] ??
+              event.event_details[`${EVENT_DETAILS_PREFIX}${name}`]
+            );
+          });
       }
     },
     expandable_by: "events.event_id",

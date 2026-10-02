@@ -616,6 +616,55 @@ describe("TRACE_MAPPINGS.annotations.keys", () => {
   });
 });
 
+describe("TRACE_MAPPINGS.events", () => {
+  const trace = {
+    trace_id: "trace-1",
+    events: [
+      {
+        event_type: "thumbs_up_down",
+        metrics: { vote: -1 },
+        event_details: {
+          "event.type": "thumbs_up_down",
+          "event.details.feedback": "too slow",
+        },
+      },
+    ],
+  };
+
+  describe("when a column maps one event detail", () => {
+    /** @scenario Mapping an event detail by its plain name */
+    it("returns only that detail", () => {
+      expect(
+        TRACE_MAPPINGS.events.mapping(
+          trace as any,
+          "thumbs_up_down",
+          "event_details.feedback",
+        ),
+      ).toEqual(["too slow"]);
+    });
+
+    it("still resolves the stored spelling", () => {
+      expect(
+        TRACE_MAPPINGS.events.mapping(
+          trace as any,
+          "thumbs_up_down",
+          "event_details.event.details.feedback",
+        ),
+      ).toEqual(["too slow"]);
+    });
+  });
+
+  describe("when the subkeys for an event type are listed", () => {
+    /** @scenario Event detail subkeys are offered by their plain name */
+    it("offers each detail by its plain name", () => {
+      const keys = TRACE_MAPPINGS.events
+        .subkeys([trace as any], "thumbs_up_down")
+        .map((option) => option.key);
+      expect(keys).toContain("event_details.feedback");
+    });
+  });
+});
+
 describe("TRACE_MAPPINGS.metadata.mapping", () => {
   const mockTrace = {
     trace_id: "trace-1",
