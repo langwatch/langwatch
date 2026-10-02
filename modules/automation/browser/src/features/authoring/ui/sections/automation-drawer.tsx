@@ -51,7 +51,7 @@ import {
 } from "../../../../behavior/automation-session.ts";
 import { useAutomation } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
-import { readHandledError } from "../../../../model/handled-error.ts";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
 import {
   ALERT_TEMPLATE_VARIABLES,
