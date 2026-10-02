@@ -47,7 +47,7 @@ export function useLangyTurnFailure({
   turnActive,
   durableLastError,
   messages,
-  regenerate,
+  retryEngineTurn,
   restoreDraftOnFailure,
 }: {
   error: Error | undefined;
@@ -55,7 +55,8 @@ export function useLangyTurnFailure({
   turnActive: boolean;
   durableLastError: string | null;
   messages: UIMessage[];
-  regenerate: () => Promise<void>;
+  /** The engine's retry, which keeps the failed reply on screen while it re-drives the turn. */
+  retryEngineTurn: () => void;
   restoreDraftOnFailure: () => void;
 }) {
   const utils = api.useUtils();
@@ -67,8 +68,8 @@ export function useLangyTurnFailure({
   // RE-DRIVE the turn; never RE-POST the message.
   const messageCount = messages.length;
   const retryTurn = useCallback(() => {
-    if (messageCount > 0) void regenerate();
-  }, [regenerate, messageCount]);
+    if (messageCount > 0) retryEngineTurn();
+  }, [retryEngineTurn, messageCount]);
 
   const [reconnectCodex, setReconnectCodex] = useState(false);
   const onErrorAction = useCallback(

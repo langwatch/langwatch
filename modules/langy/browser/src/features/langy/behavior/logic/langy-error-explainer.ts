@@ -1,6 +1,7 @@
 import {
   explainHandledError,
   PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
   PROVIDER_MODEL_MISSING_REASONS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
@@ -167,6 +168,12 @@ const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
   // "The provider answered with a failure", whatever discriminant sits beneath
   // it (Bedrock's "access_denied" is one no list here names).
   "llm_upstream_error",
+  // The gateway's own codes for a provider failure it named in its envelope
+  // rather than forwarding the provider's body: an unusable answer, no
+  // answer in time, or no connection at all.
+  "provider_error",
+  "provider_timeout",
+  "provider_connection_failed",
   "upstream_stream_error",
   "upstream_bad_request",
   "upstream_unauthorized",
@@ -463,13 +470,14 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
     }
 
     case "llm_upstream_error": {
-      // The provider was reached and refused. A refused key or a model it
-      // does not serve fails the same way every time, so the card offers the
-      // model settings; anything else (a rate limit, an outage) can pass, so
-      // it offers another try.
+      // The provider was reached and refused. A refused key, a model it
+      // does not serve or a request it reads as invalid fails the same way
+      // every time, so the card offers the model settings; anything else (a
+      // rate limit, an outage) can pass, so it offers another try.
       const deterministic =
         hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
-        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS);
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);
       return {
         ...copy,
         render: "card",

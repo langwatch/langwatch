@@ -238,6 +238,74 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A request the provider refuses as invalid reads as the provider's, with another model as the way out */
+      it("reads a Bedrock ValidationException as an invalid request, and offers the settings", () => {
+        // The chain a Bedrock turn records once the gateway forwards the 400
+        // under Bedrock's own exception name.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, body_kind: "json" },
+                reasons: [{ kind: "ValidationException" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.description).toBe(
+          "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A failure the gateway files as the provider's reads as the provider card */
+      it("reads the gateway's provider_error as the provider card", () => {
+        // The chain the guided-onboarding turn on Bedrock recorded while the
+        // gateway wrapped Bedrock's 400 in its own 502.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            httpStatus: 502,
+            reasons: [
+              {
+                kind: "provider_error",
+                meta: { http_status: 502, status: 400 },
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A provider the gateway could not reach reads as the provider being down */
+      it("reads the gateway's provider_timeout as an outage", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "provider_timeout" }],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is temporarily unavailable. Try again shortly, or pick a different model.",
+        );
+      });
+
       /** @scenario A provider outage reads as the provider being down */
       it("names an outage as the provider's, and offers another model", () => {
         const presentation = explainLangyError(

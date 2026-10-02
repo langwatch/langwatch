@@ -115,3 +115,44 @@ describe("turnOrderFromStream", () => {
     });
   });
 });
+
+describe("turnAccountFromStream", () => {
+  describe("given a turn that wrote a plan, ran a call, and failed during another", () => {
+    /** @scenario "A failed turn keeps the plan and the calls it ran as its message" */
+    it("keeps the calls that returned, with their input and result, and the order", () => {
+      const todos = [{ content: "Wire tracing in", status: "in_progress" }];
+      const account = LangyTurnOrderService.turnAccountFromStream([
+        delta("Reading your agent first."),
+        { type: "tool", id: "plan", name: "todowrite", phase: "start", input: { todos } },
+        { type: "tool", id: "plan", name: "todowrite", phase: "end", output: "" },
+        { type: "tool", id: "ls", name: "bash", phase: "start", input: { command: "ls" } },
+        { type: "tool", id: "ls", name: "bash", phase: "end", output: "agent.py", isError: false },
+        { type: "tool", id: "cat", name: "bash", phase: "start", input: { command: "cat x" } },
+      ]);
+
+      expect(account.toolCalls).toEqual([
+        { id: "plan", name: "todowrite", input: { todos }, output: "" },
+        { id: "ls", name: "bash", input: { command: "ls" }, output: "agent.py", isError: false },
+      ]);
+      expect(account.order).toEqual([
+        { kind: "text", text: "Reading your agent first." },
+        { kind: "tool", id: "plan" },
+        { kind: "tool", id: "ls" },
+        { kind: "tool", id: "cat" },
+      ]);
+      expect(account.closingText).toBe("");
+    });
+  });
+
+  describe("given a turn that ended on a paragraph", () => {
+    it("names that paragraph as the closing text", () => {
+      expect(
+        LangyTurnOrderService.turnAccountFromStream([
+          tool("c1", "start"),
+          tool("c1", "end"),
+          delta("Almost there."),
+        ]).closingText,
+      ).toBe("Almost there.");
+    });
+  });
+});
