@@ -3,10 +3,8 @@ import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
   adminOperationInputSchema,
-  type AdminDataResult,
   type AdminOperationInput,
   type AdminOperationResult,
-  type AdminOperationParams,
 } from "@langwatch/ops-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -98,33 +96,35 @@ export class AdminBackofficeService {
     }
 
     const normalized = await this.normalizeOrganizationDomain(parsed);
-    const result = await this.repository.execute(normalized);
-    await this.auditMutation(normalized, result);
+    await this.auditMutation(normalized);
 
-    return result;
+    return this.repository.execute(normalized);
   }
 
+  /**
+   * Every audit entry is recorded before the first write, so a failed audit leaves
+   * nothing applied.
+   */
   private async updateUser(input: AdminOperationInput): Promise<AdminOperationResult> {
     const data = { ...input.params.data };
     const userId = String(input.params.id ?? "");
+    const actor: LedgerActor = { type: "user", id: input.actorId };
     const sideEffectAudits: UserSideEffectAudit[] = [];
 
-    if ("deactivatedAt" in data) {
-      sideEffectAudits.push(
-        await this.applyDeactivation({
-          userId,
-          actorId: input.actorId,
-          value: data.deactivatedAt,
-        }),
-      );
-      delete data.deactivatedAt;
+    const lifecycle = "deactivatedAt" in data ? this.lifecycleChange(data.deactivatedAt) : null;
+    delete data.deactivatedAt;
+    if (lifecycle) {
+      sideEffectAudits.push({ action: "update/user", payload: { id: userId, [lifecycle]: true } });
     }
 
-    if ("email" in data && typeof data.email === "string") {
-      sideEffectAudits.push(await this.applyEmailChange({ userId, email: data.email }));
+    const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : null;
+    if (email !== null) {
       delete data.email;
+      sideEffectAudits.push({ action: "update/user", payload: { id: userId, email } });
     }
 
+    const saved: AdminOperationInput = { ...input, params: { ...input.params, data } };
+    const savesFields = sideEffectAudits.length === 0 || Object.keys(data).length > 0;
     for (const entry of sideEffectAudits) {
       await this.audit.record({
         userId: input.actorId,
@@ -133,19 +133,14 @@ export class AdminBackofficeService {
         req: input.req,
       });
     }
+    if (savesFields) await this.auditMutation(saved);
 
-    if (sideEffectAudits.length > 0 && Object.keys(data).length === 0) {
-      return this.repository.findUserById(userId);
-    }
+    if (lifecycle === "reactivate") await this.users.reactivate({ id: userId, actor });
+    if (lifecycle === "deactivate") await this.users.deactivate({ id: userId, actor });
+    // user signs the account out of every browser on a real change.
+    if (email !== null) await this.users.updateProfile({ id: userId, email });
 
-    const normalized: AdminOperationInput = {
-      ...input,
-      params: { ...input.params, data },
-    };
-    const result = await this.repository.execute(normalized);
-    await this.auditMutation(normalized, result);
-
-    return result;
+    return savesFields ? this.repository.execute(saved) : this.repository.findUserById(userId);
   }
 
   /**
@@ -153,20 +148,8 @@ export class AdminBackofficeService {
    * Both go through user's lifecycle, which stamps the database's clock, so a picked date is
    * not kept: the fact names the operator as its actor.
    */
-  private async applyDeactivation({
-    userId,
-    actorId,
-    value,
-  }: {
-    userId: string;
-    actorId: string;
-    value: unknown;
-  }): Promise<UserSideEffectAudit> {
-    const actor: LedgerActor = { type: "user", id: actorId };
-    if (value === null || value === "") {
-      await this.users.reactivate({ id: userId, actor });
-      return { action: "update/user", payload: { id: userId, reactivate: true } };
-    }
+  private lifecycleChange(value: unknown): "reactivate" | "deactivate" {
+    if (value === null || value === "") return "reactivate";
     if (typeof value !== "string" && !(value instanceof Date)) {
       throw new ValidationError("Unreadable deactivation", {
         meta: {
@@ -175,21 +158,7 @@ export class AdminBackofficeService {
       });
     }
 
-    await this.users.deactivate({ id: userId, actor });
-    return { action: "update/user", payload: { id: userId, deactivate: true } };
-  }
-
-  /** Saves the normalised email; user signs the user out of every browser on a real change. */
-  private async applyEmailChange({
-    userId,
-    email: rawEmail,
-  }: {
-    userId: string;
-    email: string;
-  }): Promise<UserSideEffectAudit> {
-    const email = rawEmail.trim().toLowerCase();
-    await this.users.updateProfile({ id: userId, email });
-    return { action: "update/user", payload: { id: userId, email } };
+    return "deactivate";
   }
 
   private async normalizeOrganizationDomain(
@@ -228,38 +197,38 @@ export class AdminBackofficeService {
     return this.ssoRouting.connectionDecides({ organizationId });
   }
 
-  private async auditMutation(
-    input: AdminOperationInput,
-    result: AdminOperationResult,
-  ): Promise<void> {
+  /** Records the intended change before it is written; a create names no id yet. */
+  private async auditMutation(input: AdminOperationInput): Promise<void> {
     if (!MUTATING_METHODS.has(input.method)) {
       return;
     }
 
     const params = input.params;
-    const ids = this.stringArray(params.ids);
     if (input.method === "updateMany" || input.method === "deleteMany") {
-      for (const id of ids) {
+      for (const id of this.stringArray(params.ids)) {
         await this.recordMutationAudit(input, id);
       }
 
       return;
     }
 
-    const id = this.operationId(params, result);
-    if (id !== null) {
-      await this.recordMutationAudit(input, id);
-    }
+    await this.recordMutationAudit(input, params.id === undefined ? undefined : String(params.id));
   }
 
-  private async recordMutationAudit(input: AdminOperationInput, id: string): Promise<void> {
-    const payload: Record<string, unknown> = { id };
-    if (input.params.previousData) {
-      payload.previousData = input.params.previousData;
-    }
-
-    if (input.params.data) {
-      payload.data = input.params.data;
+  private async recordMutationAudit(
+    input: AdminOperationInput,
+    id: string | undefined,
+  ): Promise<void> {
+    const payload: Record<string, unknown> = id === undefined ? {} : { id };
+    const { data, previousData } = input.params;
+    if (data) {
+      payload.data = data;
+      // Only the prior values of the fields being changed; never the whole row.
+      if (previousData) {
+        payload.previousData = Object.fromEntries(
+          Object.entries(previousData).filter(([key]) => Object.hasOwn(data, key)),
+        );
+      }
     }
 
     await this.audit.record({
@@ -268,24 +237,6 @@ export class AdminBackofficeService {
       args: payload,
       req: input.req,
     });
-  }
-
-  private operationId(params: AdminOperationParams, result: AdminOperationResult): string | null {
-    if (params.id !== undefined) {
-      return String(params.id);
-    }
-
-    if (!this.isDataResult(result) || !this.isRecord(result.data)) {
-      return null;
-    }
-
-    const id = result.data.id;
-
-    return typeof id === "string" || typeof id === "number" ? String(id) : null;
-  }
-
-  private isDataResult(result: AdminOperationResult): result is AdminDataResult {
-    return !Array.isArray(result.data);
   }
 
   private auditAction(method: AdminOperationInput["method"]): string {
@@ -298,10 +249,6 @@ export class AdminBackofficeService {
     }
 
     return method;
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
   }
 
   private stringArray(value: unknown): string[] {

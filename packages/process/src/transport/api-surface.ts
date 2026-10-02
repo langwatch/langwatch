@@ -243,7 +243,7 @@ class ApiSurface {
           headers[name] = value;
         });
 
-        return { headers };
+        return { headers, remoteAddress: ClientAddress.resolvedFor(context.req.raw) ?? undefined };
       }),
       bindRestMiddleware(projectRestFacts, (context) => {
         const credential = projectCredentialOfRequest(context.req.raw);
@@ -393,7 +393,7 @@ const adminAuthSession = defineRestMiddleware(
 
 const adminAuditRequest = defineRestMiddleware(
   "adminAuditRequest",
-  z.object({ headers: z.record(z.string(), z.string()) }),
+  z.object({ headers: z.record(z.string(), z.string()), remoteAddress: z.string().optional() }),
 );
 
 const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());

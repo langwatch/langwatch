@@ -141,3 +141,23 @@ Feature: Platform administration package boundary
     When they create a user through the Back office with a deactivation value
     Then the write is refused with validation_error
     And no user row is written and nothing is audited
+
+  @unit
+  Scenario: Starting an impersonation is recorded on the shared audit log
+    Given an operator holding the view grant and a healthy target account
+    When the operator starts impersonating the target
+    Then one audit entry is recorded naming the operator, the impersonate action and the target
+    And the entry carries the reason, the caller's address and its user agent
+
+  @unit
+  Scenario: A Back office write is audited before it is applied
+    Given an operator holding the manage grant
+    When they create, update, bulk-update or bulk-delete a record through the Back office
+    Then an audit entry naming the intended change, one per record of a bulk write, is recorded before anything is written
+    And when the audit entry cannot be recorded the write is refused and nothing is applied
+
+  @unit
+  Scenario: A Back office update records the prior values of only the fields it changes
+    Given an operator holding the manage grant
+    When they update a record whose prior state carries fields the update does not touch
+    Then the audit entry records the prior values of the changed fields only

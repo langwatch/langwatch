@@ -58,10 +58,16 @@ const members: ProcessMemberSource = {
 
 interface DeskApi {
   run(input: { reason: string; actor: unknown }): Promise<{ ok: true }>;
+  audited(input: { req: unknown }): Promise<{ ok: true }>;
 }
 const DeskApi = moduleApi<DeskApi>()("ops");
 const adminActor = defineRestMiddleware("adminActor", z.object({ id: z.string() }).nullable());
+const adminAuditRequest = defineRestMiddleware(
+  "adminAuditRequest",
+  z.object({ headers: z.record(z.string(), z.string()), remoteAddress: z.string().optional() }),
+);
 const run = vi.fn(async () => ({ ok: true as const }));
+const audited = vi.fn(async () => ({ ok: true as const }));
 
 const desk = defineRestRouter(DeskApi)
   .withNamespace("admin")
@@ -73,6 +79,13 @@ const desk = defineRestRouter(DeskApi)
   .withOutput(z.object({ ok: z.literal(true) }))
   .withMiddleware(adminActor)
   .handle(async ({ app, input }, actor) => app.run({ reason: input.reason, actor }))
+
+  .post("/api/admin/audited", "runAuditedAdminDesk")
+  .withInput(z.object({}))
+  .withAccess(publicRoute({ reason: "staff is resolved by the adminActor fact" }))
+  .withOutput(z.object({ ok: z.literal(true) }))
+  .withMiddleware(adminActor, adminAuditRequest)
+  .handle(async ({ app }, _actor, req) => app.audited({ req }))
   .build();
 
 const surface = apiSurface({
@@ -93,7 +106,7 @@ const surface = apiSurface({
 })(peersWithDoor({ resolve: (token) => peers.get(token), door }));
 const rest = surface.hosts.rest;
 if (!rest) throw new Error("the surface selected REST");
-rest.mount(desk.router(), () => ({ run }));
+rest.mount(desk.router(), () => ({ run, audited }));
 
 const handler = surface.serve();
 if (!isNodeHandler(handler)) throw new Error("the api surface composed no handler");
@@ -142,6 +155,29 @@ describe("the admin family's adminActor binding", () => {
     expect(run).toHaveBeenCalledWith({
       reason: "support",
       actor: expect.objectContaining({ id: "user-staff" }),
+    });
+  });
+});
+
+describe("the admin family's adminAuditRequest binding", () => {
+  it("hands the handler the caller's address and headers for the audit entry", async () => {
+    audited.mockClear();
+    const response = await fetch(`${origin}/api/admin/audited`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "audit-test",
+        cookie: "session=staff",
+      },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(200);
+    expect(audited).toHaveBeenCalledWith({
+      req: {
+        headers: expect.objectContaining({ "user-agent": "audit-test" }),
+        remoteAddress: expect.stringContaining("127.0.0.1"),
+      },
     });
   });
 });

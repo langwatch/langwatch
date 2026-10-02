@@ -152,3 +152,131 @@ describe("AdminBackofficeService user create", () => {
     },
   );
 });
+
+class RefusingAudit extends AdminAuditSink {
+  async record(): Promise<void> {
+    throw new Error("audit log unavailable");
+  }
+}
+
+describe("AdminBackofficeService audit before write", () => {
+  /** @scenario "A Back office write is audited before it is applied" */
+  it.each<
+    [
+      string,
+      AdminOperationInput["resource"],
+      AdminOperationInput["method"],
+      AdminOperationInput["params"],
+    ]
+  >([
+    [
+      "a user update with side effects",
+      "user",
+      "update",
+      { id: "user-1", data: { deactivatedAt: null, email: "a@b.c", name: "N" } },
+    ],
+    ["an organization update", "organization", "update", { id: "org-1", data: { name: "Acme" } }],
+    ["a project create", "project", "create", { data: { name: "P" } }],
+    ["a bulk update", "project", "updateMany", { ids: ["p-1", "p-2"], data: { archived: true } }],
+    ["a bulk delete", "project", "deleteMany", { ids: ["p-1", "p-2"] }],
+  ])(
+    "refuses %s when the audit entry cannot be recorded, writing nothing",
+    async (_label, resource, method, params) => {
+      const log: unknown[] = [];
+      const record = (name: string) => async (args: unknown) => {
+        log.push([name, args]);
+        return { ...backofficeOperator, id: "user-1" };
+      };
+      const service = AdminBackofficeService.create({
+        repository: new RecordingRepository(log),
+        users: new TestUserApi({
+          reactivate: record("users.reactivate"),
+          deactivate: record("users.deactivate"),
+          updateProfile: record("users.updateProfile"),
+        }),
+        audit: new RefusingAudit(),
+      });
+
+      await expect(
+        service.execute({ resource, method, params, actorId: "olive", req: { headers: {} } }),
+      ).rejects.toThrow("audit log unavailable");
+      expect(log).toEqual([]);
+    },
+  );
+
+  it("records every row of a bulk write before writing any of them", async () => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await service.execute({
+      resource: "project",
+      method: "deleteMany",
+      params: { ids: ["p-1", "p-2"] },
+      actorId: "olive",
+      req: { headers: {} },
+    });
+
+    expect(log).toEqual([
+      ["audit.record", "admin/delete/project", { id: "p-1" }],
+      ["audit.record", "admin/delete/project", { id: "p-2" }],
+      ["repository.execute", { ids: ["p-1", "p-2"] }],
+    ]);
+  });
+
+  /** @scenario "A Back office update records the prior values of only the fields it changes" */
+  it.each<[string, AdminOperationInput["resource"]]>([
+    ["a user", "user"],
+    ["an organization", "organization"],
+  ])("records only the changed fields' prior values for %s", async (_label, resource) => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await service.execute({
+      resource,
+      method: "update",
+      params: {
+        id: "row-1",
+        data: { name: "New" },
+        previousData: { id: "row-1", name: "Old", userHashKey: "h-1", otherField: "kept out" },
+      },
+      actorId: "olive",
+      req: { headers: {} },
+    });
+
+    expect(log[0]).toEqual([
+      "audit.record",
+      `admin/update/${resource}`,
+      { id: "row-1", data: { name: "New" }, previousData: { name: "Old" } },
+    ]);
+  });
+
+  it("records a create's intended data before the row exists", async () => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      audit: new RecordingAudit(log),
+    });
+
+    await service.execute({
+      resource: "project",
+      method: "create",
+      params: { data: { name: "P" } },
+      actorId: "olive",
+      req: { headers: {} },
+    });
+
+    expect(log).toEqual([
+      ["audit.record", "admin/create/project", { data: { name: "P" } }],
+      ["repository.execute", { data: { name: "P" } }],
+    ]);
+  });
+});

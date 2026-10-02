@@ -57,6 +57,7 @@ import {
   AdminAccessService,
   type AdminAccessServiceOptions,
 } from "../services/admin-access.service.ts";
+import { AdminAuditService } from "../services/admin-audit.service.ts";
 import {
   AdminBackofficeService,
   type OrganizationSsoRouting,
@@ -64,7 +65,7 @@ import {
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
-import { AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
+import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
@@ -207,20 +208,6 @@ export function sharedStorageStatsInstance(
   return { target: "shared", client: new SharedStorageStatsClickHouseClient(clickhouse) };
 }
 
-/** Warns rather than records: this process holds no admin-action audit port of its own. */
-class UnauditedOpsAuditSink extends AdminAuditSink {
-  constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  async record(entry: { action: string }): Promise<void> {
-    this.logger.warn(
-      { action: entry.action },
-      "operator action not audited: this process composed no admin-action audit sink",
-    );
-  }
-}
-
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
@@ -281,7 +268,7 @@ export function buildOpsInfrastructure(input: {
         // a no-op. Asked of identity per organization (ADR-117 §5).
         ssoRouting: organizationSsoRouting(dependencies.identity),
         database: members.prisma,
-        audit: new UnauditedOpsAuditSink(members.logger),
+        audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         scheduler: {

@@ -43,6 +43,15 @@ Feature: Audit logging
     Then one bounded audit record is written
 
   @unit
+  Scenario: Secret-bearing argument values are never stored
+    Given an audit service with a repository
+    When a caller records an action whose arguments carry a password, a token and an API key
+    Then those values are stored as redacted, at any depth
+    And a key naming a secret or a hash anywhere in it, in any case or separator style, plural or hashed, is redacted too
+    And keys that only identify, name, count or date a secret, such as apiKeyId, tokenId and secretName, are stored unchanged
+    And the actor, the action, the target and every other argument are stored unchanged
+
+  @unit
   Scenario: the home strip answers an empty trail with no items
     Given the audit log installed over memory repositories
     When somebody with no recent activity reads the home strip
