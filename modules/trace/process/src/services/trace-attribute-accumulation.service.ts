@@ -16,9 +16,9 @@ import type { TraceOriginService } from "./trace-origin.service.ts";
  * Trace-level model metadata stamped by the fold from the models its spans (or
  * log turns) actually used. Semantic:
  */
-export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
-export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
-export const MODEL_METADATA_STAMPED_MARKER = "langwatch.reserved.model_metadata_stamped";
+const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
+const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
+const MODEL_METADATA_STAMPED_MARKER = "langwatch.reserved.model_metadata_stamped";
 
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,

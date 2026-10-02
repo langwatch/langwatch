@@ -18,7 +18,7 @@ interface EdgeInfo {
   hasError: boolean;
 }
 
-export interface TopologyMermaidResult {
+interface TopologyMermaidResult {
   syntax: string;
   /** Sanitised node id → first matching span id, for click → select. */
   nodeToSpanId: Map<string, string>;

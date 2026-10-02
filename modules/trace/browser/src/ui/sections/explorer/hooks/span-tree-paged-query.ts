@@ -16,7 +16,7 @@ import { api } from "../../../../behavior/trace-api.ts";
  */
 export const SPAN_TREE_PAGE_SIZE = 500;
 
-export interface SpanTreeQueryInput {
+interface SpanTreeQueryInput {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;

@@ -7,7 +7,7 @@ export type FacetValueState = "neutral" | "include" | "exclude";
  * drilldown can render verdict pills + score range inline without
  * firing a second query per evaluator. Other facets leave this absent.
  */
-export interface FacetItemAggregates {
+interface FacetItemAggregates {
   passedCount: number;
   failedCount: number;
   erroredCount: number;
@@ -68,16 +68,9 @@ export interface AttributeKey {
   count: number;
 }
 
-export interface TooltipLine {
-  text: string;
-  negated: boolean;
-}
-
 export type SectionGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
-export type SectionKind = "cat" | "range" | "attributes";
-
-export interface SectionBase {
+interface SectionBase {
   key: string;
   label: string;
   group?: SectionGroup;

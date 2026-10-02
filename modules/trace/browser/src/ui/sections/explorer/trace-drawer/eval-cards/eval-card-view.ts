@@ -2,12 +2,12 @@ import { formatCost, formatDuration } from "@langwatch/design-system/display-for
 
 import { type EvalEntry, isCategoryOnly, isNoVerdict } from "./utils.ts";
 
-export type EvalScoreDisplay = { label: string; subLabel: string; barFill: number };
+type EvalScoreDisplay = { label: string; subLabel: string; barFill: number };
 
 const NO_SCORE: EvalScoreDisplay = { label: "", subLabel: "", barFill: 0 };
 
 /** The big score in the header and how full its bar is, for a run that produced a verdict. */
-export function scoreDisplayOf({ score, scoreType }: EvalEntry): EvalScoreDisplay {
+function scoreDisplayOf({ score, scoreType }: EvalEntry): EvalScoreDisplay {
   if (scoreType === "boolean") {
     return {
       label: score === true ? "PASS" : "FAIL",

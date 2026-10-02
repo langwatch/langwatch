@@ -59,7 +59,7 @@ export function addOtelLogRecordCountAlias(
  * the legacy trace shape. Additive next to the six legacy metric fields: an absent attribute adds
  * no key, and nothing is renamed, since the search and export response is a compatibility surface.
  */
-export const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
+const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
   cache_read_input_tokens: "langwatch.reserved.cache_read_tokens",
   cache_creation_input_tokens: "langwatch.reserved.cache_creation_tokens",
   cache_creation_5m_input_tokens: "langwatch.reserved.cache_creation_5m_tokens",
@@ -93,7 +93,7 @@ export function tokenMetricsFromAttributes(
 /**
  * Common field names used for input text in state objects (e.g., LangGraph).
  */
-export const INPUT_FIELD_NAMES = [
+const INPUT_FIELD_NAMES = [
   "question",
   "input",
   "query",
@@ -107,7 +107,7 @@ export const INPUT_FIELD_NAMES = [
 /**
  * Common field names used for output text in state objects (e.g., LangGraph).
  */
-export const OUTPUT_FIELD_NAMES = [
+const OUTPUT_FIELD_NAMES = [
   "final_answer",
   "output",
   "answer",
@@ -223,7 +223,7 @@ function extractTextFromMessages(
  * Reads annotated value types from the trace summary attributes.
  * Returns true if the given attribute key has the specified type.
  */
-export function hasAnnotatedType(
+function hasAnnotatedType(
   attributes: Record<string, string>,
   attrKey: string,
   type: string,

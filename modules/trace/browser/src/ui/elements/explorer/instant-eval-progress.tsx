@@ -10,7 +10,7 @@ import { Square } from "lucide-react";
 import type { InstantEvalRunPhase } from "../../../behavior/instant-eval-run.store.ts";
 
 /** The phases the bar is shown in: every one before the run has settled. */
-export type InstantEvalBarPhase = Exclude<InstantEvalRunPhase, "settled">;
+type InstantEvalBarPhase = Exclude<InstantEvalRunPhase, "settled">;
 
 interface InstantEvalProgressBarProps {
   /** Rows judged so far. */

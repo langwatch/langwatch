@@ -21,7 +21,7 @@ import type { TraceMediaStore } from "../app/trace.members.ts";
  * checked first. The shared schema only checks each is string-or-absent, so this is stricter.
  */
 
-export const binaryInputPartSchema = z
+const binaryInputPartSchema = z
   .object({
     type: z.literal("binary"),
     mimeType: z.string(),
@@ -44,7 +44,7 @@ export const binaryInputPartSchema = z
     },
   );
 
-export type BinaryInputPart = z.infer<typeof binaryInputPartSchema>;
+type BinaryInputPart = z.infer<typeof binaryInputPartSchema>;
 
 /**
  * A record of one stored object created (or deduplicated) during extraction.
@@ -84,7 +84,7 @@ export interface ExtractedPart {
 }
 
 /** Stores one part's bytes and answers with the reference and the URL that now stands for them. */
-export async function storePartBytes(
+async function storePartBytes(
   context: ExtractionContext,
   { bytes, mimeType }: { bytes: Buffer; mimeType: string },
 ): Promise<{ ref: ExtractedRef; url: string }> {

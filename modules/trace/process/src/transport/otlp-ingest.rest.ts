@@ -107,7 +107,7 @@ async function authenticate(
  * Never throws — an empty, malformed or unparsable body yields an empty
  * array. Tags rejection logs so a customer's trace_id can be matched to it.
  */
-export function peekCustomerTraceIds(
+function peekCustomerTraceIds(
   body: ArrayBuffer,
   contentType: string | undefined,
   max = 10,

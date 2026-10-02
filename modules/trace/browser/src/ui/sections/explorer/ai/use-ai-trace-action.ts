@@ -34,7 +34,7 @@ function readAiErrorDetails(
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
-export type AiTraceActionMode =
+type AiTraceActionMode =
   /** Filter-only: applies a query, never creates a lens. */
   | "filter"
   /** Lens-only: always creates a new lens (and applies the query inside it). */

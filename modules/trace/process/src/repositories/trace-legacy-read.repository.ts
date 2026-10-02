@@ -42,7 +42,7 @@ export type ResolveTraceSpansBatchFn = (
  * time (epoch ms) in the requested set. A one-trace caller passes an exact
  * point range (from===to); the store widens it by its own safety margin.
  */
-export interface TraceOccurredAtRange {
+interface TraceOccurredAtRange {
   from: number;
   to: number;
 }

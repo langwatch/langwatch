@@ -401,7 +401,7 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
  * Namespaced dynamic prefixes for key-discovery mode. Separate from SEARCH_FIELDS
  * because they're prefixes that expand to concrete field names, not real fields.
  */
-export interface DynamicPrefixDef {
+interface DynamicPrefixDef {
   prefix: string;
   label: string;
   group: SearchFieldGroup;

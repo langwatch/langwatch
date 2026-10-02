@@ -202,7 +202,7 @@ export const extractSystemInstructionFromMessages = (messages: unknown): string 
  * and the OpenAI Responses-dialect "developer" spelling. One predicate shared
  * by extraction and stripping so the two can never disagree on what counts.
  */
-export const isSystemRole = (role: unknown): boolean => role === "system" || role === "developer";
+const isSystemRole = (role: unknown): boolean => role === "system" || role === "developer";
 
 /**
  * Removes the first system-role message, the one extractSystemInstructionFromMessages
@@ -234,7 +234,7 @@ export const decodeMessagesPayload = (payload: unknown): unknown => {
  * Unwraps messages that are wrapped in an extra `{ message: {...} }` object.
  * Some telemetry formats wrap each message in an additional "message" property.
  */
-export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
+const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
   return messages.map((msg) => {
     const wrapped = isRecord(msg) && isRecord(msg.message) && Object.keys(msg).length === 1;
     if (wrapped) {

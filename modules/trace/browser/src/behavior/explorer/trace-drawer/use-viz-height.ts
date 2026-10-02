@@ -7,9 +7,9 @@ import {
   useState,
 } from "react";
 
-export const VIZ_MIN_HEIGHT = 80;
-export const VIZ_DEFAULT_HEIGHT = 250;
-export const VIZ_EXPANDED_HEIGHT = 480;
+const VIZ_MIN_HEIGHT = 80;
+const VIZ_DEFAULT_HEIGHT = 250;
+const VIZ_EXPANDED_HEIGHT = 480;
 const VIZ_MAX_HEIGHT = 700;
 const STORAGE_KEY = "langwatch:traces-v2:viz-height";
 

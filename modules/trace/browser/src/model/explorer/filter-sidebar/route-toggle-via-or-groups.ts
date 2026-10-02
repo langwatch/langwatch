@@ -1,6 +1,6 @@
 import type { OrGroupAnalysis } from "@langwatch/trace-contract";
 
-export interface ToggleRouting {
+interface ToggleRouting {
   /**
    * Boolean operator used to glue a newly-added clause to the existing query when no OR
    * group is targeted. Always `"AND"` — cross-field OR is built only by typing in the

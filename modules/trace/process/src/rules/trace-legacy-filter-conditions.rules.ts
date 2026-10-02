@@ -6,19 +6,19 @@ import {
 import { z } from "zod";
 
 /** One filter field's WHERE fragment and the parameters it binds. */
-export type FilterConditionResult = {
+type FilterConditionResult = {
   sql: string;
   params: Record<string, unknown>;
 };
 
 /** Cross-cutting options threaded to every condition builder. */
-export type FilterConditionOptions = {
+type FilterConditionOptions = {
   /** Bounds `sp.StartTime` to the window in `stored_spans` EXISTS subqueries; empty without one. */
   spanTimeBound?: string;
 };
 
 /** Builds one field's parameterized condition; `paramId` keeps combined filters' names apart. */
-export type FilterConditionBuilder = (input: {
+type FilterConditionBuilder = (input: {
   values: string[];
   paramId: string;
   key?: string;

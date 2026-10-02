@@ -5,7 +5,7 @@
  */
 
 /** The counters of a run that has not settled, as the copy reads them. */
-export interface InstantEvalCounters {
+interface InstantEvalCounters {
   judged: number;
   total: number | null;
   matched: number;
@@ -18,7 +18,7 @@ const ITEM_NOUN_SINGULAR: Record<string, string> = {
 };
 
 /** The noun as the count needs it: "1 trace", "2 traces". */
-export function explorerItemNoun({
+function explorerItemNoun({
   totalHits,
   itemNoun,
 }: {

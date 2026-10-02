@@ -61,7 +61,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   return text;
 };
 
-export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
+const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
   if (!value || value === "null" || value === "{}") return true;
   if (typeof value !== "object") return false;
 

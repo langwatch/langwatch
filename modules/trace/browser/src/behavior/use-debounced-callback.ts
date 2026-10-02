@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-export type DebouncedCallback<A extends unknown[]> = ((...args: A) => void) & {
+type DebouncedCallback<A extends unknown[]> = ((...args: A) => void) & {
   cancel: () => void;
 };
 

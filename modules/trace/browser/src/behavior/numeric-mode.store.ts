@@ -7,7 +7,7 @@ export type NumericMode = "range" | "discrete";
  * Per-project, per-facet override for how a numeric facet is presented — "range" (the
  * min/max slider) or "discrete" (tick the distinct integer values).
  */
-export interface NumericModeState {
+interface NumericModeState {
   byProject: Record<string, Record<string, NumericMode>>;
   hydrateFromStorage: (projectId: string) => void;
   /** Override a facet's presentation. */

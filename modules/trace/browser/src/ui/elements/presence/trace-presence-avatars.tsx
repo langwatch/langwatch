@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { selectPeersOnTrace, usePresenceStore } from "../../../behavior/presence/presence-store.ts";
 
-export interface TracePresenceAvatarsProps {
+interface TracePresenceAvatarsProps {
   traceId: string;
   max?: number;
   size?: "2xs" | "xs" | "sm";

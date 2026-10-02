@@ -5,7 +5,7 @@ import { create } from "zustand";
  * Per-project, per-user overrides on top of the density-driven default facet
  * visibility. Two opt-in sets:
  */
-export interface FacetVisibilityState {
+interface FacetVisibilityState {
   byProject: Record<
     string,
     {

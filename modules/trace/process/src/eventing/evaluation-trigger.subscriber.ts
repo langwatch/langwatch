@@ -32,7 +32,7 @@ const EVALUATION_KSUID_RESOURCE = "eval";
 
 const logger = createLogger("langwatch:trace-processing:evaluation-trigger");
 
-export interface EvaluationTriggerSubscriberDeps {
+interface EvaluationTriggerSubscriberDeps {
   featureFlags: FeatureFlagApi;
   /**
    * Narrowed from the whole `MonitorService` to the one listing this

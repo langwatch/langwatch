@@ -19,7 +19,7 @@ import {
  * The fields a suggestion can correct, on the trace itself or on one of its spans: the two that
  * hold a captured value a reviewer reads and can rewrite as text.
  */
-export type TraceEditIOField = "input" | "output";
+type TraceEditIOField = "input" | "output";
 
 /**
  * What taking a corrected field back off did: nothing to take off, the whole correction gone,

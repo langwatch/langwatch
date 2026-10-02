@@ -50,7 +50,7 @@ const SHARE_READ_LIMIT_PER_IP = 120;
 const evaluationsSchema = evaluationSchema.array();
 
 /** The trace reads the share page is assembled from — the in-app reads, not a copy of them. */
-export type TraceSharedReads = Pick<
+type TraceSharedReads = Pick<
   TraceApi,
   | "readTraceSummary"
   | "readSpanSummaries"
@@ -61,7 +61,7 @@ export type TraceSharedReads = Pick<
   | "readEvaluations"
 >;
 
-export type TraceSharedReadDependencies = Readonly<{
+type TraceSharedReadDependencies = Readonly<{
   reads: TraceSharedReads;
   share: Pick<ShareApi, "resolveForViewer" | "findCachedPayload" | "cachePayload">;
   projects: Readonly<{
@@ -74,7 +74,7 @@ export type TraceSharedReadDependencies = Readonly<{
   mappers: TraceReadMapperMembers;
 }>;
 
-export type SharedTraceRequest = Readonly<{
+type SharedTraceRequest = Readonly<{
   token: string;
   viewerUserId: string | null;
   clientIp: string | null;

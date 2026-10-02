@@ -5,7 +5,7 @@
 
 export type ContextHealthTone = "success" | "info" | "warning" | "danger";
 
-export interface ContextHealthBand {
+interface ContextHealthBand {
   tone: ContextHealthTone;
   label: string;
 }

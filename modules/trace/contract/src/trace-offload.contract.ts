@@ -23,7 +23,7 @@ export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
  * field holding the full value; `eventId` is the event_log row to read it
  * from — the read path JOINs by EventId rather than guessing.
  */
-export interface TraceEventReference {
+interface TraceEventReference {
   field: string;
   eventId: string;
 }

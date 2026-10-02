@@ -18,9 +18,9 @@ import {
  */
 
 /** The trace-level fallback content the fold picked as primary input/output. */
-export type TraceIOSource = Pick<Trace, "input" | "output">;
+type TraceIOSource = Pick<Trace, "input" | "output">;
 
-export interface LlmTraceMessages {
+interface LlmTraceMessages {
   input: ChatMessage[];
   output: ChatMessage[];
 }

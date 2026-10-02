@@ -10,9 +10,9 @@ import { filterAST, walkAST } from "./trace-query-ast.ts";
 import { escapeValue } from "./trace-query-mutations.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
-export const EVALUATOR_FIELD = "evaluator";
+const EVALUATOR_FIELD = "evaluator";
 export const EVALUATOR_VERDICT_FIELD = "evaluatorVerdict";
-export const EVALUATOR_SCORE_FIELD = "evaluatorScore";
+const EVALUATOR_SCORE_FIELD = "evaluatorScore";
 /**
  * Per-evaluator emitted-label filter. Mirrors `evaluatorVerdict`: a categorical
  * value scoped to one evaluation's group, translated to an `evaluation_runs`
@@ -23,18 +23,18 @@ export const EVALUATOR_LABEL_FIELD = "evaluatorLabel";
 /** The categorical sub-condition fields a single evaluator group can carry. */
 const CATEGORICAL_SUB_FIELDS = new Set<string>([EVALUATOR_VERDICT_FIELD, EVALUATOR_LABEL_FIELD]);
 
-export interface CategoricalSub {
+interface CategoricalSub {
   field: string;
   value: string;
   negated: boolean;
 }
 
-export interface ScoreSub {
+interface ScoreSub {
   from?: number;
   to?: number;
 }
 
-export interface EvaluatorGroup {
+interface EvaluatorGroup {
   /** Whether the evaluator anchor exists anywhere in the query. */
   present: boolean;
   categorical: CategoricalSub[];

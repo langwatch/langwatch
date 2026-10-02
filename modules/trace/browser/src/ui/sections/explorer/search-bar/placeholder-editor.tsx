@@ -88,7 +88,7 @@ function buildSegments(text: string): DecoratedSegment[] {
   return out;
 }
 
-export interface TokenClickPayload {
+interface TokenClickPayload {
   /** Bounding rect of the clicked chip — used to anchor a popover. */
   rect: DOMRect;
   field: string;

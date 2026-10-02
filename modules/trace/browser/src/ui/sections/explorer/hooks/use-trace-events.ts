@@ -4,7 +4,7 @@ import { api } from "../../../../behavior/trace-api.ts";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
-export interface TraceEventsResult {
+interface TraceEventsResult {
   events: DerivedTraceEvent[];
   isLoading: boolean;
   isError: boolean;

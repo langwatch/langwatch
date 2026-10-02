@@ -9,7 +9,7 @@ import { exactModelMatchRegex } from "../../../../../model/model-cost-regex.ts";
  * prefilled, `drawer.*` params are how `CurrentDrawer` hydrates drawer
  * props from the URL.
  */
-export function modelCostMappingUrl(model: string): string {
+function modelCostMappingUrl(model: string): string {
   const params = new URLSearchParams({
     "drawer.open": "llmModelCost",
     "drawer.prefillModel": model,

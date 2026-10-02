@@ -68,7 +68,7 @@ export function hasPromptMetadata(params: Record<string, unknown> | null | undef
  * the trace-level `langwatch.prompt_ids` array). Returns null when the
  * string isn't a usable reference.
  */
-export function parsePromptIdString(raw: string): PromptReference | null {
+function parsePromptIdString(raw: string): PromptReference | null {
   if (!raw.includes(":")) return null;
 
   const colonIndex = raw.lastIndexOf(":");
@@ -277,18 +277,4 @@ function parsePromptVariables(params: Record<string, unknown>): Record<string, s
  */
 export function promptReferenceKey(ref: PromptReference): string {
   return `${ref.handle}@${ref.versionNumber ?? ""}#${ref.tag ?? ""}`;
-}
-
-/**
- * Compact label for a prompt reference, e.g. `"refund-policy v4"`,
- * `"refund-policy production"`, or just `"refund-policy"`.
- */
-export function formatPromptReferenceLabel(ref: PromptReference): string {
-  if (ref.versionNumber != null) {
-    return `${ref.handle} v${ref.versionNumber}`;
-  }
-  if (ref.tag) {
-    return `${ref.handle} ${ref.tag}`;
-  }
-  return ref.handle;
 }

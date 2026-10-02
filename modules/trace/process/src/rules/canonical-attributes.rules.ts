@@ -8,12 +8,12 @@ import type {
 export type CanonicalAttributeStore = Map<string, unknown>;
 
 /** A span's events, and which of them an extractor has consumed. */
-export type CanonicalEventStore = {
+type CanonicalEventStore = {
   readonly events: readonly CanonicalEvent[];
   readonly consumed: Set<number>;
 };
 
-export type CanonicalSpanStore = {
+type CanonicalSpanStore = {
   readonly attrs: CanonicalAttributeStore;
   readonly events: CanonicalEventStore;
 };

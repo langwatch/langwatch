@@ -113,7 +113,7 @@ export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   ),
 };
 
-export const SPAN_TYPE_DEFAULTS = [
+const SPAN_TYPE_DEFAULTS = [
   "llm",
   "tool",
   "agent",
@@ -394,7 +394,7 @@ export function getFacetGroupId(key: string): FacetGroupDef["id"] | undefined {
  */
 export type FacetPerspectiveId = "observability" | "llm" | "cost-performance";
 
-export interface FacetPerspectiveDef {
+interface FacetPerspectiveDef {
   id: FacetPerspectiveId;
   label: string;
   /**
@@ -472,11 +472,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
 
 const PERSPECTIVE_BY_ID = new Map(FACET_PERSPECTIVES.map((p) => [p.id, p]));
 
-export function isFacetPerspectiveId(x: unknown): x is FacetPerspectiveId {
-  return typeof x === "string" && PERSPECTIVE_BY_ID.has(x as FacetPerspectiveId);
-}
-
-export function perspectiveById(id: FacetPerspectiveId): FacetPerspectiveDef {
+function perspectiveById(id: FacetPerspectiveId): FacetPerspectiveDef {
   return PERSPECTIVE_BY_ID.get(id) ?? FACET_PERSPECTIVES[0]!;
 }
 

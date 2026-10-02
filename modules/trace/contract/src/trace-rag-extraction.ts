@@ -1,6 +1,3 @@
-import { nowInstant } from "@langwatch/time";
-
-import { safeUnflatten } from "./trace-attribute-unflatten.ts";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
@@ -8,18 +5,13 @@ import {
 } from "./trace-collector-common.ts";
 import { spanInputOutputSchema } from "./trace-format.schemas.ts";
 import type {
-  ElasticSearchEvaluation,
-  ElasticSearchEvent,
   ElasticSearchInputOutput,
   ElasticSearchSpan,
-  Evaluation,
-  Event,
   RAGChunk,
   Span,
   SpanInputOutput,
 } from "./trace-format.schemas.ts";
 import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
-import { fixed64Schema } from "./trace.otlp.ts";
 
 export const getRAGChunks = (spans: (ElasticSearchSpan | Span)[]): RAGChunk[] => {
   const sortedSpans = [
@@ -85,7 +77,7 @@ export const getRAGInfo = (
   return { input, output, contexts };
 };
 
-export const elasticSearchToTypedValue = (typed: ElasticSearchInputOutput): SpanInputOutput => {
+const elasticSearchToTypedValue = (typed: ElasticSearchInputOutput): SpanInputOutput => {
   try {
     return spanInputOutputSchema.parse({
       type: typed.type,
@@ -99,29 +91,7 @@ export const elasticSearchToTypedValue = (typed: ElasticSearchInputOutput): Span
   }
 };
 
-export const elasticSearchEvaluationsToEvaluations = (
-  elasticSearchEvaluations: ElasticSearchEvaluation[],
-): Evaluation[] => {
-  return elasticSearchEvaluations.map((evaluation) => {
-    return evaluation;
-  });
-};
-
-export const elasticSearchEventsToEvents = (elasticSearchEvents: ElasticSearchEvent[]): Event[] => {
-  return elasticSearchEvents.map(elasticSearchEventToEvent);
-};
-
-export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
-  return {
-    ...event,
-    metrics: Object.fromEntries(event.metrics.map((metric) => [metric.key, metric.value])),
-    event_details: Object.fromEntries(
-      event.event_details.map((detail) => [detail.key, detail.value]),
-    ),
-  };
-};
-
-export const decodeOpenTelemetryId = (id: unknown): string | null => {
+const decodeOpenTelemetryId = (id: unknown): string | null => {
   if (typeof id === "string") {
     return id;
   }
@@ -154,43 +124,4 @@ export const decodeBase64OpenTelemetryId = (id: unknown): string | null => {
 
   // For Uint8Array, use the standard decoder
   return decodeOpenTelemetryId(id);
-};
-
-export const convertFromUnixNano = (timeUnixNano: unknown): number => {
-  let unixNano: number;
-  const parsed = fixed64Schema.safeParse(timeUnixNano);
-
-  if (!parsed.success) {
-    unixNano = nowInstant().epochMilliseconds * 1000000;
-  } else if (typeof parsed.data === "number") {
-    unixNano = parsed.data;
-  } else if (typeof parsed.data === "string") {
-    const parsedString = parseInt(parsed.data, 10);
-    unixNano = !isNaN(parsedString) ? parsedString : nowInstant().epochMilliseconds * 1000000;
-  } else {
-    const { low, high } = parsed.data;
-    unixNano = high * 0x100000000 + low;
-  }
-
-  // Convert nanoseconds to milliseconds
-  return Math.round(unixNano / 1000000);
-};
-
-export const setNestedProperty = (
-  obj: Record<string, unknown>,
-  path: string,
-  value: unknown,
-): void => {
-  const unflattened = safeUnflatten({ [path]: value });
-
-  // Merge the unflattened object into the target object, deep when both sides are objects
-  for (const key of Object.keys(unflattened)) {
-    const existing = obj[key];
-    const incoming = unflattened[key];
-    if (key in obj && typeof existing === "object" && typeof incoming === "object") {
-      obj[key] = { ...existing, ...incoming };
-    } else {
-      obj[key] = incoming;
-    }
-  }
 };

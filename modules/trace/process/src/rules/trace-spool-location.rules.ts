@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
  * match it with a plain prefix filter. S3 lifecycle filters cannot wildcard a leading tenant
  * segment, so a tenant-first path would be unexpirable. Do not reorder.
  */
-export const SPOOL_KEY_PREFIX = "trace-blobs/spool";
+const SPOOL_KEY_PREFIX = "trace-blobs/spool";
 
 /**
  * Marker carried by a spooled command instead of a storage path. v1 put the raw object key in the
@@ -31,7 +31,7 @@ const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
  * driver decodes before writing and an id of dot-dot segments could escape the object root, so
  * anything outside the safe class is replaced by a deterministic hash rather than escaped.
  */
-export function safePathSegment(id: string): string {
+function safePathSegment(id: string): string {
   if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") {
     return id;
   }
@@ -72,7 +72,7 @@ export function isLegacySpoolRef(spoolRef: string): boolean {
  * Extracts the projectId segment from a v1 spool key. The caller must check it against the
  * command's authenticated tenant before dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
  */
-export function projectIdFromLegacySpoolKey(spoolRef: string): string {
+function projectIdFromLegacySpoolKey(spoolRef: string): string {
   return spoolRef.split("/")[SPOOL_KEY_PREFIX.split("/").length] ?? "";
 }
 

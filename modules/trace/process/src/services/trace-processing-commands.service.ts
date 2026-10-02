@@ -14,7 +14,7 @@ import {
 import type { TraceProcessingCommands } from "../app/trace.members.ts";
 
 /** The trace_processing command senders this service dispatches through, and nothing else. */
-export type TraceProcessingSenders = Readonly<{
+type TraceProcessingSenders = Readonly<{
   recordSpan: EventingCommandSender<RecordSpanCommandData>;
   changeTraceName: EventingCommandSender<TraceNameChangedEventData & CommandEnvelope>;
   addAnnotation: EventingCommandSender<AnnotationAddedEventData & CommandEnvelope>;

@@ -61,7 +61,7 @@ export interface ConversationGroup {
 }
 
 /** Identity only: the number, where it lives, and what it is called. */
-export interface ConversationPullRequest {
+interface ConversationPullRequest {
   number: number;
   htmlUrl: string;
   title: string;

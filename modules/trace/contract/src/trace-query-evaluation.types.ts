@@ -32,7 +32,7 @@ export type FieldHandler = (tag: TagToken, negated: boolean, context: Translatio
  * Minimal per-span shape for in-memory evaluator span-scoped fields. Spans
  * typically absent (derived later); evaluate to UNSUPPORTED. Pinned for contract.
  */
-export interface DerivedSpanRow {
+interface DerivedSpanRow {
   /** `stored_spans.SpanName`. */
   name: string;
   /** OTel `stored_spans.StatusCode` — `1` ok, `2` error, `0`/null unset. */

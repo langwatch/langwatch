@@ -27,7 +27,7 @@ import { SessionTab } from "./session-view/index.ts";
 import { TerminalTab } from "./terminal-view/index.ts";
 import { TraceAccordions } from "./trace-accordions/index.ts";
 
-export interface TraceDrawerContentProps {
+interface TraceDrawerContentProps {
   traceId: string | undefined;
   trace: TraceHeader | null;
   spanTree: SpanTreeNode[];

@@ -2,7 +2,7 @@ import { nowInstant } from "@langwatch/time";
 
 type MemoryEntry<T> = { value: T; expiresAt: number };
 
-export type TraceTtlCacheLookup<T> = { kind: "hit"; value: T } | { kind: "miss" };
+type TraceTtlCacheLookup<T> = { kind: "hit"; value: T } | { kind: "miss" };
 
 /**
  * The per-pod TTL cache behind the explorer's facet and discover reads. Each pod keeps its own

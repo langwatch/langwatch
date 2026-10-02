@@ -327,7 +327,7 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
  * Thrown when no ClickHouse client can be resolved for a project — always a configuration
  * problem (e.g. CLICKHOUSE_URL unset), never missing data. Callers surface it as such.
  */
-export class ClickHouseClientUnavailableError extends Error {
+class ClickHouseClientUnavailableError extends Error {
   constructor(projectId: string) {
     super(
       `No ClickHouse client could be resolved for project "${projectId}" — check ClickHouse client configuration (CLICKHOUSE_URL)`,

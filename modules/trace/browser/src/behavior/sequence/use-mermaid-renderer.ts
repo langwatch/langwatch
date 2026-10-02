@@ -13,7 +13,7 @@ interface SvgSize {
   height: number;
 }
 
-export interface MermaidRenderResult {
+interface MermaidRenderResult {
   syntax: string;
   idToSpanId: Map<string, string>;
   idDisplay: Map<string, string>;

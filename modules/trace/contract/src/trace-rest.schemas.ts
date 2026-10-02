@@ -20,7 +20,7 @@ import { discoverResultSchema } from "./trace-list-view.ts";
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
-export const MAX_TRACE_FILTER_LENGTH = 4_000;
+const MAX_TRACE_FILTER_LENGTH = 4_000;
 
 /**
  * The additive half of the search body; the other half is the deployment's
@@ -88,7 +88,7 @@ const pageOffsetInput = z
  * plus the paging and ordering the list read understands. `projectId` comes
  * from the credential, and the two dates are re-added in flexible form.
  */
-export const traceSearchFilterSchema = z.object({
+const traceSearchFilterSchema = z.object({
   ...sharedFiltersInputSchema.omit({ projectId: true, startDate: true, endDate: true }).shape,
   pageOffset: pageOffsetInput,
   // Non-negative integers only (#2163): a fractional or negative page size
@@ -228,7 +228,7 @@ export const trackEventResponseSchema = z.object({
   message: z.literal("Event tracked"),
 });
 
-export const transcriptResponseSchema = z.object({
+const transcriptResponseSchema = z.object({
   agent: z.string(),
   sessionId: z.string().nullable(),
   entries: z.array(z.object({}).passthrough()),
@@ -293,7 +293,7 @@ export const tracesRestCredentialSchema = z.object({
 });
 
 /** Values per page when a facets caller names a field and no limit. */
-export const DEFAULT_FACET_VALUE_LIMIT = 50;
+const DEFAULT_FACET_VALUE_LIMIT = 50;
 
 /** Digits only, which is how epoch milliseconds arrive on a query string. */
 const EPOCH_MILLIS = /^\d+$/;
@@ -317,7 +317,7 @@ function namesARealDay(value: string): boolean {
  * A facets window bound as a query string, not a string-or-number union: a
  * `number` arm loses precision going through the generated Go client.
  */
-export const facetWindowBoundSchema = z
+const facetWindowBoundSchema = z
   .string()
   .refine(
     (value) =>

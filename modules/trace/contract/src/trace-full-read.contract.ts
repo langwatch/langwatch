@@ -7,12 +7,12 @@ import { traceRecordValueSchema } from "./trace-record.ts";
  * JSON-shaped: provider message/tool payloads are part of the captured
  * trace, not a transport-owned union.
  */
-export const traceFullContentSchema = z.looseObject({
+const traceFullContentSchema = z.looseObject({
   type: z.string().optional(),
   value: traceRecordValueSchema,
 });
 
-export const traceFullRecordSpanSchema = z.looseObject({
+const traceFullRecordSpanSchema = z.looseObject({
   span_id: z.string(),
   trace_id: z.string(),
   parent_id: z.string().nullable().optional(),
@@ -33,7 +33,7 @@ export const traceFullRecordSpanSchema = z.looseObject({
 
 export type TraceFullRecordSpan = z.infer<typeof traceFullRecordSpanSchema>;
 
-export const traceFullRecordEventSchema = z.looseObject({
+const traceFullRecordEventSchema = z.looseObject({
   event_id: z.string(),
   event_type: z.string(),
   project_id: z.string(),

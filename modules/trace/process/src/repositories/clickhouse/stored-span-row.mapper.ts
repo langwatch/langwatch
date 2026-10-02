@@ -167,7 +167,7 @@ const attributeMapSchema = z.record(z.string(), z.unknown());
  * Exported so the claim-check equivalence test drives the REAL mapping, not
  * a hand-built stand-in — exactly the column-mapping regression it must catch.
  */
-export const fullSpanRowSchema = z.looseObject({
+const fullSpanRowSchema = z.looseObject({
   SpanId: chString,
   TraceId: chString,
   TenantId: chString,
@@ -197,7 +197,7 @@ export const fullSpanRowSchema = z.looseObject({
   Links_Attributes: z.array(attributeMapSchema).optional(),
 });
 
-export type FullSpanRow = z.infer<typeof fullSpanRowSchema>;
+type FullSpanRow = z.infer<typeof fullSpanRowSchema>;
 
 export const fullSpanRowsSchema = z.array(fullSpanRowSchema);
 

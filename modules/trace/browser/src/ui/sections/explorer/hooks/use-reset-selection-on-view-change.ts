@@ -7,7 +7,7 @@ import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
  * means something else. Pagination, sort, density and column visibility are
  * deliberately absent — they change how the rows are shown, not which.
  */
-export function explorerViewKey({
+function explorerViewKey({
   activeLensId,
   queryText,
   timeKey,

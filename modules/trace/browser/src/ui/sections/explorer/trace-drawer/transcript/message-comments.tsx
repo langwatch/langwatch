@@ -1,5 +1,4 @@
-import { Box, HStack } from "@langwatch/design-system/primitives";
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { createContext, type ReactNode, useMemo } from "react";
 
 import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
@@ -52,29 +51,6 @@ function ScopeProvider({ traceId, children }: { traceId: string; children: React
 }
 
 /** Marks the element a block's comment action reveals itself on hover from. */
-export const MESSAGE_BLOCK_CLASS = "msg-block";
-
-/**
- * One block of a message, with the way to say something about it.
- */
-export function CommentableBlock({
-  blockKey,
-  children,
-}: {
-  blockKey: string;
-  children: ReactNode;
-}) {
-  const scope = useContext(MessageCommentContext);
-  if (!scope) return <>{children}</>;
-  return (
-    <HStack align="flex-start" gap={1} width="full" className={MESSAGE_BLOCK_CLASS}>
-      <Box flex={1} minWidth={0}>
-        {children}
-      </Box>
-      <MessageCommentButton scope={scope} blockKey={blockKey} />
-    </HStack>
-  );
-}
 
 function MessageCommentButton({
   scope,

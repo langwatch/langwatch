@@ -8,7 +8,7 @@ import type { SpanDetail } from "@langwatch/trace-contract";
  */
 
 /** Which agent's mark and name the banner draws. */
-export type BannerAgent =
+type BannerAgent =
   | "claude_code"
   | "claude_cowork"
   | "opencode"

@@ -6,7 +6,7 @@ import { useTraceListEvents } from "./use-trace-list-events.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
 import { useViewSwitchingDim } from "./use-view-switching-dim.ts";
 
-export interface TraceListResult {
+interface TraceListResult {
   data: TraceListItem[];
   totalHits: number;
   nextCursor: TraceListCursor | null;

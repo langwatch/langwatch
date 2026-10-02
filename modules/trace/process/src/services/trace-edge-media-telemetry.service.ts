@@ -5,8 +5,7 @@ import {
   type TraceEdgeMediaTelemetry,
 } from "../app/trace.members.ts";
 
-export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
-  "langwatch_edge_media_extract_fail_open_total";
+const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME = "langwatch_edge_media_extract_fail_open_total";
 
 /**
  * Metrics for edge media extraction; optional in the extraction service.

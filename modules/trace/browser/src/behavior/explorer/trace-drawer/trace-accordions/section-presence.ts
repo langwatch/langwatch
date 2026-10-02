@@ -49,7 +49,7 @@ export function useAutoOpenSections(
   return [open, setOpen];
 }
 
-export interface SectionPresenceState {
+interface SectionPresenceState {
   traceId: string | null;
   tab: "summary" | "span" | null;
   set: (next: { traceId: string; tab: "summary" | "span" }) => void;

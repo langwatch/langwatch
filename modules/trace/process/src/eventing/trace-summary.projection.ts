@@ -78,16 +78,16 @@ export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
  * calls. Rides ONLY api_response_body log events (no span attribute carries
  * it), so summing on the LOG path can never double-count a span-side number.
  */
-export const RESERVED_CACHE_CREATION_5M_TOKENS = "langwatch.reserved.cache_creation_5m_tokens";
-export const RESERVED_CACHE_CREATION_1H_TOKENS = "langwatch.reserved.cache_creation_1h_tokens";
+const RESERVED_CACHE_CREATION_5M_TOKENS = "langwatch.reserved.cache_creation_5m_tokens";
+const RESERVED_CACHE_CREATION_1H_TOKENS = "langwatch.reserved.cache_creation_1h_tokens";
 
 /**
  * The context the trace's first model call already carried, and the start time
  * of the call that set it (bookkeeping, so a later-arriving earlier span can
  * still win). See {@link recordContextSize}.
  */
-export const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tokens";
-export const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
+const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tokens";
+const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
 
 /**
  * A single log record's normalized contribution to the trace summary fold.

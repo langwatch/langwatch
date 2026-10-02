@@ -38,14 +38,14 @@ export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
  * Full length of a trace ID. Inputs shorter than this are treated as
  * potential prefixes; equal-or-longer inputs are treated as literal IDs.
  */
-export const FULL_TRACE_ID_LENGTH = 32;
+const FULL_TRACE_ID_LENGTH = 32;
 
 /**
  * How many candidates the resolver asks ClickHouse for when disambiguating
  * a prefix. Matches the cap the error message previews, so API clients see
  * every candidate the resolver considered.
  */
-export const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
+const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
 
 /**
  * Time window (in days) that prefix resolution scans. Without a partition bound, ClickHouse

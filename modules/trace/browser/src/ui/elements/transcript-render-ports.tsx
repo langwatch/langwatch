@@ -2,7 +2,7 @@ import type { MediaPartData } from "@langwatch/trace-contract/transcript";
 import { createContext, type ReactNode, useContext } from "react";
 
 /** Host-owned widgets needed by transcript blocks at a browser boundary. */
-export interface TranscriptRenderMembers {
+interface TranscriptRenderMembers {
   renderMediaPart?: (part: MediaPartData) => ReactNode;
   renderCommentAction?: (blockKey: string) => ReactNode;
   renderTerminalOutput?: (text: string, isError: boolean) => ReactNode;

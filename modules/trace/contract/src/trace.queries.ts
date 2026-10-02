@@ -11,8 +11,6 @@ export const spanTreeTransportInputSchema = z.object({
   occurredAtMs: z.number().int().optional(),
 });
 
-export type SpanTreeTransportInput = z.infer<typeof spanTreeTransportInputSchema>;
-
 /** Transport input plus the resolved authorization capability for the service. */
 export const spanTreeInputSchema = z.object({
   ...spanTreeTransportInputSchema.shape,
@@ -29,10 +27,8 @@ export const spanTreeDeltaTransportInputSchema = z.object({
   occurredAtMs: z.number().int().optional(),
 });
 
-export type SpanTreeDeltaTransportInput = z.infer<typeof spanTreeDeltaTransportInputSchema>;
-
 /** Transport input plus the resolved authorization capability for the service. */
-export const spanTreeDeltaInputSchema = z.object({
+const spanTreeDeltaInputSchema = z.object({
   ...spanTreeDeltaTransportInputSchema.shape,
   canSeeCosts: z.boolean(),
 });

@@ -52,7 +52,7 @@ export interface TraceListEventGroup {
  * `traces.listEvents` once per visible page, not carried on the trace summary — the
  * fold stopped hoisting events so that folding stays O(1) per span (migration 00025).
  */
-export interface TraceListEvents {
+interface TraceListEvents {
   /** Ordered by first occurrence; shorter than `distinctCount` when trimmed. */
   groups: TraceListEventGroup[];
   /** Every event the trace recorded, including names beyond the trim. */

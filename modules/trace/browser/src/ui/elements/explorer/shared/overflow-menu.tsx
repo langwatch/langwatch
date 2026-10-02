@@ -3,7 +3,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 import type React from "react";
 
-export interface OverflowMenuItem {
+interface OverflowMenuItem {
   id: string;
   label: React.ReactNode;
   /** Optional inline-start icon (Chakra/Lucide ReactNode). */

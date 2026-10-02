@@ -254,7 +254,7 @@ function traceAttributeKeyOf(
   return { kind: "other" };
 }
 
-export function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const p = nextParam(ctx, "traceId");
@@ -266,11 +266,7 @@ export function translateTraceId(tag: TagToken, negated: boolean, ctx: Translati
   return wrap(`TraceId = {${p}:String}`, negated);
 }
 
-export function translateExistence(
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
 
@@ -389,7 +385,7 @@ const EXISTENCE_PROBES: ReadonlyMap<string, (trace: InMemoryTrace) => boolean | 
     ["rootSpanType", (trace: InMemoryTrace) => (trace.summary.rootSpanType ?? "") !== ""],
   ]);
 
-export function evaluateExistence(
+function evaluateExistence(
   tag: TagToken,
   negated: boolean,
   trace: InMemoryTrace,
@@ -418,7 +414,7 @@ export function evaluateExistence(
   return present === UNSUPPORTED ? UNSUPPORTED : polarise(present);
 }
 
-export function scenarioColumnDef(column: string): FieldDef {
+function scenarioColumnDef(column: string): FieldDef {
   return {
     toClickHouse: (tag, negated, ctx) => {
       const value = extractStringValue(tag);

@@ -52,7 +52,7 @@ import { TraceSummaryFoldProjection } from "./trace-summary.projection.ts";
 import { EventingTraceTopicAdapter } from "./trace-topic-assignment.commands.ts";
 
 /** Trace pipeline name; shared by both full and producer-only registration shapes. */
-export const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";
+const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";
 
 export type EventingTracePipelineAdapterOptions = {
   spanStore: AppendStore<NormalizedSpan>;

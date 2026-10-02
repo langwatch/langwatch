@@ -17,15 +17,6 @@ import {
 } from "./parts.tsx";
 import { PendingReply } from "./pending-reply.tsx";
 
-// Single renderer for playground, simulations grid, and drawer; reuses
-// existing components (Bubble, ToolPairCard, MediaPart) in one place.
-
-/**
- * `compact` is the simulations grid cell — smaller type, tighter truncation,
- * no turn separators, since a card is a preview rather than a transcript.
- */
-export type ConversationVariant = NonNullable<UiConversationThreadProps["variant"]>;
-
 /** Dispatches one part to the component that knows how to draw it. */
 function ConversationPart({
   part,

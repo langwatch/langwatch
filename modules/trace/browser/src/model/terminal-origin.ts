@@ -2,7 +2,7 @@
  * Signals that tell us a trace came from a coding agent running in a real terminal —
  * the cue to offer the Terminal view.
  */
-export interface TerminalOriginSignals {
+interface TerminalOriginSignals {
   serviceName?: string | null;
   origin?: string | null;
   /** The `terminal.type` attribute, present only for real terminal sessions. */

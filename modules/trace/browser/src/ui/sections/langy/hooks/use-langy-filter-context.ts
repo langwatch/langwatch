@@ -1,18 +1,4 @@
-import { useMemo } from "react";
-
-import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import type { LangyContextChip } from "../../../../behavior/langy/langy.store.ts";
-
-/**
- * Turns the Trace Explorer's active filter query into a Langy context chip — "filtered:
- * <query>" — so the agent scopes "these traces" to what the user has narrowed the table
- * to.
- */
-export function useLangyFilterContext(): LangyContextChip | null {
-  const queryText = useFilterStore((s) => s.queryText);
-
-  return useMemo(() => filterContextChip(queryText), [queryText]);
-}
 
 /** Max characters shown in the filter chip before an ellipsis. */
 const MAX_FILTER_SUMMARY = 48;

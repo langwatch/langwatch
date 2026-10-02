@@ -10,7 +10,7 @@ import { filterAST, walkAST } from "./trace-query-ast.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 /** The bare field, whose target comes from the lens. */
-export const INSTANT_EVAL_FIELD = "eval";
+const INSTANT_EVAL_FIELD = "eval";
 
 /**
  * The three spellings that force the unit judged, so a lens change cannot
@@ -26,7 +26,7 @@ export const INSTANT_EVAL_TARGET_FIELDS: Readonly<Record<string, InstantEvalTarg
 export const CONVERSATIONS_LENS_ID = "conversations";
 
 /** The unit an `eval:` chip judges on this lens. */
-export function instantEvalTargetForLens(lensId: string | undefined): InstantEvalTarget {
+function instantEvalTargetForLens(lensId: string | undefined): InstantEvalTarget {
   return lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces";
 }
 
@@ -36,7 +36,7 @@ export function isInstantEvalField(fieldName: string): boolean {
 }
 
 /** The unit a chip judges: what its field forces, or what the lens shows. */
-export function instantEvalTargetOf({
+function instantEvalTargetOf({
   fieldName,
   lensId,
 }: {
@@ -47,7 +47,7 @@ export function instantEvalTargetOf({
 }
 
 /** One eval chip as it appears in a query. */
-export interface InstantEvalChip {
+interface InstantEvalChip {
   /** The question, as the judge reads it. */
   question: string;
   /** The field it was written under. */
@@ -170,11 +170,7 @@ export function instantEvalChipText({
 }
 
 /** The window half of a run key: a preset by its id, an absolute range by its bounds. */
-export function instantEvalWindowKey(window: {
-  from: number;
-  to: number;
-  presetId?: string;
-}): string {
+function instantEvalWindowKey(window: { from: number; to: number; presetId?: string }): string {
   return window.presetId ? `preset:${window.presetId}` : `${window.from}-${window.to}`;
 }
 
@@ -225,7 +221,7 @@ export interface ResolvedInstantEvalRun extends InstantEvalRunReference {
 }
 
 /** A chip and the run behind it, or `null` when none is registered. */
-export interface ResolvedInstantEvalChip extends InstantEvalChip {
+interface ResolvedInstantEvalChip extends InstantEvalChip {
   key: string;
   runId: string | null;
 }

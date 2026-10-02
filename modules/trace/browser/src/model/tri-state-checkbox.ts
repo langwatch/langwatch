@@ -3,7 +3,7 @@
  * that goes with it.
  */
 
-export type CheckboxState = boolean | "indeterminate";
+type CheckboxState = boolean | "indeterminate";
 
 /** None selected, all selected, or somewhere in between. */
 export function checkboxStateFor({

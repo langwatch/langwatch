@@ -1,17 +1,12 @@
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import { z } from "zod";
 
-export const checkPreconditionRuleSchema = z.enum([
-  "contains",
-  "not_contains",
-  "matches_regex",
-  "is",
-]);
+const checkPreconditionRuleSchema = z.enum(["contains", "not_contains", "matches_regex", "is"]);
 
 export type CheckPreconditionRule = z.infer<typeof checkPreconditionRuleSchema>;
 
 /** All fields usable in preconditions: every FilterField plus input/output */
-export const checkPreconditionFieldsSchema = z.union([
+const checkPreconditionFieldsSchema = z.union([
   filterFieldsEnum,
   z.literal("input"),
   z.literal("output"),
@@ -19,7 +14,7 @@ export const checkPreconditionFieldsSchema = z.union([
 
 export type CheckPreconditionFields = z.infer<typeof checkPreconditionFieldsSchema>;
 
-export const checkPreconditionSchema = z.object({
+const checkPreconditionSchema = z.object({
   field: checkPreconditionFieldsSchema,
   rule: checkPreconditionRuleSchema,
   value: z.string().min(1).max(500),

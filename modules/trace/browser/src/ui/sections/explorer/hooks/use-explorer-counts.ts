@@ -12,7 +12,7 @@ import { useSessionGroups } from "./use-session-groups.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
 
 /** The counters of the run behind the query that has not settled yet. */
-export interface ActiveInstantEval {
+interface ActiveInstantEval {
   runId: string;
   judged: number;
   total: number | null;
@@ -21,7 +21,7 @@ export interface ActiveInstantEval {
   phase: Exclude<InstantEvalRunPhase, "settled">;
 }
 
-export interface ExplorerCounts {
+interface ExplorerCounts {
   /**
    * Rows matching the active query in the exact window, with the hidden
    * origins left out: the count the list read returns with the page.

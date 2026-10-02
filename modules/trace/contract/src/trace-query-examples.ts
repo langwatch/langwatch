@@ -8,7 +8,7 @@
 import type { QueryExampleIntent } from "@langwatch/analytics-contract";
 
 /** One worked trace filter query. */
-export interface TraceFilterExample {
+interface TraceFilterExample {
   /** Stable identifier, unique across both example libraries. */
   readonly id: string;
   readonly title: string;

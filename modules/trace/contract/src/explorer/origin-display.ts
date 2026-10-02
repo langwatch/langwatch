@@ -14,7 +14,7 @@ export const ORIGIN_DISPLAY = {
   ai_tool: { label: "AI Tool", colorPalette: "yellow" },
 } as const satisfies Record<string, { label: string; colorPalette: string }>;
 
-export type KnownOrigin = keyof typeof ORIGIN_DISPLAY;
+type KnownOrigin = keyof typeof ORIGIN_DISPLAY;
 
 /** Display label for an origin; unknown values pass through verbatim. */
 export function originLabel(origin: string): string {

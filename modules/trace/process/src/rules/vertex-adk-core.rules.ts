@@ -5,7 +5,7 @@ import { inferSpanTypeIfAbsent } from "./canonical-extraction.rules.ts";
 import { isNonEmptyString } from "./canonical-guard.rules.ts";
 
 export const VERTEX_ADK_RULE_PREFIX = "vertex-adk";
-export const VERTEX_ADK_PROVIDER = "gcp.vertex.agent";
+const VERTEX_ADK_PROVIDER = "gcp.vertex.agent";
 
 export const VERTEX_ADK_KEYS = {
   LLM_REQUEST: "gcp.vertex.agent.llm_request",

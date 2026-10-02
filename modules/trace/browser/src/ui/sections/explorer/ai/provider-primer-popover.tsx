@@ -13,13 +13,13 @@ import type React from "react";
 import { useCallback, useState } from "react";
 
 /** What the popover says, per surface that needs a model. */
-export interface ProviderPrimerCopy {
+interface ProviderPrimerCopy {
   title: string;
   body: string;
 }
 
 /** The Ask AI composer's words: it cannot run at all without a provider. */
-export const ASK_AI_PRIMER_COPY: ProviderPrimerCopy = {
+const ASK_AI_PRIMER_COPY: ProviderPrimerCopy = {
   title: "Connect a model provider",
   body: "Ask AI uses your own model provider keys to translate plain English into trace queries: “errors yesterday from service-x”, “slow checkout traces with eval scores under 0.5”. Add a provider to unlock it.",
 };

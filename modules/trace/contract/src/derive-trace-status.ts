@@ -1,6 +1,6 @@
 export type DerivedTraceStatus = "ok" | "error" | "warning";
 
-export type TraceStatusSummary = {
+type TraceStatusSummary = {
   containsErrorStatus: boolean;
   blockedByGuardrail: boolean;
 };

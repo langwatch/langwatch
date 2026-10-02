@@ -21,7 +21,7 @@ interface AttributeChatMessage {
   content: string;
 }
 
-export interface InlineDescriptor {
+interface InlineDescriptor {
   text: string;
   hint?: string;
 }

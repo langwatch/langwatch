@@ -30,7 +30,7 @@ const MEDIA_SOURCE_ATTRS = {
 /**
  * One span's contribution to the trace's headline input and output.
  */
-export type TraceIOAccumulation = {
+type TraceIOAccumulation = {
   computedInput: string | null;
   computedOutput: string | null;
   outputFromRootSpan: boolean;

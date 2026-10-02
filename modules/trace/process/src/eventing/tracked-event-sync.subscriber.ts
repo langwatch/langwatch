@@ -41,7 +41,7 @@ const DETAILS_PREFIX = "event.details.";
  * `POST /api/events/track` body for the same ingestion path, plus the
  * occurrence ordinal separating two same-type feedback events on one span.
  */
-export interface ReconstructedTrackedEvent {
+interface ReconstructedTrackedEvent {
   event_type: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;

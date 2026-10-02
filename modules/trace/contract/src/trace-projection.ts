@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const spanInsertDataSchema = z.object({
+const spanInsertDataSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
   traceId: z.string(),

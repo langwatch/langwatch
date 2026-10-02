@@ -97,7 +97,7 @@ export type TraceFailureNotice = {
  * One thing the agent may do on the screen that is open, with the schema its
  * payload is checked against first.
  */
-export type TraceLangyActionHandler = {
+type TraceLangyActionHandler = {
   payloadSchema: z.ZodTypeAny;
   run: (payload: never) => unknown;
 };

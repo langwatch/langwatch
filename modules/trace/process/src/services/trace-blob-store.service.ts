@@ -44,7 +44,7 @@ export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
  * rather than imported so this module depends on a shape, not on the registry
  * class — the registry satisfies it structurally.
  */
-export interface SpoolObjectStore {
+interface SpoolObjectStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
   delete(uri: string): Promise<void>;

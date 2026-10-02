@@ -41,7 +41,7 @@ const GenAIRichContent = z.union([
   GenAIToolResultContent,
 ]);
 
-export type GenAIRichContent = z.infer<typeof GenAIRichContent>;
+type GenAIRichContent = z.infer<typeof GenAIRichContent>;
 
 const GenAIFunctionCall = z.object({
   name: z.string().optional(),
@@ -73,8 +73,8 @@ export type OpenTelemetryGenAIMessage = z.infer<typeof OpenTelemetryGenAIMessage
  * LangWatch format (current ChatMessage from types.ts)
  * Compatible with OpenTelemetry GenAI format
  */
-export const LangWatchMessage = OpenTelemetryGenAIMessage;
-export type LangWatchMessage = OpenTelemetryGenAIMessage;
+const LangWatchMessage = OpenTelemetryGenAIMessage;
+type LangWatchMessage = OpenTelemetryGenAIMessage;
 
 /**
  * OpenAI message format
@@ -167,7 +167,7 @@ const AnthropicContentBlock = z.union([
 ]);
 
 export type AnthropicContentBlock = z.infer<typeof AnthropicContentBlock>;
-export type AnthropicTextBlock = z.infer<typeof AnthropicTextBlock>;
+type AnthropicTextBlock = z.infer<typeof AnthropicTextBlock>;
 
 export const AnthropicMessage = z.object({
   role: z.enum(["user", "assistant"]),
@@ -212,7 +212,7 @@ const GeminiPart = z.union([
   GeminiFunctionResponsePart,
 ]);
 
-export type GeminiPart = z.infer<typeof GeminiPart>;
+type GeminiPart = z.infer<typeof GeminiPart>;
 
 export const GeminiMessage = z.object({
   role: z.enum(["user", "model", "function"]),
@@ -297,8 +297,8 @@ export type AnyProviderMessage = z.infer<typeof AnyProviderMessage>;
 /**
  * Array of messages in any supported format
  */
-export const AnyProviderMessages = z.array(AnyProviderMessage);
-export type AnyProviderMessages = z.infer<typeof AnyProviderMessages>;
+const AnyProviderMessages = z.array(AnyProviderMessage);
+type AnyProviderMessages = z.infer<typeof AnyProviderMessages>;
 
 /**
  * Helper to detect message format

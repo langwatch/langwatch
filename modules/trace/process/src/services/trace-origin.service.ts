@@ -10,7 +10,7 @@ function toNonEmptyString(value: unknown): string | undefined {
  * Rules for inferring trace origin from legacy span markers.
  * Checked in order; first match wins.
  */
-export const LEGACY_ORIGIN_RULES: {
+const LEGACY_ORIGIN_RULES: {
   check: (span: NormalizedSpan) => boolean;
   origin: string;
 }[] = [

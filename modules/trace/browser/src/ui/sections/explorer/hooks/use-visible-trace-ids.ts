@@ -4,7 +4,7 @@ import { useFilterStore, useViewStore } from "../../../../behavior/explorer.stor
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
-export interface VisibleTraceIds {
+interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */
   ids: Set<string>;
   /**

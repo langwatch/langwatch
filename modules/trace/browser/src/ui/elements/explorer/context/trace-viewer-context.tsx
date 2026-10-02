@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useContext, useMemo } from "react";
 /**
  * How the trace surface is being viewed.
  */
-export interface TraceViewer {
+interface TraceViewer {
   /** Overrides the drawer address's trace id when set. */
   traceId?: string;
   isReadOnly: boolean;

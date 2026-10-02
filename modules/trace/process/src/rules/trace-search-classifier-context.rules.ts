@@ -15,7 +15,7 @@ import {
 export const ROUTE_QUESTION_ID = "route";
 
 /** One option the classifier may answer the routing question with. */
-export interface TraceSearchRouteOption {
+interface TraceSearchRouteOption {
   name: string;
   description: string;
 }

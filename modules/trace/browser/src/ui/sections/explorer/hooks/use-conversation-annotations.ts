@@ -6,7 +6,7 @@ import {
   useAnnotationsByTraceIds,
 } from "../../use-annotations-by-trace-ids.ts";
 
-export interface ConversationAnnotations {
+interface ConversationAnnotations {
   /**
    * Comments about a turn as a whole, by the turn they were left on. This is
    * what a turn's count reads, so a reviewer who marked three spans of one turn

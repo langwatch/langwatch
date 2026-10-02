@@ -1,6 +1,6 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
-export type SequenceSubMode = "topology" | "sequence";
+type SequenceSubMode = "topology" | "sequence";
 
 export interface SequenceViewProps {
   spans: SpanTreeNode[];

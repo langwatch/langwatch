@@ -33,14 +33,3 @@ export abstract class TraceSummaryRepository {
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null>;
 }
-
-export class NullTraceSummaryRepository implements TraceSummaryRepository {
-  async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
-
-  async findByTraceId(
-    _trace: { tenantId: string; traceId: string },
-    _options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null> {
-    return null;
-  }
-}

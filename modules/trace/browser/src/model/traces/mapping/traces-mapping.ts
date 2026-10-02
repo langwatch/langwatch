@@ -9,7 +9,7 @@ import {
 } from "@langwatch/dataset-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 
-export type TraceMappingSource = keyof typeof TRACE_MAPPINGS;
+type TraceMappingSource = keyof typeof TRACE_MAPPINGS;
 export type TraceExpansion = keyof typeof TRACE_EXPANSIONS;
 export type TraceMappingDefinition = (typeof TRACE_MAPPINGS)[TraceMappingSource];
 
@@ -261,7 +261,7 @@ export function availableExpansionsFor(
 }
 
 /** Dedupe {key,label} options by key, preserving first-seen order. */
-export const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
+const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
   const seen = new Set<string>();
   return options.filter((option) => {
     if (seen.has(option.key)) return false;

@@ -3,14 +3,14 @@ import { buildFacetStateLookup, type ExplorerState, parse } from "@langwatch/tra
 import type { ExplorerResults } from "../../behavior/rows.slice.ts";
 
 /** One value the query filters on, as the sidebar would show it. */
-export interface ActiveFacet {
+interface ActiveFacet {
   field: string;
   value: string;
   state: "include" | "exclude";
 }
 
 /** The counters of the Instant Eval run still judging behind the query. */
-export interface InstantEvalProgress {
+interface InstantEvalProgress {
   runId: string;
   judged: number;
   total: number | null;

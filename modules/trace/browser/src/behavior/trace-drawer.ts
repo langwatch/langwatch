@@ -53,7 +53,8 @@ interface TraceDrawerAddressActions {
 
 /** The trace drawer as its callers read it: the address, the reader's chrome, and the writes. */
 export interface TraceDrawerState
-  extends DrawerChromeState,
+  extends
+    DrawerChromeState,
     Omit<TraceDrawerAddress, "addressedViewMode" | "addressedVizTab">,
     TraceDrawerAddressActions {
   viewMode: DrawerViewMode;

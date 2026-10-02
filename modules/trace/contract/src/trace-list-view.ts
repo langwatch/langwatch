@@ -84,7 +84,7 @@ export const traceListPageSchema = z.object({
 
 export type TraceListPage = z.infer<typeof traceListPageSchema>;
 
-export const categoricalFacetDescriptorSchema = z.object({
+const categoricalFacetDescriptorSchema = z.object({
   key: z.string(),
   kind: z.literal("categorical"),
   label: z.string(),
@@ -105,7 +105,7 @@ export const categoricalFacetDescriptorSchema = z.object({
 
 export type CategoricalFacetDescriptor = z.infer<typeof categoricalFacetDescriptorSchema>;
 
-export const rangeFacetDescriptorSchema = z.object({
+const rangeFacetDescriptorSchema = z.object({
   key: z.string(),
   kind: z.literal("range"),
   label: z.string(),
@@ -125,7 +125,7 @@ export const rangeFacetDescriptorSchema = z.object({
 
 export type RangeFacetDescriptor = z.infer<typeof rangeFacetDescriptorSchema>;
 
-export const dynamicKeysFacetDescriptorSchema = z.object({
+const dynamicKeysFacetDescriptorSchema = z.object({
   key: z.string(),
   kind: z.literal("dynamic_keys"),
   label: z.string(),
@@ -136,7 +136,7 @@ export const dynamicKeysFacetDescriptorSchema = z.object({
 
 export type DynamicKeysFacetDescriptor = z.infer<typeof dynamicKeysFacetDescriptorSchema>;
 
-export const facetDescriptorSchema = z.union([
+const facetDescriptorSchema = z.union([
   categoricalFacetDescriptorSchema,
   rangeFacetDescriptorSchema,
   dynamicKeysFacetDescriptorSchema,

@@ -10,10 +10,10 @@ import type { TraceGroup } from "./registry/index.ts";
  * trace, so anything that collects ids off the rendered rows and hands them to
  * a bulk action filters them out first with {@link withoutPlaceholderTraceIds}.
  */
-export const SKELETON_TRACE_ID_PREFIX = "__skeleton_trace_";
+const SKELETON_TRACE_ID_PREFIX = "__skeleton_trace_";
 
 /** Whether this id belongs to a loading placeholder rather than a real trace. */
-export const isPlaceholderTraceId = (traceId: string): boolean =>
+const isPlaceholderTraceId = (traceId: string): boolean =>
   traceId.startsWith(SKELETON_TRACE_ID_PREFIX);
 
 /** The ids that address a real trace, in their original order. */

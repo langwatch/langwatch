@@ -12,7 +12,7 @@ import { TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
  * defaulted to `true` by the procedure, so the client input is `z.input`,
  * not `z.output` — declaring it required would break a correct call site.
  */
-export const traceHeaderReadInputSchema = z.object({
+const traceHeaderReadInputSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
   /**
@@ -27,7 +27,7 @@ export const traceHeaderReadInputSchema = z.object({
 export type TraceHeaderReadInput = z.input<typeof traceHeaderReadInputSchema>;
 
 /** `traces.changeName`, as the browser sends it. */
-export const changeTraceNameCommandSchema = z.object({
+const changeTraceNameCommandSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
   newName: z.string(),
@@ -36,7 +36,7 @@ export const changeTraceNameCommandSchema = z.object({
 export type ChangeTraceNameCommand = z.infer<typeof changeTraceNameCommandSchema>;
 
 /** What `traces.changeName` returns: the canonical name the trace now has. */
-export const changeTraceNameResultSchema = z.object({
+const changeTraceNameResultSchema = z.object({
   traceId: z.string(),
   newName: z.string(),
 });
@@ -48,7 +48,7 @@ export type ChangeTraceNameResult = z.infer<typeof changeTraceNameResultSchema>;
  * exceeded and by how much. `HandledError.meta` is a client contract: these
  * four fields exist because this copy reads them.
  */
-export type ChangeTraceNameRejectionMeta = {
+type ChangeTraceNameRejectionMeta = {
   field: "newName";
   minLength: number;
   maxLength: number;

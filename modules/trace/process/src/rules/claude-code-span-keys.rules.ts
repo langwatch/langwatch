@@ -9,11 +9,11 @@ import type { Span } from "@langwatch/trace-contract";
 /** Span attribute keys (unflattened onto `Span.params` by the span mapper). */
 export const SPAN_REQUEST_ID_KEY = "request_id";
 export const SPAN_QUERY_SOURCE_KEY = "query_source";
-export const SPAN_TOOL_USE_ID_KEY = "tool_use_id";
-export const SPAN_TOOL_CALL_ID_KEY = "gen_ai.tool.call.id";
+const SPAN_TOOL_USE_ID_KEY = "tool_use_id";
+const SPAN_TOOL_CALL_ID_KEY = "gen_ai.tool.call.id";
 export const SPAN_USER_PROMPT_KEY = "user_prompt";
 /** The turn-root span every claude session emits per user prompt. */
-export const INTERACTION_SPAN_NAME = "claude_code.interaction";
+const INTERACTION_SPAN_NAME = "claude_code.interaction";
 export const CLAUDE_SPAN_NAME_PREFIX = "claude_code.";
 
 export function findStringParam(

@@ -47,7 +47,7 @@ export interface ClickHouseEvaluationRunRow {
  * payload — keep in sync with the interface above. Listing them avoids `SELECT *`, which on the
  * deduped read path also pulls every stale version's columns before the IN-tuple discards them.
  */
-export const EVALUATION_RUN_COLUMNS_LIGHT = [
+const EVALUATION_RUN_COLUMNS_LIGHT = [
   "ProjectionId",
   "TenantId",
   "EvaluationId",
@@ -113,32 +113,6 @@ export function mapClickHouseEvaluationToTraceEvaluation(
       scheduledAt: record.ScheduledAt ? parseChTimestampMs(record.ScheduledAt) : null,
       startedAt: record.StartedAt ? parseChTimestampMs(record.StartedAt) : null,
       completedAt: record.CompletedAt ? parseChTimestampMs(record.CompletedAt) : null,
-    },
-  };
-}
-
-/** Maps a legacy ES Evaluation (snake_case, error reduced to just the message string). */
-export function mapEsEvaluationToTraceEvaluation(
-  evaluation: Evaluation,
-  traceId: string,
-): TraceEvaluation {
-  return {
-    evaluationId: evaluation.evaluation_id,
-    evaluatorId: evaluation.evaluator_id,
-    evaluatorType: evaluation.type ?? "",
-    evaluatorName: evaluation.name ?? null,
-    traceId,
-    isGuardrail: evaluation.is_guardrail === true,
-    status: evaluation.status,
-    score: evaluation.score ?? null,
-    passed: evaluation.passed ?? null,
-    label: evaluation.label ?? null,
-    details: evaluation.details ?? null,
-    error: evaluation.error ? evaluation.error.message : null,
-    timestamps: {
-      scheduledAt: evaluation.timestamps.inserted_at ?? null,
-      startedAt: evaluation.timestamps.started_at ?? null,
-      completedAt: evaluation.timestamps.finished_at ?? null,
     },
   };
 }

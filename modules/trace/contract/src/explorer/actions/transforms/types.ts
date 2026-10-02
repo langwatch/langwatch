@@ -25,7 +25,7 @@ export type ExplorerGrouping = "flat" | "by-conversation" | "by-service" | "by-u
  * optional because the away fallback has none, so a transform checks only what
  * it was given.
  */
-export interface ExplorerTransformContext {
+interface ExplorerTransformContext {
   /** The lenses the page holds, built-in and saved. */
   lenses?: readonly {
     id: string;

@@ -5,7 +5,7 @@ import type { CodingAgentSessionDisplay } from "./session-display.ts";
  * actionable insights. Pure function of the row (no query/hook/JSX) for testability.
  */
 
-export type SessionSignalTone = "danger" | "warning" | "info";
+type SessionSignalTone = "danger" | "warning" | "info";
 
 export interface SessionSignal {
   id: string;

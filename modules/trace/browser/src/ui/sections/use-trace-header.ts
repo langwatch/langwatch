@@ -2,7 +2,7 @@ import type { TraceHeader, TraceHeaderReadInput } from "@langwatch/trace-contrac
 
 import { traceApi } from "../../behavior/trace-api.ts";
 
-export type UseTraceHeaderResult = {
+type UseTraceHeaderResult = {
   header: TraceHeader | undefined;
   isLoading: boolean;
 };

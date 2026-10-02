@@ -106,7 +106,7 @@ const useTypewriterPlaceholder = (active: boolean, examples: readonly string[]):
   return text;
 };
 
-export interface AiPromptInputProps {
+interface AiPromptInputProps {
   /** The current text in the input — controlled. */
   prompt: string;
   /** Called whenever the user types. */

@@ -52,7 +52,7 @@ import {
   createTrackedEventSyncHandler,
 } from "./tracked-event-sync.subscriber.ts";
 
-export interface TraceProcessingPeers {
+interface TraceProcessingPeers {
   codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<

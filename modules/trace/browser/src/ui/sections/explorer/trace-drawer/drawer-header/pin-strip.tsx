@@ -36,7 +36,7 @@ export interface CategorizedPin {
  */
 const CATEGORY_ORDER: PinCategory[] = ["identity", "run", "tag", "custom"];
 
-export interface PinRenderResult {
+interface PinRenderResult {
   /**
    * Pin pills + intra-category dividers, ready to spread into a flex
    * container. Empty when there are no pins.

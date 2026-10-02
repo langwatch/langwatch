@@ -29,7 +29,7 @@ const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 const FILTER_TOKEN_REGEX =
   /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)/g;
 
-export interface DecorationSlot {
+interface DecorationSlot {
   from: number;
   to: number;
   className: string;
@@ -402,7 +402,7 @@ let chipLabelLookup: Record<string, Record<string, string>> = {};
  */
 const subscribedViews = new Set<EditorView>();
 
-export const LABEL_REFRESH_META = "filterHighlight:labelRefresh" as const;
+const LABEL_REFRESH_META = "filterHighlight:labelRefresh" as const;
 
 export function setFilterChipLabels(next: Record<string, Record<string, string>>): void {
   chipLabelLookup = next;

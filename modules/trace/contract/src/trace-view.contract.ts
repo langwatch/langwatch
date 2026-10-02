@@ -64,8 +64,6 @@ export const traceListItemSchema = z.object({
     .default([]),
 });
 
-export type TraceListItemDto = z.infer<typeof traceListItemSchema>;
-
 /** Trace drawer header and summary response. */
 export const traceHeaderSchema = z.object({
   traceId: z.string(),
@@ -115,7 +113,7 @@ export const traceHeaderSchema = z.object({
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;
 
 /** Server-detected LangWatch attribute-prefix buckets for a span. */
-export const langwatchSignalBucketSchema = z.enum([
+const langwatchSignalBucketSchema = z.enum([
   "prompt",
   "scenario",
   "user",
@@ -135,7 +133,7 @@ export const spanLangwatchSignalsSchema = z.object({
 
 export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
 
-export const CONTENT_PRIVACY_STATES = ["visible", "restricted", "dropped"] as const;
+const CONTENT_PRIVACY_STATES = ["visible", "restricted", "dropped"] as const;
 
 const categoryPrivacySchema = z.object({
   state: z.enum(CONTENT_PRIVACY_STATES),
@@ -143,7 +141,7 @@ const categoryPrivacySchema = z.object({
 });
 
 /** Per-category read-time content privacy state for a span. */
-export const contentPrivacySchema = z.object({
+const contentPrivacySchema = z.object({
   input: categoryPrivacySchema,
   output: categoryPrivacySchema,
   system: categoryPrivacySchema,
@@ -153,7 +151,7 @@ export const contentPrivacySchema = z.object({
 export type CategoryPrivacy = z.infer<typeof categoryPrivacySchema>;
 export type ContentPrivacy = z.infer<typeof contentPrivacySchema>;
 
-export const restrictedAttributeSchema = z.object({
+const restrictedAttributeSchema = z.object({
   pattern: z.string(),
   visibleTo: z.string(),
   canSee: z.boolean(),
@@ -213,7 +211,7 @@ export const spanDetailSchema = z.object({
 export type SpanDetail = z.infer<typeof spanDetailSchema>;
 
 /** Adjacent conversation turns and their position within the conversation. */
-export const conversationTurnSchema = z.object({
+const conversationTurnSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -245,7 +243,7 @@ const instrumentationScopeSchema = z.object({
 
 export type InstrumentationScope = z.infer<typeof instrumentationScopeSchema>;
 
-export const spanResourceInfoSchema = z.object({
+const spanResourceInfoSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   resourceAttributes: z.record(z.string(), z.string()),

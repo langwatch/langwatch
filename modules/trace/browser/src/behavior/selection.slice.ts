@@ -7,14 +7,14 @@ import type { ExplorerStore } from "./explorer.store.ts";
  * "explicit" is the set the reader picked; "all-matching" is every trace the
  * filter answers, capped server-side, and names no ids of its own.
  */
-export type SelectionMode = "explicit" | "all-matching";
+type SelectionMode = "explicit" | "all-matching";
 
 export interface Selection {
   mode: SelectionMode;
   traceIds: Set<string>;
 }
 
-export const EMPTY_SELECTION: Selection = {
+const EMPTY_SELECTION: Selection = {
   mode: "explicit",
   traceIds: new Set<string>(),
 };

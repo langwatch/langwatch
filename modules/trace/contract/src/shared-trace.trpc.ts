@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { sharedTraceDtoSchema } from "./trace-share.schemas.ts";
 
-export const sharedTraceGetInputSchema = z.object({ token: z.string() });
+const sharedTraceGetInputSchema = z.object({ token: z.string() });
 
 export const sharedTraceTrpc = defineTrpcContract("sharedTrace")
   .query("get")

@@ -57,7 +57,7 @@ function graphemesOf(text: string): string[] {
 }
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
-export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
+type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
 const NO_TOOL_SPANS: ToolSpanIndex = new Map();
 
 /**

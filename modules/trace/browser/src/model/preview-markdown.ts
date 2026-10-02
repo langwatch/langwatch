@@ -1,6 +1,6 @@
 import type { NewlineTreatment } from "./preview-types.ts";
 
-export interface MarkdownNoiseResult {
+interface MarkdownNoiseResult {
   text: string;
   hadCode: boolean;
   hadImage: boolean;

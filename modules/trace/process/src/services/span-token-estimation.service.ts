@@ -28,7 +28,7 @@ const PROJECT_KILL_SWITCH_KEY = "token-estimation-project-killswitch";
 /**
  * Dependencies for OtlpSpanTokenEstimationService that can be injected for testing.
  */
-export interface OtlpSpanTokenEstimationServiceDependencies {
+interface OtlpSpanTokenEstimationServiceDependencies {
   tokenizer: TraceTokenCounter;
   featureFlags: FeatureFlagApi;
 }

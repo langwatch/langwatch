@@ -1523,7 +1523,7 @@ function buildRichArrivalEvaluations(): EvaluationRunData[] {
  * rich arrival trace. Consumed by `useOpenTraceDrawer` to seed each
  * relevant tRPC cache before opening the drawer.
  */
-export interface RichArrivalTraceDetail {
+interface RichArrivalTraceDetail {
   header: TraceHeader;
   spanTree: SpanTreeNode[];
   spanDetails: SpanDetail[];

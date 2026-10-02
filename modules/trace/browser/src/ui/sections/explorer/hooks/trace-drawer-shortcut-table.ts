@@ -4,7 +4,7 @@ import type { TraceDrawerState } from "../../../../behavior/trace-drawer.ts";
 import { isTerminalOrigin } from "../../../../model/terminal-origin.ts";
 import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation.ts";
 
-export type ShortcutGroupTitle = "View" | "Visualisation" | "Navigation" | "Actions" | "Help";
+type ShortcutGroupTitle = "View" | "Visualisation" | "Navigation" | "Actions" | "Help";
 
 export interface ShortcutContext {
   event: KeyboardEvent;
@@ -22,7 +22,7 @@ export interface ShortcutContext {
   onClose: () => void;
 }
 
-export interface ShortcutEntry {
+interface ShortcutEntry {
   /** Keys recognised by `KeyboardEvent.key`. Letter shortcuts list both cases. */
   matchKeys: string[];
   /** Keys rendered in the help dialog (single canonical form). */
@@ -247,7 +247,7 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
   },
 ];
 
-export interface HelpGroup {
+interface HelpGroup {
   title: ShortcutGroupTitle;
   items: { keys: string[]; label: string; detail?: string }[];
 }

@@ -87,7 +87,7 @@ export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * How many same-trace events one cycle may coalesce. Lower than the
  * platform default (500); must stay below MAX_APPLIED_EVENT_IDS.
  */
-export const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
+const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row in `trace_analytics`. Field names 1:1 to ClickHouse columns.
@@ -173,7 +173,7 @@ export interface TraceAnalyticsRow {
  * Canonical reserved-attribute keys read off the accumulated attribute map.
  * Match the `dest` values in trace-attribute-accumulation.service.ts:62-87.
  */
-export const TRACE_ANALYTICS_ATTR_KEYS = {
+const TRACE_ANALYTICS_ATTR_KEYS = {
   USER_ID: "langwatch.user_id",
   CONVERSATION_ID: "gen_ai.conversation.id",
   CUSTOMER_ID: "langwatch.customer_id",

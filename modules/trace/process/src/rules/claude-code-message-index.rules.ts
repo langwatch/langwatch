@@ -62,7 +62,7 @@ export interface ClaudeSpanEnrichment {
 
 export const INPUT_BODY_EVENT = "api_request_body";
 export const OUTPUT_BODY_EVENT = "api_response_body";
-export const USER_PROMPT_EVENT = "user_prompt";
+const USER_PROMPT_EVENT = "user_prompt";
 export const ASSISTANT_RESPONSE_EVENT = "assistant_response";
 
 /**
@@ -353,15 +353,15 @@ function findPromptFallbackBody({
   return withBody[0]!.body;
 }
 
-export function normalizeRole(role: string | undefined): ChatRole {
+function normalizeRole(role: string | undefined): ChatRole {
   return role !== undefined && CHAT_ROLE_SET.has(role) ? (role as ChatRole) : "unknown";
 }
 
-export function querySourceKey(querySource: string | null): string {
+function querySourceKey(querySource: string | null): string {
   return querySource ?? NULL_QUERY_SOURCE_KEY;
 }
 
-export function byTimeAsc(a: ClaudeContentLog, b: ClaudeContentLog): number {
+function byTimeAsc(a: ClaudeContentLog, b: ClaudeContentLog): number {
   return a.timeUnixMs - b.timeUnixMs;
 }
 

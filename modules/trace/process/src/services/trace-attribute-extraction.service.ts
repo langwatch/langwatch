@@ -44,14 +44,14 @@ const VERCEL_RESERVED_METADATA: Readonly<Record<string, string>> = {
   customerId: "langwatch.customer_id",
 };
 
-export const RESOURCE_ATTR_MAPPINGS = [
+const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.name", "sdk.name"],
   ["telemetry.sdk.version", "sdk.version"],
   ["telemetry.sdk.language", "sdk.language"],
   ["service.name", "service.name"],
 ] as const;
 
-export const SPAN_ATTR_MAPPINGS = [
+const SPAN_ATTR_MAPPINGS = [
   [ATTR_KEYS.GEN_AI_CONVERSATION_ID, "gen_ai.conversation.id"],
   [ATTR_KEYS.LANGWATCH_USER_ID, "langwatch.user_id"],
   [ATTR_KEYS.LANGWATCH_CUSTOMER_ID, "langwatch.customer_id"],
@@ -95,7 +95,7 @@ export const SPAN_ATTR_MAPPINGS = [
  * REST collector writes `metadata.thread_id` as a resource attribute, but canonicalisation only
  * runs on per-span attributes, so without this hoist such a trace never gains a conversationId.
  */
-export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
+const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
   {
     sources: [
       ATTR_KEYS.LANGWATCH_THREAD_ID, // langwatch.thread.id (new dotted form)
@@ -130,7 +130,7 @@ export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
  */
 const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set(["langwatch.cost.non_billable"]);
 
-export const STANDARD_RESOURCE_PREFIXES = [
+const STANDARD_RESOURCE_PREFIXES = [
   "host.",
   "process.",
   "telemetry.",

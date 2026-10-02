@@ -88,7 +88,7 @@ interface MissingPlaceholderSides {
  * one, never a redacted side (RedactedField semantics belong to the drawer; here
  * silence is the only honest treatment for hidden content).
  */
-export function missingPlaceholderSides({
+function missingPlaceholderSides({
   input,
   output,
   showMissingPlaceholders,
@@ -269,7 +269,7 @@ function mediaSrc(media: Extract<MediaPartData, { source: unknown }>): string {
 }
 
 /** Summary-provided refs → the row media summary (preferred source). */
-export function rowMediaFromRefs(refs: TraceMediaRef[] | undefined): RowMedia | null {
+function rowMediaFromRefs(refs: TraceMediaRef[] | undefined): RowMedia | null {
   if (!refs || refs.length === 0) return null;
   const summary: RowMedia = { ...NO_ROW_MEDIA };
   for (const ref of refs) {
@@ -281,7 +281,7 @@ export function rowMediaFromRefs(refs: TraceMediaRef[] | undefined): RowMedia | 
   return summary;
 }
 
-export function collectRowMedia(raw: string | null): RowMedia {
+function collectRowMedia(raw: string | null): RowMedia {
   if (raw === null) return NO_ROW_MEDIA;
   const parts = collectMediaParts(raw);
   if (parts.length === 0) return NO_ROW_MEDIA;

@@ -9,7 +9,7 @@ import { queryNamesFacet, queryWithoutFacet } from "@langwatch/trace-contract";
 import type { TraceFilterWhere } from "./trace-filter-hidden-origins.rules.ts";
 
 /** The facet a resolver is asked about: its key and the table it counts. */
-export interface FacetFilterSubject {
+interface FacetFilterSubject {
   key: string;
   table: string;
 }

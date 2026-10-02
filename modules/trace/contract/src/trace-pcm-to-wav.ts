@@ -34,15 +34,6 @@ export function detectRawPcmFormat(format?: string, mimeType?: string): RawPcmFo
 }
 
 /**
- * Wrap raw little-endian `pcm16` samples (base64) in a 44-byte WAV header and
- * return the result as base64, ready for a `data:audio/wav;base64,…` URI.
- * Returns null when the payload is empty or cannot be decoded.
- */
-export function convertPcm16ToWavBase64(dataBase64: string): string | null {
-  return convertRawPcmBase64ToWavBase64(dataBase64, "pcm16");
-}
-
-/**
  * Wrap (and for G.711, decode) raw realtime audio base64 into WAV base64,
  * ready for a `data:audio/wav;base64,…` URI. Returns null when the payload
  * is empty or cannot be decoded.

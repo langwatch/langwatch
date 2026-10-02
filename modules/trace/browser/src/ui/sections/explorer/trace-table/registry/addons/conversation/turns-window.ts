@@ -2,10 +2,10 @@ import { useCallback, useState } from "react";
 
 import type { TraceListItem } from "../../../../types/trace.ts";
 
-export const INITIAL_VISIBLE_TURNS = 7;
+const INITIAL_VISIBLE_TURNS = 7;
 export const SHOW_MORE_STEP = 10;
 
-export interface TurnsWindow {
+interface TurnsWindow {
   /** Leading turns rendered in order. */
   head: TraceListItem[];
   /**
@@ -23,7 +23,7 @@ export interface TurnsWindow {
  * longer than `visibleCount`, the head holds the first `visibleCount - 1` turns and the
  * tail holds the last turn, with the remainder counted as hidden.
  */
-export function windowTurns({
+function windowTurns({
   traces,
   visibleCount,
 }: {

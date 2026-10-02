@@ -35,7 +35,7 @@ export const toPositiveOrNull = (n: number | null): number | null =>
 
 export type CanonicalLift = readonly [string, string | number | null];
 
-export const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function extractConversationId(attrs: CanonicalAttributeStore): string | null {
   const sessionId = asString(attrs.get("thread.id"));

@@ -507,4 +507,3 @@ export function buildGroupColumns(
 }
 
 export const allTraceColumnIds = Object.keys(traceColumnDefs);
-export const allConversationColumnIds = Object.keys(conversationColumnDefs);

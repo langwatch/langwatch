@@ -10,7 +10,7 @@ import {
 // Value mode keeps a top-N because facet enumerations can run to hundreds.
 const MAX_VALUE_ITEMS = 10;
 
-export interface SuggestionItem {
+interface SuggestionItem {
   /** What lands in the editor when the user accepts. */
   value: string;
   /**

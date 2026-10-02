@@ -122,7 +122,7 @@ function suggestionFromTrigger(
   return { open: true, mode: "field", query: segment, tokenStart: trigger };
 }
 
-export interface DynamicSuggestionItems {
+interface DynamicSuggestionItems {
   items: string[];
   counts?: Record<string, number>;
   /**

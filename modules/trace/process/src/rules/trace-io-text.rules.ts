@@ -68,7 +68,7 @@ export const COMMON_TEXT_KEYS = [
  * pathological nesting (accidental or adversarial) — real-world payloads
  * rarely exceed a depth of ~4-5, so 32 is generous and still safe.
  */
-export const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
+const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
 
 /** The text one known key carries directly, or nothing when it carries none. */
 function extractScalarText(val: unknown): string | null {
@@ -145,7 +145,7 @@ export function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0
  * Recursively checks whether a value carries at least one meaningful leaf (non-empty string,
  * number, or boolean).
  */
-export function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
+function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
   if (value === null || value === undefined) {
     return false;
   }
@@ -198,7 +198,7 @@ export function stringifyForText(value: unknown): string | null {
  * Attempts to unwrap a "text" content block's `text`, when it is itself a JSON-encoded typed
  * block with a non-"text" inner `type`, into that inner block (recursively normalized).
  */
-export function unwrapJsonTextBlock(
+function unwrapJsonTextBlock(
   t: string,
   seen: WeakSet<object>,
 ): { unwrapped: true; value: unknown } | { unwrapped: false } {

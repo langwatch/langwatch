@@ -32,7 +32,7 @@ export interface OpenAnnotationDraftParams extends AnnotationAnchorColumns {
 }
 
 /** What a draft is about: the trace, and the part of it the comment points at. */
-export type AnnotationDraftTarget = AnnotationAnchorColumns & {
+type AnnotationDraftTarget = AnnotationAnchorColumns & {
   traceId: string;
 };
 

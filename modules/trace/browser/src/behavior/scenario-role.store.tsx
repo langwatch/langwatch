@@ -53,7 +53,7 @@ export function useIsScenarioRole(): boolean {
   return useScenarioRoleStore((s) => s.isScenario);
 }
 
-export function useIsHumanCaller(): boolean {
+function useIsHumanCaller(): boolean {
   return useScenarioRoleStore((s) => s.isHumanCaller);
 }
 

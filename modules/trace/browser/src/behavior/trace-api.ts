@@ -57,7 +57,6 @@ import type {
 import type { CodingAgentSessionDisplay } from "../model/coding-agent/trace/session-display.ts";
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
-import type { ExportProgress } from "../model/export-types.ts";
 
 /** The project every trace procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -77,7 +76,7 @@ type TraceScope = ProjectScope & { traceId: string };
 type SpanReadHint = { occurredAtMs?: number };
 
 /** The reader's own account, as the annotation rail reads it. */
-export type TraceAccountInfo = {
+type TraceAccountInfo = {
   id: string;
   name: string | null;
   email: string | null;
@@ -86,7 +85,7 @@ export type TraceAccountInfo = {
 };
 
 /** One saved lens. */
-export type SavedViewRead = {
+type SavedViewRead = {
   id: string;
   name: string;
   kind?: string | null;
@@ -747,7 +746,7 @@ export type TraceApiMap = {
  * One annotation on a trace, with the person who wrote it and the part of the trace it
  * is anchored to.
  */
-export type TraceAnnotationRead = Omit<Annotation, "anchorKind"> & {
+type TraceAnnotationRead = Omit<Annotation, "anchorKind"> & {
   /**
    * WHAT part of the trace the annotation hangs off.
    */
@@ -756,18 +755,15 @@ export type TraceAnnotationRead = Omit<Annotation, "anchorKind"> & {
   user?: { id: string; name: string | null; image?: string | null } | null;
 };
 
-/** How far a running export has got — the shape the progress state carries. */
-export type TraceExportProgress = ExportProgress;
-
 /** One frame of the export progress stream — the export module's own event. */
-export type TraceExportProgressFrame = ExportProgressEvent;
+type TraceExportProgressFrame = ExportProgressEvent;
 
 /** One presence frame, and one cursor frame — the contract's own. */
-export type TracePresenceFrame = PresenceEvent;
-export type TracePresenceCursorFrame = PresenceCursorEvent;
+type TracePresenceFrame = PresenceEvent;
+type TracePresenceCursorFrame = PresenceCursorEvent;
 
 /** One configured provider, as the frontend reads it. */
-export type ModelProviderFrontendRead = {
+type ModelProviderFrontendRead = {
   provider: string;
   enabled: boolean;
   customKeys: Record<string, unknown> | null;

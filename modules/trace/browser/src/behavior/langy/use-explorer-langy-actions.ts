@@ -18,7 +18,7 @@ import { commitExplorerState, readExplorerState } from "../explorer/commit-explo
  * The shape Langy's `useRegisterLangyActions` takes, stated structurally so
  * the Explorer's handlers are built and tested without Langy's browser half.
  */
-export interface ExplorerLangyActionHandler {
+interface ExplorerLangyActionHandler {
   payloadSchema: z.ZodTypeAny;
   run: (payload: never) => unknown;
 }

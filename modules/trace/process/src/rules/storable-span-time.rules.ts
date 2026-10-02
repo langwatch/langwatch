@@ -28,7 +28,7 @@ export interface UnstorableSpanTime {
   valueMs: number | null;
 }
 
-export interface StorableSpanTimes {
+interface StorableSpanTimes {
   startTimeUnixMs: number;
   endTimeUnixMs: number;
 }
@@ -67,9 +67,7 @@ export function storableSpanTimesOf({
 
 export const UNSTORABLE_SPAN_SKIPPED = "Skipping span: its recorded time cannot be stored";
 
-export type SpanStorability =
-  | { storable: true }
-  | { storable: false; skip: Record<string, unknown> };
+type SpanStorability = { storable: true } | { storable: false; skip: Record<string, unknown> };
 
 /**
  * Whether a received span's times can be stored. A span that cannot is

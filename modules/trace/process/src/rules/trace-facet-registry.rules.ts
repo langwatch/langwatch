@@ -1,7 +1,7 @@
 import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
-export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
+type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export interface FacetQueryContext {
   tenantId: string;
@@ -65,7 +65,7 @@ export interface DynamicKeysDef extends BaseFacetDef {
   queryBuilder: (ctx: FacetQueryContext) => FacetQuery;
 }
 
-export type CategoricalFacetDef = ExpressionCategoricalDef | QueryBuilderCategoricalDef;
+type CategoricalFacetDef = ExpressionCategoricalDef | QueryBuilderCategoricalDef;
 
 export type FacetDefinition = CategoricalFacetDef | RangeFacetDef | DynamicKeysDef;
 

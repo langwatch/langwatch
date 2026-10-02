@@ -18,7 +18,7 @@ function isHexIdentifier(value: string, pattern: RegExp): boolean {
   return pattern.test(value) && !ALL_ZEROES_PATTERN.test(value);
 }
 
-export class EventingTraceMetricCorrelationAdapter implements CommandHandler<
+class EventingTraceMetricCorrelationAdapter implements CommandHandler<
   Command<RecordMetricCorrelationCommandData>,
   MetricDataPointCorrelatedEvent
 > {

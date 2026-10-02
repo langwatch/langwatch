@@ -4,7 +4,7 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
  * Running totals at each transcript point (cost, tokens, elapsed) for scrubbing
  * HUD; built over full entry list including invisible model_call entries.
  */
-export interface TimelinePoint {
+interface TimelinePoint {
   index: number;
   cumulativeTokens: number;
   cumulativeCostUsd: number;

@@ -59,7 +59,7 @@ export const eventPayloadSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** One parsed payload as a typed shape, so the reader below can be stated without a cast. */
-export type EventLogPayload = z.infer<typeof eventPayloadSchema>;
+type EventLogPayload = z.infer<typeof eventPayloadSchema>;
 
 /**
  * The window a read prunes to, derived from the event id rather than a caller-supplied time, so it

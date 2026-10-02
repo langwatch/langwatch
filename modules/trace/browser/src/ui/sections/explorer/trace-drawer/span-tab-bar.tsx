@@ -24,12 +24,12 @@ import {
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import {
   selectPeersMatching,
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
@@ -39,7 +39,7 @@ import { spanTypeColor } from "../utils/span-type-color.ts";
  * Tab / menu label for a span: generic tool spans (claude_code.tool ...)
  * append WHICH tool ran so five identical tool tabs stay tellable apart.
  */
-export function spanTabLabel(span: {
+function spanTabLabel(span: {
   name: string | null;
   spanId: string;
   toolName?: string | null;

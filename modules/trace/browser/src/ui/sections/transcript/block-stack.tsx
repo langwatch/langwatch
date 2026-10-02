@@ -21,7 +21,7 @@ import { ReasoningBlock } from "../../blocks/transcript/reasoning-block.tsx";
 import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports.tsx";
 import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks.tsx";
 
-export interface BlockStackProps {
+interface BlockStackProps {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
   collapseTools?: boolean;

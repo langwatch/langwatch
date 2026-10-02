@@ -12,9 +12,9 @@ import type { Protections } from "./trace-viewer-protections.contract.ts";
  * pre-declares "sessions" / "spans" as future roots so the contract shape
  * does not change when they land.
  */
-export const PROJECTION_FROM_ROOTS = ["traces"] as const;
+const PROJECTION_FROM_ROOTS = ["traces"] as const;
 export type ProjectionFrom = (typeof PROJECTION_FROM_ROOTS)[number];
-export const projectionFromSchema = z.enum(PROJECTION_FROM_ROOTS);
+const projectionFromSchema = z.enum(PROJECTION_FROM_ROOTS);
 
 /**
  * Request-body extension merged into `traceSearchBodySchema`. `select` is a
@@ -54,7 +54,7 @@ export type ProjectionValueType = "string" | "number" | "boolean" | "string[]" |
  * the path belongs to a nested child array (events/annotations/evaluations) and
  * `type` describes the element-level value at that sub-path.
  */
-export interface ResolvedColumn {
+interface ResolvedColumn {
   /** The dotted path exactly as requested, e.g. "metadata.user_id". */
   path: string;
   type: ProjectionValueType;

@@ -6,7 +6,7 @@ import {
 } from "../../../behavior/presence/presence-store.ts";
 import { PresenceMarker } from "./presence-marker.tsx";
 
-export interface SectionPresenceDotProps {
+interface SectionPresenceDotProps {
   traceId: string;
   /** Drawer tab the section lives in (summary | llm | span). */
   tab: string;

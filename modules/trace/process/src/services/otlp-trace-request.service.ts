@@ -22,7 +22,7 @@ const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8
 const TRACE_FLAGS_HAS_IS_REMOTE_MASK = 1 << 9; // bit 9
 
-export type TraceFlagsInfo = {
+type TraceFlagsInfo = {
   sampled: boolean | null; // only meaningful if not null
   remote: boolean | null; // only meaningful if not null
 };
@@ -34,7 +34,7 @@ export type ParentContext = {
   isSampled: boolean | null;
 };
 
-export type TraceStateInfo = {
+type TraceStateInfo = {
   version: string | null;
   versionFormat: string | null;
   traceId: string | null;

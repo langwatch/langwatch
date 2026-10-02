@@ -45,7 +45,7 @@ export const CHAPTERS: Chapter[] = [
  * a chapter share the same dot in the BeadStrip — sub-beats inside
  * a chapter (e.g. `welcome` → `trace_explorer`) don't move the dot.
  */
-export const STAGE_TO_CHAPTER: Record<StageId, ChapterId> = {
+const STAGE_TO_CHAPTER: Record<StageId, ChapterId> = {
   settle: "welcome",
   welcome: "welcome",
   trace_explorer: "welcome",
@@ -61,7 +61,7 @@ export const STAGE_TO_CHAPTER: Record<StageId, ChapterId> = {
   complete: "outro",
 };
 
-export function chapterOf(stage: StageId): ChapterId {
+function chapterOf(stage: StageId): ChapterId {
   return STAGE_TO_CHAPTER[stage];
 }
 

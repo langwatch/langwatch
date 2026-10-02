@@ -7,14 +7,12 @@ import { z } from "zod";
  */
 
 /** One event name a trace recorded, with how often and when it first fired. */
-export const traceEventNameCountSchema = z.object({
+const traceEventNameCountSchema = z.object({
   name: z.string(),
   count: z.number(),
   /** Epoch ms of the earliest event under this name — the display order. */
   firstTimestamp: z.number(),
 });
-
-export type TraceEventNameCount = z.infer<typeof traceEventNameCountSchema>;
 
 /** A trace's events as the list renders them: named groups plus true totals. */
 export const traceEventRollupSchema = z.object({

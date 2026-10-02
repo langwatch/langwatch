@@ -77,7 +77,7 @@ const spanStatusRead: CategoricalRead = (t) =>
  * Pairs SQL predicates with in-memory evaluations for each field.
  */
 
-export function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
+function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
   const def = FACET_BY_KEY.get(key);
   if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
   if (!("expression" in def)) {
@@ -97,7 +97,7 @@ export function categoricalFacet(key: string): FieldDef {
 }
 
 /** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
-export function rangeFacet(key: string): FieldDef {
+function rangeFacet(key: string): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "range") {
     throw new Error(`facet '${key}' is not a range facet`);
@@ -109,11 +109,7 @@ export function rangeFacet(key: string): FieldDef {
 /**
  * Cross-table categorical paired with per-collection in-memory read.
  */
-export function crossCategoricalFacet(
-  key: string,
-  needs: FieldNeeds,
-  read: CategoricalRead,
-): FieldDef {
+function crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "categorical") {
     throw new Error(`facet '${key}' is not a categorical facet`);
@@ -128,7 +124,7 @@ export function crossCategoricalFacet(
   });
 }
 
-export function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
+function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "range") {
     throw new Error(`facet '${key}' is not a range facet`);
@@ -150,7 +146,7 @@ export function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead)
 // here, or a stray key. Insertion order matches KNOWN_FIELDS' historical order.
 
 /** Every filter field name, mirrored by {@link FIELD_DEFS}'s keys. */
-export type KnownField =
+type KnownField =
   | "status"
   | "origin"
   | "service"

@@ -7,7 +7,7 @@ import {
 } from "../../model/flame/constants.ts";
 import type { Viewport } from "./types.ts";
 
-export interface UseFlameViewportResult {
+interface UseFlameViewportResult {
   viewport: Viewport;
   setViewport: React.Dispatch<React.SetStateAction<Viewport>>;
   viewportRef: React.RefObject<Viewport>;

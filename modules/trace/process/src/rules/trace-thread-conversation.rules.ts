@@ -40,7 +40,7 @@ export function renderThreadConversation({
  * production traces, so each side falls back on its own to the chosen LLM
  * span's messages — an input with an empty output is the common case.
  */
-export function traceToConversationTurn({ trace }: { trace: Trace }): ConversationTurnSource {
+function traceToConversationTurn({ trace }: { trace: Trace }): ConversationTurnSource {
   const input = trace.input?.value ?? "";
   const output = trace.output?.value ?? "";
   const spans = trace.spans ?? [];

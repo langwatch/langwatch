@@ -4,7 +4,7 @@ import { create } from "zustand";
  * The connection lifecycle the live-updates subscription reports, mirrored here so the
  * store does not have to reach into the application's SSE hook for a four-member union.
  */
-export type SseConnectionState = "connecting" | "connected" | "disconnected" | "error";
+type SseConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
 const LIVE_UPDATES_STORAGE_KEY = "langwatch:traces-v2:live-updates-mode:v1";
 /** Legacy boolean preference from before "ask" mode existed. */

@@ -13,8 +13,5 @@ export const chBoolean = z
   .union([z.boolean(), z.number(), z.string()])
   .transform((value) => value === true || value === 1 || value === "1" || value === "true");
 
-/** A flag column read as the 0/1 number the row type states. */
-export const chFlag = chBoolean.transform((value) => (value ? 1 : 0));
-
 /** A Map(String, String) column, which ClickHouse writes as a JSON object. */
 export const chStringMap = z.record(z.string(), z.string());

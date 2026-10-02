@@ -7,7 +7,7 @@ import {
 import type { TraceLegacyRead } from "../app/trace.members.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
-export type TraceViewerServiceOptions = Readonly<{
+type TraceViewerServiceOptions = Readonly<{
   read: TraceLegacyRead;
   protections: Pick<TraceViewerProtectionService, "resolve">;
 }>;

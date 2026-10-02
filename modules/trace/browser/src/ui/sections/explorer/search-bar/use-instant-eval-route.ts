@@ -27,7 +27,7 @@ import type { InstantEvalRefusal } from "../instant-eval-refusal-popover.tsx";
  * Under this estimate a run starts on its own; at or over it, the dialog
  * asks first. In United States dollars.
  */
-export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
+const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
 /**
  * The refusals that get a popover of their own rather than the registry's copy. A submit made
@@ -47,7 +47,7 @@ function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   return null;
 }
 
-export interface InstantEvalRouteState {
+interface InstantEvalRouteState {
   onInstantEvalRoute: (payload: InstantEvalRoutePayload) => void;
   /**
    * Drops an estimate or a start still in flight, and closes the dialog and the popover with

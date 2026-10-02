@@ -8,7 +8,7 @@ import { Box, Circle, HStack, Skeleton, Text, VStack } from "@langwatch/design-s
 import { STATUS_COLORS } from "../../model/display-formatters.ts";
 import { useTraceHeader } from "./use-trace-header.ts";
 
-export type TracePeekSummaryProps = {
+type TracePeekSummaryProps = {
   projectId: string;
   traceId: string;
   /**

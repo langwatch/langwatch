@@ -7,7 +7,7 @@ import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 
 /** One decoded eventref pointer ready to fetch from event_log. */
-export interface EventRefEntry {
+interface EventRefEntry {
   /** The IO attribute key the resolved value belongs under (e.g. langwatch.output). */
   attrKey: string;
   /** The EventPayload field to extract (defaults to attrKey when absent). */
@@ -17,7 +17,7 @@ export interface EventRefEntry {
 }
 
 /** Result of splitting a span's attributes into preview attrs + eventref pointers. */
-export interface ParsedSpanEventRefs {
+interface ParsedSpanEventRefs {
   /** Non-reserved attributes (previews and regular attrs), reserved keys removed. */
   cleanedAttrs: NormalizedAttributes;
   /** Well-formed eventref pointers to resolve. */

@@ -118,21 +118,6 @@ export class SpanNotFoundError extends NotFoundError {
   }
 }
 
-export class TimeRangeTooWideError extends HandledError {
-  declare readonly code: "time_range_too_wide";
-
-  constructor(maxDays: number) {
-    const base = remediation("time_range_too_wide");
-    super("time_range_too_wide", `Maximum ${maxDays} days. Narrow time range.`, {
-      httpStatus: 422,
-      meta: { maxDays },
-      tips: [`Narrow the time range to ${maxDays} days or less`, ...(base.tips ?? [])],
-      ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
-    });
-    this.name = "TimeRangeTooWideError";
-  }
-}
-
 export class PageTooDeepError extends HandledError {
   declare readonly code: "page_too_deep";
 

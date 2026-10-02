@@ -1,12 +1,12 @@
 import { useCallback } from "react";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import type { FocusSection } from "../../../../behavior/focus-section.store.ts";
 import { isFocusSection, useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../behavior/span-pulse.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 
 /** A comment's anchor as it comes back from a read. */
-export interface AnnotationAnchorTarget {
+interface AnnotationAnchorTarget {
   /** The trace the comment is on, which tells its own parts from a span's. */
   traceId: string;
   anchorKind: string | null;

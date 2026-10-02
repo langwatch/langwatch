@@ -34,7 +34,7 @@ interface SegmentDef {
   description: string;
 }
 
-export const SEGMENTS: SegmentDef[] = [
+const SEGMENTS: SegmentDef[] = [
   {
     value: "skill",
     label: "Skills",
@@ -154,7 +154,7 @@ interface IntegrationContentProps {
   enabled?: boolean;
 }
 
-export function IntegrationContent({
+function IntegrationContent({
   projectId,
   minting,
   segment,

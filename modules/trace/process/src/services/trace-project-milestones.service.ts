@@ -8,7 +8,7 @@ import type {
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
 
-export type TraceProjectMilestonesSenders = Readonly<{
+type TraceProjectMilestonesSenders = Readonly<{
   recordFirstTrace: Sender<RecordFirstTraceCommandData>;
   recordTraceReceived: Sender<RecordTraceReceivedCommandData>;
 }>;

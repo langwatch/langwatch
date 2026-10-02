@@ -7,7 +7,7 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useEffect } from "react";
 
-export interface LegacyTraceDrawerRedirectProps {
+interface LegacyTraceDrawerRedirectProps {
   traceId?: string;
   /** Partition-pruning timestamp hint the Trace Explorer uses to skip a lookup. */
   t?: string;

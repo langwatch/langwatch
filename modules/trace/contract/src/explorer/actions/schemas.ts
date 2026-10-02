@@ -8,13 +8,7 @@ import { z } from "zod";
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 
-export const GROUPING_MODES = [
-  "flat",
-  "by-conversation",
-  "by-service",
-  "by-user",
-  "by-model",
-] as const;
+const GROUPING_MODES = ["flat", "by-conversation", "by-service", "by-user", "by-model"] as const;
 
 export const setFilterPayloadSchema = z
   .object({
@@ -193,7 +187,6 @@ export const runInstantEvalPayloadSchema = z
       "It runs under the search bar's cost rule: it starts on its own under half a United States dollar, and otherwise the user is asked first. " +
       "The progress shows on the table.",
   );
-export type RunInstantEvalPayload = z.input<typeof runInstantEvalPayloadSchema>;
 /**
  * The run is asked for, not awaited: the cost rule decides between starting it
  * and asking the user, and either way the page shows which.

@@ -14,7 +14,7 @@ import { AnchorCommentThread } from "./anchor-comment-thread.tsx";
 /**
  * Whether a control with no room for a label is on screen right now.
  */
-export type AnchorCommentReveal = "always" | "hidden" | "on-row-hover" | "on-block-hover";
+type AnchorCommentReveal = "always" | "hidden" | "on-row-hover" | "on-block-hover";
 
 interface AnchorCommentButtonProps {
   traceId: string;

@@ -22,7 +22,7 @@ export type OtlpIngestProject = Readonly<{
   organizationId: string;
 }>;
 
-export type OtlpIngestIdentity = Readonly<{
+type OtlpIngestIdentity = Readonly<{
   apiKeyId: string | null;
   organizationId: string;
   ingestSourceType: string | null;
@@ -58,14 +58,3 @@ export type TraceOtlpIngestApi = Readonly<{
     context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
   ): void;
 }>;
-
-/**
- * Classifies a token by prefix without exposing the value. `sk-lw-` keys
- * classify as `legacy` — the ingest discriminator lives on the resolved row,
- * not the token prefix.
- */
-export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
-  if (token.startsWith("pat-lw-")) return "pat";
-  if (token.startsWith("sk-lw-")) return "legacy";
-  return "unknown";
-}

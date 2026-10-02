@@ -33,7 +33,7 @@ export interface CellDef<TRow, TId extends string = string> {
   renderComfortable?: (ctx: CellRenderContext<TRow>) => ReactNode;
 }
 
-export interface AddonRenderContext<TRow> {
+interface AddonRenderContext<TRow> {
   row: TRow;
   density: DensityTokens;
   densityMode: Density;

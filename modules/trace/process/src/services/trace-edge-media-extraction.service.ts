@@ -18,7 +18,7 @@ import { TraceValueMediaExtractionService } from "./trace-value-media-extraction
 import { type ExtractionBudget } from "./trace-value-media-extraction.service.ts";
 
 /** Purpose tag for stored objects extracted from trace span content. */
-export const TRACE_MEDIA_PURPOSE = "trace_content";
+const TRACE_MEDIA_PURPOSE = "trace_content";
 
 /** Structured logger surface used by the extraction hook. */
 export interface EdgeMediaExtractionLogger {

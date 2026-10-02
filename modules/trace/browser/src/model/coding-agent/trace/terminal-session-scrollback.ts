@@ -45,7 +45,7 @@ export interface TurnDivider {
   atMs: number;
 }
 
-export interface MergedSession {
+interface MergedSession {
   entries: TranscriptEntry[];
   /**
    * A stable identity per row, parallel to `entries`. Keyed by position, a

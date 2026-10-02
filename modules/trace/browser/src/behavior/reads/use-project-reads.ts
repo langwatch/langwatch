@@ -1,6 +1,5 @@
 import { apiKeyClient } from "@langwatch/api-key-client";
 import { datasetClient } from "@langwatch/dataset-client";
-import { evaluatorClient } from "@langwatch/evaluator-client";
 import { promptClient } from "@langwatch/prompt-client";
 
 import { api } from "../trace-api.ts";
@@ -74,36 +73,6 @@ export function useApiKeyName({
   return apiKeyClient.apiKey.nameById.useQuery(
     { organizationId, apiKeyId },
     { enabled: !!organizationId && !!apiKeyId && enabled, retry: false },
-  );
-}
-
-export function useEvaluatorRead({
-  projectId,
-  id,
-  enabled,
-}: {
-  projectId: string | undefined;
-  id: string | undefined;
-  enabled: boolean;
-}) {
-  return evaluatorClient.evaluators.getById.useQuery(
-    { id: id ?? "", projectId: projectId ?? "" },
-    { enabled: enabled && !!id && !!projectId },
-  );
-}
-
-export function useMonitorRead({
-  projectId,
-  id,
-  enabled,
-}: {
-  projectId: string | undefined;
-  id: string | undefined;
-  enabled: boolean;
-}) {
-  return api.monitors.getById.useQuery(
-    { id: id ?? "", projectId: projectId ?? "" },
-    { enabled: enabled && !!id && !!projectId },
   );
 }
 

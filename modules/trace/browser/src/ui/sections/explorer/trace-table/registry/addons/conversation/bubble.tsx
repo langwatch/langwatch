@@ -15,7 +15,7 @@ import {
 import { ReasoningBlock } from "../../../../trace-drawer/transcript/index.ts";
 
 export type BubbleSide = "left" | "right";
-export type BubbleSize = "compact" | "regular";
+type BubbleSize = "compact" | "regular";
 
 interface BubbleProps {
   side: BubbleSide;

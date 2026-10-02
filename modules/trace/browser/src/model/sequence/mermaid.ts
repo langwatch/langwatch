@@ -4,11 +4,11 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared.ts";
 import type { SequenceSpanType } from "./types.ts";
 
-export const INVISIBLE_RETURN = "\u200B";
+const INVISIBLE_RETURN = "\u200B";
 
-export type ParticipantKind = "agent" | "llm" | "tool" | "other";
+type ParticipantKind = "agent" | "llm" | "tool" | "other";
 
-export interface SequenceMermaidResult {
+interface SequenceMermaidResult {
   syntax: string;
   /** Sanitised participant id → first matching span id, for click → select. */
   participantToSpanId: Map<string, string>;

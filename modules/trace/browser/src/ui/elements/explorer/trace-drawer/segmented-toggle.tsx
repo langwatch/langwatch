@@ -4,7 +4,7 @@ import { Flex, HStack } from "@langwatch/design-system/primitives";
  * One option in a `<SegmentedToggle>`. The string-shorthand form covers
  * the simple case (label === value).
  */
-export interface SegmentedOption {
+interface SegmentedOption {
   value: string;
   label?: string;
 }

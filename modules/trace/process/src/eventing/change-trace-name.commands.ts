@@ -23,7 +23,7 @@ const changeTraceNameDefinition = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.traceId}:change_trace_name`,
 });
 
-export class EventingChangeTraceNameAdapter extends changeTraceNameDefinition {
+class EventingChangeTraceNameAdapter extends changeTraceNameDefinition {
   static create(): EventingChangeTraceNameAdapter {
     return new EventingChangeTraceNameAdapter();
   }

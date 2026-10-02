@@ -7,25 +7,24 @@ import {
   type VizTab,
 } from "../model/trace-drawer-params.ts";
 
-export type AccordionSection = "events" | "evals" | "conversation";
+type AccordionSection = "events" | "evals" | "conversation";
 
 /**
  * Per-pane state inside the drawer body. Panes are independently sizable (via
  * `<PanelResizeHandle>`), collapsible to a header bar, and temporarily maximizable
  * within their group (double-click on header hides siblings until toggled off).
  */
-export interface PaneState {
+interface PaneState {
   collapsed: boolean;
   /** When set, this pane is maximized within its PanelGroup. */
   maximizedWithinGroup: boolean;
 }
 
-export type PaneId = "conversationContext" | "visualization" | "spanDetail";
+type PaneId = "conversationContext" | "visualization" | "spanDetail";
 
 /** Drawer width clamps. Min so chrome stays usable; max so the page edge stays clickable. */
 export const DRAWER_MIN_WIDTH_PX = 360;
 export const DRAWER_MAXIMIZE_EDGE_PX = 10;
-export const DRAWER_RESTORE_EDGE_PX = 80;
 
 /** Initial drawer width before the operator has dragged it once. */
 export const DRAWER_DEFAULT_WIDTH_PX = 920;

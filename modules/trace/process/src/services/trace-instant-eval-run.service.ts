@@ -21,7 +21,7 @@ import {
 } from "../rules/trace-instant-eval-run.rules.ts";
 
 /** What this service is composed from: the peer that owns the runs. */
-export interface TraceInstantEvalRunDeps {
+interface TraceInstantEvalRunDeps {
   instantEvals: InstantEvalApi;
 }
 

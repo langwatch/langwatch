@@ -14,7 +14,7 @@ import type { DeferredOriginPayload } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 
-export const DEFERRED_ORIGIN_CHECK_DELAY_MS = 5 * 60 * 1000;
+const DEFERRED_ORIGIN_CHECK_DELAY_MS = 5 * 60 * 1000;
 
 export function needsOriginResolution({
   event,
@@ -62,7 +62,7 @@ export const deferredOriginStateSchema = z.object({
   /** When the fallback fires, while one is armed; null once resolved or never armed. */
   resolveAfterMs: z.number().nullable(),
 });
-export type DeferredOriginState = z.infer<typeof deferredOriginStateSchema>;
+type DeferredOriginState = z.infer<typeof deferredOriginStateSchema>;
 
 export const DEFERRED_ORIGIN_INITIAL_STATE: DeferredOriginState = { resolveAfterMs: null };
 

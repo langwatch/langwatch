@@ -5,7 +5,7 @@ import { defineSlice } from "@langwatch/browser-host/global-store";
  * lens with the trace row kind doesn't collide with the conversations lens (same column
  * ids — `duration`, `cost` — but a different layout).
  */
-export type ColumnSizing = Record<string, number>;
+type ColumnSizing = Record<string, number>;
 
 interface ColumnSizingState {
   byKey: Record<string, ColumnSizing>;

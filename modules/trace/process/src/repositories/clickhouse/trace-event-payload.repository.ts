@@ -12,7 +12,7 @@ import {
  * keyed by `(TenantId, AggregateType, AggregateId, EventId)`, so the wrong
  * type matches no row, returning the 64 KB preview — a silent degradation.
  */
-export const TRACE_PAYLOAD_AGGREGATE_TYPE = "trace";
+const TRACE_PAYLOAD_AGGREGATE_TYPE = "trace";
 
 /** The tenant-keyed resolver a composition root holds, as the port the repository names. */
 class ResolvedTraceClickHouse extends TraceClickHouse {

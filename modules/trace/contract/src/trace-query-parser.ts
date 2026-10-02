@@ -36,7 +36,7 @@ const WORD_CHAR = /[\p{L}\p{N}]/u;
  * rather than opening or closing a single-quoted value. Outside quotes it
  * follows a letter or digit; inside one it also has one on its right.
  */
-export function isWordApostrophe({
+function isWordApostrophe({
   text,
   index,
   inSingleQuotes,

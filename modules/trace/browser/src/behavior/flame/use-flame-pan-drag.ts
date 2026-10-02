@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react";
 import { DRAG_THRESHOLD_PX } from "../../model/flame/constants.ts";
 import type { Viewport } from "./types.ts";
 
-export interface UseFlamePanDragResult {
+interface UseFlamePanDragResult {
   isPanningRef: React.MutableRefObject<boolean>;
   handlePointerDown: (e: React.PointerEvent) => void;
 }

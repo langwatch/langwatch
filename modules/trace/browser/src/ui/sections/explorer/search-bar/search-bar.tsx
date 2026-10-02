@@ -519,7 +519,7 @@ const UnifiedErrorBanner: React.FC<{
 };
 
 /** What the inline hint says: Enter is the one way to search. */
-export const SEARCH_SUBMIT_HINT = "⏎ Enter to search";
+const SEARCH_SUBMIT_HINT = "⏎ Enter to search";
 
 /**
  * Plain one-liner hint that floats just after the typed content. Pure UTF-8 text — no

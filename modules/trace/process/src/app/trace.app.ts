@@ -325,7 +325,7 @@ function facetWindowBound(value: string): number {
 }
 
 /** Who a write is attributed to. */
-export interface TraceCaller {
+interface TraceCaller {
   readonly id: string;
 }
 
@@ -341,7 +341,7 @@ export type TraceLogRecordReadRow = Readonly<{
 }>;
 
 /** The list, facet and discover reads behind the grid and its sidebar. */
-export type TraceListReadParams = {
+type TraceListReadParams = {
   tenantId: string;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
@@ -352,26 +352,26 @@ export type TraceListReadParams = {
   visibilityCutoffMs?: number | null;
 };
 
-export type TraceNewCountParams = {
+type TraceNewCountParams = {
   tenantId: string;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 };
 
-export type TraceSuggestionsParams = {
+type TraceSuggestionsParams = {
   tenantId: string;
   field: string;
   prefix: string;
   limit?: number;
 };
 
-export type TraceDiscoverReadParams = {
+type TraceDiscoverReadParams = {
   tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
 };
 
-export type TraceFacetValuesReadParams = {
+type TraceFacetValuesReadParams = {
   tenantId: string;
   timeRange: { from: number; to: number };
   facetKey: string;
@@ -401,7 +401,7 @@ export type TracesListReader = Readonly<{
 }>;
 
 /** The Sessions lens read. */
-export type TraceSessionGroupsReadParams = {
+type TraceSessionGroupsReadParams = {
   tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
   sort?: { columnId: string; direction: "asc" | "desc" };
@@ -537,50 +537,14 @@ export type TraceEditOverlayStore = Readonly<{
   ): Promise<TraceEditRemoval>;
 }>;
 
-/**
- * The project's topic tree, as the topic-count read names its buckets. Only
- * the three fields the grid renders are declared: which topics exist is the
- * Topic feature's, and this application only labels counts with them.
- */
-export type TracesTopicReader = Readonly<{
-  getAll(
-    input: Readonly<{ projectId: string }>,
-  ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]>;
-}>;
-
 /** The read side of the process's broadcast fabric: presence's tenant fan-out, fed from Redis. */
 export type TracesTrpcEmitters = Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
 
 /** The resolved share, as far as the anonymous trace read needs to know it. */
-export type ResolvedShare = Readonly<{
+type ResolvedShare = Readonly<{
   resourceType: string;
   projectId: string;
   resourceId: string;
-}>;
-
-/** Redeeming a share token, and the payload cache keyed by its redactions. */
-export type TraceShareReader = Readonly<{
-  resolveForViewer(input: {
-    token: string;
-    viewer: ShareViewer;
-    viewerKey?: string;
-  }): Promise<ResolvedShare>;
-  findCachedPayload(input: { token: string; protections: Protections }): Promise<unknown>;
-  cachePayload(input: {
-    token: string;
-    protections: Protections;
-    payload: SharedTraceDto;
-  }): Promise<void>;
-}>;
-
-/** The project card the share page prints above the trace. */
-export type TraceProjectReader = Readonly<{
-  findById(projectId: string): Promise<{
-    name: string | null;
-    slug: string | null;
-    language: string | null;
-    framework: string | null;
-  } | null>;
 }>;
 
 /** What the process composes this feature's application from. */

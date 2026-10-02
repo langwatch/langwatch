@@ -19,7 +19,7 @@ import {
 import type { CollectorCredential } from "../transport/collector.rest.ts";
 
 /** Exactly the API-key directory operations an ingestion door reaches. */
-export type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
+type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
 
 /** The one permission an ingestion key is measured against. */
 const INGEST_PERMISSION = "traces:create" as const;
@@ -31,7 +31,7 @@ type TraceIngestResolution = Readonly<{
 }>;
 
 /** The two peers this door reads, and nothing else. */
-export type TraceIngestCredentialOptions = Readonly<{
+type TraceIngestCredentialOptions = Readonly<{
   /** Narrowed to what this door calls: it resolves a token and stamps its clock. */
   apiKeys: TraceIngestApiKeys;
   authz: Pick<AuthzApi, "hasApiKeyPermission">;

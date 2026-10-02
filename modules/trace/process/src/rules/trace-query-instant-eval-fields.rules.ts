@@ -79,7 +79,7 @@ function compileRun({
  * Evals when nothing resolves — `eval:<name>` was the evaluator-name lookup,
  * and a saved query that spells it still is.
  */
-export function fieldDef(fieldName: string): FieldDef {
+function fieldDef(fieldName: string): FieldDef {
   const forced = INSTANT_EVAL_TARGET_FIELDS[fieldName];
 
   return {

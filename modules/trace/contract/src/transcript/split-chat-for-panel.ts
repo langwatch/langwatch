@@ -2,7 +2,7 @@ import { parseContentBlocks } from "./parsing.ts";
 import type { ChatMessage } from "./types.ts";
 
 /** Which side of a captured LLM call a chat payload is being read as. */
-export type ChatPanel = "input" | "output";
+type ChatPanel = "input" | "output";
 
 /**
  * Split a chat-shaped payload the way the trace drawer's two panels read it:

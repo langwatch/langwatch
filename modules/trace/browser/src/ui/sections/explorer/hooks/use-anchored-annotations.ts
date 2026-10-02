@@ -24,7 +24,7 @@ const NO_ANNOTATIONS: AnnotationByTrace[] = [];
 /**
  * One key per part of a trace, so a comment can be found by what it is about.
  */
-export function traceAnchorKey(anchor: {
+function traceAnchorKey(anchor: {
   anchorKind?: string | null;
   anchorId?: string | null;
   anchorPath?: string | null;
@@ -32,7 +32,7 @@ export function traceAnchorKey(anchor: {
   return [anchor.anchorKind ?? "", anchor.anchorId ?? "", anchor.anchorPath ?? ""].join("\u0000");
 }
 
-export interface AnchoredAnnotations {
+interface AnchoredAnnotations {
   /** What was said about one part of the trace, oldest first. */
   commentsAt: (anchor: TraceAnchor) => AnnotationByTrace[];
   /** Every comment on the open trace, the ones about the whole of it included. */

@@ -5,13 +5,11 @@ import { z } from "zod";
  * row per `gen_ai.conversation.id`, rollups over every trace of the session.
  */
 
-export const sessionGroupPullRequestDtoSchema = z.object({
+const sessionGroupPullRequestDtoSchema = z.object({
   number: z.number(),
   htmlUrl: z.string(),
   title: z.string(),
 });
-
-export type SessionGroupPullRequestDto = z.infer<typeof sessionGroupPullRequestDtoSchema>;
 
 export const sessionGroupCodingAgentDtoSchema = z.object({
   modelCalls: z.number(),

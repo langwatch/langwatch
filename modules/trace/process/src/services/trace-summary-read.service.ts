@@ -17,7 +17,7 @@ import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
  * `getByTraceId({ full: true })` re-reads the trace's spans, resolves `eventref` pointers from
  * event_log and recomputes input and output. When omitted, `full` is a plain summary read.
  */
-export interface TraceSummaryFullResolutionDeps {
+interface TraceSummaryFullResolutionDeps {
   spanStorageRepository: SpanStorageRepository;
   blobStore: TraceBlobStoreService;
   ioExtractionService: TraceIOExtractionService;

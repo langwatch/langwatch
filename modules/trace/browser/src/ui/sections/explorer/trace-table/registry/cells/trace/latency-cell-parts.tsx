@@ -34,7 +34,7 @@ function LatencyBar({ valueMs, p95Ms, hasStats, width, height }: LatencyBarProps
   );
 }
 
-export interface LatencyCellContentProps {
+interface LatencyCellContentProps {
   valueMs: number;
   p95Ms: number;
   hasStats: boolean;

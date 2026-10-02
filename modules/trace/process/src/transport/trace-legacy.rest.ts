@@ -111,8 +111,7 @@ export type TraceLegacySearchFields = Readonly<{
   llmMode: boolean;
 }>;
 
-export const TraceLegacyApi =
-  moduleApi<TraceLegacyRestMembers<TraceLegacySearchFields, unknown>>("trace");
+const TraceLegacyApi = moduleApi<TraceLegacyRestMembers<TraceLegacySearchFields, unknown>>("trace");
 
 /** One protocol answer, in the shape `c.json(body, status)` used to write. */
 type LegacyAnswer = Readonly<{

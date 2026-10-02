@@ -11,7 +11,7 @@ export const exportProgressEventSchema = z.object({
 });
 export type ExportProgressEvent = z.infer<typeof exportProgressEventSchema>;
 
-export const exportProgressInputSchema = z.object({
+const exportProgressInputSchema = z.object({
   projectId: z.string(),
   exportId: z.string(),
 });

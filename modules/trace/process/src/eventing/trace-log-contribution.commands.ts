@@ -9,7 +9,7 @@ import {
   type LogContributedEvent,
 } from "@langwatch/trace-contract";
 
-export class EventingTraceLogContributionAdapter implements CommandHandler<
+class EventingTraceLogContributionAdapter implements CommandHandler<
   Command<RecordLogContributionCommandData>,
   LogContributedEvent
 > {

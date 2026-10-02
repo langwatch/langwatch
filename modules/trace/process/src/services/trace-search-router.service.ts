@@ -35,7 +35,7 @@ import {
 const logger = createLogger("langwatch:traces:search-router");
 
 /** One question's answer, as the router reads it. */
-export interface TraceSearchVerdict {
+interface TraceSearchVerdict {
   readonly questionId: string;
   readonly label?: string;
 }
@@ -57,7 +57,7 @@ export interface TraceSearchClassifyRequest {
  * The judge the router asks, declared here rather than imported: the
  * classifier is another module's, and the composition supplies it.
  */
-export interface TraceSearchClassifier {
+interface TraceSearchClassifier {
   classify(request: TraceSearchClassifyRequest): Promise<TraceSearchClassification>;
 }
 

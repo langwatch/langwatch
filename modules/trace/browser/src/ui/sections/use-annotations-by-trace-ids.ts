@@ -21,7 +21,7 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export interface UseAnnotationsByTraceIdsResult {
+interface UseAnnotationsByTraceIdsResult {
   data: AnnotationByTrace[];
   isLoading: boolean;
   isError: boolean;

@@ -171,7 +171,7 @@ function hasChanges(stat: DiffStat): boolean {
 }
 
 /** The tab that has something to show, trace first when both do. */
-export function defaultDiffTab({
+function defaultDiffTab({
   traceStat,
   spansStat,
 }: {
@@ -192,7 +192,7 @@ function tabLabel(name: DiffTab, stat: DiffStat): string {
  * they were. A corrected trace payload is mostly unchanged, and scrolling past
  * thousands of identical lines to find three edited ones is not reading a diff.
  */
-export function collapseUnchanged(lines: DiffLine[]): (DiffLine | "gap")[] {
+function collapseUnchanged(lines: DiffLine[]): (DiffLine | "gap")[] {
   const keep = Array.from({ length: lines.length }, () => false);
   lines.forEach((line, index) => {
     if (line.kind === "context") return;

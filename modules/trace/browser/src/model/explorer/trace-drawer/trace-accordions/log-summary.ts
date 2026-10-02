@@ -199,7 +199,7 @@ function formatCount(raw: string): string {
   return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 }
 
-export type LogEventTone = "danger" | "warning" | "neutral";
+type LogEventTone = "danger" | "warning" | "neutral";
 
 /**
  * A quick-glance outcome colour for a coding-agent log event — the same tone vocabulary

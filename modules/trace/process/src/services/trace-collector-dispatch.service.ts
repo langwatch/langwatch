@@ -33,9 +33,7 @@ export type CollectorSpanIngestInput = {
   piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
 };
 export type CollectorSpanIngestResult = Readonly<{ status: string; error?: string | undefined }>;
-export type CollectorSpanIngest = (
-  input: CollectorSpanIngestInput,
-) => Promise<CollectorSpanIngestResult>;
+type CollectorSpanIngest = (input: CollectorSpanIngestInput) => Promise<CollectorSpanIngestResult>;
 
 /** One custom SDK evaluation, reported to the evaluation pipeline. */
 export type CollectorEvaluationReportInput = {
@@ -54,15 +52,15 @@ export type CollectorEvaluationReportInput = {
   error: string | null;
   occurredAt: number;
 };
-export type CollectorEvaluationReport = (input: CollectorEvaluationReportInput) => Promise<unknown>;
+type CollectorEvaluationReport = (input: CollectorEvaluationReportInput) => Promise<unknown>;
 
 /**
  * What `partialSuccess.errorMessage` says about a span or an evaluation the pipeline refused.
  * The pipeline's own strings name the datastore and its address, and this body reaches any
  * project key, so the count and the action travel and the diagnosis stays on the log line.
  */
-export const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
-export const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
+const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
+const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
 
 /** The age cutoff itself; see the method of the same name for why it is applied. */
 function partitionFreshSpans(
@@ -310,7 +308,7 @@ async function dispatchEvaluations(
 }
 
 /** What the collector door hands over once, so no call has to thread it through. */
-export interface TraceCollectorDispatchMembers {
+interface TraceCollectorDispatchMembers {
   /** Where a normalized span goes. Required: it is the whole of the span half. */
   ingestSpan: CollectorSpanIngest;
   /**

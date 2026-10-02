@@ -106,7 +106,7 @@ import type {
  * optional field is one the producer role does not compose; each has a named
  * refusal rather than a silent empty answer.
  */
-export type TraceCollaborators = Readonly<{
+type TraceCollaborators = Readonly<{
   resolveClickHouseClient?: TraceClickHouseResolver;
   canonicalisation: TraceCanonicalisationService;
   blobStore: TraceBlobStoreService;
@@ -120,13 +120,13 @@ export type TraceCollaborators = Readonly<{
 }>;
 
 /** Exactly the process members {@link buildTraceCollaborators} reads. */
-export type TraceBuildMembers = Readonly<{
+type TraceBuildMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   logger: Logger;
 }>;
 
 /** The config slice the deployment states for this module. */
-export type TraceBuildConfig = Readonly<{
+type TraceBuildConfig = Readonly<{
   processName: string;
   fallbackVisibilityDays: number;
   publicBaseUrl?: string | undefined;
@@ -175,7 +175,7 @@ function refusalFactory(
   return (capability: string) => new TraceCapabilityUnavailableError(processName, capability);
 }
 
-export type TraceReaderCompositionOptions = {
+type TraceReaderCompositionOptions = {
   /** The rows the registry chose for this process, one tier over both stores. */
   repositories: TraceRepositories;
   /** Absent on a process that composed no ClickHouse: every read refuses by name. */
@@ -554,7 +554,7 @@ export class TraceReadFullIo implements TraceFullIo {
   }
 }
 
-export type TraceTreeCompositionOptions = {
+type TraceTreeCompositionOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesRepository;

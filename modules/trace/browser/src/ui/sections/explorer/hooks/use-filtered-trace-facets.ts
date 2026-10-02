@@ -8,7 +8,7 @@ import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 
 type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
 
-export interface FilteredTraceFacetsResult {
+interface FilteredTraceFacetsResult {
   /** Descriptors counted under the active query, or none until the first lands. */
   data: DiscoverDescriptors | undefined;
   /** A newer query's counts are in flight and `data` is the previous query's. */

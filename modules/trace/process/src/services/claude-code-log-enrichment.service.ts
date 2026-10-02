@@ -9,7 +9,7 @@ import {
   type TraceLogRecordReader,
 } from "../rules/claude-code-log-enrichment.rules.ts";
 
-export type ClaudeCodeLogEnrichmentDependencies = {
+type ClaudeCodeLogEnrichmentDependencies = {
   logRecords: TraceLogRecordReader;
   traceCanonicalisation: TraceCanonicalisationService;
   codingAgents?: CodingAgentApi;

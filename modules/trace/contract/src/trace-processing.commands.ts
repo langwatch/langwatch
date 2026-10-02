@@ -17,8 +17,6 @@ export const recordTraceSpanEventDataSchema = z.object({
   span: normalizedSpanSchema,
 });
 
-export type RecordTraceSpanEventData = z.infer<typeof recordTraceSpanEventDataSchema>;
-
 export const assignTopicCommandDataSchema = z.object({
   tenantId: z.string(),
   traceId: z.string(),
@@ -68,5 +66,3 @@ export type ResolveOriginCommandData = z.infer<typeof resolveOriginCommandDataSc
 export const changeTraceNameInputSchema = z.object({
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
 });
-
-export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;

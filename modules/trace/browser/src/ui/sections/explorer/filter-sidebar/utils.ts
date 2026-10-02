@@ -112,20 +112,3 @@ const DEFAULT_RANGE_FORMATTER = (v: number) => String(Math.round(v));
 export function getRangeFormatter(field: string): (v: number) => string {
   return RANGE_FORMATTERS[field] ?? DEFAULT_RANGE_FORMATTER;
 }
-
-export function summarizeRange({
-  from,
-  to,
-  format,
-}: {
-  from: number | undefined;
-  to: number | undefined;
-  format: (v: number) => string;
-}): string {
-  if (from !== undefined && to !== undefined) {
-    return `${format(from)} – ${format(to)}`;
-  }
-  if (from !== undefined) return `≥ ${format(from)}`;
-  if (to !== undefined) return `≤ ${format(to)}`;
-  return "active";
-}

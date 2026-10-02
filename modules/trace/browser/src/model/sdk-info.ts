@@ -26,7 +26,7 @@ export interface SdkInfo {
  * conversations. Until it emits its own `scenario.sdk.*` resource attributes, we know
  * it's active only via the trace-level scenarioRunId.
  */
-export interface ScenarioSdkInfo {
+interface ScenarioSdkInfo {
   /** Raw `scenario.sdk.name` value, if the SDK emitted one. */
   name: string | null;
   /** Raw `scenario.sdk.version` value, if the SDK emitted one. */
@@ -35,7 +35,7 @@ export interface ScenarioSdkInfo {
   active: boolean;
 }
 
-export interface ParseSdkInputs {
+interface ParseSdkInputs {
   /** `sdk.name` resource attribute value. */
   name: unknown;
   /** `sdk.version` resource attribute value. */

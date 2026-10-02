@@ -76,7 +76,7 @@ export function formatPercent(pct: number): string {
 }
 
 // 1-2-5 nice-number step for smart tick spacing.
-export function niceStep(roughStep: number): number {
+function niceStep(roughStep: number): number {
   if (roughStep <= 0) return 1;
   const exp = Math.floor(Math.log10(roughStep));
   const f = roughStep / Math.pow(10, exp);

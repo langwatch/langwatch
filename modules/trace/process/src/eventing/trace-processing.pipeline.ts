@@ -57,7 +57,7 @@ type SummaryHandler = (
 ) => Promise<void>;
 
 /** Every reaction main's worker hung on trace_processing, keyed by its queued name. */
-export interface TraceProcessingReactions {
+interface TraceProcessingReactions {
   resolveDeferredOrigin: (payload: { tenantId: string; traceId: string }) => Promise<void>;
   evaluationTrigger: TraceSummarySubscriber;
   customEvaluationSync: SummaryHandler;

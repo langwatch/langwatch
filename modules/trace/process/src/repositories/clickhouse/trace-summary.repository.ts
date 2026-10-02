@@ -23,7 +23,7 @@ import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 /**
  * Fields shared between trace summary and list repositories from trace_summaries.
  */
-export interface TraceSummaryFieldsBase {
+interface TraceSummaryFieldsBase {
   TraceId: string;
   TenantId: string;
   OccurredAt: number;

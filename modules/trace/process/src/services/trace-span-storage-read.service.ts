@@ -33,7 +33,7 @@ import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
  * span reads resolve any `langwatch.reserved.eventref.*` pointers before mapping; when omitted the
  * service falls back to the preview values already stored, exactly as before ADR-022.
  */
-export interface SpanReadBlobResolutionDeps {
+interface SpanReadBlobResolutionDeps {
   blobStore: TraceBlobStoreService;
   ioExtractionService: TraceIOExtractionService;
 }

@@ -1,4 +1,4 @@
-export type DiffLineKind = "context" | "add" | "remove";
+type DiffLineKind = "context" | "add" | "remove";
 
 export interface DiffLine {
   kind: DiffLineKind;

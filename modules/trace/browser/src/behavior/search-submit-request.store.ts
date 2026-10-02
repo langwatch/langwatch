@@ -1,7 +1,7 @@
 import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /** A text another part of the page asked the search bar to submit. */
-export interface SearchSubmitRequest {
+interface SearchSubmitRequest {
   text: string;
   /** Makes two identical requests two distinct values. */
   nonce: number;

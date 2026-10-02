@@ -39,7 +39,7 @@ import { TraceAttributeRedactionService } from "../services/trace-attribute-reda
 // ---------------------------------------------------------------------------
 
 /** How a span's captured input/output becomes the text the drawer renders. */
-export type TraceSpanDisplay = Readonly<{
+type TraceSpanDisplay = Readonly<{
   buildDisplayInput(span: Pick<Span, "input" | "params">): string | null;
   stringifySpanIO(io: LegacySpanInputOutput | null | undefined): string | null;
 }>;
@@ -49,7 +49,7 @@ export type TraceSpanDisplay = Readonly<{
  * input/output, strips its metrics behind `cost:view`, and scrubs hidden
  * content wherever it rides along inside `params` and events.
  */
-export type TraceSpanProtection = Readonly<{
+type TraceSpanProtection = Readonly<{
   applySpanProtections(span: Span, protections: Protections, redactions: Set<string>): Span;
   extractRedactionsFromAllSpanInputs(spans: Span[]): string[];
   extractRedactionsFromAllSpanOutputs(spans: Span[]): string[];

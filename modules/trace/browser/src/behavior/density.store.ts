@@ -26,7 +26,7 @@ export const useDensityStore = defineSlice<DensityState>({
  * Padding tokens for the trace drawer's accordion section headers (INPUT AND OUTPUT,
  * METADATA, EVALS, EVENTS, EXCEPTIONS …) under the mode-tab strip.
  */
-export interface DrawerDensityTokens {
+interface DrawerDensityTokens {
   /** Vertical padding on accordion section header (the trigger row). */
   sectionTriggerY: number;
   /** Vertical padding around accordion section body content. */

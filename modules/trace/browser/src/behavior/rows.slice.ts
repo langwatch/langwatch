@@ -22,7 +22,7 @@ export interface ExplorerResults {
   isSettled: boolean;
 }
 
-export const EMPTY_RESULTS: ExplorerResults = {
+const EMPTY_RESULTS: ExplorerResults = {
   totalHits: null,
   itemNoun: "traces",
   pageTraceIds: [],

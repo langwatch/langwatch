@@ -3,7 +3,7 @@ import { chakra, HStack, type SystemStyleObject } from "@langwatch/design-system
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-export interface ErrorActionsProps {
+interface ErrorActionsProps {
   /** Canonical docs page for this error, when the server sent one. */
   docsUrl?: string;
   /**

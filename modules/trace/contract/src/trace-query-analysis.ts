@@ -225,7 +225,7 @@ export function extractRangeValue(
  * One member of a cross-facet OR group: a single Tag value within the
  * group's parenthesised expression.
  */
-export interface OrGroupMember {
+interface OrGroupMember {
   field: string;
   value: string;
   /** true when the Tag is wrapped in `NOT` / `-`. Excluded values still

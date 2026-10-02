@@ -143,7 +143,7 @@ export function buildToolOutput({
 }
 
 /** Parse-or-text: valid JSON becomes a `json` payload, anything else `text`. */
-export function toJsonOrText(value: string): SpanInputOutput {
+function toJsonOrText(value: string): SpanInputOutput {
   try {
     return { type: "json", value: JSON.parse(value) as object };
   } catch {

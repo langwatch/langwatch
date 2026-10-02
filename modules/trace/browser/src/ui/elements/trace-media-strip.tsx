@@ -19,9 +19,9 @@ export type TraceMediaPartData =
       filename?: string;
     };
 
-export const MAX_RENDERED_MEDIA_PARTS = 8;
+const MAX_RENDERED_MEDIA_PARTS = 8;
 
-export type TraceMediaStripProps = {
+type TraceMediaStripProps = {
   parts: TraceMediaPartData[];
   renderPart: (part: TraceMediaPartData) => ReactNode;
 };

@@ -87,7 +87,7 @@ export interface StageDef {
 
 export const INITIAL_STAGE: StageId = "settle";
 
-export const ONBOARDING_JOURNEY: StageDef[] = [
+const ONBOARDING_JOURNEY: StageDef[] = [
   {
     id: "settle",
     // No copy on screen during settle — this stage just gives the table + mesh

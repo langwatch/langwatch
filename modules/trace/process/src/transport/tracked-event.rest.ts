@@ -38,7 +38,7 @@ export interface TrackedEventMembers {
   }): Promise<{ message: "Event tracked" }>;
 }
 
-export const TrackedEventApi = moduleApi<TrackedEventMembers>()("trace");
+const TrackedEventApi = moduleApi<TrackedEventMembers>()("trace");
 
 /** The URL every pre-rename SDK release posts a tracked event to. */
 export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";

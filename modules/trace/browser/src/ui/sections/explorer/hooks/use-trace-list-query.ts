@@ -11,7 +11,7 @@ import type { TraceListItem } from "../types/trace.ts";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
 import { type InstantEvalRunsResult, useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 
-export interface TraceListQueryResult {
+interface TraceListQueryResult {
   data: TraceListItem[];
   totalHits: number;
   nextCursor: TraceListCursor | null;

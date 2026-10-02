@@ -482,7 +482,7 @@ export function langwatchSpanToReadableSpan(span: Span): ReadableSpan {
 }
 
 /** A trace digest rendered for a model, with what it cost and what it lost. */
-export interface BoundedSpansDigest {
+interface BoundedSpansDigest {
   text: string;
   /** Whether anything was left out to fit the budget. */
   isTruncated: boolean;

@@ -35,7 +35,7 @@ export function firstUsableAnchor({
 }
 
 /** The two time fields every anchored trace-processing fold state carries. */
-export interface AnchorableTraceState {
+interface AnchorableTraceState {
   /** The frozen storage anchor, epoch ms. 0 / undefined = nothing frozen yet. */
   storageAnchorMs?: number;
   /** The span timing baseline, epoch ms. Span-seeded only; 0 = no span folded. */

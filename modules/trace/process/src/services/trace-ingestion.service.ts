@@ -26,9 +26,9 @@ import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
-export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
+type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
-export type SpanIngestionResult = {
+type SpanIngestionResult = {
   status: SpanIngestionStatus;
   error?: string;
 };
@@ -331,7 +331,7 @@ export class TraceIngestionService {
  * handoff. Split from {@link TraceIngestionService} at the worker conversion,
  * since its coding-agent span filter is unreachable from a worker's path.
  */
-export class TraceSpanCollectionService {
+class TraceSpanCollectionService {
   private readonly logger = createLogger("langwatch:trace-processing:span-collection");
 
   private constructor(

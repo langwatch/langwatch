@@ -10,7 +10,7 @@ import { SegmentSubmodeIcon } from "../../../elements/explorer/trace-drawer/segm
  * A secondary axis of the active format, rendered as icon toggles inside
  * the selector pill (e.g. rendered/source markdown, thread/bubbles chat).
  */
-export interface FormatSubmode<Submode extends string = string> {
+interface FormatSubmode<Submode extends string = string> {
   value: Submode;
   label: string;
   icon: IconType;
@@ -18,7 +18,7 @@ export interface FormatSubmode<Submode extends string = string> {
   tooltip?: string;
 }
 
-export interface FormatSubmodeGroup<Submode extends string = string> {
+interface FormatSubmodeGroup<Submode extends string = string> {
   value: Submode;
   /**
    * Method syntax on purpose: it makes the parameter bivariant, so a handler that
@@ -34,7 +34,7 @@ export interface FormatSubmodeGroup<Submode extends string = string> {
  * simple case (label derived from the value); the object form opts into
  * `submodes` for an inline icon pair shown while the option is active.
  */
-export interface FormatOption<Value extends string = string> {
+interface FormatOption<Value extends string = string> {
   value: Value;
   label?: string;
   // Submodes are a second axis, unrelated to the format union, so they carry

@@ -19,7 +19,7 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  * captured trace is the point: the Original view, the hover-original marks and
  * the difference view.
  */
-export function useSpanTreeCanonical() {
+function useSpanTreeCanonical() {
   const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
   // `useTraceFreshness` invalidates the delta on each `span.stored` event and the
   // merge happens push-style; a reconnect asks for one catch-up delta.

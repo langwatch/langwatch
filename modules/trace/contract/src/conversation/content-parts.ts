@@ -24,7 +24,7 @@ const asString = (value: unknown): string | undefined =>
  * not through `visitContentPart`, because these carry the ids the
  * result-pairing pass needs, which the visitor's branches don't surface.
  */
-export function extractToolBlock({
+function extractToolBlock({
   item,
   context: { id, traceId, index },
 }: {

@@ -5,7 +5,7 @@
 
 import { DEPTH_FADE_FLOOR, DEPTH_FADE_STEP, TINY_BLOCK_ALPHA_FACTOR } from "./constants.ts";
 
-export interface BlockEmphasis {
+interface BlockEmphasis {
   isAncestor: boolean;
   isDirectChild: boolean;
   isDimmed: boolean;
@@ -17,7 +17,7 @@ export interface BlockEmphasis {
 }
 
 /** How far a block fades purely for sitting deep in the tree. */
-export function depthAlphaFor(depth: number): number {
+function depthAlphaFor(depth: number): number {
   return Math.max(DEPTH_FADE_FLOOR, 1 - depth * DEPTH_FADE_STEP);
 }
 

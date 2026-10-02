@@ -1,7 +1,7 @@
 // Skill setup prompt with credentials injected when reader owns an API key.
 // Spec: specs/skills/empty-state-skill-setup.feature
 
-export type SetupCredentials = {
+type SetupCredentials = {
   apiKey: string;
   projectId: string;
   /** Set only on a self-hosted deployment, where the SDK default misses. */

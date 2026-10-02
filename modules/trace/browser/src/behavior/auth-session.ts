@@ -6,7 +6,7 @@ import { useMemo } from "react";
 
 import { useOptionalTraceHost } from "./trace-host.ts";
 
-export type TraceSessionReading = {
+type TraceSessionReading = {
   data: {
     user: { id: string; name?: string | null; email?: string | null; image?: string | null };
   } | null;

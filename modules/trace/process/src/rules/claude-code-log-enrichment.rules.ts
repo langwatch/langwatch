@@ -102,7 +102,7 @@ function findContentBody(
  * participate, since those are what logs join to and restricting the set keeps positional input
  * pairing aligned to model calls. Sorted by start time so positional order matches call order.
  */
-export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
+function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
   return spans
     .filter((span) => findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
     .slice()
@@ -112,14 +112,6 @@ export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
       requestId: findStringParam(span.params, SPAN_REQUEST_ID_KEY),
       querySource: findStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
     }));
-}
-
-/**
- * True when the trace carries Claude Code model-call spans — i.e. at least one
- * span has a `request_id` for the logs to join onto.
- */
-export function hasClaudeModelCallSpans(spans: Span[]): boolean {
-  return spans.some((span) => findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
 }
 
 /**
@@ -151,7 +143,7 @@ export function isCodingAgentShapedSpan(span: Span): boolean {
 }
 
 /** Tool spans (`tool_use_id`-carrying) → exact-join refs. */
-export function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
+function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
   const refs: ClaudeToolSpanRef[] = [];
   for (const span of spans) {
     const toolUseId = findSpanToolUseId(span);
@@ -201,7 +193,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
  * `body` attribute (not the OTLP Body column) for the `api_*_body` events;
  * `user_prompt` carries its text on `prompt` instead.
  */
-export function mapLogRowsToClaudeContentLogs(
+function mapLogRowsToClaudeContentLogs(
   rows: TraceLogRecordReadRow[],
   codingAgents?: CodingAgentApi,
 ): ClaudeContentLog[] {
@@ -300,7 +292,7 @@ export function enrichSpansWithClaudeLogContent({
  * events only). Success arrives as the string "true"/"false"; numbers as
  * stringified numerics — both parsed here so the pure join sees clean types.
  */
-export function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): ClaudeToolLog[] {
+function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): ClaudeToolLog[] {
   const out: ClaudeToolLog[] = [];
   for (const row of rows) {
     const attrs = row.attributes;
@@ -350,7 +342,7 @@ export function mapSummaryRowsToClaudeRefs(rows: SpanSummaryRow[]): ClaudeSpanRe
  * The full-refs model-call join: positional input pairing needs the whole trace's call order,
  * so a one-span array cannot produce it. Never overwrites a non-null field.
  */
-export function applyModelCallEnrichment({
+function applyModelCallEnrichment({
   span,
   next,
   modelCallRefs,

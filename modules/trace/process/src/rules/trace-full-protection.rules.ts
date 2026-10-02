@@ -9,7 +9,7 @@ import type {
  * Read-time content policy for a full Trace capture. Public adapters derive it
  * from the actor; internal process reads use the explicit all-visible policy.
  */
-export type TraceFullReadProtections = {
+type TraceFullReadProtections = {
   canSeeCapturedInput: boolean;
   canSeeCapturedOutput: boolean;
   canSeeCosts: boolean;

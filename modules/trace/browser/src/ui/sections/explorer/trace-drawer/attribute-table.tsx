@@ -155,7 +155,7 @@ export interface AttributeEditing {
  * Reads an attribute value out of a text field. Numbers, booleans and JSON keep their
  * shape; anything else stays the string the reviewer typed.
  */
-export function parseAttributeInput({
+function parseAttributeInput({
   text,
   baseline,
 }: {

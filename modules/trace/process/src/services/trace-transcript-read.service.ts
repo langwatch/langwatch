@@ -30,7 +30,7 @@ export type TracesReadMembers = Readonly<{
 }>;
 
 /** The span, log and transcript reads this service stands on; the trace app answers them. */
-export type TraceTranscriptReads = Readonly<{
+type TraceTranscriptReads = Readonly<{
   readSpans(input: {
     projectId: string;
     traceId: string;

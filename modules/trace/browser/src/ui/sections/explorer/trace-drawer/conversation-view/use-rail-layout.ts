@@ -19,16 +19,16 @@ export const RAIL_WIDTH_WIDE_PX = 320;
 export const RAIL_WIDTH_SLIM_PX = 280;
 
 /** Under this pane width the rail gives up its full width. */
-export const RAIL_SLIM_BELOW_PX = 800;
+const RAIL_SLIM_BELOW_PX = 800;
 
 /**
  * Under this pane width the rail moves below the turn. At this point a slim
  * rail beside the message would leave the message under ~300px, which reads
  * worse than the same two blocks stacked.
  */
-export const RAIL_STACK_BELOW_PX = 640;
+const RAIL_STACK_BELOW_PX = 640;
 
-export type RailMode = "side" | "stacked";
+type RailMode = "side" | "stacked";
 
 export interface RailLayout {
   mode: RailMode;

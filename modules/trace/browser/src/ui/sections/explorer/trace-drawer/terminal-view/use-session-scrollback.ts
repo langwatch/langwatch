@@ -33,7 +33,7 @@ interface TurnTarget {
  * What the top of the screen is currently offering.
  */
 
-export interface SessionScrollback {
+interface SessionScrollback {
   entries: TranscriptEntry[];
   rowKeys: string[];
   toolSpans: ReadonlyMap<string, TerminalToolSpan>;

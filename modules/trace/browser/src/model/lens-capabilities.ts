@@ -13,12 +13,12 @@ export interface LensColumnOption {
   section?: string;
 }
 
-export interface LensAddonOption {
+interface LensAddonOption {
   id: string;
   label: string;
 }
 
-export interface LensCapability {
+interface LensCapability {
   /** All columns that can be picked under this grouping. */
   columns: readonly LensColumnOption[];
   /** Default column set used when the user hasn't explicitly chosen any. */
@@ -165,14 +165,6 @@ export const LENS_CAPABILITIES: Record<GroupingMode, LensCapability> = {
   "by-service": makeGroupCapability("Service"),
   "by-user": makeGroupCapability("User"),
   "by-model": makeGroupCapability("Model"),
-};
-
-export const GROUPING_LABELS: Record<GroupingMode, string> = {
-  flat: "Flat",
-  "by-conversation": "By Conversation",
-  "by-service": "By Service",
-  "by-user": "By User",
-  "by-model": "By Model",
 };
 
 export function getCapability(grouping: GroupingMode): LensCapability {

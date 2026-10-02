@@ -6,7 +6,7 @@ interface ChatMessage {
   tool_calls?: { function?: { name?: string } }[];
 }
 
-export interface ParsedIO {
+interface ParsedIO {
   text: string;
   isChat: boolean;
   isTool: boolean;

@@ -11,7 +11,7 @@ const numericValueSchema = z.union([
 
 const langWatchTimestampsSchema = z.object({ first_token_at: z.unknown() });
 
-export const FIRST_TOKEN_EVENTS = new Set([
+const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
   "first_token",

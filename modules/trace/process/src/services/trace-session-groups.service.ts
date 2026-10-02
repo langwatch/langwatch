@@ -36,7 +36,7 @@ const sessionGroupsCursorSchema = z.object({
   sortDirection: z.enum(["asc", "desc"]),
 });
 
-export type SessionGroupsCursor = z.infer<typeof sessionGroupsCursorSchema>;
+type SessionGroupsCursor = z.infer<typeof sessionGroupsCursorSchema>;
 
 function encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");

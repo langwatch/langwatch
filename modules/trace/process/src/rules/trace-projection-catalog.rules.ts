@@ -7,7 +7,7 @@
 import type { ProjectionCollection, ProjectionValueType } from "@langwatch/trace-contract";
 
 /** Visibility gate a field is subject to, mirroring {@link Protections}. */
-export type FieldProtection = "input" | "output" | "costs";
+type FieldProtection = "input" | "output" | "costs";
 
 export interface ResolvedField {
   /** The dotted path exactly as requested. */

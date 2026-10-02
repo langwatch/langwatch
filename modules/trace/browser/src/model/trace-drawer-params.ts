@@ -27,7 +27,7 @@ export function isViewMode(value: string | null | undefined): value is DrawerVie
   );
 }
 
-export function isVizTab(value: string | null | undefined): value is VizTab {
+function isVizTab(value: string | null | undefined): value is VizTab {
   return value === "waterfall" || value === "topology" || value === "sequence" || value === "flame";
 }
 
@@ -80,7 +80,7 @@ export function parseEditParam({
  * id list. Empty / malformed values become `[]` rather than throwing so
  * a bad query string can't break drawer hydration.
  */
-export function parsePinnedSpansParam(raw: string | null | undefined): string[] {
+function parsePinnedSpansParam(raw: string | null | undefined): string[] {
   if (!raw) return [];
   const seen = new Set<string>();
   const out: string[] = [];

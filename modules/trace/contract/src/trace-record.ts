@@ -21,7 +21,7 @@ export const traceRecordValueSchema: z.ZodType<TraceRecordValue> = z.lazy(() =>
   ]),
 );
 
-export const traceRecordEventSchema = z.looseObject({
+const traceRecordEventSchema = z.looseObject({
   event_id: z.string(),
   event_type: z.string(),
   project_id: z.string(),
@@ -35,7 +35,7 @@ export const traceRecordEventSchema = z.looseObject({
   }),
 });
 
-export const traceRecordSpanSchema = z.looseObject({
+const traceRecordSpanSchema = z.looseObject({
   span_id: z.string(),
   trace_id: z.string(),
   type: z.string(),
@@ -74,4 +74,3 @@ export const traceRecordSchema = z.looseObject({
 });
 
 export type TraceRecord = z.infer<typeof traceRecordSchema>;
-export type TraceRecordEvent = z.infer<typeof traceRecordEventSchema>;

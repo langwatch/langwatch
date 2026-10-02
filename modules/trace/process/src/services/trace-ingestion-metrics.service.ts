@@ -1,7 +1,7 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-export const TRACE_INGESTION_SPANS_METRIC_NAME = "trace_ingestion_spans_total";
-export const TRACE_INGESTION_OTLP_OPERATION = "otlp_traces";
+const TRACE_INGESTION_SPANS_METRIC_NAME = "trace_ingestion_spans_total";
+const TRACE_INGESTION_OTLP_OPERATION = "otlp_traces";
 
 /**
  * Span outcomes of an OTLP export, under main's series name and labels. Only

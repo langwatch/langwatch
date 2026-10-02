@@ -21,7 +21,7 @@ import { findStructuredOutput } from "./structured-output.ts";
 
 // Align to display role (not wire role) to match Bubble's behavior and
 // handle scenario role swapping.
-export function alignForRole({
+function alignForRole({
   role,
   roleMode = "chat",
 }: {

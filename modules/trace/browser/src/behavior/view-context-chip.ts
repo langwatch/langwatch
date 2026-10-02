@@ -6,7 +6,7 @@ import type { TimeRange } from "./query.slice.ts";
 import type { GroupingMode, SortConfig } from "./view.slice.ts";
 
 /** Where the rows come from — traces today, the other signals later. */
-export type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
+type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
 
 export type { TraceViewContextChip } from "@langwatch/trace-contract";
 import type { TraceViewContextChip } from "@langwatch/trace-contract";

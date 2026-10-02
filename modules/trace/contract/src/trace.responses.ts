@@ -155,9 +155,6 @@ export type TracesConversationContext = z.infer<typeof tracesConversationContext
 /** `changeName`: the trace and the name it now carries. */
 export const tracesChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });
 
-/** `changeMetadata`: the trace whose reserved metadata was written. */
-export const tracesChangedMetadataSchema = z.object({ traceId: z.string() });
-
 /** `spansPaginated`: one page of a trace's full spans, protections applied. */
 export const tracesSpansPageSchema = z.object({
   spans: z.array(langWatchSpanSchema),
@@ -169,9 +166,6 @@ export const tracesSpansDeltaSchema = z.array(langWatchSpanSchema);
 
 /** `evals`: the evaluation runs recorded against one trace. */
 export const tracesEvaluationRunsSchema = z.array(evaluationRunDataSchema);
-
-/** `onDiscoverUpdate`: one `discover_updated` signal, as the browser reads it. */
-export const tracesDiscoverUpdateSchema = z.unknown();
 
 /** `spanTree` / `spanTreeDelta`: waterfall nodes, per-span spend gated. */
 export const tracesSpanTreeNodesSchema = z.array(spanTreeNodeSchema);

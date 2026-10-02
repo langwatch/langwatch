@@ -17,7 +17,7 @@ export type RenameTraceOutcome =
     }
   | { ok: false; reason: "unknown"; error: unknown };
 
-export type UseRenameTraceResult = {
+type UseRenameTraceResult = {
   rename: (input: {
     projectId: string;
     traceId: string;

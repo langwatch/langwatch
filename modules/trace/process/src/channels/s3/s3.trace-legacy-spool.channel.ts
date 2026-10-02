@@ -4,7 +4,7 @@ import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/c
 
 import type { TraceLegacySpool } from "../trace-legacy-spool.channel.ts";
 
-export interface S3ClientResolution {
+interface S3ClientResolution {
   s3Client: S3Client;
   s3Bucket: string;
 }

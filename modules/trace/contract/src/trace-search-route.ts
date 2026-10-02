@@ -11,7 +11,7 @@ export const SEARCH_ROUTE_KINDS = ["filter", "instant_eval", "free_text", "langy
 export type SearchRouteKind = (typeof SEARCH_ROUTE_KINDS)[number];
 
 /** Who made the call: the classifier, the FAST model, or a fallback rule. */
-export const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback"] as const;
+const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback"] as const;
 
 export type SearchRouteDecidedBy = (typeof SEARCH_ROUTE_DECIDERS)[number];
 
@@ -19,7 +19,7 @@ export type SearchRouteDecidedBy = (typeof SEARCH_ROUTE_DECIDERS)[number];
  * The model a route needed was missing (`no_model`: none configured) or did
  * not answer (`model_failed`). Both are fixed from the model provider settings.
  */
-export const MODEL_TROUBLES = ["no_model", "model_failed"] as const;
+const MODEL_TROUBLES = ["no_model", "model_failed"] as const;
 
 export type ModelTrouble = (typeof MODEL_TROUBLES)[number];
 

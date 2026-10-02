@@ -3,10 +3,9 @@ import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 
-
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
-export interface TraceUpdateBroadcastSubscriberDeps {
+interface TraceUpdateBroadcastSubscriberDeps {
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
 }
 

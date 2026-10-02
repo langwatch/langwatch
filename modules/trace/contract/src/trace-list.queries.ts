@@ -131,7 +131,7 @@ export const facetValueAggregatesSchema = z.object({
   labelValues: z.array(z.object({ value: z.string(), count: z.number() })).optional(),
 });
 
-export type FacetValueAggregates = z.infer<typeof facetValueAggregatesSchema>;
+type FacetValueAggregates = z.infer<typeof facetValueAggregatesSchema>;
 
 /**
  * Per-event-name metric value tallies the event facet attaches so its sidebar drilldown

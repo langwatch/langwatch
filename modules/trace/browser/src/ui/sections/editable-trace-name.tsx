@@ -15,7 +15,7 @@ import { LuCheck, LuX } from "react-icons/lu";
 import { useTraceHost } from "../../behavior/trace-host.ts";
 import { type RenameTraceOutcome, useRenameTrace } from "./internal/use-rename-trace.ts";
 
-export type EditableTraceNameProps = {
+type EditableTraceNameProps = {
   projectId: string;
   traceId: string;
   /** Already-resolved title text — composes the same fallback chain the read-only header uses. */

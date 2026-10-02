@@ -10,7 +10,7 @@ import {
   stripLiftedSystemMessage,
 } from "./canonical-message.rules.ts";
 
-export type MessageSource =
+type MessageSource =
   | { type: "attr"; keys: readonly string[] }
   | {
       type: "event";
@@ -209,7 +209,7 @@ export const coerceStringNumberAttrs = (
   }
 };
 
-export type UsageTokenSources =
+type UsageTokenSources =
   | { input?: readonly string[]; output?: readonly string[] }
   | { object: string };
 

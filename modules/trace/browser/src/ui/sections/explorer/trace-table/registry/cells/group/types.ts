@@ -15,7 +15,7 @@ export interface TraceGroup {
   index: number;
 }
 
-export const GROUP_DOT_COLORS = [
+const GROUP_DOT_COLORS = [
   "blue.solid",
   "green.solid",
   "purple.solid",
@@ -30,7 +30,7 @@ export function dotColorForIndex(index: number): string {
   return GROUP_DOT_COLORS[index % GROUP_DOT_COLORS.length]!;
 }
 
-export function extractGroupKey(trace: TraceListItem, groupBy: GroupBy): string {
+function extractGroupKey(trace: TraceListItem, groupBy: GroupBy): string {
   switch (groupBy) {
     case "service":
       return trace.serviceName || "(unknown)";

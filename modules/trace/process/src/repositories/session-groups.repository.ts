@@ -12,7 +12,7 @@ export type SessionGroupSortColumn =
   | "duration"
   | "traces";
 
-export interface SessionGroupSort {
+interface SessionGroupSort {
   column: SessionGroupSortColumn;
   direction: "asc" | "desc";
 }

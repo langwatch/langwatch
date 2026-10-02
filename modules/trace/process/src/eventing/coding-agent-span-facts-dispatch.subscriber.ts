@@ -14,7 +14,7 @@ import {
 
 const logger = createLogger("langwatch:trace-processing:coding-agent-span-facts-dispatch");
 
-export interface CodingAgentSpanFactsDispatchDeps {
+interface CodingAgentSpanFactsDispatchDeps {
   normalize: (event: SpanReceivedEvent) => NormalizedSpan;
   contributeReceivedSpan: (input: CodingAgentReceivedSpan) => Promise<void>;
 }

@@ -3,13 +3,12 @@ import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
-
 const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");
 
 // Debounce — notification only, frontend refetches.
 export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000;
 
-export interface SpanStorageBroadcastSubscriberDeps {
+interface SpanStorageBroadcastSubscriberDeps {
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
 }
 

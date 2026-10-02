@@ -98,7 +98,7 @@ export function isSafeMediaUrl(url: string): boolean {
  * did not carry into the trace, so the renderer can say what happened rather than
  * report bytes that were never stored.
  */
-export interface NotCapturedMedia {
+interface NotCapturedMedia {
   mediaType: string;
   sizeBytes: number;
 }
@@ -194,7 +194,7 @@ export function convertMediaPartToMediaData(part: unknown): MediaPartData | null
  * Collection gate for rendering (auto-mount players/<img>/<video>). Only mount
  * our content (stored objects or data:), not external URLs (security risk).
  */
-export function isRenderableCollectedMedia(media: MediaPartData): boolean {
+function isRenderableCollectedMedia(media: MediaPartData): boolean {
   if (media.type === "binary") {
     if (media.url != null) return isStoredObjectUrl(media.url);
     return media.data != null;

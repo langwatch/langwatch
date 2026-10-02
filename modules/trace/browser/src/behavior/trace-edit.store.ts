@@ -21,7 +21,7 @@ type TraceMetadataEdits = NonNullable<TraceEditOverlayPatch["trace"]>["metadata"
 /**
  * One edited input or output.
  */
-export interface SpanIODraft {
+interface SpanIODraft {
   text: string;
   baselineText: string | null;
 }
@@ -47,13 +47,13 @@ export interface SpanEditDraft {
 }
 
 /** The fields of a span a reviewer edits directly in the drawer. */
-export type SpanDraftField = "name" | "type" | "input" | "output";
+type SpanDraftField = "name" | "type" | "input" | "output";
 
 /**
  * What the drawer should show for one span while it is being edited: the correction
  * already stored for it, with the reviewer's uncommitted changes on top.
  */
-export interface EffectiveSpanEdit {
+interface EffectiveSpanEdit {
   name?: string;
   type?: SpanTypes;
   input?: string;
@@ -664,7 +664,7 @@ export function selectSpanParamsBaseline({
 }
 
 /** Everything the correction would change, as counted for the edit bar. */
-export interface TraceEditSummary {
+interface TraceEditSummary {
   changedFields: number;
   deletedSpans: number;
 }

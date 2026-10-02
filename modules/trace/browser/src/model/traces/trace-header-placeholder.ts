@@ -4,7 +4,7 @@ import type { TraceHeader } from "@langwatch/trace-contract";
  * The fields a list row carries toward the drawer header: placeholder only, never cached
  * under the header key (ARCHITECTURE.md 10.2). This names them until the contract does.
  */
-export type TraceHeaderRow = Pick<
+type TraceHeaderRow = Pick<
   TraceHeader,
   | "traceId"
   | "timestamp"

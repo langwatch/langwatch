@@ -6,7 +6,7 @@ import type { AddonDef } from "../../types.ts";
 /**
  * Reserved columns the IO preview must never paint over.
  */
-export const RESERVED_PREVIEW_COLUMN_IDS = ["labels", "evaluations", "prompt", "events"] as const;
+const RESERVED_PREVIEW_COLUMN_IDS = ["labels", "evaluations", "prompt", "events"] as const;
 
 const RESERVED_PREVIEW_COLUMN_SET = new Set<string>(RESERVED_PREVIEW_COLUMN_IDS);
 

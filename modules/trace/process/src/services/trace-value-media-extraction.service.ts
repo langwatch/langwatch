@@ -31,7 +31,7 @@ export const MAX_MEDIA_PARTS_PER_SPAN = 16;
  * those already stored keep their references. Sized well under typical SDK export deadlines, so a
  * slow object store degrades to inline payloads instead of client timeouts and re-sent batches.
  */
-export const EXTRACTION_DEADLINE_MS = 5_000;
+const EXTRACTION_DEADLINE_MS = 5_000;
 
 /** Storage calls in flight at once during the store phase. */
 const CONCURRENT_STORES = 4;

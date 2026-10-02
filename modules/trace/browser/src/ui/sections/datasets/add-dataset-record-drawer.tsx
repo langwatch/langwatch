@@ -29,7 +29,7 @@ type FormValues = {
   datasetId: string;
 };
 
-export interface AddDatasetRecordDrawerProps {
+interface AddDatasetRecordDrawerProps {
   /** Callback function called on successful record addition */
   onSuccess?: () => void;
   /** ID of the trace to add */

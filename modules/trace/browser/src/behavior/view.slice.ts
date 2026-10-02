@@ -75,7 +75,7 @@ interface DraftLensState {
  * Fields the rich create dialog can supply when materialising a brand-new lens instead
  * of snapshotting the active table state.
  */
-export interface LensDraftInput {
+interface LensDraftInput {
   columns: string[];
   addons: string[];
   grouping: GroupingMode;
@@ -118,7 +118,7 @@ export interface ViewSlice {
  * `useLensSync`), the store calls these alongside its local writes so localStorage
  * stays a hot cache and the server stays the source of truth.
  */
-export interface LensSyncBridge {
+interface LensSyncBridge {
   create: (lens: LensConfig & { /** Optional client-suggested id. */ id: string }) => void;
   rename: (lensId: string, name: string) => void;
   delete: (lensId: string) => void;

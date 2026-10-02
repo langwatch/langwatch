@@ -27,10 +27,10 @@ import { setLens, setPage, setSort } from "./transforms/view.ts";
  * schemas, pure transforms and types only, so the page and the server executor
  * can both read it. @see specs/langy/langy-trace-explorer-actions.feature
  */
-export type ExplorerActionBackend = "transform" | "read" | "run";
-export type ExplorerActionAway = "link" | "saved" | "none";
+type ExplorerActionBackend = "transform" | "read" | "run";
+type ExplorerActionAway = "link" | "saved" | "none";
 
-export type ExplorerActionDefinition = {
+type ExplorerActionDefinition = {
   payloadSchema: z.ZodTypeAny;
   resultSchema?: z.ZodTypeAny;
   requiredPermission: AuthzPermission;
@@ -127,8 +127,3 @@ export const EXPLORER_ACTION_KINDS = Object.keys(EXPLORER_ACTIONS) as ExplorerAc
  */
 export const isExplorerActionKind = (kind: string): kind is ExplorerActionKind =>
   Object.hasOwn(EXPLORER_ACTIONS, kind);
-
-/** The parsed payload type for one action kind. */
-export type ExplorerActionPayload<Kind extends ExplorerActionKind> = z.infer<
-  (typeof EXPLORER_ACTIONS)[Kind]["payloadSchema"]
->;

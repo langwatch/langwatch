@@ -1,8 +1,8 @@
 import type { Evaluation } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
 import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context.tsx";
@@ -39,7 +39,7 @@ export type RichEval = EvalSummary & {
   timestamp?: number;
 };
 
-export interface TraceEvaluationsResult {
+interface TraceEvaluationsResult {
   rich: RichEval[];
   pendingCount: number;
   isLoading: boolean;
@@ -105,7 +105,8 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
-      enabled: !!project?.id && !!traceId && !isPreview && !viewer.isReadOnly,    },
+      enabled: !!project?.id && !!traceId && !isPreview && !viewer.isReadOnly,
+    },
   );
 
   const rawEvaluations = query.data;

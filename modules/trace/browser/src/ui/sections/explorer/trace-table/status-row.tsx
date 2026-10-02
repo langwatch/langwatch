@@ -7,7 +7,7 @@ import type { TraceStatus } from "../types/trace.ts";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
 
-export type RowVariant = "selected" | "error" | "warning" | "default";
+type RowVariant = "selected" | "error" | "warning" | "default";
 
 export interface RowStyle {
   borderColor: Color;
