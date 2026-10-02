@@ -1,10 +1,10 @@
 /**
- * Where the guided tour is right now. A module store, so the host, the
- * layer and the replay card all read the same run without threading props.
+ * Where the guided tour is right now. The `onboarding:guided-tour` slice, so the
+ * host, the layer and the replay card all read the same run without threading props.
  * @see specs/features/onboarding/guided-tour.feature
  */
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import type { GuidedPath } from "@langwatch/onboarding-contract";
-import { create } from "zustand";
 
 import { TOUR_STEPS } from "../model/tour-steps.ts";
 
@@ -35,58 +35,61 @@ interface GuidedTourState {
   setHandoff: (handoff: TourHandoff) => void;
 }
 
-export const useGuidedTourStore = create<GuidedTourState>()((set, get) => ({
-  running: false,
-  path: null,
-  stepIndex: 0,
-  handoff: null,
-  runId: 0,
-  onEnd: null,
+export const useGuidedTourStore = defineSlice<GuidedTourState>({
+  name: "onboarding:guided-tour",
+  create: (set, get) => ({
+    running: false,
+    path: null,
+    stepIndex: 0,
+    handoff: null,
+    runId: 0,
+    onEnd: null,
 
-  start: (path, options) => {
-    const onEnd = options?.onEnd ?? null;
-    if (TOUR_STEPS[path].length === 0) {
-      set({ running: false, path, stepIndex: 0, onEnd: null });
-      onEnd?.("completed");
-      return;
-    }
-    set((state) => ({
-      running: true,
-      path,
-      stepIndex: 0,
-      handoff: null,
-      runId: state.runId + 1,
-      onEnd,
-    }));
-  },
+    start: (path, options) => {
+      const onEnd = options?.onEnd ?? null;
+      if (TOUR_STEPS[path].length === 0) {
+        set({ running: false, path, stepIndex: 0, onEnd: null });
+        onEnd?.("completed");
+        return;
+      }
+      set((state) => ({
+        running: true,
+        path,
+        stepIndex: 0,
+        handoff: null,
+        runId: state.runId + 1,
+        onEnd,
+      }));
+    },
 
-  replay: (wanted) => {
-    const path = wanted ?? get().path;
-    if (!path || TOUR_STEPS[path].length === 0) return;
-    set((state) => ({
-      running: true,
-      path,
-      stepIndex: 0,
-      handoff: null,
-      runId: state.runId + 1,
-      onEnd: null,
-    }));
-  },
+    replay: (wanted) => {
+      const path = wanted ?? get().path;
+      if (!path || TOUR_STEPS[path].length === 0) return;
+      set((state) => ({
+        running: true,
+        path,
+        stepIndex: 0,
+        handoff: null,
+        runId: state.runId + 1,
+        onEnd: null,
+      }));
+    },
 
-  goToStep: (index) => {
-    const { path, running } = get();
-    if (!running || !path) return;
-    const count = TOUR_STEPS[path].length;
-    if (index < 0 || index >= count) return;
-    set({ stepIndex: index });
-  },
+    goToStep: (index) => {
+      const { path, running } = get();
+      if (!running || !path) return;
+      const count = TOUR_STEPS[path].length;
+      if (index < 0 || index >= count) return;
+      set({ stepIndex: index });
+    },
 
-  end: (status) => {
-    const { running, onEnd } = get();
-    if (!running) return;
-    set({ running: false, onEnd: null });
-    onEnd?.(status);
-  },
+    end: (status) => {
+      const { running, onEnd } = get();
+      if (!running) return;
+      set({ running: false, onEnd: null });
+      onEnd?.(status);
+    },
 
-  setHandoff: (handoff) => set({ handoff }),
-}));
+    setHandoff: (handoff) => set({ handoff }),
+  }),
+});

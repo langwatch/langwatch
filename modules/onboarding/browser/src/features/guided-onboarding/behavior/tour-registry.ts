@@ -1,10 +1,10 @@
 /**
- * A module store rather than context: the tour layer mounts once above every
+ * The `onboarding:tour-registry` slice rather than context: the tour layer mounts once above every
  * page, and the drawer that types the key name is a portal. The tour only
  * ever calls what is registered right now.
  */
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { useEffect } from "react";
-import { create } from "zustand";
 
 import type { TourActions } from "../model/tour-actions.ts";
 
@@ -13,19 +13,22 @@ interface TourRegistryState {
   register: (actions: Partial<TourActions>) => () => void;
 }
 
-export const useTourRegistry = create<TourRegistryState>()((set, get) => ({
-  actions: {},
-  register: (actions) => {
-    set({ actions: { ...get().actions, ...actions } });
-    return () => {
-      const remaining = { ...get().actions };
-      for (const key of Object.keys(actions) as (keyof TourActions)[]) {
-        if (remaining[key] === actions[key]) delete remaining[key];
-      }
-      set({ actions: remaining });
-    };
-  },
-}));
+export const useTourRegistry = defineSlice<TourRegistryState>({
+  name: "onboarding:tour-registry",
+  create: (set, get) => ({
+    actions: {},
+    register: (actions) => {
+      set({ actions: { ...get().actions, ...actions } });
+      return () => {
+        const remaining = { ...get().actions };
+        for (const key of Object.keys(actions) as (keyof TourActions)[]) {
+          if (remaining[key] === actions[key]) delete remaining[key];
+        }
+        set({ actions: remaining });
+      };
+    },
+  }),
+});
 
 /** What the tour can drive right now. */
 export function getTourActions(): Partial<TourActions> {
