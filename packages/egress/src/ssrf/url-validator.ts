@@ -8,7 +8,7 @@ import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts.t
 
 /**
  * Which addresses a process may open a connection to, and what it must connect to once it has
- * decided. FROZEN TWIN of the validation half of `platform/app/src/utils/ssrfProtection.ts`.
+ * decided.
  */
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -60,6 +60,8 @@ export type SsrfUrlValidator = (url: string) => Promise<SsrfValidationResult>;
 
 interface ValidationContext {
   url: string;
+  /** The URL as it may be logged: origin and path, no credentials, no query. */
+  logUrl: string;
   parsedUrl: URL;
   /** The host as judged: lowercased, and an IPv6 literal with its brackets off. */
   hostname: string;
@@ -72,12 +74,26 @@ interface ValidationContext {
   path: string;
 }
 
-/** The host a URL was judged by: lowercased, and unbracketed if it is an IPv6 literal. */
+/** A fully-qualified name's one trailing dot off: `example.com.` is `example.com`. */
+function withoutTrailingDot(host: string): string {
+  return host.endsWith(".") ? host.slice(0, -1) : host;
+}
+
+/** The host a URL was judged by: lowercased, unbracketed if IPv6, no trailing dot. */
 function bareHostname(parsedUrl: URL): string {
   const host = parsedUrl.hostname.toLowerCase();
-  if (!host.startsWith("[")) return host;
-  if (!host.endsWith("]")) return host;
-  return host.slice(1, -1);
+  if (host.startsWith("[") && host.endsWith("]")) return host.slice(1, -1);
+  return withoutTrailingDot(host);
+}
+
+/** A URL as it may be logged: origin and path only, never userinfo or query. */
+export function redactUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return "<unparseable url>";
+  }
 }
 
 function isBareLocalhostOrLocal(hostname: string): boolean {
@@ -90,7 +106,7 @@ function isBareLocalhostOrLocal(hostname: string): boolean {
  * operator may relax, not this unconditional one.
  */
 export function isBlockedCloudDomain(hostname: string): boolean {
-  const lowerHostname = hostname.toLowerCase();
+  const lowerHostname = withoutTrailingDot(hostname.toLowerCase());
 
   if (isBareLocalhostOrLocal(lowerHostname)) {
     return false;
@@ -123,7 +139,7 @@ function validateNotMetadataEndpoint(ctx: ValidationContext): void {
   const byName = BLOCKED_METADATA_HOSTS.some((host) => host === ctx.hostname);
   if (byName || isMetadataAddress(ctx.hostname)) {
     logger.error(
-      { url: ctx.url, hostname: ctx.hostname, reason: "metadata_endpoint" },
+      { url: ctx.logUrl, hostname: ctx.hostname, reason: "metadata_endpoint" },
       "SSRF attempt blocked: cloud metadata endpoint",
     );
     throw new Error("Access to cloud metadata endpoints is not allowed for security reasons");
@@ -138,7 +154,7 @@ function validateAddressesNotMetadata(ctx: ValidationContext, addresses: string[
   if (metadataAddresses.length > 0) {
     logger.error(
       {
-        url: ctx.url,
+        url: ctx.logUrl,
         hostname: ctx.hostname,
         resolvedAddresses: addresses,
         metadataAddresses,
@@ -155,7 +171,7 @@ function validateAddressesNotMetadata(ctx: ValidationContext, addresses: string[
 function validateNotBlockedCloudDomain(ctx: ValidationContext): void {
   if (isBlockedCloudDomain(ctx.hostname)) {
     logger.error(
-      { url: ctx.url, hostname: ctx.hostname, reason: "cloud_internal_domain" },
+      { url: ctx.logUrl, hostname: ctx.hostname, reason: "cloud_internal_domain" },
       "SSRF attempt blocked: cloud provider internal domain",
     );
     throw new Error(
@@ -168,7 +184,7 @@ function validateNotPrivateIpLiteral(ctx: ValidationContext, blockLocal: boolean
   const ipVersion = isIP(ctx.hostname);
   if (ipVersion !== 0 && blockLocal && isPrivateOrLocalhostIP(ctx.hostname)) {
     logger.warn(
-      { url: ctx.url, hostname: ctx.hostname, ipVersion, reason: "private_ip_literal" },
+      { url: ctx.logUrl, hostname: ctx.hostname, ipVersion, reason: "private_ip_literal" },
       "SSRF attempt blocked: private or localhost IP address",
     );
     throw new Error(
@@ -189,7 +205,7 @@ function validateResolvedAddresses(
   if (privateAddresses.length > 0) {
     logger.warn(
       {
-        url: ctx.url,
+        url: ctx.logUrl,
         hostname: ctx.hostname,
         resolvedAddresses: addresses,
         privateAddresses,
@@ -254,7 +270,7 @@ function handleDnsFailure(
   policy: SsrfPolicy,
   dnsError: unknown,
 ): SsrfUnresolvedResult {
-  const { hostname, url } = ctx;
+  const { hostname, logUrl: url } = ctx;
   if (!policy.blockLocal) {
     logger.debug(
       {
@@ -279,21 +295,23 @@ function handleDnsFailure(
   );
 }
 
-function findAllowlistedResult(
-  ctx: ValidationContext,
-  policy: SsrfPolicy,
-): SsrfAllowlistedResult | null {
-  if (policy.allowedHosts.length === 0) return null;
-
-  const normalizedAllowed = policy.allowedHosts.map((host) => host.trim().toLowerCase());
-  if (!normalizedAllowed.includes(ctx.hostname)) return null;
-
-  logger.info(
-    { url: ctx.url, hostname: ctx.hostname, allowedHosts: normalizedAllowed },
-    "Allowing request to allowlisted host",
+function isAllowlisted(ctx: ValidationContext, policy: SsrfPolicy): boolean {
+  return policy.allowedHosts.some(
+    (host) => withoutTrailingDot(host.trim().toLowerCase()) === ctx.hostname,
   );
-  const allowlistedVersion = isIP(ctx.hostname);
-  return buildAllowlistedResult(ctx, allowlistedVersion !== 0 ? ctx.hostname : undefined);
+}
+
+/**
+ * The allowlist relaxes the private-range refusal only: the name is still
+ * resolved, refused if any address is metadata, and pinned to what it resolved to.
+ */
+async function resolveAllowlisted(ctx: ValidationContext): Promise<SsrfAllowlistedResult> {
+  logger.info({ url: ctx.logUrl, hostname: ctx.hostname }, "Allowing request to allowlisted host");
+  if (isIP(ctx.hostname) !== 0) return buildAllowlistedResult(ctx, ctx.hostname);
+
+  const addresses = await resolveHostname(ctx.hostname);
+  validateAddressesNotMetadata(ctx, addresses);
+  return buildAllowlistedResult(ctx, addresses[0]);
 }
 
 /** The URL, refused unless it parses and speaks http or https. */
@@ -323,14 +341,14 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     const port = portFor(parsedUrl);
     const path = parsedUrl.pathname + parsedUrl.search;
 
-    const ctx: ValidationContext = { url, parsedUrl, hostname, requestHost, port, path };
+    const logUrl = redactUrlForLog(url);
+    const ctx: ValidationContext = { url, logUrl, parsedUrl, hostname, requestHost, port, path };
 
     // Always refused, before anything an operator can relax is consulted.
     validateNotMetadataEndpoint(ctx);
     validateNotBlockedCloudDomain(ctx);
 
-    const allowlistedResult = findAllowlistedResult(ctx, policy);
-    if (allowlistedResult) return allowlistedResult;
+    if (isAllowlisted(ctx, policy)) return resolveAllowlisted(ctx);
 
     const ipVersion = isIP(hostname);
     if (ipVersion !== 0) {
@@ -348,12 +366,12 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     if (allAddresses.length === 0) {
       if (!policy.blockLocal) {
         logger.debug(
-          { url, hostname },
+          { url: logUrl, hostname },
           "No DNS records found; not blocking because the policy allows local addresses",
         );
         return buildUnresolvedResult(ctx, "no-records");
       }
-      logger.error({ url, hostname }, "No DNS records found - blocking request");
+      logger.error({ url: logUrl, hostname }, "No DNS records found - blocking request");
       throw new Error(
         `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
       );
@@ -362,7 +380,10 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     validateResolvedAddresses(ctx, allAddresses, policy.blockLocal);
 
     const resolvedIp = allAddresses[0]!;
-    logger.debug({ url, hostname, resolvedIp }, "URL validated and resolved for SSRF-safe fetch");
+    logger.debug(
+      { url: logUrl, hostname, resolvedIp },
+      "URL validated and resolved for SSRF-safe fetch",
+    );
 
     return buildResolvedResult(ctx, resolvedIp);
   };

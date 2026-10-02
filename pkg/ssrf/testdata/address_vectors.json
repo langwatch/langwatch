@@ -15,6 +15,10 @@
     { "addr": "168.63.129.16", "category": "metadata", "note": "Azure WireServer (public-looking, no special range)" },
     { "addr": "fd00:ec2::254", "category": "metadata", "note": "AWS EC2 IMDS over IPv6" },
     { "addr": "::ffff:169.254.169.254", "category": "metadata", "note": "IPv4-mapped IMDS — must unmap before classifying" },
+    { "addr": "::169.254.169.254", "category": "metadata", "note": "IPv4-compatible IMDS — must unmap before classifying" },
+    { "addr": "::ffff:0:169.254.169.254", "category": "metadata", "note": "IPv4-translated IMDS (RFC 2765) — must unmap before classifying" },
+    { "addr": "100.100.100.200", "category": "metadata", "note": "Alibaba Cloud ECS metadata (inside CGNAT)" },
+    { "addr": "192.0.0.192", "category": "metadata", "note": "Oracle Cloud metadata (inside 192.0.0.0/24)" },
 
     { "addr": "0.0.0.0", "category": "special", "note": "unspecified" },
     { "addr": "0.1.2.3", "category": "special", "note": "0.0.0.0/8 this network (RFC 1122)" },
@@ -40,11 +44,13 @@
     { "addr": "255.255.255.255", "category": "special", "note": "limited broadcast, within 240.0.0.0/4 (RFC 8190)" },
     { "addr": "::ffff:127.0.0.1", "category": "special", "note": "IPv4-mapped loopback — must unmap" },
     { "addr": "::ffff:10.0.0.1", "category": "special", "note": "IPv4-mapped RFC1918 — must unmap" },
+    { "addr": "::10.0.0.1", "category": "special", "note": "IPv4-compatible RFC1918 — must unmap" },
 
     { "addr": "2606:4700:4700::1111", "category": "global", "note": "Cloudflare DNS IPv6" },
     { "addr": "2001:4860:4860::8888", "category": "global", "note": "Google DNS IPv6 — 2001:4860 is NOT Teredo 2001::/32" },
     { "addr": "2000::1", "category": "global", "note": "global unicast 2000::/3" },
     { "addr": "::ffff:8.8.8.8", "category": "global", "note": "IPv4-mapped public address is allowed after unmap" },
+    { "addr": "2606:4700::a9fe:a9fe", "category": "global", "note": "public IPv6 whose low 32 bits read as 169.254.169.254 — not unmapped" },
 
     { "addr": "::1", "category": "special", "note": "IPv6 loopback (RFC 4291)" },
     { "addr": "::", "category": "special", "note": "IPv6 unspecified (RFC 4291)" },

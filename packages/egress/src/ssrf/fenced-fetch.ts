@@ -1,14 +1,20 @@
+import dns, { type LookupAddress } from "node:dns";
 import { isIP } from "node:net";
 
 import { createLogger } from "@langwatch/observability";
 import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
 
-import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator.ts";
+import { classify } from "./address.ts";
+import {
+  redactUrlForLog,
+  type SsrfUrlValidator,
+  type SsrfValidationResult,
+} from "./url-validator.ts";
 
 /**
- * FROZEN TWIN of the fetch half of `platform/app/src/utils/ssrfProtection.ts`.
  * Pins the connection to the policy-judged IP so the hostname cannot be
  * re-resolved after the decision, while `Host`/TLS servername keep the original.
+ * With no judged IP, every address resolved at connect time is checked first.
  */
 
 /**
@@ -107,17 +113,58 @@ function resolveAgentTimeouts(init: FencedFetchOptions | undefined): AgentTimeou
   return timeouts;
 }
 
-function createIpPinningAgent(
-  resolvedIp: string,
-  tls: EgressTlsPolicy,
-  timeouts: AgentTimeoutOptions,
-): Agent {
+/** Headers that belong to the origin they were written for, never carried to another. */
+const ORIGIN_BOUND_HEADERS = ["authorization", "cookie", "proxy-authorization", "host"];
+
+const METADATA_REFUSAL =
+  "This hostname resolves to a cloud metadata endpoint, which is not allowed for security reasons";
+
+/** The pinned address, or every address the system resolver gives, each one checked. */
+function resolveForConnect({
+  hostname,
+  pinnedIp,
+  done,
+}: {
+  hostname: string;
+  pinnedIp: string | null;
+  done: (err: Error | null, addresses: LookupAddress[]) => void;
+}): void {
+  const check = (addresses: LookupAddress[]) => {
+    if (addresses.length === 0)
+      return done(new Error(`Could not resolve hostname: ${hostname}`), []);
+    if (addresses.some(({ address }) => classify(address) === "metadata")) {
+      return done(new Error(METADATA_REFUSAL), []);
+    }
+    done(null, addresses);
+  };
+  if (pinnedIp) return check([{ address: pinnedIp, family: isIP(pinnedIp) === 6 ? 6 : 4 }]);
+  dns.lookup(hostname, { all: true }, (err, addresses) => (err ? done(err, []) : check(addresses)));
+}
+
+function createGuardedAgent({
+  pinnedIp,
+  tls,
+  timeouts,
+}: {
+  pinnedIp: string | null;
+  tls: EgressTlsPolicy;
+  timeouts: AgentTimeoutOptions;
+}): Agent {
   return new Agent({
     ...timeouts,
     connect: {
       rejectUnauthorized: tls.rejectUnauthorized,
-      lookup: (_hostname, _options, callback) => {
-        callback(null, [{ address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 }]);
+      lookup: (hostname, options, callback) => {
+        resolveForConnect({
+          hostname,
+          pinnedIp,
+          done: (err, addresses) => {
+            const first = addresses[0];
+            if (err || !first) return callback(err, []);
+            if (options.all) return callback(null, addresses);
+            callback(null, first.address, first.family);
+          },
+        });
       },
     },
   });
@@ -153,15 +200,11 @@ export async function fetchValidatedDestination(
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
   const resolvedIp = getResolvedIpForPinning(validated);
-  const agentTimeouts = resolveAgentTimeouts(init);
-
-  const dispatcher =
-    resolvedIp && isIP(resolvedIp) !== 0
-      ? createIpPinningAgent(resolvedIp, tls, agentTimeouts)
-      : new Agent({
-          ...agentTimeouts,
-          connect: { rejectUnauthorized: tls.rejectUnauthorized },
-        });
+  const dispatcher = createGuardedAgent({
+    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
+    tls,
+    timeouts: resolveAgentTimeouts(init),
+  });
 
   try {
     const response = await undiciFetch(requestUrl, {
@@ -182,6 +225,7 @@ export async function fetchValidatedDestination(
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
       if (location) {
+        void dispatcher.destroy().catch(() => undefined);
         return await followRedirect({
           status: response.status,
           location,
@@ -193,8 +237,11 @@ export async function fetchValidatedDestination(
       }
     }
 
+    // Graceful: the socket closes once the caller has read the body.
+    void dispatcher.close().catch(() => undefined);
     return response;
   } catch (err) {
+    void dispatcher.destroy().catch(() => undefined);
     // Our own refusal, not the network's. Everything below rewrites an error
     // into "Connection failed to host:port: …", the right shape for a socket
     // problem and the wrong one for a decision this module made.
@@ -244,7 +291,11 @@ async function followRedirect({
   const redirectUrl = new URL(location, validated.originalUrl).toString();
 
   logger.debug(
-    { originalUrl: validated.originalUrl, redirectUrl, redirectCount: redirectCount + 1 },
+    {
+      originalUrl: redactUrlForLog(validated.originalUrl),
+      redirectUrl: redactUrlForLog(redirectUrl),
+      redirectCount: redirectCount + 1,
+    },
     "Following redirect with SSRF validation",
   );
 
@@ -259,6 +310,12 @@ async function followRedirect({
     bodyTimeoutMs: init.bodyTimeoutMs,
     _redirectCount: redirectCount + 1,
   };
+
+  if (new URL(redirectUrl).origin !== new URL(validated.originalUrl).origin) {
+    const headers = new Headers(init.headers);
+    for (const name of ORIGIN_BOUND_HEADERS) headers.delete(name);
+    redirectInit.headers = [...headers];
+  }
 
   // The method downgrade every HTTP client makes: 303 always becomes a GET, and
   // so does a POST through a redirect that is not 307 or 308. Carrying the body

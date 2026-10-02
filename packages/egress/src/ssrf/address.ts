@@ -98,18 +98,36 @@ function ipToBytes(ip: string): Uint8Array | null {
   return ip.includes(":") ? ipv6ToBytes(ip) : ipv4ToBytes(ip);
 }
 
+/** Whether bytes[from..to) are all zero. */
+function zeroBetween({
+  bytes,
+  from,
+  to,
+}: {
+  bytes: Uint8Array;
+  from: number;
+  to: number;
+}): boolean {
+  for (let i = from; i < to; i++) {
+    if (bytes[i] !== 0) return false;
+  }
+  return true;
+}
+
 /**
- * Collapse an IPv4-mapped IPv6 address (::ffff:a.b.c.d) to its 4-byte IPv4 form
- * so it classifies as the IPv4 address it really is — the mapped form is a
- * classic filter bypass. Mirrors Go's netip.Addr.Unmap().
+ * Collapse an IPv6 address carrying an IPv4 one (mapped ::ffff:a.b.c.d,
+ * compatible ::a.b.c.d, translated ::ffff:0:a.b.c.d) to its 4-byte IPv4 form,
+ * so it classifies as the IPv4 address it names. Wider than Go's Unmap().
  */
 function unmap(bytes: Uint8Array): Uint8Array {
   if (bytes.length !== 16) return bytes;
-  for (let i = 0; i < 10; i++) {
-    if (bytes[i] !== 0) return bytes;
-  }
-  if (bytes[10] === 0xff && bytes[11] === 0xff) return bytes.slice(12, 16);
-  return bytes;
+  if (!zeroBetween({ bytes, from: 0, to: 8 })) return bytes;
+  const mapped =
+    zeroBetween({ bytes, from: 8, to: 10 }) && bytes[10] === 0xff && bytes[11] === 0xff;
+  const compatible = zeroBetween({ bytes, from: 8, to: 12 });
+  const translated =
+    bytes[8] === 0xff && bytes[9] === 0xff && zeroBetween({ bytes, from: 10, to: 12 });
+  return mapped || compatible || translated ? bytes.slice(12, 16) : bytes;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +187,8 @@ const METADATA_ADDRESSES = [
   "169.254.169.254", // AWS/GCP/Azure/Oracle IMDS
   "169.254.170.2", // AWS ECS/Fargate task metadata
   "168.63.129.16", // Azure WireServer / host DNS
+  "100.100.100.200", // Alibaba Cloud ECS metadata
+  "192.0.0.192", // Oracle Cloud metadata
   "fd00:ec2::254", // AWS EC2 IMDS over IPv6
 ].map((ip) => {
   const bytes = unmap(ipToBytes(ip)!);

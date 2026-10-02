@@ -100,3 +100,19 @@ func TestInvalidAddressFailsClosed(t *testing.T) {
 		t.Fatal("IsPublicAddress(invalid) = true, want false — must fail closed")
 	}
 }
+
+func TestUnmapKeepsOrdinaryIPv6(t *testing.T) {
+	cases := map[string]string{
+		"::":                       "unspecified address",
+		"::1":                      "loopback",
+		"::169.254.169.254":        "169.254.169.254 (cloud instance metadata)",
+		"::ffff:0:169.254.169.254": "169.254.169.254 (cloud instance metadata)",
+		"2606:4700::a9fe:a9fe":     "globally routable",
+		"::1:0:a9fe:a9fe":          "globally routable",
+	}
+	for in, want := range cases {
+		if got := Describe(netip.MustParseAddr(in)); got != want {
+			t.Errorf("Describe(%s) = %q, want %q", in, got, want)
+		}
+	}
+}

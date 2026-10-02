@@ -81,6 +81,12 @@ var metadataAddresses = map[netip.Addr]struct{}{
 	// region — hence the explicit entry.
 	// https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16
 	netip.MustParseAddr("168.63.129.16"): {},
+	// Alibaba Cloud ECS instance metadata (inside CGNAT 100.64.0.0/10).
+	// https://www.alibabacloud.com/help/en/ecs/user-guide/view-instance-metadata
+	netip.MustParseAddr("100.100.100.200"): {},
+	// Oracle Cloud Infrastructure metadata (inside 192.0.0.0/24).
+	// https://docs.oracle.com/iaas/Content/Compute/Tasks/gettingmetadata.htm
+	netip.MustParseAddr("192.0.0.192"): {},
 	// AWS EC2 IMDS reached over IPv6.
 	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-existing-instances.html
 	netip.MustParseAddr("fd00:ec2::254"): {},
@@ -121,13 +127,13 @@ var specialPrefixes = []labelledPrefix{
 
 // Classify reports how an egress boundary must treat addr. An invalid address
 // is treated as CategorySpecial so a parse failure fails closed rather than
-// slipping through as "not obviously private". IPv4-mapped IPv6 addresses
-// (::ffff:a.b.c.d) are unmapped first so they classify as their IPv4 form.
+// slipping through as "not obviously private". An IPv6 address carrying an
+// IPv4 one is unmapped first (see unmap) so it classifies as its IPv4 form.
 func Classify(addr netip.Addr) Category {
 	if !addr.IsValid() {
 		return CategorySpecial
 	}
-	addr = addr.Unmap()
+	addr = unmap(addr)
 
 	if _, ok := metadataAddresses[addr]; ok {
 		return CategoryMetadata
@@ -147,6 +153,25 @@ func Classify(addr netip.Addr) Category {
 	return CategoryGlobal
 }
 
+// unmap collapses an IPv6 address carrying an IPv4 one (mapped ::ffff:a.b.c.d,
+// compatible ::a.b.c.d, translated ::ffff:0:a.b.c.d) to that IPv4 address; only
+// those exact prefixes, so other IPv6 addresses are untouched. :: and ::1 stay
+// IPv6 unspecified and loopback. Mirrors unmap() in packages/egress address.ts.
+func unmap(addr netip.Addr) netip.Addr {
+	addr = addr.Unmap()
+	if !addr.Is6() || addr.IsUnspecified() || addr.IsLoopback() {
+		return addr
+	}
+	b := addr.As16()
+	if [8]byte(b[:8]) != [8]byte{} || b[10]|b[11] != 0 {
+		return addr
+	}
+	if (b[8] == 0 && b[9] == 0) || (b[8] == 0xff && b[9] == 0xff) {
+		return netip.AddrFrom4([4]byte(b[12:]))
+	}
+	return addr
+}
+
 // Describe returns an operator-facing explanation of why addr is not a
 // globally routable destination — the named range and the RFC that reserves
 // it, e.g. "100.64.0.0/10 (CGNAT / shared address space, RFC 6598)". A global
@@ -160,7 +185,7 @@ func Describe(addr netip.Addr) string {
 	if !addr.IsValid() {
 		return "unparseable address"
 	}
-	addr = addr.Unmap()
+	addr = unmap(addr)
 
 	if _, ok := metadataAddresses[addr]; ok {
 		return addr.String() + " (cloud instance metadata)"
