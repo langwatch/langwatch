@@ -4,7 +4,7 @@
  * (ADR-122), and the one write either reconciliation surface has: a retired
  * removal sent through again. An addition is refused by name — a sync fact
  * carries ids and a reason code only, so it has no payload left to resend.
- * specs/identity/scim-reconciliation-surfaces.feature
+ * enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import {
   DIRECTORY_IDENTITY_PAGE_SIZE,

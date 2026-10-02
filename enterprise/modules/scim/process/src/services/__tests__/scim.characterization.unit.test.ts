@@ -245,7 +245,7 @@ describe("SCIM characterization: token lifecycle", () => {
 });
 
 describe("SCIM characterization: provisioning invariants", () => {
-  /** @scenario "A page reports how many resources it actually carries" */
+  /** @scenario "The last page reports how many people it actually carries" */
   it("reports the page it holds rather than the page that was asked for", async () => {
     const repo = repository({
       findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),

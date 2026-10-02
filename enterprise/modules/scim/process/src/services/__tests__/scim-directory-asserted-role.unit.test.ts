@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The membership row a directory push writes carries the role the directory asserts.
- * @see specs/identity/scim-connection-sync.feature
+ * @see enterprise/modules/scim/specs/scim-connection-sync.feature
  */
 import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -14,8 +14,8 @@ import { OrganizationAdministrationFake } from "../../__tests__/support/organiza
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
-import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
@@ -127,14 +127,15 @@ function groupGrant({
 }
 
 function scimGroupsOf(groupIds: string[]) {
-  return scimRepositoryFixture({ findDirectoryGroupIds: vi.fn(async () => groupIds) });
+  const findDirectoryGroupIds = vi.fn(async () => groupIds);
+  return { repository: scimRepositoryFixture({ findDirectoryGroupIds }), findDirectoryGroupIds };
 }
 
 describe("the membership role a SCIM push writes", () => {
   describe("given SCIM v2 grants and a SCIM group mapped ADMIN at organization scope", () => {
     /** @scenario Membership is no longer a fixed role written beside the grant */
     it("creates an ADMIN member", async () => {
-      const repository = scimGroupsOf(["scim-group"]);
+      const { repository, findDirectoryGroupIds } = scimGroupsOf(["scim-group"]);
       const writer = new GrantsFake();
       writer.listUserAndGroupBindings.mockResolvedValue([
         groupGrant({ id: "b1", groupId: "scim-group", role: "MEMBER" }),
@@ -143,7 +144,7 @@ describe("the membership role a SCIM push writes", () => {
 
       await push(serviceOver({ repository, writer, provenOffboarding: true }));
 
-      expect(repository.findDirectoryGroupIds).toHaveBeenCalledWith({
+      expect(findDirectoryGroupIds).toHaveBeenCalledWith({
         userId: "user-1",
         organizationId: "org-1",
       });
@@ -162,7 +163,7 @@ describe("the membership role a SCIM push writes", () => {
 
   describe("given SCIM v2 grants and only non-admin or custom mappings", () => {
     it("creates a MEMBER", async () => {
-      const repository = scimGroupsOf(["scim-group"]);
+      const { repository } = scimGroupsOf(["scim-group"]);
       const writer = new GrantsFake();
       writer.listUserAndGroupBindings.mockResolvedValue([
         groupGrant({ id: "b1", groupId: "scim-group", role: "VIEWER" }),
@@ -179,7 +180,7 @@ describe("the membership role a SCIM push writes", () => {
 
   describe("given the previous write path", () => {
     it("creates a MEMBER without asking what the directory maps", async () => {
-      const repository = scimGroupsOf(["scim-group"]);
+      const { repository, findDirectoryGroupIds } = scimGroupsOf(["scim-group"]);
       const writer = new GrantsFake();
       writer.listUserAndGroupBindings.mockResolvedValue([
         groupGrant({ id: "b1", groupId: "scim-group", role: "ADMIN" }),
@@ -187,7 +188,7 @@ describe("the membership role a SCIM push writes", () => {
 
       await push(serviceOver({ repository, writer, provenOffboarding: false }));
 
-      expect(repository.findDirectoryGroupIds).not.toHaveBeenCalled();
+      expect(findDirectoryGroupIds).not.toHaveBeenCalled();
       expect(writer.listUserAndGroupBindings).not.toHaveBeenCalled();
       expect(repository.addMembership).toHaveBeenCalledWith(
         expect.objectContaining({ role: "MEMBER" }),
@@ -197,7 +198,7 @@ describe("the membership role a SCIM push writes", () => {
 
   describe("given the mapping cannot be read", () => {
     it("writes no membership and fails the push when the grant listing fails", async () => {
-      const repository = scimGroupsOf(["scim-group"]);
+      const { repository } = scimGroupsOf(["scim-group"]);
       const writer = new GrantsFake();
       writer.listUserAndGroupBindings.mockRejectedValue(new Error("role bindings unavailable"));
 
@@ -232,8 +233,22 @@ describe("MemoryScimRepository.findDirectoryGroupIds", () => {
       updatedAt: epoch,
     };
     repository.groups.push(
-      { ...group, id: "scim-group", name: "Admins", slug: "admins", scimSource: "okta", externalId: "ext-1" },
-      { ...group, id: "hand-group", name: "Local", slug: "local", scimSource: null, externalId: null },
+      {
+        ...group,
+        id: "scim-group",
+        name: "Admins",
+        slug: "admins",
+        scimSource: "okta",
+        externalId: "ext-1",
+      },
+      {
+        ...group,
+        id: "hand-group",
+        name: "Local",
+        slug: "local",
+        scimSource: null,
+        externalId: null,
+      },
       {
         ...group,
         id: "other-org-group",
@@ -264,9 +279,21 @@ describe("ScimGrantsService.findDirectoryAssertedRoles", () => {
     const grants = new GrantsFake();
     grants.listUserAndGroupBindings.mockResolvedValue([
       groupGrant({ id: "b1", groupId: "scim-group", role: "ADMIN" }),
-      groupGrant({ id: "b2", groupId: "scim-group", role: "VIEWER", scopeType: "TEAM", scopeId: "team-1" }),
+      groupGrant({
+        id: "b2",
+        groupId: "scim-group",
+        role: "VIEWER",
+        scopeType: "TEAM",
+        scopeId: "team-1",
+      }),
       groupGrant({ id: "b3", groupId: "hand-group", role: "MEMBER" }),
-      groupGrant({ id: "b4", groupId: "scim-group", role: "MEMBER", organizationId: "org-2", scopeId: "org-2" }),
+      groupGrant({
+        id: "b4",
+        groupId: "scim-group",
+        role: "MEMBER",
+        organizationId: "org-2",
+        scopeId: "org-2",
+      }),
       listedGrant({
         id: "b5",
         organizationId: "org-1",

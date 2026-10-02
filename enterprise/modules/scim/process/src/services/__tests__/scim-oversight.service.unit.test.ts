@@ -3,7 +3,7 @@
  * @vitest-environment node
  * The operator's directory-sync oversight (ADR-122), over in-memory stand-ins
  * for storage only: the refusals, the ordering and the idempotency are the
- * service's own. specs/identity/scim-reconciliation-surfaces.feature
+ * service's own. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import type { ScimSyncFailure, ScimSyncState } from "@langwatch/enterprise-scim-contract";
 import { fromDate } from "@langwatch/time";

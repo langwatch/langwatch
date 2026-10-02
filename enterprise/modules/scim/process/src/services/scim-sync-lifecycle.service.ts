@@ -25,7 +25,7 @@
  *                  identifiers ever reach a fact. No token, no email, no
  *                  provider prose.
  *
- * See specs/identity/scim-connection-sync.feature.
+ * See enterprise/modules/scim/specs/scim-connection-sync.feature.
  */
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {

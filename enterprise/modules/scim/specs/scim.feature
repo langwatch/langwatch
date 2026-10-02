@@ -68,31 +68,6 @@ Feature: Enterprise SCIM package boundary
       When the webhook is delivered
       Then the response does not distinguish the path from one that was never served
 
-  Rule: A filter the directory cannot honour is refused, never widened
-
-    Both listings match on one attribute each. A filter naming any other
-    attribute used to read as no filter at all, so a provider asking for one
-    person was answered with the whole organization and read the first row back
-    as the person it asked about.
-
-    @unit
-    Scenario: A user listing filtered by an unsupported attribute is refused
-      Given a directory listing users
-      When the provider filters by an attribute the listing cannot match
-      Then the listing is refused with invalidFilter at 400
-
-    @unit
-    Scenario: A group listing filtered by an unsupported expression is refused
-      Given a directory listing groups
-      When the provider sends an expression richer than equality
-      Then the listing is refused with invalidFilter at 400
-
-    @unit
-    Scenario: A user listing filtered by userName matches without regard to case
-      Given a directory listing users
-      When the provider filters by userName
-      Then the listing narrows to that address
-
   Rule: A name is patched one half at a time
 
     SCIM carries a name as two parts and this product stores one string, so a
@@ -147,12 +122,6 @@ Feature: Enterprise SCIM package boundary
       Given a directory larger than one page
       When a provider starts past the last member
       Then the page is empty and still reports the whole total
-
-    @unit
-    Scenario: A page reports how many resources it actually carries
-      Given a directory whose size is not a multiple of the page
-      When a provider reads the last page
-      Then the page reports its real size rather than the size requested
 
     @unit
     Scenario: A provider that advances by what it was told lands on the end exactly
@@ -488,27 +457,10 @@ Feature: Enterprise SCIM package boundary
   Rule: One connection's recent directory activity reads the sync log in words (ADR-126)
 
     @unit
-    Scenario: Directory activity is read from the connection's sync log, newest first
-      Given the directory pushed a person into "acme-okta" and an apply then failed
-      When the connection's activity is read
-      Then every fact is listed newest first, the failure marked as refused
-
-    @unit
-    Scenario: Another organization's directory activity is never scanned
-      When "globex" reads activity for a connection "acme" holds
-      Then only "globex"'s own log is scanned, and nothing is listed
-
-    @unit
     Scenario: Directory activity is refused by name where no sync log can be read
       Given a process composed without an event stack
       When a connection's activity is read
       Then the read is refused as an unavailable capability rather than answered empty
-
-    @unit
-    Scenario: A push and the failure after it read as the directory's acts, in words
-      Given the directory switched off "sam" and an apply then failed
-      When the administrator reads what the directory has been doing
-      Then each line names the person and says the failure in the failure panel's words
 
     @unit
     Scenario: Recent directory activity is served in words under sso:view

@@ -2,7 +2,7 @@
  * @vitest-environment node
  * The audit trail and the group list and create ask for Enterprise, naming the feature.
  * @see specs/features/enterprise-feature-guards.feature
- * @see specs/features/scim-group-mapping.feature
+ * @see enterprise/modules/scim/specs/scim-group-mapping.feature
  */
 import type { EntitlementGate } from "@langwatch/api/access";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
@@ -72,8 +72,8 @@ describe("given an organization below Enterprise", () => {
 
   it("leaves the rest of the group namespace to its permission alone", () => {
     const gated = ["listAll", "create", "addGrant", "applyEdits"];
-    for (const [name, gate] of groups) {
-      if (!gated.includes(name)) expect(gate).toBeUndefined();
-    }
+    const ungated = [...groups].filter(([name]) => !gated.includes(name));
+    expect(ungated.length).toBeGreaterThan(0);
+    expect(ungated.filter(([, gate]) => gate !== undefined)).toEqual([]);
   });
 });

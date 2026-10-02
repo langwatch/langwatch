@@ -12,7 +12,7 @@
  * organization the session resolved, so naming another organization's
  * connection reads exactly like naming one that does not exist.
  *
- * See specs/identity/scim-reconciliation-surfaces.feature.
+ * See enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {

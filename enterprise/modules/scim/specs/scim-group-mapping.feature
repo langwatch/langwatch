@@ -25,7 +25,7 @@ Feature: SCIM Group Mapping
   # every membership consequence a push has - group bindings included -
   # arrives as a grant. The connection-level rules (one token, one
   # connection; who the directory means; what a failure looks like) live in
-  # specs/identity/scim-connection-sync.feature.
+  # enterprise/modules/scim/specs/scim-connection-sync.feature.
 
   Background:
     Given an organization on the ENTERPRISE plan
@@ -194,7 +194,7 @@ Feature: SCIM Group Mapping
   # sign-in and API-key verification, so the retained authority is LATENT.
   # What it costs is a decision - reactivating somebody restores everything
   # they held on the day they left, with nobody choosing that. Reactivation
-  # is therefore re-entry, not undo; specs/identity/scim-connection-sync.feature
+  # is therefore re-entry, not undo; enterprise/modules/scim/specs/scim-connection-sync.feature
   # carries what a return does and does not restore.
 
   @integration
@@ -206,28 +206,6 @@ Feature: SCIM Group Mapping
     Then user "user-1" is deactivated
     And the removal is proved to have left nothing resolving for "user-1" in the organization
     And a permission check for "user-1" in the organization answers no, everywhere
-
-  @integration
-  Scenario: Deactivating a user deprovisions them with the same proof
-    Given user "user-1" is a member of the organization with access through group "abc-123"
-    When Entra pushes user "user-1" as inactive
-    Then the removal is proved to have left nothing resolving for "user-1" in the organization
-    And "user-1"'s next permission check answers no
-
-  @unit
-  Scenario: A deprovision that cannot prove itself empty fails loudly
-    Given a deprovision of "user-1" whose proof still finds access resolving for them
-    When the deprovision is applied
-    Then it is refused with code offboard_incomplete and status 500
-    And "user-1"'s access is exactly what it was before the push
-    And the failure is surfaced rather than retried into silence
-
-  @integration @unimplemented
-  Scenario: Reactivating a deprovisioned user restores no access on its own
-    Given user "user-1" was pushed inactive and their access was removed
-    When Entra pushes user "user-1" as active again
-    Then "user-1" can sign in
-    And "user-1" holds no access until a push asserts it again
 
   # --- SCIM Settings UI ---
 

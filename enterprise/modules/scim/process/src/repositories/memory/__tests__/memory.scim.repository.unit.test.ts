@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Spec: specs/identity/scim-request-log.feature */
+/** Spec: enterprise/modules/scim/specs/scim-request-log.feature */
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

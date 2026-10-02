@@ -103,6 +103,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     When "ana" reads what the directory has been doing
     Then both the push and the failure are listed, in the order they happened
     And the failure is words rather than an error code
+    And each entry names the person the directory acted on
 
   @integration
   Scenario: A connection nothing has happened on says so rather than drawing an empty list

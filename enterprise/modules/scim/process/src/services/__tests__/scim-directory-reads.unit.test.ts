@@ -203,7 +203,6 @@ describe("reading the directory back", () => {
   describe("given a directory whose size is not a multiple of the page", () => {
     const people = Array.from({ length: 250 }, (_, index) => person(index));
 
-    /** @scenario "A page reports how many resources it actually carries" */
     /** @scenario "The last page reports how many people it actually carries" */
     it("reports the short last page at its real size", async () => {
       const page = await serviceOver(directory({ people })).listUsers({
@@ -215,8 +214,7 @@ describe("reading the directory back", () => {
       expect(page.Resources).toHaveLength(50);
       expect(page.itemsPerPage).toBe(50);
     });
-
-    /** @scenario "A page reports how many resources it actually carries" */
+    /** @scenario "The last page reports how many people it actually carries" */
     /** @scenario "A full page reports the whole page" */
     it("reports a full page as full", async () => {
       const page = await serviceOver(directory({ people })).listUsers({

@@ -7,7 +7,7 @@ Feature: Reading the directory back - a page of people that means what it says
   of provisioning some twice and never seeing the rest
 
   # D08's companion. The push side keeps its own file
-  # (specs/identity/scim-connection-sync.feature); this one is the READ side -
+  # (enterprise/modules/scim/specs/scim-connection-sync.feature); this one is the READ side -
   # what a provider sees when it asks who we think is here. That is the half a
   # sync starts with, and every mistake in it is silent: a provider believes
   # what the listing says.
@@ -37,7 +37,7 @@ Feature: Reading the directory back - a page of people that means what it says
   #                  person it asked about - and then writes to them.
   #
   # The page ceiling itself (a hundred, however many are asked for) keeps its
-  # own file: specs/identity/scim-connection-sync.feature covers what a token
+  # own file: enterprise/modules/scim/specs/scim-connection-sync.feature covers what a token
   # may reach, and the cap is pinned by the route's own suite.
 
   Background:

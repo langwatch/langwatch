@@ -70,7 +70,7 @@ the D05 "see single sign-on" permission), and the D05 operator surface grows
 cross-customer SCIM oversight (dead letters linked to retired intents, retry
 history, the `externalId ↔ userId` mapping detail, and one guarded write: the
 recorded re-drive of a retired apply). Spec:
-`specs/identity/scim-reconciliation-surfaces.feature`. Both views read the
+`enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature`. Both views read the
 projections and event log this document defines; nothing new is written.
 
 # Out of Scope
@@ -83,7 +83,7 @@ projections and event log this document defines; nothing new is written.
 - Three gaps the current code carries into this deliverable: `ScimService.deleteUser` calls the low-level `GrantsLedgerWriter.offboardMember`, **not** `GrantsService.offboard`, so the empty-proof postcondition and the `needsHumanDecision` manifest are never exercised (`.offboard(` has no production call site anywhere in the tree); a `PATCH`/`PUT` setting `active: false` deactivates the user and **revokes no grants at all**; and the SCIM resource id for a Group resolves to our internal `Group.id` rather than the IdP's `externalId`, which is written only on create.
 - `GrantsService.attach` cannot express a system actor at all — its `Actor` is `{ userId: string }` and its serializer stamps `{ type: "user", … }` unconditionally. Routing SCIM through `GrantsService` (rather than the ledger writer directly) needs that seam widened first; it is an authz-package change, so it is a **breaking change to this program** under the risk register and belongs on the precondition checklist.
 - Doctrine anchor: `specs/event-sourcing/pipeline-model.feature` (pipelines own their commands/events/projections); content-boundary precedent ADR-052.
-- Corpus-audit spec impacts: `scim-group-mapping.feature` — most scenarios are `@unimplemented`, so amending the deprovisioning framing from "direct RoleBinding records removed" to the proved-empty postcondition is cheap now. `groups-rest-api.feature` — the SCIM-managed provenance guards are anchors that survive. `specs/organizations/scim-tokens-rest-api.feature` — the REST mint/revoke contract gains connection scoping (create names a connection); the secret-shown-once and no-secrets-in-list anchors survive. All three amended 2026-08-24 alongside the new `specs/identity/scim-connection-sync.feature`.
+- Corpus-audit spec impacts: `scim-group-mapping.feature` — most scenarios are `@unimplemented`, so amending the deprovisioning framing from "direct RoleBinding records removed" to the proved-empty postcondition is cheap now. `groups-rest-api.feature` — the SCIM-managed provenance guards are anchors that survive. `specs/organizations/scim-tokens-rest-api.feature` — the REST mint/revoke contract gains connection scoping (create names a connection); the secret-shown-once and no-secrets-in-list anchors survive. All three amended 2026-08-24 alongside the new `enterprise/modules/scim/specs/scim-connection-sync.feature`.
 
 # Technical Plan
 
@@ -92,7 +92,7 @@ projections and event log this document defines; nothing new is written.
 3. ScimSync aggregate, events, projection; SCIM endpoints become command producers (same external API) — every membership consequence is a command landing an event, and the hand-written `OrganizationUser` insert with its unconditional `MEMBER` role goes with it.
 4. Process manager: de-enroll → `GrantsService.offboard` with postcondition check, on BOTH removal paths (delete and `active: false`); retry with backoff; dead-letter visibility in the ops surface, covering a deactivate that cannot be applied.
 5. Group mapping UI write path repointed to `grants.attach`.
-6. Amend `scim-group-mapping.feature` and `scim-tokens-rest-api.feature`; integration test asserting the offboard postcondition. **Written 2026-08-24:** `specs/identity/scim-connection-sync.feature` (ScimSync lifecycle, token scoping, directory identity, offboard postcondition, dead-letter visibility), `@unimplemented` until bound.
+6. Amend `scim-group-mapping.feature` and `scim-tokens-rest-api.feature`; integration test asserting the offboard postcondition. **Written 2026-08-24:** `enterprise/modules/scim/specs/scim-connection-sync.feature` (ScimSync lifecycle, token scoping, directory identity, offboard postcondition, dead-letter visibility), `@unimplemented` until bound.
 
 # Exit gate / rollback
 

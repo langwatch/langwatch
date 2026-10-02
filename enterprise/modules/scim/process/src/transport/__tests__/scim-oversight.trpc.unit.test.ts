@@ -3,7 +3,7 @@
  * @vitest-environment node
  * Who reaches the directory-sync oversight, and what a refusal says (ADR-122):
  * a plain not-found, so a cross-customer surface does not confirm itself to a
- * prober. specs/identity/scim-reconciliation-surfaces.feature
+ * prober. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { initTRPC, TRPCError } from "@trpc/server";

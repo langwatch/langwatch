@@ -2,7 +2,7 @@
 /**
  * D08's remainder, over the real guards: a token belongs to one connection,
  * its pushes are attributed to it, and every membership a push causes is
- * explained by a fact (specs/identity/scim-connection-sync.feature).
+ * explained by a fact (enterprise/modules/scim/specs/scim-connection-sync.feature).
  */
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {

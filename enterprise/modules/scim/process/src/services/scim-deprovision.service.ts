@@ -49,7 +49,7 @@ export class ScimDeprovisionService {
     try {
       // The organization's own way in is not the directory's to close: a push
       // that would leave nobody able to administer it is refused before any
-      // authority is taken away. specs/identity/scim-connection-sync.feature.
+      // authority is taken away. enterprise/modules/scim/specs/scim-connection-sync.feature.
       await this.organization.assertRemovalKeepsAnAdministrator({
         organizationId: input.organizationId,
         userId: input.userId,

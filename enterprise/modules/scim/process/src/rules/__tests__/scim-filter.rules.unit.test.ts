@@ -15,7 +15,7 @@ describe("parseScimFilter", () => {
   });
 
   describe("when the filter names a supported attribute", () => {
-    /** @scenario "A user listing filtered by userName matches without regard to case" */
+    /** @scenario "Looking somebody up by their sign-in address still works" */
     it("returns the term under the spelling the listing uses", () => {
       expect(
         parseScimFilter({ filter: 'username eq "Ada@acme.test"', supported: ["userName"] }),
@@ -31,7 +31,7 @@ describe("parseScimFilter", () => {
   });
 
   describe("when the filter names an attribute the listing cannot match", () => {
-    /** @scenario "A user listing filtered by an unsupported attribute is refused" */
+    /** @scenario "A filter on something we do not support is refused" */
     it("refuses, naming the attribute and not the value", () => {
       const parsed = parseScimFilter({
         filter: 'emails.value eq "ada@acme.test"',
@@ -46,7 +46,7 @@ describe("parseScimFilter", () => {
   });
 
   describe("when the filter is richer than equality", () => {
-    /** @scenario "A group listing filtered by an unsupported expression is refused" */
+    /** @scenario "A group filter follows the same rule as a person filter" */
     it("refuses rather than half-honouring it", () => {
       for (const filter of [
         'displayName sw "Eng"',

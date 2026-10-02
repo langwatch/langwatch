@@ -3,7 +3,7 @@
  * The server half of `scimOversight.*`: the back office's directory-sync
  * oversight (ADR-122). Gated on the platform-operator grant (ops:* at the
  * platform tier), never an org-scoped RBAC permission, so no org role may widen
- * who may re-drive a customer's deprovision. specs/identity/scim-reconciliation-surfaces.feature
+ * who may re-drive a customer's deprovision. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import {
   defineTrpcRouter,

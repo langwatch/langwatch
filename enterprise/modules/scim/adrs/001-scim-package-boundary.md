@@ -4,7 +4,7 @@
 
 **Behavioural contract:** [Enterprise SCIM](../specs/scim.feature)
 
-**Related:** [SCIM group mapping](../../../../../specs/features/scim-group-mapping.feature), [SCIM token REST API](../../../../../specs/organizations/scim-tokens-rest-api.feature)
+**Related:** [SCIM group mapping](../specs/scim-group-mapping.feature), [SCIM token REST API](../../../../../specs/organizations/scim-tokens-rest-api.feature)
 
 ## Context
 

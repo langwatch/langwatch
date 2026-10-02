@@ -11,12 +11,6 @@ Feature: SCIM provisioning keeps directory and access in sync
   # scim-webhook-signature.rules.ts, identity/scim-sync-guards.service.ts
 
   @unit @unimplemented
-  Scenario: Deactivating a user through SCIM revokes their access
-    Given an active SCIM-provisioned user
-    When the directory patches them to inactive
-    Then they can no longer sign in and their grants are removed
-
-  @unit @unimplemented
   Scenario: A PATCH whose attribute casing differs from the schema still applies
     Given a directory that sends "Active" rather than "active"
     When the patch is applied
@@ -27,12 +21,6 @@ Feature: SCIM provisioning keeps directory and access in sync
     Given a user whose only project access comes from a SCIM group
     When the directory removes them from that group
     Then they lose that project access
-
-  @unit @unimplemented
-  Scenario: A SCIM webhook with an invalid signature is refused
-    Given a webhook body whose signature does not verify
-    When it is received
-    Then it is refused and no directory change is applied
 
   @unit @unimplemented
   Scenario: A SCIM write for a directory not connected to the organization is refused

@@ -397,7 +397,7 @@ describe("SCIM user parity", () => {
       );
     });
 
-    /** @scenario "Deactivating a user deprovisions them with the same proof" */
+    /** @scenario "Marking somebody inactive is a deprovision, not a flag" */
     it("routes a push of active false through the same proof before deactivating", async () => {
       const { writer, repo, service } = harness({
         membership: { user: user() },

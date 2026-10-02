@@ -2,7 +2,7 @@
 /**
  * @vitest-environment node
  * Identity says where each connection's sync stands, scoped to the asking
- * organization. Corresponds to specs/identity/scim-connection-sync.feature.
+ * organization. Corresponds to enterprise/modules/scim/specs/scim-connection-sync.feature.
  */
 import {
   emptyScimSync,

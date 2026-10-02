@@ -46,7 +46,7 @@ Feature: SCIM tokens REST API
   # token therefore names the connection it is for, and that naming is what
   # makes a cross-connection write impossible rather than merely discouraged.
   # What such a token may then do is
-  # specs/identity/scim-connection-sync.feature's; what this API says about
+  # enterprise/modules/scim/specs/scim-connection-sync.feature's; what this API says about
   # it is here. The two anchors above are untouched by any of it: the secret
   # is still shown exactly once, and listing still hands out no secrets.
 

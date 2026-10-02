@@ -12,7 +12,7 @@ Feature: Groups REST API
   # detail: a group the directory owns is edited by the directory or not at
   # all, whichever way its access is stored underneath. D08 moves the writes
   # a directory push makes onto the grants ledger and scopes its tokens per
-  # connection (specs/identity/scim-connection-sync.feature) - none of which
+  # connection (enterprise/modules/scim/specs/scim-connection-sync.feature) - none of which
   # changes any answer here. If one of these guards ever stops refusing, the
   # next sync silently reverts a customer's edit, which is the failure they
   # exist to prevent.

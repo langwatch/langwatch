@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * The operator's directory-sync surface: one more back-office list, with the
  * operator's depth. The router's gating is the server's, asserted in scim-process.
- * @see specs/identity/scim-reconciliation-surfaces.feature
+ * @see enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

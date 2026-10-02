@@ -8,7 +8,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # D08 (delivery plan Wave 3). The SCIM protocol surface does not change -
   # this is about what a token may reach, whose identity a push is about, and
   # what a removal has to prove. Group mapping keeps its own file
-  # (specs/features/scim-group-mapping.feature); the mint and revoke contract
+  # (enterprise/modules/scim/specs/scim-group-mapping.feature); the mint and revoke contract
   # keeps its own (specs/organizations/scim-tokens-rest-api.feature).
   #
   # SCIM becomes a COMMAND PRODUCER. The endpoints answer the same protocol
@@ -421,7 +421,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And neither could complete while anything still resolved for them
 
   # That a removal denies before the push returns, queue or no queue, is
-  # specs/features/scim-group-mapping.feature's and is unchanged by D08.
+  # enterprise/modules/scim/specs/scim-group-mapping.feature's and is unchanged by D08.
 
   @unit
   Scenario: A removal decision needing a person is surfaced, not guessed at
@@ -584,16 +584,6 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # A name reaches us as two halves and is stored as one string, so a directory
   # that patches one half is asking us to change that half and leave the other.
-  # Okta and Entra both patch one part at a time, over a dotted path carrying a
-  # plain string — the one spelling the handler used to skip entirely, answering
-  # 200 with the record untouched and filing it in the request log as accepted.
-
-  @unit
-  Scenario: A directory patches one half of a name with a dotted path
-    Given a person the directory provisioned as "Ada Lovelace"
-    When the directory patches only their surname to "Smith"
-    Then they are stored as "Ada Smith"
-    And the change is reported as applied rather than merely accepted
 
   @unit
   Scenario: A directory replaces both halves of a name at once

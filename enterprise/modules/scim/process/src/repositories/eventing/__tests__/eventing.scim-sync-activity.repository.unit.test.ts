@@ -99,7 +99,7 @@ describe("given a connection the directory pushed to and then failed on", () => 
   ];
 
   describe("when its activity is read", () => {
-    /** @scenario "Directory activity is read from the connection's sync log, newest first" */
+    /** @scenario "What the directory has been doing is listed newest first" */
     it("lists every fact newest first, with a failure marked refused", async () => {
       const { repository } = repositoryOver({ [ACME]: events });
 
@@ -135,7 +135,6 @@ describe("given a connection the directory pushed to and then failed on", () => 
   });
 
   describe("when another organization names the same connection", () => {
-    /** @scenario "Another organization's directory activity is never scanned" */
     /** @scenario "Another organization's directory activity is not there to read" */
     it("scans only the asking organization's tenant and finds nothing", async () => {
       const { repository, requestedTenants } = repositoryOver({ [ACME]: events });

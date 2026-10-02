@@ -84,7 +84,6 @@ describe("ScimDeprovisionService", () => {
   });
 
   /** @scenario "A removal that cannot prove itself empty fails loudly" */
-  /** @scenario "A deprovision that cannot prove itself empty fails loudly" */
   it("records a stable retryable failure when the proof refuses to commit", async () => {
     const grants = new GrantsFake();
     const lifecycle = new LifecycleFake();

@@ -10,7 +10,7 @@ Feature: SSO connection history - the raw events, read and live
   # ADR-117 §5 (D04) already event-sources every fact about a connection;
   # this is the first surface that reads the log itself rather than only the
   # folded projection. Unlike the SCIM request log (ADR-126,
-  # specs/identity/scim-request-log.feature), which is deliberately a TABLE
+  # enterprise/modules/scim/specs/scim-request-log.feature), which is deliberately a TABLE
   # because a request authors nothing, a connection's history is the log
   # itself: every entry is a fact the aggregate already states, so there is
   # no separate store, no retention sweep and no "we cannot attribute this"

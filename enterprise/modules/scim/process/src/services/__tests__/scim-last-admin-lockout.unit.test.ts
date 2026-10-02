@@ -6,7 +6,7 @@
  *
  * Both write paths ask, because the grants flag chooses HOW access is removed
  * and never whether the organization may be left with nobody to administer
- * it. specs/identity/scim-connection-sync.feature.
+ * it. enterprise/modules/scim/specs/scim-connection-sync.feature.
  */
 import type { ScimCreateUserRequest } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";

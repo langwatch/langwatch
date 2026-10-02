@@ -106,5 +106,5 @@ reason would be worse than saying it plainly.
   table that starts empty reads correctly, because "no requests recorded" and
   "no requests" are the same sentence on a surface that has just been turned
   on. Deleting the table is a no-op for every other surface.
-- Spec: `specs/identity/scim-reconciliation-surfaces.feature` (the feed, beside
-  ADR-122's scenarios) and `specs/identity/scim-request-log.feature`.
+- Spec: `enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature` (the feed, beside
+  ADR-122's scenarios) and `enterprise/modules/scim/specs/scim-request-log.feature`.
