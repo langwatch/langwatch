@@ -1,6 +1,5 @@
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
-import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Alert,
@@ -16,12 +15,25 @@ import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { useAgentListArchive } from "../../behavior/use-agent-list-archive.ts";
+import {
+  useAgentListArchive,
+  type AgentListArchiveOptions,
+} from "../../behavior/use-agent-list-archive.ts";
 import { AgentArchiveDialog } from "../blocks/agent-archive-dialog.tsx";
 import { agentTypeIcons, agentTypeLabels } from "../blocks/agent-card.tsx";
 
 type AgentWithFields = WireOf<StoredAgentWithFields>;
-export type AgentListDrawerProps = UiAgentListDrawerProps;
+/** What a caller hands agent's list drawer: the agents, as the browser receives them. */
+export type AgentListDrawerProps = AgentListArchiveOptions & {
+  open: boolean;
+  items: AgentWithFields[];
+  isLoading: boolean;
+  errorMessage?: string;
+  onClose: () => void;
+  onSelect(agent: AgentWithFields): void;
+  onEdit(agent: AgentWithFields): void;
+  onCreateNew: () => void;
+};
 
 export function AgentListDrawer(props: AgentListDrawerProps) {
   const isOpen = props.open;

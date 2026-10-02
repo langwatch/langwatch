@@ -2,25 +2,18 @@ import { clearTimeout, setTimeout } from "node:timers";
 
 import {
   type AgentCallSignal,
-  AgentBusyError,
-  AgentCallFailedError,
   AgentCallTimeoutError,
   AgentDisconnectedError,
   AgentOfflineError,
-  AgentPayloadTooLargeError,
-  BUSY_RETRY_AFTER_MS,
   CALL_KEY_SLACK_SECONDS,
   type CallEnvelope,
   type CallOutcome,
   FIRST_TURN_GRACE_MS,
   FIRST_TURN_POLL_MS,
   RESULT_POLL_MS,
-  STICKY_PIN_TTL_SECONDS,
   buildCallEnvelope,
   type InstanceNudge,
   type StoredCall,
-  type StoredResultError,
-  storedResultSchema,
 } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -35,9 +28,9 @@ import {
   callKey,
   instanceChannel,
   pendingKey,
-  resultKey,
   threadPinKey,
 } from "../rules/connected-agent-keys.rules.ts";
+import { ConnectedAgentAnswerService } from "./connected-agent-answer.service.ts";
 import type { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
 import { ConnectedAgentReplyService } from "./connected-agent-reply.service.ts";
 import { type DispatchParams, type LiveInstance } from "./connected-agent-runtime.service.ts";
@@ -72,6 +65,7 @@ export class ConnectedAgentDispatchService {
   readonly #firstTurnGraceMs: number;
   readonly #firstTurnPollMs: number;
   readonly #replies: ConnectedAgentReplyService;
+  readonly #answers: ConnectedAgentAnswerService;
 
   private constructor(options: CallDispatcherOptions) {
     this.#podId = options.podId;
@@ -84,6 +78,7 @@ export class ConnectedAgentDispatchService {
       store: options.store,
       pollMs: options.resultPollMs ?? RESULT_POLL_MS,
     });
+    this.#answers = ConnectedAgentAnswerService.create({ store: options.store });
   }
 
   start(): Promise<void> {
@@ -203,7 +198,7 @@ export class ConnectedAgentDispatchService {
     }
 
     const chosen = chooseInstance(live, call.threadId);
-    await this.#pinThread({
+    await this.#answers.pinThread({
       isSticky: agent.isSticky,
       pinKey,
       instanceId: chosen.instanceId,
@@ -229,20 +224,6 @@ export class ConnectedAgentDispatchService {
       now: now(),
     });
     return live.filter((instance) => !excluded.includes(instance.instanceId));
-  }
-
-  /** Holds a sticky thread on the instance that answers it. */
-  async #pinThread({
-    isSticky,
-    pinKey,
-    instanceId,
-  }: {
-    isSticky: boolean;
-    pinKey: string;
-    instanceId: string;
-  }): Promise<void> {
-    if (!isSticky) return;
-    await this.#store.set(pinKey, instanceId, STICKY_PIN_TTL_SECONDS);
   }
 
   /** Writes, nudges and waits for one call on one instance. */
@@ -303,15 +284,14 @@ export class ConnectedAgentDispatchService {
       });
       switch (outcome.kind) {
         case "result":
-          return await this.#readAnswer({ projectId, instance, envelope, isSticky });
+          return await this.#answers.read({ projectId, instance, envelope, isSticky });
         case "gone": {
           // The frame reached a socket. Whether the instance acknowledged it
           // or not, the function may have started, so the turn is not placed
           // again. A frame that never left says so through the result, which
           // `readAnswer` reads.
           await this.#retire({ projectId, instance, agentId: envelope.agentId });
-          const result = await this.#readResult({ projectId, callId });
-          if (result?.undelivered) return { kind: "retry" };
+          if (await this.#answers.isUndelivered({ projectId, callId })) return { kind: "retry" };
           return { kind: "disconnected" };
         }
         case "timeout":
@@ -370,61 +350,6 @@ export class ConnectedAgentDispatchService {
     );
   }
 
-  /** Reads a delivered result as the answer, a retry or a disconnect. */
-  async #readAnswer({
-    projectId,
-    instance,
-    envelope,
-    isSticky,
-  }: {
-    projectId: string;
-    instance: LiveInstance;
-    envelope: CallEnvelope;
-    isSticky: boolean;
-  }): Promise<
-    | { kind: "answered"; answer: Omit<CallOutcome, "durationMs"> }
-    | { kind: "retry" }
-    | { kind: "disconnected" }
-  > {
-    const { callId } = envelope;
-    const result = await this.#readResult({ projectId, callId });
-    if (result?.undelivered) {
-      // The frame never left the platform, so the function did not start.
-      return { kind: "retry" };
-    }
-    if (!result || result.disconnected) {
-      // The socket carried the call and then closed with no answer. The
-      // function may have run, so the turn is not placed on another
-      // instance.
-      return { kind: "disconnected" };
-    }
-    if (result.error) {
-      throw remoteError(result.error);
-    }
-    await this.#pinThread({
-      isSticky,
-      pinKey: threadPinKey(projectId, envelope.agentId, envelope.threadId),
-      instanceId: instance.instanceId,
-    });
-    return {
-      kind: "answered",
-      answer: {
-        output: result.output ?? "",
-        session: result.session,
-        instance: {
-          instanceId: instance.instanceId,
-          hostname: instance.hostname,
-          label: instance.label,
-        },
-      },
-    };
-  }
-
-  async #readResult({ projectId, callId }: { projectId: string; callId: string }) {
-    const raw = await this.#store.tryGet(resultKey(projectId, callId));
-    return raw ? findParsedFrame(storedResultSchema, raw) : null;
-  }
-
   /** Tells the instance to stop, and forgets the call. */
   async #cancel({
     projectId,
@@ -457,34 +382,6 @@ export class ConnectedAgentDispatchService {
       instanceId: instance.instanceId,
       agentIds: [agentId],
     });
-  }
-}
-
-/**
- * The error a result carries, as the handled error the caller reads.
- */
-function remoteError(error: StoredResultError): Error {
-  if (error.payload) {
-    return new AgentPayloadTooLargeError(error.payload);
-  }
-  if (error.code === "agent_busy") {
-    return new AgentBusyError({ retryAfterMs: BUSY_RETRY_AFTER_MS });
-  }
-  return new AgentCallFailedError({
-    remoteCode: error.code,
-    remoteMessage: error.message,
-  });
-}
-
-function findParsedFrame<T>(
-  schema: { safeParse: (raw: unknown) => { success: boolean; data?: T } },
-  raw: string,
-): T | null {
-  try {
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? (parsed.data as T) : null;
-  } catch {
-    return null;
   }
 }
 

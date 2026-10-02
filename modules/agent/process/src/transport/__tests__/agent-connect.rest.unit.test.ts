@@ -3,29 +3,17 @@ import {
   type AgentApi,
   type AgentConnectRegisterOutput,
 } from "@langwatch/agent-contract";
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import type { RestCaller } from "@langwatch/api/hosting";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature
  */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
-
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message, ...error.meta },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: "internal_server_error", message: "Internal server error" }, 500);
-};
 
 function buildApi({
   relayMaxPayloadMb,
@@ -41,7 +29,7 @@ function buildApi({
     "/",
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
-      onError: renderRefusal,
+      onError: canonicalErrorResponse,
       facts: [
         bindRestMiddleware(agentConnectHeaders, (context) => ({
           authorization: context.req.header("authorization"),
@@ -111,9 +99,9 @@ describe("registerConnectedAgentInstance", () => {
     });
 
     expect(response.status).toBe(status);
-    const body = (await response.json()) as { error: string; frame?: unknown };
-    expect(body.error).toBe("agent_register_refused");
-    expect(body.frame).toEqual(refusedFrame);
+    const body = (await response.json()) as { code: string; meta?: { frame?: unknown } };
+    expect(body.code).toBe("agent_register_refused");
+    expect(body.meta?.frame).toEqual(refusedFrame);
   });
 
   it("answers a registered frame and instance token with HTTP 200", async () => {
@@ -175,7 +163,7 @@ describe("registerConnectedAgentInstance", () => {
         });
         const body = (await response.json()) as { error?: string; target?: string };
 
-        expect(body).toMatchObject({ error: "validation_error", target: "json" });
+        expect(body).toMatchObject({ code: "validation_error", meta: { target: "json" } });
         expect(framesSpy).not.toHaveBeenCalled();
       });
     });
@@ -198,7 +186,7 @@ describe("registerConnectedAgentInstance", () => {
           message?: string;
         };
 
-        expect(body.error).toBe("agent_payload_too_large");
+        expect(body.code).toBe("agent_payload_too_large");
         expect(body.message).toMatch(/limit of 2096 bytes/);
         expect(body.message).not.toContain(String(oversized.length));
         expect(framesSpy).not.toHaveBeenCalled();

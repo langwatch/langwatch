@@ -1,10 +1,17 @@
-import type { RelatedAgentEntities } from "@langwatch/agent-contract";
-import type { UiAgentListArchiveOptions } from "@langwatch/browser-host/drawer";
+import type { AgentCascadeArchive, RelatedAgentEntities } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import { useEffect, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
 
-export type AgentListArchiveOptions = UiAgentListArchiveOptions;
+/** The archive flow agent's list drawer runs for the agent it is asked to delete. */
+export type AgentListArchiveOptions = {
+  onGetRelated: (agentId: string) => Promise<RelatedAgentEntities>;
+  onDelete(agentId: string): Promise<void>;
+  onCascadeArchive(agentId: string): Promise<WireOf<AgentCascadeArchive>>;
+  onArchived(workflowArchived: boolean): void;
+  onError: (error: unknown) => void;
+};
 
 export function useAgentListArchive(props: AgentListArchiveOptions) {
   const [agentToDelete, setAgentToDelete] = useState<AgentBrowser | null>(null);

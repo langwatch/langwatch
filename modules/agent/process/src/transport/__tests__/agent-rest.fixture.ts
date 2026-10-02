@@ -1,10 +1,11 @@
 import type { Agent, AgentApi, AgentType } from "@langwatch/agent-contract";
+import type { RestCaller } from "@langwatch/api/hosting";
 import {
   bindRestMiddleware,
   createRestRuntime,
   defineRestMiddleware,
   projectRestFacts,
-  type RestErrorHandler,
+  canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -16,14 +17,12 @@ import { Hono } from "hono";
  * `/api/agents` alias, mounted the way `apps/api/src/features/agent/agent-rest.mount.ts`
  * mounts them: one `createRestRuntime`, one door per family, real handlers.
  */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
 import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -37,17 +36,6 @@ class ForbiddenTestError extends HandledError {
     super("forbidden", "Missing permission", { httpStatus: 403 });
   }
 }
-
-/** The flat legacy envelope this family has always published. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message, ...error.meta },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: "internal_server_error", message: "Internal server error" }, 500);
-};
 
 export async function buildAgentApps(
   options: {
@@ -87,7 +75,7 @@ export async function buildAgentApps(
   }
 
   const agents = () => app as AgentApi;
-  const onError = renderRefusal;
+  const onError = canonicalErrorResponse;
   // Every request authenticates as the same project and person; a route's
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({

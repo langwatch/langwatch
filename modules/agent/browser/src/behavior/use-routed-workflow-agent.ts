@@ -1,11 +1,11 @@
 import { findLinkedWorkflowIds, type Field } from "@langwatch/agent-contract";
-import type { UiWorkflowAgentEditorOptions } from "@langwatch/browser-host/drawer";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { getMappingSurfaceInputs, studioWorkflowSchema } from "@langwatch/workflow-contract";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { agentApi } from "./agent-api.ts";
+import type { WorkflowAgentEditorOptions } from "./use-workflow-agent-editor.ts";
 
 const textField = (identifier: string): Field => ({ identifier, type: "str" });
 
@@ -48,7 +48,7 @@ export function useRoutedWorkflowAgent({
   const update = agentApi.agents.update.useMutation();
   const { inputs, outputs } = workflowFields(workflowQuery.data?.currentVersion?.dsl);
 
-  const options: UiWorkflowAgentEditorOptions = {
+  const options: WorkflowAgentEditorOptions = {
     open: true,
     ...(agentQuery.data ? { agent: agentQuery.data } : {}),
     isLoading: agentQuery.isLoading || (Boolean(workflowId) && workflowQuery.isLoading),

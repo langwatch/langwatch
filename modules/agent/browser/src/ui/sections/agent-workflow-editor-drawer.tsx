@@ -1,7 +1,4 @@
-import type {
-  UiAgentWorkflowEditorDrawerProps,
-  UiAgentWorkflowMappingProps,
-} from "@langwatch/browser-host/drawer";
+import type { AgentInputBinding, Field as WorkflowField } from "@langwatch/agent-contract";
 import {
   Box,
   Button,
@@ -14,12 +11,29 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { useWorkflowAgentEditor } from "../../behavior/use-workflow-agent-editor.ts";
+import {
+  useWorkflowAgentEditor,
+  type WorkflowAgentEditorOptions,
+} from "../../behavior/use-workflow-agent-editor.ts";
 
-export type AgentWorkflowMappingProps = UiAgentWorkflowMappingProps;
+/** What agent's workflow editor hands the caller's mapping section. */
+export type AgentWorkflowMappingProps = {
+  inputs: WorkflowField[];
+  outputs: WorkflowField[];
+  mappings: Record<string, AgentInputBinding>;
+  outputField?: string;
+  onMappingChange(identifier: string, mapping: AgentInputBinding | undefined): void;
+  onOutputFieldChange(field: string | undefined): void;
+};
 
-export type AgentWorkflowEditorDrawerProps = UiAgentWorkflowEditorDrawerProps;
+/** What a caller hands agent's workflow editor drawer. */
+export type AgentWorkflowEditorDrawerProps = WorkflowAgentEditorOptions & {
+  workflowCard?: ReactNode;
+  renderMappings(props: AgentWorkflowMappingProps): ReactNode;
+  onGoBack?: () => void;
+};
 
 export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps) {
   const form = useWorkflowAgentEditor(props);

@@ -1,28 +1,16 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { RestCaller } from "@langwatch/api/hosting";
 /**
  * @vitest-environment node
  * `POST /api/v1/agents/connect/frames`: refused before the transport (ADR-128).
  * @see specs/agents/connected-agents.feature
  */
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
-
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message, ...error.meta },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: "internal_server_error", message: String(error) }, 500);
-};
 
 function buildApi(relayMaxPayloadMb?: number) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
@@ -35,7 +23,7 @@ function buildApi(relayMaxPayloadMb?: number) {
     "/",
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
-      onError: renderRefusal,
+      onError: canonicalErrorResponse,
       facts: [
         bindRestMiddleware(agentConnectHeaders, (context) => ({
           authorization: context.req.header("authorization"),
@@ -69,7 +57,7 @@ describe("POST /connect/frames", () => {
 
       expect(response.status).toBe(422);
       const body = (await response.json()) as { error?: string; target?: string };
-      expect(body).toMatchObject({ error: "validation_error", target: "json" });
+      expect(body).toMatchObject({ code: "validation_error", meta: { target: "json" } });
       expect(framesSpy).not.toHaveBeenCalled();
     });
   });
@@ -96,8 +84,8 @@ describe("POST /connect/frames", () => {
       });
 
       expect(response.status).toBe(413);
-      const body = (await response.json()) as { error: string; message: string };
-      expect(body.error).toBe("agent_payload_too_large");
+      const body = (await response.json()) as { code: string; message: string };
+      expect(body.code).toBe("agent_payload_too_large");
       // The cap stopped the read, so the message names only the limit —
       // never a measured size, which the cap never let it weigh.
       expect(body.message).toMatch(/^The result is above the limit of \d+ bytes\.$/);

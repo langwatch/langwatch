@@ -4,12 +4,13 @@ import {
   AgentOwnerOnlyError,
   type AgentApi,
 } from "@langwatch/agent-contract";
+import type { RestCaller } from "@langwatch/api/hosting";
 import {
   bindRestMiddleware,
   createRestRuntime,
   defineRestMiddleware,
   projectRestFacts,
-  type RestErrorHandler,
+  canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -18,12 +19,10 @@ import { Hono } from "hono";
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature
  */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -34,16 +33,6 @@ class ForbiddenTestError extends HandledError {
     super("forbidden", "forbidden", { httpStatus: 403 });
   }
 }
-
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message, ...error.meta },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: "internal_server_error", message: "Internal server error" }, 500);
-};
 
 const PROJECT_ID = "project-1";
 
@@ -75,7 +64,7 @@ function buildApi(
     "/",
     runtime.mount(createAgentRest(options.relayMaxPayloadMb).router(), {
       app: () => app,
-      onError: renderRefusal,
+      onError: canonicalErrorResponse,
       facts: [
         bindRestMiddleware(projectRestFacts, () => ({
           projectSlug: "project-one",
@@ -109,7 +98,7 @@ describe("the connected-agent call boundary", () => {
     });
 
     expect(response.status).toBe(413);
-    expect(await response.json()).toMatchObject({ error: "agent_payload_too_large" });
+    expect(await response.json()).toMatchObject({ code: "agent_payload_too_large" });
     expect(call).not.toHaveBeenCalled();
   });
 
@@ -183,7 +172,7 @@ describe("the connected-agent call boundary", () => {
     });
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ error: "agent_owner_only" });
+    expect(await response.json()).toMatchObject({ code: "agent_owner_only" });
     expect(call.mock.calls[0]?.[0]).not.toHaveProperty("viewerUserId");
     expect(call.mock.calls[0]?.[1]).toMatchObject({ viewerUserId: "u_2" });
   });

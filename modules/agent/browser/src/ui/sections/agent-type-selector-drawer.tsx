@@ -1,4 +1,3 @@
-import type { UiAgentTypeSelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, Cable, Code, Globe, Mic, Workflow } from "lucide-react";
@@ -8,7 +7,16 @@ import type { NewAgentType } from "../../model/new-agent-drawer.ts";
 
 export type AgentType = NewAgentType;
 
-export type AgentTypeSelectorDrawerProps = UiAgentTypeSelectorDrawerProps;
+/** What a caller hands agent's type selector drawer. */
+export type AgentTypeSelectorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onGoBack?: () => void;
+  canGoBack?: boolean;
+  onSelect?: (type: NewAgentType) => void;
+  /** Where "Connect from Code" goes; opened by address, it navigates to the connect drawer. */
+  onConnectFromCode?: () => void;
+};
 
 const agentTypes: {
   type: AgentType;

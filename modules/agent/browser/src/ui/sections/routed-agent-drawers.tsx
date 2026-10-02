@@ -2,10 +2,8 @@
  * The drawers the address bar opens, each wired to what it reads so it needs no caller
  * (main's #3193; ARCHITECTURE.md: drawers are URL-routed singletons that navigate).
  */
-import type {
-  UiAgentEditorDrawerProps,
-  UiWorkflowSelectorDrawerProps,
-} from "@langwatch/browser-host/drawer";
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -33,6 +31,17 @@ import { ConnectedAgentDrawer } from "./connected-agent-drawer.tsx";
 import { WorkflowSelectorDrawer } from "./workflow-selector-drawer.tsx";
 import { RenderCode } from "./workflow/code/render-code.tsx";
 import { EmojiPickerModal } from "./workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
+
+/** What a caller hands agent's HTTP or code editor: the agent to edit, and where a save goes. */
+export type AgentEditorDrawerProps = {
+  agentId?: string;
+  onSave?: (agent: WireOf<AgentWithFields>) => void;
+};
+
+/** What a caller hands agent's workflow selector drawer: where the agent it creates goes. */
+export type WorkflowSelectorDrawerProps = {
+  onSave?: (agent: WireOf<AgentWithFields>) => void;
+};
 
 export function RoutedConnectedAgentDrawer({ agentId }: { agentId?: string }) {
   const { close } = useRoutedDrawer();
@@ -62,7 +71,7 @@ export function RoutedConnectFromCodeDrawer() {
   );
 }
 
-export function RoutedWorkflowSelectorDrawer({ onSave }: UiWorkflowSelectorDrawerProps) {
+export function RoutedWorkflowSelectorDrawer({ onSave }: WorkflowSelectorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const [defaultIcon] = useState(getRandomWorkflowIcon);
   const workflowAgent = useCreateWorkflowAgent({ onSave });
@@ -79,7 +88,7 @@ export function RoutedWorkflowSelectorDrawer({ onSave }: UiWorkflowSelectorDrawe
   );
 }
 
-export function RoutedAgentHttpEditorDrawer({ agentId, onSave }: UiAgentEditorDrawerProps) {
+export function RoutedAgentHttpEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const http = useRoutedHttpAgent({ agentId, onSave, close, ...(goBack ? { goBack } : {}) });
   return (
@@ -115,7 +124,7 @@ const CodeEditorModalHost: WorkflowCodeEditorModalHost = ({ open, onRequestClose
   </Dialog.Root>
 );
 
-export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: UiAgentEditorDrawerProps) {
+export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const code = useRoutedCodeAgent({ agentId, onSave, close });
   return (
@@ -152,7 +161,7 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: UiAgentEditorDr
 
 // ponytail: mapping sections and the workflow card live in other modules' browsers; until one is
 // lent as a capability these drawers draw no mapping editor (saved mappings keep their defaults).
-export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: UiAgentEditorDrawerProps) {
+export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const workflow = useRoutedWorkflowAgent({ agentId, close, ...(onSave ? { onSave } : {}) });
   return (
