@@ -163,26 +163,25 @@ function createInstantEvalClassifier(): InstantEvalClassifier {
   }
   // The key is read again only so the type narrows: the route is `own_key`
   // exactly when it is set.
-  if (route !== "own_key" || !apiKey) {
-    if (route === "disconnected") {
-      logger.info(
-        "No Instant Evals classifier is configured; judged columns will be skipped",
-      );
-    }
-    return new NullInstantEvalClassifier();
+  if (route === "own_key" && apiKey) {
+    return new JevInstantEvalClassifier({
+      apiKey,
+      ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),
+      // `jev-latest` is the name the API accepts and is what it resolves to a
+      // concrete version (`jev-1.13.0` as of September 2026); a version
+      // spelled out, such as `jev-1.13`, is refused as an unknown model. This
+      // is here so a deployment can pin whatever concrete name the provider
+      // later publishes without a release.
+      ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
+      limiter: createInstantEvalRateLimiter(),
+    });
   }
-
-  return new JevInstantEvalClassifier({
-    apiKey,
-    ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),
-    // `jev-latest` is the name the API accepts and is what it resolves to a
-    // concrete version (`jev-1.13.0` as of September 2026); a version spelled
-    // out, such as `jev-1.13`, is refused as an unknown model. This is here so
-    // a deployment can pin whatever concrete name the provider later publishes
-    // without a release.
-    ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
-    limiter: createInstantEvalRateLimiter(),
-  });
+  if (route === "disconnected") {
+    logger.info(
+      "No Instant Evals classifier is configured; judged columns will be skipped",
+    );
+  }
+  return new NullInstantEvalClassifier();
 }
 
 /** The shared limiter, sized from the environment. */
