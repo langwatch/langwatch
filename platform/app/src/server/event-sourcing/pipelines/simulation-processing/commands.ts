@@ -5,6 +5,7 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunMetadataRefreshedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -120,6 +121,27 @@ export const RecordCutAtLimitCommand = defineCommand({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
+});
+export const RefreshMetadataCommand = defineCommand({
+  commandType: "lw.simulation_run.refresh_metadata",
+  eventType: "lw.simulation_run.metadata_refreshed",
+  eventVersion: "2026-09-18",
+  aggregateType: "simulation_run",
+  schema: simulationRunMetadataRefreshedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  // Keyed on the attempt that wrote it, NOT on the run and NOT on occurredAt.
+  // A per-run key like recordCutAtLimit's would dedupe a second refresh
+  // carrying different values, which is exactly the retry this event exists to
+  // land (#8032). occurredAt is the call's end time, identical across every
+  // re-drive of one call, so it would collapse them the same way. A retry of
+  // the same attempt re-sends the same attemptId and still dedupes.
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.attemptId}`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:refresh-metadata:${d.attemptId}`,
 });
 
 export const CancelRunCommand = defineCommand({

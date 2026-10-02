@@ -10,6 +10,7 @@ import {
   RecordAgentInstanceCommand,
   RecordCutAtLimitCommand,
   RecordEvaluationsCommand,
+  RefreshMetadataCommand,
   StartRunCommand,
   TextMessageEndCommand,
   TextMessageStartCommand,
@@ -109,6 +110,8 @@ export interface SimulationProcessingPipelineDeps {
  *   the connected agent instance that served the run
  * - recordCutAtLimit: Emits SimulationRunCutAtLimitRecordedEvent when the run
  *   was ended at the maximum call duration (AC28)
+ * - refreshMetadata: Emits SimulationRunMetadataRefreshedEvent when a later
+ *   attempt at a run carries metadata the first attempt could not (#8032)
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
@@ -186,6 +189,7 @@ export function createSimulationProcessingPipeline(
     )
     .withCommand("recordAgentInstance", RecordAgentInstanceCommand)
     .withCommand("recordCutAtLimit", RecordCutAtLimitCommand)
+    .withCommand("refreshMetadata", RefreshMetadataCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance(

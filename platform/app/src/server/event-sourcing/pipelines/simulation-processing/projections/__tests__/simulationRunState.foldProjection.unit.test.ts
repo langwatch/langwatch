@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
+import { deduplicateEvents } from "../../../../stores/eventStoreUtils";
+import { RefreshMetadataCommand } from "../../commands";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -11,6 +13,7 @@ import type {
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
+  SimulationRunMetadataRefreshedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
   SimulationTextMessageEndEvent,
@@ -118,6 +121,29 @@ function createRunFinishedEvent(
     version: SIMULATION_EVENT_VERSIONS.FINISHED,
     data: {
       scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createMetadataRefreshedEvent(
+  overrides: Partial<SimulationRunMetadataRefreshedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunMetadataRefreshedEvent> = {},
+): SimulationRunMetadataRefreshedEvent {
+  return {
+    id: "event-metadata-refreshed",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 3000,
+    occurredAt: 3000,
+    type: SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
+    version: SIMULATION_EVENT_VERSIONS.METADATA_REFRESHED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      attemptId: "attempt-1",
+      metadata: {},
       ...overrides,
     },
     ...eventOverrides,
@@ -333,28 +359,40 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
-  describe("when a finish is re-driven after a second started event", () => {
-    /** @scenario "A re-driven finish keeps the first attempt's metadata" */
-    it("keeps the first started event's metadata and reaches finished with the snapshot's messages", () => {
+  describe("when a re-drive refreshes the run's metadata", () => {
+    /** @scenario "A re-driven finish refreshes the run's metadata to the second attempt" */
+    it("takes the refresh event's fields over the first attempt's and keeps the run's other metadata", () => {
       const state = foldEvents([
         createRunStartedEvent(
           {
-            metadata: { source: "browser", langwatch: { targetType: "voice" } },
+            metadata: {
+              source: "browser",
+              agentId: "agent_row_1",
+              langwatch: { targetType: "voice", callerKind: "human" },
+            },
           },
           { id: "event-started-1", occurredAt: 1000 },
         ),
+        // The retry's second started event is first-wins in the fold and, in
+        // production, deduped by the per-run start idempotency key — it cannot
+        // carry the new fields. The refresh event does.
         createRunStartedEvent(
-          {
-            metadata: {
-              source: "provider",
-              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
-            },
-          },
+          { metadata: { source: "provider" } },
           { id: "event-started-2", occurredAt: 1500 },
         ),
         createMessageSnapshotEvent({
           messages: [{ role: "user", content: "hello" }],
         }),
+        createMetadataRefreshedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              langwatch: { isCutAtLimit: false },
+            },
+          },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
         createRunFinishedEvent({
           results: {
             verdict: "success",
@@ -365,18 +403,205 @@ describe("simulationRunStateFoldProjection", () => {
         }),
       ]);
 
-      // The first started event's metadata wins: the re-drive does not
-      // overwrite it with the second attempt's fields (#7973).
+      // The second attempt's fields win through the refresh (#8032): a
+      // "browser, no recording" first attempt becomes the "provider, with
+      // audio" the retry actually saw, so `findExistingRun` reads it back
+      // correctly on any later retry.
       const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
-      expect(metadata.source).toBe("browser");
-      expect(metadata.langwatch).toEqual({ targetType: "voice" });
-      expect(metadata).not.toHaveProperty("audioUrl");
+      expect(metadata.source).toBe("provider");
+      expect(metadata.audioUrl).toBe(
+        "/api/voice/session/conv_1/audio?projectId=p1",
+      );
+      // The run's other top-level metadata is left as it was — only the keys
+      // the refresh carried are touched.
+      expect(metadata.agentId).toBe("agent_row_1");
+      // The reserved namespace is deep-merged, not replaced: the refresh's
+      // isCutAtLimit lands beside the run's targetType / callerKind.
+      expect(metadata.langwatch).toEqual({
+        targetType: "voice",
+        callerKind: "human",
+        isCutAtLimit: false,
+      });
 
       expect(state.Status).toBe("SUCCESS");
       expect(state.FinishedAt).toBe(3000);
       expect(state.Messages).toHaveLength(1);
       expect(state.Messages[0]?.Role).toBe("user");
       expect(state.Messages[0]?.Content).toBe("hello");
+    });
+
+    /** @scenario "A metadata refresh does not disturb the run's terminal status" */
+    it("leaves a finished run finished", () => {
+      const state = foldEvents([
+        createRunStartedEvent(
+          { metadata: { source: "browser" } },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createRunFinishedEvent(
+          {
+            results: {
+              verdict: "success",
+              reasoning: "done",
+              metCriteria: [],
+              unmetCriteria: [],
+            },
+          },
+          { id: "event-finished", occurredAt: 2000 },
+        ),
+        createMetadataRefreshedEvent(
+          { metadata: { source: "provider" } },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+      ]);
+
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.FinishedAt).toBe(2000);
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.source).toBe("provider");
+    });
+
+    /** @scenario "A re-drive that lost its recording clears the run's audio link" */
+    it("clears a stale audioUrl when the refresh carries null", () => {
+      const state = foldEvents([
+        // The first attempt had a recording and wrote its proxy url.
+        createRunStartedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              langwatch: { targetType: "voice" },
+            },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        // The retry has no recording, so its refresh carries audioUrl: null.
+        createMetadataRefreshedEvent(
+          {
+            metadata: {
+              source: "browser",
+              audioUrl: null,
+              langwatch: { isCutAtLimit: false },
+            },
+          },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "done",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      // The stale link is gone: the run must not offer a Play control for a
+      // recording the latest attempt does not have (#8032).
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.audioUrl).toBeNull();
+      expect(metadata.source).toBe("browser");
+      // The reserved namespace is still deep-merged, not dropped.
+      expect(metadata.langwatch).toEqual({
+        targetType: "voice",
+        isCutAtLimit: false,
+      });
+    });
+
+    /** @scenario "Two re-drives at the same end time each keep their own refresh" */
+    it("keeps the later re-drive's refresh on a refold when both share the call's end time", () => {
+      // Two re-drives of one finished call: same end time, different recording
+      // metadata. Built through the real command so the idempotency key is the
+      // one the event log dedupes on.
+      const CALL_ENDED_AT = 2000;
+      const refreshFrom = ({
+        attemptId,
+        writtenAt,
+        audioUrl,
+      }: {
+        attemptId: string;
+        writtenAt: number;
+        audioUrl: string | null;
+      }) => {
+        vi.setSystemTime(writtenAt);
+        const [event] = new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: CALL_ENDED_AT,
+            scenarioRunId: "scenario-run-1",
+            attemptId,
+            metadata: { source: "provider", audioUrl },
+          },
+        } as never);
+        return event as SimulationRunMetadataRefreshedEvent;
+      };
+      // The first re-drive found no recording; its finish then failed, and a
+      // second re-drive found the provider recording.
+      const firstRedrive = refreshFrom({
+        attemptId: "attempt-a",
+        writtenAt: 5000,
+        audioUrl: null,
+      });
+      const secondRedrive = refreshFrom({
+        attemptId: "attempt-b",
+        writtenAt: 6000,
+        audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+      });
+
+      // Replay the event log the way a refold does: dedupe on the
+      // idempotency key, then fold in occurredAt-then-arrival order.
+      const log = [
+        createRunStartedEvent(
+          {
+            metadata: { source: "browser", langwatch: { targetType: "voice" } },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        firstRedrive,
+        secondRedrive,
+      ];
+      const replayed = deduplicateEvents(log as SimulationProcessingEvent[]);
+
+      // Both refreshes survive the dedupe: they are different attempts.
+      expect(
+        replayed.filter(
+          (e) => e.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
+        ),
+      ).toHaveLength(2);
+
+      const state = foldEvents(replayed);
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      // The latest attempt's recording is what the run shows (#8032).
+      expect(metadata.audioUrl).toBe(
+        "/api/voice/session/conv_1/audio?projectId=p1",
+      );
+    });
+
+    it("still dedupes a retry of the same attempt", () => {
+      const handleOnce = () =>
+        new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: 2000,
+            scenarioRunId: "scenario-run-1",
+            attemptId: "attempt-a",
+            metadata: { source: "provider" },
+          },
+        } as never)[0]!;
+
+      const [original, retried] = [handleOnce(), handleOnce()];
+
+      expect(retried.idempotencyKey).toBe(original.idempotencyKey);
+      expect(deduplicateEvents([original, retried])).toHaveLength(1);
     });
   });
 
