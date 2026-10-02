@@ -154,10 +154,15 @@ const SELF_HOSTED_REFUSAL_COPY: Record<
   },
 };
 
-function isSelfHostedRefusal(
-  kind: InstantEvalRefusal["kind"],
+/**
+ * Whether a refusal kind, or the server's offer it came from, is one of the
+ * self-hosted ones. The copy record above is the one list of them, so the
+ * route hook asks here rather than keeping a second.
+ */
+export function isSelfHostedRefusal(
+  kind: string | undefined,
 ): kind is SelfHostedInstantEvalOffer {
-  return Object.hasOwn(SELF_HOSTED_REFUSAL_COPY, kind);
+  return kind !== undefined && Object.hasOwn(SELF_HOSTED_REFUSAL_COPY, kind);
 }
 
 /**

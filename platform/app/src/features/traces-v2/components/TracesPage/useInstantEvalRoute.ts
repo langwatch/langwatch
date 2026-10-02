@@ -1,10 +1,7 @@
 import { type MutableRefObject, useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { explainAnyError, readHandledError } from "~/features/errors";
-import type {
-  InstantEvalOptInOffer,
-  SelfHostedInstantEvalOffer,
-} from "~/server/app-layer/instant-evals/opt-in";
+import type { InstantEvalOptInOffer } from "~/server/app-layer/instant-evals/opt-in";
 import type { InstantEvalSearchTarget } from "~/server/app-layer/traces/ai-query";
 import {
   instantEvalChipText,
@@ -16,7 +13,10 @@ import type { ModelTrouble } from "~/server/app-layer/traces/search-router/contr
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalConfirmation } from "./InstantEvalConfirmDialog";
-import type { InstantEvalRefusal } from "./InstantEvalRefusalPopover";
+import {
+  type InstantEvalRefusal,
+  isSelfHostedRefusal,
+} from "./InstantEvalRefusalPopover";
 
 /**
  * What the search router hands over when Enter on a sentence is a judgement
@@ -367,32 +367,11 @@ function bailUnreleased({
     outcome.setRefusal({ kind: "ask_admin" });
     return;
   }
-  if (isSelfHostedOffer(optInOffer)) {
+  if (isSelfHostedRefusal(optInOffer)) {
     outcome.setRefusal({ kind: optInOffer });
     return;
   }
   outcome.setRefusal({ kind: "unreleased" });
-}
-
-/**
- * The offers a self-hosted install is refused with, each its own popover.
- *
- * Keyed by the server's type rather than imported from it, because the
- * module that declares it is server code: a record over the union makes the
- * typecheck fail on an offer added there and not here, or kept here and
- * dropped there.
- */
-const SELF_HOSTED_OFFERS: Record<SelfHostedInstantEvalOffer, true> = {
-  not_in_license: true,
-  switched_off: true,
-  not_connected: true,
-  ask_operator: true,
-};
-
-function isSelfHostedOffer(
-  offer: InstantEvalOptInOffer | undefined,
-): offer is SelfHostedInstantEvalOffer {
-  return offer !== undefined && Object.hasOwn(SELF_HOSTED_OFFERS, offer);
 }
 
 /** Confirms or abandons the run sitting in the dialog. */
