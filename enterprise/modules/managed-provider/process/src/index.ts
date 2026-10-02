@@ -6,4 +6,4 @@ export {
 export { HttpManagedProviderCredentialsChannel } from "./channels/http/http.managed-provider-credentials.channel.ts";
 export { MemoryManagedProviderCredentialsChannel } from "./channels/memory/memory.managed-provider-credentials.channel.ts";
 export { managedProviderCredentialsChannels } from "./channels/managed-provider-credentials-channels.registry.ts";
-export { createManagedProviderService, managedProviderProcessModule } from "./managed-provider.module.ts";
+export { managedProviderProcessModule } from "./managed-provider.module.ts";
