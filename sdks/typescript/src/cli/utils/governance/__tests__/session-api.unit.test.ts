@@ -12,7 +12,11 @@ vi.mock("../config", () => ({
 
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
-import { fetchPersonalProject, mintProjectFullAccessKey, mintProjectIngestionKey } from "../session-api";
+import {
+  fetchPersonalProject,
+  mintProjectFullAccessKey,
+  mintProjectIngestionKey,
+} from "../session-api";
 
 const liveSession = (): GovernanceConfig =>
   ({

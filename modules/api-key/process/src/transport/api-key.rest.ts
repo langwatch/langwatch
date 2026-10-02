@@ -249,8 +249,8 @@ const isIngestionShape = ({
 };
 
 /**
- * The one shape a person's project session may mint as its full-access key: personal, their own, one
- * ADMIN binding to that project, every permission, capped at the person's own access there.
+ * The one shape a person's project session may mint as its full-access key: personal, their own,
+ * one ADMIN binding to that project, every permission, capped at the person's own access there.
  */
 const isFullAccessShape = ({
   input,
@@ -277,7 +277,7 @@ const isFullAccessShape = ({
   );
 };
 
-/** The person a full-access key is minted for, or the refusal: a person's session, the one shape. */
+/** Who a full-access key is minted for, or the refusal: a person's session, the one shape. */
 const fullAccessKeyOwner = ({
   principal,
   input,
