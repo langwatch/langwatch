@@ -1,4 +1,3 @@
-import type { UiEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import { describe, expect, it } from "vitest";
 
 import { defineBrowserModule, installedDrawerLoaders } from "../src/index.ts";
@@ -13,7 +12,7 @@ const trace = defineBrowserModule("trace").withDrawers({
 
 const evaluator = defineBrowserModule("evaluator").withDrawers({
   evaluatorEditor: {
-    load: () => Promise.resolve({ default: (_props: UiEvaluatorEditorDrawerProps) => null }),
+    load: () => Promise.resolve({ default: () => null }),
   },
 });
 

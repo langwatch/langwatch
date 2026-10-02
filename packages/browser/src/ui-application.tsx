@@ -24,6 +24,8 @@ import {
 import { createUiRootLayout } from "./ui-root-layout.tsx";
 import type { UiRouteDescriptor, UiShellLayout } from "./ui-route-descriptor.ts";
 import { createUiRouteObjects } from "./ui-route-objects.tsx";
+import type { UiFailureInterceptor } from "./ui-feature.ts";
+import type { SupplyModule } from "./web-module.ts";
 
 export type UiApplicationInstall = {
   providers: UiOuterProviderInstall & UiInnerProviderInstall;
@@ -95,4 +97,11 @@ export function createUiApplication({
       rootErrorBoundary: pages.rootErrorBoundary,
     }),
   };
+}
+
+/** Every installed module's failure interceptors, in install order (`features.failures`). */
+export function installedModuleFailures(
+  modules: readonly SupplyModule[],
+): readonly UiFailureInterceptor[] {
+  return modules.flatMap((module) => module.installation.failureInterceptors);
 }

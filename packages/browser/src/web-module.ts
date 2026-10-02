@@ -13,6 +13,7 @@ import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
 import type { ComponentType } from "react";
 import type { output, ZodType } from "zod";
 
+import type { UiFailureInterceptor } from "./ui-feature.ts";
 import type { Merge } from "./ui-supply.types.ts";
 
 type Empty = Record<never, never>;
@@ -124,7 +125,8 @@ export type WebModuleInstallation = Readonly<{
   api?: unknown;
   /** The contracts whose cache policies the api's reads follow. */
   apiContracts?: readonly CacheDeclaringContract[];
-  failureInterceptors: readonly unknown[];
+  /** Read as `features.failures`: each runs over every failed mutation (ARCHITECTURE.md). */
+  failureInterceptors: readonly UiFailureInterceptor[];
 }>;
 
 type RequirementFields<Names extends UiSupplyName> = Readonly<{
@@ -373,20 +375,11 @@ export class WebModule<
     return this.#next({ ...this.#installation, mounts });
   }
 
-  withFailureInterceptors<const Interceptors extends readonly unknown[]>(
-    failureInterceptors: Interceptors,
-  ): WebModule<
-    Name,
-    Merge<Requirements, RequirementFields<"feedback">>,
-    Config,
-    Declaration,
-    Precise
-  > {
-    return this.#next({
-      ...this.#installation,
-      failureInterceptors,
-      requirements: mergeNames(this.#installation.requirements, ["feedback"]),
-    });
+  withFailureInterceptors(
+    failureInterceptors: readonly UiFailureInterceptor[],
+  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
+    // Requires no supply: the shell hands each interceptor its `UiFailureHost`.
+    return this.#next({ ...this.#installation, failureInterceptors });
   }
 
   #next<
