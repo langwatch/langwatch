@@ -21,7 +21,7 @@ import {
 } from "../openapi-document.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
-const METHODS = ["get", "post", "put", "patch", "delete"] as const;
+const METHODS = ["get", "head", "post", "put", "patch", "delete"] as const;
 
 type OpenApiDocument = { paths: Record<string, Partial<Record<string, unknown>>> };
 

@@ -393,6 +393,35 @@ describe("hoistStraySchemaDefs", () => {
     });
   });
 
+  describe("given a schema that names its definition like a generated one", () => {
+    /** @scenario "A generated name never takes a name a schema chose" */
+    it("publishes the anonymous definition under another name", () => {
+      const document = {
+        components: { schemas: {} as Record<string, unknown> },
+        paths: {
+          "/a": {
+            get: {
+              schema: { $ref: "#/$defs/__schema0", $defs: { __schema0: { type: "number" } } },
+            },
+          },
+          "/b": {
+            get: {
+              schema: { $ref: "#/$defs/__hoisted0", $defs: { __hoisted0: { type: "string" } } },
+            },
+          },
+        },
+      };
+
+      hoistStraySchemaDefs(document);
+
+      expect(document.components.schemas).toEqual({
+        __hoisted0: { type: "string" },
+        __hoisted1: { type: "number" },
+      });
+      expect(document.paths["/a"].get.schema).toEqual({ $ref: "#/components/schemas/__hoisted1" });
+    });
+  });
+
   describe("given a response schema with no $defs entry", () => {
     /** @scenario "A schema with no $defs is left exactly as it was" */
     it("leaves the schema exactly as it was", () => {

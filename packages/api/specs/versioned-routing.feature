@@ -91,8 +91,9 @@ Feature: Explicit compatibility version namespaces
   Scenario: The dated and latest aliases are served but never documented
     Given the service declares documentable endpoints
     When the OpenAPI document is generated
-    Then it contains a path for /api/things/things.list
+    Then it contains a path for /api/v1/things/things.list
     And no documented path contains a dated namespace or the latest namespace
+    And the bare /api/things/things.list address is not a second documented path
 
   @unimplemented
   Scenario: Preview never reaches the document

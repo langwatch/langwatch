@@ -53,3 +53,10 @@ Feature: A recursive response schema publishes a document that resolves
     Given two routes whose schemas name different definitions "Widget"
     When the document is written
     Then the run fails naming "components.schemas.Widget"
+
+  Scenario: A generated name never takes a name a schema chose
+    Given one route whose schema names its definition "__hoisted0"
+    And another route whose schema carries an anonymous definition
+    When the document is written
+    Then the named definition keeps "__hoisted0"
+    And the anonymous definition is published under another name

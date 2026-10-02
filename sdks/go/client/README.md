@@ -431,22 +431,27 @@ The low-level request/response models and HTTP client in
 document with [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) and
 **committed**, so `go build` works with no extra toolchain.
 
-To regenerate after the API spec changes, from this module's root:
+The OpenAPI document is generated from the LangWatch API's route declarations
+and is not committed, so regeneration needs a full checkout of the langwatch
+repository with `pnpm` dependencies installed, plus `python3` and the Go
+toolchain on `PATH`. From the repository root, `make sync-all-openapi`
+regenerates this client together with the TypeScript and Python clients. To
+regenerate only this one, from this module's root:
 
 ```bash
 go generate ./...
 ```
 
-This runs two steps (see `internal/openapi/generate.go`):
+This runs three steps (see `internal/openapi/generate.go`):
 
-1. `downconvert.py` rewrites the canonical OpenAPI **3.1** document to a
-   **3.0.3**-compatible temporary file (oapi-codegen does not parse 3.1). The
-   canonical spec is never modified.
-2. `oapi-codegen` (pinned to `v2.7.1` in the directive, configured by
+1. `pnpm --filter @langwatch/platform-api openapi:generate` writes the OpenAPI
+   **3.1** document to `specs/api-reference/openapi-document.json`.
+2. `downconvert.py` rewrites it to a **3.0.3**-compatible temporary file
+   (oapi-codegen does not parse 3.1).
+3. `oapi-codegen` (pinned to `v2.7.1` in the directive, configured by
    `oapi-codegen.yaml`) emits the generated Go.
 
-Requires `python3` and the Go toolchain on `PATH`. The generation is
-deterministic: re-running it produces an identical file.
+The generation is deterministic: re-running it produces an identical file.
 
 ## Module layout
 

@@ -596,18 +596,47 @@ export function hoistStraySchemaDefs(document: unknown): void {
   if (!schemas) return;
 
   const byShape = new Map(NAMED_SHAPES.map(({ name, schema }) => [shapeOf(schema), name]));
+  const reserved = new Set([...Object.keys(schemas), ...explicitDefinitionNames(document)]);
   let nextId = 0;
+  const generatedName = (): string => {
+    let candidate = `__hoisted${nextId++}`;
+    while (reserved.has(candidate)) candidate = `__hoisted${nextId++}`;
+    reserved.add(candidate);
+
+    return candidate;
+  };
 
   walkForDefs(document, schemas, (name, definition) => {
     if (!ANONYMOUS_DEFINITION.test(name)) return name;
 
     const shape = canonicalShape(definition, name);
-    const named = byShape.get(shape) ?? `__hoisted${nextId++}`;
+    const named = byShape.get(shape) ?? generatedName();
 
     byShape.set(shape, named);
 
     return named;
   });
+}
+
+/** Every `$defs` name a schema chose itself with `.meta({ id })`, anywhere in the document. */
+function explicitDefinitionNames(node: unknown, names = new Set<string>()): Set<string> {
+  if (Array.isArray(node)) {
+    for (const child of node) explicitDefinitionNames(child, names);
+
+    return names;
+  }
+
+  if (!isRecord(node)) return names;
+
+  if (isRecord(node.$defs)) {
+    for (const name of Object.keys(node.$defs)) {
+      if (!ANONYMOUS_DEFINITION.test(name)) names.add(name);
+    }
+  }
+
+  for (const child of Object.values(node)) explicitDefinitionNames(child, names);
+
+  return names;
 }
 
 /** The one definition zod emits for a recursive schema, as a canonical shape key. */

@@ -10,8 +10,10 @@
 // # Regeneration
 //
 // The generated code is committed so `go build` works without any toolchain
-// beyond Go itself. To regenerate after the API spec changes, run from the
-// client module root:
+// beyond Go itself. Regenerating needs a full langwatch repository checkout
+// with pnpm dependencies installed, python3 and Go. From the repository root,
+// `make sync-all-openapi` regenerates every client; to regenerate only this
+// one, run from the client module root:
 //
 //	go generate ./...
 //
