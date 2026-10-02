@@ -1,4 +1,5 @@
 import {
+  ModelProviderInvalidError,
   ModelProviderScopesRequiredError,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
@@ -131,7 +132,7 @@ export class ModelProviderScopeService {
       organizationId === void 0 ||
       organizationIds.some((candidate) => candidate !== organizationId)
     ) {
-      throw new Error("Model Provider scopes must belong to one organization");
+      throw new ModelProviderInvalidError("Model provider scopes must belong to one organization");
     }
 
     return organizationId;

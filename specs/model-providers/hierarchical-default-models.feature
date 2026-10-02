@@ -86,3 +86,9 @@ Feature: Hierarchical default models across organization, team, and project
     When I view the Default Models section for project "web-app"
     Then I see "openai/gpt-4o" as the effective default
     And the source is labelled "inherited from team platform"
+
+  @unit
+  Scenario: Scopes spanning more than one organization are refused
+    Given a provider or default whose scopes name teams in two different organizations
+    When it is saved
+    Then the save is refused as an invalid model provider
