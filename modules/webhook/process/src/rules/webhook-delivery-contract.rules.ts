@@ -7,6 +7,7 @@
  */
 
 import type { Event, IntentContext } from "@langwatch/eventing";
+import type { SpendUsage } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { z } from "zod";
@@ -17,22 +18,6 @@ export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as 
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
 export const GATEWAY_SPEND_FAILED_EVENT_TYPE = "lw.gateway.spend.failed" as const;
 export const GATEWAY_SPEND_SETTLED_EVENT_TYPE = "lw.gateway.spend.settled" as const;
-
-export type SpendUsage = {
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_input_tokens: number;
-  cache_creation_input_tokens: number;
-  cache_creation_1h_tokens: number;
-  reasoning_tokens: number;
-  input_audio_tokens: number;
-  output_audio_tokens: number;
-  input_chars: number;
-  audio_ms: number;
-  input_image_tokens: number;
-  output_image_tokens: number;
-  image_count: number;
-};
 
 export const EMPTY_SPEND_USAGE: SpendUsage = {
   input_tokens: 0,

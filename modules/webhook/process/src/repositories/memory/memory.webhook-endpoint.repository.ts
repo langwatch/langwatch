@@ -1,8 +1,6 @@
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
-  WebhookEndpointValidationError,
-  isValidEventSelector,
   type SqsDestinationInput,
   type SqsDestinationView,
   type WebhookDeliveryOutcome,
@@ -10,24 +8,28 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 
-import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
+import { parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   describeDestination,
-  findUrlProblem,
-  isRoleArn,
   sqsCredentialMode,
   type WebhookDestinationConfig,
-  type WebhookUrlProblemCode,
 } from "../../rules/webhook-destination.rules.ts";
 import {
+  assertDestinationUnchanged,
   assertValidDeliveryControls,
+  assertValidDestinationInput,
+  assertValidEvents,
+  assertValidUrl,
+  mergeSqsUpdate,
   webhookEndpointConfiguration,
   type WebhookEndpointConfiguration,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
+  WEBHOOK_KEPT_SECRET,
 } from "../../rules/webhook-endpoint-policy.rules.ts";
+import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "../../rules/webhook-signature.rules.ts";
 import type {
   WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
@@ -40,16 +42,7 @@ import {
   type MemoryWebhookEndpointRow,
 } from "./memory.webhook.database.ts";
 
-const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-
-const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
-  invalid_url: "url must be a valid URL",
-  scheme: "url must use https",
-  host: "url must have a host",
-  port: "url must use the default https port (443)",
-  credentials: "url must not carry credentials",
-};
 
 interface StoredDestination {
   url: string | null;
@@ -68,9 +61,6 @@ const EMPTY_DESTINATION: StoredDestination = {
   sqsAccessKeyId: null,
   sqsSecretAccessKeyEncrypted: null,
 };
-
-/** Stands in for a stored secret the caller did not resend. */
-const KEPT_SECRET = "__langwatch_kept_secret__";
 
 let secretCounter = 0;
 
@@ -143,62 +133,6 @@ function toSqsView(row: MemoryWebhookEndpointRow): SqsDestinationView | null {
   };
 }
 
-function assertValidUrl(url: string, configuration: WebhookEndpointConfiguration): void {
-  const problem = findUrlProblem(url, configuration.allowInsecureLocalUrls);
-  if (problem) throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
-}
-
-function assertValidEvents(enabledEvents: string[]): void {
-  if (enabledEvents.length === 0) {
-    throw new WebhookEndpointValidationError("enabled_events must select at least one event type");
-  }
-  for (const selector of enabledEvents) {
-    if (!isValidEventSelector(selector)) {
-      throw new WebhookEndpointValidationError(`unknown event selector "${selector}"`);
-    }
-  }
-}
-
-function assertValidSqsDestination(
-  sqs: SqsDestinationInput,
-  configuration: WebhookEndpointConfiguration,
-): void {
-  const inspection = inspectSqsQueueUrl(sqs.queueUrl);
-  if (!inspection.ok) {
-    throw new WebhookEndpointValidationError(
-      inspection.problem === "fifo"
-        ? "sqs.queue_url must name a standard queue; FIFO queues are not supported. Deliveries are at-least-once and deduplicated on the envelope id, which is what a standard queue provides."
-        : "sqs.queue_url must be an Amazon SQS queue URL, like https://sqs.<region>.amazonaws.com/<account id>/<queue name>",
-    );
-  }
-  if (sqs.roleArn && !isRoleArn(sqs.roleArn)) {
-    throw new WebhookEndpointValidationError(
-      "sqs.role_arn must be an IAM role ARN, like arn:aws:iam::<account id>:role/<role name>",
-    );
-  }
-  if (sqs.externalId && !sqs.roleArn) {
-    throw new WebhookEndpointValidationError(
-      "sqs.external_id only applies with sqs.role_arn, which names the role to assume",
-    );
-  }
-  const hasKeyId = Boolean(sqs.accessKeyId);
-  const hasSecret = Boolean(sqs.secretAccessKey);
-  if (hasKeyId !== hasSecret) {
-    throw new WebhookEndpointValidationError(
-      "sqs.access_key_id and sqs.secret_access_key are set together or not at all",
-    );
-  }
-  const mode = sqsCredentialMode({
-    roleArn: sqs.roleArn,
-    accessKeyId: sqs.accessKeyId,
-  });
-  if (mode === "ambient" && !configuration.allowAmbientAwsCredentials) {
-    throw new WebhookEndpointValidationError(
-      "sqs needs credentials of its own: either sqs.role_arn for a role to assume, or sqs.access_key_id with sqs.secret_access_key",
-    );
-  }
-}
-
 function storedSqsDestination(
   sqs: SqsDestinationInput,
   secrets: WebhookEndpointServiceOptions["secrets"],
@@ -213,87 +147,15 @@ function storedSqsDestination(
   };
 }
 
-function assertValidDestination(
-  params: { destinationKind: WebhookDestinationKind; url?: string; sqs?: SqsDestinationInput },
-  configuration: WebhookEndpointConfiguration,
+function storedDestination(
+  params: { url?: string; sqs?: SqsDestinationInput },
   secrets: WebhookEndpointServiceOptions["secrets"],
 ): StoredDestination {
-  if (params.destinationKind === "http") {
-    if (!params.url)
-      throw new WebhookEndpointValidationError("url is required for an http endpoint");
-    if (params.sqs)
-      throw new WebhookEndpointValidationError("sqs does not apply to an http endpoint");
-    assertValidUrl(params.url, configuration);
-
-    return { ...EMPTY_DESTINATION, url: params.url };
-  }
-  if (!params.sqs?.queueUrl) {
-    throw new WebhookEndpointValidationError("sqs.queue_url is required for an sqs endpoint");
-  }
-  if (params.url) {
-    throw new WebhookEndpointValidationError(
-      "url does not apply to an sqs endpoint; name the queue in sqs.queue_url",
-    );
-  }
-  assertValidSqsDestination(params.sqs, configuration);
-
+  if (!params.sqs) return { ...EMPTY_DESTINATION, url: params.url ?? null };
   return storedSqsDestination(params.sqs, secrets);
 }
 
-function assertDestinationUnchanged({
-  endpoint,
-  params,
-}: {
-  endpoint: MemoryWebhookEndpointRow;
-  params: {
-    destinationKind?: WebhookDestinationKind;
-    url?: string;
-    sqs?: Partial<SqsDestinationInput>;
-  };
-}): void {
-  if (params.destinationKind !== undefined && params.destinationKind !== endpoint.destinationKind) {
-    throw new WebhookEndpointValidationError(
-      `destination_kind cannot be changed after an endpoint is created; create a new endpoint for the ${params.destinationKind} destination and archive this one once it has drained`,
-    );
-  }
-  if (params.url !== undefined && endpoint.destinationKind !== "http") {
-    throw new WebhookEndpointValidationError(
-      "url does not apply to this endpoint; it delivers to an Amazon SQS queue",
-    );
-  }
-  if (params.sqs !== undefined && endpoint.destinationKind !== "sqs") {
-    throw new WebhookEndpointValidationError(
-      "sqs does not apply to this endpoint; it delivers over HTTPS",
-    );
-  }
-}
-
-function selects(value: string | null | undefined): boolean {
-  return typeof value === "string" && value.trim() !== "";
-}
-
-function deriveMergedCredentialField({
-  isCleared,
-  sent,
-  stored,
-}: {
-  isCleared: boolean;
-  sent: string | null | undefined;
-  stored: string | null;
-}): string | null {
-  if (isCleared) return null;
-
-  return sent !== undefined ? sent : stored;
-}
-
-function withExclusiveCredentials(sqs: SqsDestinationInput): SqsDestinationInput {
-  if (sqs.roleArn) return { ...sqs, accessKeyId: null, secretAccessKey: null };
-  if (sqs.accessKeyId) return { ...sqs, roleArn: null, externalId: null };
-
-  return { ...sqs, roleArn: null, externalId: null, accessKeyId: null, secretAccessKey: null };
-}
-
-function assertValidSqsUpdate({
+function storedSqsUpdate({
   endpoint,
   sqs,
   configuration,
@@ -304,44 +166,23 @@ function assertValidSqsUpdate({
   configuration: WebhookEndpointConfiguration;
   secrets: WebhookEndpointServiceOptions["secrets"];
 }): StoredDestination {
-  const selectsRole = selects(sqs.roleArn);
-  const selectsStatic = selects(sqs.accessKeyId);
-  if (selectsRole && selectsStatic) {
-    throw new WebhookEndpointValidationError(
-      "sqs.role_arn and sqs.access_key_id select different credential modes; send one of them, and null for the other",
-    );
-  }
-  const merged: SqsDestinationInput = {
-    queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
-    roleArn: deriveMergedCredentialField({
-      isCleared: selectsStatic,
-      sent: sqs.roleArn,
-      stored: endpoint.sqsRoleArn,
-    }),
-    externalId: deriveMergedCredentialField({
-      isCleared: selectsStatic,
-      sent: sqs.externalId,
-      stored: endpoint.sqsExternalId,
-    }),
-    accessKeyId: deriveMergedCredentialField({
-      isCleared: selectsRole,
-      sent: sqs.accessKeyId,
-      stored: endpoint.sqsAccessKeyId,
-    }),
-    secretAccessKey: deriveMergedCredentialField({
-      isCleared: selectsRole,
-      sent: sqs.secretAccessKey,
-      stored: endpoint.sqsSecretAccessKeyEncrypted ? KEPT_SECRET : null,
-    }),
-  };
-  const exclusive = withExclusiveCredentials(merged);
-  assertValidSqsDestination(exclusive, configuration);
+  const exclusive = mergeSqsUpdate({
+    stored: {
+      queueUrl: endpoint.sqsQueueUrl,
+      roleArn: endpoint.sqsRoleArn,
+      externalId: endpoint.sqsExternalId,
+      accessKeyId: endpoint.sqsAccessKeyId,
+      hasSecretAccessKey: Boolean(endpoint.sqsSecretAccessKeyEncrypted),
+    },
+    sqs,
+    configuration,
+  });
   const stored = storedSqsDestination(exclusive, secrets);
 
   return {
     ...stored,
     sqsSecretAccessKeyEncrypted:
-      exclusive.secretAccessKey === KEPT_SECRET
+      exclusive.secretAccessKey === WEBHOOK_KEPT_SECRET
         ? endpoint.sqsSecretAccessKeyEncrypted
         : stored.sqsSecretAccessKeyEncrypted,
   };
@@ -381,12 +222,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
-    const destination = assertValidDestination(
-      { ...params, destinationKind },
-      this.#configuration,
-      this.#options.secrets,
-    );
+    assertValidDestinationInput({ ...params, destinationKind }, this.#configuration);
     assertValidEvents(params.enabledEvents);
+    const destination = storedDestination(params, this.#options.secrets);
     assertValidDeliveryControls(params);
     const secret = newSecret();
     const now = nowInstant();
@@ -446,11 +284,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
-    assertDestinationUnchanged({ endpoint, params });
+    assertDestinationUnchanged({ currentKind: endpoint.destinationKind, params });
     if (params.url !== undefined) assertValidUrl(params.url, this.#configuration);
     const sqsUpdate =
       params.sqs !== undefined
-        ? assertValidSqsUpdate({
+        ? storedSqsUpdate({
             endpoint,
             sqs: params.sqs,
             configuration: this.#configuration,

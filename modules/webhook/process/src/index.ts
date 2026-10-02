@@ -49,7 +49,6 @@ export type {
   SendBatchPayload,
   SettleSpendCommandData,
   SpendAttribution,
-  SpendUsage,
   WebhookDeliveryEndpointService,
   WebhookDeliveryState,
 } from "./rules/webhook-delivery-contract.rules.ts";
