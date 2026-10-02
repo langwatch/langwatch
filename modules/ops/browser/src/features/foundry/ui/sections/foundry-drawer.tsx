@@ -1,4 +1,3 @@
-import type { UiFoundryDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
@@ -20,6 +19,11 @@ import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { useTargetProjectKey } from "../../behavior/use-target-project-key.ts";
 import { type Preset, SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
+
+/** What the host hands ops' foundry drawer: the close it renders its own chrome around. */
+export type UiFoundryDrawerProps = {
+  onClose: () => void;
+};
 
 export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
   const { project, mintApiKey } = useTargetProjectKey();

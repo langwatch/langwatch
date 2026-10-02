@@ -15,7 +15,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
-import { MemoryDatastoreHealthRepository } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import {
+  MemoryClickHouseHealthRepository,
+  MemoryPostgresHealthRepository,
+  MemoryRedisHealthRepository,
+} from "../../repositories/memory/memory.datastore-health.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
 import { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
@@ -46,7 +50,6 @@ let world: UsageReportWorld;
 let switchWrites: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean }[];
 
 function checkupService(): OpsCheckupService {
-  const datastores = MemoryDatastoreHealthRepository.create();
   return OpsCheckupService.create({
     members: {
       isSaas: false,
@@ -104,7 +107,11 @@ function checkupService(): OpsCheckupService {
         }),
       },
     },
-    repositories: { postgres: datastores, clickhouse: datastores, redis: datastores },
+    repositories: {
+      postgres: MemoryPostgresHealthRepository.create(),
+      clickhouse: MemoryClickHouseHealthRepository.create(),
+      redis: MemoryRedisHealthRepository.create(),
+    },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
       probes: MemoryCheckupProbeChannel.create(),

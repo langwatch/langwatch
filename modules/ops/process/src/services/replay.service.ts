@@ -16,6 +16,7 @@ import { nowInstant } from "@langwatch/time";
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import type { ReplayRepository } from "../repositories/replay.repository.ts";
+import { ReplayFinalizationService } from "./replay-finalization.service.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 
 const logger = createLogger("langwatch:ops:replay-service");
@@ -55,7 +56,11 @@ export class ReplayService {
   private constructor(
     readonly repo: ReplayRepository,
     private readonly runtimeFactory: OpsReplayRuntimeFactory,
-  ) {}
+  ) {
+    this.finalization = ReplayFinalizationService.create({ repo });
+  }
+
+  private readonly finalization: ReplayFinalizationService;
 
   #requests: ProjectionReplayRequestSender | null = null;
 
@@ -145,7 +150,7 @@ export class ReplayService {
         occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
-      await this.finalizeWithError({
+      await this.finalization.finalizeWithError({
         runId,
         errorMessage: error instanceof Error ? error.message : String(error),
         historyCtx: run,
@@ -198,7 +203,7 @@ export class ReplayService {
     try {
       runtime = this.runtimeFactory.create();
     } catch (err) {
-      await this.finalizeWithError({
+      await this.finalization.finalizeWithError({
         runId: params.runId,
         errorMessage: err instanceof Error ? err.message : String(err),
       });
@@ -209,7 +214,7 @@ export class ReplayService {
     try {
       const selection = ReplayService.selectProjections(runtime, params.projectionNames);
       if (selection.length === 0) {
-        await this.finalizeWithError({
+        await this.finalization.finalizeWithError({
           runId: params.runId,
           errorMessage: "No matching projections found",
         });
@@ -218,7 +223,7 @@ export class ReplayService {
       }
 
       if (await this.repo.isCancelled()) {
-        await this.finalizeCancelled({ runId: params.runId, historyCtx: params });
+        await this.finalization.finalizeCancelled({ runId: params.runId, historyCtx: params });
 
         return;
       }
@@ -238,7 +243,7 @@ export class ReplayService {
       }
 
       if (result.batchErrors > 0) {
-        await this.finalizeWithError({
+        await this.finalization.finalizeWithError({
           runId: params.runId,
           errorMessage: result.firstError ?? "Unknown batch error",
           historyCtx: params,
@@ -247,7 +252,7 @@ export class ReplayService {
         return;
       }
 
-      await this.finalizeCompleted({ params, result });
+      await this.finalization.finalizeCompleted({ params, result });
     } catch (err) {
       await this.finalizeAfterFailure({ params, err });
     } finally {
@@ -274,9 +279,9 @@ export class ReplayService {
         "Skipping replay finalization: lock now held by another run",
       );
     } else if (err instanceof ReplayCancelledError) {
-      await this.finalizeCancelled({ runId: params.runId, historyCtx: params });
+      await this.finalization.finalizeCancelled({ runId: params.runId, historyCtx: params });
     } else {
-      await this.finalizeWithError({
+      await this.finalization.finalizeWithError({
         runId: params.runId,
         errorMessage: err instanceof Error ? err.message : String(err),
         historyCtx: params,
@@ -384,49 +389,6 @@ export class ReplayService {
     }
   }
 
-  /** The completed run, written to the status row and pushed onto the history list. */
-  private async finalizeCompleted({
-    params,
-    result,
-  }: {
-    params: {
-      runId: string;
-      projectionNames: string[];
-      since: string;
-      tenantIds: string[];
-      description: string;
-      userName: string;
-    };
-    result: { aggregatesReplayed: number; totalEvents: number };
-  }): Promise<void> {
-    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
-    const status = await this.repo.getStatus();
-    await this.repo.writeStatus({
-      status: {
-        ...status,
-        state: "completed",
-        completedAt,
-        aggregatesProcessed: result.aggregatesReplayed,
-        eventsProcessed: result.totalEvents,
-      },
-    });
-    await this.repo.pushToHistory({
-      entry: {
-        runId: params.runId,
-        projectionNames: params.projectionNames,
-        since: params.since,
-        tenantIds: params.tenantIds,
-        description: params.description,
-        startedAt: status.startedAt ?? completedAt,
-        completedAt,
-        state: "completed",
-        userName: params.userName,
-        aggregatesProcessed: result.aggregatesReplayed,
-        eventsProcessed: result.totalEvents,
-      },
-    });
-  }
-
   private async updateProgress(params: { runId: string; progress: ReplayProgress }): Promise<void> {
     const lockHolder = await this.repo.getLockHolder();
     if (lockHolder.kind === "free" || lockHolder.runId !== params.runId) {
@@ -448,82 +410,5 @@ export class ReplayService {
         eventsProcessed: params.progress.totalEventsReplayed,
       },
     });
-  }
-
-  private async finalizeWithError(params: {
-    runId: string;
-    errorMessage: string;
-    historyCtx?: {
-      projectionNames: string[];
-      since: string;
-      tenantIds: string[];
-      description: string;
-      userName: string;
-    };
-  }): Promise<void> {
-    logger.error({ runId: params.runId, error: params.errorMessage }, "Replay failed");
-    const current = await this.repo.getStatus();
-    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
-    await this.repo.writeStatus({
-      status: {
-        ...current,
-        state: "failed",
-        completedAt,
-        error: params.errorMessage,
-      },
-    });
-    if (params.historyCtx) {
-      await this.repo.pushToHistory({
-        entry: {
-          runId: params.runId,
-          ...params.historyCtx,
-          startedAt: current.startedAt ?? completedAt,
-          completedAt,
-          state: "failed",
-          aggregatesProcessed: current.aggregatesProcessed,
-          eventsProcessed: current.eventsProcessed,
-          error: params.errorMessage,
-        },
-      });
-    }
-
-    await this.repo.releaseLock({ runId: params.runId });
-  }
-
-  private async finalizeCancelled(params: {
-    runId: string;
-    historyCtx?: {
-      projectionNames: string[];
-      since: string;
-      tenantIds: string[];
-      description: string;
-      userName: string;
-    };
-  }): Promise<void> {
-    logger.info({ runId: params.runId }, "Replay cancelled");
-    const current = await this.repo.getStatus();
-    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
-    await this.repo.writeStatus({
-      status: {
-        ...current,
-        state: "cancelled",
-        completedAt,
-      },
-    });
-    if (params.historyCtx) {
-      await this.repo.pushToHistory({
-        entry: {
-          runId: params.runId,
-          ...params.historyCtx,
-          startedAt: current.startedAt ?? completedAt,
-          completedAt,
-          state: "cancelled",
-          aggregatesProcessed: current.aggregatesProcessed,
-          eventsProcessed: current.eventsProcessed,
-        },
-      });
-    }
-
-    await this.repo.releaseLock({ runId: params.runId });
   }
 }

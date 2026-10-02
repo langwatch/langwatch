@@ -15,7 +15,6 @@ export type {
   OpsReplayRunner,
 } from "./app/ops.app.ts";
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
-export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export type { OpsOperationsOptions } from "./app/ops-composition.build.ts";
 export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
 export type { AdminAccess, AdminAccessServiceOptions } from "./services/admin-access.service.ts";

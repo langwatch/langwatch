@@ -14,6 +14,7 @@ import {
   Table,
   Text,
 } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -22,7 +23,6 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { readableDate } from "../../../../model/ops-formatters.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",

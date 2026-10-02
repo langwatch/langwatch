@@ -1,10 +1,10 @@
 import { Kbd } from "@langwatch/design-system/kbd";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { describeError } from "../../../../model/describe-error.ts";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { useDejaViewState } from "../../behavior/deja-view-state.ts";
 import { type EventResult } from "../../model/deja-view-types.ts";
 import { DejaView } from "./deja-view-content.tsx";

@@ -1,10 +1,10 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import type { ComponentProps } from "react";
 
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { BackofficeTable as OpsBackofficeTable } from "../blocks/backoffice-table.tsx";
 
 type BackofficeTableProps = Omit<

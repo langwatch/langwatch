@@ -8,13 +8,13 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import type { OpsPlatformOperator } from "@langwatch/ops-contract";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { formatDateTime } from "../../../admin/ui/elements/backoffice-cells.tsx";
 
 /**

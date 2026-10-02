@@ -5,23 +5,18 @@ import type {
   RedisHealthRepository,
 } from "../datastore-health.repository.ts";
 
-/** Every datastore healthy, with the ledger a test wrote; `down` makes each ping throw. */
-export class MemoryDatastoreHealthRepository
-  implements PostgresHealthRepository, ClickHouseHealthRepository, RedisHealthRepository
-{
+/** A healthy Postgres holding the ledger and release folders a test wrote. */
+export class MemoryPostgresHealthRepository implements PostgresHealthRepository {
   readonly ledger: MigrationLedgerRow[] = [];
   readonly releaseMigrations: string[] = [];
-  migrationStatus = "";
-  down = false;
 
   private constructor() {}
 
-  static create(): MemoryDatastoreHealthRepository {
-    return new MemoryDatastoreHealthRepository();
+  static create(): MemoryPostgresHealthRepository {
+    return new MemoryPostgresHealthRepository();
   }
 
   async findServerVersion(): Promise<string> {
-    await this.ping();
     return "memory";
   }
 
@@ -32,17 +27,36 @@ export class MemoryDatastoreHealthRepository
   async findReleaseMigrationNames(): Promise<string[]> {
     return [...this.releaseMigrations];
   }
+}
+
+/** A healthy ClickHouse whose goose status is whatever a test wrote. */
+export class MemoryClickHouseHealthRepository implements ClickHouseHealthRepository {
+  migrationStatus = "";
+
+  private constructor() {}
+
+  static create(): MemoryClickHouseHealthRepository {
+    return new MemoryClickHouseHealthRepository();
+  }
+
+  async ping(): Promise<void> {}
 
   async readMigrationStatus(): Promise<string> {
-    await this.ping();
     return this.migrationStatus;
+  }
+}
+
+/** A healthy Redis. */
+export class MemoryRedisHealthRepository implements RedisHealthRepository {
+  private constructor() {}
+
+  static create(): MemoryRedisHealthRepository {
+    return new MemoryRedisHealthRepository();
   }
 
   describeTarget(): string {
     return "memory";
   }
 
-  async ping(): Promise<void> {
-    if (this.down) throw new Error("connect ECONNREFUSED");
-  }
+  async ping(): Promise<void> {}
 }

@@ -29,6 +29,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
+    "@langwatch/error-views": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",

@@ -1,13 +1,18 @@
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 /**
  * What Settings, Checkup reads and asks for. A row that costs egress or money
  * keeps "not run" until an administrator runs its band; the answer replaces
  * it in place. Spec: specs/self-hosting/checkup/checkup.feature
  */
-import type { CheckGroup, CheckRow } from "@langwatch/ops-contract";
+import type { CheckGroup, CheckRow, checkupTrpc } from "@langwatch/ops-contract";
 import { useState } from "react";
 
 import { useCheckupHost } from "../model/checkup-host.ts";
-import { checkupApi } from "./checkup-api.ts";
+
+/** The `checkup.*` procedures Settings, Checkup calls, derived from the contract. */
+type CheckupApiMap = ContractApiMap<typeof checkupTrpc>;
+
+const checkupApi = createModuleApi<CheckupApiMap>();
 
 export function useCheckupScreen(organizationId: string) {
   const host = useCheckupHost();

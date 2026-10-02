@@ -1,10 +1,10 @@
 import { Center, Spinner } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { OperatorFeatureFlagCatalogueView } from "./operator-feature-flag-catalogue.tsx";
 export function FeatureFlagsContent() {
   const showErrorToast = useShowErrorToast();

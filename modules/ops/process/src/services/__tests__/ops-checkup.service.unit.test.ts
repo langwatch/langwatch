@@ -14,7 +14,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
-import { MemoryDatastoreHealthRepository } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import {
+  MemoryClickHouseHealthRepository,
+  MemoryPostgresHealthRepository,
+  MemoryRedisHealthRepository,
+} from "../../repositories/memory/memory.datastore-health.repository.ts";
 import { OpsCheckupService } from "../ops-checkup.service.ts";
 import { UsageReportWorld } from "./support/usage-report-peers.ts";
 
@@ -60,7 +64,11 @@ const PROJECT: Project = {
   lastCodingAgentPullRequestAt: null,
 };
 
-let datastores: MemoryDatastoreHealthRepository;
+let datastores: {
+  postgres: MemoryPostgresHealthRepository;
+  clickhouse: MemoryClickHouseHealthRepository;
+  redis: MemoryRedisHealthRepository;
+};
 let world: UsageReportWorld;
 let probedProjects: string[];
 let provisionable: boolean[];
@@ -133,7 +141,7 @@ function service() {
         },
       },
     },
-    repositories: { postgres: datastores, clickhouse: datastores, redis: datastores },
+    repositories: datastores,
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
       probes,
@@ -147,7 +155,11 @@ async function verdictOf(id: string) {
 }
 
 beforeEach(() => {
-  datastores = MemoryDatastoreHealthRepository.create();
+  datastores = {
+    postgres: MemoryPostgresHealthRepository.create(),
+    clickhouse: MemoryClickHouseHealthRepository.create(),
+    redis: MemoryRedisHealthRepository.create(),
+  };
   world = UsageReportWorld.create();
   probedProjects = [];
   provisionable = [true];
@@ -163,8 +175,8 @@ beforeEach(() => {
 describe("OpsCheckupService", () => {
   describe("given a release migration the ledger never finished", () => {
     it("names it as pending, and a started one as failed", async () => {
-      datastores.releaseMigrations.push("0_init", "20260101_add", "20260102_more");
-      datastores.ledger.push(
+      datastores.postgres.releaseMigrations.push("0_init", "20260101_add", "20260102_more");
+      datastores.postgres.ledger.push(
         { name: "0_init", finished: true, rolledBack: false },
         { name: "20260102_more", finished: false, rolledBack: false },
       );
@@ -186,7 +198,7 @@ describe("OpsCheckupService", () => {
 
   describe("given goose reports a pending ClickHouse migration", () => {
     it("refuses with the pending count", async () => {
-      datastores.migrationStatus = "Applied  00001_init.sql\nPending -- 00002_more.sql";
+      datastores.clickhouse.migrationStatus = "Applied  00001_init.sql\nPending -- 00002_more.sql";
 
       await expect(verdictOf("clickhouse_migrations")).resolves.toMatchObject({
         outcome: "refused",

@@ -7,11 +7,11 @@ import {
   Spacer,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 import { useActivationCodeCommands } from "../../behavior/use-activation-code-commands.ts";
 import { ActivationCodesTable } from "../blocks/activation-codes-table.tsx";
 import { IssueActivationCodeDrawer } from "./issue-activation-code-drawer.tsx";

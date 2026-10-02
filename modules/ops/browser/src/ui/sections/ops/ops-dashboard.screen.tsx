@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Database } from "lucide-react";
 
 import { api } from "../../../behavior/ops-api.ts";
@@ -7,7 +8,6 @@ import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";
 import { OpsBlobsDrawer } from "../../../features/blob-store/ui/sections/ops-blobs-drawer.tsx";
 import { ConnectionStatusIndicator } from "../../../features/event-store/ui/elements/connection-status-indicator.tsx";
 import { OpsDashboardContent } from "../../../features/event-store/ui/sections/ops-dashboard-content.tsx";
-import { HandledErrorAlert } from "../../elements/ops-handled-error-alert.tsx";
 
 /** Whether the page is reading a live snapshot, still waiting, or cut off. */
 function describeSnapshotConnection({
