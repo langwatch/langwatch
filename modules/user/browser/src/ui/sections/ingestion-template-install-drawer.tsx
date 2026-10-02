@@ -9,11 +9,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 
 const SECRET_MASK = "•".repeat(48);
 

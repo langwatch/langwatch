@@ -5,10 +5,10 @@
  */
 
 import { Box, Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
 import { useEmailIdentifiers } from "../../behavior/use-email-identifiers.ts";
 import { AddAddressForm } from "../elements/add-address-form.tsx";
 import { AddressConfirmationNotice } from "./address-confirmation-notice.tsx";
@@ -41,10 +41,12 @@ export function EmailIdentifiersSection({
 
       {identifiers.isPending ? <Spinner size="sm" /> : null}
 
-      <HandledErrorAlert
-        error={identifiers.error}
-        fallbackTitle="Couldn't load the addresses on this account"
-      />
+      {identifiers.error ? (
+        <HandledErrorAlert
+          error={identifiers.error}
+          fallbackTitle="Couldn't load the addresses on this account"
+        />
+      ) : null}
 
       <VStack width="full" align="stretch" gap={2}>
         <AddressList identifiers={identifiers} />

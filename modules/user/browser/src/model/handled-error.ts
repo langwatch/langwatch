@@ -1,33 +1,7 @@
-/**
- * Handled-error payload: code and field rejections. Read from server via
- * platform/app's logic, duplicated in feature-web packages.
- */
-
-export type UserHandledError = {
-  code: string;
-  httpStatus: number;
-  /** Whatever the code documented. Read by key, never spread into the UI. */
-  meta: Record<string, unknown>;
-};
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** The tRPC envelope's payload, or `null` when the failure was not a handled one. */
-export function readHandledError(error: unknown): UserHandledError | null {
-  const candidate = (error as { data?: { error?: unknown } } | null)?.data?.error;
-  if (!isRecord(candidate)) return null;
-
-  const code = typeof candidate.code === "string" ? candidate.code : null;
-  if (code === null) return null;
-  if (typeof candidate.httpStatus !== "number") return null;
-
-  return {
-    code,
-    httpStatus: candidate.httpStatus,
-    meta: isRecord(candidate.meta) ? candidate.meta : {},
-  };
 }
 
 /** Server field rejections for validation errors, keyed by field name. */

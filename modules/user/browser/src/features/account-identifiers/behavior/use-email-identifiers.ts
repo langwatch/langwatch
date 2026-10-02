@@ -4,11 +4,11 @@
  * Spec: specs/identity/authentication-settings.feature
  */
 
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { AccountIdentifier } from "@langwatch/identity-contract";
 import { useState } from "react";
 
 import { api } from "../../../behavior/personal-workspace-api.ts";
-import { readHandledError } from "../../../model/handled-error.ts";
 import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
 import {
   forgetAddressVerifier,

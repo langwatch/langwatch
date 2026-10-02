@@ -7,5 +7,4 @@ export {
   createGdprUserDataEraseRunner,
   type GdprUserDataEraseOutcome,
 } from "./tasks/user-data-erase.task.ts";
-export type { GdprUserDataEraseDatabase } from "./repositories/prisma/prisma.user-data-erase.repository.ts";
 export { userProcessModule } from "./user.module.ts";
