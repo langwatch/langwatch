@@ -116,7 +116,6 @@ describe("auth router when the sign-up policy refuses the address", () => {
           addressProof: "proof-1",
         }),
       ).rejects.toMatchObject({ cause: { code: "auth_sign_up_restricted" } });
-      expect(localSignUpDecision).not.toHaveBeenCalled();
     });
 
     it("tells a caller holding no valid proof nothing about the policy", async () => {
@@ -129,6 +128,31 @@ describe("auth router when the sign-up policy refuses the address", () => {
       ).rejects.toMatchObject({
         cause: { code: "auth_no_address_to_confirm" },
       });
+      expect(assertSignUp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an account is already awaiting its confirmation", () => {
+    it("sends the link again without asking the policy", async () => {
+      addressState.mockResolvedValue("awaiting_confirmation");
+      await expect(
+        signedOut().requestSignUpVerification({ email: "sam@acme.com" }),
+      ).resolves.toEqual({ sent: true });
+      expect(assertSignUp).not.toHaveBeenCalled();
+    });
+
+    it("sends the enrollment to log in without asking the policy", async () => {
+      localSignUpDecision.mockResolvedValue({
+        outcome: "existing_account",
+        methodSet: [],
+        reasonCode: "account_methods",
+      });
+      await expect(
+        signedOut().signUpEnrollment({
+          email: "sam@acme.com",
+          addressProof: "proof-1",
+        }),
+      ).resolves.toMatchObject({ outcome: "existing_account" });
       expect(assertSignUp).not.toHaveBeenCalled();
     });
   });

@@ -290,7 +290,6 @@ export class BetterAuthDatabaseHooks {
     if (governing) return;
 
     logger.info(
-      { email: user.email },
       "Refused a new account: the installation's sign-up policy does not admit the address",
     );
     throw APIError.from("FORBIDDEN", {

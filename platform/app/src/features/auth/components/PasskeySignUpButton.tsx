@@ -100,14 +100,14 @@ async function createAccountWithPasskey(
 function readRefusal(error: { status: number } & object): Refusal {
   const code = readCode(error);
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
-  // A session was already open. Named rather than folded into the generic
-  // refusal, because its remedy — sign out, or add from settings — is the one
-  // thing "something went wrong" would not tell them.
   // The installation's sign-up policy refused the address; the registry has
   // the words for it.
   if (code === "auth_sign_up_restricted") {
     return { kind: "report", error: { error: "auth_sign_up_restricted" } };
   }
+  // A session was already open. Named rather than folded into the generic
+  // refusal, because its remedy — sign out, or add from settings — is the one
+  // thing "something went wrong" would not tell them.
   if (code === ALREADY_SIGNED_IN) {
     return {
       kind: "report",

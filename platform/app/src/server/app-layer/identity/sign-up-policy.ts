@@ -119,7 +119,7 @@ export class SignUpPolicy {
     const verdict = await this.checkSignUp({ email });
     if (verdict.allowed) return;
     logger.info(
-      { email, reason: verdict.reason },
+      { reason: verdict.reason },
       "sign-up refused by the installation's sign-up policy",
     );
     throw new SignUpRestrictedError(verdict.reason);
