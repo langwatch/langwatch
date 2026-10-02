@@ -465,12 +465,23 @@ describe("given a password account whose address is confirmed", () => {
   });
 
   describe("when the connection has not verified the domain", () => {
-    it("leaves the link to the library's own rule", async () => {
+    /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+    it("refuses with the missing domain proof named", async () => {
       const { service } = createWorld({ owners: [], confirmed: true });
 
       await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual({
-        action: "continue",
+        action: "reject",
+        code: "sso_domain_not_verified",
       });
+    });
+
+    /** @scenario "Microsoft Entra ID's xms_edov true links a confirmed account without a domain proof" */
+    it("links the existing account on Entra ID's verified domain claim", async () => {
+      const { service } = createWorld({ owners: [], confirmed: true });
+
+      await expect(
+        service.resolveUser(assertion({ emailVerified: false, emailVerification: "verified" })),
+      ).resolves.toEqual(LINKED);
     });
   });
 

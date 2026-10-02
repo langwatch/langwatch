@@ -56,7 +56,9 @@ import {
   type SsoSetupRegistered,
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
+  type SsoSetupIdentityProviderView,
   type SsoSetupRenameInput,
+  type SsoSetupUpdateIdentityProviderInput,
   type SsoSelfServeAvailability,
   type SsoSelfServeContext,
   type SsoSetupStartMigrationInput,
@@ -300,6 +302,8 @@ export class SsoModule implements SsoApiContract {
       finalizeLegacyMigration: (input, actor) =>
         setup().finalizeLegacyMigration({ ...input, actor }),
       rename: (input, actor) => setup().rename({ ...input, actor }),
+      getIdentityProvider: (input) => setup().getIdentityProvider(input),
+      updateIdentityProvider: (input, actor) => setup().updateIdentityProvider({ ...input, actor }),
       setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
       activate: (input, actor) => setup().activate({ ...input, actor }),
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
@@ -784,6 +788,36 @@ export class SsoModule implements SsoApiContract {
       action: "rename",
       args: { ...input },
       ceremony: (actor) => this.#selfServe.rename(input, actor),
+    });
+  }
+
+  async findIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | null> {
+    const view = await this.#selfServe.getIdentityProvider(input);
+    return view.protocol === "grandfathered" ? null : view;
+  }
+
+  /**
+   * Gated like registering, because these settings decide where sign-ins go.
+   * The audit row names the protocol and leaves the settings out: they can
+   * carry a client secret.
+   */
+  async setupUpdateIdentityProvider(
+    input: SsoSetupUpdateIdentityProviderInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
+    await this.#attempted({
+      by,
+      action: "updateIdentityProvider",
+      args: {
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        protocol: input.idp.protocol,
+      },
+      ceremony: (actor) => this.#selfServe.updateIdentityProvider(input, actor),
     });
   }
 

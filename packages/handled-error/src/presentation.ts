@@ -2975,7 +2975,7 @@ const presentations = {
   sso_domain_not_verified: {
     title: "This domain is not verified yet",
     describe: () =>
-      "Single sign-on only admits people from a domain your organization has proven it owns. Finish the domain verification, then try again.",
+      "Single sign-on only admits people from a domain your organization has proven it owns. If you are setting up single sign-on, verify the domain in Settings > Authentication > Identity provider and try again. Otherwise, ask whoever manages single sign-on to verify it.",
   },
   sso_domain_proof_lapsed: {
     title: "This domain's proof has lapsed",

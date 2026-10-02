@@ -5,6 +5,7 @@ import {
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
+  SsoDomainNotVerifiedError,
   SsoExistingAccountUnconfirmedError,
   type SsoUserResolution,
   type SsoUserResolutionInput,
@@ -132,9 +133,9 @@ export class SsoUserResolutionService {
   }
 
   /**
-   * A confirmed account, signed in on self-hosted by an OIDC provider that did
-   * not send `email_verified: true` (Entra ID never does). The library would
-   * refuse, so the connection's domain proof links it, as for an unconfirmed one.
+   * A confirmed account an OIDC provider signs in on self-hosted without
+   * `email_verified: true`: linked on the connection's domain proof or Entra ID's
+   * `xms_edov: true`, otherwise refused with the missing domain proof named.
    */
   private async resolveConfirmedOidcUser({
     connection,
@@ -150,7 +151,12 @@ export class SsoUserResolutionService {
     if (this.deps.isHosted || input.emailVerified) return CONTINUE;
     if (user.deactivated) return REFUSE;
     if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
-    if (!connectionProvesDomainOf({ connection, email: input.email })) return CONTINUE;
+    if (
+      input.emailVerification !== "verified" &&
+      !connectionProvesDomainOf({ connection, email: input.email })
+    ) {
+      return refuseUnprovedDomain({ providerId: input.providerId });
+    }
     const contested = await this.deps.people.isAddressOrSubjectHeldByAnother({
       userId: user.id,
       email,
@@ -320,6 +326,18 @@ function connectionProvesDomainOf({
   }
   const domain = normalizeDomain(email.slice(at + 1));
   return qualifySsoDomainOwnership({ state: connection, domain }).status === "QUALIFIED";
+}
+
+/** A confirmed account the provider did not vouch for, on a domain the
+ *  connection has no proof for: named, so the screen can say which proof is
+ *  missing instead of "account already exists". The person signing in is often
+ *  the administrator testing the connection, and verifying the domain is theirs. */
+function refuseUnprovedDomain({ providerId }: { providerId: string }): SsoUserResolution {
+  const detail =
+    "the provider sent no email verification claim and the connection has no qualified proof for the address's domain";
+  const error = new SsoDomainNotVerifiedError(detail);
+  logger.info({ code: error.code, providerId }, `single sign-on link refused: ${detail}`);
+  return { action: "reject", code: "sso_domain_not_verified" };
 }
 
 /** Logged with its cause because the library carries only the code onward. */

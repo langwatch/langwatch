@@ -72,13 +72,9 @@ export class SsoIdpRegistrationService {
       throw new SsoIssuerMultiTenantError({ issuer: registration.issuer, segment: null });
     }
     if (withoutTrailingSlashes(named) !== withoutTrailingSlashes(registration.issuer)) {
-      throw new SsoIssuerMismatchError({
-        expected: registration.issuer,
-        received: named,
-        at: "registration",
-      });
+      throw new SsoIssuerMismatchError({ expected: registration.issuer, received: named });
     }
-    return { issuer: named };
+    return { issuer: canonicalEntraIssuer(named) };
   }
 
   /** Checks a SAML registration and answers the document to keep. What is

@@ -25,6 +25,17 @@ const logger = createLogger("langwatch:identity:sso-issuer-discovery");
 /** The issuer a discovery document names for itself, which its tokens carry. */
 const discoveryIssuerSchema = z.object({ issuer: z.string().min(1) });
 
+/** The discovery fields the SSO engine reads an endpoint address from. */
+const ENDPOINT_FIELDS = [
+  "authorization_endpoint",
+  "token_endpoint",
+  "userinfo_endpoint",
+  "jwks_uri",
+  "end_session_endpoint",
+  "revocation_endpoint",
+  "introspection_endpoint",
+] as const;
+
 /** A discovery journey may canonicalise, but not wander, and not for long. */
 const DISCOVERY_TIMEOUT_MS = 5_000;
 
@@ -152,7 +163,15 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
         return { reachable: false, reason: "answered something else" };
       }
       const named = discoveryIssuerSchema.safeParse(document);
-      return named.success ? { reachable: true, issuer: named.data.issuer } : { reachable: true };
+      const record = document as Record<string, unknown>;
+      return {
+        reachable: true,
+        ...(named.success ? { issuer: named.data.issuer } : {}),
+        endpoints: ENDPOINT_FIELDS.flatMap((field) => {
+          const value = record[field];
+          return typeof value === "string" ? [value] : [];
+        }),
+      };
     } catch (error) {
       const reason = reasonFor({ error, aborted: controller.signal.aborted });
       logger.warn({ issuer, endpoint, reason, error }, "an sso issuer could not be reached");

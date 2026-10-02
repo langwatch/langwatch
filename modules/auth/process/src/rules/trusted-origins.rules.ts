@@ -36,6 +36,7 @@ export function resolveTrustedOrigins({
   trustedIdpOrigins,
   idpSimulatorUrl,
   registeredIssuers = [],
+  issuerEndpointOrigins = [],
   isProduction,
 }: {
   /** Where this instance believes it is served. */
@@ -54,6 +55,9 @@ export function resolveTrustedOrigins({
    *  `callbackURL`, so the whole set would make one tenant's registered
    *  origin a redirect target for every other tenant. */
   registeredIssuers?: string[];
+  /** Origins the discovery documents of `registeredIssuers` name for their
+   *  endpoints, already checked public by the module that owns them. */
+  issuerEndpointOrigins?: string[];
   isProduction: boolean;
 }): string[] {
   const origins = [
@@ -64,6 +68,7 @@ export function resolveTrustedOrigins({
       const origins = findOrigins(issuer);
       return origins.length === 0 ? [] : [...origins, ...entraEndpointOrigins(issuer)];
     }),
+    ...issuerEndpointOrigins.flatMap(findOrigins),
     ...originsIn(trustedIdpOrigins),
     ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
   ];

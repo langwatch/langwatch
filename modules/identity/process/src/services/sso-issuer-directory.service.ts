@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { normalizeDomain, type SsoIssuerDirectoryApi } from "@langwatch/identity-contract";
 
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
+import type { SsoIssuerEndpointOriginsService } from "./sso-issuer-endpoint-origins.service.ts";
 
 /**
  * Which issuers this installation's own connections registered — what the
@@ -9,11 +10,26 @@ import type { SsoConnectionReadRepository } from "../repositories/sso-connection
  * contains the next customer's provider; registration is the declaration.
  */
 export class SsoIssuerDirectoryService implements SsoIssuerDirectoryApi {
-  static create(deps: { connections: SsoConnectionReadRepository }): SsoIssuerDirectoryService {
-    return new SsoIssuerDirectoryService(deps.connections);
+  static create(deps: {
+    connections: SsoConnectionReadRepository;
+    /** Absent where nothing may be dialed to read a discovery document: the
+     *  issuers' own origins are then the only ones trusted. */
+    endpointOrigins?: SsoIssuerEndpointOriginsService;
+  }): SsoIssuerDirectoryService {
+    return new SsoIssuerDirectoryService(deps.connections, deps.endpointOrigins ?? null);
   }
 
-  private constructor(private readonly connections: SsoConnectionReadRepository) {}
+  private constructor(
+    private readonly connections: SsoConnectionReadRepository,
+    private readonly endpointOrigins: SsoIssuerEndpointOriginsService | null,
+  ) {}
+
+  /** The public https origins these issuers' discovery documents serve their
+   *  endpoints from. Read at sign-in, cached per issuer. */
+  async findEndpointOrigins({ issuers }: { issuers: readonly string[] }): Promise<string[]> {
+    if (!this.endpointOrigins || issuers.length === 0) return [];
+    return this.endpointOrigins.findEndpointOrigins({ issuers });
+  }
 
   /** Not restricted by lifecycle: an administrator testing a connection they
    *  have not activated yet is dialing it, and refusing that is the whole

@@ -57,7 +57,10 @@ export type SsoUserResolution =
   | Readonly<{ action: "link"; userId: string; profile: "preserve"; confirmAddress?: true }>
   | Readonly<{
       action: "reject";
-      code: "OAuthAccountNotLinked" | "sso_existing_account_unconfirmed";
+      code:
+        | "OAuthAccountNotLinked"
+        | "sso_existing_account_unconfirmed"
+        | "sso_domain_not_verified";
     }>;
 
 /**

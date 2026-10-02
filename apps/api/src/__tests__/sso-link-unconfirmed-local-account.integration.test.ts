@@ -922,6 +922,59 @@ describe.skipIf(!databaseUrl)("single sign-on onto an existing password account"
         expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
       });
     });
+
+    describe("when Microsoft Entra ID sends xms_edov true and the domain is not verified", () => {
+      /** @scenario "Microsoft Entra ID's xms_edov true links a confirmed account without a domain proof" */
+      it("links the existing account on the provider's word", async () => {
+        const issuer = entra("entra-confirmed-edov");
+        const { user, providerId } = await setUp({
+          label: "entra-confirmed-edov",
+          state: "DRAFT",
+          domainVerified: false,
+          issuer,
+          confirmed: true,
+        });
+        await identityProviderAsserts({
+          email: user.email,
+          subject: `entra-confirmed-edov-${SUITE}`,
+          issuer,
+          claims: { xms_edov: true },
+        });
+
+        const result = await signInThrough(selfHosted, providerId);
+
+        expect(result.error).toBeNull();
+        expect(result.session?.user.id).toBe(user.id);
+        expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+        expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
+      });
+    });
+
+    describe("when a provider that sends no email_verified signs it in before the domain is verified", () => {
+      /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+      it("refuses with sso_domain_not_verified and leaves the account as it was", async () => {
+        const issuer = entra("entra-confirmed-unproved");
+        const { user, providerId } = await setUp({
+          label: "entra-confirmed-unproved",
+          state: "DRAFT",
+          domainVerified: false,
+          issuer,
+          confirmed: true,
+        });
+        await identityProviderAsserts({
+          email: user.email,
+          subject: `entra-confirmed-unproved-${SUITE}`,
+          issuer,
+        });
+
+        const result = await signInThrough(selfHosted, providerId);
+
+        expect(result.error).toBe("sso_domain_not_verified");
+        expect(result.session).toBeNull();
+        expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+        expect(await addressConfirmed(user.id)).toBe(true);
+      });
+    });
   });
 
   describe("given an unconfirmed password account on LangWatch Cloud", () => {

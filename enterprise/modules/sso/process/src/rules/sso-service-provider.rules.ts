@@ -44,18 +44,23 @@ export function ssoServiceProviderAddresses({
   };
 }
 
-/** The provider ids a deployment names for its own sign-in, in a reader's words. */
+/**
+ * The provider ids a deployment names for its own sign-in, in the words the
+ * sign-in picker uses for them. Auth0 is a bridge there, offering the
+ * connections behind it; any id not listed is "single sign-on".
+ */
 const DEPLOYMENT_PROVIDER_NAMES: Readonly<Record<string, string>> = {
   "azure-ad": "Microsoft",
+  microsoft: "Microsoft",
   auth0: "Auth0",
-  cognito: "AWS Cognito",
+  cognito: "Amazon Cognito",
   github: "GitHub",
   gitlab: "GitLab",
   google: "Google",
   okta: "Okta",
   onelogin: "OneLogin",
-  oidc: "OpenID Connect",
 };
+const SINGLE_SIGN_ON = "single sign-on";
 
 export interface DeploymentSignIn {
   name: string;
@@ -77,7 +82,7 @@ export function findDeploymentSignIns({
   if (provider === "" || provider === "email") return [];
   return [
     {
-      name: DEPLOYMENT_PROVIDER_NAMES[provider] ?? provider,
+      name: DEPLOYMENT_PROVIDER_NAMES[provider] ?? SINGLE_SIGN_ON,
       redirectUrl: `${withoutTrailingSlashes(baseUrl)}/api/auth/callback/${provider}`,
     },
   ];

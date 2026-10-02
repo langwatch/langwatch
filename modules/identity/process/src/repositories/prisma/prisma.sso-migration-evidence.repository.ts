@@ -10,7 +10,7 @@ import type {
 /** The two models the pair's evidence is read through. */
 export type PrismaSsoMigrationEvidenceDatabase = Pick<
   PrismaClient,
-  "identifier" | "ssoAuthenticationActivity" | "$queryRaw"
+  "account" | "identifier" | "ssoAuthenticationActivity" | "$queryRaw"
 >;
 
 export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenceRepository {
@@ -71,13 +71,19 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     organizationId,
     connectionId,
     limit,
+    issuer = null,
   }: {
     organizationId: string;
     connectionId: string;
     limit: number;
+    issuer?: string | null;
   }): Promise<SsoAuthenticationRecord[]> {
     const rows = await this.database.ssoAuthenticationActivity.findMany({
-      where: { organizationId, connectionId },
+      where: {
+        organizationId,
+        connectionId,
+        ...(await this.throughIssuer({ connectionId, issuer })),
+      },
       orderBy: { authenticatedAt: "desc" },
       take: limit,
       select: { userId: true, authenticatedAt: true, providerAccountId: true },
@@ -95,17 +101,52 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
   async findLastAuthenticationAtMs({
     organizationId,
     connectionId,
+    issuer = null,
   }: {
     organizationId: string;
     connectionId: string;
+    issuer?: string | null;
   }): Promise<number | null> {
     const row = await this.database.ssoAuthenticationActivity.findFirst({
-      where: { organizationId, connectionId },
+      where: {
+        organizationId,
+        connectionId,
+        ...(await this.throughIssuer({ connectionId, issuer })),
+      },
       orderBy: { authenticatedAt: "desc" },
       select: { authenticatedAt: true },
     });
 
     return row?.authenticatedAt.getTime() ?? null;
+  }
+
+  /**
+   * Leaves out sign-ins whose subject the engine bound under another issuer
+   * (the trail carries no issuer, the account row does). A sign-in naming no
+   * subject, or an account written before the column, still counts.
+   */
+  private async throughIssuer({
+    connectionId,
+    issuer,
+  }: {
+    connectionId: string;
+    issuer: string | null;
+  }): Promise<{
+    OR?: ({ providerAccountId: null } | { providerAccountId: { notIn: string[] } })[];
+  }> {
+    if (issuer === null) return {};
+    const elsewhere = await this.database.account.findMany({
+      // The connection id is the provider, and it belongs to one organization.
+      where: { provider: connectionId, issuer: { not: null }, NOT: { issuer } },
+      select: { providerAccountId: true },
+    });
+    if (elsewhere.length === 0) return {};
+    return {
+      OR: [
+        { providerAccountId: null },
+        { providerAccountId: { notIn: elsewhere.map((row) => row.providerAccountId) } },
+      ],
+    };
   }
 
   async findLastAuthenticationByUser({

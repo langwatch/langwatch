@@ -45,12 +45,20 @@ export abstract class SsoMigrationEvidenceRepository {
     organizationId: string;
     connectionId: string;
     limit: number;
+    /** Only sign-ins through this issuer: one whose account the engine bound
+     *  under an issuer the connection no longer dials (its identity provider
+     *  was edited) is left out. Absent or null reads every sign-in. */
+    issuer?: string | null;
   }): Promise<SsoAuthenticationRecord[]>;
 
   /** When this connection last signed anybody in, or null. */
   abstract findLastAuthenticationAtMs(args: {
     organizationId: string;
     connectionId: string;
+    /** Only sign-ins through this issuer: one whose account the engine bound
+     *  under an issuer the connection no longer dials (its identity provider
+     *  was edited) is left out. Absent or null reads every sign-in. */
+    issuer?: string | null;
   }): Promise<number | null>;
 
   /** When it last signed each of these people in. Absent means never. */

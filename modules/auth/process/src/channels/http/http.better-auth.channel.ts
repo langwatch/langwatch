@@ -388,15 +388,18 @@ export const createAuthOptions = ({
    * because the answer is not fixed at boot, and only single sign-on requests
    * pay for the read. See `rules/trusted-origins.rules.ts`.
    */
-  trustedOrigins: async (request) =>
-    resolveTrustedOrigins({
+  trustedOrigins: async (request) => {
+    const registeredIssuers = await ssoIssuers.issuersForRequest(request);
+    return resolveTrustedOrigins({
       baseUrl: deployment.baseUrl,
       publicBaseUrl: deployment.publicBaseUrl,
       trustedIdpOrigins: deployment.trustedIdpOrigins,
       idpSimulatorUrl: deployment.idpSimulatorUrl,
-      registeredIssuers: await ssoIssuers.issuersForRequest(request),
+      registeredIssuers,
+      issuerEndpointOrigins: (await ssoIssuers.endpointOriginsFor?.(registeredIssuers)) ?? [],
       isProduction: deployment.isProduction,
-    }),
+    });
+  },
   secret: deployment.secret,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
@@ -815,6 +818,9 @@ export async function resolveSsoUser({
  */
 export interface BetterAuthSsoIssuers {
   issuersForRequest(request: Request | undefined): Promise<string[]>;
+  /** The public origins those issuers' discovery documents serve endpoints
+   *  from. Absent, only the issuers' own origins are trusted. */
+  endpointOriginsFor?(issuers: readonly string[]): Promise<string[]>;
 }
 
 /**

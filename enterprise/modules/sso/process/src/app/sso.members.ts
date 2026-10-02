@@ -27,6 +27,8 @@ import type {
   SsoSetupArrivalsInput,
   SsoSetupConnectionInput,
   SsoSetupDomainInput,
+  SsoSetupIdentityProviderUpdate,
+  SsoSetupIdentityProviderView,
   SsoSetupMigration,
   SsoSetupMigrationProgressInput,
   SsoSetupMigrationRouteInput,
@@ -121,6 +123,14 @@ export interface SsoSetupCommandLedger {
   finalizeLegacyMigration(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
   rename(
     input: SsoSetupConnectionInput & { name: string },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  /** A grandfathered connection answers `grandfathered`: it has no settings of its own. */
+  getIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | { protocol: "grandfathered" }>;
+  updateIdentityProvider(
+    input: SsoSetupConnectionInput & { idp: SsoSetupIdentityProviderUpdate },
     actor: SsoSelfServeActor,
   ): Promise<void>;
   setArrivals(

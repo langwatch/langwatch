@@ -486,6 +486,7 @@ export async function buildBetterAuth(
         findIssuersForConnection: (args) =>
           options.identityApi.ssoIssuers().findIssuersForConnection(args),
         findIssuersForDomain: (args) => options.identityApi.ssoIssuers().findIssuersForDomain(args),
+        findEndpointOrigins: (args) => options.identityApi.ssoIssuers().findEndpointOrigins(args),
       },
       logger,
     }),

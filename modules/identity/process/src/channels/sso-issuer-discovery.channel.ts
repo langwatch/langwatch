@@ -4,13 +4,14 @@
  * reason is what says which.
  */
 export type SsoIssuerDiscovery =
-  /** `issuer` is the one the discovery document names, when it names one. */
-  { reachable: true; issuer?: string } | { reachable: false; reason: string };
+  /** `issuer` is the one the discovery document names, when it names one;
+   *  `endpoints` are the endpoint addresses it lists. */
+  { reachable: true; issuer?: string; endpoints?: string[] } | { reachable: false; reason: string };
 
 /**
- * Asking an issuer whether it is one. Runs once, at registration, to turn
- * "I typed the address wrong" into a sentence on the screen rather than a
- * redirect that fails later on somebody else's sign-in.
+ * Asking an issuer whether it is one: at registration, so a mistyped address is
+ * a sentence on the screen rather than a later failed redirect, and before a
+ * sign-in, to read which origins the issuer's endpoints live on.
  */
 export interface SsoIssuerDiscoveryChannel {
   discover(args: { issuer: string }): Promise<SsoIssuerDiscovery>;

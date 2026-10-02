@@ -6,6 +6,7 @@ import {
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
   ssoDomainClaimAuthoritySchema,
+  ssoIdpDialingSchema,
   ssoIdpMetadataSchema,
   ssoMigrationRouteSchema,
   ssoAttestationEvidenceRefSchema,
@@ -53,6 +54,12 @@ export const RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE =
 export const SET_ARRIVAL_POLICY_COMMAND_TYPE = "lw.identity.set_arrival_policy" as const;
 /** The word on the card, changed. Nothing routes on it (ADR-117). */
 export const RENAME_CONNECTION_COMMAND_TYPE = "lw.identity.rename_connection" as const;
+/**
+ * Replacing what the engine dials on an existing connection. Its own verb, not a
+ * discard and a fresh registration, because the connection id keys the redirect
+ * address at the identity provider, and with it domains, proofs and accounts.
+ */
+export const UPDATE_CONNECTION_IDP_COMMAND_TYPE = "lw.identity.update_connection_idp" as const;
 /** The legacy-to-direct cutover, in four verbs: register the one replacement
  *  an organization may run beside its grandfathered connection, choose which
  *  of the pair decides sign-ins, open the durable finalization gate, and
@@ -84,6 +91,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
   RENAME_CONNECTION_COMMAND_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
@@ -174,6 +182,16 @@ export const renameConnectionCommandDataSchema = commandDataSchema(
   }),
 );
 export type RenameConnectionCommandData = z.infer<typeof renameConnectionCommandDataSchema>;
+
+/** The identity provider's dialing information, as references already in the
+ *  credential store. The name is not part of it. */
+export const updateConnectionIdpCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    idp: ssoIdpDialingSchema,
+  }),
+);
+export type UpdateConnectionIdpCommandData = z.infer<typeof updateConnectionIdpCommandDataSchema>;
 
 /** The raw domain as it was typed; the guard normalizes it, and only the
  *  normalized form ever reaches a fact. */
@@ -406,6 +424,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof RENAME_CONNECTION_COMMAND_TYPE;
       data: RenameConnectionCommandData;
+    }
+  | {
+      type: typeof UPDATE_CONNECTION_IDP_COMMAND_TYPE;
+      data: UpdateConnectionIdpCommandData;
     }
   | {
       type: typeof REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE;
