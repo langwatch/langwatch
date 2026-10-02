@@ -9,7 +9,13 @@
  * @see specs/lwql/eval-functions.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  instanceIdentityTable,
+  LANGWATCH_KEYS,
+  LICENSE,
+} from "@ee/licensing/connect/install/__tests__/installFakes";
+import { resetInstanceIdentity } from "@ee/licensing/connect/install/instanceIdentity";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -17,9 +23,27 @@ import {
   instantEvalsReleased,
   organizationOfProject,
 } from "../access";
+import { resetInstantEvalClassifier } from "../classifier";
 
 const flag = vi.hoisted(() => ({ isEnabled: vi.fn(async () => false) }));
 vi.mock("~/server/featureFlag", () => ({ featureFlagService: flag }));
+
+/**
+ * An install that sets nothing: self-hosted, no judge key of its own, Connect
+ * permitted. The license read below runs for real on it.
+ */
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
+vi.mock("~/env.mjs", () => ({ env }));
+
+/** The organization row the deployment's classifier reads its license from. */
+const db = vi.hoisted(() => ({
+  row: {
+    license: null as string | null,
+    connectServicesDisabled: [] as string[],
+  },
+  prisma: {} as Record<string, unknown>,
+}));
+vi.mock("~/server/db", () => ({ prisma: db.prisma }));
 
 /** A Prisma that fails loudly, so a reach for it is observable either way. */
 const REACHED = "the gate read the project";
@@ -118,10 +142,48 @@ describe("given the flag is off on a self-hosted install that judges through Lan
   });
 
   describe("when an admin switched hosted judging off", () => {
+    beforeEach(async () => {
+      for (const key of Object.keys(env)) delete env[key];
+      process.env.LANGWATCH_LICENSE_PUBLIC_KEY = LANGWATCH_KEYS.publicKey;
+      resetInstanceIdentity();
+      await resetInstantEvalClassifier();
+      db.row.license = LICENSE.licenseKey;
+      db.row.connectServicesDisabled = ["instant_evals"];
+      db.prisma.organization = { findUnique: async () => ({ ...db.row }) };
+      db.prisma.instanceIdentity = instanceIdentityTable();
+    });
+
+    afterEach(async () => {
+      await resetInstantEvalClassifier();
+      delete process.env.LANGWATCH_LICENSE_PUBLIC_KEY;
+    });
+
     /** @scenario "An admin who switched hosted judging off keeps it off" */
-    it("answers no, from the license and the switch alike", async () => {
-      // The license read is false here because `isAvailableForOrganization`
-      // is: the Connect classifier reads the admin's switch-off as off.
+    it("answers no from the license read, which sees the admin's switch", async () => {
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-switched-off-organization",
+          isOptedIn: async () => false,
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers yes for the same license once the admin switches it back on", async () => {
+      // The contrast that makes the answer above the switch's: same license,
+      // same install, only the organization's switch differs.
+      db.row.connectServicesDisabled = [];
+
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-switched-on-organization",
+          isOptedIn: async () => false,
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it("refuses before asking the license when a project asks whether it may judge", async () => {
       await expect(
         instantEvalsEnabled({
           prisma: QUIET_PRISMA,
@@ -131,14 +193,6 @@ describe("given the flag is off on a self-hosted install that judges through Lan
           isLicensed: async () => {
             throw new Error("an unavailable classifier never asks the license");
           },
-          isOptedIn: async () => false,
-        }),
-      ).resolves.toBe(false);
-      await expect(
-        instantEvalsReleased({
-          prisma: QUIET_PRISMA,
-          projectId: "project-of-a-switched-off-organization",
-          isLicensed: async () => false,
           isOptedIn: async () => false,
         }),
       ).resolves.toBe(false);
