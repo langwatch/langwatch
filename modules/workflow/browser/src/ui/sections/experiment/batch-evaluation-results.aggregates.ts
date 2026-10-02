@@ -1,4 +1,8 @@
-import { computeMetricStats, type MetricStats } from "@langwatch/experiment-contract";
+import {
+  computeMetricStats,
+  type EvaluatorAggregate,
+  type TargetAggregate,
+} from "@langwatch/experiment-contract";
 
 /**
  * Compute aggregate statistics from batch evaluation data.
@@ -11,55 +15,12 @@ import type {
   BatchTargetOutput,
 } from "./batch-evaluation-results.types.ts";
 
-/**
- * Aggregate statistics for a target's evaluator results.
- */
-export type BatchEvaluatorAggregate = {
-  evaluatorId: string;
-  evaluatorName: string;
-  /** Total results processed */
-  total: number;
-  /** Number of passed evaluations */
-  passed: number;
-  /** Number of failed evaluations */
-  failed: number;
-  /** Number of errors */
-  errors: number;
-  /** Pass rate as percentage (0-100) */
-  passRate: number | null;
-  /** Average score (if scores are available) */
-  averageScore: number | null;
-};
+/** The contract's evaluator aggregate, named for the batch view. */
+export type BatchEvaluatorAggregate = EvaluatorAggregate & { evaluatorName: string };
 
-/**
- * Aggregate statistics for a target in batch results.
- */
-export type BatchTargetAggregate = {
-  targetId: string;
-  /** Total rows with results */
-  completedRows: number;
-  /** Total rows */
-  totalRows: number;
-  /** Number of rows with errors */
-  errorRows: number;
-  /** Per-evaluator aggregates */
+/** The contract's target aggregate, with batch evaluator aggregates. */
+export type BatchTargetAggregate = Omit<TargetAggregate, "evaluators"> & {
   evaluators: BatchEvaluatorAggregate[];
-  /** Overall pass rate across all evaluators */
-  overallPassRate: number | null;
-  /** Overall average score across all evaluators with scores */
-  overallAverageScore: number | null;
-  /** Average cost in USD */
-  averageCost: number | null;
-  /** Total cost in USD */
-  totalCost: number | null;
-  /** Average latency in milliseconds */
-  averageLatency: number | null;
-  /** Total execution time in milliseconds */
-  totalDuration: number | null;
-  /** Detailed latency statistics */
-  latencyStats: MetricStats | null;
-  /** Detailed cost statistics */
-  costStats: MetricStats | null;
 };
 
 /**

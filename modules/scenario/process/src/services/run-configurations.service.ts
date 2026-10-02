@@ -3,6 +3,7 @@ import {
   parseRunParametersJson,
   withoutParameterNames,
   type ResultsFilter,
+  type RunConfigurationEntryResponse,
   type RunParameterValues,
 } from "@langwatch/scenario-contract";
 import {
@@ -13,6 +14,7 @@ import {
   splitTargetKey,
   suiteTargetSchema,
   targetKeyOf,
+  type PlanConfig,
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
@@ -41,21 +43,10 @@ function defaultConfigurationWindowStart(now = nowInstant().epochMilliseconds): 
  * What a configuration covers, with the hand-picked list inside the rule. The stored scope names no
  * scenarios, because a plan keeps its hand-picked list in its own `scenarioIds` column.
  */
-export type RunConfigurationScope =
-  | { mode: "all" }
-  | { mode: "test_suites"; testSuiteIds: string[] }
-  | { mode: "labels"; labels: string[] }
-  | { mode: "scenarios"; scenarioIds: string[] };
+export type RunConfigurationScope = RunConfigurationEntryResponse["configuration"]["scope"];
 
 /** Everything a picked entry puts back into the run dialog. */
-export interface RunConfiguration {
-  scope: RunConfigurationScope;
-  /** Stably sorted, so "dev vs prod" and "prod vs dev" are one configuration. */
-  targets: SuiteTarget[];
-  repeatCount: number;
-  simulatorModel: string | null;
-  judgeModel: string | null;
-}
+export type RunConfiguration = Omit<PlanConfig, "scope"> & { scope: RunConfigurationScope };
 
 /** One line of the Run name dropdown. */
 export interface RunConfigurationEntry {

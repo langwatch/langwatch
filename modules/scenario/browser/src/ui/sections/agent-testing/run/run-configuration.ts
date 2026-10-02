@@ -3,24 +3,23 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { RunParameterValues } from "@langwatch/scenario-contract";
+import type {
+  RunConfigurationEntryResponse,
+  RunParameterValues,
+} from "@langwatch/scenario-contract";
 import {
   configurationKey,
   scopeKey,
   targetLabels as labelTargets,
   targetSortKey,
 } from "@langwatch/suite-contract";
-import type { SuiteScope, SuiteTarget } from "@langwatch/suite-contract";
+import type { PlanConfig, SuiteScope, SuiteTarget } from "@langwatch/suite-contract";
 import type { Instant } from "@langwatch/time";
 
 /**
  * What a run covers, as the dialog holds it.
  */
-export type RunScope =
-  | { mode: "all" }
-  | { mode: "test_suites"; testSuiteIds: string[] }
-  | { mode: "labels"; labels: string[] }
-  | { mode: "scenarios"; scenarioIds: string[] };
+export type RunScope = RunConfigurationEntryResponse["configuration"]["scope"];
 
 /** The scope as the server stores it: the rule, without the hand-picked list. */
 export function toSuiteScope(scope: RunScope): SuiteScope {
@@ -45,14 +44,7 @@ export function normaliseRunScope({
 }
 
 /** Everything a picked entry puts back into the dialog. */
-export type RunConfiguration = {
-  scope: RunScope;
-  /** Stably sorted, so "dev vs prod" and "prod vs dev" are one configuration. */
-  targets: SuiteTarget[];
-  repeatCount: number;
-  simulatorModel: string | null;
-  judgeModel: string | null;
-};
+export type RunConfiguration = Omit<PlanConfig, "scope"> & { scope: RunScope };
 
 /** One line of the run name dropdown. */
 export type RunConfigurationEntry = {

@@ -4,6 +4,7 @@
 
 import type { ScenarioRunStatus } from "./scenario-run.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { ResultsOverviewResponse } from "./scenario.responses.ts";
 import type { ScenarioEvaluationStatus } from "./schemas/event-schemas.ts";
 
 /** The target key a run carries when it names no platform target. */
@@ -189,23 +190,8 @@ export interface ResultGroup {
   cost: AtomCost;
 }
 
-export interface ResultTotals {
-  /** Atoms in scope. */
-  executions: number;
-  /** Distinct runs in scope. */
-  runCount: number;
-  passRate: number | null;
-  /** Distinct scenarios with at least one failed atom. */
-  failingScenarios: number;
-  cost: AtomCost;
-  /** Pass rate over time, oldest first. */
-  series: SeriesBucket[];
-}
-
-export interface ResultsOverview {
-  totals: ResultTotals;
-  groups: ResultGroup[];
-}
+export type ResultsOverview = ResultsOverviewResponse;
+export type ResultTotals = ResultsOverview["totals"];
 
 /** Scope filter for results; shared between overview and atom list to ensure
  * consistent page views.

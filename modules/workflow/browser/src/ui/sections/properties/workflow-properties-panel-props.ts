@@ -1,3 +1,4 @@
+import type { HttpProxyResult } from "@langwatch/agent-contract";
 import type {
   ComponentType as WorkflowComponentType,
   Field,
@@ -70,19 +71,7 @@ export type WorkflowHttpConfigProps = {
   onTest: (templateVariables: Record<string, unknown>) => Promise<WorkflowHttpTestResult>;
 };
 
-export type WorkflowHttpTestResult = {
-  success: boolean;
-  response?: unknown;
-  extractedOutput?: string;
-  error?: string;
-  errorCode?: string;
-  status?: number;
-  statusText?: string;
-  duration?: number;
-  responseHeaders?: Record<string, string>;
-  renderedBody?: string;
-  warnings?: string[];
-};
+export type WorkflowHttpTestResult = HttpProxyResult;
 
 export type WorkflowHttpTestConfig = Pick<
   WorkflowHttpConfigProps,

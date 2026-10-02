@@ -4,16 +4,12 @@ import {
   type DatasetColumnType,
   type DatasetRecordEntry,
   type DatasetRecordInput,
+  type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import type { Field, NodeDataset } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-export type StudioInMemoryDataset = {
-  datasetId?: string;
-  name?: string;
-  datasetRecords: DatasetRecordEntry[];
-  columnTypes: DatasetColumns;
-};
+export type StudioInMemoryDataset = InMemoryDataset;
 
 const storedStudioDatasetRecordSchema = z
   .object({
