@@ -4,14 +4,15 @@ import { useState } from "react";
 import { parseSnippet } from "~/features/onboarding/regions/observability/codegen/snippets";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { API_KEY_PLACEHOLDER } from "../shared/build-mcp-config";
 import { CodePreview } from "./CodePreview";
 
 export function OpenTelemetrySetup(): React.ReactElement {
-  const { project } = useActiveProject();
+  const { freshToken } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [isVisible, setIsVisible] = useState(false);
 
-  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
   const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
 
   function toggleVisibility(): void {
@@ -74,8 +75,8 @@ service:
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
-          sensitiveValue={effectiveApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           onToggleVisibility={toggleVisibility}
         />
@@ -101,8 +102,8 @@ service:
           filename="collector-config.yaml"
           languageIconUrl="/images/external-icons/otel.svg"
           codeLanguage="yaml"
-          sensitiveValue={effectiveApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           highlightLines={highlightLines}
           onToggleVisibility={toggleVisibility}

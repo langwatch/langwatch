@@ -80,6 +80,10 @@ const GLOBAL_MODELS = [
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
+  // The server-only credential a project's internal callers authenticate
+  // with. Authentication reads it by token hash before any project is known,
+  // the same posture as `Project` read by its API key hash.
+  "ProjectInternalKey",
   // Cluster-wide kill switches; one row per flag key, no tenant column. Keeps
   // system-scoped flags off PostHog (see /ops/feature-flags).
   "FeatureFlag",

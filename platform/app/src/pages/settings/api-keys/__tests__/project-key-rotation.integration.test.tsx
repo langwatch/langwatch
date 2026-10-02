@@ -1,16 +1,16 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for rotating the legacy project base API key from the
- * Settings > API Keys page (project-key-rotation.feature).
+ * Integration tests for the "Project API Key" row of the Settings > API Keys
+ * page (project-key-rotation.feature, and the display scenarios of
+ * project-key-hashed-storage.feature).
  *
- * The unified-keys rework removed the UI to rotate the project base/legacy
- * key. These tests cover restoring that control on the legacy "Project API
- * Key" row: it is permission-gated on `project:manage`, opens the reused
- * regenerate-confirm dialog, and drives the `project.regenerateApiKey`
- * mutation. A failed rotation surfaces an error toast. The success path
- * drives through `TokenCreatedDialog`, whose dynamic ShikiCommandBox import
- * is stubbed synchronously so the new key is assertable in jsdom.
+ * The row shows only the last four characters of the key, offers rotation
+ * only (permission-gated on `project:manage`), opens the regenerate-confirm
+ * dialog and drives the `project.regenerateApiKey` mutation. A failed rotation
+ * surfaces an error toast. The success path drives through
+ * `TokenCreatedDialog`, whose dynamic ShikiCommandBox import is stubbed
+ * synchronously so the new key is assertable in jsdom.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -106,13 +106,14 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 
 // Built once via vi.hoisted and returned by reference on every call — a fresh
 // literal per call busts the useMemo([organization]) inside useAvailableScopes
-// and hangs the worker. `project.apiKey` is mutated per test to toggle the
-// legacy project-key row; `hasPermission` is parametrized per test.
+// and hangs the worker. `project.apiKeyLast4` is mutated per test;
+// `hasPermission` is parametrized per test. The browser never holds the key
+// itself, so the project carries no `apiKey`.
 const otpMocks = vi.hoisted(() => ({
   project: {
     id: "proj-1",
     name: "Project Alpha",
-    apiKey: null as string | null,
+    apiKeyLast4: null as string | null,
   },
   canManage: true,
 }));
@@ -163,7 +164,7 @@ const ROTATE_LABEL = "Rotate Project API Key";
 describe("<ApiKeysSection /> project base key rotation", () => {
   beforeEach(() => {
     for (const k of Object.keys(mockRouterQuery)) delete mockRouterQuery[k];
-    otpMocks.project.apiKey = "sk-lw-legacybasekeysecretabcd";
+    otpMocks.project.apiKeyLast4 = "abcd";
     otpMocks.canManage = true;
     regenerateImpl.current = undefined;
     vi.clearAllMocks();
@@ -171,8 +172,20 @@ describe("<ApiKeysSection /> project base key rotation", () => {
   });
   afterEach(() => cleanup());
 
-  describe("given a legacy project key and permission to manage the project", () => {
-    describe("when viewing the legacy project key row", () => {
+  describe("given a project key and permission to manage the project", () => {
+    describe("when viewing the project key row", () => {
+      /** @scenario "The settings page shows only the last four characters" */
+      it("shows only the last four characters and offers no reveal or copy", () => {
+        renderSection();
+        expect(screen.getByText("sk-lw-…abcd")).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /copy/i }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /show|reveal/i }),
+        ).not.toBeInTheDocument();
+      });
+
       /** @scenario An admin rotates the base key and sees the new key once */
       it("offers a control to rotate the project base API key", () => {
         renderSection();
@@ -250,12 +263,29 @@ describe("<ApiKeysSection /> project base key rotation", () => {
     });
   });
 
-  describe("given a legacy project key but no permission to manage the project", () => {
+  describe("given a key stored before its last four characters were recorded", () => {
+    beforeEach(() => {
+      otpMocks.project.apiKeyLast4 = null;
+    });
+
+    describe("when viewing the project key row", () => {
+      /** @scenario "The settings page shows only the last four characters" */
+      it("still shows the row with its rotate control", () => {
+        renderSection();
+        expect(screen.getByText("sk-lw-…")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: ROTATE_LABEL }),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a project key but no permission to manage the project", () => {
     beforeEach(() => {
       otpMocks.canManage = false;
     });
 
-    describe("when viewing the legacy project key row", () => {
+    describe("when viewing the project key row", () => {
       /** @scenario Rotation requires permission to manage the project */
       it("does not render the secret-bearing legacy key row", () => {
         renderSection();

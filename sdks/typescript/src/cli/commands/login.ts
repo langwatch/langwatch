@@ -467,8 +467,8 @@ export const loginCommand = async (
       await runDeviceFlowLogin({ browser: options?.browser });
     }
     if (mode.mode === "api-key" || mode.mode === "both") {
-      // The browser page shows a project picker; approving sends that
-      // project's existing API key back to the CLI over the same RFC 8628
+      // The browser page shows a project picker; approving sends an API key
+      // for that project back to the CLI over the same RFC 8628
       // poll endpoint as the device-session flow. No copy-paste of the
       // credential ever.
       await runUnifiedLoginFlow({

@@ -63,7 +63,7 @@ describe("Prompt tags appear in prompt responses", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
 
     const configData = llmPromptConfigFactory.build({
       projectId: testProject.id,

@@ -61,7 +61,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   private readonly config: WorkflowAgentData;
   private readonly nlpServiceUrl: string;
   /**
-   * The LangWatch platform API key (project.apiKey), sent as
+   * The project internal key (see `getProjectInternalKey`), sent as
    * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
    * on its callbacks into the platform (agentblock/workflow_runner.go,
    * evaluatorblock/executor.go, engine.go) — never an LLM provider

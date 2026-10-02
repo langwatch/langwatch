@@ -218,7 +218,10 @@ export const useOrganizationTeamProject = (
         // stay empty/null rather than fake. The explicit `Project` annotation
         // (no `as` cast) makes the compiler flag any new required column, so a
         // future field can never silently ship unset here. See ADR-057.
-        apiKey: "",
+        apiKey: null,
+        apiKeyHash: null,
+        apiKeyLast4: null,
+        apiKeyHashedAt: null,
         lwqlKey: "",
         teamId: "",
         kind: "application",

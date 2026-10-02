@@ -73,6 +73,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { app } from "../auth-cli";
 
 const suffix = ids.suffix;
@@ -162,7 +164,11 @@ describe("CLI login personal-project guards", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      // A project-key exchange mints the person's key, which writes grants.
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
     await prisma.organization.create({
       data: {
         id: ORG_ID,
@@ -343,6 +349,7 @@ describe("CLI login personal-project guards", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
     });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     // The device-session exchange now mints a user-scoped CLI ApiKey (plus
     // its private custom role); ApiKey→Organization is a Restrict relation,
     // so these go before the organization delete.
@@ -707,21 +714,33 @@ describe("CLI login personal-project guards", () => {
       });
     });
 
-    describe("when the base key rotates between approval and exchange", () => {
-      /** @scenario project-login exchange returns a key rotated after approval */
-      it("returns the current key rather than the cached approval secret", async () => {
-        const rotatedKey = `sk-lw-rotated-${suffix}-${"r".repeat(34)}`;
-        const dc = await mintDeviceCodePair("project_api_key");
-        const approved = await approve({
-          user_code: dc.userCode,
-          project_id: SHARED_PROJECT_ID,
-        });
-        expect(approved.status).toBe(200);
-        await prisma.project.update({
-          where: { id: SHARED_PROJECT_ID },
-          data: { apiKey: rotatedKey },
+    describe("when an approved project login is exchanged", () => {
+      /** @scenario project-login exchange never hands out the base API key */
+      it("hands the person a key of their own and stores none on the approval", async () => {
+        // The minted key is capped by the person's own access, which the
+        // RBAC mock above does not reach: hold the real binding here.
+        const binding = await seedRoleBinding(prisma, {
+          id: `rb-guard-handout-${suffix}`,
+          organizationId: ORG_ID,
+          userId: USER_ID,
+          role: "ADMIN",
+          scopeType: "TEAM",
+          scopeId: TEAM_ID,
         });
         try {
+          const dc = await mintDeviceCodePair("project_api_key");
+          const approved = await approve({
+            user_code: dc.userCode,
+            project_id: SHARED_PROJECT_ID,
+          });
+          expect(approved.status).toBe(200);
+          const record = await redisConnection!.get(
+            `lwcli:device:${dc.deviceCode}`,
+          );
+          expect(record).not.toBeNull();
+          expect(record).not.toContain(SHARED_API_KEY);
+          expect(record).not.toContain('api_key":"sk-lw-');
+
           const exchange = await app.request("/api/auth/cli/exchange", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -731,12 +750,15 @@ describe("CLI login personal-project guards", () => {
           const body = apiKeyExchangeResponseSchema.parse(
             await exchange.json(),
           );
-          expect(body.api_key).toBe(rotatedKey);
+          expect(body.api_key).toMatch(/^sk-lw-[A-Za-z0-9]+_/);
           expect(body.api_key).not.toBe(SHARED_API_KEY);
+          expect(body.project.id).toBe(SHARED_PROJECT_ID);
         } finally {
-          await prisma.project.update({
-            where: { id: SHARED_PROJECT_ID },
-            data: { apiKey: SHARED_API_KEY },
+          await prisma.grant.deleteMany({
+            where: { organizationId: ORG_ID, id: binding.id },
+          });
+          await prisma.roleBinding.deleteMany({
+            where: { organizationId: ORG_ID, id: binding.id },
           });
         }
       });

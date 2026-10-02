@@ -6,9 +6,12 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   # Background
   #
   # Device login stores a session in ~/.langwatch/config.json and the server
-  # ensures a personal workspace (team + project) for the user. The personal
-  # project is a normal project with a normal apiKey, so commands like
-  # `langwatch trace search` can authenticate with it directly. The CLI
+  # ensures a personal workspace (team + project) for the user. The login
+  # hands the session an API key of the user's own for the personal project
+  # (the project API key itself is stored as a hash and never handed out), so
+  # commands like `langwatch trace search` can authenticate with it directly.
+  # The key is minted under the session's login key and dies with the
+  # session. The CLI
   # resolves credentials in a fixed priority order and tells the user, on
   # stderr, which identity a command ran as.
   #
@@ -38,8 +41,8 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   # ─────────────────────────────────────────────────────────────────────
   # Revocation cannot be bypassed by the cached key
   #
-  # The cached key is a long-lived Project.apiKey, not a session-bound token,
-  # so trusting it forever would let a stolen ~/.langwatch/config.json keep
+  # The cached key is a long-lived API key, not a session-bound token, so
+  # trusting it forever would let a stolen ~/.langwatch/config.json keep
   # working after the device was revoked from the devices inventory. The resolver trusts
   # the cache only within a short window; past it, it re-confirms the session
   # is live before using the key, and drops the key when the session is gone.

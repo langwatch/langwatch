@@ -77,8 +77,8 @@ export interface ExchangeCliApiKeyScope {
  * The CLI device-code flow can mint two distinct credential types:
  *   - "device_session" — the user-scoped OAuth-style access+refresh
  *     token pair used by `langwatch claude/codex/...` wrappers.
- *   - "project_api_key" — the project-scoped SDK key
- *     (`Project.apiKey`) returned verbatim, used by SDK consumers
+ *   - "project_api_key": an API key bound to the picked project, owned
+ *     by the user who approved, used by SDK consumers
  *     and `langwatch sync/eval/prompt/...` commands.
  *
  * Caller selects via `startDeviceCode({ credentialType })`. Server

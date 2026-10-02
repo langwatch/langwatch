@@ -75,9 +75,8 @@ interface IntegrateDrawerProps {
  * hero) so the empty state stays a quiet, atmospheric preview while
  * the drawer becomes the focused "I'm doing real setup now" surface.
  *
- * Once minted, the freshly-scoped PAT is plumbed through every path
- * via `ActiveProjectProvider` — every lifted onboarding screen reads
- * `project.apiKey` unmodified and gets the right credential.
+ * Once minted, the freshly-scoped key is plumbed through every path
+ * via `ActiveProjectProvider` as `freshToken`.
  */
 export function IntegrateDrawer({
   open,
@@ -93,7 +92,7 @@ export function IntegrateDrawer({
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
-    project: token ? { ...project, apiKey: token } : project,
+    project,
     organization,
     freshToken: token ?? undefined,
     onFreshToken: setToken,

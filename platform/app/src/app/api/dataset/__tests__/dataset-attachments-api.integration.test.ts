@@ -152,7 +152,7 @@ describe("Feature: Attach files to dataset cells", () => {
         personalFeatures: {},
       },
     });
-    apiKey = project.apiKey;
+    apiKey = project.apiKey!;
   });
 
   afterEach(async () => {

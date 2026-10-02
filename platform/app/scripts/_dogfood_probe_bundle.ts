@@ -47,7 +47,7 @@ async function probe(secret: string) {
     `  → eligible MPs:     ${eligibleMPs.map((m) => `${m.provider}(${m.id.slice(0, 8)}…)`).join(", ") || "(empty)"}`,
   );
   console.log(
-    `  → traceProject:     ${traceProject ? `${traceProject.id} (apiKey=${traceProject.apiKey.slice(0, 12)}…)` : "null (no project_id on bundle)"}`,
+    `  → traceProject:     ${traceProject ? traceProject.id : "null (no project_id on bundle)"}`,
   );
   console.log(`  → bundle.project_id:        ${bundle.project_id ?? "null"}`);
   console.log(`  → bundle.team_id:           ${bundle.team_id ?? "null"}`);

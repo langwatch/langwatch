@@ -47,6 +47,7 @@ import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
 import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -181,12 +182,13 @@ export interface WorkflowVersionFetcher {
 /**
  * Minimal interface for project lookup.
  *
- * The organization comes along because minting a run's sandbox key needs it,
- * and the project row is already being read.
+ * `internalKey` is the project internal key (see `getProjectInternalKey`), the
+ * credential the run's child process reports telemetry with. The organization
+ * comes along because minting a run's sandbox key needs it.
  */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
-    apiKey: string | null;
+    internalKey: string;
     team: { organizationId: string } | null;
   } | null>;
 }
@@ -473,8 +475,8 @@ export async function prefetchScenarioData({
     context.projectId,
   );
 
-  // The child's environment needs only the scenario's labels and the project's
-  // API key, and those two land well before the adapter, suite config and
+  // The child's environment needs only the scenario's labels and the project
+  // internal key, and those two land well before the adapter, suite config and
   // model params. Announcing them here lets the caller start the child booting
   // against the slow half of this function instead of after it — the child is
   // still one fresh process per run, only started sooner.
@@ -484,7 +486,7 @@ export async function prefetchScenarioData({
   if (onChildEnvReady) {
     void Promise.all([scenarioPromise, projectPromise])
       .then(([scenario, project]) => {
-        if (!scenario || !project.success || !project.data.apiKey) return;
+        if (!scenario || !project.success) return;
         onChildEnvReady({
           labels: scenario.config.labels,
           telemetry: {
@@ -568,7 +570,7 @@ export async function prefetchScenarioData({
   //     model when set, else the project's scenarios.agent_under_test
   //     DEFAULT-role default. workflow / code / http targets never consume
   //     an LLM key for the agent under test — the workflow/code adapters
-  //     send the project's platform API key instead (see
+  //     send the project internal key instead (see
   //     serialized-adapter.registry.ts) and http needs neither — so
   //     resolving and preparing one for them is skipped entirely rather
   //     than risking a project whose FAST/coding default is a
@@ -848,13 +850,10 @@ async function fetchProject(
   if (!project) {
     return { success: false, error: `Project ${projectId} not found` };
   }
-  if (!project.apiKey) {
-    return { success: false, error: `Project ${projectId} missing API key` };
-  }
   return {
     success: true,
     data: {
-      apiKey: project.apiKey,
+      apiKey: project.internalKey,
       organizationId: project.team?.organizationId ?? null,
     },
   };
@@ -1558,11 +1557,17 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       },
     },
     projectFetcher: {
-      findUnique: async (projectId) =>
-        prisma.project.findUnique({
+      findUnique: async (projectId) => {
+        const project = await prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true, team: { select: { organizationId: true } } },
-        }),
+          select: { team: { select: { organizationId: true } } },
+        });
+        if (!project) return null;
+        return {
+          internalKey: await getProjectInternalKey({ prisma, projectId }),
+          team: project.team,
+        };
+      },
     },
     sandboxKeyMinter: {
       mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),

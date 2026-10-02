@@ -1,14 +1,11 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
 import { GenerateApiSnippetButton } from "../../../../components/GenerateApiSnippetButton";
 import { GeneratePromptApiSnippetDialog } from "../../../components/GeneratePromptApiSnippetDialog";
 import { EditablePromptHandleField } from "../../fields/EditablePromptHandleField";
 
 export function PromptHandleInfo() {
-  const { project } = useOrganizationTeamProject();
-  const { apiKey } = project ?? {};
   const form = useFormContext<PromptConfigFormValues>();
   const handle = form.watch("handle");
 
@@ -25,7 +22,7 @@ export function PromptHandleInfo() {
         <EditablePromptHandleField />
 
         <HStack gap={2} alignSelf="flex-end">
-          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={apiKey}>
+          <GeneratePromptApiSnippetDialog promptHandle={handle}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>

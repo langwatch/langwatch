@@ -32,6 +32,7 @@ import {
   TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { PROJECT_SECRET_FIELDS_OMIT } from "~/server/projects/projectSecretFields";
 import { RoleNotFoundError } from "~/server/role/errors/role-not-found.error";
 import {
   CustomRoleIdRequiredError,
@@ -317,6 +318,7 @@ export class TeamService {
             archivedAt: null,
             kind: { not: "internal_governance" },
           },
+          omit: PROJECT_SECRET_FIELDS_OMIT,
         },
       },
     });
@@ -369,6 +371,7 @@ export class TeamService {
             archivedAt: null,
             kind: { not: "internal_governance" },
           },
+          omit: PROJECT_SECRET_FIELDS_OMIT,
         },
       },
     });
@@ -430,6 +433,7 @@ export class TeamService {
         projects: {
           where: { archivedAt: null, kind: { not: "internal_governance" } },
           orderBy: { name: "asc" },
+          omit: PROJECT_SECRET_FIELDS_OMIT,
         },
       },
       orderBy: { name: "asc" },

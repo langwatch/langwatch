@@ -109,8 +109,8 @@ describe("project.regenerateApiKey mutation logic", () => {
     caller = projectRouter.createCaller(ctx);
   });
 
-  describe("getProjectAPIKey security pipeline", () => {
-    const callerForKeyRead = ({
+  describe("regenerateApiKey security pipeline", () => {
+    const callerForRotation = ({
       permitted,
       organizationRole,
       satisfied,
@@ -165,18 +165,15 @@ describe("project.regenerateApiKey mutation logic", () => {
       };
     };
 
-    it("refuses an allowed member without the required second factor before reading the key", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        apiKey: "sk-lw-secret",
-      });
-      const { caller, standingForSession } = callerForKeyRead({
+    it("refuses an allowed member without the required second factor before rotating the key", async () => {
+      const { caller, standingForSession } = callerForRotation({
         permitted: true,
         organizationRole: "MEMBER",
         satisfied: false,
       });
 
       await expect(
-        caller.getProjectAPIKey({ projectId: "project-own" }),
+        caller.regenerateApiKey({ projectId: "project-own" }),
       ).rejects.toMatchObject({
         cause: expect.objectContaining({
           code: "identity_mfa_enrollment_required",
@@ -191,55 +188,48 @@ describe("project.regenerateApiKey mutation logic", () => {
       expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
     });
 
-    it("returns the key after the canonical permission and MFA checks pass", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        apiKey: "sk-lw-secret",
-      });
-      const { caller } = callerForKeyRead({
+    it("returns the new key after the canonical permission and MFA checks pass", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({ kind: "application" });
+      mockPrisma.project.update.mockResolvedValue({ id: "project-own" });
+      const { caller } = callerForRotation({
         permitted: true,
         organizationRole: "MEMBER",
         satisfied: true,
       });
 
-      await expect(
-        caller.getProjectAPIKey({ projectId: "project-own" }),
-      ).resolves.toEqual({ apiKey: "sk-lw-secret" });
-      expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { id: "project-own" },
-        select: { apiKey: true },
+      const result = await caller.regenerateApiKey({
+        projectId: "project-own",
       });
+      expect(result.apiKey).toMatch(/^sk-lw-/);
+      expect(mockPrisma.project.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "project-own" } }),
+      );
     });
 
-    it("conceals a foreign project and never reads its key", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        apiKey: "sk-lw-foreign-secret",
-      });
-      const { caller, ownerOf, standingForSession } = callerForKeyRead({
+    it("refuses a foreign project and never touches its key", async () => {
+      const { caller, ownerOf, standingForSession } = callerForRotation({
         permitted: false,
         organizationRole: null,
         satisfied: true,
       });
 
       await expect(
-        caller.getProjectAPIKey({ projectId: "project-foreign" }),
-      ).rejects.toMatchObject({
-        code: "NOT_FOUND",
-        message: "Project not found",
-      });
+        caller.regenerateApiKey({ projectId: "project-foreign" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(ownerOf).not.toHaveBeenCalled();
       expect(standingForSession).not.toHaveBeenCalled();
       expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
     });
 
     it("keeps a same-organization permission refusal forbidden", async () => {
-      const { caller, ownerOf, standingForSession } = callerForKeyRead({
+      const { caller, ownerOf, standingForSession } = callerForRotation({
         permitted: false,
         organizationRole: "MEMBER",
         satisfied: true,
       });
 
       await expect(
-        caller.getProjectAPIKey({ projectId: "project-own" }),
+        caller.regenerateApiKey({ projectId: "project-own" }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(ownerOf).not.toHaveBeenCalled();
       expect(standingForSession).not.toHaveBeenCalled();
@@ -262,22 +252,20 @@ describe("project.regenerateApiKey mutation logic", () => {
       // Act
       const result = await caller.regenerateApiKey({ projectId });
 
-      // Assert
+      // Assert: the token is returned once and only its hash is stored
       expect(result).toEqual({
         apiKey: expectedApiKey,
       });
-      expect(result.apiKey).toMatch(/^sk-lw-/);
       expect(mockPrisma.project.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: projectId },
           data: {
-            apiKey: expect.stringMatching(/^sk-lw-/),
+            apiKey: null,
+            apiKeyHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            apiKeyLast4: expectedApiKey.slice(-4),
+            apiKeyHashedAt: null,
           },
-          select: {
-            apiKey: true,
-            id: true,
-            slug: true,
-          },
+          select: { id: true },
         }),
       );
     });

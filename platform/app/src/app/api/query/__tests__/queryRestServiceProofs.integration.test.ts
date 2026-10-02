@@ -721,7 +721,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
    */
   /** Runs a whole request body as one project, asserting it answered. */
   const runBody = async (project: Project, body: Record<string, unknown>) =>
-    succeed(await post(body, { token: project.apiKey }), "POST /api/v1/query");
+    succeed(await post(body, { token: project.apiKey! }), "POST /api/v1/query");
 
   const run = (
     project: Project,
@@ -737,7 +737,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
    * identically.
    */
   const refuse = async (project: Project, sql: string) => {
-    const response = await post({ sql }, { token: project.apiKey });
+    const response = await post({ sql }, { token: project.apiKey! });
     const body = (await response.json()) as Record<string, any>;
     if (response.status < 400) {
       throw new Error(
@@ -758,7 +758,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     succeed(
       await app.request(schemaPath, {
         method: "GET",
-        headers: authHeaders(project.apiKey),
+        headers: authHeaders(project.apiKey!),
       }),
       "GET /api/v1/query/schema",
     );
@@ -1173,7 +1173,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           timeWindow: { start: second(-60), end: second(60) },
         },
-        { token: openProject.apiKey },
+        { token: openProject.apiKey! },
       );
       const body = (await response.json()) as Record<string, any>;
 
@@ -1265,7 +1265,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           projectId: gatedProject.id,
           tenantId: gatedProject.id,
         },
-        { token: openProject.apiKey },
+        { token: openProject.apiKey! },
       );
       const body = (await response.json()) as any;
       expect(response.status, JSON.stringify(body)).toBe(200);
@@ -1374,7 +1374,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       // The same queries for a caller who holds the permission, so the
       // refusals are about the gate rather than about the SQL.
       for (const sql of positions(database)) {
-        const response = await post({ sql }, { token: openProject.apiKey });
+        const response = await post({ sql }, { token: openProject.apiKey! });
         expect(response.status, sql).toBe(200);
       }
     });
@@ -1386,7 +1386,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         refused.meta.violations.map((violation: any) => violation.code),
       ).toContain("WILDCARD_NOT_ALLOWED");
 
-      expect((await post({ sql }, { token: openProject.apiKey })).status).toBe(
+      expect((await post({ sql }, { token: openProject.apiKey! })).status).toBe(
         200,
       );
     });
@@ -1419,7 +1419,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         sql,
       ).toContain("GATED_COLUMN");
 
-      const response = await post({ sql }, { token: openProject.apiKey });
+      const response = await post({ sql }, { token: openProject.apiKey! });
       expect(response.status, sql).toBe(200);
     });
 
@@ -1438,7 +1438,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     it("answers a costs-gated column (TargetCost) for every API-key caller, gated or not", async () => {
       const sql = `SELECT TargetCost FROM ${database}.experiment_items LIMIT 1`;
       for (const project of [openProject, gatedProject]) {
-        const response = await post({ sql }, { token: project.apiKey });
+        const response = await post({ sql }, { token: project.apiKey! });
         expect(response.status, project.slug).toBe(200);
       }
     });
@@ -1532,7 +1532,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       for (const dataset of schema.views) {
         const response = await post(
           { sql: dataset.exampleSql },
-          { token: gatedProject.apiKey },
+          { token: gatedProject.apiKey! },
         );
         expect(response.status, `${dataset.name}: ${dataset.exampleSql}`).toBe(
           200,
@@ -1848,7 +1848,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           sql: parameterized,
           parameters: { name: "checkout" },
         },
-        { token: openProject.apiKey },
+        { token: openProject.apiKey! },
       );
       const body = (await response.json()) as any;
       expect(response.status).toBe(400);
@@ -2072,7 +2072,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         capability,
         harness.names.keyMapTable,
         openProject.id,
-        openProject.apiKey,
+        openProject.apiKey!,
         openProject.lwqlKey,
         facts,
         ...relayed,
@@ -2148,7 +2148,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
               sql: probe.sql,
               ...(probe.parameters ? { parameters: probe.parameters } : {}),
             },
-            { token: gatedProject.apiKey },
+            { token: gatedProject.apiKey! },
           );
           expect(
             response.status === 200,
@@ -2368,7 +2368,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Auth-Token": openProject.apiKey,
+            "X-Auth-Token": openProject.apiKey!,
           },
           body: JSON.stringify({ sql: "SELECT 1" }),
         });

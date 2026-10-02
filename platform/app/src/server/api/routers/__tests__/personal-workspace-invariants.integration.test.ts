@@ -985,7 +985,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
   });
 
   /** @scenario Personal context remains usable when its base key is withheld */
-  it("returns personal context with a blank base key when manage is ceilinged", async () => {
+  it("returns personal context without a base key when manage is ceilinged", async () => {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
 
     const seatCaller = appRouter.createCaller(
@@ -996,7 +996,8 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     });
 
     expect(context.workspace.project.id).toBe(seatPersonalProjectId);
-    expect(context.workspace.project.apiKey).toBe("");
+    expect(context.workspace.project).not.toHaveProperty("apiKey");
+    expect(context.canManageProject).toBe(false);
   });
 
   /** @scenario Giving a Lite Member their full access back restores writing in their own workspace */

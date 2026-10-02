@@ -34,7 +34,8 @@ export interface CreateProjectInput {
   language: string;
   framework: string;
   teamId: string;
-  apiKey: string;
+  apiKeyHash: string;
+  apiKeyLast4: string;
 }
 
 export interface CreateTeamWithBindingInput {

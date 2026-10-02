@@ -35,7 +35,7 @@ import {
   type Project,
 } from "~/generated/prisma/client";
 
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+import { mintProjectApiKey } from "~/server/api-key/project-api-key";
 import { recordGovernanceTenantUse } from "./governanceTenantHistory.service";
 
 /** Canonical Project.kind values. Free-form string in the DB column for
@@ -161,7 +161,7 @@ async function createGovernanceProject({
         id: nanoid(),
         name: "Governance (internal)",
         slug,
-        apiKey: generateApiKey(),
+        ...mintProjectApiKey().columns,
         teamId,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
         // Internal-only — these aren't real "I'm building an app"

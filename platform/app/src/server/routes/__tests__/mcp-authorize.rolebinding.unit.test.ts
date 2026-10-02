@@ -88,7 +88,7 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
               })
             : Promise.resolve({
                 id: PROJECT_ID,
-                apiKey: "lw_test_key",
+                apiKey: null,
                 archivedAt: null as Date | null,
               }),
         ),
@@ -122,6 +122,9 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
     tryGetApp: () => app,
   };
 });
+vi.mock("~/server/api-key/project-internal-key", () => ({
+  getProjectInternalKey: vi.fn().mockResolvedValue("sk-lw-internal"),
+}));
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
   decrypt: (text: string) =>
@@ -185,6 +188,23 @@ describe("POST /mcp/authorize", () => {
       expect(json.error).toBeUndefined();
       expect(json.redirect).toContain("code=");
     });
+
+    it("binds the authorization code to the project internal key", async () => {
+      mockRedis.set.mockClear();
+
+      await authorize();
+
+      const authCodeWrite = mockRedis.set.mock.calls.find(
+        ([key]) => typeof key === "string" && key.includes("auth_code"),
+      );
+      expect(authCodeWrite).toBeDefined();
+      const entry = JSON.parse(authCodeWrite![1] as string) as {
+        projectId: string;
+        encryptedApiKey: string;
+      };
+      expect(entry.projectId).toBe(PROJECT_ID);
+      expect(entry.encryptedApiKey).toBe("encrypted:sk-lw-internal");
+    });
   });
 
   describe("when the user has no binding granting access to the project", () => {
@@ -201,7 +221,7 @@ describe("POST /mcp/authorize", () => {
       // circuits to the unified 403 before the permission check.
       mockPrisma.project.findUnique.mockResolvedValueOnce({
         id: PROJECT_ID,
-        apiKey: "lw_test_key",
+        apiKey: null,
         archivedAt: new Date("2026-01-01T00:00:00Z"),
       });
 

@@ -124,7 +124,7 @@ beforeAll(async () => {
     },
   });
   projectId = project.id;
-  projectKey = project.apiKey;
+  projectKey = project.apiKey!;
   const personal = await prisma.project.create({
     data: {
       id: `project_${nanoid()}`,

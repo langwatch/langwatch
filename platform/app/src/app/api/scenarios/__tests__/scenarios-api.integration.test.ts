@@ -60,7 +60,7 @@ describe("Scenarios API", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     helpers = {

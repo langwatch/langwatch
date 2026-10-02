@@ -36,6 +36,7 @@
 import { createClient } from "@clickhouse/client";
 import { randomBytes } from "crypto";
 import { TeamUserRole } from "../../../src/generated/prisma/client";
+import { mintProjectApiKey } from "../../../src/server/api-key/project-api-key";
 
 import { prisma } from "../../../src/server/db";
 
@@ -72,6 +73,7 @@ async function seed() {
       organizationId: org.id,
     },
   });
+  const projectKey = mintProjectApiKey();
   const project = await prisma.project.create({
     data: {
       id: rid("proj_smoke"),
@@ -80,7 +82,7 @@ async function seed() {
       teamId: team.id,
       language: "en",
       framework: "openai",
-      apiKey: `sk-smoke-${randomBytes(16).toString("hex")}`,
+      ...projectKey.columns,
     },
   });
   const user = await prisma.user.create({
@@ -97,7 +99,12 @@ async function seed() {
   await prisma.teamUser.create({
     data: { userId: user.id, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  return { org, team, project, user };
+  return {
+    org,
+    team,
+    project: { id: project.id, apiKey: projectKey.token },
+    user,
+  };
 }
 
 interface SeededState {

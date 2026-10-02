@@ -69,7 +69,7 @@ vi.mock("~/features/guided-onboarding/home/GuidedOnboardingOffer", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { id: "project_1", apiKey: "sk-lw-home" },
+    project: { id: "project_1" },
     organization: { id: "org_1" },
   }),
 }));
@@ -160,7 +160,10 @@ describe("LangyHomeHero onboarding control", () => {
         expect(renders_before(walkthrough, docs)).toBe(true);
       });
 
-      it("copies the tracing skill led by the project's keys", async () => {
+      // The project's own key is stored as a hash and never reaches the
+      // browser, so the copied prompt carries the skill alone and the agent
+      // reads the key from the environment.
+      it("copies the tracing skill without credentials", async () => {
         reachMock.mockReturnValue(NEW_PROJECT_REACH);
         let copied = "";
         const writeText = vi.fn((text: string) => {
@@ -179,11 +182,8 @@ describe("LangyHomeHero onboarding control", () => {
         );
 
         await waitFor(() => expect(writeText).toHaveBeenCalled());
-        expect(copied.indexOf("Use these keys to instrument:")).toBe(0);
-        expect(copied).toContain('LANGWATCH_API_KEY="sk-lw-home"');
-        expect(copied.indexOf(SKILL_BODY)).toBeGreaterThan(0);
-        // Cloud is the SDK default, so no endpoint line to get wrong.
-        expect(copied).not.toContain("LANGWATCH_ENDPOINT");
+        expect(copied).toBe(SKILL_BODY);
+        expect(copied).not.toContain("LANGWATCH_API_KEY");
       });
     });
 

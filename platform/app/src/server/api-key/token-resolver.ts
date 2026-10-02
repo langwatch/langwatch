@@ -2,6 +2,7 @@ import type { PrismaClient, Project } from "~/generated/prisma/client";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { ApiKeyService } from "./api-key.service";
 import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
+import { findProjectByApiKey } from "./project-api-key";
 import { LANGY_SESSION_API_KEY_NAME } from "./reserved-names";
 
 /**
@@ -124,11 +125,9 @@ export class TokenResolver {
   private async resolveLegacyProjectKey(
     apiKey: string,
   ): Promise<ResolvedToken | null> {
-    const project = await this.prisma.project.findUnique({
-      where: { apiKey, archivedAt: null },
-      include: {
-        team: { select: { id: true, organizationId: true } },
-      },
+    const project = await findProjectByApiKey({
+      prisma: this.prisma,
+      token: apiKey,
     });
 
     if (!project) return null;

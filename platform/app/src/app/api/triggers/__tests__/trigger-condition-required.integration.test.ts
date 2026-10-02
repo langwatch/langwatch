@@ -55,7 +55,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
   const projectId = () => project!.id;
 
   const headers = () => ({
-    "X-Auth-Token": project!.apiKey,
+    "X-Auth-Token": project!.apiKey!,
     "Content-Type": "application/json",
   });
 

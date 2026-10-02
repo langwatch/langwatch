@@ -252,7 +252,15 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
       expect(found).not.toBeNull();
       expect(found?.team.id).toBeDefined();
       expect(found?.project.id).toBeDefined();
-      expect(found?.project.apiKey).toBeDefined();
+      expect(found?.project).not.toHaveProperty("apiKey");
+      // The personal project's API key is stored as a hash only.
+      const stored = await prisma.project.findUnique({
+        where: { id: found!.project.id },
+        select: { apiKey: true, apiKeyHash: true, apiKeyLast4: true },
+      });
+      expect(stored?.apiKey).toBeNull();
+      expect(stored?.apiKeyHash).toEqual(expect.any(String));
+      expect(stored?.apiKeyLast4).toHaveLength(4);
     });
   });
 });

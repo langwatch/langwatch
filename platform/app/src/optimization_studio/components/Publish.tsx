@@ -21,12 +21,15 @@ import {
   XCircle,
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
+import { MintApiKeyBanner } from "~/components/api-keys/MintApiKeyBanner";
 import { RenderCode } from "~/components/code/RenderCode";
+import { API_KEY_PLACEHOLDER } from "~/features/onboarding/components/sections/shared/build-mcp-config";
 import type {
   Dataset,
   DatasetRecord,
   Project,
 } from "~/generated/prisma/client";
+import { useMintProjectApiKey } from "~/hooks/useMintProjectApiKey";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
@@ -679,7 +682,11 @@ export const ApiModalContent = () => {
     workflowId,
   }));
 
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
+  const mintKey = useMintProjectApiKey({
+    organizationId: organization?.id,
+    projectId: project?.id,
+  });
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
     {
@@ -719,14 +726,22 @@ export const ApiModalContent = () => {
       </Dialog.Header>
       <Dialog.CloseTrigger />
       <Dialog.Body>
-        <Text paddingBottom={8}>
+        <Text paddingBottom={4}>
           Incorporate the following JSON payload within the body of your HTTP
           POST request to get the workflow result.
         </Text>
+        <Box paddingBottom={4}>
+          <MintApiKeyBanner
+            token={mintKey.token}
+            onMint={mintKey.mint}
+            isPending={mintKey.isPending}
+            hint="to fill the snippet below."
+          />
+        </Box>
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
             code={`# Set your API key
-LANGWATCH_API_KEY="${project?.apiKey ?? "your_langwatch_api_key"}"
+LANGWATCH_API_KEY="${mintKey.token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "${langwatchEndpoint()}/api/workflows/${workflowId}/run" \\
@@ -738,17 +753,6 @@ EOF`}
             language="bash"
           />
         </Box>
-        <Text marginTop={4}>
-          To retrieve your API key, click{" "}
-          <Link
-            href={`/${project?.slug}/setup`}
-            textDecoration="underline"
-            isExternal
-          >
-            here
-          </Link>
-          .
-        </Text>
         <Text marginTop={4}>
           To access the API details and view more information, please refer to
           the official documentation{" "}

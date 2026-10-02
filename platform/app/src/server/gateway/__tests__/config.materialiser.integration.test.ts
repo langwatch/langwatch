@@ -32,6 +32,8 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { findProjectByApiKey } from "~/server/api-key/project-api-key";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -538,6 +540,34 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(bundle.providers.length).toBeGreaterThan(0);
     });
 
+    it("exports traces with the project internal key, never the project API key", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+
+      const internalKey = await getProjectInternalKey({
+        prisma,
+        projectId: PROJECT_ID,
+      });
+      expect(bundle.project_otlp_token).toBe(internalKey);
+      expect(bundle.project_otlp_token).not.toBe(`key-${suffix}`);
+      const authenticated = await findProjectByApiKey({
+        prisma,
+        token: bundle.project_otlp_token!,
+      });
+      expect(authenticated?.id).toBe(PROJECT_ID);
+    });
+
+    it("ships the same token on every materialise, so a cached bundle stays valid", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const first = await mat.materialise(vk!);
+      const second = await mat.materialise(vk!);
+      expect(second.project_otlp_token).toBe(first.project_otlp_token);
+    });
+
     it("materialises the custom provider slot with its base_url and empty api_key", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
@@ -759,6 +789,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       // side stays empty.
       expect(bundle.guardrails).toEqual([]);
       expect(bundle.guardrail_attachments).toEqual([]);
+      expect(bundle.project_otlp_token).toBeNull();
       // RP still hydrates the policy side regardless of traceProject.
       expect(bundle.model_aliases).toEqual({ "gpt-5": "gpt-5-mini" });
     });

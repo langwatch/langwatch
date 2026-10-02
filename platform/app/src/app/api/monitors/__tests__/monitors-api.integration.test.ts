@@ -69,7 +69,7 @@ describe("Monitors API", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     evaluator = await prisma.evaluator.create({

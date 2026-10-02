@@ -23,7 +23,7 @@ import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { generateApiKey } from "../../utils/apiKeyGenerator";
+import { mintProjectApiKey } from "../../api-key/project-api-key";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
@@ -177,7 +177,7 @@ export const projectRouter = createTRPCRouter({
           language: input.language,
           framework: input.framework,
           teamId: teamId,
-          apiKey: generateApiKey(),
+          ...mintProjectApiKey().columns,
         },
       });
 
@@ -212,32 +212,6 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: project.slug };
     }),
-  /**
-   * The base key grants full access to one project. Revealing it is therefore
-   * an administrator action, just like rotating it.
-   */
-  getProjectAPIKey: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("project:manage", {
-      nondisclosure: "not-found-outside-organization",
-    })
-    .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { apiKey: true },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      return project;
-    }),
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
@@ -258,22 +232,16 @@ export const projectRouter = createTRPCRouter({
       });
       assertNotGovernanceProject(target?.kind);
 
-      // Generate new API key
-      const newApiKey = generateApiKey();
+      // Only the hash is stored, so this response is the one time the new
+      // key can be read. Clearing the plaintext also retires a key still
+      // stored the old way.
+      const { token, columns } = mintProjectApiKey();
 
       try {
-        // Update the project with new API key
-        // Note: updatedAt is handled automatically by Prisma @updatedAt
-        const project = await prisma.project.update({
+        await prisma.project.update({
           where: { id: input.projectId },
-          data: {
-            apiKey: newApiKey,
-          },
-          select: {
-            apiKey: true,
-            id: true,
-            slug: true,
-          },
+          data: columns,
+          select: { id: true },
         });
 
         // Audit log the security-critical action; non-fatal so an audit
@@ -284,7 +252,7 @@ export const projectRouter = createTRPCRouter({
           projectId: input.projectId,
         }).catch(captureException);
 
-        return { apiKey: project.apiKey };
+        return { apiKey: token };
       } catch (error) {
         // Prisma throws P2025 when no record is found
         if (

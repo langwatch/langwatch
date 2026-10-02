@@ -247,7 +247,6 @@ function parseModelProviderIds(raw: unknown): string[] {
 export type TraceProject = {
   id: string;
   teamId: string;
-  apiKey: string;
   /** Set when the customer deleted the project; deletion is soft. */
   archivedAt: Date | null;
 };
@@ -257,7 +256,6 @@ type ProjectClient = PrismaClient | Prisma.TransactionClient;
 const TRACE_PROJECT_FIELDS = {
   id: true,
   teamId: true,
-  apiKey: true,
   archivedAt: true,
 } as const;
 

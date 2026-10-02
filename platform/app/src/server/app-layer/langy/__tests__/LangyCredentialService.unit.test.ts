@@ -65,7 +65,6 @@ function makePrisma(overrides: any = {}) {
   return {
     project: {
       findUnique: vi.fn().mockResolvedValue({
-        apiKey: "sk-lw-test-project-key",
         team: { organizationId: "org-1" },
       }),
       ...overrides.project,

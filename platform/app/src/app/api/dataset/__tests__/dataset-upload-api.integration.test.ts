@@ -58,7 +58,7 @@ describe("Feature: Dataset File Upload REST API", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 
@@ -669,7 +669,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
           const res = await app.request("/api/dataset/direct-upload", {
             method: "POST",
-            headers: { "X-Auth-Token": foreignProject.apiKey }, // project B's key
+            headers: { "X-Auth-Token": foreignProject.apiKey! }, // project B's key
             body: form,
           });
 

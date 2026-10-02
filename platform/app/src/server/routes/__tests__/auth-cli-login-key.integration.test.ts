@@ -32,6 +32,7 @@ import {
   defaultCliKeyPermissions,
 } from "~/server/api-key/cli-key-defaults";
 import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
+import { CLI_LOGIN_KEY_NAME_PREFIX } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -193,6 +194,7 @@ async function runFlow(args: {
   return exchanged.json;
 }
 
+/** The live CLI login key of a device (not the project keys handed out beside it). */
 async function mintedKeyFor({
   userId,
   deviceLabel,
@@ -205,6 +207,7 @@ async function mintedKeyFor({
       organizationId: ORG_ID,
       userId,
       createdByDeviceLabel: deviceLabel,
+      name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
       revokedAt: null,
     },
     include: { roleBindings: true },
@@ -651,6 +654,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           organizationId: ORG_ID,
           userId: MEMBER_ID,
           createdByDeviceLabel: HOSTNAME,
+          name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
           revokedAt: null,
         },
       });
@@ -668,6 +672,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           organizationId: ORG_ID,
           userId: MEMBER_ID,
           createdByDeviceLabel: HOSTNAME,
+          name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         },
         orderBy: { createdAt: "desc" },
         select: { id: true, createdAt: true },
@@ -883,6 +888,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
             organizationId: ORG_ID,
             userId: MEMBER_ID,
             createdByDeviceLabel: HOSTNAME,
+            name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
             revokedAt: null,
           },
         });

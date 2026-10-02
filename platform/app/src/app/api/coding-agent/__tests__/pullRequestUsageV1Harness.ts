@@ -279,7 +279,7 @@ export async function seedPullRequestUsageV1Fixture({
         bindings: [projectBinding(TeamUserRole.ADMIN)],
       })
     ).token,
-    legacyProjectKey: projectA.apiKey,
+    legacyProjectKey: projectA.apiKey!,
     otherOrganization,
     otherOrgUserId,
     otherOrgToken: (

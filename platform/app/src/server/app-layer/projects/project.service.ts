@@ -10,10 +10,10 @@ import {
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
 } from "~/server/analytics/lwql/provisioning";
+import { mintProjectApiKey } from "~/server/api-key/project-api-key";
 import { parseConnectionUrl } from "~/server/clickhouse/goose";
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
@@ -353,6 +353,9 @@ export class ProjectService {
       );
     }
 
+    // The REST caller receives a scoped service key instead, so this token is
+    // not returned; an admin rotates the project API key to get one.
+    const { columns: apiKeyColumns } = mintProjectApiKey();
     const project = await this.repo.create({
       id: projectId,
       name: params.name,
@@ -360,7 +363,8 @@ export class ProjectService {
       language: params.language,
       framework: params.framework,
       teamId,
-      apiKey: generateApiKey(),
+      apiKeyHash: apiKeyColumns.apiKeyHash,
+      apiKeyLast4: apiKeyColumns.apiKeyLast4,
     });
 
     await this.syncLwqlKeyMapRow(project);

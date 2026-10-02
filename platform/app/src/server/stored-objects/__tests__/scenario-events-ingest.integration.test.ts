@@ -366,7 +366,7 @@ beforeAll(async () => {
   const created = await prisma.project.create({
     data: { ...project, teamId: team.id, personalFeatures: {} },
   });
-  testApiKey = created.apiKey;
+  testApiKey = created.apiKey!;
   testProjectId = created.id;
 
   // Set BASE_HOST so the handler can build the redirect URL

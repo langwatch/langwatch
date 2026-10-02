@@ -141,7 +141,7 @@ beforeAll(async () => {
       personalFeatures: {},
     },
   });
-  apiKey = created.apiKey;
+  apiKey = created.apiKey!;
   projectId = created.id;
   projectSlug = created.slug;
 
@@ -152,7 +152,7 @@ beforeAll(async () => {
       personalFeatures: {},
     },
   });
-  otherApiKey = other.apiKey;
+  otherApiKey = other.apiKey!;
   otherProjectId = other.id;
 });
 

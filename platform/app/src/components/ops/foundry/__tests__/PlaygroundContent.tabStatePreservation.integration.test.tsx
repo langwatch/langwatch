@@ -32,6 +32,14 @@ vi.mock("~/utils/api", () => ({
     organization: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
+    apiKey: {
+      create: {
+        useMutation: () => ({
+          mutateAsync: async () => ({}),
+          isPending: false,
+        }),
+      },
+    },
   },
 }));
 

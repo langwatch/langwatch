@@ -1,9 +1,4 @@
-import type {
-  Organization,
-  Project,
-  Team,
-  User,
-} from "~/generated/prisma/client";
+import type { User } from "~/generated/prisma/client";
 
 /**
  * Prisma `include` shape used by the Backoffice Users list to resolve every
@@ -18,17 +13,23 @@ import type {
  * main app happily showed those projects in their switcher.
  *
  * Non-archived teams and projects only — archived rows must not leak onto
- * the admin table either.
+ * the admin table either. Only the columns the row renders are selected, so
+ * no organization or project credential is ever loaded for this list.
  */
 export const USER_BACKOFFICE_INCLUDE = {
   orgMemberships: {
-    include: {
+    select: {
       organization: {
-        include: {
+        select: {
+          id: true,
+          name: true,
           teams: {
             where: { archivedAt: null },
-            include: {
-              projects: { where: { archivedAt: null } },
+            select: {
+              projects: {
+                where: { archivedAt: null },
+                select: { id: true, name: true, slug: true },
+              },
             },
           },
         },
@@ -44,8 +45,10 @@ export const USER_BACKOFFICE_INCLUDE = {
  */
 export type UserWithBackofficeIncludes = User & {
   orgMemberships: {
-    organization: Organization & {
-      teams: (Team & { projects: Project[] })[];
+    organization: {
+      id: string;
+      name: string;
+      teams: { projects: { id: string; name: string; slug: string }[] }[];
     };
   }[];
 };
@@ -102,8 +105,9 @@ export function mapUserToBackofficeRow(
     }
   }
 
+  const { orgMemberships: _memberships, ...userColumns } = user;
   return {
-    ...user,
+    ...userColumns,
     organizations: Array.from(orgMap.values()),
     projects: Array.from(projectMap.values()),
   };

@@ -51,7 +51,7 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
               })
             : Promise.resolve({
                 id: PROJECT_ID,
-                apiKey: "lw_test_key",
+                apiKey: null,
                 archivedAt: null as Date | null,
               }),
         ),
@@ -85,6 +85,9 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
     tryGetApp: fakeApp,
   };
 });
+vi.mock("~/server/api-key/project-internal-key", () => ({
+  getProjectInternalKey: vi.fn().mockResolvedValue("sk-lw-internal"),
+}));
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
   decrypt: (text: string) =>

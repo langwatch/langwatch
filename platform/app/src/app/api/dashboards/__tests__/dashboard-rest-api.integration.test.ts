@@ -79,7 +79,7 @@ describe("Feature: Dashboard REST API", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     helpers = {

@@ -106,7 +106,7 @@ describe("Feature: Test Suites REST API", () => {
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 

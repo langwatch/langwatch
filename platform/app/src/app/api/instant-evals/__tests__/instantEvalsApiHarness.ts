@@ -85,7 +85,7 @@ function useSeededProject(): { readonly current: () => SeededProject } {
       },
     });
     seeded = {
-      apiKey: project.apiKey,
+      apiKey: project.apiKey!,
       projectId: project.id,
       organization,
       team,

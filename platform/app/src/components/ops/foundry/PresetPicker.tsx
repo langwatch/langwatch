@@ -66,7 +66,9 @@ export function PresetPicker() {
   const setTrace = useTraceStore((s) => s.setTrace);
   const { builtIn, userPresets } = usePresetStore();
   const allPresets = [...builtIn, ...userPresets];
-  const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
+  const selectedProjectId = useFoundryProjectStore(
+    (s) => s.selectedTarget?.projectId ?? null,
+  );
   const prompts = api.prompts.getAllPromptsForProject.useQuery(
     { projectId: selectedProjectId! },
     { enabled: !!selectedProjectId },

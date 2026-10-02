@@ -20,6 +20,7 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
+import { hashProjectApiKey } from "~/server/api-key/project-api-key";
 import type { McpHandler } from "../handler";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,9 @@ import type { McpHandler } from "../handler";
 const mockPrisma = {
   project: {
     findUnique: vi.fn(),
+  },
+  projectInternalKey: {
+    findUnique: vi.fn().mockResolvedValue(null),
   },
 };
 
@@ -917,7 +921,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(200);
       expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { apiKey: VALID_API_KEY, archivedAt: null },
+        where: { apiKeyHash: hashProjectApiKey(VALID_API_KEY) },
+        include: expect.anything(),
       });
     });
   });
@@ -977,7 +982,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.headers["mcp-session-id"]).toBeDefined();
       // Verify a fresh DB lookup happened during MCP init
       expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { apiKey: VALID_API_KEY, archivedAt: null },
+        where: { apiKeyHash: hashProjectApiKey(VALID_API_KEY) },
+        include: expect.anything(),
       });
     });
   });

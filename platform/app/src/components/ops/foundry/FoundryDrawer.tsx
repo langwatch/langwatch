@@ -13,19 +13,16 @@ import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
 import { usePresetStore } from "./presetStore";
 import { getFoundryExecutor } from "./traceExecutor";
 import { useTraceStore } from "./traceStore";
 import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
+import { useFoundryCredential } from "./useFoundryCredential";
 
 export function FoundryDrawer() {
-  const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const { projectId, ensureApiKey } = useFoundryCredential();
   const trace = useTraceStore((s) => s.trace);
   const setTrace = useTraceStore((s) => s.setTrace);
   const resetTrace = useTraceStore((s) => s.resetTrace);
@@ -61,7 +58,7 @@ export function FoundryDrawer() {
   }, [resetTrace]);
 
   async function handleSend() {
-    if (running || !apiKey) return;
+    if (running || !projectId) return;
     setRunning(true);
     const logId = `log-${Date.now()}`;
     addLogEntry({
@@ -70,13 +67,13 @@ export function FoundryDrawer() {
       timestamp: Date.now(),
       status: "pending",
     });
-    const executor = getFoundryExecutor({
-      apiKey,
-      endpoint: window.location.origin,
-      projectId: project?.id,
-      resourceAttributes: trace.resourceAttributes,
-    });
     try {
+      const executor = getFoundryExecutor({
+        apiKey: await ensureApiKey(),
+        endpoint: window.location.origin,
+        projectId,
+        resourceAttributes: trace.resourceAttributes,
+      });
       const traceId = await executor.executeTrace(trace);
       updateLogEntry(logId, { status: "success", traceId });
       setLastTraceId(traceId);
@@ -256,7 +253,7 @@ export function FoundryDrawer() {
                       size="sm"
                       colorPalette="orange"
                       onClick={handleSend}
-                      disabled={running || !apiKey}
+                      disabled={running || !projectId}
                       loading={running}
                       loadingText="Sending..."
                     >

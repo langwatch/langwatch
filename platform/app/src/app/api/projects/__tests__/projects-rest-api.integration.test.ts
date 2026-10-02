@@ -172,6 +172,7 @@ describe("Feature: Projects REST API", () => {
       expect(body.serviceApiKey).toMatch(/^sk-lw-/);
       expect(body.serviceApiKeyId).toBeDefined();
       expect(body).not.toHaveProperty("apiKey");
+      expect(body).not.toHaveProperty("apiKeyHash");
       expect(body.language).toBe("python");
       expect(body.framework).toBe("langchain");
       expect(body.teamId).toBe(testTeam.id);
@@ -246,6 +247,7 @@ describe("Feature: Projects REST API", () => {
       const body = await res.json();
       for (const project of body.data) {
         expect(project).not.toHaveProperty("apiKey");
+        expect(project).not.toHaveProperty("apiKeyHash");
       }
     });
 
@@ -275,6 +277,7 @@ describe("Feature: Projects REST API", () => {
       const body = await res.json();
       expect(body.id).toBe(created.id);
       expect(body).not.toHaveProperty("apiKey");
+      expect(body).not.toHaveProperty("apiKeyHash");
       expect(body).not.toHaveProperty("serviceApiKey");
     });
 
@@ -516,17 +519,16 @@ describe("Feature: Projects REST API", () => {
       projectId = await createProject();
     });
 
-    /** @scenario An API key principal cannot read the base key */
     it("refuses the organization API key before reading the stored key", async () => {
       const stored = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { apiKey: true },
+        select: { apiKeyHash: true },
       });
       const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
       try {
         const res = await api.get(`/api/projects/${projectId}/api-key`);
         expect(res.status).toBe(403);
-        expect(await res.text()).not.toContain(stored!.apiKey);
+        expect(await res.text()).not.toContain(stored!.apiKeyHash!);
         expect(readSecret).not.toHaveBeenCalled();
       } finally {
         readSecret.mockRestore();
@@ -541,12 +543,11 @@ describe("Feature: Projects REST API", () => {
       expect(res.status).toBe(403);
       const stored = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { apiKey: true },
+        select: { apiKeyHash: true },
       });
-      expect(await res.text()).not.toContain(stored!.apiKey);
+      expect(await res.text()).not.toContain(stored!.apiKeyHash!);
     });
 
-    /** @scenario API key refusal happens before the project is read */
     it("refuses before revealing whether the target project exists", async () => {
       const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
       try {
@@ -562,7 +563,7 @@ describe("Feature: Projects REST API", () => {
     it("refuses rotation before reading or changing the stored key", async () => {
       const before = await prisma.project.findUniqueOrThrow({
         where: { id: projectId },
-        select: { apiKey: true },
+        select: { apiKeyHash: true },
       });
       const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
       const writeSecret = vi.spyOn(prisma.project, "update");
@@ -581,7 +582,7 @@ describe("Feature: Projects REST API", () => {
       await expect(
         prisma.project.findUniqueOrThrow({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKeyHash: true },
         }),
       ).resolves.toEqual(before);
     });

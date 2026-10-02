@@ -1747,7 +1747,22 @@ model Project {
   id                  String                    @id @default(nanoid())
   name                String
   slug                String                    @unique
-  apiKey              String                    @unique
+  /// Plaintext of the project API key, only for keys stored before keys were
+  /// hashed. The maintenance sweep hashes it into `apiKeyHash` and clears it
+  /// once `apiKeyHashedAt` is older than the grace window. New and rotated keys
+  /// never write it. See src/server/api-key/project-api-key.ts.
+  apiKey              String?                   @unique
+  /// HMAC-SHA256 of the full project API key, keyed by the API key pepper
+  /// (`CREDENTIALS_SECRET`, falling back to `NEXTAUTH_SECRET`). Authentication
+  /// looks the project up by this column.
+  apiKeyHash          String?                   @unique
+  /// Last four characters of the project API key, for display only.
+  apiKeyLast4         String?
+  /// When the sweep hashed a key that still had its plaintext stored. The
+  /// plaintext is cleared a grace window after this, so a pod of the previous
+  /// release can still authenticate the key during a rolling deploy.
+  apiKeyHashedAt      DateTime?
+  internalKey         ProjectInternalKey?
   /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
   /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
@@ -3089,6 +3104,21 @@ enum LangyProjectionTitleSource {
   derived
   auto
   user
+}
+
+/// The credential LangWatch's own services use to act as a project: the
+/// workflow engine, scenario runs, the AI gateway's trace export, the checkup
+/// canaries and MCP sessions. It is separate from the project API key so that
+/// key can be stored as a hash only and rotated without breaking these callers.
+/// It never leaves the server. The token is stored encrypted for the callers
+/// that hand it on, and as an HMAC for lookup.
+model ProjectInternalKey {
+  projectId      String   @id
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tokenHash      String   @unique
+  tokenEncrypted String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 }
 
 model ProjectSecret {

@@ -76,7 +76,7 @@ export interface ResolvedCredentials {
 /**
  * How long a device session's cached personal-project key is trusted before
  * the resolver re-confirms the session is still live. The key is a long-lived
- * `Project.apiKey`, not a session-bound token, so trusting it forever would
+ * API key, not a session-bound token, so trusting it forever would
  * let a stolen `~/.langwatch/config.json` keep working after the device was
  * revoked from /me/devices. Bounding the trust to this window means a
  * server-side revocation severs CLI access within at most this long: past the

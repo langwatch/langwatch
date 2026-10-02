@@ -1,11 +1,10 @@
 import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
 import { getFoundryExecutor } from "./traceExecutor";
 import { useTraceStore } from "./traceStore";
+import { useFoundryCredential } from "./useFoundryCredential";
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const {
@@ -19,20 +18,30 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
     updateLogEntry,
   } = useExecutionStore();
   const trace = useTraceStore((s) => s.trace);
-  const { project } = useOrganizationTeamProject();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const { projectId, ensureApiKey } = useFoundryCredential();
 
   async function handleSend() {
-    if (running || !apiKey) return;
+    if (running || !projectId) return;
     setRunning(true);
-    const executor = getFoundryExecutor({
-      apiKey,
-      endpoint: window.location.origin,
-      projectId: project?.id,
-      resourceAttributes: trace.resourceAttributes,
-    });
     try {
+      let executor: ReturnType<typeof getFoundryExecutor>;
+      try {
+        executor = getFoundryExecutor({
+          apiKey: await ensureApiKey(),
+          endpoint: window.location.origin,
+          projectId,
+          resourceAttributes: trace.resourceAttributes,
+        });
+      } catch (err) {
+        addLogEntry({
+          id: `log-${Date.now()}`,
+          traceId: "",
+          timestamp: Date.now(),
+          status: "error",
+          error: err instanceof Error ? err.message : "Send failed",
+        });
+        return;
+      }
       for (let i = 0; i < batchCount; i++) {
         const logId = `log-${Date.now()}-${i}`;
         addLogEntry({
@@ -105,13 +114,13 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
         size="sm"
         colorPalette="orange"
         onClick={handleSend}
-        disabled={running || !apiKey}
+        disabled={running || !projectId}
         loading={running}
         loadingText="Sending..."
       >
         <Play size={14} /> Send Traces
       </Button>
-      {!apiKey && (
+      {!projectId && (
         <Text fontSize="xs" color="fg.muted" mt={1}>
           Navigate to a project first
         </Text>

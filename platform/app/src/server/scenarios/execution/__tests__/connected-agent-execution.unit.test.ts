@@ -346,7 +346,7 @@ describe("prefetchScenarioData", () => {
       },
       projectFetcher: {
         findUnique: vi.fn().mockResolvedValue({
-          apiKey: "test-api-key",
+          internalKey: "test-api-key",
           team: { organizationId: "organization_1" },
         }),
       },

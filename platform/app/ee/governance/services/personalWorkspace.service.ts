@@ -34,6 +34,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { mintProjectApiKey } from "~/server/api-key/project-api-key";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
   type GrantsLedgerWriter,
@@ -57,7 +58,6 @@ export interface PersonalWorkspace {
     id: string;
     name: string;
     slug: string;
-    apiKey: string;
     createdAt: Date;
   };
   /** True iff the workspace was created in this call. */
@@ -277,10 +277,11 @@ export class PersonalWorkspaceService {
         id: generate(KSUID_RESOURCES.PROJECT).toString(),
         name: "Personal Workspace",
         slug: `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`,
-        // API key kept distinct from VK secret format. Personal projects
-        // get a key like every other project for trace ingestion paths
-        // that still authenticate via project apiKey.
-        apiKey: `pkey_${nanoid(40)}`,
+        // A project API key like every other project's, stored as a hash.
+        // The token is never shown: the person reaches the project with API
+        // keys of their own, minted where they need one (CLI login, the
+        // API keys page).
+        ...mintProjectApiKey().columns,
         teamId: team.id,
         language: "other",
         framework: "other",
@@ -312,7 +313,6 @@ export class PersonalWorkspaceService {
           id: project.id,
           name: project.name,
           slug: project.slug,
-          apiKey: project.apiKey,
           createdAt: project.createdAt,
         },
         created: true,
@@ -537,7 +537,6 @@ export class PersonalWorkspaceService {
             id: true,
             name: true,
             slug: true,
-            apiKey: true,
             createdAt: true,
           },
           take: 1,
@@ -561,7 +560,6 @@ export class PersonalWorkspaceService {
         id: project.id,
         name: project.name,
         slug: project.slug,
-        apiKey: project.apiKey,
         createdAt: project.createdAt,
       },
     };

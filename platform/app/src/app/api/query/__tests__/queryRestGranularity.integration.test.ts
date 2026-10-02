@@ -65,7 +65,7 @@ describe("given the /api/v1/query REST endpoint and the granularity budget", () 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": project.apiKey,
+        "X-Auth-Token": project.apiKey!,
       },
       body: JSON.stringify(body),
     });

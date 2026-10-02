@@ -113,7 +113,7 @@ describe("Feature: Run Plans REST API", () => {
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
     testUserIds = [];
     testApiKeyIds = [];

@@ -34,9 +34,9 @@ type AdapterFactory = (params: {
    *  neither (issue #6634). */
   modelParams?: LiteLLMParams;
   nlpServiceUrl: string;
-  /** The LangWatch platform API key (project.apiKey). Only the workflow and
-   *  code factories read this — see their adapters' doc comments for why it
-   *  is the platform key, never an LLM credential. */
+  /** The project internal key (see `getProjectInternalKey`). Only the
+   *  workflow and code factories read this; see their adapters' doc comments
+   *  for why it is a platform credential, never an LLM credential. */
   projectApiKey?: string;
   /** The values the run resolved, which every target reads as `params.NAME`. */
   parameters?: RunParameterValues;

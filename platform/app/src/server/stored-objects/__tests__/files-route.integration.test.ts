@@ -190,7 +190,7 @@ beforeAll(async () => {
   const createdA = await prisma.project.create({
     data: { ...projA, teamId: team.id, personalFeatures: {} },
   });
-  projectAKey = createdA.apiKey;
+  projectAKey = createdA.apiKey!;
   projectAId = createdA.id;
 
   const projB = projectFactory.build({
@@ -199,7 +199,7 @@ beforeAll(async () => {
   const createdB = await prisma.project.create({
     data: { ...projB, teamId: team.id, personalFeatures: {} },
   });
-  projectBKey = createdB.apiKey;
+  projectBKey = createdB.apiKey!;
   projectBId = createdB.id;
 });
 

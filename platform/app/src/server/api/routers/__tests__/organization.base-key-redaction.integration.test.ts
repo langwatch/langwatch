@@ -2,10 +2,12 @@
  * @vitest-environment node
  *
  * @see specs/api-keys/project-key-read-access.feature
+ * @see specs/api-keys/project-key-hashed-storage.feature
  *
- * The project base key travels inside the payload the app loads on every page,
- * so gating the endpoints that return it is only half the job — what the
- * session already holds has to be gated too.
+ * The payloads the app loads on every page carry Project rows. None of them
+ * may carry project key material: the base key (still in plaintext on rows the
+ * hashing sweep has not cleared), its hash, the internal key or the
+ * LangWatchQL key. Only the last four characters are shown.
  */
 
 import { generate } from "@langwatch/ksuid";
@@ -16,6 +18,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { hashProjectApiKey } from "~/server/api-key/project-api-key";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -58,11 +62,6 @@ const projectInPayload = async (
   return project;
 };
 
-const projectApiKeyFor = async (
-  caller: ReturnType<typeof callerFor>,
-  projectId: string,
-) => (await projectInPayload(caller, projectId)).apiKey;
-
 const projectLangWatchQLKeyFor = async (
   caller: ReturnType<typeof callerFor>,
   projectId: string,
@@ -72,11 +71,15 @@ describe("Feature: base key in the organizations payload", () => {
   let organizationId: string;
   let teamId: string;
   let projectId: string;
+  let teamSlug: string;
   let baseApiKey: string;
+  let baseApiKeyHash: string;
+  let internalKey: string;
   /** Database-minted, so the control below is the real stored value. */
   let storedLangWatchQLKey: string;
 
   let adminCaller: ReturnType<typeof callerFor>;
+  let orgAdminCaller: ReturnType<typeof callerFor>;
   let updaterCaller: ReturnType<typeof callerFor>;
   let viewerCaller: ReturnType<typeof callerFor>;
 
@@ -85,7 +88,11 @@ describe("Feature: base key in the organizations payload", () => {
    * org-level permissions, so it would not grant `project:update` however the
    * redaction behaved.
    */
-  const makeUser = async (label: string, teamRole: TeamUserRole) => {
+  const makeUser = async (
+    label: string,
+    teamRole: TeamUserRole,
+    organizationRole: OrganizationUserRole = OrganizationUserRole.MEMBER,
+  ) => {
     const user = await prisma.user.create({
       data: { name: `${label} ${ns}`, email: `${label}-${ns}@example.com` },
     });
@@ -93,9 +100,19 @@ describe("Feature: base key in the organizations payload", () => {
       data: {
         userId: user.id,
         organizationId,
-        role: OrganizationUserRole.MEMBER,
+        role: organizationRole,
       },
     });
+    if (organizationRole === OrganizationUserRole.ADMIN) {
+      await seedRoleBinding(prisma, {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        userId: user.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      });
+    }
     await prisma.teamUser.create({
       data: { userId: user.id, teamId, role: teamRole },
     });
@@ -161,13 +178,20 @@ describe("Feature: base key in the organizations payload", () => {
       },
     });
     teamId = team.id;
+    teamSlug = team.slug;
 
-    baseApiKey = `test-base-key-${ns}`;
+    // A key created before hashed storage, hashed by the sweep and still
+    // inside its plaintext grace window: every form of it is stored.
+    baseApiKey = `sk-lw-test-base-key-${ns}`;
+    baseApiKeyHash = hashProjectApiKey(baseApiKey);
     const project = await prisma.project.create({
       data: {
         name: `Base Key Project ${ns}`,
         slug: `--test-project-${ns}`,
         apiKey: baseApiKey,
+        apiKeyHash: baseApiKeyHash,
+        apiKeyLast4: baseApiKey.slice(-4),
+        apiKeyHashedAt: new Date(),
         teamId: team.id,
         language: "python",
         framework: "openai",
@@ -175,6 +199,7 @@ describe("Feature: base key in the organizations payload", () => {
     });
     projectId = project.id;
     storedLangWatchQLKey = project.lwqlKey;
+    internalKey = await getProjectInternalKey({ prisma, projectId });
 
     const adminId = await makeUser("admin", TeamUserRole.ADMIN);
     const updaterId = await makeUser("updater", TeamUserRole.MEMBER);
@@ -183,12 +208,20 @@ describe("Feature: base key in the organizations payload", () => {
     adminCaller = callerFor(adminId);
     updaterCaller = callerFor(updaterId);
     viewerCaller = callerFor(viewerId);
+    orgAdminCaller = callerFor(
+      await makeUser(
+        "orgadmin",
+        TeamUserRole.ADMIN,
+        OrganizationUserRole.ADMIN,
+      ),
+    );
   });
 
   afterAll(async () => {
     await resetApp();
     await cleanupTestRows(prisma, [
       ["grant", { organizationId }],
+      ["projectInternalKey", { projectId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["project", { team: { organizationId } }],
@@ -200,18 +233,28 @@ describe("Feature: base key in the organizations payload", () => {
     ]);
   });
 
-  describe("given a caller who can manage the project", () => {
-    /** @scenario The base key stays in the session payload for project admins */
-    it("includes the base key in the payload", async () => {
-      const apiKey = await projectApiKeyFor(adminCaller, projectId);
+  const secretsOf = () => [baseApiKey, baseApiKeyHash, internalKey];
 
-      expect(apiKey).toBe(baseApiKey);
+  describe("given a caller who can manage the project", () => {
+    /** @scenario The base key is withheld from the session payload for project admins */
+    /** @scenario "The application payload carries no project key material" */
+    it("withholds the key and its hash, and keeps the last four characters", async () => {
+      const project = await projectInPayload(adminCaller, projectId);
+
+      expect(project.apiKey).toBeNull();
+      expect(project.apiKeyHash).toBeNull();
+      expect(project.apiKeyLast4).toBe(baseApiKey.slice(-4));
+
+      const payload = JSON.stringify(await adminCaller.organization.getAll({}));
+      for (const secret of secretsOf()) {
+        expect(payload).not.toContain(secret);
+      }
     });
   });
 
   describe("given a caller who can update but not manage the project", () => {
     /** @scenario The base key is withheld from the session payload for project members */
-    it("redacts every base-key occurrence from the whole organization payload", async () => {
+    it("redacts every key occurrence from the whole organization payload", async () => {
       const organizations = await updaterCaller.organization.getAll({});
       const visibleProjects = organizations.flatMap((organization) =>
         organization.teams.flatMap((team) => team.projects),
@@ -219,27 +262,56 @@ describe("Feature: base key in the organizations payload", () => {
       expect(visibleProjects.some((project) => project.id === projectId)).toBe(
         true,
       );
-      expect(visibleProjects.every((project) => project.apiKey === "")).toBe(
-        true,
-      );
-      expect(JSON.stringify(organizations)).not.toContain(baseApiKey);
-    });
-
-    it("withholds the base key from the payload", async () => {
-      const apiKey = await projectApiKeyFor(updaterCaller, projectId);
-
-      expect(apiKey).toBe("");
-      expect(apiKey).not.toBe(baseApiKey);
+      expect(
+        visibleProjects.every(
+          (project) => project.apiKey === null && project.apiKeyHash === null,
+        ),
+      ).toBe(true);
+      const payload = JSON.stringify(organizations);
+      for (const secret of secretsOf()) {
+        expect(payload).not.toContain(secret);
+      }
     });
   });
 
   describe("given a caller who can only view the project", () => {
     /** @scenario The base key is withheld from the session payload for project members */
-    it("withholds the base key from the payload", async () => {
-      const apiKey = await projectApiKeyFor(viewerCaller, projectId);
+    it("withholds the key and its hash from the payload", async () => {
+      const project = await projectInPayload(viewerCaller, projectId);
 
-      expect(apiKey).toBe("");
-      expect(apiKey).not.toBe(baseApiKey);
+      expect(project.apiKey).toBeNull();
+      expect(project.apiKeyHash).toBeNull();
+    });
+  });
+
+  describe("given the team and cost payloads", () => {
+    /** @scenario Team and cost payloads carry no project key material */
+    it("carries no project key material for an organization admin", async () => {
+      const payloads = await Promise.all([
+        orgAdminCaller.team.getTeamsWithMembers({ organizationId }),
+        orgAdminCaller.team.getTeamWithMembers({
+          organizationId,
+          slug: teamSlug,
+        }),
+        orgAdminCaller.team.getTeamsWithRoleBindings({ organizationId }),
+        orgAdminCaller.costs.getAggregatedCostsForOrganization({
+          organizationId,
+          startDate: Date.now() - 24 * 60 * 60 * 1000,
+          endDate: Date.now(),
+        }),
+      ]);
+      const [teams] = payloads;
+      // Without the project in the payload, the absence below is vacuous.
+      expect(
+        teams.some((team) =>
+          team.projects.some((project) => project.id === projectId),
+        ),
+      ).toBe(true);
+
+      const payload = JSON.stringify(payloads);
+      for (const secret of [...secretsOf(), storedLangWatchQLKey]) {
+        expect(payload).not.toContain(secret);
+      }
     });
   });
 

@@ -87,7 +87,7 @@ describe("prefetchScenarioData", () => {
   };
 
   const defaultProject = {
-    apiKey: "test-api-key",
+    internalKey: "test-api-key",
     team: { organizationId: "organization_1" },
   };
 
@@ -235,10 +235,10 @@ describe("prefetchScenarioData", () => {
         expect(onChildEnvReady).not.toHaveBeenCalled();
       });
 
-      it("stays silent when the project has no api key", async () => {
+      it("stays silent when the project does not exist", async () => {
         const deps = createMockDeps({
           projectFetcher: {
-            findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+            findUnique: vi.fn().mockResolvedValue(null),
           },
         });
         const onChildEnvReady = vi.fn();

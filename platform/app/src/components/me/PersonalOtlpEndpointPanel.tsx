@@ -1,22 +1,38 @@
 import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { MintApiKeyBanner } from "~/components/api-keys/MintApiKeyBanner";
 import { toaster } from "~/components/ui/toaster";
+import { API_KEY_PLACEHOLDER } from "~/features/onboarding/components/sections/shared/build-mcp-config";
+import { useMintProjectApiKey } from "~/hooks/useMintProjectApiKey";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 const SECRET_MASK = "•".repeat(36);
 
-export function PersonalOtlpEndpointPanel({ apiKey }: { apiKey: string }) {
+/**
+ * OTLP endpoint and credentials for the personal workspace. The project's
+ * own key can never be shown, so the panel mints a personal API key bound to
+ * the workspace project and shows it once.
+ */
+export function PersonalOtlpEndpointPanel({
+  organizationId,
+  projectId,
+}: {
+  organizationId: string;
+  projectId: string;
+}) {
   const publicEnv = usePublicEnv();
   const baseHost = publicEnv.data?.BASE_HOST ?? "";
   const endpoint = baseHost ? `${baseHost}/api/otel` : "";
   const [showSecret, setShowSecret] = useState(false);
+  const mintKey = useMintProjectApiKey({ organizationId, projectId });
+  const apiKey = mintKey.token ?? "";
+  let shownKey = API_KEY_PLACEHOLDER;
+  if (apiKey) shownKey = showSecret ? apiKey : SECRET_MASK;
 
   const envVars = endpoint
     ? `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
-        showSecret ? apiKey : SECRET_MASK
-      }"`
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${shownKey}"`
     : "";
 
   const copy = (value: string, label: string) => {
@@ -26,6 +42,12 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
 
   return (
     <VStack align="stretch" gap={3}>
+      <MintApiKeyBanner
+        token={mintKey.token}
+        onMint={mintKey.mint}
+        isPending={mintKey.isPending}
+        hint="to fill the settings below."
+      />
       <Row label="Endpoint">
         <Text fontSize="sm" fontFamily="mono" wordBreak="break-all" flex={1}>
           {endpoint || "—"}
@@ -42,7 +64,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
 
       <Row label="API key">
         <Text fontSize="sm" fontFamily="mono" wordBreak="break-all" flex={1}>
-          {apiKey ? (showSecret ? apiKey : SECRET_MASK) : "—"}
+          {apiKey ? shownKey : "Not created yet"}
         </Text>
         <Button
           size="xs"

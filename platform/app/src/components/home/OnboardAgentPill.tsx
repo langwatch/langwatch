@@ -5,7 +5,6 @@ import {
 } from "~/components/SetupWithAgentButton";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { selfHostedEndpoint } from "~/features/traces-v2/onboarding/logic/selfHostedEndpoint";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { HeroLeadPill } from "./HeroLeadPill";
 
@@ -44,10 +43,6 @@ export function OnboardAgentPill({
    */
   prominent?: boolean;
 } = {}) {
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
   const publicEnv = usePublicEnv();
   const canAsk = useCanAskLangy();
   // The same condition the menu itself applies, so the tiles on the pill
@@ -90,9 +85,6 @@ export function OnboardAgentPill({
       copy={{
         prompt: setupAgentPrompt("traces"),
         skill: "tracing",
-        // The project's own key, so the agent gets a setup it can run rather
-        // than one that stops to ask for credentials.
-        apiKey: project?.apiKey,
         endpoint: selfHostedEndpoint(publicEnv.data?.BASE_HOST) ?? undefined,
         label: "Copy a prompt for your coding agent",
         hint: "Paste it into Claude Code, Cursor, or whatever you use",

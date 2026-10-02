@@ -38,7 +38,7 @@ export const registerRedactionProject = (ns: string) => {
   const organizationId = () => organization!.id;
 
   const headers = () => ({
-    "X-Auth-Token": project!.apiKey,
+    "X-Auth-Token": project!.apiKey!,
     "Content-Type": "application/json",
   });
 

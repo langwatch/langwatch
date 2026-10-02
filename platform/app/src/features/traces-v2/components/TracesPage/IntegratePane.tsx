@@ -50,7 +50,7 @@ export const IntegratePane: React.FC = () => {
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
-    project: token ? { ...project, apiKey: token } : project,
+    project,
     organization,
     freshToken: token ?? undefined,
     onFreshToken: setToken,

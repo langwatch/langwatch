@@ -34,6 +34,14 @@ export const AGENT_SANDBOX_API_KEY_NAME = "Agent sandbox run";
 export const CLI_LOGIN_KEY_NAME_PREFIX = "CLI login - ";
 
 /**
+ * Name prefix of the project key `langwatch login` hands a person (see
+ * `CliProjectKeyService`); the project name and the device label follow it,
+ * so the person recognizes it on the API keys page. Nothing looks a key up by
+ * this name.
+ */
+export const CLI_PROJECT_KEY_NAME_PREFIX = "CLI project key - ";
+
+/**
  * Keys with these names are system-managed and short-lived; they are excluded
  * from both the per-user and the admin (org-wide) API-keys listings so the UI
  * shows only keys a human created and manages. They remain fully functional for

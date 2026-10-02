@@ -81,7 +81,7 @@ const PromptPlaygroundChat = forwardRef<
       <CopilotKit
         runtimeUrl="/api/copilotkit"
         headers={{
-          "X-Auth-Token": project?.apiKey ?? "",
+          "X-Project-Id": project?.id ?? "",
         }}
         forwardedParameters={{
           // @ts-expect-error - Total hack to pass additional params to the service adapter

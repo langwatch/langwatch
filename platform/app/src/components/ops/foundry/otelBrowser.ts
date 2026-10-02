@@ -8,8 +8,6 @@ import {
 } from "@opentelemetry/semantic-conventions";
 import { attributes } from "langwatch/observability";
 
-const PAT_PREFIX = "pat-lw-";
-
 export function createFoundryProvider({
   apiKey,
   endpoint,
@@ -19,10 +17,8 @@ export function createFoundryProvider({
   apiKey: string;
   endpoint: string;
   /**
-   * Required when `apiKey` is a legacy API key (`pat-lw-*`). The
-   * unified auth middleware needs the project id alongside the API key to
-   * resolve the role binding. Optional for legacy `sk-lw-*` keys, which
-   * encode project identity themselves.
+   * The project the traces belong to. Sent as `x-project-id` so the auth
+   * middleware resolves the API key's role binding for that project.
    */
   projectId?: string;
   resourceAttributes: Record<string, string>;
@@ -39,14 +35,13 @@ export function createFoundryProvider({
 
   const url = new URL("/api/otel/v1/traces", endpoint).toString();
 
-  const isPat = apiKey.startsWith(PAT_PREFIX);
   const headers: Record<string, string> = {
     authorization: `Bearer ${apiKey}`,
     "x-langwatch-sdk-name": "langwatch-foundry",
     "x-langwatch-sdk-language": "typescript",
     "x-langwatch-sdk-runtime": "web",
   };
-  if (isPat && projectId) {
+  if (projectId) {
     headers["x-project-id"] = projectId;
   }
 

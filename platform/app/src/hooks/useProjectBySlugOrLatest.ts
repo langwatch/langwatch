@@ -5,7 +5,6 @@ export interface MinimalProject {
   id: string;
   slug: string;
   name: string;
-  apiKey?: string;
   createdAt?: Date | string | null;
 }
 

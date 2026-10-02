@@ -3,7 +3,6 @@ import type { StudioClientEvent } from "../../types/events";
 
 vi.mock("../../../server/db", () => ({
   prisma: {
-    project: { findUniqueOrThrow: vi.fn() },
     projectSecret: { findMany: vi.fn() },
   },
 }));
@@ -11,6 +10,10 @@ vi.mock("../../../server/db", () => ({
 vi.mock("../../../utils/encryption", () => ({
   encrypt: vi.fn((v: string) => `encrypted:${v}`),
   decrypt: vi.fn((v: string) => v.replace("encrypted:", "")),
+}));
+
+vi.mock("../../../server/api-key/project-internal-key", () => ({
+  getProjectInternalKey: vi.fn(),
 }));
 
 vi.mock("../../../server/api/routers/modelProviders.utils", () => ({
@@ -22,12 +25,13 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../../server/api/routers/modelProviders.utils";
+import { getProjectInternalKey } from "../../../server/api-key/project-internal-key";
 import { prisma } from "../../../server/db";
 import { decrypt } from "../../../utils/encryption";
 import { addEnvs, LlmModelNotSetError } from "../addEnvs";
 
 const PROJECT_ID = "project-123";
-const API_KEY = "test-api-key";
+const INTERNAL_KEY = "sk-lw-internal-key";
 
 const makeExecuteComponentEvent = ({
   workflowId = "wf-1",
@@ -65,9 +69,23 @@ describe("addEnvs", () => {
     vi.mocked(prepareLitellmParams).mockResolvedValue({
       model: "openai/gpt-4o",
     });
-    vi.mocked(prisma.project.findUniqueOrThrow).mockResolvedValue({
-      apiKey: API_KEY,
-    } as any);
+    vi.mocked(getProjectInternalKey).mockResolvedValue(INTERNAL_KEY);
+  });
+
+  describe("when the workflow is sent to the workflow engine", () => {
+    beforeEach(() => {
+      vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([]);
+    });
+
+    it("authenticates it with the project internal key", async () => {
+      const result = await addEnvs(makeExecuteComponentEvent(), PROJECT_ID);
+
+      const workflow = (result.payload as any).workflow;
+      expect(workflow.api_key).toBe(INTERNAL_KEY);
+      expect(getProjectInternalKey).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT_ID }),
+      );
+    });
   });
 
   describe("when project has secrets", () => {

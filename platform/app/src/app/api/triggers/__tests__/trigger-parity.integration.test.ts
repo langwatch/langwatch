@@ -68,7 +68,7 @@ describe("Feature: automations over the public API express what the dashboard ex
   const projectId = () => project!.id;
 
   const headers = () => ({
-    "X-Auth-Token": project!.apiKey,
+    "X-Auth-Token": project!.apiKey!,
     "Content-Type": "application/json",
   });
 
@@ -489,7 +489,7 @@ describe("Feature: automations over the public API express what the dashboard ex
     let capped: Project | undefined;
 
     const cappedHeaders = () => ({
-      "X-Auth-Token": capped!.apiKey,
+      "X-Auth-Token": capped!.apiKey!,
       "Content-Type": "application/json",
     });
 

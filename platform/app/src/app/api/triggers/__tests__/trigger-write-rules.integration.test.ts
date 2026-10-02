@@ -40,7 +40,7 @@ describe("Feature: the API saves what the dashboard would accept", () => {
   const projectId = () => project!.id;
 
   const headers = () => ({
-    "X-Auth-Token": project!.apiKey,
+    "X-Auth-Token": project!.apiKey!,
     "Content-Type": "application/json",
   });
 

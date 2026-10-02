@@ -60,6 +60,7 @@ import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
+import { sweepProjectApiKeys } from "~/server/api-key/project-api-key";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapFinishedSignInLocks } from "~/server/app-layer/identity/sign-in-security-adapters";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
@@ -244,6 +245,7 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
+import { createProjectApiKeyMaintenancePipeline } from "./pipelines/project-api-key-maintenance/pipeline";
 import { createSignInLockMaintenancePipeline } from "./pipelines/sign-in-lock-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
@@ -720,6 +722,19 @@ export class PipelineRegistry {
       createCliLoginKeyMaintenancePipeline({
         loginKeyReap: {
           reap: () => reapExpiredCliLoginKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Project API key storage, on the same footing. Keys stored before they
+    // were hashed are hashed here, and their plaintext cleared once the grace
+    // window has passed.
+    this.deps.eventSourcing.register(
+      createProjectApiKeyMaintenancePipeline({
+        keySweep: {
+          sweep: () => sweepProjectApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

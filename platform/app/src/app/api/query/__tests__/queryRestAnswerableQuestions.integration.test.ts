@@ -727,7 +727,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": asking.apiKey,
+        "X-Auth-Token": asking.apiKey!,
       },
       body: JSON.stringify({ sql }),
     });

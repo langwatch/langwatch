@@ -28,7 +28,7 @@ describe("Feature: connected agents on the REST agents API", () => {
   let project: Project;
 
   const headers = () => ({
-    "X-Auth-Token": project.apiKey,
+    "X-Auth-Token": project.apiKey!,
     "Content-Type": "application/json",
   });
 

@@ -32,9 +32,9 @@
  *   Project:      local-dev-project
  *   User:         local-dev-admin-user
  *
- * Ingestion key — Project.apiKey, the legacy project key SDKs paste into
- * LANGWATCH_API_KEY (exact-string-match lookup; see token-resolver.ts's
- * "legacyProjectKey" path — this predates and is independent of the ApiKey
+ * Ingestion key: the project API key SDKs paste into LANGWATCH_API_KEY,
+ * stored as its hash on the Project row (see project-api-key.ts and
+ * token-resolver.ts's "legacyProjectKey" path; independent of the ApiKey
  * table below). Overridable via the LANGWATCH_API_KEY env var: haven injects
  * this same default automatically (domain.DefaultLocalAPIKey in
  * tools/thuishaven/domain/overlay.go — keep the two in sync by hand, they
@@ -89,6 +89,7 @@ import {
   hashSecret,
   INGEST_KEY_PREFIX,
 } from "../src/server/api-key/api-key-token.utils";
+import { mintProjectApiKey } from "../src/server/api-key/project-api-key";
 import { modelProviders } from "../src/server/modelProviders/registry";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
@@ -329,13 +330,14 @@ async function main() {
     update: {},
   });
 
+  const apiKeyColumns = mintProjectApiKey({ token: apiKey }).columns;
   const project = await prisma.project.upsert({
     where: { id: PROJECT_ID },
     create: {
       id: PROJECT_ID,
       name: PROJECT_NAME,
       slug: PROJECT_SLUG,
-      apiKey,
+      ...apiKeyColumns,
       teamId: team.id,
       language: "en",
       framework: "langchain",
@@ -347,11 +349,11 @@ async function main() {
     update:
       hasFirstMessageOverride || isPastOnboarding
         ? {
-            apiKey,
+            ...apiKeyColumns,
             firstMessage: isPastOnboarding,
             integrated: isPastOnboarding,
           }
-        : { apiKey },
+        : apiKeyColumns,
   });
 
   // Admin user + BetterAuth credential (email/password) login.
@@ -583,9 +585,7 @@ async function main() {
   // Only echo the key in full when it's the non-secret default; otherwise redact
   // (same rationale as the seeding log above — real credentials must not hit shipped logs).
   const displayApiKey =
-    project.apiKey === DEFAULT_INGESTION_KEY
-      ? project.apiKey
-      : `${project.apiKey.slice(0, 8)}…`;
+    apiKey === DEFAULT_INGESTION_KEY ? apiKey : `${apiKey.slice(0, 8)}…`;
   console.log(`✅ Ingestion key:        ${displayApiKey}`);
   console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
   console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);

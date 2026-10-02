@@ -45,6 +45,7 @@
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { randomBytes } from "crypto";
+import { mintProjectApiKey } from "~/server/api-key/project-api-key";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -172,7 +173,7 @@ export async function runSeedPersonas(
     data: {
       name: "Dogfood Project",
       slug: `${orgSlug}-default`,
-      apiKey: `lw_pk_${randomBytes(24).toString("base64url")}`,
+      ...mintProjectApiKey().columns,
       teamId: team.id,
       language: "typescript",
       framework: "openai",

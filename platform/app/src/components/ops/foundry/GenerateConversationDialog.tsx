@@ -15,11 +15,11 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { showErrorToast } from "~/features/errors";
 import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
 import { generateConversation } from "./generateConversation";
 import { getFoundryExecutor } from "./traceExecutor";
+import { useFoundryCredential } from "./useFoundryCredential";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
 
@@ -29,21 +29,19 @@ export function GenerateConversationDialog() {
   const [staggerMs, setStaggerMs] = useState(150);
   const [isSending, setIsSending] = useState(false);
 
-  const { project } = useOrganizationTeamProject();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const { projectId, ensureApiKey } = useFoundryCredential();
   const { addLogEntry, updateLogEntry } = useExecutionStore();
 
   async function handleSend() {
-    if (!apiKey || isSending) return;
+    if (!projectId || isSending) return;
     setIsSending(true);
     setIsOpen(false);
     try {
       const traces = generateConversation({ turnCount });
       const executor = getFoundryExecutor({
-        apiKey,
+        apiKey: await ensureApiKey(),
         endpoint: window.location.origin,
-        projectId: project?.id,
+        projectId,
         resourceAttributes: traces[0]?.resourceAttributes,
       });
       for (let i = 0; i < traces.length; i++) {
@@ -67,6 +65,11 @@ export function GenerateConversationDialog() {
           await new Promise((r) => setTimeout(r, staggerMs));
         }
       }
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't send the conversation",
+      });
     } finally {
       setIsSending(false);
     }
@@ -84,7 +87,7 @@ export function GenerateConversationDialog() {
           variant="outline"
           loading={isSending}
           loadingText="Sending…"
-          disabled={!apiKey}
+          disabled={!projectId}
         >
           <MessagesSquare size={14} />
           Fake conversation
@@ -165,12 +168,12 @@ export function GenerateConversationDialog() {
               colorPalette="orange"
               onClick={handleSend}
               w="full"
-              disabled={!apiKey}
+              disabled={!projectId}
             >
               <MessagesSquare size={14} />
               Send {turnCount} turns
             </Button>
-            {!apiKey && (
+            {!projectId && (
               <Text fontSize="xs" color="fg.muted">
                 Navigate to a project first.
               </Text>

@@ -21,7 +21,7 @@ async function main() {
 
   const project = await prisma.project.findFirst({
     where: { slug },
-    select: { id: true, apiKey: true },
+    select: { id: true },
   });
   if (!project) throw new Error(`No project with slug ${slug}`);
 

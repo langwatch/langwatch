@@ -194,7 +194,7 @@ describe("given a project with one saved experiment", () => {
       try {
         const { status, text } = await read({
           slugOrId: slug,
-          apiKey: otherProject.apiKey,
+          apiKey: otherProject.apiKey!,
         });
 
         expect(status, text).toBe(404);

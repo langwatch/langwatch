@@ -34,6 +34,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
+import { findProjectByApiKey } from "../server/api-key/project-api-key";
 import { tryGetApp } from "../server/app-layer/app";
 import { prisma } from "../server/db";
 import type { NextApiRequest } from "../types/next-stubs";
@@ -575,10 +576,7 @@ export function createMcpHandler(): McpHandler {
     apiKey: string,
   ): Promise<{ id: string; teamId: string } | null> {
     try {
-      const project = await prisma.project.findUnique({
-        where: { apiKey, archivedAt: null },
-      });
-      return project;
+      return await findProjectByApiKey({ prisma, token: apiKey });
     } catch (err) {
       logger.error({ error: err }, "Database API key validation failed");
       return null;

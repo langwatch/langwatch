@@ -202,8 +202,8 @@ export interface SessionProjectKey {
 }
 
 /**
- * Non-interactive project login: resolve a shared project's existing API key
- * by slug through the device session. Server enforces write access and
+ * Non-interactive project login: get an API key for a project by slug
+ * through the device session. Server enforces write access and
  * refuses other users' personal projects; the error_description is carried
  * through so the CLI can show the server's own sentence.
  */

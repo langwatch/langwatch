@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { getProjectInternalKey } from "../../api-key/project-internal-key";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -16,11 +17,10 @@ export const optimizationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { workflowId, inputMessages, projectId } = input;
 
-      const project = await ctx.prisma.project.findFirst({
-        where: { id: projectId },
+      const apiKey = await getProjectInternalKey({
+        prisma: ctx.prisma,
+        projectId,
       });
-
-      const apiKey = project?.apiKey;
 
       const response = await fetch(
         `${process.env.BASE_HOST}/api/workflows/${workflowId}/run`,
@@ -29,7 +29,7 @@ export const optimizationRouter = createTRPCRouter({
           body: JSON.stringify(inputMessages[0]),
           headers: {
             "Content-Type": "application/json",
-            ...(apiKey && { "x-auth-token": apiKey }),
+            "x-auth-token": apiKey,
           },
         },
       );

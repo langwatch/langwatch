@@ -35,7 +35,7 @@ interface AdminProject {
   id: string;
   name: string;
   slug: string;
-  apiKey: string;
+  apiKeyLast4: string | null;
   teamId: string;
   language: string | null;
   framework: string | null;
@@ -426,9 +426,11 @@ function ProjectEditDrawer({
                 <Text fontSize="xs" color="fg.muted">
                   Team: {project.teamId}
                 </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  API key: {project.apiKey}
-                </Text>
+                {project.apiKeyLast4 && (
+                  <Text fontSize="xs" color="fg.muted">
+                    API key: sk-lw-…{project.apiKeyLast4}
+                  </Text>
+                )}
                 {project.archivedAt && (
                   <Text fontSize="xs" color="fg.muted">
                     Archived at: {formatDate(project.archivedAt)}

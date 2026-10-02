@@ -1,14 +1,10 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Key, Sparkles } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { showErrorToast } from "~/features/errors";
+import { MintApiKeyBanner } from "~/components/api-keys/MintApiKeyBanner";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
-import { InlineCopyButton } from "~/features/onboarding/components/sections/shared/InlineCopyButton";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import { useMintProjectApiKey } from "~/hooks/useMintProjectApiKey";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { api } from "~/utils/api";
 import { selfHostedEndpoint } from "../logic/selfHostedEndpoint";
 
 interface ApiKeyIntegrationInfoCardProps {
@@ -22,34 +18,6 @@ interface ApiKeyIntegrationInfoCardProps {
   token: string | null;
   onTokenGenerated: (token: string) => void;
 }
-
-/**
- * Hardcoded scope for the empty-state API key: project-level MEMBER role —
- * read+write within the active project, nothing else. We don't expose a
- * scope picker here because the goal is one-click provisioning for "send
- * me my first traces"; users who need narrower or broader scopes can mint
- * a custom API key from Settings → API Keys.
- *
- * TODO(traces-v2): When LangWatch ships a tracing-only custom role we
- * should switch this to `customRoleId = TRACING_RW` for least-privilege.
- * MEMBER is the closest preset that grants traces + prompts read/write.
- */
-function buildEmptyStateBindings(projectId: string) {
-  return [
-    {
-      role: TeamUserRole.MEMBER,
-      customRoleId: null as string | null,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: projectId,
-    },
-  ];
-}
-
-// TODO(traces-v2): Rename this card's generated key to something more
-// descriptive ("LangWatch Tracing — <projectName>") and let the user supply
-// their own name. "Initial API key" is a placeholder so the empty-state
-// flow has zero text inputs.
-const API_KEY_NAME = "Initial API key";
 
 interface EnvLine {
   key: string;
@@ -122,24 +90,12 @@ export function ApiKeyIntegrationInfoCard({
   // them hide it again.
   const [revealed, setRevealed] = useState(true);
 
-  const createMutation = api.apiKey.create.useMutation();
-
-  const handleGenerate = () => {
-    createMutation.mutate(
-      {
-        organizationId,
-        name: API_KEY_NAME,
-        bindings: buildEmptyStateBindings(projectId),
-      },
-      {
-        onSuccess: (result) => {
-          onTokenGenerated(result.token);
-        },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
-      },
-    );
-  };
+  const { mint: handleGenerate, isPending } = useMintProjectApiKey({
+    organizationId,
+    projectId,
+    token,
+    onToken: onTokenGenerated,
+  });
 
   // `G` triggers Generate when the button is on screen. Skipped when a
   // token is already minted (button disappears) or while another mutation
@@ -152,7 +108,7 @@ export function ApiKeyIntegrationInfoCard({
   const handleGenerateRef = useRef(handleGenerate);
   handleGenerateRef.current = handleGenerate;
   useEffect(() => {
-    if (token || createMutation.isPending) return;
+    if (token || isPending) return;
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
@@ -170,7 +126,7 @@ export function ApiKeyIntegrationInfoCard({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [token, createMutation.isPending]);
+  }, [token, isPending]);
 
   // Pre-generation preview shows the .env shape with a non-secret
   // placeholder for the API key. The placeholder is hidden behind a
@@ -192,96 +148,14 @@ export function ApiKeyIntegrationInfoCard({
 
   return (
     <VStack align="stretch" gap={3}>
-      {/* Slim, full-width, subtly orange banner sitting directly above
-          the .env code block — this is the single canonical mint CTA
-          for the whole integration surface. It transforms in place
-          after the user mints, becoming the "copy this token now"
-          advisory + Mint-another link. Both .env and mcp.json fill in
-          from the same shared state, so one click is enough. */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={token ? "post-gen" : "pre-gen"}
-          initial={{ opacity: 0, y: 2 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -2 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-        >
-          {token ? (
-            <Box
-              borderWidth="1px"
-              borderColor="orange.muted"
-              borderRadius="lg"
-              bg="orange.subtle"
-              paddingX={4}
-              paddingY={3}
-            >
-              <HStack justify="space-between" align="center" gap={3}>
-                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
-                  <Icon
-                    as={Sparkles}
-                    boxSize={4}
-                    color="orange.fg"
-                    flexShrink={0}
-                  />
-                  <Text fontSize="sm" lineHeight="snug">
-                    <Text as="span" color="orange.fg" fontWeight="semibold">
-                      Copy this token before you move on.
-                    </Text>{" "}
-                    <Text as="span" color="fg.muted">
-                      It won&apos;t be shown again.
-                    </Text>
-                  </Text>
-                  <InlineCopyButton text={token} label="Token" />
-                </HStack>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="orange"
-                  onClick={handleGenerate}
-                  loading={createMutation.isPending}
-                  flexShrink={0}
-                >
-                  <Key size={12} />
-                  Mint another
-                </Button>
-              </HStack>
-            </Box>
-          ) : (
-            <Box
-              borderWidth="1px"
-              borderColor="orange.muted"
-              borderRadius="lg"
-              bg="orange.subtle"
-              paddingX={4}
-              paddingY={3}
-            >
-              <HStack justify="space-between" align="center" gap={3}>
-                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
-                  <Icon as={Key} boxSize={4} color="orange.fg" flexShrink={0} />
-                  <Text fontSize="sm" lineHeight="snug">
-                    <Text as="span" fontWeight="semibold" color="fg">
-                      Generate an access token
-                    </Text>{" "}
-                    <Text as="span" color="fg.muted">
-                      to fill the snippets below.
-                    </Text>
-                  </Text>
-                </HStack>
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  variant="solid"
-                  onClick={handleGenerate}
-                  loading={createMutation.isPending}
-                  flexShrink={0}
-                >
-                  Generate access token
-                </Button>
-              </HStack>
-            </Box>
-          )}
-        </motion.div>
-      </AnimatePresence>
+      {/* The single canonical mint CTA for the whole integration surface.
+          Both .env and mcp.json fill in from the same shared state, so one
+          click is enough. */}
+      <MintApiKeyBanner
+        token={token}
+        onMint={handleGenerate}
+        isPending={isPending}
+      />
       <CodePreview
         code={code}
         filename=".env"

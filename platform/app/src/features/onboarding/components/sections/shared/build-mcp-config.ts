@@ -1,5 +1,11 @@
 export const CLOUD_ENDPOINT = "https://app.langwatch.ai";
 
+/**
+ * Shown in a setup snippet until an access token is minted. The project's own
+ * key can never be read back, so snippets never fall back to it.
+ */
+export const API_KEY_PLACEHOLDER = "YOUR_LANGWATCH_API_KEY";
+
 interface BuildMcpInput {
   apiKey: string;
   endpoint: string | undefined;

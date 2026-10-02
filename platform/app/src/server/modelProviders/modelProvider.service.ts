@@ -686,12 +686,11 @@ export class ModelProviderService {
   ): Promise<MaterializedModelProvider[]> {
     const teams = await this.prisma.team.findMany({
       where: { organizationId },
-      include: { projects: true },
+      select: { projects: { select: { createdAt: true } } },
     });
     const projects = teams.flatMap((t) => t.projects);
-    const oldestProject = projects.reduce<Project | null>(
-      (oldest, p) =>
-        !oldest || p.createdAt < oldest.createdAt ? (p as Project) : oldest,
+    const oldestProject = projects.reduce<Pick<Project, "createdAt"> | null>(
+      (oldest, p) => (!oldest || p.createdAt < oldest.createdAt ? p : oldest),
       null,
     );
     const defaultProviders = oldestProject
@@ -757,7 +756,7 @@ export class ModelProviderService {
    */
   private buildDefaultProvidersFromEnvShape(
     providerKey: string,
-    referenceProject: Project | null,
+    referenceProject: Pick<Project, "createdAt"> | null,
   ): MaybeStoredModelProvider | null {
     if (!referenceProject) return null;
     const registry = modelProviders[providerKey as keyof typeof modelProviders];
@@ -1473,7 +1472,7 @@ export class ModelProviderService {
   // ─────────────────────────────────────────────────────────────────
 
   private buildDefaultProviders(
-    project: Project,
+    project: Pick<Project, "createdAt">,
   ): Record<string, MaybeStoredModelProvider> {
     return Object.fromEntries(
       Object.entries(modelProviders)

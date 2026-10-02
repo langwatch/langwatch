@@ -65353,7 +65353,9 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 | S3 | Server-side encryption (SSE-S3 or SSE-KMS) |
 | Stored credentials | Application-level encryption via `CREDENTIALS_SECRET` |
 
-The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+The `CREDENTIALS_SECRET` environment variable is used to encrypt credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+
+LangWatch API keys, including project API keys, are not stored. PostgreSQL holds an HMAC-SHA256 of each key, keyed by `CREDENTIALS_SECRET` (or `NEXTAUTH_SECRET` when it is not set). A copy of the database alone does not yield a working key.
 
 ### In Transit
 
@@ -66782,6 +66784,25 @@ docker compose up -d
 ```
 
 ## Breaking Changes
+
+### Project API keys are stored as hashes
+
+The project API key is now stored as an HMAC-SHA256 hash, like every other API key. Existing keys keep working for trace ingestion and the SDKs, and there is no manual step.
+
+- The workers hash every stored project API key within an hour of the upgrade. A key used before that is hashed on its first request.
+- The plaintext stays in PostgreSQL for 7 days after a key is hashed, so the previous release can still authenticate it during the rollout and a rollback. After that, the plaintext is removed.
+- **Settings > API Keys** shows only the last four characters of the project API key. The full key is shown once, when you rotate it. To get a working key again, rotate the project API key or create a new API key.
+- Keep `CREDENTIALS_SECRET` stable. The hash is keyed by `CREDENTIALS_SECRET`, or by `NEXTAUTH_SECRET` when `CREDENTIALS_SECRET` is not set. Changing that value, including setting `CREDENTIALS_SECRET` for the first time on an install that only had `NEXTAUTH_SECRET`, invalidates every project API key and every other API key.
+- Rolling back to an earlier release more than 7 days after the upgrade leaves that release unable to authenticate project API keys, since it reads only the plaintext. Rotate the project API keys after such a rollback.
+
+To hash every key now, or to remove the plaintext without waiting 7 days, run the sweep from an app container:
+
+```bash
+pnpm run task hashProjectApiKeys                    # hash; remove plaintext older than 7 days
+pnpm run task hashProjectApiKeys --clear-plaintext  # hash and remove all plaintext now
+```
+
+Use `--clear-plaintext` only after the rollout has finished and you do not plan to roll back.
 
 ### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
 

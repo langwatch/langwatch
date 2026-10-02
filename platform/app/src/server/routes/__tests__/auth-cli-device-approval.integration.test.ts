@@ -28,6 +28,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 
 import {
   publishDeviceCodeSettled,
@@ -116,7 +117,11 @@ describe("CLI device-approval stream", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      // A project-key exchange mints the person's key, which writes grants.
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     // The redemption path re-derives membership from Postgres, so the user and
     // org the approvals below name have to exist for an exchange to reach 200.
@@ -175,6 +180,8 @@ describe("CLI device-approval stream", () => {
   afterAll(async () => {
     await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
     await prisma.project
@@ -355,7 +362,6 @@ describe("CLI device-approval stream", () => {
             project_id: PROJECT_ID,
             project_slug: `approval-proj-${suffix}`,
             project_name: `Approval Project ${suffix}`,
-            api_key: PROJECT_API_KEY,
           },
         });
 
@@ -370,9 +376,12 @@ describe("CLI device-approval stream", () => {
 
         const winner = first.status === 200 ? first : second;
         const loser = first.status === 200 ? second : first;
-        expect(((await winner.json()) as { api_key: string }).api_key).toBe(
-          PROJECT_API_KEY,
+        const handedOut = ((await winner.json()) as { api_key: string })
+          .api_key;
+        expect(handedOut).toEqual(
+          expect.stringMatching(/^sk-lw-[A-Za-z0-9]+_/),
         );
+        expect(handedOut).not.toBe(PROJECT_API_KEY);
         expect(((await loser.json()) as { error: string }).error).toBe(
           "slow_down",
         );
@@ -420,7 +429,6 @@ describe("CLI device-approval stream", () => {
             project_id: PROJECT_ID,
             project_slug: `approval-proj-${suffix}`,
             project_name: `Approval Project ${suffix}`,
-            api_key: PROJECT_API_KEY,
           },
         });
         const recordTheRacerRead = await redisConnection?.get(

@@ -54,6 +54,8 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
   return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
+import { CLI_PROJECT_KEY_NAME_PREFIX } from "~/server/api-key/reserved-names";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
@@ -62,6 +64,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -117,8 +121,16 @@ interface DeviceFlowResult {
   exchange: ExchangeSuccess;
 }
 
-/** Run the full device flow: mint, approve (stubbed browser session), exchange. */
-async function runDeviceFlow(): Promise<DeviceFlowResult> {
+/**
+ * Run the full device flow: mint, approve (stubbed browser session), exchange.
+ * A login from the same device replaces the previous session's login key, so
+ * a flow that must leave the suite's main session alone names its own device.
+ */
+async function runDeviceFlow({
+  deviceLabel,
+}: {
+  deviceLabel?: string;
+} = {}): Promise<DeviceFlowResult> {
   const dcRes = await app.request("/api/auth/cli/device-code", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -139,7 +151,10 @@ async function runDeviceFlow(): Promise<DeviceFlowResult> {
   const exchangeRes = await app.request("/api/auth/cli/exchange", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ device_code: dc.device_code }),
+    body: JSON.stringify({
+      device_code: dc.device_code,
+      ...(deviceLabel ? { client_info: { device_label: deviceLabel } } : {}),
+    }),
   });
   return {
     approveStatus: approveRes.status,
@@ -191,6 +206,16 @@ async function seedCallerOrg(): Promise<void> {
   });
   await prisma.teamUser.create({
     data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
+  });
+  // The handed-out keys are capped by the person's own access, so the caller
+  // holds the organization ADMIN binding an org admin really has.
+  await seedRoleBinding(prisma, {
+    id: `rb-mecred-admin-${suffix}`,
+    organizationId: ORG_ID,
+    userId: USER_ID,
+    role: "ADMIN",
+    scopeType: "ORGANIZATION",
+    scopeId: ORG_ID,
   });
   await prisma.project.create({
     data: {
@@ -296,6 +321,28 @@ const personalTeamCount = (userId: string) =>
     },
   });
 
+/** The project a token authenticates as when the request names none. */
+async function projectOfToken(token: string): Promise<string | null> {
+  const resolved = await TokenResolver.create(prisma).resolve({
+    token,
+    projectId: null,
+  });
+  return resolved?.project.id ?? null;
+}
+
+/** Every string and set member in the test Redis, to look for a stored secret. */
+async function allRedisValues(): Promise<string> {
+  const redis = redisConnection!;
+  const keys = await redis.keys("*");
+  const values: string[] = [];
+  for (const key of keys) {
+    const type = await redis.type(key);
+    if (type === "string") values.push((await redis.get(key)) ?? "");
+    if (type === "set") values.push(...(await redis.smembers(key)));
+  }
+  return values.join("\n");
+}
+
 let deviceFlow: DeviceFlowResult;
 let exchange: ExchangeSuccess;
 
@@ -309,6 +356,8 @@ beforeAll(async () => {
     resolveClient: async () => getTestClickHouseClient(),
     // The CLI device flow writes its codes and tokens to Redis.
     redis: redisConnection,
+    // Minting the login key and the project keys writes grants.
+    eventSourcing: createAuthzTestEventSourcing(prisma),
   });
   await seedCallerOrg();
   await seedOtherMemberWorkspace();
@@ -330,6 +379,7 @@ afterAll(async () => {
   });
   const teamIds = personalTeams.map((t) => t.id);
   await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
   // The device-session exchange mints a user-scoped CLI ApiKey (plus its
   // private custom role); ApiKey→Organization is a Restrict relation, so
   // these must go before the organization delete or it silently no-ops.
@@ -350,12 +400,12 @@ afterAll(async () => {
 
 describe("/me credentials delivery, given a completed device-session exchange", () => {
   /** @scenario device-login exchange delivers the personal project key and the CLI stores it */
-  it("ships the personal project with a real api_key", async () => {
+  it("ships the personal project with an API key of the person's own", async () => {
     expect(deviceFlow.approveStatus).toBe(200);
     expect(deviceFlow.exchangeStatus).toBe(200);
     expect(exchange.kind).toBe("device_session");
     expect(exchange.personal_project).toBeDefined();
-    expect(exchange.personal_project!.api_key).toMatch(/^pkey_/);
+    expect(exchange.personal_project!.api_key).toMatch(/^sk-lw-[A-Za-z0-9]+_/);
     expect(exchange.personal_project!.slug).toContain("personal-");
 
     const project = await prisma.project.findUnique({
@@ -364,13 +414,62 @@ describe("/me credentials delivery, given a completed device-session exchange", 
     });
     expect(project?.isPersonal).toBe(true);
     expect(project?.ownerUserId).toBe(USER_ID);
-    expect(project?.apiKey).toBe(exchange.personal_project!.api_key);
+    // The project API key itself is stored as a hash only.
+    expect(project?.apiKey).toBeNull();
+  });
+
+  /** @scenario the key a CLI login hands out is the person's own, bound to the one project */
+  it("mints the key for the person, bound to the project, under the session's login key", async () => {
+    const loginKey = await prisma.apiKey.findFirst({
+      where: {
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        name: { startsWith: "CLI login - " },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    const keys = await prisma.apiKey.findMany({
+      where: {
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        name: { startsWith: CLI_PROJECT_KEY_NAME_PREFIX },
+        parentApiKeyId: loginKey!.id,
+      },
+      select: { id: true, permissionMode: true },
+    });
+    expect(keys).toHaveLength(1);
+    expect(keys[0]!.permissionMode).toBe("all");
+    const bindings = await prisma.roleBinding.findMany({
+      where: { organizationId: ORG_ID, apiKeyId: keys[0]!.id },
+      select: { role: true, scopeType: true, scopeId: true },
+    });
+    expect(bindings).toEqual([
+      {
+        role: "ADMIN",
+        scopeType: "PROJECT",
+        scopeId: exchange.personal_project!.id,
+      },
+    ]);
+  });
+
+  /** @scenario the handed-out key authenticates as its project without a project header */
+  it("authenticates as the personal project without naming it", async () => {
+    await expect(
+      projectOfToken(exchange.personal_project!.api_key),
+    ).resolves.toBe(exchange.personal_project!.id);
+  });
+
+  /** @scenario no plaintext key is stored with the device login */
+  it("stores no handed-out key in plaintext in Redis", async () => {
+    const values = await allRedisValues();
+    expect(values).not.toContain(exchange.personal_project!.api_key);
   });
 
   /** @scenario device-login exchange stays valid when the personal project key is withheld */
   it("keeps the device login successful when project administration is absent", async () => {
     vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
-    const flow = await runDeviceFlow();
+    const flow = await runDeviceFlow({ deviceLabel: "other-laptop" });
     expect(flow.approveStatus).toBe(200);
     expect(flow.exchangeStatus).toBe(200);
     expect(flow.exchange.kind).toBe("device_session");
@@ -425,6 +524,7 @@ describe("/me credentials delivery, given the lazy personal-project exchange", (
     // ensure() is idempotent: the lazy exchange resolves the SAME workspace
     // the login exchange created, never a duplicate.
     expect(body.project.id).toBe(exchange.personal_project!.id);
+    // The session's key is re-sent, not minted again on every check.
     expect(body.project.api_key).toBe(exchange.personal_project!.api_key);
   });
 
@@ -545,7 +645,7 @@ describe("/me credentials delivery, given a token whose user is no longer an act
     // Rotation mints a new pair, so it re-derives membership like every
     // other minting endpoint — otherwise the hour-long access token would
     // roll forward for ninety days.
-    const flow = await runDeviceFlow();
+    const flow = await runDeviceFlow({ deviceLabel: "other-laptop" });
     expect(flow.exchangeStatus).toBe(200);
     const refreshToken = flow.exchange.refresh_token;
 
@@ -624,15 +724,49 @@ describe("/me credentials delivery, given a token whose user is no longer an act
 
 describe("/me credentials delivery, given POST /api/auth/cli/project-key (headless --project <slug>)", () => {
   /** @scenario `langwatch login --project <slug>` resolves the key through the device session, no browser */
-  it("returns the shared project's existing key by slug", async () => {
+  it("returns a key of the person's own for the shared project by slug", async () => {
     const { status, json } = await projectKey(
       exchange.access_token,
       SHARED_PROJECT_SLUG,
     );
 
     expect(status).toBe(200);
-    expect(json.api_key).toBe(SHARED_API_KEY);
+    expect(json.api_key).not.toBe(SHARED_API_KEY);
     expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
+    await expect(projectOfToken(json.api_key as string)).resolves.toBe(
+      SHARED_PROJECT_ID,
+    );
+  });
+
+  /** @scenario asking again for the same project re-sends the key instead of minting another */
+  it("re-sends the same key to the same device", async () => {
+    const first = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
+    const second = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
+
+    expect(second.json.api_key).toBe(first.json.api_key);
+    expect(await allRedisValues()).not.toContain(first.json.api_key as string);
+  });
+
+  /** @scenario a key revoked from the API keys page is never re-sent */
+  it("mints a new key once the held one was revoked", async () => {
+    const first = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
+    await prisma.apiKey.updateMany({
+      where: {
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        name: { startsWith: CLI_PROJECT_KEY_NAME_PREFIX },
+        parentApiKeyId: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    const second = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
+
+    expect(second.status).toBe(200);
+    expect(second.json.api_key).not.toBe(first.json.api_key);
+    await expect(projectOfToken(second.json.api_key as string)).resolves.toBe(
+      SHARED_PROJECT_ID,
+    );
   });
 
   /** @scenario the project-key endpoint refuses another user's personal project */
@@ -656,7 +790,9 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
     );
 
     expect(status).toBe(200);
-    expect(json.api_key).toBe(exchange.personal_project!.api_key);
+    await expect(projectOfToken(json.api_key as string)).resolves.toBe(
+      exchange.personal_project!.id,
+    );
   });
 
   /** @scenario the project-key endpoint refuses a project the caller cannot manage */
@@ -698,5 +834,52 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
       body: JSON.stringify({ slug: SHARED_PROJECT_SLUG }),
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("/me credentials delivery, given a new login from the same device", () => {
+  /** @scenario a new login from the same device retires the previous session's project key */
+  it("retires the previous session's personal project key", async () => {
+    const previousKey = exchange.personal_project!.api_key;
+    await expect(projectOfToken(previousKey)).resolves.toBe(
+      exchange.personal_project!.id,
+    );
+
+    const next = await runDeviceFlow();
+
+    expect(next.exchangeStatus).toBe(200);
+    expect(next.exchange.personal_project!.api_key).not.toBe(previousKey);
+    await expect(projectOfToken(previousKey)).resolves.toBeNull();
+    // Revoked with the login key it was minted under, not only refused.
+    const sessionKeys = await prisma.apiKey.findMany({
+      where: {
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        name: { startsWith: CLI_PROJECT_KEY_NAME_PREFIX },
+        parentApiKeyId: { not: null },
+        createdByDeviceLabel: "unknown-device",
+      },
+      select: { revokedAt: true, revocationCause: true },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(sessionKeys[0]).toEqual({
+      revokedAt: expect.any(Date),
+      revocationCause: "rotation",
+    });
+    await expect(
+      projectOfToken(next.exchange.personal_project!.api_key),
+    ).resolves.toBe(exchange.personal_project!.id);
+  });
+
+  /** @scenario a superseded session gets no key for its personal project */
+  it("hands the superseded session no key", async () => {
+    const res = await app.request("/api/auth/cli/personal-project", {
+      headers: { authorization: `Bearer ${exchange.access_token}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = personalProjectResponseSchema.parse(await res.json());
+    expect(body.project.id).toBe(exchange.personal_project!.id);
+    expect(body.project.api_key).toBeUndefined();
   });
 });

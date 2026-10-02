@@ -50,7 +50,7 @@ export interface GovernanceConfig {
     api_key?: string;
     /**
      * Unix epoch (seconds) the device session was last confirmed live for
-     * this cached key. The key is a long-lived Project.apiKey, so using it
+     * this cached key. The key is a long-lived API key, so using it
      * unconditionally would outlive a revoked device (a stolen config would
      * work forever). The resolver only trusts the cache within a short
      * revalidation window; past it, it re-confirms liveness through the

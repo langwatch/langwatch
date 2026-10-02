@@ -2,14 +2,15 @@ import { Accordion, Separator, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { API_KEY_PLACEHOLDER } from "../shared/build-mcp-config";
 import { CodePreview } from "./CodePreview";
 
 export function LangflowSetup(): React.ReactElement {
-  const { project } = useActiveProject();
+  const { freshToken } = useActiveProject();
   const [isVisible, setIsVisible] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string[]>([]);
 
-  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
 
   function toggleVisibility(): void {
     setIsVisible((prev) => !prev);
@@ -93,8 +94,8 @@ langwatch.get_current_trace().update(
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
-          sensitiveValue={effectiveApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           onToggleVisibility={toggleVisibility}
         />

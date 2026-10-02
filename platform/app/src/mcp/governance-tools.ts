@@ -56,6 +56,7 @@ import { createLogger } from "@langwatch/observability";
 import { auditLog } from "../../ee/audit-log/auditLog";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
+import { findProjectByApiKey } from "../server/api-key/project-api-key";
 import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
 const logger = createLogger("langwatch:mcp:governance-tools");
@@ -95,9 +96,9 @@ export function registerGovernanceMcpTools(
   const resolve = async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {
       resolvedPromise = (async () => {
-        const project = await ctx.prisma.project.findUnique({
-          where: { apiKey: ctx.apiKey, archivedAt: null },
-          select: { team: { select: { organizationId: true } } },
+        const project = await findProjectByApiKey({
+          prisma: ctx.prisma,
+          token: ctx.apiKey,
         });
         if (!project) {
           throw new Error(

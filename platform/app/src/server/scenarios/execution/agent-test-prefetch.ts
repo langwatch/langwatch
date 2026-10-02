@@ -1,5 +1,5 @@
 /**
- * What an agent test run needs before its child starts: the project's key,
+ * What an agent test run needs before its child starts: the project internal key,
  * the agent's adapter data and the fixed scenario. No scenario row is read
  * and no model is resolved, because the conversation is written down and the
  * script decides the verdict.
@@ -20,7 +20,10 @@ import type {
 } from "./data-prefetcher";
 import type { TargetAdapterData, TargetConfig } from "./types";
 
-/** The project fields the run reads, or why they could not be read. */
+/**
+ * The project fields the run reads, or why they could not be read. `apiKey`
+ * is the project internal key (see `getProjectInternalKey`).
+ */
 export type ProjectRead =
   | { success: true; data: { apiKey: string; organizationId: string | null } }
   | { success: false; error: string };

@@ -26,7 +26,6 @@ import {
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { usePromptTags } from "~/prompts/hooks/usePromptTags";
 import { api } from "~/utils/api";
@@ -46,8 +45,6 @@ export function DeployPromptDialog({
   handle,
   projectId,
 }: DeployPromptDialogProps) {
-  const { project } = useOrganizationTeamProject();
-
   const { data: allTags, refetch: refetchTags } = usePromptTags({
     projectId,
     enabled: isOpen && !!projectId,
@@ -427,7 +424,6 @@ export function DeployPromptDialog({
                         </Select.Root>
                         <GeneratePromptApiSnippetDialog
                           promptHandle={handle}
-                          apiKey={project?.apiKey}
                           label={tagDef.name}
                         >
                           <GeneratePromptApiSnippetDialog.Trigger>

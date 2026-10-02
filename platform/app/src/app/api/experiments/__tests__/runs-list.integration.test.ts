@@ -58,7 +58,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments/runs", () => {
       /** @scenario "Missing experimentSlug returns 400" */
       it("rejects with 400", async () => {
         const response = await fetch(`${getBaseUrl()}/api/experiments/runs`, {
-          headers: { "X-Auth-Token": project.apiKey },
+          headers: { "X-Auth-Token": project.apiKey! },
         });
         expect(response.status).toBe(400);
         const body = await response.json();
@@ -71,7 +71,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments/runs", () => {
       it("returns 404", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/experiments/runs?experimentSlug=does-not-exist-${Date.now()}`,
-          { headers: { "X-Auth-Token": project.apiKey } },
+          { headers: { "X-Auth-Token": project.apiKey! } },
         );
         expect(response.status).toBe(404);
       });
@@ -83,7 +83,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments/runs", () => {
       it("returns 200 with a runs array (possibly empty)", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/experiments/runs?experimentSlug=${testSlug}`,
-          { headers: { "X-Auth-Token": project.apiKey } },
+          { headers: { "X-Auth-Token": project.apiKey! } },
         );
         expect(response.status).toBe(200);
         const body = await response.json();

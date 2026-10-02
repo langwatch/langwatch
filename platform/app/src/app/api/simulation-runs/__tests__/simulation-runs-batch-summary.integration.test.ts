@@ -65,7 +65,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 

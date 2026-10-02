@@ -3,6 +3,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../server/api/routers/modelProviders.utils";
+import { getProjectInternalKey } from "../../server/api-key/project-internal-key";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { decrypt } from "../../utils/encryption";
@@ -38,16 +39,9 @@ export const addEnvs = async (
     return event;
   }
 
-  const [modelProviders, { apiKey }, projectSecrets] = await Promise.all([
+  const [modelProviders, apiKey, projectSecrets] = await Promise.all([
     getProjectModelProviders(projectId),
-    prisma.project.findUniqueOrThrow({
-      where: {
-        id: projectId,
-      },
-      select: {
-        apiKey: true,
-      },
-    }),
+    getProjectInternalKey({ prisma, projectId }),
     prisma.projectSecret.findMany({
       where: { projectId },
       select: { name: true, encryptedValue: true },

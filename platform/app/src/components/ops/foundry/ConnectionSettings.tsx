@@ -13,7 +13,8 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
   );
   const [isOpen, setIsOpen] = useState(false);
 
-  const { selectedProjectId, setSelectedProject } = useFoundryProjectStore();
+  const { selectedTarget, setSelectedTarget } = useFoundryProjectStore();
+  const selectedProjectId = selectedTarget?.projectId;
 
   const allProjects = useMemo(() => {
     if (!organizations.data) return [];
@@ -23,7 +24,7 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
           id: project.id,
           name: project.name,
           slug: project.slug,
-          apiKey: project.apiKey,
+          organizationId: org.id,
           orgName: org.name,
           teamName: team.name,
         })),
@@ -128,7 +129,10 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
                   projects={allProjects}
                   selectedId={selectedProject?.id}
                   onSelect={(project) => {
-                    setSelectedProject(project.id, project.apiKey);
+                    setSelectedTarget({
+                      projectId: project.id,
+                      organizationId: project.organizationId,
+                    });
                     setIsOpen(false);
                   }}
                 />
@@ -150,12 +154,12 @@ function ProjectList({
     id: string;
     name: string;
     slug: string;
-    apiKey: string;
+    organizationId: string;
     orgName: string;
     teamName: string;
   }>;
   selectedId: string | undefined;
-  onSelect: (project: { id: string; apiKey: string }) => void;
+  onSelect: (project: { id: string; organizationId: string }) => void;
 }) {
   // Group by org
   const grouped = useMemo(() => {

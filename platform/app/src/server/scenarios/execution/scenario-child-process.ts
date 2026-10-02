@@ -12,7 +12,7 @@
  * a non-zero exit code.
  *
  * OTEL isolation is achieved by:
- * 1. Parent injects LANGWATCH_API_KEY (project.apiKey) and LANGWATCH_ENDPOINT
+ * 1. Parent injects LANGWATCH_API_KEY (the project internal key) and LANGWATCH_ENDPOINT
  *    as env vars via buildChildProcessEnv in scenario.processor.ts
  * 2. This process imports @langwatch/scenario which calls setupObservability()
  *    at module load time, reading from those env vars
@@ -237,7 +237,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
 
-  // The platform API key rides the same telemetry channel every child
+  // The project internal key rides the same telemetry channel every child
   // process already gets (buildChildProcessEnv in scenario.processor.ts
   // sets LANGWATCH_API_KEY from prefetchScenarioData's telemetry.apiKey) —
   // no need to duplicate it onto the job payload. The workflow/code

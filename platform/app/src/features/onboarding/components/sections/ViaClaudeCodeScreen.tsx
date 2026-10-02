@@ -7,6 +7,8 @@ import { useAnalytics } from "react-contextual-analytics";
 
 const MotionVStack = motion.create(VStack);
 
+import { MintApiKeyBanner } from "~/components/api-keys/MintApiKeyBanner";
+import { useMintProjectApiKey } from "~/hooks/useMintProjectApiKey";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
@@ -21,6 +23,7 @@ import {
 } from "./code-prompts";
 import { maskApiKey } from "./shared/api-key-utils";
 import {
+  API_KEY_PLACEHOLDER,
   buildMcpJson,
   CLOUD_ENDPOINT,
   findLangwatchEnvLines,
@@ -562,9 +565,16 @@ interface ViaClaudeCodeScreenProps {
 export function ViaClaudeCodeScreen({
   showMcpTab = true,
 }: ViaClaudeCodeScreenProps = {}): React.ReactElement {
-  const { project } = useActiveProject();
+  const { project, organization, freshToken, onFreshToken } =
+    useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
+  const mintKey = useMintProjectApiKey({
+    organizationId: organization?.id,
+    projectId: project?.id,
+    token: freshToken ?? null,
+    onToken: (token) => onFreshToken?.(token),
+  });
   const { emit } = useAnalytics();
 
   const selectTab = (tab: TabKey): void => {
@@ -572,11 +582,13 @@ export function ViaClaudeCodeScreen({
     emit("selected", "tab", { tab });
   };
 
-  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
   const effectiveProjectId = project?.id;
 
-  const maskedApiKey = maskApiKey(effectiveApiKey);
+  const maskedApiKey = freshToken
+    ? maskApiKey(freshToken)
+    : API_KEY_PLACEHOLDER;
 
   const mcpJson = useMemo(
     () =>
@@ -727,6 +739,16 @@ export function ViaClaudeCodeScreen({
                   <SkillRow key={skill.id} skill={skill} />
                 ))}
               </Grid>
+            )}
+            {showMcpTab && activeTab === "mcp" && !freshToken && (
+              <Box marginBottom={4}>
+                <MintApiKeyBanner
+                  token={null}
+                  onMint={mintKey.mint}
+                  isPending={mintKey.isPending}
+                  hint="to fill the commands below."
+                />
+              </Box>
             )}
             {showMcpTab && activeTab === "mcp" && (
               <McpTab

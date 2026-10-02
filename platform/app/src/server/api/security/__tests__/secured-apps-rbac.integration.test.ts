@@ -244,13 +244,13 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
       expect(res.status).toBe(403);
     });
 
-    it("forbids POST /api/copilotkit (requires prompts:view)", async () => {
+    it("refuses an API key on POST /api/copilotkit (signed-in session only)", async () => {
       const res = await copilotkitApp.request("/api/copilotkit", {
         method: "POST",
         headers: headers(readOnlyTokenA, projectA1.id),
         body: JSON.stringify({}),
       });
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
 
     it("forbids GET /api/model-defaults (requires project:view)", async () => {

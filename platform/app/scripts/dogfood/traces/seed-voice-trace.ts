@@ -34,6 +34,7 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { access, mkdir } from "node:fs/promises";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { maybeExtractSpanMedia } from "~/server/app-layer/traces/edge-media-extraction";
 import { prisma } from "~/server/db";
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
@@ -161,14 +162,14 @@ async function resolveProject(slug: string) {
   if (slug) {
     const project = await prisma.project.findFirst({
       where: { slug },
-      select: { id: true, slug: true, name: true, apiKey: true },
+      select: { id: true, slug: true, name: true },
     });
     if (!project) throw new Error(`no project with slug "${slug}"`);
     return project;
   }
 
   const projects = await prisma.project.findMany({
-    select: { id: true, slug: true, name: true, apiKey: true },
+    select: { id: true, slug: true, name: true },
     orderBy: { createdAt: "asc" },
     take: 25,
   });
@@ -194,10 +195,12 @@ async function main() {
 
   const project = await resolveProject(args.project);
   await assertWritableStorageRoot(project.id);
-  const apiKey = args.apiKey || project.apiKey;
-  if (!apiKey) {
-    throw new Error(`project ${project.slug} has no api key; pass --api-key`);
-  }
+  // The project API key is stored as a hash, so without --api-key the script
+  // acts as the project with its internal key, the way LangWatch's own
+  // services do.
+  const apiKey =
+    args.apiKey ||
+    (await getProjectInternalKey({ prisma, projectId: project.id }));
 
   const spoken = tonePcm16({ hz: 440, seconds: 1.2 });
   const reply = tonePcm16({ hz: 660, seconds: 1.6 });

@@ -72,7 +72,7 @@ function prefetchDeps(
     workflowVersionFetcher: { getLatestDsl: vi.fn().mockResolvedValue(null) },
     projectFetcher: {
       findUnique: vi.fn().mockResolvedValue({
-        apiKey: "sk-lw-project",
+        internalKey: "sk-lw-project",
         team: { organizationId: "org_1" },
       }),
     },

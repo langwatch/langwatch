@@ -25,6 +25,8 @@ export const ProductScreen: React.FC = () => {
   });
   const { project: activeProject, slug: skipSlug } =
     useProjectBySlugOrLatest(organization);
+  // One minted access token shared by every setup screen of the flow.
+  const [freshToken, setFreshToken] = useState<string | undefined>();
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -78,7 +80,12 @@ export const ProductScreen: React.FC = () => {
       >
         <Box w="full">
           <ActiveProjectProvider
-            value={{ project: activeProject, organization }}
+            value={{
+              project: activeProject,
+              organization,
+              freshToken,
+              onFreshToken: setFreshToken,
+            }}
           >
             {!isLoading && currentScreen.component ? (
               <AnalyticsBoundary

@@ -83,7 +83,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
 
     const configData = llmPromptConfigFactory.build({
       projectId: testProject.id,

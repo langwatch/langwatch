@@ -470,12 +470,15 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<ProjectCredentialFact[]> {
-    // `Project.apiKey` is a non-null column, so in practice every project
-    // carries the legacy credential; the empty-string guard is what keeps
-    // "has a credential" the predicate rather than "is a project", should a
-    // future project be minted without one.
+    // A project carries its credential as a hash (`apiKeyHash`), or as
+    // plaintext until the sweep hashes it. In practice every project has one;
+    // the predicate keeps "has a credential" the test rather than "is a
+    // project", should a project be minted without one.
     const rows = await this.prisma.project.findMany({
-      where: { team: { organizationId }, apiKey: { not: "" } },
+      where: {
+        team: { organizationId },
+        OR: [{ apiKeyHash: { not: null } }, { apiKey: { not: "" } }],
+      },
       select: { id: true, createdAt: true },
     });
     return rows.map((row) => ({

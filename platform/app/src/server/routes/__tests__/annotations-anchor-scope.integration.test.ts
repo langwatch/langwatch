@@ -23,7 +23,7 @@ describe("Annotations REST API", () => {
   const get = (path: string) =>
     app.request(path, {
       method: "GET",
-      headers: { "X-Auth-Token": project.apiKey },
+      headers: { "X-Auth-Token": project.apiKey! },
     });
 
   beforeAll(async () => {

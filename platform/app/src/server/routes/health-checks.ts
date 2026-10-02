@@ -48,11 +48,10 @@ const tokenResolver = TokenResolver.create(prisma);
  * Resolves the project credential behind a health probe, or the refusal body to
  * answer with.
  *
- * Routed through {@link TokenResolver.resolve} rather than a bespoke
- * `prisma.project.findUnique({ where: { apiKey } })`, so an API key that
- * self-scopes to exactly one project (not just a legacy project key) can
- * authenticate a health probe too. Legacy project keys still resolve exactly
- * as before (the resolver's legacy path is an exact `Project.apiKey` match),
+ * Routed through {@link TokenResolver.resolve} rather than a bespoke project
+ * lookup, so an API key that self-scopes to exactly one project (not just a
+ * project API key) can authenticate a health probe too. Project API keys
+ * resolve through `findProjectByApiKey`, the same path every route uses,
  * and an unknown, revoked, or ambiguous (multi-project) key gets the same
  * vague "Invalid auth token" refusal. `authToken` is the raw token the caller
  * sent, which the probes forward to their downstream canary requests.

@@ -53,7 +53,7 @@ describe("Model Providers API", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     helpers = {

@@ -64,6 +64,7 @@ import {
   CliLoginKeyService,
   loginKeyExpiresAt,
 } from "~/server/api-key/cli-login-key.service";
+import { CliProjectKeyService } from "~/server/api-key/cli-project-key.service";
 import {
   deviceLabelForSession,
   sanitizeDeviceLabel,
@@ -191,10 +192,10 @@ type DeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
  * - `device_session` (default, back-compat): personal VK + access/refresh tokens
  *   for governance-plane CLI use (`langwatch claude`, `whoami`, etc.). Lands in
  *   `~/.langwatch/config.json`.
- * - `project_api_key`: the existing API key of a user-selected project, returned
- *   verbatim so the SDK can use it. Lands in `$CWD/.env` as `LANGWATCH_API_KEY`.
- *   No fresh key is minted; the user picks an existing project they have access
- *   to and the server returns its already-issued `Project.apiKey`.
+ * - `project_api_key`: an API key for a user-selected project, so the SDK can
+ *   use it. Lands in `$CWD/.env` as `LANGWATCH_API_KEY`. The project API key is
+ *   stored as a hash and never handed out: /exchange gives the person a key of
+ *   their own for that project (`CliProjectKeyService`).
  *
  * Older CLIs that don't send `credential_type` default to `device_session`.
  */
@@ -223,15 +224,13 @@ interface DeviceCodeRecord {
     base_url: string;
   };
   /**
-   * For `credential_type: "project_api_key"` after approval — the picked
-   * project's existing API key + identifying fields, shipped to the CLI on
-   * the next /exchange poll. Mutable across approvals (user can re-pick).
+   * For `credential_type: "project_api_key"` after approval: the picked
+   * project. No secret: /exchange mints the person's key for it.
    */
   project_api_key?: {
     project_id: string;
     project_slug: string;
     project_name: string;
-    api_key: string;
   };
   /**
    * For `credential_type: "device_session"` after approval — the scope +
@@ -430,12 +429,12 @@ async function isDeveloperSeat({
 }
 
 /**
- * The authorization rule every endpoint that hands back a Project.apiKey
+ * The authorization rule every endpoint that hands out a project key
  * shares (/approve with a project pick, /project-key): a personal project is
  * honoured only as the caller's OWN explicit pick (the original hazard, per
  * customer report, was a coding agent silently auto-selecting someone's
- * personal project), and because the key is the shared write credential
- * usable outside the UI's RBAC constraints, team membership alone is not
+ * personal project), and because the key grants full project access
+ * outside the UI's RBAC constraints, team membership alone is not
  * enough: the caller needs project administration. Ownership of a personal
  * project does not replace that canonical permission.
  *
@@ -852,7 +851,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 
     // Exclusive redemption. Everything below hands out a credential the
     // device code is only supposed to buy once: the project-key branch
-    // returns the project apiKey, the device-session branch mints an ApiKey
+    // mints a project key, the device-session branch mints an ApiKey
     // and a token pair, and the mint revokes the previous login key for the
     // same device label. Two concurrent exchanges both reaching that would
     // hand out two sets and let the second revoke the first's key, so the
@@ -945,10 +944,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     const responseEndpoint = controlPlaneBaseUrl();
 
     // No-paste API-key flow: the user picked a project on /cli/auth and the
-    // approve handler stamped the project's existing apiKey onto the record.
-    // Return the verbatim apiKey + project identity; CLI writes it to .env.
-    // No access/refresh tokens needed — the apiKey IS the credential the
-    // SDK uses, and it's already revocable from /settings/projects.
+    // approve handler stamped the pick onto the record. The person gets an
+    // API key of their own for that project (minted here, so an approval
+    // that is never exchanged mints nothing); the CLI writes it to .env. No
+    // access/refresh tokens: the key IS the credential the SDK uses, and it
+    // is revocable from the API keys page.
     if ((record.credential_type ?? "device_session") === "project_api_key") {
       if (!record.project_api_key) {
         logger.warn(
@@ -1006,15 +1006,19 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         );
       }
 
-      const currentProjectKey = await prisma.project.findFirst({
-        where: {
-          id: currentProject.id,
-          archivedAt: null,
-          team: { organizationId: organization.id },
-        },
-        select: { apiKey: true },
-      });
-      if (!currentProjectKey) {
+      let projectKey: { token: string };
+      try {
+        projectKey = await CliProjectKeyService.create(prisma).issue({
+          userId: user.id,
+          organizationId: organization.id,
+          project: currentProject,
+          deviceLabel: deviceLabelForSession(parsed.data.client_info),
+        });
+      } catch (err) {
+        if (!ApiKeyScopeViolationError.is(err)) {
+          await redis.del(claimKey);
+          throw err;
+        }
         await redis.del(deviceCodeKey(device_code));
         await redis.del(userCodeKey(record.user_code));
         await redis.del(pollRateKey(device_code));
@@ -1022,7 +1026,8 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         return c.json(
           {
             error: "access_denied",
-            error_description: "The selected project is no longer available",
+            error_description:
+              "You need the Admin role on the selected project to create an API key for it",
           },
           410,
         );
@@ -1039,7 +1044,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       return c.json(
         {
           kind: "api_key" as const,
-          api_key: currentProjectKey.apiKey,
+          api_key: projectKey.token,
           project: {
             id: currentProject.id,
             slug: currentProject.slug,
@@ -1062,49 +1067,6 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // dogfood account) can still sign the user in for governance / portal
     // navigation. The CLI wrapper mints a VK lazily on first gateway call
     // once a provider chain becomes available.
-
-    // Personal project delivery: the personal project is a normal project
-    // with a normal apiKey, and it is what data commands (`langwatch trace
-    // search`, `/api/me/usage`, ...) authenticate with after a device
-    // login. Ensure the workspace here (idempotent; approve may have
-    // skipped VK minting for provider-less orgs) and ship its key so the
-    // CLI never has to ask the user for one. Best-effort: a workspace
-    // failure must not fail the login itself, and older CLIs ignore the
-    // extra field.
-    let personalProject:
-      | { id: string; slug: string; name: string; api_key: string }
-      | undefined;
-    try {
-      const workspace = await new PersonalWorkspaceService(prisma).ensure({
-        userId: user.id,
-        organizationId: organization.id,
-        displayName: user.name,
-        displayEmail: user.email,
-      });
-      const canManagePersonalProject = await probeProjectPermission(
-        {
-          session: permissionSessionForAuthenticatedIdentity({
-            userId: user.id,
-            expiresAt: record.expires_at,
-          }),
-        },
-        workspace.project.id,
-        "project:manage",
-      );
-      if (canManagePersonalProject) {
-        personalProject = {
-          id: workspace.project.id,
-          slug: workspace.project.slug,
-          name: workspace.project.name,
-          api_key: workspace.project.apiKey,
-        };
-      }
-    } catch (err) {
-      logger.error(
-        { err, userId: user.id, organizationId: organization.id },
-        "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
-      );
-    }
 
     // User-scoped CLI ApiKey — minted HERE, from the selection approval
     // stamped, so an approval that is never exchanged mints nothing. Minted
@@ -1179,6 +1141,35 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         project_ids: minted.scope.projectIds,
         permissions: minted.permissions,
       };
+    }
+
+    // Personal project delivery: the personal project is what data commands
+    // (`langwatch trace search`, `/api/me/usage`, ...) authenticate with
+    // after a device login, through the login key or, for a CLI that
+    // predates it, `personal_project.api_key`. Ensure the workspace here
+    // (idempotent) and ship a key for it so the CLI never has to ask the
+    // user for one. The key is minted under the login key, so it lives and
+    // dies with this session. Best-effort: a workspace failure must not fail
+    // the login itself, and older CLIs ignore the extra field.
+    let personalProject: PersonalProjectHandout | undefined;
+    try {
+      const handout = await personalProjectHandout({
+        userId: user.id,
+        organizationId: organization.id,
+        displayName: user.name,
+        displayEmail: user.email,
+        sessionExpiresAt: record.expires_at,
+        deviceLabel: deviceLabelForSession(parsed.data.client_info),
+        parentApiKeyId: cliApiKeyId,
+      });
+      if (handout.api_key) {
+        personalProject = { ...handout, api_key: handout.api_key };
+      }
+    } catch (err) {
+      logger.error(
+        { err, userId: user.id, organizationId: organization.id },
+        "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
+      );
     }
 
     // Mint access + refresh tokens, persist both in Redis with TTL so
@@ -1842,14 +1833,99 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
   return c.json(result, 200);
 });
 
+/** The personal project as `/exchange` and `/personal-project` ship it. */
+interface PersonalProjectHandout {
+  id: string;
+  slug: string;
+  name: string;
+  api_key: string;
+}
+
+/**
+ * Ensures the caller's personal workspace and, when they may manage its
+ * project, hands them their CLI key for it (`CliProjectKeyService`): the key
+ * held for this session, or a new one. `parentApiKeyId` is the session's CLI
+ * login key, under which the key is minted so it dies with the session; the
+ * CLI calls this every few minutes, which is why it re-sends the held key
+ * instead of minting. No `api_key` when the person cannot manage the project,
+ * or when the session's login key has ended (a newer login replaced it).
+ */
+async function personalProjectHandout({
+  userId,
+  organizationId,
+  displayName,
+  displayEmail,
+  sessionExpiresAt,
+  deviceLabel,
+  parentApiKeyId,
+}: {
+  userId: string;
+  organizationId: string;
+  displayName?: string | null;
+  displayEmail?: string | null;
+  sessionExpiresAt: number;
+  deviceLabel: string;
+  parentApiKeyId?: string;
+}): Promise<Omit<PersonalProjectHandout, "api_key"> & { api_key?: string }> {
+  const workspace = await new PersonalWorkspaceService(prisma).ensure({
+    userId,
+    organizationId,
+    displayName,
+    displayEmail,
+  });
+  const project = {
+    id: workspace.project.id,
+    slug: workspace.project.slug,
+    name: workspace.project.name,
+  };
+  const canManagePersonalProject = await probeProjectPermission(
+    {
+      session: permissionSessionForAuthenticatedIdentity({
+        userId,
+        expiresAt: sessionExpiresAt,
+      }),
+    },
+    workspace.project.id,
+    "project:manage",
+  );
+  if (!canManagePersonalProject) return project;
+  try {
+    const keys = CliProjectKeyService.create(prisma);
+    // A session without a login key (minted before login keys existed, or
+    // whose approval resolved no scope) gets the long-lived per-device key.
+    const key = parentApiKeyId
+      ? await keys.issueUnderSession({
+          userId,
+          organizationId,
+          project: workspace.project,
+          deviceLabel,
+          loginApiKeyId: parentApiKeyId,
+        })
+      : await keys.issue({
+          userId,
+          organizationId,
+          project: workspace.project,
+          deviceLabel,
+        });
+    return key ? { ...project, api_key: key.token } : project;
+  } catch (err) {
+    if (!ApiKeyScopeViolationError.is(err)) throw err;
+    logger.warn(
+      { err, userId, organizationId, projectId: project.id },
+      "[auth-cli] personal project key refused by the owner ceiling",
+    );
+    return project;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/personal-project
 // ---------------------------------------------------------------------------
-// Lazy personal-key exchange for device sessions minted before /exchange
-// started shipping `personal_project`. The CLI calls this once with its
-// bearer token, persists the key into ~/.langwatch/config.json, and never
-// asks again. Ensures the workspace (idempotent) so sessions approved via
-// the provider-less branch, which skips VK minting, still resolve a key.
+// The CLI's session check and lazy personal-key exchange. The CLI calls this
+// with its bearer token whenever its cached key is older than a few minutes,
+// and persists the answer into ~/.langwatch/config.json. Ensures the
+// workspace (idempotent) and returns the session's key for the personal
+// project (one per session, see `personalProjectHandout`).
 //
 // Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
 // ---------------------------------------------------------------------------
@@ -1876,35 +1952,16 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
     select: { name: true, email: true },
   });
   try {
-    const workspace = await new PersonalWorkspaceService(prisma).ensure({
+    const project = await personalProjectHandout({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       displayName: user?.name,
       displayEmail: user?.email,
+      sessionExpiresAt: tokenRecord.expires_at,
+      deviceLabel: deviceLabelForSession(tokenRecord.client_info),
+      parentApiKeyId: tokenRecord.cli_api_key_id,
     });
-    const canManagePersonalProject = await probeProjectPermission(
-      {
-        session: permissionSessionForAuthenticatedIdentity({
-          userId: tokenRecord.user_id,
-          expiresAt: tokenRecord.expires_at,
-        }),
-      },
-      workspace.project.id,
-      "project:manage",
-    );
-    return c.json(
-      {
-        project: {
-          id: workspace.project.id,
-          slug: workspace.project.slug,
-          name: workspace.project.name,
-          ...(canManagePersonalProject
-            ? { api_key: workspace.project.apiKey }
-            : {}),
-        },
-      },
-      200,
-    );
+    return c.json({ project }, 200);
   } catch (err) {
     logger.error(
       { err, userId: tokenRecord.user_id },
@@ -2100,12 +2157,14 @@ async function issuePersonalVirtualKey({
 // POST /api/auth/cli/project-key
 // ---------------------------------------------------------------------------
 // Non-interactive project login: `langwatch login --project <slug>` in a
-// headless context (agent VM, CI without a key). The device session proves
-// the user; the same RBAC gate as the browser approve flow applies
-// (`project:manage`, because Project.apiKey grants full project access),
-// and nothing new is minted, the project's existing key is returned. The
-// caller's OWN personal project is allowed, exactly like the authorize page's
-// explicit personal pick; anyone else's personal project is refused.
+// headless context (agent VM, CI without a key), and `langwatch langy`. The
+// device session proves the user; the same RBAC gate as the browser approve
+// flow applies (`project:manage`, because the key grants full project
+// access). The answer is the person's own key for the project
+// (`CliProjectKeyService`): not tied to the session, since it lands in a
+// .env that outlives it, and re-sent to this device while it is held.
+// The caller's OWN personal project is allowed, exactly like the authorize
+// page's explicit personal pick; anyone else's personal project is refused.
 //
 // Spec: specs/ai-governance/cli-onboarding/login-unified.feature
 // ---------------------------------------------------------------------------
@@ -2170,26 +2229,28 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
     }),
   );
   if (refusal) return refusal;
-  const projectWithKey = await prisma.project.findFirst({
-    where: {
-      id: project.id,
-      archivedAt: null,
-      team: { organizationId: tokenRecord.organization_id },
-    },
-    select: { apiKey: true },
-  });
-  if (!projectWithKey) {
+  let projectKey: { token: string };
+  try {
+    projectKey = await CliProjectKeyService.create(prisma).issue({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      project,
+      deviceLabel: deviceLabelForSession(tokenRecord.client_info),
+    });
+  } catch (err) {
+    if (!ApiKeyScopeViolationError.is(err)) throw err;
     return c.json(
       {
-        error: "not_found",
-        error_description: "Project is no longer available",
+        error: "forbidden",
+        error_description:
+          "You need the Admin role on this project to create an API key for it",
       },
-      404,
+      403,
     );
   }
   return c.json(
     {
-      api_key: projectWithKey.apiKey,
+      api_key: projectKey.token,
       project: { id: project.id, slug: project.slug, name: project.name },
     },
     200,
@@ -3099,10 +3160,9 @@ const approveRequestSchema = z.object({
   user_code: z.string().min(1),
   organization_id: z.string().min(1),
   /**
-   * Required when the device-code's `credential_type` is `project_api_key` —
-   * the project the user picked on the browser approval page. Server returns
-   * that project's existing API key (no new key is minted; the CLI gets a
-   * verbatim copy of `Project.apiKey` for the SDK to consume).
+   * Required when the device-code's `credential_type` is `project_api_key`:
+   * the project the user picked on the browser approval page. /exchange mints
+   * the person's API key for that project for the SDK to consume.
    */
   project_id: z.string().optional(),
   /**
@@ -3198,9 +3258,9 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   }
 
   // Branch on the credential type the CLI requested at /device-code time.
-  // `project_api_key` returns the user-picked project's existing apiKey; no
-  // new key is minted, so existing consumers (other team members, CI, etc.)
-  // keep working unchanged. The CLI writes the key into `$CWD/.env`.
+  // `project_api_key` stamps the user-picked project; /exchange mints the
+  // person's key for it, which the CLI writes into `$CWD/.env`. Nothing
+  // secret is stored on the device-code record.
   if ((record.credential_type ?? "device_session") === "project_api_key") {
     if (!project_id) {
       return c.json(
@@ -3255,24 +3315,6 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     // everything else the shared handout rule refuses.
     const refusal = await refuseProjectKeyHandout(c, project, session);
     if (refusal) return refusal;
-    const projectWithKey = await prisma.project.findFirst({
-      where: {
-        id: project.id,
-        archivedAt: null,
-        team: { organizationId: organization_id },
-      },
-      select: { apiKey: true },
-    });
-    if (!projectWithKey) {
-      return c.json(
-        {
-          error: "forbidden",
-          error_description:
-            "Project not found or unavailable in this organization",
-        },
-        403,
-      );
-    }
 
     await approveDeviceCode({
       deviceCode: record.device_code,
@@ -3282,7 +3324,6 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
         project_id: project.id,
         project_slug: project.slug,
         project_name: project.name,
-        api_key: projectWithKey.apiKey,
       },
     });
 
@@ -3560,7 +3601,6 @@ export async function approveDeviceCode({
     project_id: string;
     project_slug: string;
     project_name: string;
-    api_key: string;
   };
   /**
    * For a `device_session` code — the validated scope + permission selection

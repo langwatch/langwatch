@@ -22,11 +22,10 @@ wireDefaultTestApp();
 describe("project.regenerateApiKey integration", () => {
   const testNamespace = `regen-api-key-${nanoid(8)}`;
   let projectId: string;
-  let siblingProjectId: string;
-  let foreignProjectId: string;
+  let organizationId: string;
+  /** The key that currently authenticates as the project. */
+  let liveKey: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
-  let memberCaller: ReturnType<typeof appRouter.createCaller>;
-  let projectAdminCaller: ReturnType<typeof appRouter.createCaller>;
   // A caller for a user who can view but NOT manage the project, used to prove
   // rotation is gated on `project:manage`.
   let viewerCaller: ReturnType<typeof appRouter.createCaller>;
@@ -48,61 +47,21 @@ describe("project.regenerateApiKey integration", () => {
       },
     });
 
+    organizationId = organization.id;
+
+    // Stored in plaintext, the way a key created before hashed storage is.
+    liveKey = `sk-lw-test-${nanoid()}`;
     const project = await prisma.project.create({
       data: {
         name: "Test Project",
         slug: `--test-project-${testNamespace}`,
-        apiKey: `sk-lw-test-${nanoid()}`,
+        apiKey: liveKey,
         teamId: team.id,
         language: "en",
         framework: "test",
       },
     });
     projectId = project.id;
-
-    const siblingTeam = await prisma.team.create({
-      data: {
-        name: "Sibling Team",
-        slug: `--test-team-${testNamespace}-sibling`,
-        organizationId: organization.id,
-      },
-    });
-    const siblingProject = await prisma.project.create({
-      data: {
-        name: "Sibling Project",
-        slug: `--test-project-${testNamespace}-sibling`,
-        apiKey: `sk-lw-test-${nanoid()}`,
-        teamId: siblingTeam.id,
-        language: "en",
-        framework: "test",
-      },
-    });
-    siblingProjectId = siblingProject.id;
-
-    const foreignOrganization = await prisma.organization.create({
-      data: {
-        name: "Foreign Organization",
-        slug: `--test-org-${testNamespace}-foreign`,
-      },
-    });
-    const foreignTeam = await prisma.team.create({
-      data: {
-        name: "Foreign Team",
-        slug: `--test-team-${testNamespace}-foreign`,
-        organizationId: foreignOrganization.id,
-      },
-    });
-    const foreignProject = await prisma.project.create({
-      data: {
-        name: "Foreign Project",
-        slug: `--test-project-${testNamespace}-foreign`,
-        apiKey: `sk-lw-foreign-${nanoid()}`,
-        teamId: foreignTeam.id,
-        language: "en",
-        framework: "test",
-      },
-    });
-    foreignProjectId = foreignProject.id;
 
     const user = await prisma.user.create({
       data: {
@@ -167,53 +126,9 @@ describe("project.regenerateApiKey integration", () => {
     });
     viewerCaller = appRouter.createCaller(viewerCtx);
 
-    const member = await prisma.user.create({
-      data: {
-        name: "Member User",
-        email: `member-${testNamespace}@example.com`,
-      },
-    });
-    await prisma.organizationUser.create({
-      data: {
-        userId: member.id,
-        organizationId: organization.id,
-        role: OrganizationUserRole.MEMBER,
-      },
-    });
-    await prisma.teamUser.create({
-      data: { userId: member.id, teamId: team.id, role: TeamUserRole.MEMBER },
-    });
-    memberCaller = appRouter.createCaller(
-      createInnerTRPCContext({
-        session: { user: { id: member.id }, expires: "1" },
-      }),
-    );
-
-    const projectAdmin = await prisma.user.create({
-      data: {
-        name: "Project Admin User",
-        email: `project-admin-${testNamespace}@example.com`,
-      },
-    });
-    await prisma.organizationUser.create({
-      data: {
-        userId: projectAdmin.id,
-        organizationId: organization.id,
-        role: OrganizationUserRole.MEMBER,
-      },
-    });
-    await prisma.teamUser.create({
-      data: {
-        userId: projectAdmin.id,
-        teamId: team.id,
-        role: TeamUserRole.ADMIN,
-      },
-    });
     for (const [userId, role] of [
       [user.id, TeamUserRole.ADMIN],
       [viewer.id, TeamUserRole.VIEWER],
-      [member.id, TeamUserRole.MEMBER],
-      [projectAdmin.id, TeamUserRole.ADMIN],
     ] as const) {
       await seedRoleBinding(prisma, {
         organizationId: organization.id,
@@ -230,11 +145,6 @@ describe("project.regenerateApiKey integration", () => {
       scopeType: "ORGANIZATION",
       scopeId: organization.id,
     });
-    projectAdminCaller = appRouter.createCaller(
-      createInnerTRPCContext({
-        session: { user: { id: projectAdmin.id }, expires: "1" },
-      }),
-    );
   });
 
   afterAll(async () => {
@@ -289,90 +199,56 @@ describe("project.regenerateApiKey integration", () => {
         where: { email: `viewer-${testNamespace}@example.com` },
       })
       .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: {
-          email: {
-            in: [
-              `member-${testNamespace}@example.com`,
-              `project-admin-${testNamespace}@example.com`,
-            ],
-          },
-        },
-      })
-      .catch(() => {});
   });
 
   describe("given a project base key", () => {
-    /** @scenario A signed-in project admin reads the base key */
-    it("returns it to a signed-in project admin", async () => {
-      const stored = await prisma.project.findUniqueOrThrow({
-        where: { id: projectId },
-        select: { apiKey: true },
+    /** @scenario "No route reads the base key back" */
+    it("offers no route that returns the base key once it is created", async () => {
+      expect(Object.keys(appRouter._def.procedures)).not.toContain(
+        "project.getProjectAPIKey",
+      );
+
+      const { apiKey: token } = await caller.project.regenerateApiKey({
+        projectId,
       });
-      await expect(
-        caller.project.getProjectAPIKey({ projectId }),
-      ).resolves.toEqual({ apiKey: stored.apiKey });
-    });
+      liveKey = token;
 
-    /** @scenario A project member cannot read the base key */
-    it("refuses a signed-in member who can update but not manage", async () => {
-      await expect(
-        memberCaller.project.getProjectAPIKey({ projectId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    });
-
-    /** @scenario Permission is checked against the requested project */
-    it("grants an admin only the concrete project they administer", async () => {
-      await expect(
-        projectAdminCaller.project.getProjectAPIKey({ projectId }),
-      ).resolves.toMatchObject({ apiKey: expect.stringMatching(/^sk-lw-/) });
-      await expect(
-        projectAdminCaller.project.getProjectAPIKey({
-          projectId: siblingProjectId,
-        }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    });
-
-    /** @scenario "A project in another organization is not disclosed" */
-    it("answers a foreign project like an absent one and never returns its key", async () => {
-      const attempt = caller.project.getProjectAPIKey({
-        projectId: foreignProjectId,
-      });
-
-      await expect(attempt).rejects.toMatchObject({ code: "NOT_FOUND" });
+      const payloads = await Promise.all([
+        caller.organization.getAll({}),
+        caller.team.getTeamsWithMembers({ organizationId }),
+        caller.team.getTeamsWithRoleBindings({ organizationId }),
+      ]);
+      expect(JSON.stringify(payloads)).not.toContain(token);
     });
   });
 
   describe("given an existing project", () => {
     describe("when regenerating the API key", () => {
-      it("regenerates API key for existing project", async () => {
-        // Get the original API key
-        const project = await prisma.project.findUnique({
-          where: { id: projectId },
-          select: { apiKey: true },
-        });
-
-        if (!project) {
-          throw new Error("Test project not found");
-        }
-
-        const originalApiKey = project.apiKey;
-
-        // Regenerate the API key
+      /** @scenario "An admin rotates the base key and sees the new key once" */
+      /** @scenario "Rotating the key returns the new key once and stores only its hash" */
+      it("returns the new key once and stores only its hash and last four characters", async () => {
+        const previousKey = liveKey;
         const result = await caller.project.regenerateApiKey({ projectId });
 
-        // Verify the new key is different
-        expect(result.apiKey).not.toBe(originalApiKey);
         expect(result.apiKey).toMatch(/^sk-lw-/);
+        expect(result.apiKey).not.toBe(previousKey);
+        liveKey = result.apiKey;
 
-        // Verify the key was actually updated in the database
-        const updatedProject = await prisma.project.findUnique({
+        const resolver = TokenResolver.create(prisma);
+        await expect(
+          resolver.resolve({ token: previousKey }),
+        ).resolves.toBeNull();
+        const resolved = await resolver.resolve({ token: result.apiKey });
+        expect(resolved?.project.id).toBe(projectId);
+
+        const stored = await prisma.project.findUniqueOrThrow({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKey: true, apiKeyHash: true, apiKeyLast4: true },
         });
-        expect(updatedProject?.apiKey).toBe(result.apiKey);
-        expect(updatedProject?.apiKey).not.toBe(originalApiKey);
+        expect(stored.apiKey).toBeNull();
+        expect(stored.apiKeyHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(stored.apiKeyHash).not.toContain(result.apiKey);
+        expect(stored.apiKeyLast4).toBe(result.apiKey.slice(-4));
       });
     });
   });
@@ -398,11 +274,7 @@ describe("project.regenerateApiKey integration", () => {
     /** @scenario "Rotation invalidates the previous base key" */
     /** @scenario "The base key keeps working until it is explicitly rotated" */
     it("makes the old base key stop authenticating and the new one authenticate scoped to the project", async () => {
-      const before = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { apiKey: true },
-      });
-      const originalApiKey = before!.apiKey;
+      const originalApiKey = liveKey;
 
       const resolver = TokenResolver.create(prisma);
 
@@ -426,16 +298,16 @@ describe("project.regenerateApiKey integration", () => {
       const resolvedNew = await resolver.resolve({ token: newApiKey });
       expect(resolvedNew?.type).toBe("legacyProjectKey");
       expect(resolvedNew?.project.id).toBe(projectId);
+      liveKey = newApiKey;
     });
   });
 
   describe("given a user without project:manage permission", () => {
     it("rejects the rotation and leaves the base key unchanged", async () => {
-      const before = await prisma.project.findUnique({
+      const before = await prisma.project.findUniqueOrThrow({
         where: { id: projectId },
-        select: { apiKey: true },
+        select: { apiKeyHash: true },
       });
-      const keyBefore = before!.apiKey;
 
       await expect(
         viewerCaller.project.regenerateApiKey({ projectId }),
@@ -448,11 +320,15 @@ describe("project.regenerateApiKey integration", () => {
         code: "FORBIDDEN",
       });
 
-      const after = await prisma.project.findUnique({
+      const after = await prisma.project.findUniqueOrThrow({
         where: { id: projectId },
-        select: { apiKey: true },
+        select: { apiKeyHash: true },
       });
-      expect(after!.apiKey).toBe(keyBefore);
+      expect(after.apiKeyHash).toBe(before.apiKeyHash);
+      const resolved = await TokenResolver.create(prisma).resolve({
+        token: liveKey,
+      });
+      expect(resolved?.project.id).toBe(projectId);
     });
   });
 

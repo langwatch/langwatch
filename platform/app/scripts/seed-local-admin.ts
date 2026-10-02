@@ -26,6 +26,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../src/generated/prisma/client";
+import { mintProjectApiKey } from "../src/server/api-key/project-api-key";
 import { prisma } from "../src/server/db";
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 
@@ -119,14 +120,18 @@ async function main() {
   let project = await prisma.project.findFirst({
     where: { name: projectName, teamId: team.id },
   });
+  // The project API key is stored as a hash, so it can be printed only when
+  // this run creates it.
+  let createdApiKey: string | undefined;
   if (!project) {
-    const apiKey = `sk-lw-${nanoid(24)}`;
+    const projectKey = mintProjectApiKey();
+    createdApiKey = projectKey.token;
     project = await prisma.project.create({
       data: {
         id: nanoid(),
         name: projectName,
         slug: `local-dev-project-${nanoid(6).toLowerCase()}`,
-        apiKey,
+        ...projectKey.columns,
         teamId: team.id,
         language: "en",
         framework: "langchain",
@@ -194,7 +199,9 @@ async function main() {
   console.log(`  Org slug:     ${org.slug}`);
   console.log(`  Team slug:    ${team.slug}`);
   console.log(`  Project slug: ${project.slug}`);
-  console.log(`  API key:      ${project.apiKey}`);
+  console.log(
+    `  API key:      ${createdApiKey ?? `sk-lw-...${project.apiKeyLast4 ?? ""} (rotate it in project settings to see a new one)`}`,
+  );
   console.log("=========================");
 }
 

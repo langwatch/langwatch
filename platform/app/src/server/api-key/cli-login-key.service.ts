@@ -561,7 +561,66 @@ export class CliLoginKeyService {
         "could not revoke the ingest keys of a revoked CLI login key",
       );
     }
+    await this.revokeProjectKeysUnder({
+      apiKeyId,
+      userId,
+      organizationId,
+      cause: cause === "user" ? "session" : cause,
+    });
     return { loginKeyRevoked, ingestKeysRevoked };
+  }
+
+  /**
+   * Retires the project keys the session was handed (`CliProjectKeyService`
+   * with this login key as parent). `verify` already refuses them once the
+   * login key is dead; revoking them keeps the API keys page from listing
+   * them as live. Best effort, like the ingest cascade.
+   */
+  private async revokeProjectKeysUnder({
+    apiKeyId,
+    userId,
+    organizationId,
+    cause,
+  }: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    cause: "session" | "rotation" | "expired" | "offboarded";
+  }): Promise<void> {
+    try {
+      const children = await this.prisma.apiKey.findMany({
+        where: {
+          organizationId,
+          userId,
+          parentApiKeyId: apiKeyId,
+          ingestSourceType: null,
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+      for (const child of children) {
+        try {
+          await this.apiKeyService.revoke({
+            id: child.id,
+            callerUserId: userId,
+            callerIsAdmin: false,
+            organizationId,
+            awaitProjection: false,
+            cause,
+            cascadeToChildren: false,
+          });
+        } catch (err) {
+          if (ApiKeyAlreadyRevokedError.is(err)) continue;
+          if (ApiKeyNotFoundError.is(err)) continue;
+          throw err;
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId, userId, organizationId, cause },
+        "could not revoke the project keys of a revoked CLI login key",
+      );
+    }
   }
 
   /**

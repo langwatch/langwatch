@@ -19,12 +19,12 @@ describe("Feature: guided onboarding REST family", () => {
   let project: Project;
 
   const get = (path: string) =>
-    app.request(path, { headers: { "X-Auth-Token": project.apiKey } });
+    app.request(path, { headers: { "X-Auth-Token": project.apiKey! } });
   const post = (path: string) =>
     app.request(path, {
       method: "POST",
       headers: {
-        "X-Auth-Token": project.apiKey,
+        "X-Auth-Token": project.apiKey!,
         "Content-Type": "application/json",
       },
     });

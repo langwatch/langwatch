@@ -20,6 +20,7 @@ import {
   canProvisionAppFunctions,
   probeAppFunctionStore,
 } from "~/server/analytics/lwql/provisioning";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { getApp } from "~/server/app-layer/app";
 import { resolveWorkerCallbackUrl } from "~/server/app-layer/langy/LangyCredentialService";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
@@ -105,7 +106,7 @@ function firstProjectOf({ prisma, organizationId }: CheckupScope) {
     await prisma.project.findFirst({
       where: { team: { organizationId } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, apiKey: true },
+      select: { id: true },
     });
 }
 
@@ -345,8 +346,12 @@ function canaryDeps(
       if (!project) return { status: 412, body: { message: "no project" } };
       const query = new URLSearchParams(params).toString();
       const url = `${env.BASE_HOST}/api/health/${name}${query ? `?${query}` : ""}`;
+      const internalKey = await getProjectInternalKey({
+        prisma: scope.prisma,
+        projectId: project.id,
+      });
       const response = await fetch(url, {
-        headers: { "X-Auth-Token": project.apiKey, "X-Project-Id": project.id },
+        headers: { "X-Auth-Token": internalKey, "X-Project-Id": project.id },
         signal: AbortSignal.timeout(CANARY_TIMEOUT_MS),
       });
       const text = await response.text();

@@ -34,7 +34,7 @@ describe("given an organization whose default models carry DEFAULT and FAST but 
     app.request("/api/evaluators", {
       method: "POST",
       headers: {
-        "X-Auth-Token": project.apiKey,
+        "X-Auth-Token": project.apiKey!,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),

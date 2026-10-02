@@ -9,10 +9,12 @@ import {
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
+import { API_KEY_PLACEHOLDER } from "~/features/onboarding/components/sections/shared/build-mcp-config";
 import { EvaluationExecutionMode } from "~/generated/prisma/client";
+import { useMintProjectApiKey } from "~/hooks/useMintProjectApiKey";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators";
-import { api } from "../../utils/api";
+import { MintApiKeyBanner } from "../api-keys/MintApiKeyBanner";
 import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
 import { RenderCode } from "../code/RenderCode";
 import { Checkbox } from "../ui/checkbox";
@@ -153,18 +155,13 @@ export function EvaluationManualIntegration({
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const canManageProject = hasPermission("project:manage");
+  const { project, organization } = useOrganizationTeamProject();
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");
-  const projectAPIKey = api.project.getProjectAPIKey.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && canManageProject,
-    },
-  );
+  const mintKey = useMintProjectApiKey({
+    organizationId: organization?.id,
+    projectId: project?.id,
+  });
 
   const PythonInstructions = ({ async }: { async: boolean }) => {
     const nameParam = `\n        name="${name}",`;
@@ -503,10 +500,18 @@ ${
         </Tabs.Content>
         <Tabs.Content value="curl" padding={0}>
           <VStack align="start" width="full" gap={3}>
+            <Box width="full">
+              <MintApiKeyBanner
+                token={mintKey.token}
+                onMint={mintKey.mint}
+                isPending={mintKey.isPending}
+                hint="to fill the snippet below."
+              />
+            </Box>
             <Box className="markdown" width="full">
               <RenderCode
                 code={`# Set your API key and endpoint URL
-API_KEY="${projectAPIKey.data?.apiKey ?? "your_langwatch_api_key"}"
+API_KEY="${mintKey.token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\

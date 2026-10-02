@@ -14,6 +14,7 @@ import type {
   TeamUserRole,
   User,
 } from "~/generated/prisma/client";
+import type { ProjectWithoutSecrets } from "~/server/projects/projectSecretFields";
 import type { TeamRoleUpdateOrigin } from "../compute-effective-team-role-updates";
 
 export type TeamWithProjects = Team & {
@@ -43,7 +44,7 @@ export type TeamMemberWithTeam = TeamUser & {
 
 export type TeamWithProjectsAndMembersAndUsers = Team & {
   members: TeamMemberWithUser[];
-  projects: Project[];
+  projects: ProjectWithoutSecrets[];
 };
 
 export type UserWithTeams = User & {

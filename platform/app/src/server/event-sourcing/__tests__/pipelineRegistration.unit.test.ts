@@ -142,6 +142,14 @@ describe("PipelineRegistry.registerAll", () => {
         );
       });
 
+      it("mounts the project API key sweep", () => {
+        // Keys stored before they were hashed keep their plaintext until this
+        // sweep clears it, so an unmounted sweep leaves them in plaintext.
+        expect(registeredPipelineNames()).toContain(
+          "project_api_key_maintenance",
+        );
+      });
+
       it("mounts the blob-maintenance sweep alongside it", () => {
         // Same class of defect, same guard: a scheduled sweep with no caller
         // is indistinguishable from a working one until the thing it protects

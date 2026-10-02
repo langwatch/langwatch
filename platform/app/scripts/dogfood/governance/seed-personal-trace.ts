@@ -3,7 +3,7 @@
  *
  * Skips the gateway + LLM call entirely. POSTs a synthetic
  * OTLP/HTTP traces payload directly to the personal project's
- * `/api/otel/v1/traces` endpoint using the project's apiKey. Lands
+ * `/api/otel/v1/traces` endpoint using the project's internal key. Lands
  * one trace in trace_summaries scoped to the personal projectId
  * within the existing receiver auth + subscriber pipeline.
  *
@@ -27,6 +27,7 @@
  */
 import { randomBytes } from "crypto";
 
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { prisma } from "~/server/db";
 
 interface Args {
@@ -137,7 +138,7 @@ async function main() {
       id: true,
       projects: {
         where: { isPersonal: true, archivedAt: null },
-        select: { id: true, slug: true, apiKey: true },
+        select: { id: true, slug: true },
         take: 1,
       },
     },
@@ -149,6 +150,12 @@ async function main() {
     );
   }
   const project = team.projects[0]!;
+  // The project API key is stored as a hash; the script acts as the project
+  // with its internal key, the way LangWatch's own services do.
+  const projectKey = await getProjectInternalKey({
+    prisma,
+    projectId: project.id,
+  });
 
   const traceIds: string[] = [];
   for (let i = 0; i < args.count; i++) {
@@ -161,7 +168,7 @@ async function main() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
+        Authorization: `Bearer ${projectKey}`,
       },
       body: JSON.stringify(payload),
     });

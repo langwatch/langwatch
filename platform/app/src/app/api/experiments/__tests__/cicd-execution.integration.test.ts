@@ -183,7 +183,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -199,7 +199,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${project.apiKey}`,
+              Authorization: `Bearer ${project.apiKey!}`,
             },
           },
         );
@@ -217,7 +217,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -236,7 +236,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -257,7 +257,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
               Accept: "text/event-stream",
             },
           },
@@ -335,7 +335,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "GET",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -350,7 +350,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -364,7 +364,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "GET",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -386,7 +386,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           {
             method: "POST",
             headers: {
-              "X-Auth-Token": project.apiKey,
+              "X-Auth-Token": project.apiKey!,
             },
           },
         );
@@ -410,7 +410,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             {
               method: "GET",
               headers: {
-                "X-Auth-Token": project.apiKey,
+                "X-Auth-Token": project.apiKey!,
               },
             },
           );

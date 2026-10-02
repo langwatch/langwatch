@@ -111,7 +111,7 @@ describe("Feature: Governance REST API", () => {
       } as unknown as Parameters<typeof prisma.project.create>[0]["data"],
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
 
     testUser = await prisma.user.create({
       data: { email: `gov-${suffix}@example.com`, name: `Gov User ${suffix}` },

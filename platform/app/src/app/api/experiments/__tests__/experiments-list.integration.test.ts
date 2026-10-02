@@ -60,7 +60,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
       /** @scenario "Authenticated request lists experiments scoped to the project" */
       it("returns 200 with the project's experiments", async () => {
         const response = await fetch(`${getBaseUrl()}/api/experiments`, {
-          headers: { "X-Auth-Token": project.apiKey },
+          headers: { "X-Auth-Token": project.apiKey! },
         });
         expect(response.status).toBe(200);
         const body = await response.json();
@@ -74,7 +74,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
 
       it("exposes id, slug, name, type, runsCount, lastRunAt on each entry", async () => {
         const response = await fetch(`${getBaseUrl()}/api/experiments`, {
-          headers: { "X-Auth-Token": project.apiKey },
+          headers: { "X-Auth-Token": project.apiKey! },
         });
         const body = await response.json();
         const entry = body.experiments.find(
@@ -97,7 +97,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
       it("returns at most 2 entries and reports hasMore correctly", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/experiments?pageSize=2&page=1`,
-          { headers: { "X-Auth-Token": project.apiKey } },
+          { headers: { "X-Auth-Token": project.apiKey! } },
         );
         expect(response.status).toBe(200);
         const body = await response.json();

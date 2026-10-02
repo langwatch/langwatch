@@ -7,8 +7,9 @@
  *   - a device session (existing behavior, default for back-compat) → returns
  *     access+refresh tokens and no credential; CLI persists to
  *     ~/.langwatch/config.json
- *   - a project API key (new) → returns the user-picked project's existing
- *     apiKey verbatim; CLI persists `LANGWATCH_API_KEY=...` to $CWD/.env
+ *   - a project API key → returns an API key of the person's own for the
+ *     user-picked project (the project API key is stored as a hash and never
+ *     handed out); CLI persists `LANGWATCH_API_KEY=...` to $CWD/.env
  *
  * Exercises `/device-code` → `approveDeviceCode` (in-process) → `/exchange`
  * round-trip with real Redis + real Prisma. The browser-mediated `/approve`
@@ -21,15 +22,17 @@
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CLI_PROJECT_KEY_NAME_PREFIX } from "~/server/api-key/reserved-names";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 
 import { app, approveDeviceCode } from "../auth-cli";
 
@@ -63,7 +66,11 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      // The exchange mints the person's project key, which writes grants.
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     await prisma.organization.create({
       data: {
@@ -117,6 +124,8 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
     await resetApp();
     await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.project
       .deleteMany({ where: { id: PROJECT_ID } })
       .catch(() => {});
@@ -135,7 +144,8 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
   });
 
   describe("when CLI requests credential_type=project_api_key", () => {
-    it("server returns the project's existing apiKey verbatim with kind:'api_key' on /exchange", async () => {
+    /** @scenario a CLI project login receives an API key of the person's own, never the project key */
+    it("server mints the person's API key for the project with kind:'api_key' on /exchange", async () => {
       // CLI: POST /device-code with credential_type=project_api_key
       const dcRes = await callDeviceCode({
         credential_type: "project_api_key",
@@ -154,7 +164,7 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
       // would have produced after access-checking the picked project.
       const project = await prisma.project.findUniqueOrThrow({
         where: { id: PROJECT_ID },
-        select: { id: true, slug: true, name: true, apiKey: true },
+        select: { id: true, slug: true, name: true },
       });
       const approval = await approveDeviceCode({
         deviceCode: dc.device_code,
@@ -164,10 +174,19 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
           project_id: project.id,
           project_slug: project.slug,
           project_name: project.name,
-          api_key: project.apiKey,
         },
       });
       expect(approval.approved).toBe(true);
+      // The approved record holds the pick only, no secret.
+      const stored = await redisConnection!.get(
+        `lwcli:device:${dc.device_code}`,
+      );
+      expect(stored).not.toContain(PROJECT_API_KEY);
+      expect(JSON.parse(stored!).project_api_key).toEqual({
+        project_id: project.id,
+        project_slug: project.slug,
+        project_name: project.name,
+      });
 
       // CLI polls /exchange — discriminator path returns kind:'api_key'
       const exRes = await callExchange(dc.device_code);
@@ -175,7 +194,24 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
       const ex = (await exRes.json()) as Record<string, unknown>;
 
       expect(ex.kind).toBe("api_key");
-      expect(ex.api_key).toBe(PROJECT_API_KEY);
+      expect(ex.api_key).toEqual(expect.stringMatching(/^sk-lw-[A-Za-z0-9]+_/));
+      expect(ex.api_key).not.toBe(PROJECT_API_KEY);
+      // Bound to the one project, the key needs no project id to authenticate,
+      // so a CLI that only writes LANGWATCH_API_KEY keeps working.
+      const resolved = await TokenResolver.create(prisma).resolve({
+        token: ex.api_key as string,
+        projectId: null,
+      });
+      expect(resolved?.project.id).toBe(PROJECT_ID);
+      const minted = await prisma.apiKey.findMany({
+        where: {
+          organizationId: ORG_ID,
+          userId: USER_ID,
+          name: { startsWith: CLI_PROJECT_KEY_NAME_PREFIX },
+        },
+        select: { permissionMode: true, parentApiKeyId: true },
+      });
+      expect(minted).toEqual([{ permissionMode: "all", parentApiKeyId: null }]);
       expect(ex.project).toEqual({
         id: PROJECT_ID,
         slug: `credtype-proj-${suffix}`,

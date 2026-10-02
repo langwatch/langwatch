@@ -8,76 +8,20 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type React from "react";
+import { useState } from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
-import { CopyableInputWithPrefix } from "../../features/onboarding/components/sections/observability/CopyableInputWithPrefix";
+import { ApiKeyIntegrationInfoCard } from "../../features/traces-v2/onboarding/components/ApiKeyIntegrationInfoCard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { trackEvent } from "../../utils/tracking";
 import { useIntegrationChecks } from "../IntegrationChecks";
 import { Link } from "../ui/link";
-import { toaster } from "../ui/toaster";
 import ObservabilityCard from "./ObservabilityCard";
 
 const APICard: React.FC = () => {
-  const { project } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
+  const { project, organization } = useOrganizationTeamProject();
   const integrationChecks = useIntegrationChecks();
   const hasFirstMessage = Boolean(integrationChecks.data?.firstMessage);
 
-  const effectiveApiKey = project?.apiKey ?? "";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
-
-  async function copyApiKey({
-    withBashPrefix,
-  }: {
-    withBashPrefix: boolean;
-  }): Promise<void> {
-    trackEvent("api_key_copy", { project_id: project?.id });
-    try {
-      await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_API_KEY=${effectiveApiKey}`
-          : effectiveApiKey,
-      );
-      toaster.create({
-        title: "Copied",
-        description: "API key copied to clipboard",
-        type: "success",
-      });
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy the API key. Please try again.",
-        type: "error",
-      });
-    }
-  }
-
-  async function copyEndpoint({
-    withBashPrefix,
-  }: {
-    withBashPrefix: boolean;
-  }): Promise<void> {
-    trackEvent("endpoint_copy", { project_id: project?.id });
-    try {
-      await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}`
-          : effectiveEndpoint,
-      );
-      toaster.create({
-        title: "Copied",
-        description: "Endpoint copied to clipboard",
-        type: "success",
-      });
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy the endpoint. Please try again.",
-        type: "error",
-      });
-    }
-  }
+  const [token, setToken] = useState<string | null>(null);
 
   return (
     <VStack
@@ -98,44 +42,14 @@ const APICard: React.FC = () => {
           LangWatch!
         </Text>
       </Box>
-      <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
-        <VStack align="start">
-          <Text fontSize="sm" color="fg" fontWeight="medium">
-            API key
-          </Text>
-          <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
-            Keep it secret, keep it safe. Don&apos;t let this key fall into
-            prying eyes.
-          </Text>
-        </VStack>
-        <CopyableInputWithPrefix
-          prefix="LANGWATCH_API_KEY="
-          value={effectiveApiKey}
-          ariaLabel="API key"
-          showVisibilityToggle
-          onCopy={copyApiKey}
+      {project && organization && (
+        <ApiKeyIntegrationInfoCard
+          organizationId={organization.id}
+          projectId={project.id}
+          token={token}
+          onTokenGenerated={setToken}
         />
-      </VStack>
-      {effectiveEndpoint &&
-        effectiveEndpoint !== "https://app.langwatch.ai" && (
-          <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
-            <VStack align="start">
-              <Text fontSize="sm" color="fg" fontWeight="medium">
-                Endpoint
-              </Text>
-              <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
-                This is the endpoint you should configure in your SDK to send
-                data to LangWatch.
-              </Text>
-            </VStack>
-            <CopyableInputWithPrefix
-              prefix="LANGWATCH_ENDPOINT="
-              value={effectiveEndpoint}
-              ariaLabel="Endpoint"
-              onCopy={copyEndpoint}
-            />
-          </VStack>
-        )}
+      )}
       <Box mt={1}>
         {hasFirstMessage ? (
           <Alert.Root

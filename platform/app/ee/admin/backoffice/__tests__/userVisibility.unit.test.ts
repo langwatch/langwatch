@@ -171,4 +171,22 @@ describe("mapUserToBackofficeRow", () => {
       expect(row.projects.map((p) => p.id)).toEqual(["p_alive"]);
     });
   });
+
+  describe("given a project row that carries key material", () => {
+    it("returns only the project and organization references", () => {
+      const project = buildProject({
+        id: "p_keyed",
+        apiKey: "sk-lw-plaintext",
+        apiKeyHash: "hash",
+      });
+      const org = buildOrg({ teams: [buildTeam({ projects: [project] })] });
+
+      const row = mapUserToBackofficeRow(
+        buildUser({ orgMemberships: [{ organization: org }] }),
+      );
+
+      expect(row).not.toHaveProperty("orgMemberships");
+      expect(JSON.stringify(row)).not.toContain("sk-lw-plaintext");
+    });
+  });
 });

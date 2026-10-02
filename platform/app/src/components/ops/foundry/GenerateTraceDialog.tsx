@@ -24,7 +24,9 @@ const DEPTH_PRESETS = [
 export function GenerateTraceDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const setTrace = useTraceStore((s) => s.setTrace);
-  const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
+  const selectedProjectId = useFoundryProjectStore(
+    (s) => s.selectedTarget?.projectId ?? null,
+  );
 
   const [targetSpanCount, setTargetSpanCount] = useState(1500);
   const [depthPreset, setDepthPreset] = useState<number>(1); // index into DEPTH_PRESETS

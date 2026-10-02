@@ -131,12 +131,12 @@ Feature: CLI login never lands a user on a personal project
       And the device code is consumed, so a further exchange reports it expired
 
     @integration @project-picker @rbac
-    Scenario: project-login exchange returns a key rotated after approval
+    Scenario: project-login exchange never hands out the base API key
       Given a device code approved while the caller could manage the project
-      And the project's base API key is rotated after approval
+      Then the approved device code holds the picked project and no key
       When the CLI exchanges that device code
-      Then the response contains the current base API key
-      And the approval-time base API key is NOT returned
+      Then the response contains an API key of the caller's own, bound to that project
+      And the project's base API key is NOT returned
 
     @unit @project-picker
     Scenario: the project picker lists the caller's personal project explicitly and omits internal-governance projects

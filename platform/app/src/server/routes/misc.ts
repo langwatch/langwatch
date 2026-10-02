@@ -52,6 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
@@ -949,9 +950,16 @@ secured
       );
     }
 
+    // The MCP session acts as the project with the project internal key: the
+    // project API key is stored as a hash only, and the token the MCP client
+    // receives at /oauth/token is an opaque access token, never this key.
+    const internalKey = await getProjectInternalKey({
+      prisma,
+      projectId: project.id,
+    });
     const authCodeEntry = JSON.stringify({
       projectId: project.id,
-      encryptedApiKey: encrypt(project.apiKey),
+      encryptedApiKey: encrypt(internalKey),
       // Captured here so MCP tools that need a caller identity (e.g.,
       // governance install/uninstall/rotate) can attribute audit rows to
       // the actual OAuth-flowing user instead of falling back to a project-

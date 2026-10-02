@@ -12,7 +12,6 @@ import {
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
-  batchScopePermissions,
   checkOrganizationPermission,
   checkProjectPermission,
   type PermissionMiddlewareParams,
@@ -245,10 +244,6 @@ export const organizationRouter = createTRPCRouter({
       // must not hand the decrypted secret to lite/viewer members just
       // because the UI happens not to render it.
       const manageableOrgIds = new Set<string>();
-      // Decides the base-key redaction below. One batched resolution per org,
-      // not one check per project — a scoped check is ~4 queries, so a
-      // per-project fan-out would scale with the org's project count.
-      const manageableProjectsByOrg = new Map<string, Map<string, boolean>>();
       for (const organization of organizations) {
         const canManage = await probeOrganizationPermission(
           ctx,
@@ -256,27 +251,6 @@ export const organizationRouter = createTRPCRouter({
           "organization:manage",
         );
         if (canManage) manageableOrgIds.add(organization.id);
-
-        const projectTeamId: Record<string, string> = {};
-        for (const team of organization.teams) {
-          for (const project of team.projects) {
-            projectTeamId[project.id] = team.id;
-          }
-        }
-        const projectIds = Object.keys(projectTeamId);
-        if (projectIds.length === 0) continue;
-
-        const { projects: manageableProjects } = await batchScopePermissions(
-          ctx,
-          {
-            organizationId: organization.id,
-            teamIds: [],
-            projectIds,
-            projectTeamId,
-            permission: "project:manage",
-          },
-        );
-        manageableProjectsByOrg.set(organization.id, manageableProjects);
       }
 
       for (const organization of organizations) {
@@ -294,17 +268,12 @@ export const organizationRouter = createTRPCRouter({
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
           }
-          // A base key grants full access to one project, so include it only
-          // for callers who can administer that exact project. Demo projects
-          // expose it to no one.
-          const canManageProject =
-            manageableProjectsByOrg.get(organization.id)?.get(project.id) ??
-            false;
-          if (isDemo || !canManageProject) {
-            project.apiKey = "";
-          }
-          // The LangWatchQL key is a control-plane secret: no client surface
-          // reads it, so unlike the base key it is sent to no one at all.
+          // Project key material never reaches a browser. The stored key is a
+          // hash (plaintext only lingers on rows awaiting the hashing sweep),
+          // the settings page renders `apiKeyLast4`, and rotation returns the
+          // new key once. The LangWatchQL key is a control-plane secret.
+          project.apiKey = null;
+          project.apiKeyHash = null;
           project.lwqlKey = "";
         }
       }

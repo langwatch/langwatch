@@ -2,7 +2,6 @@ import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { SavePromptButton } from "~/prompts/components/SavePromptButton";
@@ -51,7 +50,6 @@ export function PromptEditorFooter({
   onApply,
   onDiscard,
 }: PromptEditorFooterProps) {
-  const { project } = useOrganizationTeamProject();
   // Form context may not be available when rendered outside FormProvider
   // (e.g., in Drawer.Footer or StudioDrawerWrapper footer slot).
   // Falls back gracefully when all values are provided via props.
@@ -79,10 +77,7 @@ export function PromptEditorFooter({
           hasUnsavedChanges={hasUnsavedChanges}
         />
       )}
-      <GeneratePromptApiSnippetDialog
-        promptHandle={handle}
-        apiKey={project?.apiKey}
-      >
+      <GeneratePromptApiSnippetDialog promptHandle={handle}>
         <GeneratePromptApiSnippetDialog.Trigger>
           <GenerateApiSnippetButton hasHandle={!!handle} />
         </GeneratePromptApiSnippetDialog.Trigger>

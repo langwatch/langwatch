@@ -89,7 +89,7 @@ describe("Prompts API", () => {
     });
 
     // Update variables after project creation to ensure they have the correct values
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     // The cascading resolver requires a model to be configured at

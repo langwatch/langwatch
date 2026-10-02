@@ -947,16 +947,12 @@ export const userRouter = createTRPCRouter({
         workspace.project.id,
         "project:manage",
       );
-      const safeWorkspace = {
-        ...workspace,
-        project: {
-          ...workspace.project,
-          apiKey: canManageProject ? workspace.project.apiKey : "",
-        },
-      };
 
       return {
-        workspace: safeWorkspace,
+        workspace,
+        // Whether the caller may mint API keys for their personal project.
+        // The project API key itself is stored as a hash and never returned.
+        canManageProject,
         routingPolicy: defaultPolicy
           ? { id: defaultPolicy.id, name: defaultPolicy.name }
           : null,

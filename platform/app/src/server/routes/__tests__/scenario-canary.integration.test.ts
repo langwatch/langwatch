@@ -16,6 +16,7 @@
  * queue call.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hashProjectApiKey } from "~/server/api-key/project-api-key";
 
 const { runScenarioHealthCanary, projectFindUnique } = vi.hoisted(() => ({
   runScenarioHealthCanary: vi.fn(),
@@ -27,14 +28,22 @@ vi.mock("~/server/health-probes/scenario-canary.service", () => ({
 }));
 
 // The route authenticates exactly like its siblings: the project API key in
-// `X-Auth-Token` is resolved through `prisma.project.findUnique`. That lookup
-// is the second (and only other) boundary this route crosses.
+// `X-Auth-Token` is resolved by its hash through `prisma.project.findUnique`.
+// That lookup is the second (and only other) boundary this route crosses.
 vi.mock("~/server/db", () => ({
-  prisma: { project: { findUnique: projectFindUnique } },
+  prisma: {
+    project: { findUnique: projectFindUnique },
+    projectInternalKey: { findUnique: vi.fn().mockResolvedValue(null) },
+  },
 }));
 
 const API_KEY = "scenario-canary-project-api-key";
-const PROJECT = { id: "proj-1", apiKey: API_KEY, team: { id: "team-1" } };
+const PROJECT = {
+  id: "proj-1",
+  apiKey: null,
+  archivedAt: null,
+  team: { id: "team-1" },
+};
 const AUTHED = { headers: { "x-auth-token": API_KEY } };
 
 describe("GET /api/health/scenarios", () => {
@@ -42,8 +51,8 @@ describe("GET /api/health/scenarios", () => {
     runScenarioHealthCanary.mockReset();
     projectFindUnique.mockReset();
     projectFindUnique.mockImplementation(
-      async ({ where }: { where: { apiKey: string } }) =>
-        where.apiKey === API_KEY ? PROJECT : null,
+      async ({ where }: { where: { apiKeyHash?: string } }) =>
+        where.apiKeyHash === hashProjectApiKey(API_KEY) ? PROJECT : null,
     );
     // Fresh module registry per test so the route's own module-scope state
     // (if any) does not leak between auth/busy/healthy cases.

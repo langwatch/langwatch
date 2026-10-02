@@ -387,7 +387,10 @@ export const ModelConfigSchema = z.object({
 });
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
-/** Telemetry configuration - where to send traces */
+/**
+ * Telemetry configuration: where to send traces. `apiKey` is the project
+ * internal key (see `getProjectInternalKey`), never shown to a user.
+ */
 export const TelemetryConfigSchema = z.object({
   endpoint: z.string(),
   apiKey: z.string(),
@@ -483,7 +486,7 @@ export const ChildProcessJobDataSchema = z
     /**
      * Model params for the target adapter (the prompt under test). Only a
      * prompt target ever resolves one — workflow / code / http targets send
-     * the project's platform API key instead (see
+     * the project internal key instead (see
      * serialized-adapter.registry.ts) and never consume an LLM key for the
      * agent under test, so this is absent for them.
      *

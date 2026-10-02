@@ -68,7 +68,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       },
     });
 
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
 
     // Cascade resolver requires a DEFAULT model at some scope to create

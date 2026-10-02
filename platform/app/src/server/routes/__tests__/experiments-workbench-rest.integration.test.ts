@@ -69,7 +69,7 @@ describe("the experiments workbench REST surface", () => {
       method,
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": token ?? project.apiKey,
+        "X-Auth-Token": token ?? project.apiKey!,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });

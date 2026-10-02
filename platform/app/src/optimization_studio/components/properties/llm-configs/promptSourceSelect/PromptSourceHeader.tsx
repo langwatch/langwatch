@@ -6,7 +6,6 @@ import { useFormContext } from "react-hook-form";
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompts";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
@@ -39,7 +38,6 @@ export function PromptSourceHeader({
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
-  const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
   const configId = node.data.configId;
 
@@ -118,10 +116,7 @@ export function PromptSourceHeader({
         >
           <EditablePromptHandleField />
           <Spacer />
-          <GeneratePromptApiSnippetDialog
-            promptHandle={handle}
-            apiKey={project?.apiKey}
-          >
+          <GeneratePromptApiSnippetDialog promptHandle={handle}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>

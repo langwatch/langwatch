@@ -17,6 +17,7 @@ import type {
   VirtualKey,
 } from "~/generated/prisma/client";
 
+import { getProjectInternalKey } from "~/server/api-key/project-internal-key";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import {
   type LangyMirrorTier,
@@ -137,6 +138,11 @@ export type GatewayConfigPayload = {
    * under one filter). Null for older self-hosted orgs without a
    * governance project — the gateway skips span export rather than
    * failing the config fetch.
+   *
+   * project_otlp_token is the project internal key (see
+   * `getProjectInternalKey`). The gateway caches this bundle by revision, so
+   * the token has to stay valid for as long as the bundle does: the internal
+   * key never expires and rotating the project API key leaves it alone.
    */
   project_id: string | null;
   project_otlp_token: string | null;
@@ -384,7 +390,12 @@ export class GatewayConfigMaterialiser {
       display_prefix: vk.displayPrefix,
       organization_id: vk.organizationId,
       project_id: traceProject?.id ?? null,
-      project_otlp_token: traceProject?.apiKey ?? null,
+      project_otlp_token: traceProject
+        ? await getProjectInternalKey({
+            prisma: this.prisma,
+            projectId: traceProject.id,
+          })
+        : null,
       team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
       // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the

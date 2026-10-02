@@ -354,7 +354,7 @@ export const GET_PROJECT_API_KEY: DescribeRouteOptions = {
   summary: "Get the project API key",
   deprecated: true,
   description:
-    "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
+    "Deprecated. Project base keys are stored as hashes and cannot be read back. A signed-in project administrator sees a new key once when rotating it in the browser. Every request to this route is refused with 403.",
   security: [
     {
       admin_api_key: [],
@@ -372,8 +372,7 @@ export const GET_PROJECT_API_KEY: DescribeRouteOptions = {
   responses: {
     "401": { description: "Invalid or missing API key token" },
     "403": {
-      description:
-        "A signed-in project administrator is required; API-key principals cannot reveal base keys",
+      description: "Project base keys cannot be read back",
     },
   },
 };

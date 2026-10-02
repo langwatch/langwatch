@@ -1,69 +1,41 @@
 @integration
-Feature: Read the project base API key
+Feature: The project base API key is never readable after it is created
   As a project admin
-  I want the project's base (legacy) API key to be readable only in an
-  administrator session, and only for the project I administer
-  So that access to it lines up with the access it grants
+  I want the project's base API key to be shown only when it is created or
+  rotated
+  So that no session, page or API response can hand it out later
 
-  The base key is a full-access credential for one project. Revealing it is
-  therefore gated by `project:manage` in a signed-in user session. API-key
-  principals cannot reveal another legacy key, even when their scope includes
-  `project:manage` or they identify the project's owner.
-
-  It also travels inside the payload the application loads on every page, so
-  that copy is gated on the same permission — otherwise the endpoint gates
-  would decide nothing about what a client actually holds.
+  The base key is a full-access credential for one project. Only its hash and
+  its last four characters are stored, so nothing can read it back. Rotation
+  returns the new key once. Every other surface that needs a key for a person
+  mints a personal API key for them instead.
 
   Background:
     Given a project that has a base API key
 
-  Scenario: A signed-in project admin reads the base key
+  Scenario: No route reads the base key back
     Given I have a signed-in user session
     And I have permission to manage the project
-    When I request the project's base API key
-    Then the base API key is returned to me
+    When I look for a way to read the project's base API key
+    Then no route returns it
 
-  Scenario: A project member cannot read the base key
-    Given I have a signed-in user session
-    And I can update the project but not manage it
-    When I request the project's base API key
-    Then the request is rejected as forbidden
-    And no base API key is disclosed
-
-  Scenario: Permission is checked against the requested project
-    Given I may manage one project but not another in the same organization
-    When I request the base API key for the project I may not manage
-    Then the request is rejected as forbidden
-    And no base API key is disclosed to me
-    And the base API key for the project I may manage is still returned
-
-  Scenario: An API key principal cannot read the base key
-    Given an API key principal whose scope includes permission to manage the project
-    When it requests the project's base API key
-    Then the request is rejected as forbidden
-    And no base API key is disclosed to me
-
-  Scenario: API key refusal happens before the project is read
-    Given an API key principal
-    When it requests a base API key for an unknown project id
-    Then the request is rejected as forbidden
-    And the response does not reveal whether that project exists
-
-  Scenario: A project in another organization is not disclosed
-    Given a project belonging to an organization I am not a member of
-    When I request that project's base API key
-    Then the project is reported as not found
-    And no base API key is disclosed to me
-
-  Scenario: The base key stays in the session payload for project admins
+  Scenario: The base key is withheld from the session payload for project admins
     Given I have permission to manage the project
     When the application loads my organizations and projects
-    Then the project's base API key is included in the payload
+    Then the project's base API key is blank in the payload
+    And its key hash is blank in the payload
+    And its last four characters are included in the payload
 
   Scenario: The base key is withheld from the session payload for project members
     Given I can update the project but not manage it
     When the application loads my organizations and projects
     Then the project's base API key is blank in the payload
+    And its key hash is blank in the payload
+
+  Scenario: Team and cost payloads carry no project key material
+    Given I have permission to manage the project
+    When the application loads my teams, their members or their costs
+    Then no project in the payload carries its base API key or key hash
 
   Scenario: Personal context remains usable when its base key is withheld
     Given I have a valid signed-in session for my personal workspace

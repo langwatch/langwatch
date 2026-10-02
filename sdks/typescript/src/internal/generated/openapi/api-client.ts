@@ -3532,7 +3532,7 @@ export interface paths {
         /**
          * Get the project API key
          * @deprecated
-         * @description Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.
+         * @description Deprecated. Project base keys are stored as hashes and cannot be read back. A signed-in project administrator sees a new key once when rotating it in the browser. Every request to this route is refused with 403.
          */
         get: operations["getProjectApiKey"];
         put?: never;
@@ -23815,7 +23815,7 @@ export interface operations {
                         email: string;
                         /** @enum {string} */
                         role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
-                        teams: {
+                        teams?: {
                             teamId: string;
                             /** @enum {string} */
                             role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -27795,7 +27795,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description A signed-in project administrator is required; API-key principals cannot reveal base keys */
+            /** @description Project base keys cannot be read back */
             403: {
                 headers: {
                     [name: string]: unknown;

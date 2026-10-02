@@ -167,7 +167,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   };
 
   /** The credential a request presents: a project's own key, unless told otherwise. */
-  const asProject = (project: Project) => ({ "X-Auth-Token": project.apiKey });
+  const asProject = (project: Project) => ({ "X-Auth-Token": project.apiKey! });
   const asViewOnly = (project: Project) => ({
     Authorization: `Bearer ${viewOnlyToken}`,
     "X-Project-Id": project.id,

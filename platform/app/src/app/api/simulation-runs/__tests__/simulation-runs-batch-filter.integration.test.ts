@@ -66,7 +66,7 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 

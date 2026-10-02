@@ -4,7 +4,7 @@
  * Analytics instrumentation on the coding-agent onboarding screen.
  *
  * The screen renders install commands and an MCP config that EMBED the
- * project API key, so the property allowlist is a privacy property, not a
+ * minted API key, so the property allowlist is a privacy property, not a
  * tidiness one: every payload must stay a fixed identifier and must never
  * carry the copied string.
  */
@@ -28,9 +28,21 @@ vi.mock("react-contextual-analytics", () => ({
 
 const API_KEY = "sk-lw-test-SUPERSECRET-000";
 
+// The key a reader minted on this screen: the commands embed it.
 vi.mock("../../contexts/ActiveProjectContext", () => ({
   useActiveProject: () => ({
-    project: { id: "project-1", apiKey: API_KEY },
+    project: { id: "project-1" },
+    organization: { id: "org-1" },
+    freshToken: API_KEY,
+  }),
+}));
+
+vi.mock("~/hooks/useMintProjectApiKey", () => ({
+  useMintProjectApiKey: () => ({
+    token: API_KEY,
+    mint: vi.fn(),
+    isPending: false,
+    canMint: true,
   }),
 }));
 

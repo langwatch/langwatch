@@ -67,7 +67,7 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 

@@ -1,6 +1,12 @@
 import { z } from "zod";
-import type { Project } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+
+type CostProject = {
+  id: string;
+  name: string;
+  slug: string;
+  teamId: string;
+};
 
 export const costsRouter = createTRPCRouter({
   getAggregatedCostsForOrganization: protectedProcedure
@@ -55,10 +61,11 @@ export const costsRouter = createTRPCRouter({
             },
           ],
         },
+        select: { id: true, name: true, slug: true, teamId: true },
       });
       const projectsById = userProjects.reduce(
         (acc, project) => ({ ...acc, [project.id]: project }),
-        {} as Record<string, Project>,
+        {} as Record<string, CostProject>,
       );
       const projectIds = Object.keys(projectsById);
 
@@ -121,7 +128,7 @@ export const costsRouter = createTRPCRouter({
         {} as Record<
           string,
           {
-            project: Project;
+            project: CostProject;
             costs: typeof aggregatedCosts;
           }
         >,

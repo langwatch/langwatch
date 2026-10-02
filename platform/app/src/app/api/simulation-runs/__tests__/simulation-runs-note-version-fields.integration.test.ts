@@ -78,7 +78,7 @@ describe("Feature: run responses carry the note and the scenario version", () =>
         personalFeatures: {},
       },
     });
-    testApiKey = testProject.apiKey;
+    testApiKey = testProject.apiKey!;
     testProjectId = testProject.id;
   });
 

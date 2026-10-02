@@ -233,7 +233,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   Scenario: the project-key endpoint returns the caller's own personal project key
     Given a device-session bearer token
     When POST /api/auth/cli/project-key names the caller's own personal project slug
-    Then the server returns the personal project's API key
+    Then the server returns an API key of the caller's own for the personal project
 
   @bdd @cli @login @project @slug @integration
   Scenario: the project-key endpoint refuses another user's personal project
@@ -330,11 +330,11 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And the user clicks "Send API key" on the /cli/auth page
       after picking a project
     Then the server records the picked `project_id` on the device-code
-      record + stamps the picked project's existing `Project.apiKey`
+      record, and no key
     And the CLI's `POST /api/auth/cli/exchange` poll returns:
       | field    | value                                              |
       | kind     | "api_key"                                          |
-      | api_key  | the project's apiKey verbatim (sk-lw-…)            |
+      | api_key  | an API key of the user's own for the project       |
       | project  | { id, slug, name } of the picked project           |
     And the CLI writes `LANGWATCH_API_KEY=<api_key>` to `$CWD/.env`
     And the CLI writes `LANGWATCH_ENDPOINT=<endpoint>` to `$CWD/.env`

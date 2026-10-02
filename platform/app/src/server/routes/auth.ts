@@ -13,6 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { findProjectByApiKey } from "~/server/api-key/project-api-key";
 import { sessionRevocation } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
@@ -44,9 +45,7 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
     return c.json({ message: "X-Auth-Token header is required." }, 401);
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
+  const project = await findProjectByApiKey({ prisma, token: authToken });
 
   if (!project) {
     return c.json({ message: "Invalid auth token." }, 401);

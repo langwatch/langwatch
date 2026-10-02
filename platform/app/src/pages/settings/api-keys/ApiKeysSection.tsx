@@ -10,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { showErrorToast } from "~/features/errors";
@@ -40,38 +40,20 @@ import { TokenCreatedDialog } from "./TokenCreatedDialog";
 type ApiKeyRow = RouterOutputs["apiKey"]["list"][number];
 
 /**
- * Actions for the legacy "Project API Key" row. The row intentionally has no
- * edit/revoke affordance — the only mutating action is rotation, and only when
- * the viewer can manage the project (`project:manage`). Rotation is the
- * supported, audited replacement for the base key that the unified-keys rework
- * removed.
+ * Actions for the "Project API Key" row. Only the key's hash and last four
+ * characters are stored, so there is nothing to reveal or copy: the only
+ * action is rotation, and only when the viewer can manage the project
+ * (`project:manage`). Rotation shows the new key once.
  */
 function ProjectKeyActions({
-  apiKey,
   canManage,
   onRotate,
 }: {
-  apiKey: string;
   canManage: boolean;
   onRotate: () => void;
 }) {
   return (
     <HStack gap={1}>
-      <Button
-        size="xs"
-        variant="ghost"
-        aria-label="Copy secret key"
-        onClick={() => {
-          void navigator.clipboard.writeText(apiKey);
-          toaster.create({
-            title: "API key copied to clipboard",
-            type: "success",
-            duration: 2000,
-          });
-        }}
-      >
-        <Clipboard size={14} />
-      </Button>
       {canManage && (
         <Tooltip content="Rotate this key">
           <Button
@@ -320,7 +302,7 @@ export function ApiKeysSection({
   // Rotate the legacy project base key. The mutation does a single atomic
   // update + audit log server-side, so on success the previous key is already
   // dead; we surface the fresh key once via the existing TokenCreatedDialog
-  // (driven by `newToken`) and refresh the row that sources `project.apiKey`.
+  // (driven by `newToken`) and refresh the row that shows `apiKeyLast4`.
   const handleRotateProjectKey = () => {
     if (!project?.id) return;
     regenerateMutation.mutate(
@@ -349,15 +331,17 @@ export function ApiKeysSection({
     );
   };
 
-  // Build unified rows: API keys + project service key
-  const projectApiKey = project?.apiKey;
+  // Build unified rows: API keys + project service key. Only the last four
+  // characters of the project key are known to the browser; a key stored
+  // before hashed storage gets them on the next maintenance sweep.
+  const projectKeyLast4 = project?.apiKeyLast4 ?? null;
 
   // Decide whether the legacy project service key survives the active scope
   // filter by running it through the same inclusive cascade as user-scoped keys.
   // A fake row with a single PROJECT-scoped binding is synthesised so the same
   // filterProvidersByScope logic can decide.
   const showProjectKey: boolean = useMemo(() => {
-    if (!canManageProject || !projectApiKey || !project?.id) return false;
+    if (!canManageProject || !project?.id) return false;
     // Synthesize a single-binding row so the project-service-key row reuses the
     // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
     // Intent: keep the cascade rules in ONE place — not a hack to bypass typing.
@@ -371,14 +355,7 @@ export function ApiKeysSection({
         currentProjectId: project?.id,
       }).length > 0
     );
-  }, [
-    canManageProject,
-    projectApiKey,
-    project?.id,
-    scopeFilter,
-    hierarchy,
-    team?.id,
-  ]);
+  }, [canManageProject, project?.id, scopeFilter, hierarchy, team?.id]);
 
   const getStatus = (key: ApiKeyRow) => {
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
@@ -459,7 +436,7 @@ export function ApiKeysSection({
                 </Table.Header>
                 <Table.Body>
                   {/* Project service key row — only shown when it survives the active scope filter */}
-                  {showProjectKey && projectApiKey && (
+                  {showProjectKey && (
                     <Table.Row>
                       <Table.Cell>
                         <HStack align="center">
@@ -478,7 +455,9 @@ export function ApiKeysSection({
                           fontFamily="monospace"
                           color="fg.muted"
                         >
-                          sk-…{projectApiKey.slice(-4)}
+                          {projectKeyLast4
+                            ? `sk-lw-…${projectKeyLast4}`
+                            : "sk-lw-…"}
                         </Text>
                       </Table.Cell>
                       <Table.Cell>
@@ -517,7 +496,6 @@ export function ApiKeysSection({
                       </Table.Cell>
                       <Table.Cell>
                         <ProjectKeyActions
-                          apiKey={projectApiKey}
                           canManage={canManageProject}
                           onRotate={() => setIsRotateConfirmOpen(true)}
                         />

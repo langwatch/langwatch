@@ -61,7 +61,7 @@ async function main() {
 
   const project = await prisma.project.findFirst({
     where: { slug },
-    select: { id: true, slug: true, apiKey: true, teamId: true },
+    select: { id: true, slug: true, teamId: true },
   });
   if (!project) throw new Error(`No project with slug ${slug}`);
 
@@ -185,7 +185,6 @@ async function main() {
       {
         projectId: project.id,
         projectSlug: project.slug,
-        projectApiKey: project.apiKey,
         agentId: agent.id,
         experimentSlug: experiment.slug,
       },

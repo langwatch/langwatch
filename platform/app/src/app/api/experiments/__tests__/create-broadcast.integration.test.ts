@@ -50,7 +50,7 @@ describe("creating an experiment over REST", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Auth-Token": project.apiKey,
+            "X-Auth-Token": project.apiKey!,
           },
           body: JSON.stringify({ name: `Broadcast ${nanoid(6)}` }),
         });
