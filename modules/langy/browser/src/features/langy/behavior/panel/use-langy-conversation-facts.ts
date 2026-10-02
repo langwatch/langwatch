@@ -4,7 +4,7 @@ import { useProjectReach } from "../../../../behavior/home/use-project-reach.ts"
 import {
   PANEL_SUGGESTION_COUNT,
   selectLangySuggestions,
-} from "../../../../ui/sections/langy-home-suggestions.ts";
+} from "../../../../model/langy-home-suggestions.ts";
 import type { useLangyConversationList } from "../data/use-langy-conversation-list.ts";
 
 type ConversationItems = ReturnType<typeof useLangyConversationList>["items"];
