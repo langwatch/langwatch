@@ -6,6 +6,7 @@ import {
   type WebhookDeliveryOutcome,
   type WebhookDestinationKind,
   type WebhookEndpointView,
+  WEBHOOK_PREVIOUS_SECRET_TTL_MS,
 } from "@langwatch/webhook-contract";
 
 import { parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
@@ -16,11 +17,6 @@ import {
   type WebhookDestinationConfig,
 } from "../../rules/webhook-destination.rules.ts";
 import {
-  assertDestinationUnchanged,
-  assertValidDeliveryControls,
-  assertValidDestinationInput,
-  assertValidEvents,
-  assertValidUrl,
   mergeSqsUpdate,
   webhookEndpointConfiguration,
   type WebhookEndpointConfiguration,
@@ -29,7 +25,6 @@ import {
   WEBHOOK_DISABLED_REASON_MANUAL,
   WEBHOOK_KEPT_SECRET,
 } from "../../rules/webhook-endpoint-policy.rules.ts";
-import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "../../rules/webhook-signature.rules.ts";
 import type {
   WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
@@ -222,10 +217,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
-    assertValidDestinationInput({ ...params, destinationKind }, this.#configuration);
-    assertValidEvents(params.enabledEvents);
     const destination = storedDestination(params, this.#options.secrets);
-    assertValidDeliveryControls(params);
     const secret = newSecret();
     const now = nowInstant();
     const row: MemoryWebhookEndpointRow = {
@@ -284,8 +276,6 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
-    assertDestinationUnchanged({ currentKind: endpoint.destinationKind, params });
-    if (params.url !== undefined) assertValidUrl(params.url, this.#configuration);
     const sqsUpdate =
       params.sqs !== undefined
         ? storedSqsUpdate({
@@ -295,8 +285,6 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
             secrets: this.#options.secrets,
           })
         : {};
-    if (params.enabledEvents !== undefined) assertValidEvents(params.enabledEvents);
-    assertValidDeliveryControls(params);
     const updated: MemoryWebhookEndpointRow = {
       ...endpoint,
       ...sqsUpdate,

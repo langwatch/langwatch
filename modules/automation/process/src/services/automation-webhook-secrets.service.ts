@@ -4,10 +4,12 @@ import {
   type WebhookActionParams,
 } from "@langwatch/automation-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { WEBHOOK_HEADER_VALUE_KEPT, webhookMethodSchema } from "@langwatch/webhook-contract";
+import {
+  WEBHOOK_HEADER_VALUE_KEPT,
+  WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+  webhookMethodSchema,
+} from "@langwatch/webhook-contract";
 import { z } from "zod";
-
-export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface AutomationWebhookSecretCrypto {
   encrypt(value: string): string;

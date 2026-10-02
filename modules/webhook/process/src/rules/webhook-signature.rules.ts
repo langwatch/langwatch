@@ -10,13 +10,6 @@ export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 /** Receiver-side freshness window, documented in the endpoint docs. */
 export const WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
-/**
- * How long a rolled-off secret keeps signing and verifying — long enough for
- * a receiver to notice the roll and deploy the new value, short enough that
- * a leaked secret's usefulness ends on a known clock.
- */
-export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
-
 function hmacHex(secret: string, signedPayload: string): string {
   return createHmac("sha256", secret).update(signedPayload).digest("hex");
 }

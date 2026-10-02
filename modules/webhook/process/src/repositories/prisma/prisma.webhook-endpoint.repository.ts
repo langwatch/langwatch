@@ -13,6 +13,7 @@ import {
   type WebhookDestinationKind,
   type WebhookEndpointView,
   webhookRequestFailureResponseSchema,
+  WEBHOOK_PREVIOUS_SECRET_TTL_MS,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
@@ -24,11 +25,6 @@ import {
   type WebhookDestinationConfig,
 } from "../../rules/webhook-destination.rules.ts";
 import {
-  assertDestinationUnchanged,
-  assertValidDeliveryControls,
-  assertValidDestinationInput,
-  assertValidEvents,
-  assertValidUrl,
   mergeSqsUpdate,
   webhookEndpointConfiguration,
   type WebhookEndpointConfiguration,
@@ -37,7 +33,6 @@ import {
   WEBHOOK_DISABLED_REASON_MANUAL,
   WEBHOOK_KEPT_SECRET,
 } from "../../rules/webhook-endpoint-policy.rules.ts";
-import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "../../rules/webhook-signature.rules.ts";
 import type {
   WebhookEndpointRepository,
   WebhookRequestAttempt,
@@ -190,13 +185,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
-    assertValidDestinationInput({ ...params, destinationKind }, this.configuration);
-    assertValidEvents(params.enabledEvents);
     const destination = PrismaWebhookEndpointRepository.storedDestination(
       params,
       this.deps.secrets,
     );
-    assertValidDeliveryControls(params);
     const secret = PrismaWebhookEndpointRepository.newSecret();
     const data: Prisma.WebhookEndpointUncheckedCreateInput = {
       id: this.deps.ids.newEndpointId(),
@@ -251,8 +243,6 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.getEndpoint(params);
-    assertDestinationUnchanged({ currentKind: endpoint.destinationKind, params });
-    if (params.url !== undefined) assertValidUrl(params.url, this.configuration);
     const sqsUpdate =
       params.sqs !== undefined
         ? PrismaWebhookEndpointRepository.storedSqsUpdate({
@@ -262,8 +252,6 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
             secrets: this.deps.secrets,
           })
         : {};
-    if (params.enabledEvents !== undefined) assertValidEvents(params.enabledEvents);
-    assertValidDeliveryControls(params);
     const data: Prisma.WebhookEndpointUncheckedUpdateInput = { ...sqsUpdate };
     if (params.url !== undefined) data.url = params.url;
     if (params.enabledEvents !== undefined) {

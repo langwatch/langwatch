@@ -39,6 +39,7 @@ import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
+import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
 import {
   WebhookDeliveryService,
@@ -49,6 +50,7 @@ import { WebhookDispatchCapService } from "../services/webhook-dispatch-cap.serv
 import { WebhookEgressService } from "../services/webhook-egress.service.ts";
 import { WebhookEndpointRequeueService } from "../services/webhook-endpoint-requeue.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
+import { WebhookEndpointService } from "../services/webhook-endpoint.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
@@ -292,10 +294,10 @@ export class WebhookModule implements WebhookApiContract {
     this.#dependencies = dependencies;
   }
 
-  create: WebhookApiContract["create"] = (input) => this.#dependencies.endpoints.create(input);
+  create: WebhookApiContract["create"] = (input) => this.#endpointSaves.create(input);
   getAll: WebhookApiContract["getAll"] = (input) => this.#dependencies.endpoints.findAll(input);
   getById: WebhookApiContract["getById"] = (input) => this.#dependencies.endpoints.getById(input);
-  update: WebhookApiContract["update"] = (input) => this.#dependencies.endpoints.update(input);
+  update: WebhookApiContract["update"] = (input) => this.#endpointSaves.update(input);
 
   applyEndpointChanges: WebhookApiContract["applyEndpointChanges"] = async ({
     status,
@@ -405,6 +407,13 @@ export class WebhookModule implements WebhookApiContract {
   };
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
     this.#requeue.appendReplay(input);
+
+  get #endpointSaves(): WebhookEndpointService {
+    return WebhookEndpointService.create({
+      endpoints: this.#dependencies.endpoints,
+      configuration: webhookEndpointConfiguration(),
+    });
+  }
 
   get #requeue(): WebhookEndpointRequeueService {
     const { endpoints, endpointStream } = this.#dependencies;

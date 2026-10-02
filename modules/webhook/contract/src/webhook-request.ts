@@ -5,6 +5,8 @@ import { z } from "zod";
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 /** A saved header value the author left unchanged; resolved before sending, never sent. */
 export const WEBHOOK_HEADER_VALUE_KEPT = "__kept__";
+/** How long a rolled-off signing secret keeps signing and verifying after a rotation. */
+export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 export const webhookMethodSchema = z.enum(WEBHOOK_METHODS);
 export type WebhookMethod = z.infer<typeof webhookMethodSchema>;
 

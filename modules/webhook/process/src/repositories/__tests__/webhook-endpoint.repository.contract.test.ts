@@ -2,10 +2,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Tests endpoint registry contract: admission, enable/disable, rotation, auto-disable.
  */
-import {
-  WebhookEndpointNotFoundError,
-  WebhookEndpointValidationError,
-} from "@langwatch/webhook-contract";
+import { WebhookEndpointNotFoundError } from "@langwatch/webhook-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
@@ -76,26 +73,6 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
       await expect(repository.findAll({ organizationId: OTHER_ORGANIZATION_ID })).resolves.toEqual(
         [],
       );
-    });
-
-    it("rejects a URL that does not use https", async () => {
-      await expect(
-        repository.create({
-          organizationId: ORGANIZATION_ID,
-          url: "http://example.com/hook",
-          enabledEvents: ["gateway.request.completed"],
-        }),
-      ).rejects.toThrow(WebhookEndpointValidationError);
-    });
-
-    it("rejects an empty event selection", async () => {
-      await expect(
-        repository.create({
-          organizationId: ORGANIZATION_ID,
-          url: "https://example.com/hook",
-          enabledEvents: [],
-        }),
-      ).rejects.toThrow(WebhookEndpointValidationError);
     });
   });
 
