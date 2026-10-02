@@ -14,7 +14,6 @@ import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declaration
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
-import { getUserPermissionsAtScope } from "../model/api-key-permissions.ts";
 import {
   AuthorizeHostApi,
   AuthorizeHostProvider,
@@ -128,12 +127,12 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
-  // The person's own bindings: the ceiling the minted token never exceeds.
-  const myBindings = apiKeyApi.apiKey.myBindings.useQuery(
-    { organizationId: activeScope.organizationId ?? "" },
-    { enabled: !!activeScope.organizationId },
+  // What the person holds on the project, resolved by the server: the token's ceiling.
+  const standing = apiKeyApi.authz.effectivePermissions.useQuery(
+    { projectId: activeScope.projectId ?? "" },
+    { enabled: !!activeScope.projectId },
   );
-  const { refetch: refetchBindings } = myBindings;
+  const { refetch: refetchStanding } = standing;
   // As `useMintPersonalToken`: the token is never kept in the mutation cache.
   const { mutateAsync: mintToken, reset: resetMint } = apiKeyApi.apiKey.create.useMutation({
     gcTime: 0,
@@ -161,17 +160,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         mintProjectToken: async () => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
-          const bindings = myBindings.data ?? (await refetchBindings()).data ?? [];
-          const held = getUserPermissionsAtScope({
-            myBindings: bindings,
-            scopeType: "PROJECT",
-            scopeId: projectId,
-            organizationId,
-            orgProjects: (graph.organization?.teams ?? []).flatMap((team) =>
-              team.projects.map((project) => ({ id: project.id, teamId: team.id })),
-            ),
-            isServiceKey: false,
-          });
+          const held = (standing.data ?? (await refetchStanding()).data)?.permissions ?? [];
           const permissions = cappedDeviceFlowPermissions({ held });
           if (permissions.length === 0) {
             throw new ApiKeyScopeViolationError(
@@ -192,8 +181,8 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     [
       activeScope,
       graph,
-      myBindings.data,
-      refetchBindings,
+      standing.data,
+      refetchStanding,
       sessionActor,
       session,
       location,

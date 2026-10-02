@@ -6,6 +6,7 @@
 
 import type { apiKeyTrpc } from "@langwatch/api-key-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;
@@ -35,6 +36,13 @@ type BorrowedProcedures = {
      * Read for the CLI picker; invalidated after a key rotation.
      */
     getAll: { query: { input: { isDemo?: boolean }; output: unknown } };
+  };
+
+  authz: {
+    /** The reader's own permissions at a scope, resolved by the server (custom roles too). */
+    effectivePermissions: {
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
+    };
   };
 };
 

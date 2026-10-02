@@ -69,3 +69,17 @@ describe("given a person holding nothing on the project", () => {
     });
   });
 });
+
+describe("given a custom-role holder whose server-resolved permissions include the defaults", () => {
+  describe("when the authorize page caps the defaults", () => {
+    it("keeps every default a project binding can grant", () => {
+      const held = [...defaultCliKeyPermissions(), "organization:view"];
+
+      expect(cappedDeviceFlowPermissions({ held })).toEqual(
+        defaultCliKeyPermissions().filter((permission) =>
+          bindingScopeCanGrantPermission({ scopeType: "PROJECT", permission }),
+        ),
+      );
+    });
+  });
+});
