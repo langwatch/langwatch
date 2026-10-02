@@ -3,7 +3,7 @@
  * swallow, and stopping a turn.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -382,11 +382,11 @@ const host = new FakeLangyHost();
 // context chips) from LangyProvider — the real app mounts it above the panel,
 // so the test does too.
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={host}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 interface UIMessageLike {

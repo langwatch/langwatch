@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-guided-onboarding.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,7 +66,7 @@ function renderMessage(
   } = {},
 ) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <MessageContent
         message={message}
         organizationId="org_1"
@@ -77,7 +77,7 @@ function renderMessage(
         onDiscard={() => {}}
         {...extra}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -164,9 +164,9 @@ describe("the tour card before the kickoff message exists", () => {
   it("shows the tour in progress with no kickoff yet", () => {
     tour.running = true;
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <GuidedTourCard kickoff={null} organizationId="org_1" />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
     expect(screen.getByText("Doing guided tour")).toBeInTheDocument();
   });

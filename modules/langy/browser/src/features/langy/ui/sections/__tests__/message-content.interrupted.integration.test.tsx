@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-stop-and-resume.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
@@ -73,7 +73,7 @@ function renderMessage({
   message?: UIMessage;
 }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <MessageContent
         message={message}
         appliedOutcomes={{}}
@@ -83,7 +83,7 @@ function renderMessage({
         onDiscard={() => {}}
         interrupted={interrupted}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,10 +4,10 @@
  * @see specs/licensing/proration-preview.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type * as errorsModule from "@langwatch/browser-host/errors";
 import type { UpgradeModalSeatsVariant } from "@langwatch/browser-host/upgrade-modal-store";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,13 +55,13 @@ const seatUpdate = (
 
 const renderPreview = (variant: UpgradeModalSeatsVariant, onClose = vi.fn()) => {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Dialog.Root open={true}>
         <Dialog.Content>
           <SeatProrationPreview variant={variant} open={true} onClose={onClose} />
         </Dialog.Content>
       </Dialog.Root>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return { onClose };
 };

@@ -5,7 +5,7 @@
  * it used to show raw JSON where the scenario's own name and status belong.
  * @see specs/langy/langy-capability-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -27,7 +27,7 @@ function renderCard(output: unknown) {
   const descriptor = resolveCapability("langwatch.scenario.get");
   if (!descriptor) throw new Error("no descriptor for langwatch.scenario.get");
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyScenarioCard
         descriptor={descriptor}
         input={{
@@ -36,7 +36,7 @@ function renderCard(output: unknown) {
         output={output}
         projectSlug="acme"
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

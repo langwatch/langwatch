@@ -3,7 +3,7 @@
  * Spec: specs/langy/langy-context-awareness.feature ("Everything armed twinkles rather
  *   than pulsing in formation", "Things near my pointer light up quietly")
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,12 +20,12 @@ function press(key: string, target: EventTarget = document.body) {
 
 function renderPage() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyContextTargetLayer />
       <LangyContextTarget target={{ id: "trace:t-1", kind: "trace", label: "Trace t-1" }}>
         <div data-testid="trace-card">a trace row</div>
       </LangyContextTarget>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

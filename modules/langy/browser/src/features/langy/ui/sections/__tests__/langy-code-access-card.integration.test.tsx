@@ -5,7 +5,7 @@
  * tRPC hooks and the GitHub connect popup.
  * @see specs/langy/langy-code-access.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,7 +100,7 @@ const ASKING = {
 
 function renderCard(over: Partial<Parameters<typeof LangyCodeAccessCard>[0]> = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyCodeAccessCard
         projectId="p_1"
         conversationId="c_1"
@@ -110,7 +110,7 @@ function renderCard(over: Partial<Parameters<typeof LangyCodeAccessCard>[0]> = {
         onAskAgain={vi.fn()}
         {...over}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

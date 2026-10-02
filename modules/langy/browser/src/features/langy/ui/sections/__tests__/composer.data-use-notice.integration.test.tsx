@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-composer-data-use-notice.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -35,7 +35,7 @@ import { COMPOSER_DATA_USE_NOTICE, Composer } from "../composer.tsx";
 function renderComposer({ isSaaS }: { isSaaS: boolean }) {
   deployment.isSaaS = isSaaS;
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         model="openai/gpt-5-mini"
         modelOptions={["openai/gpt-5-mini"]}
@@ -44,7 +44,7 @@ function renderComposer({ isSaaS }: { isSaaS: boolean }) {
         onStop={() => {}}
         disabled={false}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

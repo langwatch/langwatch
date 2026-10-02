@@ -3,7 +3,7 @@
  * Spec: specs/langy/langy-navigation-persistence.feature, specs/langy/langy-mount-scope.feature
  *       specs/langy/langy-worker-prewarm.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
@@ -179,11 +179,11 @@ const renderAt = (initialPath: string) => {
     { initialEntries: [initialPath] },
   );
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <TestHost>
         <RouterProvider router={router} />
       </TestHost>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
   return router;
 };
@@ -206,11 +206,11 @@ const renderRoutedAt = (initialPath: string) => {
     { initialEntries: [initialPath] },
   );
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <TestHost>
         <RouterProvider router={router} />
       </TestHost>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 };
 

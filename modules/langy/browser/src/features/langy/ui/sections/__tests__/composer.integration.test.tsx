@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-navigation-persistence.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,7 +37,7 @@ function renderComposer({
   variant?: "floating" | "sidebar" | "hero";
 } = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         variant={variant}
         model="openai/gpt-5-mini"
@@ -47,7 +47,7 @@ function renderComposer({
         onStop={() => {}}
         disabled={false}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

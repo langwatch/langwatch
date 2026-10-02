@@ -4,7 +4,7 @@
  * A shared-folder disconnect writes a `system`-role NOTICE (ADR-129): the panel must keep it
  * (the engine drops every other role) and draw it as a plain line, not as a reader message.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
@@ -62,7 +62,7 @@ function message({ role }: { role: "system" | "user" }): UIMessage {
 
 function renderMessage(uiMessage: UIMessage) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <MessageContent
         message={uiMessage}
         appliedOutcomes={{}}
@@ -71,7 +71,7 @@ function renderMessage(uiMessage: UIMessage) {
         onApply={async () => {}}
         onDiscard={() => {}}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

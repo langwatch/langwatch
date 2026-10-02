@@ -3,7 +3,7 @@
  * @see specs/langy/langy-capability-cards.feature
  *      "A card's links never reload the app"
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,9 +17,9 @@ const { LangySpaAnchor } = await import("../langy-spa-anchor.tsx");
 
 const renderAnchor = (href: string) =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangySpaAnchor href={href}>Open in Scenarios</LangySpaAnchor>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 const click = (init: MouseEventInit = {}) => {

@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UIMessage } from "ai";
@@ -40,9 +40,9 @@ function skillMessage(): UIMessage {
 
 function renderActivity() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyToolActivity message={skillMessage()} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,7 +37,7 @@ function renderComposer(
   over: { awaitingAnswer?: boolean; terminalConnected?: boolean } = {},
 ) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         model="openai/gpt-5-mini"
         modelOptions={["openai/gpt-5-mini"]}
@@ -47,7 +47,7 @@ function renderComposer(
         disabled={false}
         {...over}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -138,7 +138,7 @@ describe("given the turn has ended", () => {
 
       useLangyStore.setState({ turnPhase: "idle" });
       rerender(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <Composer
             model="openai/gpt-5-mini"
             modelOptions={["openai/gpt-5-mini"]}
@@ -147,7 +147,7 @@ describe("given the turn has ended", () => {
             onStop={() => {}}
             disabled={false}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       const idleField = screen.getByPlaceholderText(IDLE_PLACEHOLDER);

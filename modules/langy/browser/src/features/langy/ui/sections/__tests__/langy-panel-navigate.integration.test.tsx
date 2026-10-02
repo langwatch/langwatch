@@ -5,7 +5,7 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  * @see specs/langy/langy-frontend-realtime.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
@@ -232,13 +232,13 @@ class FakeLangyHost extends LangyHostApi {
 const host = new FakeLangyHost();
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
       <LangyHostProvider value={host}>
         <LangyProvider>{children}</LangyProvider>
       </LangyHostProvider>
     </UiCapabilityContextProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 function renderPanel() {

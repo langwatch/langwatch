@@ -1,11 +1,11 @@
+import type * as webPushModule from "@langwatch/browser-host/web-push";
+import { Menu } from "@langwatch/design-system/menu";
 /**
  * @vitest-environment jsdom
  * The offer card and the menu's Notifications item, over stubbed Notification and Web Push.
  * @see specs/langy/langy-notifications.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as webPushModule from "@langwatch/browser-host/web-push";
-import { Menu } from "@langwatch/design-system/menu";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -112,21 +112,21 @@ function installNotification({
 
 const renderCard = () =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyNotificationsOfferCard />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 const renderMenu = () =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Menu.Root open>
         <Menu.Trigger>More</Menu.Trigger>
         <Menu.Content>
           <LangyNotificationsMenuGroup />
         </Menu.Content>
       </Menu.Root>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 // The menu positions itself with a ResizeObserver, which jsdom does not have.
@@ -179,9 +179,9 @@ describe("the notifications offer card", () => {
         );
         expect(requestPermission).toHaveBeenCalledOnce();
         view.rerender(
-          <ChakraProvider value={defaultSystem}>
+          <DesignSystemProvider forcedTheme="light">
             <LangyNotificationsOfferCard />
-          </ChakraProvider>,
+          </DesignSystemProvider>,
         );
         expect(await screen.findByText(LANGY_NOTIFICATIONS_ENABLED_LINE)).toBeDefined();
       });
@@ -229,9 +229,9 @@ describe("the notifications offer card", () => {
         );
         expect(requestPermission).not.toHaveBeenCalled();
         view.rerender(
-          <ChakraProvider value={defaultSystem}>
+          <DesignSystemProvider forcedTheme="light">
             <LangyNotificationsOfferCard />
-          </ChakraProvider>,
+          </DesignSystemProvider>,
         );
         expect(screen.getByText(LANGY_NOTIFICATIONS_DECLINED_LINE)).toBeDefined();
       });
@@ -272,14 +272,14 @@ describe("the Notifications section of Langy's menu", () => {
 
       await waitFor(() => expect(save).toHaveBeenCalledWith({ topic: "langy", choice: "enabled" }));
       view.rerender(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <Menu.Root open>
             <Menu.Trigger>More</Menu.Trigger>
             <Menu.Content>
               <LangyNotificationsMenuGroup />
             </Menu.Content>
           </Menu.Root>
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       expect(await screen.findByTestId("langy-notifications-on")).toBeDefined();
     });

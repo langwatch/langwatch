@@ -3,7 +3,7 @@
  * Spec: specs/langy/langy-inline-model-setup.feature — the panel's
  * `langyNeedsModel` gate over `api.modelProvider.getResolvedDefault`.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -194,11 +194,11 @@ class FakeLangyHost extends LangyHostApi {
 }
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={new FakeLangyHost()}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 function renderPanel() {

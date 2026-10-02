@@ -4,8 +4,8 @@
  * specs/langy/langy-local-control.feature): says the folder, carries the
  * machine and branch, and is the one place the share ends.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const disconnectWorkspace = vi.fn();
@@ -34,11 +34,7 @@ afterEach(cleanup);
 beforeEach(() => disconnectWorkspace.mockClear());
 
 const renderChip = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <LangyLocalWorkspaceChip projectId="p_1" conversationId="c_1" />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<LangyLocalWorkspaceChip projectId="p_1" conversationId="c_1" />);
 
 describe("given a connected folder", () => {
   beforeEach(() => {

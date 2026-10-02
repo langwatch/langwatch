@@ -4,7 +4,7 @@
  * @see specs/langy/langy-derived-cards.feature, langy-derived-stats-presentation.feature
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -67,7 +67,7 @@ function renderMessage(
   extra: Partial<Parameters<typeof MessageContent>[0]> = {},
 ) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <MessageContent
         message={message}
         appliedOutcomes={{}}
@@ -77,7 +77,7 @@ function renderMessage(
         onDiscard={() => {}}
         {...extra}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -211,9 +211,9 @@ describe("StreamingAnswerWithCards", () => {
 
   const renderStream = (text: string) =>
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <StreamingAnswerWithCards text={text} />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
 
   describe("given an opening fence written loosely", () => {

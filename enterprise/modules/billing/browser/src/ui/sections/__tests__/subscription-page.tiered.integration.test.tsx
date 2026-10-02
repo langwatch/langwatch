@@ -4,7 +4,7 @@
  * mocked `billingApi`. @see specs/licensing/subscription-page.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,9 +86,9 @@ class TestBillingHost extends BillingHostApi {
 const renderSubscriptionPage = () => {
   const host = new TestBillingHost();
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <BillingHostProvider value={host}>{children}</BillingHostProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
   return render(<SubscriptionPage />, { wrapper: Wrapper });
 };

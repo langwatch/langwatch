@@ -2,7 +2,7 @@
  * The activity card is the RUNNING card, and nothing else.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
@@ -42,9 +42,9 @@ function turn(state: "input-available" | "output-available"): UIMessage {
 
 function renderTurn(message: UIMessage, { live = true }: { live?: boolean } = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyToolActivity message={message} live={live} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-capability-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,7 @@ function assistantMessage(parts: UIMessage["parts"]): UIMessage {
 
 function renderMessage(message: UIMessage, isStreaming = false) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <MessageContent
         message={message}
         conversationId="conv-1"
@@ -81,7 +81,7 @@ function renderMessage(message: UIMessage, isStreaming = false) {
         onDiscard={() => {}}
         isStreaming={isStreaming}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

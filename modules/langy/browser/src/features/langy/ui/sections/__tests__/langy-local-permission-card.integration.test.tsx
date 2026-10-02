@@ -4,7 +4,7 @@
  * The permission card (ADR-129, specs/langy/langy-local-permissions.feature): proves the answer
  * reaches the right mutation and a settled card never re-offers the buttons.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -69,7 +69,7 @@ const PENDING: LangyPermissionCardData = {
 
 function renderCard(over: Partial<Parameters<typeof LangyLocalPermissionCard>[0]> = {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyLocalPermissionCard
         projectId="p_1"
         conversationId="c_1"
@@ -78,7 +78,7 @@ function renderCard(over: Partial<Parameters<typeof LangyLocalPermissionCard>[0]
         skipPermissions={false}
         {...over}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

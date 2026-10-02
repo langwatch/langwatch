@@ -3,7 +3,7 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A plan limit is a decision, not a broken step"
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,9 +71,9 @@ const turn = (): UIMessage =>
 
 const renderTurn = () =>
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyToolActivity message={turn()} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 
 describe("a tool call refused on a plan limit", () => {

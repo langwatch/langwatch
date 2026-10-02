@@ -1,11 +1,11 @@
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
  * @vitest-environment-options { "url": "https://app.langwatch.ai/" }
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -84,13 +84,13 @@ const descriptor = resolveCapability("langwatch.simulation-run.get")!;
 
 function renderCard(output: unknown) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
         <LangyHostProvider value={host}>
           <LangyEvalRunCard descriptor={descriptor} input={{}} output={output} projectSlug="acme" />
         </LangyHostProvider>
       </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -13,9 +13,9 @@ afterEach(cleanup);
 
 function renderCard(card: LangyDerivedCard) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyDerivedCardView card={card} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -53,7 +53,7 @@ describe("Langy derived card presentation", () => {
     };
 
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <LangyChoicesCard
           card={card}
           lockState={{ status: "open" }}
@@ -64,7 +64,7 @@ describe("Langy derived card presentation", () => {
             ])
           }
         />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
 
     expect(screen.getByText("Publish the winning draft")).toBeDefined();
@@ -81,9 +81,9 @@ describe("Langy derived card presentation", () => {
     };
 
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <LangyChoicesCard card={card} lockState={{ status: "open" }} onSelect={onSelect} />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Staging agent" }));
@@ -96,7 +96,7 @@ describe("Langy derived card presentation", () => {
 
   it("keeps an invalid derived block visible as an expandable disclosure", () => {
     render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <LangyFailedCard
           part={{
             type: "langy-card-failed",
@@ -104,7 +104,7 @@ describe("Langy derived card presentation", () => {
             raw: '{"kind":"unknown"}',
           }}
         />
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /view raw/i }));

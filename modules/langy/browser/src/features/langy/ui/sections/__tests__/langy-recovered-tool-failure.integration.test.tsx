@@ -5,7 +5,7 @@
  * "Running a command failed" card rather than being hidden by the reply that followed it.
  * @see specs/langy/langy-card-taxonomy.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UIMessage } from "ai";
@@ -33,9 +33,9 @@ const reply = {
 function renderActivity(parts: UIMessage["parts"]) {
   const message: UIMessage = { id: "assistant-1", role: "assistant", parts };
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyToolActivity message={message} live={false} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -83,9 +83,9 @@ describe("a failed step on a settled turn", () => {
         parts: [failedProbe],
       };
       const { container } = render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyToolActivity message={message} live={false} answeredAfter />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(container.textContent).toContain("and Langy carried on");
@@ -100,9 +100,9 @@ describe("a failed step on a settled turn", () => {
         parts: [failedProbe, reply],
       };
       const { container } = render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyToolActivity message={message} live={true} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(container.textContent).toContain("This step couldn't be completed.");

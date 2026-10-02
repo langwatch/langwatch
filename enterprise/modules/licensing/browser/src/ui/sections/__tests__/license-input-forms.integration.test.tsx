@@ -5,7 +5,7 @@
  * page takes an activation code or a signed license key, told apart by shape.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -68,9 +68,9 @@ class TestHost extends LicensingHostApi {
 }
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LicensingHostProvider value={new TestHost()}>{children}</LicensingHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 const ACTIVATION_CODE = "LW-ABCD-EFGH-JKMN-PQRS";

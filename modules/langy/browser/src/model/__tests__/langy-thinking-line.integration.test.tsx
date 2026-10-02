@@ -2,7 +2,7 @@
  * The thinking line is a plain, non-interactive status line.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,9 +15,9 @@ const REASONING_TEXT =
 
 function renderLine({ hasLiveReasoning }: { hasLiveReasoning: boolean }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyThinkingLine messages={[]} hasLiveReasoning={hasLiveReasoning} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -77,7 +77,7 @@ describe("LangyThinkingLine", () => {
       // full (clamped by the renderer), so the content path is exercised, not
       // just the CSS.
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyThinkingLine
             messages={
               [
@@ -99,7 +99,7 @@ describe("LangyThinkingLine", () => {
             }
             toolNarrator={{ describe }}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       const status = screen.getByRole("status");
       expect(status.textContent).toContain("Using the GitHub skill");
@@ -131,9 +131,9 @@ describe("LangyThinkingLine", () => {
      * @scenario "The escalation measures silence, not how long the turn has run" */
     it("drops the stuck line as soon as the turn produces something", () => {
       const line = (activityKey: string) => (
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyThinkingLine messages={[]} activityKey={activityKey} />
-        </ChakraProvider>
+        </DesignSystemProvider>
       );
       const { rerender } = render(line("calls:0"));
 
@@ -153,9 +153,9 @@ describe("LangyThinkingLine", () => {
     /** @scenario "A turn that really is silent still ends up looking stuck" */
     it("keeps escalating while nothing at all happens", () => {
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyThinkingLine messages={[]} activityKey="quiet" />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       expect(orbState()).toBe("active");
 

@@ -3,7 +3,7 @@
  * @integration
  * Spec: specs/langy/langy-trace-explorer-link.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -91,7 +91,7 @@ function trace(id: string, startedAt: number) {
 function renderCard({ totalHits, count }: { totalHits: number; count: number }) {
   const traces = Array.from({ length: count }, (_, i) => trace(`trace_${i}`, 1750000000000 + i));
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyHostProvider value={host}>
         <LangyTraceSampleCard
           descriptor={descriptor}
@@ -100,7 +100,7 @@ function renderCard({ totalHits, count }: { totalHits: number; count: number }) 
           projectSlug="acme"
         />
       </LangyHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -117,7 +117,7 @@ const reducedRow = {
 
 function renderReduced() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyHostProvider value={host}>
         <LangyTraceSampleCard
           descriptor={descriptor}
@@ -129,7 +129,7 @@ function renderReduced() {
           projectSlug="acme"
         />
       </LangyHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

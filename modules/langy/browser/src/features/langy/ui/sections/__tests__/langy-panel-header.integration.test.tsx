@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-header.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -177,11 +177,11 @@ class FakeLangyHost extends LangyHostApi {
 }
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={new FakeLangyHost()}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 function renderPanel() {

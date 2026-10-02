@@ -18,6 +18,6 @@ export default defineConfig({
     kind: "jsdom",
     // Suites mock their own behavior modules; a shared fork would hand them the real one.
     isolate: true,
-    test: { environment: "node" },
+    test: { environment: "node", setupFiles: ["./src/__tests__/setup.ts"] },
   }),
 });

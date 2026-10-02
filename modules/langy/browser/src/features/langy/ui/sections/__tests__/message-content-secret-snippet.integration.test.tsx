@@ -5,7 +5,7 @@
  * call, and the activity spine leaves the call out, so the card is its only rendering.
  * @see specs/langy/langy-secret-snippet.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -76,7 +76,7 @@ describe("given an assistant message carrying a secret_snippet call", () => {
     /** @scenario "The card reveals the secret on first render, with a copy button" */
     it("draws the secret snippet card and reads the secret for the organization", async () => {
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <MessageContent
             message={assistantMessage}
             organizationId="org_1"
@@ -86,7 +86,7 @@ describe("given an assistant message carrying a secret_snippet call", () => {
             onApply={async () => {}}
             onDiscard={() => {}}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       await waitFor(() => {
         expect(screen.getByTestId("langy-secret-snippet-card")).toHaveAttribute(
@@ -105,9 +105,9 @@ describe("given an assistant message carrying a secret_snippet call", () => {
     /** @scenario "The secret snippet call is a card, not an activity row" */
     it("leaves the call out, so the card is its only rendering", () => {
       const { container } = render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyToolActivity message={assistantMessage} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       expect(container.textContent).not.toContain("Secret snippet");
       expect(container.textContent).not.toContain("secret_snippet");

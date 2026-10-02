@@ -5,7 +5,7 @@
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -63,7 +63,7 @@ const agentResponded = (o: { id: string; createdAt: number }) => ({
 
 function renderComposer(onSend: (text: string) => void) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         model="openai/gpt-5-mini"
         modelOptions={["openai/gpt-5-mini"]}
@@ -72,7 +72,7 @@ function renderComposer(onSend: (text: string) => void) {
         onStop={() => undefined}
         disabled={false}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

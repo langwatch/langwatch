@@ -2,7 +2,7 @@
 /**
  * @see specs/langy/langy-derived-stats-presentation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,9 +31,9 @@ function preferReducedMotion() {
 
 function renderCard(metrics: Parameters<typeof StreamingStatCard>[0]["metrics"]) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <StreamingStatCard metrics={metrics} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

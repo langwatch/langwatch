@@ -2,7 +2,7 @@
  * The in-progress capability shell, and what it says once the turn is over.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,7 @@ afterEach(cleanup);
 
 function renderCard({ interrupted }: { interrupted: boolean }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyCapabilityPendingCard
         surface="traces"
         overline="Traces"
@@ -24,7 +24,7 @@ function renderCard({ interrupted }: { interrupted: boolean }) {
         detail="langwatch trace search --origin application"
         interrupted={interrupted}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -5,7 +5,7 @@
  * minutes ago still reads as work in progress after a reload.
  * @see specs/langy/langy-github-prs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -19,9 +19,9 @@ function renderCard({
   live?: boolean;
 }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyGitHubProgressCard events={events} live={live} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,7 +4,7 @@
  * specs/langy/langy-local-permissions.feature): a settled turn's card
  * stays above the closing message; a running turn's stays at the live edge.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -228,11 +228,11 @@ import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx
 import { LangySidecar } from "../langy-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <MemoryRouter>
       <LangyProvider>{children}</LangyProvider>
     </MemoryRouter>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 function renderOpenPanel() {

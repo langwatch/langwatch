@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-navigation-persistence.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -272,11 +272,11 @@ class FakeLangyHost extends LangyHostApi {
 }
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={new FakeLangyHost()}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 /** Mount the way a reload does: the store still points at the conversation. */

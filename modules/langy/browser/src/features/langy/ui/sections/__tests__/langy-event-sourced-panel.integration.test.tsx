@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -345,11 +345,11 @@ class FakeLangyHost extends LangyHostApi {
 const host = new FakeLangyHost();
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={host}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 /**

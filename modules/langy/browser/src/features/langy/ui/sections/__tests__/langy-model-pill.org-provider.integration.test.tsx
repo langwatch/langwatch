@@ -4,7 +4,7 @@
  * A provider row at ORGANIZATION scope, none at project scope (ADR-021): the picker must
  * still offer its models. @see specs/langy/langy-model-selection.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -56,13 +56,13 @@ afterEach(() => cleanup());
 
 function renderPill() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyModelPill
         model="anthropic/claude-sonnet-4-5"
         options={OPTIONS}
         onChange={() => undefined}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

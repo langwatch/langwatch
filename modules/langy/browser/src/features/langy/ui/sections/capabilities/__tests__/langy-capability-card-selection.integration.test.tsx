@@ -4,7 +4,7 @@
  * Mocks: host, tRPC, router, hydration hook, recharts' ResponsiveContainer.
  * Spec: specs/langy/langy-capability-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { toCliToolResult } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
@@ -185,11 +185,11 @@ function settledCall({
 
 function renderCall(call: Parameters<typeof LangyCapabilityRenderer>[0]["call"]) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyHostProvider value={host}>
         <LangyCapabilityRenderer call={call} />
       </LangyHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

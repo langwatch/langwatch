@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-context-attach.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,7 +39,7 @@ const held = [
 
 function renderComposer(variant: "floating" | "sidebar") {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         variant={variant}
         model="openai/gpt-5-mini"
@@ -50,7 +50,7 @@ function renderComposer(variant: "floating" | "sidebar") {
         disabled={false}
         contextChips={held}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

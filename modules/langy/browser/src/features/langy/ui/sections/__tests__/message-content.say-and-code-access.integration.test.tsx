@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-code-access.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -61,7 +61,7 @@ describe("given a settled reply that only says a line and asks for code access",
     /** @scenario A reply that only says a line and asks for code access shows both */
     it("shows the said line and the code access card instead of No content", () => {
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <MessageContent
             message={sayThenAskForCode}
             conversationId="conv-1"
@@ -71,7 +71,7 @@ describe("given a settled reply that only says a line and asks for code access",
             onApply={async () => {}}
             onDiscard={() => {}}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       expect(screen.getByText(SAID)).toBeInTheDocument();

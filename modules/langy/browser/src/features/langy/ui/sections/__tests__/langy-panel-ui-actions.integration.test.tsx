@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-ui-actions.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
@@ -236,11 +236,11 @@ class FakeLangyHost extends LangyHostApi {
 const host = new FakeLangyHost();
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <LangyHostProvider value={host}>
       <LangyProvider>{children}</LangyProvider>
     </LangyHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 const run = vi.fn(() => ({ targetId: "target-2" }));

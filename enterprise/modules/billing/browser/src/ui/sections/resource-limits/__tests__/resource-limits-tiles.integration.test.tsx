@@ -4,7 +4,7 @@
  * specs/licensing/license-page-styling.feature: where usage against limits is read.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +20,7 @@ vi.mock("../../../../behavior/lent-resource-limit-row.tsx", () => ({
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 const limits = {

@@ -4,7 +4,7 @@
  * @see specs/features/settings-plans-comparison.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +30,7 @@ function renderPlans(
     <PlansComparisonPage {...props} growthSeatPriceCents={TEST_GROWTH_SEAT_PRICE_CENTS} />,
     {
       wrapper: ({ children }: { children: React.ReactNode }) => (
-        <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+        <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
       ),
     },
   );

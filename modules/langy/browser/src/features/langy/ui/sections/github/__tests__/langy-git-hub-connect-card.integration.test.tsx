@@ -2,7 +2,7 @@
  * The connect card opens the real GitHub App integration flow (the popup).
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,9 +17,9 @@ import { LangyGitHubConnectCard } from "../langy-git-hub-connect-card.tsx";
 function renderCard() {
   return render(
     <MemoryRouter>
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <LangyGitHubConnectCard organizationId="org-1" />
-      </ChakraProvider>
+      </DesignSystemProvider>
     </MemoryRouter>,
   );
 }

@@ -1,6 +1,22 @@
 /**
- * The jest-dom matchers, registered once for the package. Without this
- * import, `toBeInTheDocument` is an unknown Chai property and every
- * assertion using it throws rather than failing.
+ * The jest-dom matchers, registered once for the package, and a matchMedia
+ * stub: the design-system colour-mode provider reads it and jsdom lacks it.
  */
 import "@testing-library/jest-dom/vitest";
+
+if (typeof window !== "undefined" && !window.matchMedia) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+}

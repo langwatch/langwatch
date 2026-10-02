@@ -3,7 +3,7 @@
  * leave. These are the ways it could go wrong: - `#` is a character.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -117,9 +117,9 @@ describe("useLangyContextArming", () => {
  */
 function renderLayer() {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyContextTargetLayer />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

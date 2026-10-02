@@ -5,7 +5,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-capability-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { CapabilityBodyWidget, CliResultDigest } from "@langwatch/langy-contract";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
@@ -121,7 +121,7 @@ function renderCard({
   const descriptor = resolveCapability(name);
   if (!descriptor) throw new Error(`no descriptor for ${name}`);
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyHostProvider value={host}>
         <LangySendProvider value={send}>
           <LangyDeclarativeCard
@@ -132,7 +132,7 @@ function renderCard({
           />
         </LangySendProvider>
       </LangyHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -490,7 +490,7 @@ describe("LangyDeclarativeCard", () => {
     const renderHydrated = () => {
       const descriptor = resolveCapability("langwatch.prompt.list")!;
       return render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangyHostProvider value={host}>
             <LangyDeclarativeCard
               descriptor={descriptor}
@@ -500,7 +500,7 @@ describe("LangyDeclarativeCard", () => {
               projectSlug="acme"
             />
           </LangyHostProvider>
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
     };
 
@@ -594,7 +594,7 @@ describe("given a body widget the catalog names", () => {
     const descriptor = resolveCapability("langwatch.analytics.query");
     if (!descriptor) throw new Error("no descriptor for analytics query");
     return render(
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <LangyHostProvider value={host}>
           <LangyDeclarativeCard
             descriptor={{ ...descriptor, body }}
@@ -603,7 +603,7 @@ describe("given a body widget the catalog names", () => {
             projectSlug="acme"
           />
         </LangyHostProvider>
-      </ChakraProvider>,
+      </DesignSystemProvider>,
     );
   }
 

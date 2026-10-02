@@ -4,7 +4,7 @@
  * @see specs/self-hosting/connected-services/connected-billing.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedBillingState, OpenInvoices } from "../connected-billing-state.tsx";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 function overview(overrides: Partial<ConnectedBillingOverview> = {}): ConnectedBillingOverview {

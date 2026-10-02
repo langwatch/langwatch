@@ -5,7 +5,7 @@
  * its card sits at the call and the work streams in below it, not after the closing reply.
  * @see specs/langy/langy-notifications.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -89,7 +89,7 @@ describe("given a turn that offered notifications and then kept working", () => 
         },
       );
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <MessageContent
             message={assistantMessage}
             organizationId="org_1"
@@ -99,7 +99,7 @@ describe("given a turn that offered notifications and then kept working", () => 
             onApply={async () => {}}
             onDiscard={() => {}}
           />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
 
       const card = screen.getByText(LANGY_NOTIFICATIONS_ENABLED_LINE);

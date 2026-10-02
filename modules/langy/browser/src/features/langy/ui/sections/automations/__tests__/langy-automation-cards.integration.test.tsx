@@ -4,7 +4,7 @@
  * Slack save draws instead of the failure card. The viewer's reads are mocked at the hook seam.
  * @see specs/langy/langy-automations.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { SlackConnection } from "@langwatch/slack-contract";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -109,11 +109,11 @@ const alert = {
 
 function wrap({ node, send = null }: { node: ReactNode; send?: LangySend | null }) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangyHostProvider value={host}>
         <LangySendProvider value={send}>{node}</LangySendProvider>
       </LangyHostProvider>
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,7 +51,7 @@ import { Composer } from "../composer.tsx";
 
 function renderComposer(onSend: (input: string) => void = () => {}) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Composer
         model="openai/gpt-5-mini"
         modelOptions={["openai/gpt-5-mini"]}
@@ -60,7 +60,7 @@ function renderComposer(onSend: (input: string) => void = () => {}) {
         onStop={() => {}}
         disabled={false}
       />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

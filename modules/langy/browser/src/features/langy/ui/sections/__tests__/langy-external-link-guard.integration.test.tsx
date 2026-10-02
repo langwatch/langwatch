@@ -3,7 +3,7 @@
  * opens, and the answer's own markdown links rendered exactly as the panel renders them.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useRef } from "react";
@@ -50,12 +50,12 @@ function LangyPanelHarness({ answer }: { answer: string }) {
   const guard = useLangyExternalLinkGuard();
   const recorder = useNavigationRecorder();
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <div data-testid="panel-root" {...guard.guardProps} ref={recorder}>
         <Markdown linkVariant="langy">{answer}</Markdown>
       </div>
       <LangyExternalLinkDialog {...guard.dialogProps} />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 
@@ -353,7 +353,7 @@ function ChromeAndAnswerHarness() {
   const guard = useLangyExternalLinkGuard();
   const recorder = useNavigationRecorder();
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <div data-testid="panel-root" {...guard.guardProps} ref={recorder}>
         <a
           href="https://auth.openai.com/device"
@@ -368,7 +368,7 @@ function ChromeAndAnswerHarness() {
         </Markdown>
       </div>
       <LangyExternalLinkDialog {...guard.dialogProps} />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

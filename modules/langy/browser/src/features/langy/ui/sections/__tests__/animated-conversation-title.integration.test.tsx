@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-header.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,9 +12,9 @@ import { AnimatedConversationTitle } from "../animated-conversation-title.tsx";
 
 function renderTitle(title: string) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <AnimatedConversationTitle title={title} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 

@@ -4,7 +4,7 @@
  * the one mutation the card calls; the server's answers are the fixtures.
  * Spec: specs/langy/langy-secret-snippet.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,9 +68,9 @@ function refusal(code: string) {
 
 function renderCard(call: LangySecretSnippetCall = CALL) {
   return render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <LangySecretSnippetCard organizationId="org_1" call={call} />
-    </ChakraProvider>,
+    </DesignSystemProvider>,
   );
 }
 
@@ -115,10 +115,10 @@ describe("LangySecretSnippetCard", () => {
 
     it("spends the read once for two cards of the same call in this tab", async () => {
       render(
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <LangySecretSnippetCard organizationId="org_1" call={CALL} />
           <LangySecretSnippetCard organizationId="org_1" call={CALL} />
-        </ChakraProvider>,
+        </DesignSystemProvider>,
       );
       await waitFor(() => {
         expect(screen.getAllByText(LANGY_SECRET_SHOWN_ONCE_LINE)).toHaveLength(2);
