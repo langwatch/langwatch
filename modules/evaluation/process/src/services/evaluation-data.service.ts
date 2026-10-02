@@ -104,48 +104,15 @@ export class EvaluationDataService {
       level: isThreadLevel ? "thread" : "trace",
     });
 
-    let data: Record<string, unknown>;
-
-    if (isThreadLevel) {
-      data = await this.buildThreadData({
-        projectId,
-        trace,
-        mappings,
-        protections,
-        maxTokens: renderBudgetTokens,
-      });
-    } else {
-      const mappedData = mapTraceFields(trace, mappings);
-      if (!mappedData) {
-        throw new TraceNotEvaluatableError(trace.trace_id);
-      }
-
-      await this.fillServerOnlyTraceSources({
-        mapping: mappings.mapping,
-        mappedData: mappedData as Record<string, unknown>,
-        trace,
-        maxTokens: renderBudgetTokens,
-      });
-
-      data = mappedData as Record<string, unknown>;
-
-      // Resolve any thread-typed mappings mixed into trace-level evaluations
-      if (mappings && hasThreadMappings(mappings)) {
-        await resolveThreadMappingsIntoData({
-          data,
+    const data = isThreadLevel
+      ? await this.buildThreadData({
+          projectId,
           trace,
           mappings,
-          spanDigest: this.deps.spanDigest,
+          protections,
           maxTokens: renderBudgetTokens,
-          getThreadTraces: (threadId) =>
-            this.deps.traces.readThreadsTraces({
-              projectId,
-              threadIds: [threadId],
-              protections,
-            }),
-        });
-      }
-    }
+        })
+      : await this.buildTraceData({ projectId, trace, mappings, protections, renderBudgetTokens });
 
     // Workflow/code/custom evaluators pass data through as-is
     if (
@@ -178,6 +145,53 @@ export class EvaluationDataService {
     const filtered = Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
 
     return { type: "default", data: filtered };
+  }
+
+  private async buildTraceData({
+    projectId,
+    trace,
+    mappings,
+    protections,
+    renderBudgetTokens,
+  }: {
+    projectId: string;
+    trace: Trace;
+    mappings: MappingState;
+    protections: ReadProtections;
+    renderBudgetTokens: number;
+  }): Promise<Record<string, unknown>> {
+    const mappedData = mapTraceFields(trace, mappings);
+    if (!mappedData) {
+      throw new TraceNotEvaluatableError(trace.trace_id);
+    }
+
+    await this.fillServerOnlyTraceSources({
+      mapping: mappings.mapping,
+      mappedData: mappedData as Record<string, unknown>,
+      trace,
+      maxTokens: renderBudgetTokens,
+    });
+
+    const data = mappedData as Record<string, unknown>;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data,
+        trace,
+        mappings,
+        spanDigest: this.deps.spanDigest,
+        maxTokens: renderBudgetTokens,
+        getThreadTraces: (threadId) =>
+          this.deps.traces.readThreadsTraces({
+            projectId,
+            threadIds: [threadId],
+            protections,
+          }),
+      });
+    }
+
+    return data;
   }
 
   private async buildThreadData({

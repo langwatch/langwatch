@@ -101,20 +101,7 @@ export class LangevalsEvaluatorService {
         kind: "evaluation",
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
         signal: withCallerSignal({ own: controller.signal, caller: signal }),
-        body: {
-          data: [
-            {
-              input: convertTo(data.input, "string"),
-              output: convertTo(data.output, "string"),
-              contexts: toLangevalsContexts(data.contexts),
-              expected_contexts: toLangevalsContexts(data.expected_contexts),
-              expected_output: convertTo(data.expected_output, "string"),
-              conversation: convertTo(data.conversation, "array"),
-            },
-          ],
-          settings: settings ?? {},
-          env,
-        },
+        body: evaluationBody({ data, settings, env }),
       });
     } catch (error) {
       throwFetchFailure({
@@ -139,25 +126,7 @@ export class LangevalsEvaluatorService {
         return this.evaluateWithRetry(params, retriesLeft - 1);
       }
 
-      const duration = performance.now() - startTime;
-      let statusText = response.statusText;
-      try {
-        statusText = JSON.stringify(await response.json(), undefined, 2);
-      } catch {
-        // The status text remains the meaningful response summary.
-      }
-
-      if (response.status === 413) {
-        this.telemetry?.record({ evaluatorType, status: "skipped", durationMs: duration });
-        throw new EvaluatorInputTooLargeError({
-          meta: { evaluatorType, httpStatus: response.status },
-        });
-      }
-
-      this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
-      throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
-        meta: { evaluatorType, httpStatus: response.status },
-      });
+      return this.throwHttpFailure({ response, evaluatorType, startTime });
     }
 
     const duration = performance.now() - startTime;
@@ -183,6 +152,57 @@ export class LangevalsEvaluatorService {
     this.telemetry?.record({ evaluatorType, status: result.status, durationMs: duration });
     return result;
   }
+
+  private async throwHttpFailure({
+    response,
+    evaluatorType,
+    startTime,
+  }: {
+    response: Response;
+    evaluatorType: string;
+    startTime: number;
+  }): Promise<never> {
+    const duration = performance.now() - startTime;
+    let statusText = response.statusText;
+    try {
+      statusText = JSON.stringify(await response.json(), undefined, 2);
+    } catch {
+      // The status text remains the meaningful response summary.
+    }
+
+    if (response.status === 413) {
+      this.telemetry?.record({ evaluatorType, status: "skipped", durationMs: duration });
+      throw new EvaluatorInputTooLargeError({
+        meta: { evaluatorType, httpStatus: response.status },
+      });
+    }
+
+    this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+    throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+      meta: { evaluatorType, httpStatus: response.status },
+    });
+  }
+}
+
+function evaluationBody({
+  data,
+  settings,
+  env,
+}: Pick<LangevalsEvaluateParams, "data" | "settings" | "env">) {
+  return {
+    data: [
+      {
+        input: convertTo(data.input, "string"),
+        output: convertTo(data.output, "string"),
+        contexts: toLangevalsContexts(data.contexts),
+        expected_contexts: toLangevalsContexts(data.expected_contexts),
+        expected_output: convertTo(data.expected_output, "string"),
+        conversation: convertTo(data.conversation, "array"),
+      },
+    ],
+    settings: settings ?? {},
+    env,
+  };
 }
 
 function withCallerSignal({
