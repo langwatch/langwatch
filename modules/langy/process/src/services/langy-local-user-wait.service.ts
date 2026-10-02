@@ -31,6 +31,8 @@ const logger = createLogger("langwatch:langy:local-control:waits");
 import {
   blankUserWait,
   given,
+  permissionCardEntry,
+  questionCardEntry,
   refuseSettled,
   storedUserWaitSchema,
   toPollResponse,
@@ -443,24 +445,7 @@ export class UserWaitService {
     await this.buffer.appendLocalPermission({
       conversationId: wait.conversationId,
       turnId: wait.turnId,
-      entry: {
-        waitId: wait.waitId,
-        callId: wait.callId,
-        summary: wait.summary ?? "",
-        pattern: wait.pattern ?? "",
-        patterns: wait.patterns ?? [],
-        reason: wait.reason ?? "",
-        skipOffered: wait.skipOffered ?? false,
-        workspaceName: wait.workspaceName ?? "",
-        hostname: wait.hostname ?? "",
-        status: wait.state,
-        ...given({
-          toolCallId: wait.toolCallId,
-          timeoutSeconds: wait.timeoutSeconds,
-          decision: wait.decision,
-          source: wait.source,
-        }),
-      },
+      entry: permissionCardEntry({ wait, callId: wait.callId }),
     });
   }
 
@@ -468,13 +453,7 @@ export class UserWaitService {
     await this.buffer.appendQuestion({
       conversationId: wait.conversationId,
       turnId: wait.turnId,
-      entry: {
-        waitId: wait.waitId,
-        ...(wait.toolCallId ? { toolCallId: wait.toolCallId } : {}),
-        questions: wait.questions ?? [],
-        status: wait.state,
-        ...(wait.answers !== undefined ? { answers: wait.answers } : {}),
-      },
+      entry: questionCardEntry(wait),
     });
   }
 

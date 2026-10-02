@@ -9,12 +9,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
-  CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
   CALL_POLL_HOLD_MS,
-  CALL_RESULT_TTL_MS,
   LIVE_STREAM_KEEPALIVE_MS,
-  PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
   LangyLocalRecordUnreadableError,
   LangyLocalWorkspaceOfflineError,
@@ -47,6 +44,7 @@ import {
   workspaceChannel,
 } from "../rules/langy-local-control-keys.rules.ts";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
+import { LocalCallStoreService } from "./langy-local-call-store.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 
@@ -60,6 +58,7 @@ export class LocalCallDispatcherService {
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;
+  private readonly records: LocalCallStoreService;
   readonly now: () => number;
 
   static create(options: LocalCallDispatcherOptions): LocalCallDispatcherService {
@@ -73,6 +72,7 @@ export class LocalCallDispatcherService {
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.offlineWaitMs = options.offlineWaitMs ?? CALL_OFFLINE_WAIT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+    this.records = LocalCallStoreService.create({ store: this.store, now: this.now });
   }
 
   /**
@@ -114,8 +114,8 @@ export class LocalCallDispatcherService {
       ...call,
     } as StoredLocalCall;
 
-    await this.write(stored);
-    await this.track(stored);
+    await this.records.write(stored);
+    await this.records.track(stored);
     await this.store.publish(
       workspaceChannel(conversationId),
       JSON.stringify({ call: stored.callId } satisfies WorkspaceNudge),
@@ -236,7 +236,7 @@ export class LocalCallDispatcherService {
     }
     const { call } = lookup;
 
-    await this.write({ ...call, state: "running" });
+    await this.records.write({ ...call, state: "running" });
   }
 
   /**
@@ -256,8 +256,8 @@ export class LocalCallDispatcherService {
       state: "awaiting_permission",
       waitId,
     };
-    await this.write(next);
-    await this.track(next);
+    await this.records.write(next);
+    await this.records.track(next);
   }
 
   /** Sends the developer's answer to the command line holding the call. */
@@ -281,8 +281,8 @@ export class LocalCallDispatcherService {
         state: "running",
         deadlineAt: this.now() + (call.timeoutMs ?? call.deadlineAt - call.createdAt),
       };
-      await this.write(released);
-      await this.track(released);
+      await this.records.write(released);
+      await this.records.track(released);
     }
 
     await this.store.publish(
@@ -307,7 +307,7 @@ export class LocalCallDispatcherService {
     }
     const { call } = lookup;
 
-    await this.settle({
+    await this.records.settle({
       ...call,
       ok: frame.ok,
       ...(frame.text !== undefined ? { text: frame.text } : {}),
@@ -341,7 +341,7 @@ export class LocalCallDispatcherService {
       JSON.stringify({ cancel: callId } satisfies WorkspaceNudge),
     );
 
-    await this.settle({ ...call, ok: false, error: { code, message } });
+    await this.records.settle({ ...call, ok: false, error: { code, message } });
   }
 
   /** Every call still in flight on one turn, for the Stop path. */
@@ -460,51 +460,6 @@ export class LocalCallDispatcherService {
         throw error;
       },
     );
-  }
-
-  private async settle(call: StoredLocalCall): Promise<StoredLocalCall> {
-    const done: StoredLocalCall = { ...call, state: "done" };
-    await this.store.set(
-      callKey(done.callId),
-      JSON.stringify(done),
-      Math.ceil(CALL_RESULT_TTL_MS / 1000),
-    );
-    await this.store.zrem(pendingCallsKey(done.conversationId), done.callId);
-
-    return done;
-  }
-
-  private async write(call: StoredLocalCall): Promise<void> {
-    await this.store.set(callKey(call.callId), JSON.stringify(call), this.envelopeTtlSeconds(call));
-  }
-
-  /** Keeps the conversation's pending set in step with the call's own expiry. */
-  private async track(call: StoredLocalCall): Promise<void> {
-    await this.store.zadd({
-      key: pendingCallsKey(call.conversationId),
-      score: this.expiresAt(call),
-      member: call.callId,
-      ttlSeconds: this.envelopeTtlSeconds(call),
-    });
-  }
-
-  /**
-   * When the envelope stops being worth keeping. A call waiting on a card
-   * lives for the card's whole budget: the developer has that long to answer,
-   * and the call has to be there when they do.
-   */
-  private expiresAt(call: StoredLocalCall): number {
-    if (call.state !== "awaiting_permission") {
-      return call.deadlineAt;
-    }
-
-    return Math.max(call.deadlineAt, this.now() + PERMISSION_WAIT_BUDGET_MS);
-  }
-
-  private envelopeTtlSeconds(call: StoredLocalCall): number {
-    const remaining = this.expiresAt(call) - this.now() + CALL_ENVELOPE_SLACK_MS;
-
-    return Math.max(1, Math.ceil(remaining / 1000));
   }
 }
 

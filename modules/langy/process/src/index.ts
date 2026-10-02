@@ -65,8 +65,6 @@ export {
 // importer is rewired onto the seam.
 export {
   createLangyAnalyticsEventClickHouseSink,
-  createLangyTokenBufferRedisRepository,
-  createLangyTurnHandoffRedisRepository,
   createLangyTitleGenerator,
 } from "./langy.module.ts";
 export {

@@ -10,12 +10,11 @@ import type {
 
 import {
   type LangyConversationCommands,
-  type LangyBlockMetrics,
+  LangyBlockMetrics,
   type LangySessionKeyMetrics,
 } from "../app/langy.members.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
-import { LangyBlockMetricsNullService } from "./langy-block-metrics-null.service.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
   LangyCredentialService,
@@ -26,7 +25,7 @@ import {
   type LangyVirtualKeyService,
 } from "./langy-credential.service.ts";
 import { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
-import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import { type LangyBlockCounter, LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
 import { LangySessionKeyService } from "./langy-session-key.service.ts";
 import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.service.ts";
@@ -36,6 +35,21 @@ import {
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy.service.ts";
+
+/** The default: a deployment composed no block-metrics collector publishes nothing. */
+class LangyBlockMetricsNullService extends LangyBlockMetrics {
+  private constructor() {
+    super();
+  }
+
+  static create(): LangyBlockMetricsNullService {
+    return new LangyBlockMetricsNullService();
+  }
+
+  blockCounter(): LangyBlockCounter {
+    return () => undefined;
+  }
+}
 
 export abstract class LangyTrustedMessage {
   abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<

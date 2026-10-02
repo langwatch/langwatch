@@ -104,6 +104,39 @@ export type LangyConversationDefinition = StaticPipelineDefinition<
   RegisteredCommand
 >;
 
+/** The langy_conversation_processing pipeline and the events it carries. */
+function defineLangyConversationEvents() {
+  return definePipeline({
+    name: "langy_conversation_processing",
+    aggregate: defineAggregate({
+      type: "langy_conversation",
+    }),
+  }).withEvents([
+    LangyConversationStartedEventSchema,
+    LangyConversationForkedEventSchema,
+    LangyMessageRecordedEventSchema,
+    LangyMessageImportedEventSchema,
+    LangyAgentTurnAcceptedEventSchema,
+    LangyToolCallInitiatedEventSchema,
+    LangyToolCallSucceededEventSchema,
+    LangyToolCallFailedEventSchema,
+    LangyPlanUpdatedEventSchema,
+    LangyAgentResponseFailedEventSchema,
+    LangyAgentRespondedEventSchema,
+    LangyConversationArchivedEventSchema,
+    LangyConversationMetadataUpdatedEventSchema,
+    LangyConversationHandoffPendingEventSchema,
+    LangyConversationHandoffConsumedEventSchema,
+    LangyConversationTitleGeneratedEventSchema,
+    LangyLocalControlRequestedEventSchema,
+    LangyLocalWorkspaceConnectedEventSchema,
+    LangyLocalWorkspaceDisconnectedEventSchema,
+    LangyLocalPolicyChangedEventSchema,
+    LangyUserWaitStartedEventSchema,
+    LangyUserWaitEndedEventSchema,
+  ]);
+}
+
 /**
  * Aggregate: `langy_conversation` (aggregateId = conversationId, TenantId = projectId).
  * Creates the langy-conversation-processing pipeline definition (ADR-046).
@@ -112,36 +145,7 @@ export type LangyConversationDefinition = StaticPipelineDefinition<
 function buildLangyConversationPipeline(
   deps: LangyConversationProcessingPipelineDeps,
 ): LangyConversationDefinition {
-  let builder = definePipeline({
-    name: "langy_conversation_processing",
-    aggregate: defineAggregate({
-      type: "langy_conversation",
-    }),
-  })
-    .withEvents([
-      LangyConversationStartedEventSchema,
-      LangyConversationForkedEventSchema,
-      LangyMessageRecordedEventSchema,
-      LangyMessageImportedEventSchema,
-      LangyAgentTurnAcceptedEventSchema,
-      LangyToolCallInitiatedEventSchema,
-      LangyToolCallSucceededEventSchema,
-      LangyToolCallFailedEventSchema,
-      LangyPlanUpdatedEventSchema,
-      LangyAgentResponseFailedEventSchema,
-      LangyAgentRespondedEventSchema,
-      LangyConversationArchivedEventSchema,
-      LangyConversationMetadataUpdatedEventSchema,
-      LangyConversationHandoffPendingEventSchema,
-      LangyConversationHandoffConsumedEventSchema,
-      LangyConversationTitleGeneratedEventSchema,
-      LangyLocalControlRequestedEventSchema,
-      LangyLocalWorkspaceConnectedEventSchema,
-      LangyLocalWorkspaceDisconnectedEventSchema,
-      LangyLocalPolicyChangedEventSchema,
-      LangyUserWaitStartedEventSchema,
-      LangyUserWaitEndedEventSchema,
-    ])
+  let builder = defineLangyConversationEvents()
     .withPostgresProjection(
       LangyConversationStateFoldProjection.create({
         store: deps.langyConversationProjectionStore,

@@ -210,3 +210,44 @@ export function blankUserWait({
     }),
   };
 }
+
+/** The live permission card entry for one wait. */
+export function permissionCardEntry({
+  wait,
+  callId,
+}: {
+  wait: StoredUserWait;
+  callId: string;
+}): Parameters<UserWaitBuffer["appendLocalPermission"]>[0]["entry"] {
+  return {
+    waitId: wait.waitId,
+    callId,
+    summary: wait.summary ?? "",
+    pattern: wait.pattern ?? "",
+    patterns: wait.patterns ?? [],
+    reason: wait.reason ?? "",
+    skipOffered: wait.skipOffered ?? false,
+    workspaceName: wait.workspaceName ?? "",
+    hostname: wait.hostname ?? "",
+    status: wait.state,
+    ...given({
+      toolCallId: wait.toolCallId,
+      timeoutSeconds: wait.timeoutSeconds,
+      decision: wait.decision,
+      source: wait.source,
+    }),
+  };
+}
+
+/** The live question card entry for one wait. */
+export function questionCardEntry(
+  wait: StoredUserWait,
+): Parameters<UserWaitBuffer["appendQuestion"]>[0]["entry"] {
+  return {
+    waitId: wait.waitId,
+    ...(wait.toolCallId ? { toolCallId: wait.toolCallId } : {}),
+    questions: wait.questions ?? [],
+    status: wait.state,
+    ...(wait.answers !== undefined ? { answers: wait.answers } : {}),
+  };
+}

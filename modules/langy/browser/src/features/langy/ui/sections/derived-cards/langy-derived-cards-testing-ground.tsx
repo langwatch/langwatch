@@ -13,11 +13,14 @@ import {
   type LangyDerivedChoicesCard,
 } from "@langwatch/langy-contract";
 import { Pause, Play, RotateCcw, StepForward } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { LangyFailedCard } from "../../../../../ui/elements/derived-cards/langy-failed-card.tsx";
-import type { ChoicesRefRow } from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
-import { LangyChoicesCard } from "./langy-choices-card.tsx";
+import { LangyChoicesCard as LangyChoicesCardPresentation } from "../../../../../ui/sections/derived-cards/langy-choices-card.tsx";
+import {
+  type ChoicesRefRow,
+  useChoicesRefRows,
+} from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
 import { LangyDerivedCardView } from "./langy-derived-card-view.tsx";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -407,4 +410,18 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </VStack>
   );
+}
+
+type PresentationProps = ComponentProps<typeof LangyChoicesCardPresentation>;
+
+type LangyChoicesCardProps = Omit<PresentationProps, "refRows"> & {
+  refRowsOverride?: ReadonlyMap<string, ChoicesRefRow>;
+};
+
+/** App adapter for viewer-scoped reference hydration. */
+function LangyChoicesCard({ refRowsOverride, ...props }: LangyChoicesCardProps) {
+  const hydratedRows = useChoicesRefRows(refRowsOverride ? [] : props.card.options);
+  const refRows = refRowsOverride ?? hydratedRows;
+
+  return <LangyChoicesCardPresentation {...props} refRows={refRows} />;
 }

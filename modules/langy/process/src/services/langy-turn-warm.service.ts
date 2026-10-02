@@ -10,6 +10,10 @@ const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 const logger = createLogger("langwatch:langy:turn-warm");
 
+type WarmCredentials = Awaited<
+  ReturnType<LangyTurnBaseDependenciesService["resolve"]>
+>["credentials"];
+
 /** Private collaborator for the intentionally best-effort panel-open warm path. */
 export class LangyTurnWarmService {
   private constructor(private readonly deps: LangyTurnServiceDependencies) {}
@@ -117,6 +121,26 @@ export class LangyTurnWarmService {
       return { conversationId, warmed: true };
     }
 
+    await this.startWarm({ worker, session, projectId, conversationId, credentials, warmModel });
+    return { conversationId, warmed: true };
+  }
+
+  /** Mints the worker's session key and starts the warm without waiting for it. */
+  private async startWarm({
+    worker,
+    session,
+    projectId,
+    conversationId,
+    credentials,
+    warmModel,
+  }: {
+    worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
+    session: { user: { id: string } };
+    projectId: string;
+    conversationId: string;
+    credentials: WarmCredentials;
+    warmModel: string;
+  }): Promise<void> {
     const minted = await this.deps.sessionKeys.mint({
       session,
       projectId,
@@ -127,7 +151,7 @@ export class LangyTurnWarmService {
     void worker
       .warm({
         projectId,
-        actorUserId: userId,
+        actorUserId: session.user.id,
         conversationId,
         credentials,
         modelOverride: warmModel,
@@ -138,7 +162,5 @@ export class LangyTurnWarmService {
           "langy warm dispatch failed; the first message cold-starts the worker",
         );
       });
-
-    return { conversationId, warmed: true };
   }
 }

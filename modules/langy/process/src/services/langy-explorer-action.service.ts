@@ -22,7 +22,9 @@ const THIRTY_DAYS_MS = 30 * 24 * 3_600_000;
 
 /** What a read answered from defaults says about itself. */
 export const SAVED_READ_NOTE =
-  "No open Trace Explorer page answered. These are the Explorer's defaults, not what is on the user's screen: do not report them as the user's filter, window or count. Open the Explorer with `langwatch navigate open traces` and read the state again.";
+  "No open Trace Explorer page answered. These are the Explorer's defaults, not what " +
+  "is on the user's screen: do not report them as the user's filter, window or count. " +
+  "Open the Explorer with `langwatch navigate open traces` and read the state again.";
 
 /** The label the card puts on the link an away action answers. */
 export const EXPLORER_LINK_LABEL = "View in Trace Explorer";
