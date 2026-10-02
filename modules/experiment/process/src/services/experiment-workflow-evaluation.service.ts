@@ -27,7 +27,11 @@ import type { WorkflowEvaluationRequestedEventData } from "../eventing/experimen
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
-import { requestedRunIsUntouched } from "../rules/experiment-workflow-evaluation.rules.ts";
+import {
+  persistedDatasetRef,
+  requestedRunIsUntouched,
+  WORKFLOW_DATASET_ID,
+} from "../rules/experiment-workflow-evaluation.rules.ts";
 import { ExperimentCellPlanService } from "./experiment-cell-plan.service.ts";
 import type {
   ExperimentWorkflowDsl,
@@ -45,9 +49,8 @@ export type WorkflowEvaluationParameters = Record<string, string | number | bool
 
 const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
-// Stable ids for the single workflow target + dataset of a workflow experiment.
+// Stable id for the single workflow target of a workflow experiment.
 const WORKFLOW_TARGET_ID = "workflow-target";
-const WORKFLOW_DATASET_ID = "workflow-dataset";
 
 /**
  * Runs a studio workflow as an evaluations-v3 evaluation. The single
@@ -411,7 +414,7 @@ export class WorkflowEvaluationService {
       // The persisted dataset reference reflects what was actually evaluated, so the results page
       // renders the right columns.
       datasets: [
-        WorkflowEvaluationService.persistedDatasetRef({
+        persistedDatasetRef({
           workflowName,
           columns: datasetColumns,
           resolvedDatasetId,
@@ -464,33 +467,6 @@ export class WorkflowEvaluationService {
         columns,
       },
     };
-  }
-
-  /** The dataset reference stored on the run, saved when an id resolved and inline otherwise. */
-  private static persistedDatasetRef({
-    workflowName,
-    columns,
-    resolvedDatasetId,
-  }: {
-    workflowName: string;
-    columns: DatasetColumn[];
-    resolvedDatasetId: string | undefined;
-  }): DatasetReference {
-    return resolvedDatasetId
-      ? {
-          id: WORKFLOW_DATASET_ID,
-          name: workflowName,
-          type: "saved",
-          datasetId: resolvedDatasetId,
-          columns,
-        }
-      : {
-          id: WORKFLOW_DATASET_ID,
-          name: workflowName,
-          type: "inline",
-          inline: { columns, records: {} },
-          columns,
-        };
   }
 }
 

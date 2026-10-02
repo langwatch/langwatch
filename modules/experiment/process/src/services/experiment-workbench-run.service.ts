@@ -8,11 +8,9 @@ import {
   ExperimentRunLoopUnavailableError,
   ExperimentRunNotFoundError as RunNotFoundError,
   InvalidExperimentConfigurationError,
-  createInitialUIState,
   generateHumanReadableId,
   persistedEvaluationsV3StateSchema,
   runsSavedDataset,
-  type EvaluationsV3State,
   type ExecutionScope,
   type ExperimentRunWithItems,
   type RunResultsRequest,
@@ -38,6 +36,7 @@ import type {
 import type { ExperimentRunRefusal } from "../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { workbenchRunState } from "../rules/experiment-workbench-run-state.rules.ts";
 import {
   ExperimentExecutionDataService,
   type LoadedExecutionData,
@@ -220,24 +219,7 @@ export class ExperimentWorkbenchRunService {
       });
     }
 
-    const state: EvaluationsV3State = {
-      name: input.name,
-      // The wire's column `type` is a plain string and the state's is the
-      // narrowed union, which is the same widening the two casts below carry.
-      datasets: [input.dataset as EvaluationsV3State["datasets"][number]],
-      activeDatasetId: input.dataset.id ?? "dataset-1",
-      targets: input.targets as EvaluationsV3State["targets"],
-      evaluators: input.evaluators as EvaluationsV3State["evaluators"],
-      results: {
-        status: "running",
-        targetOutputs: {},
-        targetMetadata: {},
-        evaluatorResults: {},
-        errors: {},
-      },
-      pendingSavedChanges: {},
-      ui: createInitialUIState(),
-    };
+    const state = workbenchRunState(input);
 
     const experimentId = input.experimentId ?? "";
     const plan = ExperimentRunPlanService.create().buildPlan({

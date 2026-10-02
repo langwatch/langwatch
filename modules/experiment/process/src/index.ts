@@ -4,8 +4,6 @@
  * still import the full surface's type from here.
  */
 export type { ExperimentServiceOptions } from "./services/experiment.service.ts";
-export type { ExperimentDatabase } from "./repositories/prisma/prisma.experiment.repository.ts";
-export type { ExperimentWorkflowVersionDatabase } from "./repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 export type {
   ClickhouseExperimentRunProcessingRepository,
   ExperimentRunProcessingPipeline,

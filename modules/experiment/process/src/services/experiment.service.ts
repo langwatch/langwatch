@@ -62,6 +62,10 @@ import {
   type ExperimentRepository,
 } from "../repositories/experiment.repository.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
+import {
+  type ExperimentExecution,
+  UnavailableExperimentExecution,
+} from "./experiment-run-command-dispatcher.service.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
 import {
   ExperimentWorkbenchReferencesService,
@@ -72,45 +76,6 @@ import {
   NoopExperimentWorkbenchUpdates,
   type ExperimentWorkbenchUpdates,
 } from "./experiment-workbench.service.ts";
-
-/**
- * Private boundary between the canonical Experiment service and the app's
- * Eventing pipeline. The feature owns validation; this only dispatches
- * already-valid commands with their original IDs and timestamps unchanged.
- */
-export abstract class ExperimentExecution {
-  abstract startExperimentRun(input: StartExperimentRunInput): Promise<void>;
-  abstract recordTargetResult(input: RecordTargetResultInput): Promise<void>;
-  abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
-  abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
-}
-
-/** Refuses execution where the application composes no Eventing pipeline. */
-export class UnavailableExperimentExecution extends ExperimentExecution {
-  static create(): UnavailableExperimentExecution {
-    return new UnavailableExperimentExecution();
-  }
-
-  private unavailable(): never {
-    throw new Error("Experiment execution is not configured for this application instance");
-  }
-
-  async startExperimentRun(_input: StartExperimentRunInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async recordTargetResult(_input: RecordTargetResultInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async recordEvaluatorResult(_input: RecordEvaluatorResultInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async completeExperimentRun(_input: CompleteExperimentRunInput): Promise<void> {
-    this.unavailable();
-  }
-}
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;

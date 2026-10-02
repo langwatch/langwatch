@@ -5,6 +5,8 @@
  */
 
 import {
+  COMPARISON_EVALUATOR_TYPE,
+  type CellEvaluatorConfig,
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
@@ -24,6 +26,7 @@ import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:comparison-variants");
+const runOrchestratorLogger = createLogger("langwatch:experiment:run-orchestrator");
 
 export class ExperimentComparisonVariantService {
   private constructor(private readonly loadedEvaluators: LoadedEvaluators | undefined) {}
@@ -153,5 +156,80 @@ export class ExperimentComparisonVariantService {
     }
 
     return { candidates: { candidates } };
+  }
+
+  /** The synthetic per-row evaluator a column-style comparison target dispatches through. */
+  syntheticColumnEvaluator({
+    target,
+    cfg,
+    datasetId,
+    datasetEntry,
+    rowIndex,
+    variantIds,
+    legacyPairwise,
+    built,
+  }: {
+    target: TargetConfig;
+    cfg: ComparisonEvaluatorConfig;
+    datasetId: string;
+    datasetEntry: Record<string, unknown>;
+    rowIndex: number;
+    variantIds: string[];
+    legacyPairwise: boolean;
+    built: { candidates: ExecutionCell["comparison"] };
+  }): CellEvaluatorConfig {
+    const resolvedInput = // falls back to the golden field (#5100/#5378)
+      (cfg.inputField ? datasetEntry[cfg.inputField] : undefined) ??
+      datasetEntry.input ??
+      (cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined);
+    if (resolvedInput === undefined && !cfg.hasGoldenAnswer && rowIndex === 0) {
+      runOrchestratorLogger.debug(
+        { targetId: target.id },
+        "Comparison column-target: no 'input' dataset column and no golden field to " +
+          "fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
+      );
+    }
+
+    const goldenValue = // same #5378 gate buildEvaluatorInputs applies at runtime
+      cfg.hasGoldenAnswer !== false && cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined;
+
+    // Per-row synthetic evaluator with pre-resolved value mappings (#5131).
+    const [candidateA, candidateB] = built.candidates!.candidates;
+    const perRowMappings: Record<
+      string,
+      Record<string, Record<string, { type: "value"; value: unknown }>>
+    > = {
+      [datasetId]: {
+        [target.id]: legacyPairwise
+          ? {
+              candidate_a_id: { type: "value", value: variantIds[0] },
+              candidate_a_output: { type: "value", value: candidateA?.output },
+              candidate_a_cost: { type: "value", value: candidateA?.cost },
+              candidate_a_duration: { type: "value", value: candidateA?.duration },
+              candidate_b_id: { type: "value", value: variantIds[1] },
+              candidate_b_output: { type: "value", value: candidateB?.output },
+              candidate_b_cost: { type: "value", value: candidateB?.cost },
+              candidate_b_duration: { type: "value", value: candidateB?.duration },
+              input: { type: "value", value: resolvedInput },
+              golden: { type: "value", value: goldenValue },
+            }
+          : {
+              candidates: { type: "value", value: built.candidates!.candidates },
+              row_index: { type: "value", value: rowIndex },
+              input: { type: "value", value: resolvedInput },
+              golden: { type: "value", value: goldenValue },
+            },
+      },
+    };
+
+    return {
+      id: target.id,
+      dbEvaluatorId: target.targetEvaluatorId,
+      // Mirrors the judge that will actually run; see isLegacyPairwiseBacked (#5528).
+      evaluatorType: legacyPairwise ? LEGACY_PAIRWISE_EVALUATOR_TYPE : COMPARISON_EVALUATOR_TYPE,
+      comparison: cfg,
+      inputs: target.inputs,
+      mappings: perRowMappings,
+    };
   }
 }

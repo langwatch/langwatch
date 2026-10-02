@@ -289,6 +289,54 @@ export class ExperimentWorkflowCellService {
     });
   }
 
+  private async postFlowEvent({
+    projectId,
+    workflowDsl,
+    traceId,
+    inputs,
+    isAborted,
+    sandboxApiKey,
+    principal,
+  }: {
+    projectId: string;
+    workflowDsl: StudioWorkflow;
+    traceId: string;
+    inputs: Awaited<ReturnType<ExperimentRunCollaborators["attachments"]["buildDispatchInputs"]>>;
+    isAborted?: () => Promise<boolean>;
+    sandboxApiKey?: string;
+    principal?: WorkflowRunPrincipal | undefined;
+  }): Promise<StudioServerEvent[]> {
+    const rawEvent = {
+      type: "execute_flow" as const,
+      payload: {
+        trace_id: traceId,
+        workflow: { ...workflowDsl, state: { execution: { status: "idle" as const } } },
+        inputs: [inputs],
+        manual_execution_mode: false,
+        do_not_trace: false,
+        run_evaluations: true,
+        origin: "evaluation",
+      },
+    };
+
+    const enrichedEvent = sandboxKey.withSandboxApiKey(
+      await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
+      sandboxApiKey,
+    );
+
+    const events: StudioServerEvent[] = [];
+    await this.ports.studio.postStudioEvent({
+      projectId,
+      event: enrichedEvent,
+      isAborted,
+      onEvent: (serverEvent) => {
+        events.push(serverEvent);
+      },
+    });
+
+    return events;
+  }
+
   async *executeWorkflowCell({
     cell,
     projectId,
@@ -329,32 +377,14 @@ export class ExperimentWorkflowCellService {
         workflowDsl.nodes.filter((n) => n.type === "evaluator").map((n) => [n.id, n.data?.name]),
       );
 
-      const rawEvent = {
-        type: "execute_flow" as const,
-        payload: {
-          trace_id: traceId,
-          workflow: { ...workflowDsl, state: { execution: { status: "idle" as const } } },
-          inputs: [inputs],
-          manual_execution_mode: false,
-          do_not_trace: false,
-          run_evaluations: true,
-          origin: "evaluation",
-        },
-      };
-
-      const enrichedEvent = sandboxKey.withSandboxApiKey(
-        await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
-        sandboxApiKey,
-      );
-
-      const events: StudioServerEvent[] = [];
-      await this.ports.studio.postStudioEvent({
+      const events = await this.postFlowEvent({
         projectId,
-        event: enrichedEvent,
+        workflowDsl,
+        traceId,
+        inputs,
         isAborted,
-        onEvent: (serverEvent) => {
-          events.push(serverEvent);
-        },
+        sandboxApiKey,
+        principal,
       });
 
       const state = await this.foldFlowEvents({

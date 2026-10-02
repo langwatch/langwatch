@@ -20,11 +20,11 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { UnavailableExperimentExecution } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 import {
   ExperimentService,
   type ExperimentService as ExperimentServiceContract,
-  UnavailableExperimentExecution,
 } from "../../services/experiment.service.ts";
 import type { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../experiment-run.repository.ts";

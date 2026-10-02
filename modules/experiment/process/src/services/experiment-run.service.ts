@@ -35,6 +35,7 @@ import type { ExperimentIdLookupRepository } from "../repositories/experiment-id
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { experimentRunRepositories } from "../repositories/experiment-run-repositories.registry.ts";
+import type { ExperimentRunRepositories } from "../repositories/experiment-run.repositories.ts";
 import {
   runRefusalsOf,
   type ExperimentRunRefusals,
@@ -129,43 +130,9 @@ export class ExperimentRunService {
         "experiment runs are refused in this process",
       );
     }
-    const services: ExecutionDataServices = {
-      datasets: peers.dataset,
-      prompts: peers.prompts,
-      agents: peers.agents,
-      evaluators: peers.evaluators,
-      workflows: ExperimentWorkflowSourceService.create(peers.workflows),
-      entitlements: peers.entitlement,
-      projects: peers.projects,
-    };
+    const services = executionDataServicesOf(peers);
     const cost = ExperimentRunModelCostService.create({ modelProviders: peers.modelProviders });
-    const cells = ExperimentRunCellService.create({
-      folds,
-      stream,
-      services,
-      workflows: peers.workflows,
-      collaborators: {
-        studio: peers.workflows,
-        cost,
-        abort,
-        experiments,
-        evaluationReporting: peers.evaluation,
-        sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-          apiKeys: peers.apiKeys,
-        }),
-        connectedDispatch: peers.agents,
-        attachments: ExperimentAttachmentInputService.create({
-          storedObjects: peers.storedObjects,
-          links: experimentAttachmentLinkChannels.http.create({
-            policy: {
-              blockLocal: config.blockLocalHttpCalls,
-              allowedHosts: config.allowedProxyHosts,
-              verifyTls: members.isSaas,
-            },
-          }),
-        }),
-      },
-    });
+    const cells = createRunCells({ deps, folds, stream, services, cost, abort });
     const workflowEvaluations = WorkflowEvaluationService.create({
       experiments,
       workflowSource: services.workflows,
@@ -185,22 +152,13 @@ export class ExperimentRunService {
       cost,
       workflowEvaluations,
       processing: {
-        pipeline: buildExperimentRunProcessingPipeline({
-          experimentRunStateFoldStore: repositories.experimentRunStateFoldStore,
-          experimentRunItemAppendStore: repositories.experimentRunItemAppendStore,
+        pipeline: buildRunPipeline({
+          deps,
+          repositories,
           workflowEvaluations,
-          experimentRunPlanFoldStore: ExperimentRunPlanStore.create({ repository: folds }),
-          experimentRunProgressFoldStore: ExperimentRunProgressStore.create({ repository: folds }),
-          executeCell: ExecuteExperimentCellCommand.create({ cells }),
-          runExecution: {
-            executeCell: executeCell(commands),
-            failCell: failLostCell(commands),
-            complete: completeRun({ commands, boardWriteBack }),
-          },
-          runFrames: createExperimentRunFramesSubscriber({ stream }),
-          retention: {
-            resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
-          },
+          cells,
+          boardWriteBack,
+          stream,
         }),
         commands,
         idLookup: repositories.idLookup,
@@ -231,4 +189,95 @@ export class ExperimentRunService {
     this.workflowEvaluations = parts.workflowEvaluations;
     this.processing = parts.processing;
   }
+}
+
+function executionDataServicesOf(peers: ExperimentRunPeers): ExecutionDataServices {
+  return {
+    datasets: peers.dataset,
+    prompts: peers.prompts,
+    agents: peers.agents,
+    evaluators: peers.evaluators,
+    workflows: ExperimentWorkflowSourceService.create(peers.workflows),
+    entitlements: peers.entitlement,
+    projects: peers.projects,
+  };
+}
+
+function createRunCells({
+  deps: { experiments, members, peers, config },
+  folds,
+  stream,
+  services,
+  cost,
+  abort,
+}: {
+  deps: ExperimentRunDeps;
+  folds: ExperimentRunFoldRepository;
+  stream: ExperimentRunEventStream;
+  services: ExecutionDataServices;
+  cost: ExperimentRunModelCostService;
+  abort: ExperimentRunAbortRepository;
+}): ExperimentRunCellService {
+  return ExperimentRunCellService.create({
+    folds,
+    stream,
+    services,
+    workflows: peers.workflows,
+    collaborators: {
+      studio: peers.workflows,
+      cost,
+      abort,
+      experiments,
+      evaluationReporting: peers.evaluation,
+      sandboxCredentials: ExperimentRunSandboxCredentialService.create({
+        apiKeys: peers.apiKeys,
+      }),
+      connectedDispatch: peers.agents,
+      attachments: ExperimentAttachmentInputService.create({
+        storedObjects: peers.storedObjects,
+        links: experimentAttachmentLinkChannels.http.create({
+          policy: {
+            blockLocal: config.blockLocalHttpCalls,
+            allowedHosts: config.allowedProxyHosts,
+            verifyTls: members.isSaas,
+          },
+        }),
+      }),
+    },
+  });
+}
+
+function buildRunPipeline({
+  deps: { commands, peers },
+  repositories,
+  workflowEvaluations,
+  cells,
+  boardWriteBack,
+  stream,
+}: {
+  deps: ExperimentRunDeps;
+  repositories: ExperimentRunRepositories;
+  workflowEvaluations: WorkflowEvaluationService;
+  cells: ExperimentRunCellService;
+  boardWriteBack: ExperimentRunBoardWriteBackService;
+  stream: ExperimentRunEventStream;
+}): ExperimentRunProcessingPipeline {
+  const { folds } = repositories;
+  return buildExperimentRunProcessingPipeline({
+    experimentRunStateFoldStore: repositories.experimentRunStateFoldStore,
+    experimentRunItemAppendStore: repositories.experimentRunItemAppendStore,
+    workflowEvaluations,
+    experimentRunPlanFoldStore: ExperimentRunPlanStore.create({ repository: folds }),
+    experimentRunProgressFoldStore: ExperimentRunProgressStore.create({ repository: folds }),
+    executeCell: ExecuteExperimentCellCommand.create({ cells }),
+    runExecution: {
+      executeCell: executeCell(commands),
+      failCell: failLostCell(commands),
+      complete: completeRun({ commands, boardWriteBack }),
+    },
+    runFrames: createExperimentRunFramesSubscriber({ stream }),
+    retention: {
+      resolve: (tenantId) => peers.retention.getResolvedForProject({ projectId: tenantId }),
+    },
+  });
 }

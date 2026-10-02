@@ -262,6 +262,42 @@ export class ExperimentCellExecutionService {
   }
 
   /** Dispatches the target node and yields its mapped events, pricing untariffed tokens. */
+  private async prepareTargetEvent({
+    projectId,
+    workflow,
+    targetNodeId,
+    inputs,
+    traceId,
+    principal,
+    sandboxApiKey,
+  }: {
+    projectId: string;
+    workflow: StudioWorkflow;
+    targetNodeId: string;
+    inputs: Awaited<ReturnType<ExperimentRunCollaborators["attachments"]["buildDispatchInputs"]>>;
+    traceId: string;
+    principal?: WorkflowRunPrincipal | undefined;
+    sandboxApiKey: LoadedCellData["sandboxApiKey"];
+  }) {
+    const rawEvent = {
+      type: "execute_component" as const,
+      payload: {
+        trace_id: traceId,
+        workflow: { ...workflow, state: { execution: { status: "idle" as const } } },
+        node_id: targetNodeId,
+        inputs,
+        origin: "evaluation",
+      },
+    };
+
+    // Prepare runtime credentials and datasets, then set the run's own
+    // sandbox credential on the workflow so its code nodes authenticate.
+    return sandboxKey.withSandboxApiKey(
+      await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
+      sandboxApiKey,
+    );
+  }
+
   private async *dispatchTarget({
     cell,
     projectId,
@@ -296,23 +332,15 @@ export class ExperimentCellExecutionService {
       datasetColumns,
       shouldFetchExternal: targetReadsExternalAttachments(cell),
     });
-    const rawEvent = {
-      type: "execute_component" as const,
-      payload: {
-        trace_id: traceId,
-        workflow: { ...workflow, state: { execution: { status: "idle" as const } } },
-        node_id: targetNodeId,
-        inputs,
-        origin: "evaluation",
-      },
-    };
-
-    // Prepare runtime credentials and datasets, then set the run's own
-    // sandbox credential on the workflow so its code nodes authenticate.
-    const enrichedEvent = sandboxKey.withSandboxApiKey(
-      await this.workflows.prepareStudioEvent({ event: rawEvent, projectId, principal }),
-      loadedData.sandboxApiKey,
-    );
+    const enrichedEvent = await this.prepareTargetEvent({
+      projectId,
+      workflow,
+      targetNodeId,
+      inputs,
+      traceId,
+      principal,
+      sandboxApiKey: loadedData.sandboxApiKey,
+    });
 
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;

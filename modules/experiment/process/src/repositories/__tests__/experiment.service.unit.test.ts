@@ -17,8 +17,9 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ExperimentExecution } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
-import { ExperimentService, ExperimentExecution } from "../../services/experiment.service.ts";
+import { ExperimentService } from "../../services/experiment.service.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository.ts";

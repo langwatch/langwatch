@@ -1,8 +1,9 @@
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import {
   getFlowCallbacks,
   setComplexProps,
   setFlowCallbacks,
-  type UiAgentListDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
@@ -100,7 +101,7 @@ export const useWorkbenchTargetSelection = () => {
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
-    (savedAgent: UiAgentListDrawerProps["items"][number]) => {
+    (savedAgent: WireOf<AgentWithFields>) => {
       addOrReplaceTarget(savedAgentTargetConfig(savedAgent));
       closeDrawer();
     },

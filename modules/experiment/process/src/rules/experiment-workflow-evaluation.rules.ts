@@ -1,3 +1,5 @@
+import type { DatasetColumn, DatasetReference } from "@langwatch/experiment-contract";
+
 import type { ExperimentRunProgressState } from "../repositories/experiment-run-fold.repository.ts";
 
 /**
@@ -22,4 +24,34 @@ export function requestedRunIsUntouched({
   if (!state || state.experimentId !== experimentId) return true;
 
   return runAwaitsStart(state);
+}
+
+/** Stable id for the single dataset of a workflow experiment. */
+export const WORKFLOW_DATASET_ID = "workflow-dataset";
+
+/** The dataset reference stored on the run, saved when an id resolved and inline otherwise. */
+export function persistedDatasetRef({
+  workflowName,
+  columns,
+  resolvedDatasetId,
+}: {
+  workflowName: string;
+  columns: DatasetColumn[];
+  resolvedDatasetId: string | undefined;
+}): DatasetReference {
+  return resolvedDatasetId
+    ? {
+        id: WORKFLOW_DATASET_ID,
+        name: workflowName,
+        type: "saved",
+        datasetId: resolvedDatasetId,
+        columns,
+      }
+    : {
+        id: WORKFLOW_DATASET_ID,
+        name: workflowName,
+        type: "inline",
+        inline: { columns, records: {} },
+        columns,
+      };
 }
