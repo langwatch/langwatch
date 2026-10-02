@@ -6,27 +6,28 @@
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import { PersonalOtlpEndpointPanel } from "../personal-otlp-endpoint-panel.tsx";
 
-const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
+const { hookInput, mint } = vi.hoisted(() => ({ hookInput: vi.fn(), mint: vi.fn() }));
 
-vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
-  personalWorkspaceApi: {},
-  api: {
-    apiKey: {
-      create: {
-        useMutation: () => ({
-          isPending: false,
-          mutate: (input: unknown, handlers: { onSuccess: (r: { token: string }) => void }) => {
-            mint(input);
-            handlers.onSuccess({ token: "lw-pat-minted" });
-          },
-        }),
+vi.mock("@langwatch/api-key-client", () => ({
+  useMintPersonalToken: (input: unknown) => {
+    hookInput(input);
+    const [token, setToken] = useState<string>();
+    return {
+      token,
+      isMinting: false,
+      scopeNote: "",
+      mint: () => {
+        mint();
+        setToken("lw-pat-minted");
+        return Promise.resolve("lw-pat-minted");
       },
-    },
+    };
   },
 }));
 
@@ -59,13 +60,9 @@ describe("given the personal workspace's OTLP panel", () => {
         .click(screen.getByRole("button", { name: "Create a personal access token" }));
 
       await waitFor(() => expect(screen.getByText(/Bearer lw-pat-minted/)).toBeInTheDocument());
-      expect(mint).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organizationId: "org_1",
-          keyType: "personal",
-          permissionMode: "all",
-          bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: "proj_me" }],
-        }),
+      expect(mint).toHaveBeenCalledOnce();
+      expect(hookInput).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_1", projectId: "proj_me" }),
       );
     });
   });
