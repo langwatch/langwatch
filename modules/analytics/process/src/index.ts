@@ -1,8 +1,6 @@
 export {
   analyticsProcessModule,
   createAnalyticsComparisonWindow,
-  createLegacyFilterMatching,
-  createPreconditionTraceData,
 } from "./analytics.module.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */

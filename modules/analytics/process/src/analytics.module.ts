@@ -5,8 +5,6 @@ import { defineProcessModule } from "@langwatch/process";
 import { AnalyticsModule } from "./app/analytics.app.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
-import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
-import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 import { analyticsRest } from "./transport/analytics.rest.ts";
@@ -34,18 +32,4 @@ export const analyticsProcessModule = defineProcessModule("analytics")
 /** Where the window immediately before a requested period begins. */
 export function createAnalyticsComparisonWindow(): AnalyticsComparisonWindowService {
   return AnalyticsComparisonWindowService.create();
-}
-
-/**
- * Filter matching without a query engine: the legacy `filters` grammar decided
- * in memory, for a settled automation match re-checked in a background process
- * with no ClickHouse round trip to spend.
- */
-export function createLegacyFilterMatching(): LegacyFilterMatchingService {
-  return LegacyFilterMatchingService.create();
-}
-
-/** The trace shape the in-memory filter matching reads a fold state as. */
-export function createPreconditionTraceData(): PreconditionTraceDataService {
-  return PreconditionTraceDataService.create();
 }
