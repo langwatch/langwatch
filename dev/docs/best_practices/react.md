@@ -35,6 +35,6 @@ stores) → `ui/elements|blocks|sections` (ARCHITECTURE.md §3.4).
 
 ## Page headings
 
-- **Page titles use `<PageLayout.Heading>` at its default size**, except account pages (every `/me` page, Settings > Profile and Settings > Security), which pass `size="lg"` (ruled 2026-10-02, Alex). Never set any other `size`, never a `fontSize`, and never hand-roll a title with `<Text fontSize="lg">`. `PageLayout.Heading` accepts only `size="lg"` and omits `fontSize` at the type level, so the typechecker rejects any other override.
+- **Page titles use `<PageLayout.Heading>` with no size.** Account pages (every `/me` page, Settings > Profile and Settings > Security) get the large title from the route table: their entry in `apps/ui/src/shell/ui-route-table.ts` carries `heading: "account"`, and the shell draws the page under the large heading size (ruled 2026-10-02, Alex). A page never sets a heading size, never a `fontSize`, and never hand-rolls a title with `<Text fontSize="lg">`. `PageLayout.Heading` omits `size` and `fontSize` at the type level, so the typechecker rejects an override.
 - A reusable component that renders its own title (for example the dataset editor) uses the Chakra `<Heading>` component at its default size, not a sized `<Text>`.
 - `size` on a raw Chakra `<Heading>` is fine for _sub_-headings: drawer and dialog titles, card and section labels. The rule above is specifically about top-level page titles, not every heading on the page.

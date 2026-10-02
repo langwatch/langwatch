@@ -17,7 +17,7 @@ export default function SecurityScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading size="lg">Security</PageLayout.Heading>
+        <PageLayout.Heading>Security</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">

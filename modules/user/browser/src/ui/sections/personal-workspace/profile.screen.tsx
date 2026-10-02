@@ -16,7 +16,7 @@ export default function ProfileScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading size="lg">Profile</PageLayout.Heading>
+        <PageLayout.Heading>Profile</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">Who you are here, how you get in, and where you are signed in.</Text>

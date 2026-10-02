@@ -16,7 +16,7 @@ export function PersonalPullRequestsScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading size="lg">Pull requests</PageLayout.Heading>
+        <PageLayout.Heading>Pull requests</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">

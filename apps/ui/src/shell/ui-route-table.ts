@@ -35,6 +35,8 @@ export type UiPageRouteDescriptor = {
   readonly page: string;
   /** The explicit native route mount point for a pre-router web installation. */
   readonly webRouteParent?: "project";
+  /** An account page (`/me`, Settings > Profile and Security): the shell draws its title large. */
+  readonly heading?: "account";
   readonly children?: readonly UiRouteDescriptor[];
 };
 
@@ -345,6 +347,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               {
                 path: "/settings/security",
                 page: "pages/settings/security",
+                heading: "account",
               },
               {
                 // Members, Teams, Groups and SCIM became the Directory and its tabs.
@@ -408,6 +411,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               {
                 path: "/settings/profile",
                 page: "pages/settings/profile",
+                heading: "account",
               },
               {
                 path: "/settings/scim",
@@ -538,10 +542,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               {
                 path: "/me",
                 page: "pages/me/index",
+                heading: "account",
               },
               {
                 path: "/me/configure",
                 page: "pages/me/configure",
+                heading: "account",
               },
               {
                 // The devices inventory moved into a tab of /me/configure, and this
@@ -556,10 +562,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               {
                 path: "/me/pull-requests",
                 page: "pages/me/pull-requests",
+                heading: "account",
               },
               {
                 path: "/me/sessions",
                 page: "pages/me/sessions",
+                heading: "account",
               },
               {
                 // Budget-increase request page that the CLI's `langwatch request-increase`
@@ -568,6 +576,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 // budget-exceeded → request flow Ariana caught in dogfood.
                 path: "/me/budget/request",
                 page: "pages/me/budget/request",
+                heading: "account",
               },
 
               // AI Gateway: org-scoped admin pages live under /gateway/** at the top level,

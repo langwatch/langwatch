@@ -3,6 +3,7 @@
  */
 
 import { lazyRoute } from "@langwatch/browser-host/navigation";
+import { PageHeadingSizeProvider } from "@langwatch/design-system/page-layout";
 import { Outlet, useMatches, type RouteObject } from "react-router";
 
 import {
@@ -41,6 +42,22 @@ export function useUiMatchedPageKey(): string | undefined {
  */
 export function UiRouteOutlet() {
   return <Outlet />;
+}
+
+/** An account page, as the route table marks it, draws its page title large. */
+function accountPageLoader({ load }: { load: UiPageLoader }): UiPageLoader {
+  return async () => {
+    const { default: Page } = await load();
+    return {
+      default: function UiAccountPage() {
+        return (
+          <PageHeadingSizeProvider size="lg">
+            <Page />
+          </PageHeadingSizeProvider>
+        );
+      },
+    };
+  };
 }
 
 export type UiRouteObjectsOptions = {
@@ -91,6 +108,19 @@ function resolveUiShellLayoutLoader({
   return loader;
 }
 
+function pageLoader({
+  loaders,
+  page,
+  heading,
+}: {
+  loaders: UiPageLoaderRegistry;
+  page: string;
+  heading: "account" | undefined;
+}): UiPageLoader {
+  const load = resolveUiPageLoader({ registry: loaders, key: page });
+  return heading === "account" ? accountPageLoader({ load }) : load;
+}
+
 type MaterializeRoutesOptions = Omit<UiRouteObjectsOptions, "shellLayouts"> & {
   shellLayouts: Readonly<Record<UiShellLayout, UiPageLoader>>;
 };
@@ -122,7 +152,9 @@ function materializeRoutes({
       "layout" in descriptor
         ? { ...lazyRoute(resolveUiShellLayoutLoader({ shellLayouts, layout: descriptor.layout })) }
         : {
-            ...lazyRoute(resolveUiPageLoader({ registry: loaders, key: descriptor.page })),
+            ...lazyRoute(
+              pageLoader({ loaders, page: descriptor.page, heading: descriptor.heading }),
+            ),
             // The key travels onto the match, so a LAYOUT route above the page can ask
             // which half of the product serves it.
             handle: { page: descriptor.page } satisfies UiRouteHandle,

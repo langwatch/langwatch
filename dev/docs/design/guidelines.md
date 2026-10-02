@@ -146,8 +146,8 @@ Every page inside the app chrome, workspace, settings, governance and `/me` alik
 and are `PageLayout.HeaderButton` only: no raw `Button`, no solid primary. Full-screen tools
 (studio, traces explorer, workbench) and card screens (auth, onboarding, authorize) carry no bar.
 Exemplar: `modules/workflow/browser/src/ui/sections/workflows/workflows-screen.tsx:46`.
-Titles use the standard size; account pages (every `/me` page, Settings > Profile and
-Security) pass `size="lg"` to `PageLayout.Heading` (ruled 2026-10-02, Alex).
+Pages never size their title. Account pages (every `/me` page, Settings > Profile and
+Security) get a large one from the route table's `heading: "account"` (ruled 2026-10-02, Alex).
 
 ```tsx
 import { PageLayout } from "@langwatch/design-system/page-layout";

@@ -12,7 +12,7 @@ import {
   Heading as ChakraHeading,
   HStack,
 } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
+import { createContext, useContext, type PropsWithChildren } from "react";
 
 // Container component
 interface ContainerProps extends ChakraContainerProps {
@@ -67,16 +67,21 @@ function Header({ children, withBorder = true, ...props }: PropsWithChildren<Hea
   );
 }
 
-// Page titles render at the standard Heading size; account pages (Me, Settings
-// profile and security) pass size="lg". fontSize stays forbidden so no page
-// hand-tunes its title. See dev/docs/best_practices/react.md.
-interface HeadingProps extends Omit<ChakraHeadingProps, "size" | "fontSize"> {
-  size?: "lg";
+// Page titles render at the standard Heading size; callers never size one.
+// The shell mounts PageHeadingSizeProvider over account pages, which the route
+// table marks, so their title draws large. See dev/docs/best_practices/react.md.
+const PageHeadingSizeContext = createContext<"lg" | undefined>(undefined);
+
+export function PageHeadingSizeProvider({ size, children }: PropsWithChildren<{ size: "lg" }>) {
+  return <PageHeadingSizeContext.Provider value={size}>{children}</PageHeadingSizeContext.Provider>;
 }
 
+type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
+
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
+  const size = useContext(PageHeadingSizeContext);
   return (
-    <ChakraHeading as="h1" {...props}>
+    <ChakraHeading as="h1" size={size} {...props}>
       {children}
     </ChakraHeading>
   );
