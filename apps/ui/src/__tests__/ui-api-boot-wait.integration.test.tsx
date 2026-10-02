@@ -5,7 +5,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, renderHook, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createTRPCUntypedClient, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
@@ -210,7 +211,7 @@ function renderShell({
     })),
     { initialEntries: [path] },
   );
-  const view = render(<RouterProvider router={router} />);
+  const view = renderWithDesignSystem(<RouterProvider router={router} />);
   dispose = () => {
     view.unmount();
     router.dispose();
@@ -302,7 +303,7 @@ describe("given the reader is on the waiting screen", () => {
   describe("when the screen renders", () => {
     /** @scenario "The waiting screen carries the LangWatch logo" */
     it("shows the LangWatch logo above the heading", () => {
-      const view = render(
+      const view = renderWithDesignSystem(
         <UiApiWaitingScreen
           endpoint="http://localhost:5560/api/health"
           isDevelopment
@@ -323,7 +324,7 @@ describe("given the wait has run long enough to be worth explaining", () => {
   describe("when the application is a developer's own stack", () => {
     /** @scenario "A long wait in development names the command that starts the API" */
     it("names the command that starts the API", () => {
-      const view = render(
+      const view = renderWithDesignSystem(
         <UiApiWaitingScreen endpoint="http://localhost:5560/api/health" isDevelopment explaining />,
       );
       dispose = () => view.unmount();
@@ -353,7 +354,7 @@ describe("given the wait has run long enough to be worth explaining", () => {
   describe("when the application is not a developer's own stack", () => {
     /** @scenario "A long wait in production names no command" */
     it("says it is reconnecting, names no command, and keeps the wait on screen", () => {
-      const view = render(
+      const view = renderWithDesignSystem(
         <UiApiWaitingScreen
           endpoint="https://app.langwatch.ai/api/health"
           isDevelopment={false}

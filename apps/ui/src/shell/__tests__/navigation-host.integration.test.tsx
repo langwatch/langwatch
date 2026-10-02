@@ -33,6 +33,7 @@ const ROOT = await loadUiRootCapabilities();
 const { useOptionalNavigationHost } = ROOT.navigationHost;
 
 vi.mock("@langwatch/navigation-browser/chrome", () => ({
+  useNavigationTracking: () => undefined,
   NavigationShell: ({ children }: { children: ReactNode }) => (
     <div data-testid="navigation-shell">{children}</div>
   ),
