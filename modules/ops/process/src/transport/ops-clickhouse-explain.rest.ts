@@ -1,11 +1,19 @@
 /**
- * Operator-secret rather than RBAC: this route resolves the deployment key and
- * its own 401; the application retains wrapping and auditing.
+ * Operator-secret rather than RBAC: the secret is compared in constant time by
+ * the application, as an early fact, before the body is capped or parsed.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
 import { OpsApi, opsExplainRequestSchema } from "@langwatch/ops-contract";
 import { resolveRequestBound } from "@langwatch/plans";
+import { z } from "zod";
+
+import { operatorExplainRefusal } from "#rules/ops-intake-refusal.rules";
 
 /** Every body this route writes, in the sentences the operator tool parses. */
 const OPERATOR_ANSWERS =
@@ -13,6 +21,20 @@ const OPERATOR_ANSWERS =
   "rows all keep the exact bodies the agent already parses";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
+
+/**
+ * The operator secret, checked off the Authorization header alone. A public
+ * route's sourceless fact resolves before the body, so a caller without the
+ * secret is refused 401 ahead of any 400, 413 or 422.
+ */
+export const operatorSecret = defineRestMiddleware("operatorSecret", z.null());
+
+/** Every refusal, the secret's included, in the `{ message }` the tool reads. */
+const operatorRefusal: RestProtocolRefusal = ({ failure, response }) => {
+  const { status, body } = operatorExplainRefusal(failure);
+
+  return response.write({ status, mediaType: "application/json", body: JSON.stringify(body) });
+};
 
 /**
  * `/api/ops/clickhouse/explain`, at the one fixed path the operator tool
@@ -24,18 +46,10 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/ops/clickhouse/explain", "explainClickHouseQuery")
-  // The body is read rather than parsed: a rejected request answers the
-  // bespoke `{ message }` the agent already reads, at the field path that
-  // failed, which no validation envelope can express.
-  .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withInput(opsExplainRequestSchema)
   .withDocs({
     summary: "Explain a ClickHouse query as the read-only operator account",
     description: OPERATOR_ANSWERS,
-    requestBody: {
-      description: "The inner SELECT to explain, and the plan to ask for.",
-      schema: opsExplainRequestSchema,
-    },
   })
   .withAccess(
     publicRoute({
@@ -45,12 +59,15 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
         "this door, because operator is not an RBAC grain",
     }),
   )
-  .withResponse("protocol", { produces: "application/json", because: OPERATOR_ANSWERS })
-  .handle(async ({ app, request, raw, response }) => {
-    const answer = await app.explainClickHouseRequest({
-      body: raw,
-      authorization: request.headers.get("authorization"),
-    });
+  .withMiddleware(operatorSecret)
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withResponse("protocol", {
+    produces: "application/json",
+    because: OPERATOR_ANSWERS,
+    refusal: operatorRefusal,
+  })
+  .handle(async ({ app, input, response }) => {
+    const answer = await app.explainClickHouseRequest({ request: input });
 
     return response.write({
       status: answer.status,

@@ -224,8 +224,6 @@ import {
   type OpsSignUpHealthInput,
   type SignUpHealth,
   type OpsDoorAnswer,
-  opsExplainRequestSchema,
-  submitBugReportSchema,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -246,13 +244,7 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
-import {
-  extractBearerSecret,
-  parseJsonDocument,
-  toCallerKey,
-  toDoorStatus,
-  toExplainDoorAnswer,
-} from "#rules/ops-door.rules";
+import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
@@ -1539,27 +1531,9 @@ export class OpsModule implements OpsApi {
     return outcome;
   }
 
-  /** The operator door's whole answer: the secret, the body, then the EXPLAIN. */
-  async explainClickHouseRequest(input: {
-    body: string;
-    authorization: string | null;
-  }): Promise<OpsDoorAnswer> {
-    this.authorizeOperatorSecret({ presented: extractBearerSecret(input.authorization) });
-
-    const posted = parseJsonDocument(input.body);
-    if (posted === undefined || posted === null) {
-      return { status: 400, body: { message: "request body must be JSON" } };
-    }
-
-    const parsed = opsExplainRequestSchema.safeParse(posted);
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
-
-      return { status: 400, body: { message: `${path}${issue?.message ?? "invalid body"}` } };
-    }
-
-    return toExplainDoorAnswer(await this.explainClickHouseQuery(parsed.data));
+  /** The operator door's answer, once the secret and the body passed the route. */
+  async explainClickHouseRequest(input: { request: OpsExplainRequest }): Promise<OpsDoorAnswer> {
+    return toExplainDoorAnswer(await this.explainClickHouseQuery(input.request));
   }
 
   // -- the process's own readings --------------------------------------------
@@ -1804,23 +1778,13 @@ export class OpsModule implements OpsApi {
 
   /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
   async receiveBugReport(input: {
-    body: string;
+    report: SubmitBugReport;
     forwardedFor: string | null;
     credential: Readonly<{ token: string; projectId: string | null }> | null;
   }): Promise<OpsDoorAnswer> {
-    const posted = parseJsonDocument(input.body);
-    if (posted === undefined || posted === null) {
-      return { status: 400, body: { error: "Invalid body, expecting JSON" } };
-    }
-
-    const parsed = submitBugReportSchema.safeParse(posted);
-    if (!parsed.success) {
-      return { status: 400, body: { error: "Invalid report", details: parsed.error.flatten() } };
-    }
-
     try {
       const { id } = await this.submitBugReport({
-        report: parsed.data,
+        report: input.report,
         callerKey: toCallerKey(input.forwardedFor),
         apiToken: input.credential?.token,
         projectIdHint: input.credential?.projectId ?? null,

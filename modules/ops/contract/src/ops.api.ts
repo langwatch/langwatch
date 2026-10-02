@@ -492,10 +492,7 @@ export interface OpsApi {
   /** One operator EXPLAIN, guardrails and fail-closed rule included. */
   explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
   /** One EXPLAIN as the operator door received it, answered in the bodies the tool parses. */
-  explainClickHouseRequest(input: {
-    body: string;
-    authorization: string | null;
-  }): Promise<OpsDoorAnswer>;
+  explainClickHouseRequest(input: { request: OpsExplainRequest }): Promise<OpsDoorAnswer>;
   listPipelineRegistrations(): OpsPipelineRegistrations;
   getEventLogSearchWindow(): OpsEventLogSearchWindow;
   /** Null when no Grafana is configured: callers render no link, not a dead one. */
@@ -566,7 +563,7 @@ export interface OpsApi {
   }): Promise<{ id: string }>;
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
-    body: string;
+    report: SubmitBugReport;
     forwardedFor: string | null;
     credential: Readonly<{ token: string; projectId: string | null }> | null;
   }): Promise<OpsDoorAnswer>;

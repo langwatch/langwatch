@@ -347,7 +347,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
         kind: "summary",
         title: "no content at all",
       });
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it("rejects a report without a title", async () => {
@@ -356,7 +356,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
         kind: "summary",
         summary: "something broke",
       });
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it("rejects a body that is not JSON at all", async () => {

@@ -8,6 +8,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import {
   bugReportIntakeHeadersSchema,
@@ -15,6 +16,8 @@ import {
   submitBugReportSchema,
 } from "@langwatch/ops-contract";
 import { z } from "zod";
+
+import { bugReportRefusal } from "#rules/ops-intake-refusal.rules";
 
 /**
  * Headroom over the nine-million-character session cap: JSON escaping can
@@ -37,6 +40,13 @@ const INTAKE_ANSWERS =
   "released CLI and MCP builds parse the intake's own bodies: { id } on 201, " +
   "{ error, details } on a rejected report, { error, code } on a named refusal";
 
+/** Every refusal, written in the bodies released builds read. */
+const intakeRefusal: RestProtocolRefusal = ({ failure, response }) => {
+  const { status, body } = bugReportRefusal(failure);
+
+  return response.write({ status, mediaType: "application/json", body: JSON.stringify(body) });
+};
+
 /**
  * `/api/bug-reports`, at exactly the address released CLI and MCP builds POST
  * to. Literal because the intake has no dated contract to negotiate.
@@ -47,17 +57,10 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/bug-reports", "submitBugReport")
-  // The body is read rather than parsed: a rejected report answers the bespoke
-  // `{ error, details }` released builds already read, which no validation
-  // envelope can express.
-  .withRawBody("text", { mediaType: "application/json" })
+  .withInput(submitBugReportSchema)
   .withDocs({
     summary: "File an issue report from a coding agent",
     description: INTAKE_ANSWERS,
-    requestBody: {
-      description: "The report. Either a summary or a session transcript is required.",
-      schema: submitBugReportSchema,
-    },
   })
   .withAccess(
     publicRoute({
@@ -69,10 +72,14 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
   .withMiddleware(bugReportCredential)
   .withHeaders(bugReportIntakeHeadersSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
-  .withResponse("protocol", { produces: "application/json", because: INTAKE_ANSWERS })
-  .handle(async ({ app, raw, response }, credential, headers) => {
+  .withResponse("protocol", {
+    produces: "application/json",
+    because: INTAKE_ANSWERS,
+    refusal: intakeRefusal,
+  })
+  .handle(async ({ app, input, response }, credential, headers) => {
     const answer = await app.receiveBugReport({
-      body: raw,
+      report: input,
       forwardedFor: headers["x-forwarded-for"] ?? null,
       credential,
     });
