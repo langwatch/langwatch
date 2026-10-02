@@ -1,0 +1,50 @@
+---
+title: Inventory
+description: Manage the AI tool catalog, environments and ingestion sources that LangWatch uses to describe what your organization runs.
+sidebarTitle: Inventory
+keywords: ai inventory, ingestion sources, tool catalog, governance sources, environments
+---
+
+Open **AI Governance > Inventory** (`/governance/inventory`) to manage what LangWatch knows about your organization's AI tools and activity sources. The page has three tabs: **Catalog**, **Environments** and **Sources**.
+
+## What Catalog is for
+
+**Catalog** lists the AI tool entries that power the personal portal at `/me`. Use it to publish coding assistants, model providers and external tools, then scope each tile to the organization or to specific departments.
+
+<Frame caption="The Catalog tab shows the tools that can appear on each developer's personal home page.">
+  ![The Catalog tab of the AI Governance inventory](/images/ai-governance/governance-inventory-catalog.png)
+</Frame>
+
+Use the catalog when a developer should find an approved tool in `/me`. For tile types, scoping and starter-pack import, see [AI Tools Portal admin catalog editor](/ai-governance/personal-portal/admin-catalog).
+
+## What Environments is for
+
+**Environments** lists the places your connected AI systems run, such as a Power Platform environment or a Databricks workspace. LangWatch discovers environments from sources that name one.
+
+You can also add an environment by hand. Manual environment rows are not stored yet, so they stay on screen only until you leave the page.
+
+The table shows the environment name, description, created date and creator. If no source names an environment yet, the tab shows **No environments yet**.
+
+## What Sources is for
+
+**Sources** lists the systems that send or expose AI activity to LangWatch. A source can push events in real time, or LangWatch can pull from a provider API, S3 export or Dataverse table on a schedule.
+
+<Frame caption="The Sources tab shows connected feeds, their status and their last activity.">
+  ![The Sources tab of the AI Governance inventory](/images/ai-governance/governance-inventory-sources.png)
+</Frame>
+
+Use **Add source** to choose a vendor, enter the connector fields and set the trace destination when the connector supports conversation traces. Source secrets are shown only when they are created or rotated.
+
+## How source health works
+
+A new source starts as **Awaiting first event**. It becomes **Active** after the first event arrives or the first pull records data. The table also shows failure counts, last success and how far the last pull read when the connector reports those fields.
+
+A source can point at an archived or removed trace project. In that case, the row says the destination is archived so you can change it before more conversations are pulled.
+
+## Permissions
+
+Opening Inventory needs `governance:view`. Reading sources needs `ingestionSources:view`. Creating and changing sources needs `ingestionSources:manage`.
+
+Catalog editing follows the management permissions described in the catalog docs. Environments are discovered from sources, so readers without source access cannot read the environment list.
+
+**Also check:** [Ingestion sources](/ai-governance/ingestion-sources/index) for connector setup, [AI Tools Portal admin catalog editor](/ai-governance/personal-portal/admin-catalog) for catalog tiles, and [CLI debug](/ai-governance/cli-debug) for source health from the terminal.

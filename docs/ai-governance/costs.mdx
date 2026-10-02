@@ -1,0 +1,48 @@
+---
+title: Costs
+description: Read provider bills, LangWatch AI Gateway metering, seats, providers, models and spender breakdowns without treating them as one AI spend total.
+sidebarTitle: Costs
+keywords: ai cost, governance cost, provider bills, gateway spend, seats, spend attribution
+---
+
+Open **AI Governance > Costs** (`/governance/costs`) to read the money signals LangWatch has measured for the organization. The page keeps provider bills, LangWatch AI Gateway metering and seat counts separate because those sources can overlap, arrive at different times and measure different things.
+
+Opening the page needs the Enterprise plan and `governanceCost:view`.
+
+## What the top lanes show
+
+The top of the page shows three lanes:
+
+| Lane | What it shows | Boundary |
+|---|---|---|
+| **Billed by provider** | Provider-reported costs imported from billing or admin reports | It is not added to LangWatch AI Gateway metering as if the two were independent |
+| **Metered by gateway** | Spend recorded by the LangWatch AI Gateway as it served traffic | It does not cover traffic that bypassed the gateway |
+| **Seats** | License pools and assigned seat counts where a provider reports them | It never creates a price from a seat count |
+
+A missing figure stays missing. LangWatch does not show `$0.00` unless the source reported zero spend.
+
+## How to change the view
+
+Use **Time frame** and **Time interval** to change the window and bucket size. Figures cover the last 12 months when the selected frame reaches further back.
+
+Use the department filter to focus the charts on one department. Department labels come from the People side of governance, so person and department breakdowns need both `governanceCost:view` and `governance:view`.
+
+## What the breakdowns mean
+
+The page can show provider cost over time, cost by provider, cost by model, cost by department, provider-reported spend by user, metered spend by person and seat adoption.
+
+Provider-reported spend by user uses the user identifier the provider reports. Shared API keys can make one provider row represent more than one person, so the panel states that boundary instead of assigning the money to a single person.
+
+## Why a total can be unavailable
+
+LangWatch withholds a total when part of the source data has no trustworthy amount for that total. For example, a provider can report non-USD money or rows without a USD figure. Adding the priced subset would make a partial number look complete.
+
+Seat counts follow the same rule in a different form. The Seats lane reports bought and assigned seats, but it does not multiply those counts by a guessed price.
+
+## Where the data comes from
+
+Provider billed rows come from governance ingestion sources and provider admin pullers. LangWatch AI Gateway metering comes from the gateway ledger. The cost screen reads a daily governance rollup for provider billed rows and reads gateway metering separately.
+
+Use **Refresh** to ask the page to read again. If there is still no connected cost source, the page shows the empty state rather than a zero-cost claim.
+
+**Also check:** [Inventory](/ai-governance/inventory) for connected sources, [People](/ai-governance/people) for departments and identity labels, and [Pull-mode connectors](/ai-governance/pull-mode-connectors) for provider API polling.

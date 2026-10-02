@@ -1,0 +1,42 @@
+---
+title: Agents
+description: See registered and provider-discovered agents across the organization, their owner context, source, models, health and recent usage.
+sidebarTitle: Agents
+keywords: agents, agent inventory, discovered agents, registered agents, governance
+---
+
+Open **AI Governance > Agents** (`/governance/agents`) to see the agents and AI applications LangWatch can identify across the organization. The page combines agents that register themselves with agents discovered from connected providers.
+
+## What the list shows
+
+The default list view shows one row per agent. Columns include **Agent**, **Environment**, **Owner**, **Source**, **Models**, **Health**, **Cost · 30 days**, **Requests · 30 days**, **Last active** and **Registered**.
+
+Some values can be unavailable. A dash means LangWatch has not measured that value for the agent yet. It does not mean the value is zero.
+
+## What the summary shows
+
+The summary strip counts the same rows as the table. It shows fleet-level status, registration, activity and spend only from data the page has already read.
+
+Sample data is an explicit mode. Turning it on replaces the list with invented rows and shows a banner that the data is not real.
+
+## How to filter and change layout
+
+Use the source, ownership and sort filters to narrow the list. Use the layout control to switch between the table and cards. Both layouts read the same agent rows, so a missing value has the same meaning in both views.
+
+If filters hide every row, use **Clear filters** to return to the full list.
+
+## How syncing works
+
+Use **Sync agents** to ask connected providers for their current agent list. The button is visible even when you cannot press it, so the page can explain whether a provider is connected, whether a sync is already running or whether your role cannot request one.
+
+Provider-discovered agents are governance metadata. Syncing them does not grant access to the provider, change provider permissions or create a running agent.
+
+## How registration works
+
+Use **Register agent** for a first-party agent that runs in your own process. The drawer gives you a snippet to add to that running agent. LangWatch does not create a real first-party agent from a name typed into the UI alone.
+
+## Permissions
+
+Opening Agents needs `governance:view`. Registering an agent and requesting provider discovery need `governance:manage`. Provider listing also depends on the connected source and the provider credentials behind it.
+
+**Also check:** [Inventory](/ai-governance/inventory) for connected sources, [Ingestion sources](/ai-governance/ingestion-sources/index) for provider connectors, and [People](/ai-governance/people) for ownership and department context.
