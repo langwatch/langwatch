@@ -213,6 +213,19 @@ docker compose up -d
 
 ## Breaking Changes
 
+### Internal authentication for the NLP service
+
+The app can now authenticate itself to the NLP service with a shared credential, `LANGWATCH_NLP_INTERNAL_SECRET`. The app sends it on every NLP request, and the NLP service refuses requests that do not carry it. With the variable unset on the NLP service, it accepts unauthenticated requests as before.
+
+An upgrade requires no change, and an install that never sets the variable keeps working. Setting it is recommended, and the value has to be the same on both sides:
+
+- **Docker Compose**: the app, the workers and `langwatch_nlp` all read `platform/app/.env`, so add one `LANGWATCH_NLP_INTERNAL_SECRET` line there (`openssl rand -hex 32`) and restart the stack.
+- **Helm chart**: with `autogen.enabled=true` the chart generates the value into the app Secret and points the app, the workers and the NLP Deployment at the same key, so a default install needs no change. A value already in that Secret is kept, so an upgrade does not rotate it.
+
+  If you supply the app Secret yourself, add a `LANGWATCH_NLP_INTERNAL_SECRET` key to it and roll the three Deployments. Until you do, the key is absent, the variable stays unset on all three, and the install carries on.
+
+Docker Compose also no longer publishes the NLP service on host port 5561. The app and the workers reach it over the compose network at `langwatch_nlp:5561`, which is what `LANGWATCH_NLP_SERVICE` already points at. If you were calling port 5561 from the host, add a `ports` entry for `langwatch_nlp` in your own compose override.
+
 ### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
 
 The gateway sub-chart used to create its own Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now renders no Ingress. The `gateway.ingress.*` values are gone.

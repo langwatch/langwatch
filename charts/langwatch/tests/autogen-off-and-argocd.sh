@@ -130,6 +130,7 @@ test_key_names_are_remappable() {
     return
   fi
   local app=langwatch/templates/app/deployment.yaml gw=langwatch/charts/gateway/templates/deployment.yaml
+  local nlp=langwatch/templates/langwatch_nlp/deployment.yaml
   local want got
   for pair in \
     "$app LW_GATEWAY_INTERNAL_SECRET gateway-internal-secret" \
@@ -139,7 +140,9 @@ test_key_names_are_remappable() {
     "$app LWQL_CLICKHOUSE_PASSWORD lwql-clickhouse-password" \
     "$app LWQL_POSTGRES_READER_PASSWORD lwql-postgres-reader-password" \
     "$app CREDENTIALS_SECRET credentials-encryption-key" \
-    "$app LANGY_INTERNAL_SECRET langy-internal-secret"; do
+    "$app LANGY_INTERNAL_SECRET langy-internal-secret" \
+    "$app LANGWATCH_NLP_INTERNAL_SECRET nlp-internal-secret" \
+    "$nlp LANGWATCH_NLP_INTERNAL_SECRET nlp-internal-secret"; do
     read -r src var want <<<"$pair"
     got=$(env_key keys "$src" "$var")
     if [[ "$got" == "$want" ]]; then

@@ -14,6 +14,7 @@ import {
 } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
+import { nlpgoInternalHeaders } from "../../../server/nlpgo/internalSecret";
 import {
   CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS,
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
@@ -838,6 +839,7 @@ export const invokeLambda = async (
   const path = options.path ?? "/studio/execute";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...nlpgoInternalHeaders(),
     ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
     ...(options.headers ?? {}),
   };

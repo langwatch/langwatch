@@ -289,6 +289,9 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
                                         LangWatchQL simply stays unprovisioned
                                         instead of failing. See Section 8.)
 {{- end }}
+    - {{ include "langwatch.nlpInternalSecretKey" . }}   (optional: without it the NLP
+                                        service accepts unauthenticated requests
+                                        from inside the cluster)
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
 {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
@@ -325,15 +328,16 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal={{ include "langwatch.gatewayInternalSecretKey" . }}="$(openssl rand -hex 32)" \
-      --from-literal={{ include "langwatch.gatewayJwtSecretKey" . }}="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+      --from-literal={{ include "langwatch.gatewayJwtSecretKey" . }}="$(openssl rand -hex 32)" \
 {{- end }}
 {{- if .Values.lwql.enabled }}
       --from-literal={{ include "langwatch.lwql.clickhousePasswordKey" . }}="$(openssl rand -hex 32)" \
-      --from-literal={{ include "langwatch.lwql.postgresReaderPasswordKey" . }}="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal={{ include "langwatch.lwql.postgresReaderPasswordKey" . }}="$(openssl rand -hex 32)" \
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
-      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)" \
 {{- end }}
+      --from-literal={{ include "langwatch.nlpInternalSecretKey" . }}="$(openssl rand -hex 32)"
 {{- if .Values.lwql.enabled }}
 
   (The two LWQL_*_PASSWORD lines above apply only to this operator-provided path.

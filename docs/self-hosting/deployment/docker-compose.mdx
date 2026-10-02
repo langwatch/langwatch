@@ -36,15 +36,17 @@ Why port 5560? On a T9 keyboard, 5560 spells "LLM".
 
 Docker Compose starts the following services:
 
-| Service | Image | Port | Description |
-|---------|-------|------|-------------|
+| Service | Image | Host port | Description |
+|---------|-------|-----------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
 | `workers` | `langwatch/langwatch:latest` | - | Background job processing |
-| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | - | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
 | `redis` | `redis:alpine` | - | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
+
+Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
 
 ## Configuration
 
@@ -57,6 +59,11 @@ NEXTAUTH_SECRET=your-session-secret
 # Encrypts stored credentials and peppers API key hashes.
 # Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
 CREDENTIALS_SECRET=your-64-hex-character-key
+
+# Optional: shared credential the app authenticates to the NLP service with.
+# Every container in the stack reads this file, so one value covers both sides.
+# Generate with: openssl rand -hex 32
+LANGWATCH_NLP_INTERNAL_SECRET=
 
 # Optional: an Enterprise license, either an activation code
 # (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)

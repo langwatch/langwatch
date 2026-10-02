@@ -67,7 +67,7 @@ Keep the value stable across upgrades, restores and migrations to a new cluster,
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
-| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS). App and workers authenticate to NLP with `LANGWATCH_NLP_INTERNAL_SECRET` |
 
 <Tip>
 For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
@@ -94,10 +94,11 @@ kubectl create secret generic langwatch-secrets \
   --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \
-  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
+  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGWATCH_NLP_INTERNAL_SECRET=$(openssl rand -hex 32)
 ```
 
-The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `helm install` prints the exact list for your values (section "Required Secrets").
+The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `LANGWATCH_NLP_INTERNAL_SECRET` is optional: without it the NLP service accepts unauthenticated requests from inside the cluster. `helm install` prints the exact list for your values (section "Required Secrets").
 
 Reference in `values.yaml`. The gateway and the Langy agent mount the same Secret, so point them at it too:
 

@@ -60355,7 +60355,13 @@ A single sign-on connection is set up per organization in **Settings > Authentic
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LANGWATCH_NLP_SERVICE` | URL of the NLP service. Required | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
+| `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | - |
 | `LANGEVALS_ENDPOINT` | URL of the LangEvals service | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`) |
+
+`LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
+
+- **Docker Compose**: the app, the workers and `langwatch_nlp` all read `platform/app/.env`, so one line covers every container. Generate a value with `openssl rand -hex 32`. The NLP service is not published on a host port, so only the compose network reaches it.
+- **Helm chart**: the chart generates the value into the app Secret and points the app, the workers and the NLP Deployment at the same key, so a default install needs no change. If you supply the app Secret yourself, add a `LANGWATCH_NLP_INTERNAL_SECRET` key to it (or rename the key with `langwatch_nlp.secrets.internalSecretKey`) and roll the three Deployments.
 
 ## Object Storage (S3)
 
@@ -60643,6 +60649,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Deploys the separate workers Deployment. The chart never sets `START_WORKERS` |
+| `langwatch_nlp.secrets.internalSecretKey` | Key of the app Secret the app, the workers and the NLP service read `LANGWATCH_NLP_INTERNAL_SECRET` from |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
@@ -61918,15 +61925,17 @@ Why port 5560? On a T9 keyboard, 5560 spells "LLM".
 
 Docker Compose starts the following services:
 
-| Service | Image | Port | Description |
-|---------|-------|------|-------------|
+| Service | Image | Host port | Description |
+|---------|-------|-----------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
 | `workers` | `langwatch/langwatch:latest` | - | Background job processing |
-| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | - | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
 | `redis` | `redis:alpine` | - | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
+
+Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
 
 ## Configuration
 
@@ -61939,6 +61948,11 @@ NEXTAUTH_SECRET=your-session-secret
 # Encrypts stored credentials and peppers API key hashes.
 # Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
 CREDENTIALS_SECRET=your-64-hex-character-key
+
+# Optional: shared credential the app authenticates to the NLP service with.
+# Every container in the stack reads this file, so one value covers both sides.
+# Generate with: openssl rand -hex 32
+LANGWATCH_NLP_INTERNAL_SECRET=
 
 # Optional: an Enterprise license, either an activation code
 # (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
@@ -65469,7 +65483,7 @@ Keep the value stable across upgrades, restores and migrations to a new cluster,
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
-| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS). App and workers authenticate to NLP with `LANGWATCH_NLP_INTERNAL_SECRET` |
 
 <Tip>
 For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
@@ -65496,10 +65510,11 @@ kubectl create secret generic langwatch-secrets \
   --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \
-  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
+  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGWATCH_NLP_INTERNAL_SECRET=$(openssl rand -hex 32)
 ```
 
-The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `helm install` prints the exact list for your values (section "Required Secrets").
+The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `LANGWATCH_NLP_INTERNAL_SECRET` is optional: without it the NLP service accepts unauthenticated requests from inside the cluster. `helm install` prints the exact list for your values (section "Required Secrets").
 
 Reference in `values.yaml`. The gateway and the Langy agent mount the same Secret, so point them at it too:
 
@@ -66881,6 +66896,19 @@ docker compose up -d
 ```
 
 ## Breaking Changes
+
+### Internal authentication for the NLP service
+
+The app can now authenticate itself to the NLP service with a shared credential, `LANGWATCH_NLP_INTERNAL_SECRET`. The app sends it on every NLP request, and the NLP service refuses requests that do not carry it. With the variable unset on the NLP service, it accepts unauthenticated requests as before.
+
+An upgrade requires no change, and an install that never sets the variable keeps working. Setting it is recommended, and the value has to be the same on both sides:
+
+- **Docker Compose**: the app, the workers and `langwatch_nlp` all read `platform/app/.env`, so add one `LANGWATCH_NLP_INTERNAL_SECRET` line there (`openssl rand -hex 32`) and restart the stack.
+- **Helm chart**: with `autogen.enabled=true` the chart generates the value into the app Secret and points the app, the workers and the NLP Deployment at the same key, so a default install needs no change. A value already in that Secret is kept, so an upgrade does not rotate it.
+
+  If you supply the app Secret yourself, add a `LANGWATCH_NLP_INTERNAL_SECRET` key to it and roll the three Deployments. Until you do, the key is absent, the variable stays unset on all three, and the install carries on.
+
+Docker Compose also no longer publishes the NLP service on host port 5561. The app and the workers reach it over the compose network at `langwatch_nlp:5561`, which is what `LANGWATCH_NLP_SERVICE` already points at. If you were calling port 5561 from the host, add a `ports` entry for `langwatch_nlp` in your own compose override.
 
 ### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
 

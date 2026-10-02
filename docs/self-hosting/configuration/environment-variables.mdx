@@ -76,7 +76,13 @@ A single sign-on connection is set up per organization in **Settings > Authentic
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LANGWATCH_NLP_SERVICE` | URL of the NLP service. Required | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
+| `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | - |
 | `LANGEVALS_ENDPOINT` | URL of the LangEvals service | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`) |
+
+`LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
+
+- **Docker Compose**: the app, the workers and `langwatch_nlp` all read `platform/app/.env`, so one line covers every container. Generate a value with `openssl rand -hex 32`. The NLP service is not published on a host port, so only the compose network reaches it.
+- **Helm chart**: the chart generates the value into the app Secret and points the app, the workers and the NLP Deployment at the same key, so a default install needs no change. If you supply the app Secret yourself, add a `LANGWATCH_NLP_INTERNAL_SECRET` key to it (or rename the key with `langwatch_nlp.secrets.internalSecretKey`) and roll the three Deployments.
 
 ## Object Storage (S3)
 
@@ -364,6 +370,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Deploys the separate workers Deployment. The chart never sets `START_WORKERS` |
+| `langwatch_nlp.secrets.internalSecretKey` | Key of the app Secret the app, the workers and the NLP service read `LANGWATCH_NLP_INTERNAL_SECRET` from |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
