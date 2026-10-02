@@ -1,9 +1,9 @@
 import { Box, Image } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import type { AiToolType } from "@langwatch/enterprise-governance-contract";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { AiToolType } from "../../model/ai-tool-catalog.ts";
 import {
   ASSISTANT_PRESETS,
   type AssistantKind,

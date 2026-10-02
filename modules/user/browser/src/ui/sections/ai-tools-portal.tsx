@@ -6,11 +6,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { useMemo } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/personal-workspace-session.ts";
-import type { AiToolEntry } from "../../model/ai-tool-catalog.ts";
 import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 import { ExternalToolTile } from "../blocks/external-tool-tile.tsx";
 import { CodingAssistantTile } from "./coding-assistant-tile.tsx";

@@ -8,13 +8,12 @@ import type { authTrpc } from "@langwatch/auth-contract";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
 import type { personalVirtualKeysTrpc } from "@langwatch/enterprise-gateway-contract";
 import type {
+  AiToolEntry,
   ingestionKeyTrpc,
   personalSessionsTrpc,
 } from "@langwatch/enterprise-governance-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { userTrpc } from "@langwatch/user-contract";
-
-import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
 
 /**
  * The workspace a person is given inside an organization. `EnsuredPersonalWorkspace` in
