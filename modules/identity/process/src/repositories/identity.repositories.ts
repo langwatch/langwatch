@@ -22,6 +22,7 @@ import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "./join-request.repository.ts";
+import type { LegacySsoOrganizationRepository } from "./legacy-sso-organization.repository.ts";
 import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
 import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
@@ -64,6 +65,8 @@ export interface IdentityRepositories {
   readonly ssoConnections: SsoConnectionReadRepository;
   /** The connections sign-in routing reads by domain, and the live set (ADR-117 §5). */
   readonly ssoConnectionRouting: SsoConnectionRoutingRepository;
+  /** The legacy domain columns the router falls back to (ADR-117 §5). */
+  readonly legacySsoOrganizations: LegacySsoOrganizationRepository;
   readonly ssoStranding: SsoConnectionStrandingRepository;
   /** The per-organization registration slots a new connection claims first. */
   readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;

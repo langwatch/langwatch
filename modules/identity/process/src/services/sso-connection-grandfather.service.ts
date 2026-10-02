@@ -7,6 +7,7 @@ import {
   type SsoIdpMetadata,
 } from "@langwatch/identity-contract";
 
+import type { LegacySsoOrganizationRepository } from "../repositories/legacy-sso-organization.repository.ts";
 import {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
@@ -17,14 +18,6 @@ import type { SsoConnectionService } from "./sso-connection.service.ts";
 /**
  * Grandfathering (ADR-117 §5, D04): the organizations that already have
  */
-
-/** Where the legacy strings are read from. */
-export interface LegacySsoOrganizationRepository {
-  /** `SsoConnectionNotFoundError` when the organization carries no complete legacy pair. */
-  getLegacySso(args: {
-    organizationId: string;
-  }): Promise<{ ssoDomain: string; ssoProvider: string }>;
-}
 
 export type SsoConnectionGrandfatherOutcome =
   | { status: "finalized"; report: { kind: "no_legacy_sso" } }
@@ -52,7 +45,8 @@ export type SsoConnectionGrandfatherOutcome =
 
 export interface SsoConnectionGrandfatherDeps {
   connections: SsoConnectionService;
-  legacy: LegacySsoOrganizationRepository;
+  /** Where the legacy strings are read from. */
+  legacy: Pick<LegacySsoOrganizationRepository, "getLegacySso">;
   /** The string-based lookup — what decides sign-in today. */
   legacyRouting: SignInDomainRouting;
   /** The projection-based lookup — what will decide it after the flip. */

@@ -56,7 +56,7 @@ import { addressConfirmationMailChannels } from "../channels/address-confirmatio
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
-import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
+import { ssoBreakGlassWarningChannels } from "../channels/sso-break-glass-warning-channels.registry.ts";
 import {
   ssoDomainProofChannels,
   ssoDomainProofFileChannels,
@@ -110,6 +110,7 @@ import { JoinRequestGuardsService } from "../services/join-request-guards.servic
 import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import { JoinRequestsService } from "../services/join-requests.service.ts";
+import { LegacySsoDomainRoutingService } from "../services/legacy-sso-domain-routing.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
@@ -672,7 +673,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       : null;
     const ssoBreakGlassGrants = SsoBreakGlassService.create({
       bindings: setup.repositories.ssoBreakGlass,
-      warnings: LoggedSsoBreakGlassWarningChannel.create(),
+      warnings: ssoBreakGlassWarningChannels.live.create(),
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
       holderIsEligible: breakGlassEligibility(
@@ -688,16 +689,19 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
-    // Main's router (identity/runtime.ts): projected connections, the method policy, one
-    // per-process break-glass budget, and the projection-first account lookup.
+    const mountedMethods = () =>
+      SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider);
+    // Main's router (identity/runtime.ts): projected connections first, the legacy columns
+    // when none decides, the method policy, one break-glass budget, the account lookup.
     const signInRouter = SignInRouterService.create({
+      legacy: LegacySsoDomainRoutingService.create({
+        organizations: setup.repositories.legacySsoOrganizations,
+        mountedMethods,
+      }),
       domains: SsoConnectionRoutingService.create({
         connections: setup.repositories.ssoConnectionRouting,
         dial: ssoMethodDialWith({
-          mountedMethods: async () =>
-            (await SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider)).map(
-              (method) => method.id,
-            ),
+          mountedMethods: async () => (await mountedMethods()).map((method) => method.id),
           engineHoldsProvider: (args) =>
             setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
         }),

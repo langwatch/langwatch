@@ -28,6 +28,7 @@ import {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
 } from "./prisma.join-request.repository.ts";
+import { PrismaLegacySsoOrganizationRepository } from "./prisma.legacy-sso-organization.repository.ts";
 import { PrismaMfaEnrollmentProjectionRepository } from "./prisma.mfa-enrollment-projection.repository.ts";
 import { PrismaMfaEnrollmentRepository } from "./prisma.mfa-enrollment.repository.ts";
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
@@ -79,6 +80,7 @@ export class PostgresIdentityRepositories {
       joinCandidates: PrismaJoinCandidateRepository.create(database),
       ssoConnections: PrismaSsoConnectionReadRepository.create(database),
       ssoConnectionRouting: PrismaSsoConnectionRoutingRepository.create({ database }),
+      legacySsoOrganizations: PrismaLegacySsoOrganizationRepository.create(database),
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoRegistrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
