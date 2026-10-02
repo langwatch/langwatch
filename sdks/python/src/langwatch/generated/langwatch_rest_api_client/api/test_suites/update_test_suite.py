@@ -8,13 +8,13 @@ from ...client import AuthenticatedClient, Client
 from ...models.update_test_suite_body import UpdateTestSuiteBody
 from ...models.update_test_suite_response_200 import UpdateTestSuiteResponse200
 from ...models.update_test_suite_response_404 import UpdateTestSuiteResponse404
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateTestSuiteBody,
+    body: UpdateTestSuiteBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,7 +25,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -70,14 +71,14 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateTestSuiteBody,
+    body: UpdateTestSuiteBody | Unset = UNSET,
 ) -> Response[UpdateTestSuiteResponse200 | UpdateTestSuiteResponse404]:
     """Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what
     changes. The slug is kept on a rename, so links and run history stay where they are.
 
     Args:
         id (str):
-        body (UpdateTestSuiteBody):
+        body (UpdateTestSuiteBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -103,14 +104,14 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateTestSuiteBody,
+    body: UpdateTestSuiteBody | Unset = UNSET,
 ) -> UpdateTestSuiteResponse200 | UpdateTestSuiteResponse404 | None:
     """Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what
     changes. The slug is kept on a rename, so links and run history stay where they are.
 
     Args:
         id (str):
-        body (UpdateTestSuiteBody):
+        body (UpdateTestSuiteBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,14 +132,14 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateTestSuiteBody,
+    body: UpdateTestSuiteBody | Unset = UNSET,
 ) -> Response[UpdateTestSuiteResponse200 | UpdateTestSuiteResponse404]:
     """Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what
     changes. The slug is kept on a rename, so links and run history stay where they are.
 
     Args:
         id (str):
-        body (UpdateTestSuiteBody):
+        body (UpdateTestSuiteBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,14 +163,14 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateTestSuiteBody,
+    body: UpdateTestSuiteBody | Unset = UNSET,
 ) -> UpdateTestSuiteResponse200 | UpdateTestSuiteResponse404 | None:
     """Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what
     changes. The slug is kept on a rename, so links and run history stay where they are.
 
     Args:
         id (str):
-        body (UpdateTestSuiteBody):
+        body (UpdateTestSuiteBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

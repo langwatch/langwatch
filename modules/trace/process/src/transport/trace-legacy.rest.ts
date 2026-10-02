@@ -389,6 +389,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withMiddleware(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
+    operationId: "getApiTraceId",
     description: "Returns single trace details based on the ID supplied",
     tags: ["Traces"],
     responses: {
@@ -411,6 +412,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
+    operationId: "postApiTraceIdShare",
     description: "Returns a public path for a trace",
     tags: ["Traces"],
     responses: {
@@ -429,6 +431,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
+    operationId: "postApiTraceIdUnshare",
     description: "Deletes a public path for a trace",
     tags: ["Traces"],
     responses: {
@@ -453,10 +456,11 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withMiddleware(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
+    operationId: "postApiTraceSearch",
     summary: "Search traces",
     description: "Search for traces based on given criteria",
     tags: ["Traces"],
-    requestBody: { schema: traceLegacySearchBodySchema },
+    requestBody: { schema: traceLegacySearchBodySchema.meta({ id: "SearchRequest" }) },
     responses: {
       200: {
         description: "Successful response",

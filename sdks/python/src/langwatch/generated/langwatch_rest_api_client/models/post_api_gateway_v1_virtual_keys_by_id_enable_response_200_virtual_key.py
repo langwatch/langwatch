@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..models.post_api_gateway_v1_virtual_keys_by_id_enable_response_200_virtual_key_purpose import (
@@ -83,7 +82,6 @@ class PostApiGatewayV1VirtualKeysByIdEnableResponse200VirtualKey:
     last_used_at: datetime.datetime | None
     revoked_at: datetime.datetime | None
     expires_at: datetime.datetime | None
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -151,7 +149,7 @@ class PostApiGatewayV1VirtualKeysByIdEnableResponse200VirtualKey:
             expires_at = self.expires_at
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -331,21 +329,4 @@ class PostApiGatewayV1VirtualKeysByIdEnableResponse200VirtualKey:
             expires_at=expires_at,
         )
 
-        post_api_gateway_v1_virtual_keys_by_id_enable_response_200_virtual_key.additional_properties = d
         return post_api_gateway_v1_virtual_keys_by_id_enable_response_200_virtual_key
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

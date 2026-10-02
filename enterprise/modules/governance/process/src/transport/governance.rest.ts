@@ -114,6 +114,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withPermission("aiTools:view")
   .withOutput(governanceRestTemplateListSchema)
   .withDocs({
+    operationId: "getApiGovernanceIngestionTemplates",
     summary: "List ingestion templates",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -131,6 +132,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withOutput(governanceRestTemplateListSchema)
   .withMiddleware(governanceRestCaller)
   .withDocs({
+    operationId: "getApiGovernanceIngestionTemplatesAdmin",
     summary: "List ingestion templates (admin shape, includes OTTL)",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -154,6 +156,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withOutput(governanceRestTemplateDetailSchema)
   .withMiddleware(governanceRestCaller)
   .withDocs({
+    operationId: "getApiGovernanceIngestionTemplatesById",
     summary: "Get ingestion template",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -177,6 +180,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withStatus(201)
   .withMiddleware(governanceRestCaller, governanceRestSurface)
   .withDocs({
+    operationId: "postApiGovernanceIngestionTemplates",
     summary: "Create org-authored ingestion template",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -213,6 +217,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withOutput(governanceRestTemplateDetailSchema)
   .withMiddleware(governanceRestCaller, governanceRestSurface)
   .withDocs({
+    operationId: "patchApiGovernanceIngestionTemplatesByIdOttlRules",
     summary: "Replace ottl_rules on an org-authored template",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -234,6 +239,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withOutput(governanceRestTemplateArchivedSchema)
   .withMiddleware(governanceRestCaller, governanceRestSurface)
   .withDocs({
+    operationId: "deleteApiGovernanceIngestionTemplatesById",
     summary: "Soft-archive an org-authored template",
     tags: ["Governance / Ingestion Templates"],
     description:
@@ -256,6 +262,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withStatus(201)
   .withMiddleware(governanceRestCaller, governanceRestSurface)
   .withDocs({
+    operationId: "postApiGovernanceIngestionTemplatesClone",
     summary: "Clone a platform-published template into the caller's org",
     tags: ["Governance / Ingestion Templates"],
     description:

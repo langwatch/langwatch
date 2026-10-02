@@ -79,7 +79,9 @@ def sync_detailed(
     projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
     to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
     grant exactly those permissions. Minting a service key or a key for another member requires
-    organization admin rights. The plaintext token is returned once — store it securely.
+    organization admin rights, held by both the key making the request and its member. A key can grant
+    at most what the key making the request holds. The plaintext token is returned once — store it
+    securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -114,7 +116,9 @@ def sync(
     projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
     to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
     grant exactly those permissions. Minting a service key or a key for another member requires
-    organization admin rights. The plaintext token is returned once — store it securely.
+    organization admin rights, held by both the key making the request and its member. A key can grant
+    at most what the key making the request holds. The plaintext token is returned once — store it
+    securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -144,7 +148,9 @@ async def asyncio_detailed(
     projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
     to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
     grant exactly those permissions. Minting a service key or a key for another member requires
-    organization admin rights. The plaintext token is returned once — store it securely.
+    organization admin rights, held by both the key making the request and its member. A key can grant
+    at most what the key making the request holds. The plaintext token is returned once — store it
+    securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -177,7 +183,9 @@ async def asyncio(
     projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
     to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
     grant exactly those permissions. Minting a service key or a key for another member requires
-    organization admin rights. The plaintext token is returned once — store it securely.
+    organization admin rights, held by both the key making the request and its member. A key can grant
+    at most what the key making the request holds. The plaintext token is returned once — store it
+    securely.
 
     Args:
         body (CreateApiKeyBody):

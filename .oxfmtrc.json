@@ -24,7 +24,6 @@
     "packages/prisma-client/src/table-catalogue.ts",
     "**/CHANGELOG.md",
     "docs/api-reference/openapiLangWatch.json",
-    "specs/api-reference/openapi-document.json",
     "skills/_compiled/**",
     "services/langyagent/internal/assets/skills/**",
     "plugins/langwatch/scripts/session-context.mjs",

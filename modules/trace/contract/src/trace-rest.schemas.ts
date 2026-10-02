@@ -9,7 +9,12 @@ import { principalRefSchema } from "@langwatch/authorization";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-import { traceSchema } from "./trace-format.schemas.ts";
+import {
+  evaluationSchema,
+  traceInputSchema,
+  traceOutputSchema,
+  traceSchema,
+} from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import { discoverResultSchema } from "./trace-list-view.ts";
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
@@ -135,17 +140,40 @@ export const traceLegacyThreadParamsSchema = z.object({
   threadId: z.string().min(1).describe("The thread ID."),
 });
 
+/**
+ * The deprecated family's trace, under the component names the generated clients name their
+ * types after (`Trace`, `Metadata`, `Metrics`, ...). Each `.meta()` names a copy: the shared
+ * trace schema, and every other route built from it, stay unnamed.
+ */
+const legacyEvaluationSchema = evaluationSchema
+  .safeExtend({
+    timestamps: evaluationSchema.shape.timestamps.meta({ id: "EvaluationTimestamps" }),
+  })
+  .meta({ id: "Evaluation" });
+
+const legacyTraceSchema = traceSchema
+  .safeExtend({
+    metadata: traceSchema.shape.metadata.meta({ id: "Metadata" }),
+    timestamps: traceSchema.shape.timestamps.meta({ id: "Timestamps" }),
+    input: traceInputSchema.meta({ id: "Input" }).optional(),
+    output: traceOutputSchema.meta({ id: "Output" }).optional(),
+    metrics: traceSchema.shape.metrics.unwrap().meta({ id: "Metrics" }).optional(),
+    evaluations: z.array(legacyEvaluationSchema).optional(),
+  })
+  .meta({ id: "Trace" });
+
 /** `GET /api/trace/:id` in json format: the trace, its evaluations, the span tree as text. */
-export const traceLegacyReadResponseSchema = z.object({
-  ...traceSchema.shape,
+export const traceLegacyReadResponseSchema = legacyTraceSchema.safeExtend({
   ascii_tree: z.string(),
 });
 
 /** `POST /api/trace/search`: the page of traces and the scroll to the next one. */
-export const traceLegacySearchResponseSchema = z.object({
-  traces: z.array(traceSchema),
-  pagination: z.object({ totalHits: z.number(), scrollId: z.string().nullish() }),
-});
+export const traceLegacySearchResponseSchema = z
+  .object({
+    traces: z.array(legacyTraceSchema),
+    pagination: z.object({ totalHits: z.number(), scrollId: z.string().nullish() }),
+  })
+  .meta({ id: "SearchResponse" });
 
 /** `POST /api/trace/:id/share`: the public path the trace now answers at. */
 export const traceLegacyShareResponseSchema = z.object({

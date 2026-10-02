@@ -28,6 +28,7 @@ class PostApiAnalyticsTimeseriesBody:
         filters (PostApiAnalyticsTimeseriesBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
+        exclude_origins (list[str] | Unset):
         group_by (str | Unset):
         group_by_key (str | Unset):
         time_scale (int | Literal['full'] | Unset):
@@ -41,6 +42,7 @@ class PostApiAnalyticsTimeseriesBody:
     filters: PostApiAnalyticsTimeseriesBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
+    exclude_origins: list[str] | Unset = UNSET
     group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | Literal["full"] | Unset = UNSET
@@ -72,6 +74,10 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = self.negate_filters
 
+        exclude_origins: list[str] | Unset = UNSET
+        if not isinstance(self.exclude_origins, Unset):
+            exclude_origins = self.exclude_origins
+
         group_by = self.group_by
 
         group_by_key = self.group_by_key
@@ -100,6 +106,8 @@ class PostApiAnalyticsTimeseriesBody:
             field_dict["traceIds"] = trace_ids
         if negate_filters is not UNSET:
             field_dict["negateFilters"] = negate_filters
+        if exclude_origins is not UNSET:
+            field_dict["excludeOrigins"] = exclude_origins
         if group_by is not UNSET:
             field_dict["groupBy"] = group_by
         if group_by_key is not UNSET:
@@ -148,6 +156,8 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
+        exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
+
         group_by = d.pop("groupBy", UNSET)
 
         group_by_key = d.pop("groupByKey", UNSET)
@@ -172,6 +182,7 @@ class PostApiAnalyticsTimeseriesBody:
             filters=filters,
             trace_ids=trace_ids,
             negate_filters=negate_filters,
+            exclude_origins=exclude_origins,
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,

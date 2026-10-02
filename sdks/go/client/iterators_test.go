@@ -227,7 +227,7 @@ func TestProjectsAll(t *testing.T) {
 			for p, err := range c.Projects.All(context.Background(), ListProjectsParams{}) {
 				require.NoError(t, err)
 				require.NotNil(t, p.Id)
-				ids = append(ids, *p.Id)
+				ids = append(ids, p.Id)
 			}
 			assert.Equal(t, []string{"project_1"}, ids)
 			assert.Equal(t, int32(1), atomic.LoadInt32(&calls), "a short first page ends the walk")
@@ -271,7 +271,7 @@ func TestTracesAll(t *testing.T) {
 			for tr, err := range c.Traces.All(context.Background(), TraceSearchParams{Query: "x", PageSize: 2}) {
 				require.NoError(t, err)
 				require.NotNil(t, tr.TraceId)
-				ids = append(ids, *tr.TraceId)
+				ids = append(ids, tr.TraceId)
 			}
 
 			assert.Equal(t, []string{"t0", "t1", "t2", "t3", "t4"}, ids, "yields every trace in order")
@@ -296,7 +296,7 @@ func TestTracesAll(t *testing.T) {
 			var ids []string
 			for tr, err := range c.Traces.All(context.Background(), TraceSearchParams{PageSize: 2}) {
 				require.NoError(t, err)
-				ids = append(ids, *tr.TraceId)
+				ids = append(ids, tr.TraceId)
 			}
 			assert.Equal(t, []string{"t0", "t1"}, ids)
 			assert.Equal(t, int32(1), atomic.LoadInt32(&calls),
@@ -342,7 +342,7 @@ func TestTracesAll(t *testing.T) {
 					errs = append(errs, err)
 					continue
 				}
-				ids = append(ids, *tr.TraceId)
+				ids = append(ids, tr.TraceId)
 			}
 
 			require.Len(t, errs, 1, "the caller is told why the walk stopped")
@@ -371,7 +371,7 @@ func TestTracesAll(t *testing.T) {
 			var ids []string
 			for tr, err := range c.Traces.All(context.Background(), TraceSearchParams{PageSize: 2}) {
 				require.NoError(t, err)
-				ids = append(ids, *tr.TraceId)
+				ids = append(ids, tr.TraceId)
 			}
 			assert.Equal(t, []string{"t0", "t1"}, ids)
 			assert.Equal(t, int32(2), atomic.LoadInt32(&calls), "an empty page terminates the walk")

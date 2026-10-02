@@ -17,11 +17,11 @@ export type CreateTriggerBody = NonNullable<
 >["content"]["application/json"];
 
 export type UpdateTriggerBody = NonNullable<
-  paths["/api/v1/triggers/{id}"]["patch"]["requestBody"]
+  paths["/api/v1/triggers/{triggerId}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
 export type TriggerDeleteResponse =
-  paths["/api/v1/triggers/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/triggers/{triggerId}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 export class TriggersApiError extends Error {
   constructor(
@@ -65,8 +65,8 @@ export class TriggersApiService {
   }
 
   async get(id: string): Promise<TriggerResponse> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/triggers/{id}", {
-      params: { path: { id } },
+    const { data, error, response } = await this.apiClient.GET("/api/v1/triggers/{triggerId}", {
+      params: { path: { triggerId: id } },
     });
     return unwrapApiResult({
       operation: `get trigger "${id}"`,
@@ -91,8 +91,8 @@ export class TriggersApiService {
   }
 
   async update(id: string, params: UpdateTriggerBody): Promise<TriggerResponse> {
-    const { data, error, response } = await this.apiClient.PATCH("/api/v1/triggers/{id}", {
-      params: { path: { id } },
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/triggers/{triggerId}", {
+      params: { path: { triggerId: id } },
       body: params,
     });
     return unwrapApiResult({
@@ -105,8 +105,8 @@ export class TriggersApiService {
   }
 
   async delete(id: string): Promise<TriggerDeleteResponse> {
-    const { data, error, response } = await this.apiClient.DELETE("/api/v1/triggers/{id}", {
-      params: { path: { id } },
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/triggers/{triggerId}", {
+      params: { path: { triggerId: id } },
     });
     return unwrapApiResult({
       operation: `delete trigger "${id}"`,

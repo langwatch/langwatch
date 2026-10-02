@@ -10,13 +10,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    organization_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v1/organizations/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/organizations/{organization_id}".format(
+            organization_id=quote(str(organization_id), safe=""),
         ),
     }
 
@@ -52,14 +52,14 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    organization_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetOrganizationByIdResponse200]:
     """Read one organization's provisioning summary, self-hosted instance administrators only.
 
     Args:
-        id (str):
+        organization_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -70,7 +70,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        organization_id=organization_id,
     )
 
     response = client.get_httpx_client().request(
@@ -81,14 +81,14 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    organization_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetOrganizationByIdResponse200 | None:
     """Read one organization's provisioning summary, self-hosted instance administrators only.
 
     Args:
-        id (str):
+        organization_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -99,20 +99,20 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        organization_id=organization_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    organization_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetOrganizationByIdResponse200]:
     """Read one organization's provisioning summary, self-hosted instance administrators only.
 
     Args:
-        id (str):
+        organization_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,7 +123,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        organization_id=organization_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -132,14 +132,14 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    organization_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetOrganizationByIdResponse200 | None:
     """Read one organization's provisioning summary, self-hosted instance administrators only.
 
     Args:
-        id (str):
+        organization_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,7 +151,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            organization_id=organization_id,
             client=client,
         )
     ).parsed

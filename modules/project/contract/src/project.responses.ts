@@ -87,17 +87,26 @@ export const projectRestDetailSchema = projectRestSchema.safeExtend({
 });
 export type ProjectRestDetail = z.infer<typeof projectRestDetailSchema>;
 
+/**
+ * The `Project` component the generated clients name their type after: the listing's shape, and
+ * the PII level a single project's own GET and PATCH add.
+ */
+const projectRestComponentSchema = projectRestSchema
+  .safeExtend({ piiRedactionLevel: dataPrivacyPiiRedactionLevelSchema.optional() })
+  .meta({ id: "Project" });
+
 /** A page of them, with the count the caller pages through. */
 export const projectRestPageSchema = z
   .object({
-    data: z.array(projectRestSchema),
+    data: z.array(projectRestComponentSchema),
     pagination: z
       .object({
         page: z.number().int().positive(),
         limit: z.number().int().positive(),
         total: z.number().int().nonnegative(),
       })
-      .strict(),
+      .strict()
+      .meta({ id: "Pagination" }),
   })
   .strict();
 export type ProjectRestPage = z.infer<typeof projectRestPageSchema>;

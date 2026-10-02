@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.update_agent_body import UpdateAgentBody
 from ...models.update_agent_response_200 import UpdateAgentResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateAgentBody,
+    body: UpdateAgentBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -62,13 +63,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAgentBody,
+    body: UpdateAgentBody | Unset = UNSET,
 ) -> Response[UpdateAgentResponse200]:
     """Update an authored agent
 
     Args:
         id (str):
-        body (UpdateAgentBody):
+        body (UpdateAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -94,13 +95,13 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAgentBody,
+    body: UpdateAgentBody | Unset = UNSET,
 ) -> UpdateAgentResponse200 | None:
     """Update an authored agent
 
     Args:
         id (str):
-        body (UpdateAgentBody):
+        body (UpdateAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -121,13 +122,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAgentBody,
+    body: UpdateAgentBody | Unset = UNSET,
 ) -> Response[UpdateAgentResponse200]:
     """Update an authored agent
 
     Args:
         id (str):
-        body (UpdateAgentBody):
+        body (UpdateAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,13 +152,13 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateAgentBody,
+    body: UpdateAgentBody | Unset = UNSET,
 ) -> UpdateAgentResponse200 | None:
     """Update an authored agent
 
     Args:
         id (str):
-        body (UpdateAgentBody):
+        body (UpdateAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

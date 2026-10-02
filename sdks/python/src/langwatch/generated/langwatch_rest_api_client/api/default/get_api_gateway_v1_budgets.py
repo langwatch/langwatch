@@ -119,7 +119,8 @@ def sync_detailed(
     """List budgets
 
      Returns the non-archived budgets in the caller's organization across all seven scope types, with
-    live spent_usd from the spend ledger.
+    live spent_usd from the spend ledger. Takes a project key or an organization key; requires
+    gatewayBudgets:view at the key's project, or at the organization for a key that names no project.
 
     Args:
         cursor (str | Unset):
@@ -167,7 +168,8 @@ def sync(
     """List budgets
 
      Returns the non-archived budgets in the caller's organization across all seven scope types, with
-    live spent_usd from the spend ledger.
+    live spent_usd from the spend ledger. Takes a project key or an organization key; requires
+    gatewayBudgets:view at the key's project, or at the organization for a key that names no project.
 
     Args:
         cursor (str | Unset):
@@ -209,7 +211,8 @@ async def asyncio_detailed(
     """List budgets
 
      Returns the non-archived budgets in the caller's organization across all seven scope types, with
-    live spent_usd from the spend ledger.
+    live spent_usd from the spend ledger. Takes a project key or an organization key; requires
+    gatewayBudgets:view at the key's project, or at the organization for a key that names no project.
 
     Args:
         cursor (str | Unset):
@@ -255,7 +258,8 @@ async def asyncio(
     """List budgets
 
      Returns the non-archived budgets in the caller's organization across all seven scope types, with
-    live spent_usd from the spend ledger.
+    live spent_usd from the spend ledger. Takes a project key or an organization key; requires
+    gatewayBudgets:view at the key's project, or at the organization for a key that names no project.
 
     Args:
         cursor (str | Unset):

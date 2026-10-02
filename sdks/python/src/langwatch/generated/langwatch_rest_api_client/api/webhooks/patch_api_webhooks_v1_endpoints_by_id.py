@@ -6,19 +6,14 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_webhooks_v1_endpoints_by_id_body import PatchApiWebhooksV1EndpointsByIdBody
-from ...models.patch_api_webhooks_v1_endpoints_by_id_response_200_type_0 import (
-    PatchApiWebhooksV1EndpointsByIdResponse200Type0,
-)
-from ...models.patch_api_webhooks_v1_endpoints_by_id_response_200_type_1 import (
-    PatchApiWebhooksV1EndpointsByIdResponse200Type1,
-)
-from ...types import Response, safe_http_status
+from ...models.patch_api_webhooks_v1_endpoints_by_id_response_200 import PatchApiWebhooksV1EndpointsByIdResponse200
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiWebhooksV1EndpointsByIdBody,
+    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -39,27 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1 | None:
+) -> PatchApiWebhooksV1EndpointsByIdResponse200 | None:
     if response.status_code == 200:
-
-        def _parse_response_200(
-            data: object,
-        ) -> PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_200_type_0 = PatchApiWebhooksV1EndpointsByIdResponse200Type0.from_dict(data)
-
-                return response_200_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            response_200_type_1 = PatchApiWebhooksV1EndpointsByIdResponse200Type1.from_dict(data)
-
-            return response_200_type_1
-
-        response_200 = _parse_response_200(response.json())
+        response_200 = PatchApiWebhooksV1EndpointsByIdResponse200.from_dict(response.json())
 
         return response_200
 
@@ -71,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1]:
+) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -87,8 +65,8 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWebhooksV1EndpointsByIdBody,
-) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1]:
+    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200]:
     """Update a webhook endpoint
 
      Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
@@ -98,14 +76,14 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody):
+        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1]
+        Response[PatchApiWebhooksV1EndpointsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -124,8 +102,8 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWebhooksV1EndpointsByIdBody,
-) -> PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1 | None:
+    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+) -> PatchApiWebhooksV1EndpointsByIdResponse200 | None:
     """Update a webhook endpoint
 
      Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
@@ -135,14 +113,14 @@ def sync(
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody):
+        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1
+        PatchApiWebhooksV1EndpointsByIdResponse200
     """
 
     return sync_detailed(
@@ -156,8 +134,8 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWebhooksV1EndpointsByIdBody,
-) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1]:
+    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+) -> Response[PatchApiWebhooksV1EndpointsByIdResponse200]:
     """Update a webhook endpoint
 
      Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
@@ -167,14 +145,14 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody):
+        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1]
+        Response[PatchApiWebhooksV1EndpointsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -191,8 +169,8 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWebhooksV1EndpointsByIdBody,
-) -> PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1 | None:
+    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+) -> PatchApiWebhooksV1EndpointsByIdResponse200 | None:
     """Update a webhook endpoint
 
      Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
@@ -202,14 +180,14 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody):
+        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiWebhooksV1EndpointsByIdResponse200Type0 | PatchApiWebhooksV1EndpointsByIdResponse200Type1
+        PatchApiWebhooksV1EndpointsByIdResponse200
     """
 
     return (

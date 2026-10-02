@@ -46,7 +46,9 @@ runs:
           modules/langy/browser/src/model/shared/langy/langySkills.generated.json
           modules/langy/process/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
-          sdks/typescript/src/internal/generated
+          sdks/typescript/src/internal/generated/types
+          sdks/typescript/src/internal/generated/cli
+          sdks/typescript/src/internal/generated/redaction
           mcp/typescript/dist
           packages/ksuid/dist
           packages/mail/dist
@@ -66,7 +68,6 @@ runs:
             'sdks/typescript/copy-types.sh',
             'sdks/typescript/scripts/**',
             'feature-map.json',
-            'specs/api-reference/openapi-document.json',
             'modules/evaluator/contract/src/evaluators.native.ts',
             'modules/model-provider/contract/src/catalog/model-catalog.json',
             'modules/scenario/contract/src/suite-fields.ts',

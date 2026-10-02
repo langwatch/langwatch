@@ -1170,19 +1170,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  # The frozen OpenAPI document against the routes the API process answers.
+  # The SDK clients and the docs site copy against the OpenAPI document the
+  # routes generate.
   #
-  # `specs/api-reference/openapi-document.json` is frozen: three routes serve
-  # it and the SDKs generate clients from it, so this job never writes it. The
-  # check boots the api over memory stores, composes its application and
-  # matches every documented operation against the route table.
-  #
-  # ONE direction fails: an operation the document lists that no route
-  # answers, since a client generated from it would 404. Accepted gaps sit in
-  # `specs/api-reference/openapi-unserved-baseline.json`, and an entry that is
-  # served again fails too, so the baseline only shrinks. Operations served and
-  # undocumented are reported and never failed on.
-  openapi-drift:
+  # The document itself is never committed: the api builds it from the routes
+  # it mounts, and `pnpm --filter @langwatch/platform-api openapi:generate`
+  # writes the same document to specs/api-reference/openapi-document.json,
+  # which git ignores. The TypeScript, Python and Go clients and the docs copy
+  # are generated from it and committed, so this job regenerates all of them
+  # with `make sync-all-openapi` and fails when any of them changes. The fix is
+  # to run the same target locally and commit the result.
+  openapi-clients:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
@@ -1199,19 +1197,55 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api... @langwatch/ui..."
+          install: "@langwatch/platform-api... @langwatch/ui... langwatch..."
 
       - uses: ./.github/actions/prepare-generated-files
 
-      - name: Check the frozen OpenAPI document against the served surface
-        run: pnpm --filter @langwatch/platform-api run openapi:check
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: sdks/go/client/go.mod
+          cache: true
+          cache-dependency-path: sdks/go/client/go.sum
+
+      # The default cache glob is **/uv.lock, which walks the installed
+      # node_modules tree; name the workspace lockfile instead.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Regenerate the clients and the docs copy
+        run: make sync-all-openapi
+
+      - name: Check the committed clients match the routes
+        run: |
+          STALE=0
+          if ! git diff --exit-code --stat; then
+            STALE=1
+          fi
+          UNTRACKED=$(git ls-files --others --exclude-standard \
+            sdks/typescript/src/internal/generated/openapi \
+            sdks/python/src/langwatch/generated \
+            sdks/go/client/internal/openapi \
+            docs/api-reference)
+          if [ -n "$UNTRACKED" ]; then
+            echo "These generated files are not committed:"
+            echo "$UNTRACKED"
+            STALE=1
+          fi
+          if [ "$STALE" = "1" ]; then
+            echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
+            exit 1
+          fi
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh openapi-drift
+        run: bash .github/scripts/notify-slack-job-failure.sh openapi-clients
 
   build:
     needs: changes
@@ -1512,7 +1546,7 @@ jobs:
         package-suites,
         lint,
         feature-parity,
-        openapi-drift,
+        openapi-clients,
         build,
         ci-scripts-test,
         ci-self-test,
@@ -1524,4 +1558,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: affected, typecheck, test-unit, package-suites, lint, feature-parity, openapi-drift, build, ci-scripts-test, ci-self-test
+          allowed-skips: affected, typecheck, test-unit, package-suites, lint, feature-parity, openapi-clients, build, ci-scripts-test, ci-self-test

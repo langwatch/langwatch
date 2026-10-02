@@ -29,6 +29,7 @@ class GetStoredObjectResponse200Metadata:
         sha256 (str):
         byte_length (int):
         media_type (str):
+        filename (Any):
         media_type_verified (bool):
         status (GetStoredObjectResponse200MetadataStatus):
         audiences (list[GetStoredObjectResponse200MetadataAudiencesItem]):
@@ -44,6 +45,7 @@ class GetStoredObjectResponse200Metadata:
     sha256: str
     byte_length: int
     media_type: str
+    filename: Any
     media_type_verified: bool
     status: GetStoredObjectResponse200MetadataStatus
     audiences: list[GetStoredObjectResponse200MetadataAudiencesItem]
@@ -63,6 +65,8 @@ class GetStoredObjectResponse200Metadata:
         byte_length = self.byte_length
 
         media_type = self.media_type
+
+        filename = self.filename
 
         media_type_verified = self.media_type_verified
 
@@ -96,6 +100,7 @@ class GetStoredObjectResponse200Metadata:
                 "sha256": sha256,
                 "byteLength": byte_length,
                 "mediaType": media_type,
+                "filename": filename,
                 "mediaTypeVerified": media_type_verified,
                 "status": status,
                 "audiences": audiences,
@@ -127,6 +132,8 @@ class GetStoredObjectResponse200Metadata:
         byte_length = d.pop("byteLength")
 
         media_type = d.pop("mediaType")
+
+        filename = d.pop("filename")
 
         media_type_verified = d.pop("mediaTypeVerified")
 
@@ -165,6 +172,7 @@ class GetStoredObjectResponse200Metadata:
             sha256=sha256,
             byte_length=byte_length,
             media_type=media_type,
+            filename=filename,
             media_type_verified=media_type_verified,
             status=status,
             audiences=audiences,

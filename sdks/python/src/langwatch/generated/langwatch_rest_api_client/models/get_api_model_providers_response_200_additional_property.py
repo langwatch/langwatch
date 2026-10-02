@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -57,7 +56,6 @@ class GetApiModelProvidersResponse200AdditionalProperty:
     ) = UNSET
     disabled_by_default: bool | Unset = UNSET
     extra_headers: list[GetApiModelProvidersResponse200AdditionalPropertyExtraHeadersType0Item] | None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_model_providers_response_200_additional_property_custom_keys_type_0 import (
@@ -136,7 +134,7 @@ class GetApiModelProvidersResponse200AdditionalProperty:
             extra_headers = self.extra_headers
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "provider": provider,
@@ -347,21 +345,4 @@ class GetApiModelProvidersResponse200AdditionalProperty:
             extra_headers=extra_headers,
         )
 
-        get_api_model_providers_response_200_additional_property.additional_properties = d
         return get_api_model_providers_response_200_additional_property
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

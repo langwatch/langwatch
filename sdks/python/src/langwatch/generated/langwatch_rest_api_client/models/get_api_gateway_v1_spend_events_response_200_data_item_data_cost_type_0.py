@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="GetApiGatewayV1SpendEventsResponse200DataItemDataCostType0")
 
@@ -13,29 +14,36 @@ T = TypeVar("T", bound="GetApiGatewayV1SpendEventsResponse200DataItemDataCostTyp
 class GetApiGatewayV1SpendEventsResponse200DataItemDataCostType0:
     """
     Attributes:
-        total_usd (str): Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never
-            exponent notation. Use nano_usd for arithmetic.
-        nano_usd (int): Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure
-            to reconcile against.
+        total_usd (str): Display value. Use nano_usd for arithmetic.
+        nano_usd (int): Canonical integer cost, nano-USD.
+        rate_version (None | str | Unset):
     """
 
     total_usd: str
     nano_usd: int
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    rate_version: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         total_usd = self.total_usd
 
         nano_usd = self.nano_usd
 
+        rate_version: None | str | Unset
+        if isinstance(self.rate_version, Unset):
+            rate_version = UNSET
+        else:
+            rate_version = self.rate_version
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "total_usd": total_usd,
                 "nano_usd": nano_usd,
             }
         )
+        if rate_version is not UNSET:
+            field_dict["rate_version"] = rate_version
 
         return field_dict
 
@@ -46,26 +54,19 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataCostType0:
 
         nano_usd = d.pop("nano_usd")
 
+        def _parse_rate_version(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        rate_version = _parse_rate_version(d.pop("rate_version", UNSET))
+
         get_api_gateway_v1_spend_events_response_200_data_item_data_cost_type_0 = cls(
             total_usd=total_usd,
             nano_usd=nano_usd,
+            rate_version=rate_version,
         )
 
-        get_api_gateway_v1_spend_events_response_200_data_item_data_cost_type_0.additional_properties = d
         return get_api_gateway_v1_spend_events_response_200_data_item_data_cost_type_0
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

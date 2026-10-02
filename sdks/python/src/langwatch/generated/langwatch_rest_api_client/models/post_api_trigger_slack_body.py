@@ -20,27 +20,40 @@ T = TypeVar("T", bound="PostApiTriggerSlackBody")
 class PostApiTriggerSlackBody:
     """
     Attributes:
-        slack_webhook (str): Incoming webhook URL the alert is posted to
         name (str): How the trigger is listed in the app
         alert_type (PostApiTriggerSlackBodyAlertType):
+        slack_webhook (str | Unset): Incoming webhook URL the alert is posted to. It is stored as a Slack connection
+            this project can use (an existing one holding the same URL, else a new project connection). Send this or
+            `slack_connection_id`, not both.
+        slack_connection_id (str | Unset): The Slack connection the alert posts through: an organization connection or
+            one of this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` list them. Send
+            this or `slack_webhook`, not both.
+        slack_channel_id (str | Unset): The channel a bot connection posts in; required with one. Invite the LangWatch
+            app to it first.
         message (str | Unset): Extra line included with each alert
         filters (PostApiTriggerSlackBodyFilters | Unset): Which traces the trigger fires on. An empty object fires on
             all of them.
     """
 
-    slack_webhook: str
     name: str
     alert_type: PostApiTriggerSlackBodyAlertType
+    slack_webhook: str | Unset = UNSET
+    slack_connection_id: str | Unset = UNSET
+    slack_channel_id: str | Unset = UNSET
     message: str | Unset = UNSET
     filters: PostApiTriggerSlackBodyFilters | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        slack_webhook = self.slack_webhook
-
         name = self.name
 
         alert_type = self.alert_type.value
+
+        slack_webhook = self.slack_webhook
+
+        slack_connection_id = self.slack_connection_id
+
+        slack_channel_id = self.slack_channel_id
 
         message = self.message
 
@@ -52,11 +65,16 @@ class PostApiTriggerSlackBody:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "slack_webhook": slack_webhook,
                 "name": name,
                 "alert_type": alert_type,
             }
         )
+        if slack_webhook is not UNSET:
+            field_dict["slack_webhook"] = slack_webhook
+        if slack_connection_id is not UNSET:
+            field_dict["slack_connection_id"] = slack_connection_id
+        if slack_channel_id is not UNSET:
+            field_dict["slack_channel_id"] = slack_channel_id
         if message is not UNSET:
             field_dict["message"] = message
         if filters is not UNSET:
@@ -69,11 +87,15 @@ class PostApiTriggerSlackBody:
         from ..models.post_api_trigger_slack_body_filters import PostApiTriggerSlackBodyFilters
 
         d = dict(src_dict)
-        slack_webhook = d.pop("slack_webhook")
-
         name = d.pop("name")
 
         alert_type = PostApiTriggerSlackBodyAlertType(d.pop("alert_type"))
+
+        slack_webhook = d.pop("slack_webhook", UNSET)
+
+        slack_connection_id = d.pop("slack_connection_id", UNSET)
+
+        slack_channel_id = d.pop("slack_channel_id", UNSET)
 
         message = d.pop("message", UNSET)
 
@@ -85,9 +107,11 @@ class PostApiTriggerSlackBody:
             filters = PostApiTriggerSlackBodyFilters.from_dict(_filters)
 
         post_api_trigger_slack_body = cls(
-            slack_webhook=slack_webhook,
             name=name,
             alert_type=alert_type,
+            slack_webhook=slack_webhook,
+            slack_connection_id=slack_connection_id,
+            slack_channel_id=slack_channel_id,
             message=message,
             filters=filters,
         )

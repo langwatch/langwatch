@@ -13,14 +13,14 @@ T = TypeVar("T", bound="TraceEventsItemTimestamps")
 class TraceEventsItemTimestamps:
     """
     Attributes:
-        started_at (int):
-        inserted_at (int):
-        updated_at (int):
+        started_at (float):
+        inserted_at (float):
+        updated_at (float):
     """
 
-    started_at: int
-    inserted_at: int
-    updated_at: int
+    started_at: float
+    inserted_at: float
+    updated_at: float
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

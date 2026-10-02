@@ -55,7 +55,8 @@ def sync_detailed(
     client: AuthenticatedClient,
 ) -> Response[DeleteRoleResponse200]:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
-    answers 409 custom_role_in_use with the counts in meta.
+    answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
+    role_is_built_in.
 
     Args:
         id (str):
@@ -85,7 +86,8 @@ def sync(
     client: AuthenticatedClient,
 ) -> DeleteRoleResponse200 | None:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
-    answers 409 custom_role_in_use with the counts in meta.
+    answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
+    role_is_built_in.
 
     Args:
         id (str):
@@ -110,7 +112,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[DeleteRoleResponse200]:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
-    answers 409 custom_role_in_use with the counts in meta.
+    answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
+    role_is_built_in.
 
     Args:
         id (str):
@@ -138,7 +141,8 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> DeleteRoleResponse200 | None:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
-    answers 409 custom_role_in_use with the counts in meta.
+    answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
+    role_is_built_in.
 
     Args:
         id (str):

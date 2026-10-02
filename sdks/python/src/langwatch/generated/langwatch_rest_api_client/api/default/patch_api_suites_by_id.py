@@ -8,13 +8,13 @@ from ...client import AuthenticatedClient, Client
 from ...models.patch_api_suites_by_id_body import PatchApiSuitesByIdBody
 from ...models.patch_api_suites_by_id_response_200 import PatchApiSuitesByIdResponse200
 from ...models.patch_api_suites_by_id_response_404 import PatchApiSuitesByIdResponse404
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,7 +25,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -70,13 +71,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]:
     """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -102,13 +103,13 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404 | None:
     """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -129,13 +130,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]:
     """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,13 +160,13 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404 | None:
     """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

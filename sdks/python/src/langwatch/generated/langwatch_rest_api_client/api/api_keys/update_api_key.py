@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.update_api_key_body import UpdateApiKeyBody
 from ...models.update_api_key_response_200 import UpdateApiKeyResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateApiKeyBody,
+    body: UpdateApiKeyBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -84,18 +85,19 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateApiKeyBody,
+    body: UpdateApiKeyBody | Unset = UNSET,
 ) -> Response[Any | UpdateApiKeyResponse200]:
     """Update an API key
 
      Update an API key's name, description, permission mode, permissions or bindings. Every field is
     optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns.
     You may update your own keys; organization admins may update any key in the organization. Bindings
-    can never exceed the access of the member the key belongs to. The token itself never changes.
+    can never exceed the access of the member the key belongs to, and a key can grant at most what the
+    key making the request holds. The token itself never changes.
 
     Args:
         id (str):
-        body (UpdateApiKeyBody):
+        body (UpdateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -121,18 +123,19 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateApiKeyBody,
+    body: UpdateApiKeyBody | Unset = UNSET,
 ) -> Any | UpdateApiKeyResponse200 | None:
     """Update an API key
 
      Update an API key's name, description, permission mode, permissions or bindings. Every field is
     optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns.
     You may update your own keys; organization admins may update any key in the organization. Bindings
-    can never exceed the access of the member the key belongs to. The token itself never changes.
+    can never exceed the access of the member the key belongs to, and a key can grant at most what the
+    key making the request holds. The token itself never changes.
 
     Args:
         id (str):
-        body (UpdateApiKeyBody):
+        body (UpdateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,18 +156,19 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateApiKeyBody,
+    body: UpdateApiKeyBody | Unset = UNSET,
 ) -> Response[Any | UpdateApiKeyResponse200]:
     """Update an API key
 
      Update an API key's name, description, permission mode, permissions or bindings. Every field is
     optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns.
     You may update your own keys; organization admins may update any key in the organization. Bindings
-    can never exceed the access of the member the key belongs to. The token itself never changes.
+    can never exceed the access of the member the key belongs to, and a key can grant at most what the
+    key making the request holds. The token itself never changes.
 
     Args:
         id (str):
-        body (UpdateApiKeyBody):
+        body (UpdateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -188,18 +192,19 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateApiKeyBody,
+    body: UpdateApiKeyBody | Unset = UNSET,
 ) -> Any | UpdateApiKeyResponse200 | None:
     """Update an API key
 
      Update an API key's name, description, permission mode, permissions or bindings. Every field is
     optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns.
     You may update your own keys; organization admins may update any key in the organization. Bindings
-    can never exceed the access of the member the key belongs to. The token itself never changes.
+    can never exceed the access of the member the key belongs to, and a key can grant at most what the
+    key making the request holds. The token itself never changes.
 
     Args:
         id (str):
-        body (UpdateApiKeyBody):
+        body (UpdateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

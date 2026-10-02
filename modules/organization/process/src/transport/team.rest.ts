@@ -109,6 +109,7 @@ export const teamsRest: Readonly<{
   .withQuery(organizationTeamRestPaginationQuerySchema)
   .withOutput(organizationTeamRestPageSchema)
   .withDocs({
+    operationId: "getApiTeams",
     tags: ["Teams"],
     description: "List all non-archived teams for the organization (paginated)",
   })
@@ -131,6 +132,7 @@ export const teamsRest: Readonly<{
   .withOutput(organizationTeamRestSchema)
   .withStatus(201)
   .withDocs({
+    operationId: "postApiTeams",
     tags: ["Teams"],
     description: "Create a new team that can group projects and members",
   })
@@ -148,6 +150,7 @@ export const teamsRest: Readonly<{
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestSchema)
   .withDocs({
+    operationId: "getApiTeamsById",
     tags: ["Teams"],
     description: "Get a team by its id",
   })
@@ -166,6 +169,7 @@ export const teamsRest: Readonly<{
   .withInput(organizationTeamRestUpdateSchema)
   .withOutput(organizationTeamRestSchema)
   .withDocs({
+    operationId: "patchApiTeamsById",
     tags: ["Teams"],
     description: "Update a team by its id",
   })
@@ -184,6 +188,7 @@ export const teamsRest: Readonly<{
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestArchivedSchema)
   .withDocs({
+    operationId: "deleteApiTeamsById",
     tags: ["Teams"],
     description: "Archive a team (soft-delete)",
   })
@@ -205,6 +210,7 @@ export const teamsRest: Readonly<{
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestMemberListSchema)
   .withDocs({
+    operationId: "getApiTeamsByIdMembers",
     tags: ["Teams"],
     description: "List members of a team",
   })
@@ -233,6 +239,7 @@ export const teamsRest: Readonly<{
   .withOutput(organizationTeamRestSuccessSchema)
   .withStatus(201)
   .withDocs({
+    operationId: "postApiTeamsByIdMembers",
     tags: ["Teams"],
     description: "Add a member to a team",
   })
@@ -261,6 +268,7 @@ export const teamsRest: Readonly<{
   .withParams(organizationTeamRestMemberParamsSchema)
   .withOutput(organizationTeamRestSuccessSchema)
   .withDocs({
+    operationId: "deleteApiTeamsByIdMembersByUserId",
     tags: ["Teams"],
     description: "Remove a member from a team",
   })
@@ -283,6 +291,7 @@ export const teamsRest: Readonly<{
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestProjectListSchema)
   .withDocs({
+    operationId: "getApiTeamsByIdProjects",
     tags: ["Teams"],
     description: "List projects in a team",
   })

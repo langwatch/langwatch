@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
@@ -57,7 +56,6 @@ class GetApiEvaluatorsResponse200Item:
     platform_url: str
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_evaluators_response_200_item_config_type_0 import (
@@ -108,7 +106,7 @@ class GetApiEvaluatorsResponse200Item:
         workflow_icon = self.workflow_icon
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -230,21 +228,4 @@ class GetApiEvaluatorsResponse200Item:
             workflow_icon=workflow_icon,
         )
 
-        get_api_evaluators_response_200_item.additional_properties = d
         return get_api_evaluators_response_200_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

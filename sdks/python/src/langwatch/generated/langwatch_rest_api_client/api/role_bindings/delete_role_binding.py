@@ -57,7 +57,7 @@ def sync_detailed(
     client: AuthenticatedClient,
 ) -> Response[DeleteRoleBindingResponse200]:
     """Delete a role binding. An id that does not exist in the caller's organization answers 404
-    role_binding_not_found.
+    role_binding_not_found. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         id (str):
@@ -87,7 +87,7 @@ def sync(
     client: AuthenticatedClient,
 ) -> DeleteRoleBindingResponse200 | None:
     """Delete a role binding. An id that does not exist in the caller's organization answers 404
-    role_binding_not_found.
+    role_binding_not_found. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         id (str):
@@ -112,7 +112,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[DeleteRoleBindingResponse200]:
     """Delete a role binding. An id that does not exist in the caller's organization answers 404
-    role_binding_not_found.
+    role_binding_not_found. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         id (str):
@@ -140,7 +140,7 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> DeleteRoleBindingResponse200 | None:
     """Delete a role binding. An id that does not exist in the caller's organization answers 404
-    role_binding_not_found.
+    role_binding_not_found. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         id (str):

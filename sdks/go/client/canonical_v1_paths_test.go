@@ -30,8 +30,9 @@ var v1Families = strings.Fields(`agent-cache analytics annotations api-keys bug-
 var (
 	barePathPattern = regexp.MustCompile(`/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_%-]+)*)`)
 	versionSegment  = regexp.MustCompile(`^v\d+$`)
-	// Routes the document keeps bare because they have no /api/v1 twin.
-	bareOnly = regexp.MustCompile(`^/api/traces/[^/]+/transcript$|^/api/trace/(search|[^/]+(/share|/unshare)?)$`)
+	// Routes the document keeps bare because they have no /api/v1 twin, including
+	// Langy's in-process worker families, declared literal.
+	bareOnly = regexp.MustCompile(`^/api/traces/[^/]+/transcript$|^/api/trace/(search|[^/]+(/share|/unshare)?)$|^/api/langy/(local|waits|ui)(/|$)`)
 )
 
 // @scenario "The track-event path is v1-form"

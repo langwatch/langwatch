@@ -10,13 +10,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    request_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/langy/control/requests/{id}/cancel".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/langy/control/requests/{request_id}/cancel".format(
+            request_id=quote(str(request_id), safe=""),
         ),
     }
 
@@ -52,7 +52,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[CancelLangyControlRequestResponse200]:
@@ -60,7 +60,7 @@ def sync_detailed(
     Langy's next turn offers the choice again.
 
     Args:
-        id (str):
+        request_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -71,7 +71,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        request_id=request_id,
     )
 
     response = client.get_httpx_client().request(
@@ -82,7 +82,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
 ) -> CancelLangyControlRequestResponse200 | None:
@@ -90,7 +90,7 @@ def sync(
     Langy's next turn offers the choice again.
 
     Args:
-        id (str):
+        request_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -101,13 +101,13 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        request_id=request_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[CancelLangyControlRequestResponse200]:
@@ -115,7 +115,7 @@ async def asyncio_detailed(
     Langy's next turn offers the choice again.
 
     Args:
-        id (str):
+        request_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,7 +126,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        request_id=request_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -135,7 +135,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
 ) -> CancelLangyControlRequestResponse200 | None:
@@ -143,7 +143,7 @@ async def asyncio(
     Langy's next turn offers the choice again.
 
     Args:
-        id (str):
+        request_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -155,7 +155,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            request_id=request_id,
             client=client,
         )
     ).parsed

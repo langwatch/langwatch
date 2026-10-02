@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
 from ...models.register_connected_agent_instance_response_200 import RegisterConnectedAgentInstanceResponse200
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: RegisterConnectedAgentInstanceBody | Unset = UNSET,
+    body: RegisterConnectedAgentInstanceBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,8 +20,7 @@ def _get_kwargs(
         "url": "/api/v1/agents/connect/register",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -60,14 +59,14 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
-    body: RegisterConnectedAgentInstanceBody | Unset = UNSET,
+    body: RegisterConnectedAgentInstanceBody,
 ) -> Response[RegisterConnectedAgentInstanceResponse200]:
     """Register this process's agents
 
      Returns a registered frame and instance token, or refuses at the status of the reason.
 
     Args:
-        body (RegisterConnectedAgentInstanceBody | Unset):
+        body (RegisterConnectedAgentInstanceBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -91,14 +90,14 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient | Client,
-    body: RegisterConnectedAgentInstanceBody | Unset = UNSET,
+    body: RegisterConnectedAgentInstanceBody,
 ) -> RegisterConnectedAgentInstanceResponse200 | None:
     """Register this process's agents
 
      Returns a registered frame and instance token, or refuses at the status of the reason.
 
     Args:
-        body (RegisterConnectedAgentInstanceBody | Unset):
+        body (RegisterConnectedAgentInstanceBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -117,14 +116,14 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
-    body: RegisterConnectedAgentInstanceBody | Unset = UNSET,
+    body: RegisterConnectedAgentInstanceBody,
 ) -> Response[RegisterConnectedAgentInstanceResponse200]:
     """Register this process's agents
 
      Returns a registered frame and instance token, or refuses at the status of the reason.
 
     Args:
-        body (RegisterConnectedAgentInstanceBody | Unset):
+        body (RegisterConnectedAgentInstanceBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -146,14 +145,14 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient | Client,
-    body: RegisterConnectedAgentInstanceBody | Unset = UNSET,
+    body: RegisterConnectedAgentInstanceBody,
 ) -> RegisterConnectedAgentInstanceResponse200 | None:
     """Register this process's agents
 
      Returns a registered frame and instance token, or refuses at the status of the reason.
 
     Args:
-        body (RegisterConnectedAgentInstanceBody | Unset):
+        body (RegisterConnectedAgentInstanceBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

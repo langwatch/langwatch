@@ -18,6 +18,7 @@ export {
 } from "./api-door.ts";
 export { SessionReader, type SessionCaller, type SessionVerification } from "./session-reader.ts";
 export { mountApiDiscovery } from "./api-discovery.ts";
+export { buildOpenApiDocument } from "./openapi-document.ts";
 export {
   HttpMux,
   type HttpExchange,

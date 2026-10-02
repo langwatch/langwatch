@@ -15,16 +15,16 @@ T = TypeVar("T", bound="TraceSpansItemType0Timestamps")
 class TraceSpansItemType0Timestamps:
     """
     Attributes:
-        started_at (int):
-        finished_at (int):
+        started_at (float):
+        finished_at (float):
         ignore_timestamps_on_write (bool | None | Unset):
-        first_token_at (int | None | Unset):
+        first_token_at (float | None | Unset):
     """
 
-    started_at: int
-    finished_at: int
+    started_at: float
+    finished_at: float
     ignore_timestamps_on_write: bool | None | Unset = UNSET
-    first_token_at: int | None | Unset = UNSET
+    first_token_at: float | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,7 +38,7 @@ class TraceSpansItemType0Timestamps:
         else:
             ignore_timestamps_on_write = self.ignore_timestamps_on_write
 
-        first_token_at: int | None | Unset
+        first_token_at: float | None | Unset
         if isinstance(self.first_token_at, Unset):
             first_token_at = UNSET
         else:
@@ -75,12 +75,12 @@ class TraceSpansItemType0Timestamps:
 
         ignore_timestamps_on_write = _parse_ignore_timestamps_on_write(d.pop("ignore_timestamps_on_write", UNSET))
 
-        def _parse_first_token_at(data: object) -> int | None | Unset:
+        def _parse_first_token_at(data: object) -> float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(int | None | Unset, data)
+            return cast(float | None | Unset, data)
 
         first_token_at = _parse_first_token_at(d.pop("first_token_at", UNSET))
 

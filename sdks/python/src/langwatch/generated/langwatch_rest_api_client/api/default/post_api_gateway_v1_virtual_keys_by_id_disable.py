@@ -21,13 +21,13 @@ from ...models.post_api_gateway_v1_virtual_keys_by_id_disable_response_403 impor
 from ...models.post_api_gateway_v1_virtual_keys_by_id_disable_response_500 import (
     PostApiGatewayV1VirtualKeysByIdDisableResponse500,
 )
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiGatewayV1VirtualKeysByIdDisableBody,
+    body: PostApiGatewayV1VirtualKeysByIdDisableBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -38,7 +38,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -111,7 +112,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysByIdDisableBody,
+    body: PostApiGatewayV1VirtualKeysByIdDisableBody | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysByIdDisableResponse200
     | PostApiGatewayV1VirtualKeysByIdDisableResponse400
@@ -126,7 +127,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PostApiGatewayV1VirtualKeysByIdDisableBody):
+        body (PostApiGatewayV1VirtualKeysByIdDisableBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -152,7 +153,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysByIdDisableBody,
+    body: PostApiGatewayV1VirtualKeysByIdDisableBody | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysByIdDisableResponse200
     | PostApiGatewayV1VirtualKeysByIdDisableResponse400
@@ -168,7 +169,7 @@ def sync(
 
     Args:
         id (str):
-        body (PostApiGatewayV1VirtualKeysByIdDisableBody):
+        body (PostApiGatewayV1VirtualKeysByIdDisableBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -189,7 +190,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysByIdDisableBody,
+    body: PostApiGatewayV1VirtualKeysByIdDisableBody | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysByIdDisableResponse200
     | PostApiGatewayV1VirtualKeysByIdDisableResponse400
@@ -204,7 +205,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PostApiGatewayV1VirtualKeysByIdDisableBody):
+        body (PostApiGatewayV1VirtualKeysByIdDisableBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -228,7 +229,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysByIdDisableBody,
+    body: PostApiGatewayV1VirtualKeysByIdDisableBody | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysByIdDisableResponse200
     | PostApiGatewayV1VirtualKeysByIdDisableResponse400
@@ -244,7 +245,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PostApiGatewayV1VirtualKeysByIdDisableBody):
+        body (PostApiGatewayV1VirtualKeysByIdDisableBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

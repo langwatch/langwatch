@@ -99,19 +99,14 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json`. Three routes serve it and the SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The OpenAPI document is generated from the route declarations and is not committed. The api builds it at boot and serves it at `/api/openapi.json`. The SDK clients and the copy published alongside these docs, `docs/api-reference/openapiLangWatch.json`, are generated from it and committed, and CI fails when they no longer match the routes.
 
 ```bash
-# from the repo root: check that every operation the document lists is still
-# served by a route. It never writes the checked-in artifact, which is edited
-# deliberately, with a diff in front of a person.
-pnpm --filter @langwatch/platform-api run openapi:check
+# from the repo root: write the document to specs/api-reference/openapi-document.json (gitignored)
+pnpm --filter @langwatch/platform-api run openapi:generate
 
-# from sdks/typescript/
-pnpm generate:openapi-types         # regenerate the TS generated client from that spec
-
-# from sdks/python/
-make generate/api-client            # regenerate the Python generated client
+# from the repo root: regenerate the TypeScript, Python and Go clients and the docs copy
+make sync-all-openapi
 ```
 
 The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.

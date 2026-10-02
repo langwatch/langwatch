@@ -20,6 +20,7 @@ export const checkupRest = defineRestRouter(OpsApi)
   .withPermission("organization:view")
   .withOutput(projectCheckupReportSchema)
   .withDocs({
+    operationId: "getApiCheckup",
     summary: "Run the free checks of a self-hosted install",
     description:
       "The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. A project API key reads the verdicts only; what each check found and how to fix it is shown to install administrators on the Settings > Checkup page. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage figures of the key's own organization. Answers 404 on LangWatch Cloud.",
@@ -31,6 +32,7 @@ export const checkupRest = defineRestRouter(OpsApi)
   .withPermission("organization:manage")
   .withOutput(checkupResultSchema)
   .withDocs({
+    operationId: "postApiCheckupRun",
     summary: "Run the checks that open a connection or spend money",
     description:
       "Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. A project API key reads the verdicts only. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.",

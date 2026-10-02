@@ -6,8 +6,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="Timestamps")
 
 
@@ -15,14 +13,14 @@ T = TypeVar("T", bound="Timestamps")
 class Timestamps:
     """
     Attributes:
-        started_at (int | Unset):
-        inserted_at (int | Unset):
-        updated_at (int | Unset):
+        started_at (float):
+        inserted_at (float):
+        updated_at (float):
     """
 
-    started_at: int | Unset = UNSET
-    inserted_at: int | Unset = UNSET
-    updated_at: int | Unset = UNSET
+    started_at: float
+    inserted_at: float
+    updated_at: float
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,24 +32,24 @@ class Timestamps:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if started_at is not UNSET:
-            field_dict["started_at"] = started_at
-        if inserted_at is not UNSET:
-            field_dict["inserted_at"] = inserted_at
-        if updated_at is not UNSET:
-            field_dict["updated_at"] = updated_at
+        field_dict.update(
+            {
+                "started_at": started_at,
+                "inserted_at": inserted_at,
+                "updated_at": updated_at,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        started_at = d.pop("started_at", UNSET)
+        started_at = d.pop("started_at")
 
-        inserted_at = d.pop("inserted_at", UNSET)
+        inserted_at = d.pop("inserted_at")
 
-        updated_at = d.pop("updated_at", UNSET)
+        updated_at = d.pop("updated_at")
 
         timestamps = cls(
             started_at=started_at,

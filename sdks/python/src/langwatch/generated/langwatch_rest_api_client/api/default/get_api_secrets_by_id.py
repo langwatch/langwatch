@@ -6,13 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_secrets_by_id_response_200 import GetApiSecretsByIdResponse200
-from ...types import UNSET, Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -64,13 +64,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> Response[GetApiSecretsByIdResponse200]:
     """Get project-secret metadata
 
     Args:
         id (str):
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -96,13 +96,13 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> GetApiSecretsByIdResponse200 | None:
     """Get project-secret metadata
 
     Args:
         id (str):
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,13 +123,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> Response[GetApiSecretsByIdResponse200]:
     """Get project-secret metadata
 
     Args:
         id (str):
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,13 +153,13 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> GetApiSecretsByIdResponse200 | None:
     """Get project-secret metadata
 
     Args:
         id (str):
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

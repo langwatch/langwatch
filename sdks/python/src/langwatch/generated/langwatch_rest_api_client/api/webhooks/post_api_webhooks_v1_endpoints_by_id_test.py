@@ -61,8 +61,8 @@ def sync_detailed(
     """Send a test event to an endpoint
 
      Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
-    the test itself ran; delivered says whether the receiver accepted it, so clients must read the body,
-    not the status code.
+    the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
+    body, not the status code.
 
     Args:
         id (str):
@@ -94,8 +94,8 @@ def sync(
     """Send a test event to an endpoint
 
      Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
-    the test itself ran; delivered says whether the receiver accepted it, so clients must read the body,
-    not the status code.
+    the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
+    body, not the status code.
 
     Args:
         id (str):
@@ -122,8 +122,8 @@ async def asyncio_detailed(
     """Send a test event to an endpoint
 
      Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
-    the test itself ran; delivered says whether the receiver accepted it, so clients must read the body,
-    not the status code.
+    the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
+    body, not the status code.
 
     Args:
         id (str):
@@ -153,8 +153,8 @@ async def asyncio(
     """Send a test event to an endpoint
 
      Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
-    the test itself ran; delivered says whether the receiver accepted it, so clients must read the body,
-    not the status code.
+    the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
+    body, not the status code.
 
     Args:
         id (str):

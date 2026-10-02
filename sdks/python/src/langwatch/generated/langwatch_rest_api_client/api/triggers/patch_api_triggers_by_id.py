@@ -8,24 +8,25 @@ from ...client import AuthenticatedClient, Client
 from ...models.patch_api_triggers_by_id_body import PatchApiTriggersByIdBody
 from ...models.patch_api_triggers_by_id_response_200 import PatchApiTriggersByIdResponse200
 from ...models.patch_api_triggers_by_id_response_404 import PatchApiTriggersByIdResponse404
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    trigger_id: str,
     *,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/v1/triggers/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/triggers/{trigger_id}".format(
+            trigger_id=quote(str(trigger_id), safe=""),
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -67,16 +68,18 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404]:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
+    changed.
 
     Args:
-        id (str):
-        body (PatchApiTriggersByIdBody):
+        trigger_id (str):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -87,7 +90,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        trigger_id=trigger_id,
         body=body,
     )
 
@@ -99,16 +102,18 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404 | None:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
+    changed.
 
     Args:
-        id (str):
-        body (PatchApiTriggersByIdBody):
+        trigger_id (str):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -119,23 +124,25 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        trigger_id=trigger_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404]:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
+    changed.
 
     Args:
-        id (str):
-        body (PatchApiTriggersByIdBody):
+        trigger_id (str):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -146,7 +153,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        trigger_id=trigger_id,
         body=body,
     )
 
@@ -156,16 +163,18 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404 | None:
-    """Update a trigger (name, active state, message, filters)
+    """Update an automation. Every field is optional and what is left out is left alone, except
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
+    changed.
 
     Args:
-        id (str):
-        body (PatchApiTriggersByIdBody):
+        trigger_id (str):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -177,7 +186,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            trigger_id=trigger_id,
             client=client,
             body=body,
         )

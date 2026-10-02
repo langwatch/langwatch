@@ -310,6 +310,7 @@ export function createTracesRest(): Readonly<{
     .withResponse("bytes", { produces: "application/json" })
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
+      operationId: "postApiTracesSearch",
       description: "Search traces for a project",
       responses: {
         200: {
@@ -334,6 +335,7 @@ export function createTracesRest(): Readonly<{
     .withOutput(traceFacetsResponseSchema)
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
+      operationId: "getApiTracesFacets",
       summary: "Discover what the trace filter fields hold",
       description:
         "Discover what the trace filter fields hold in this project. Without `field`, " +
@@ -365,6 +367,7 @@ export function createTracesRest(): Readonly<{
     .withOutput(transcriptRestResponseSchema)
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
+      operationId: "getApiTracesByTraceIdTranscript",
       description:
         "Derived coding-agent transcript for a trace: what the agent did, in order, " +
         "with per-call token and cost economics. Empty entries for traces without " +
@@ -403,6 +406,7 @@ export function createTracesRest(): Readonly<{
     .withPermission("traces:update")
     .withOutput(traceMetadataResponseSchema)
     .withDocs({
+      operationId: "patchApiTracesByTraceIdMetadata",
       description:
         "Update metadata on a trace after creation. Inserts a synthetic span carrying the new " +
         "attributes through the standard ingestion pipeline. New keys are added, existing keys " +
@@ -427,6 +431,7 @@ export function createTracesRest(): Readonly<{
     .withOutput(traceDetailResponseSchema)
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
+      operationId: "getApiTracesByTraceId",
       description: "Get a single trace by ID.",
       responses: {
         200: {

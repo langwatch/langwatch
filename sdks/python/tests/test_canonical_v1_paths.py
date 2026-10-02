@@ -31,6 +31,8 @@ BARE_PATH = re.compile(r"/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_{}-]+)*)")
 BARE_ONLY = (
     re.compile(r"^/api/traces/[^/]+/transcript$"),
     re.compile(r"^/api/trace/(search|[^/]+(/share|/unshare)?)$"),
+    # Langy's in-process worker families, declared literal with no /api/v1 twin.
+    re.compile(r"^/api/langy/(local|waits|ui)(/|$)"),
 )
 
 

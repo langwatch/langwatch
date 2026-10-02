@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from ..models.metrics import Metrics
     from ..models.output import Output
     from ..models.timestamps import Timestamps
+    from ..models.trace_contexts_item import TraceContextsItem
     from ..models.trace_error_type_0 import TraceErrorType0
     from ..models.trace_events_item import TraceEventsItem
     from ..models.trace_expected_output import TraceExpectedOutput
@@ -31,15 +32,15 @@ T = TypeVar("T", bound="Trace")
 class Trace:
     """
     Attributes:
+        trace_id (str):
+        project_id (str):
+        metadata (Metadata):
+        timestamps (Timestamps):
         spans (list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]):
-        trace_id (str | Unset):
-        project_id (str | Unset):
-        metadata (Metadata | Unset):
         privacy (TracePrivacy | Unset):
-        timestamps (Timestamps | Unset):
         input_ (Input | Unset):
         output (Output | Unset):
-        contexts (list[Any] | Unset):
+        contexts (list[TraceContextsItem] | Unset):
         expected_output (TraceExpectedOutput | Unset):
         metrics (Metrics | Unset):
         error (None | TraceErrorType0 | Unset):
@@ -49,15 +50,15 @@ class Trace:
         redacted_by_visibility_window (bool | Unset):
     """
 
+    trace_id: str
+    project_id: str
+    metadata: Metadata
+    timestamps: Timestamps
     spans: list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]
-    trace_id: str | Unset = UNSET
-    project_id: str | Unset = UNSET
-    metadata: Metadata | Unset = UNSET
     privacy: TracePrivacy | Unset = UNSET
-    timestamps: Timestamps | Unset = UNSET
     input_: Input | Unset = UNSET
     output: Output | Unset = UNSET
-    contexts: list[Any] | Unset = UNSET
+    contexts: list[TraceContextsItem] | Unset = UNSET
     expected_output: TraceExpectedOutput | Unset = UNSET
     metrics: Metrics | Unset = UNSET
     error: None | TraceErrorType0 | Unset = UNSET
@@ -72,6 +73,14 @@ class Trace:
         from ..models.trace_spans_item_type_0 import TraceSpansItemType0
         from ..models.trace_spans_item_type_1 import TraceSpansItemType1
 
+        trace_id = self.trace_id
+
+        project_id = self.project_id
+
+        metadata = self.metadata.to_dict()
+
+        timestamps = self.timestamps.to_dict()
+
         spans = []
         for spans_item_data in self.spans:
             spans_item: dict[str, Any]
@@ -84,21 +93,9 @@ class Trace:
 
             spans.append(spans_item)
 
-        trace_id = self.trace_id
-
-        project_id = self.project_id
-
-        metadata: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.metadata, Unset):
-            metadata = self.metadata.to_dict()
-
         privacy: dict[str, Any] | Unset = UNSET
         if not isinstance(self.privacy, Unset):
             privacy = self.privacy.to_dict()
-
-        timestamps: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.timestamps, Unset):
-            timestamps = self.timestamps.to_dict()
 
         input_: dict[str, Any] | Unset = UNSET
         if not isinstance(self.input_, Unset):
@@ -108,9 +105,12 @@ class Trace:
         if not isinstance(self.output, Unset):
             output = self.output.to_dict()
 
-        contexts: list[Any] | Unset = UNSET
+        contexts: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.contexts, Unset):
-            contexts = self.contexts
+            contexts = []
+            for contexts_item_data in self.contexts:
+                contexts_item = contexts_item_data.to_dict()
+                contexts.append(contexts_item)
 
         expected_output: dict[str, Any] | Unset = UNSET
         if not isinstance(self.expected_output, Unset):
@@ -152,19 +152,15 @@ class Trace:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
+                "trace_id": trace_id,
+                "project_id": project_id,
+                "metadata": metadata,
+                "timestamps": timestamps,
                 "spans": spans,
             }
         )
-        if trace_id is not UNSET:
-            field_dict["trace_id"] = trace_id
-        if project_id is not UNSET:
-            field_dict["project_id"] = project_id
-        if metadata is not UNSET:
-            field_dict["metadata"] = metadata
         if privacy is not UNSET:
             field_dict["privacy"] = privacy
-        if timestamps is not UNSET:
-            field_dict["timestamps"] = timestamps
         if input_ is not UNSET:
             field_dict["input"] = input_
         if output is not UNSET:
@@ -196,6 +192,7 @@ class Trace:
         from ..models.metrics import Metrics
         from ..models.output import Output
         from ..models.timestamps import Timestamps
+        from ..models.trace_contexts_item import TraceContextsItem
         from ..models.trace_error_type_0 import TraceErrorType0
         from ..models.trace_events_item import TraceEventsItem
         from ..models.trace_expected_output import TraceExpectedOutput
@@ -205,6 +202,14 @@ class Trace:
         from ..models.trace_spans_item_type_2 import TraceSpansItemType2
 
         d = dict(src_dict)
+        trace_id = d.pop("trace_id")
+
+        project_id = d.pop("project_id")
+
+        metadata = Metadata.from_dict(d.pop("metadata"))
+
+        timestamps = Timestamps.from_dict(d.pop("timestamps"))
+
         spans = []
         _spans = d.pop("spans")
         for spans_item_data in _spans:
@@ -236,30 +241,12 @@ class Trace:
 
             spans.append(spans_item)
 
-        trace_id = d.pop("trace_id", UNSET)
-
-        project_id = d.pop("project_id", UNSET)
-
-        _metadata = d.pop("metadata", UNSET)
-        metadata: Metadata | Unset
-        if isinstance(_metadata, Unset):
-            metadata = UNSET
-        else:
-            metadata = Metadata.from_dict(_metadata)
-
         _privacy = d.pop("privacy", UNSET)
         privacy: TracePrivacy | Unset
         if isinstance(_privacy, Unset):
             privacy = UNSET
         else:
             privacy = TracePrivacy.from_dict(_privacy)
-
-        _timestamps = d.pop("timestamps", UNSET)
-        timestamps: Timestamps | Unset
-        if isinstance(_timestamps, Unset):
-            timestamps = UNSET
-        else:
-            timestamps = Timestamps.from_dict(_timestamps)
 
         _input_ = d.pop("input", UNSET)
         input_: Input | Unset
@@ -275,7 +262,14 @@ class Trace:
         else:
             output = Output.from_dict(_output)
 
-        contexts = cast(list[Any], d.pop("contexts", UNSET))
+        _contexts = d.pop("contexts", UNSET)
+        contexts: list[TraceContextsItem] | Unset = UNSET
+        if _contexts is not UNSET:
+            contexts = []
+            for contexts_item_data in _contexts:
+                contexts_item = TraceContextsItem.from_dict(contexts_item_data)
+
+                contexts.append(contexts_item)
 
         _expected_output = d.pop("expected_output", UNSET)
         expected_output: TraceExpectedOutput | Unset
@@ -331,12 +325,12 @@ class Trace:
         redacted_by_visibility_window = d.pop("redacted_by_visibility_window", UNSET)
 
         trace = cls(
-            spans=spans,
             trace_id=trace_id,
             project_id=project_id,
             metadata=metadata,
-            privacy=privacy,
             timestamps=timestamps,
+            spans=spans,
+            privacy=privacy,
             input_=input_,
             output=output,
             contexts=contexts,

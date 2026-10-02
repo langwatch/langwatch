@@ -101,7 +101,8 @@ def sync_detailed(
 ]:
     """Archive budget
 
-     Soft-delete: the row is marked archived and no longer counted by the budget engine.
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
+    gatewayBudgets:delete at the organization.
 
     Args:
         id (str):
@@ -139,7 +140,8 @@ def sync(
 ):
     """Archive budget
 
-     Soft-delete: the row is marked archived and no longer counted by the budget engine.
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
+    gatewayBudgets:delete at the organization.
 
     Args:
         id (str):
@@ -171,7 +173,8 @@ async def asyncio_detailed(
 ]:
     """Archive budget
 
-     Soft-delete: the row is marked archived and no longer counted by the budget engine.
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
+    gatewayBudgets:delete at the organization.
 
     Args:
         id (str):
@@ -207,7 +210,8 @@ async def asyncio(
 ):
     """Archive budget
 
-     Soft-delete: the row is marked archived and no longer counted by the budget engine.
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
+    gatewayBudgets:delete at the organization.
 
     Args:
         id (str):

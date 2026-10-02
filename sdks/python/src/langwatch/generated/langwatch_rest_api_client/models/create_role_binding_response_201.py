@@ -5,12 +5,10 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..models.create_role_binding_response_201_role import CreateRoleBindingResponse201Role
 from ..models.create_role_binding_response_201_scope_type import CreateRoleBindingResponse201ScopeType
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.create_role_binding_response_201_principal import CreateRoleBindingResponse201Principal
@@ -32,7 +30,7 @@ class CreateRoleBindingResponse201:
         scope_id (str):
         scope_name (None | str):
         created_at (datetime.datetime):
-        has_legacy_access_notice (bool | Unset):
+        expires_at (datetime.datetime | None):
     """
 
     id: str
@@ -44,8 +42,7 @@ class CreateRoleBindingResponse201:
     scope_id: str
     scope_name: None | str
     created_at: datetime.datetime
-    has_legacy_access_notice: bool | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    expires_at: datetime.datetime | None
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -69,10 +66,14 @@ class CreateRoleBindingResponse201:
 
         created_at = self.created_at.isoformat()
 
-        has_legacy_access_notice = self.has_legacy_access_notice
+        expires_at: None | str
+        if isinstance(self.expires_at, datetime.datetime):
+            expires_at = self.expires_at.isoformat()
+        else:
+            expires_at = self.expires_at
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -84,10 +85,9 @@ class CreateRoleBindingResponse201:
                 "scopeId": scope_id,
                 "scopeName": scope_name,
                 "createdAt": created_at,
+                "expiresAt": expires_at,
             }
         )
-        if has_legacy_access_notice is not UNSET:
-            field_dict["hasLegacyAccessNotice"] = has_legacy_access_notice
 
         return field_dict
 
@@ -129,7 +129,20 @@ class CreateRoleBindingResponse201:
 
         created_at = isoparse(d.pop("createdAt"))
 
-        has_legacy_access_notice = d.pop("hasLegacyAccessNotice", UNSET)
+        def _parse_expires_at(data: object) -> datetime.datetime | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                expires_at_type_0 = isoparse(data)
+
+                return expires_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
+
+        expires_at = _parse_expires_at(d.pop("expiresAt"))
 
         create_role_binding_response_201 = cls(
             id=id,
@@ -141,24 +154,7 @@ class CreateRoleBindingResponse201:
             scope_id=scope_id,
             scope_name=scope_name,
             created_at=created_at,
-            has_legacy_access_notice=has_legacy_access_notice,
+            expires_at=expires_at,
         )
 
-        create_role_binding_response_201.additional_properties = d
         return create_role_binding_response_201
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

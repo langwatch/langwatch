@@ -97,21 +97,13 @@ batch-evaluation-example:
 # and drop the override if upstream PR #1407 has landed.
 OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
 
-ensure-openapi-python-client:
-	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
-
-# The OpenAPI document is a CHECKED-IN artifact owned by the API process. It
-# used to be regenerated here first (`pnpm run task generateOpenAPISpec`); that
-# generator was deleted with the monolith's task lane and has no replacement,
-# so this target reads the document as it stands and fails loudly if it is
-# missing rather than generating a client from nothing.
+# The OpenAPI document is generated from the api's route declarations and never
+# committed, so this target writes it first. The client it produces is
+# committed; CI regenerates it and fails on a diff (the `openapi-clients` job).
 API_SPEC = ../../specs/api-reference/openapi-document.json
 
-generate/api-client: ensure-openapi-python-client
-	@test -f $(API_SPEC) || { \
-		echo "$(API_SPEC) is missing — the Python client is generated from it" >&2; \
-		exit 1; \
-	}
+generate/api-client:
+	@cd ../.. && pnpm --filter @langwatch/platform-api run openapi:generate
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
@@ -126,7 +118,7 @@ generate/api-client: ensure-openapi-python-client
 		--overwrite
 	@echo "Copying necessary files to SDK..."
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
-	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
+	@cp -R .tmp/api-client/lang_watch_api_client/. src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."

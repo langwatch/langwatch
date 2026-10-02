@@ -23,7 +23,8 @@ export const createUnattributedAnnotationSchema = z.object({
 export type CreateUnattributedAnnotationInput = z.output<typeof createUnattributedAnnotationSchema>;
 
 // Existing REST callers receive the complete stored row, including extra projection fields.
-const annotationRestRecordSchema = z.looseObject(annotationSchema.shape);
+// Published as the `Annotation` component the generated clients name their type after.
+const annotationRestRecordSchema = z.looseObject(annotationSchema.shape).meta({ id: "Annotation" });
 
 export const annotationRestResponseSchema = z.object({ data: annotationRestRecordSchema });
 export const annotationRestListResponseSchema = z.object({

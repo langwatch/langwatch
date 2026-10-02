@@ -191,7 +191,6 @@ jobs:
               - 'dev/tests/agentic-e2e/package.json'
               - 'dev/scripts/**'
               - 'dev/tsconfig.web-declarations.json'
-              - 'specs/api-reference/openapi-document.json'
               - 'vendor/**'
               - 'go.work'
               - 'go.work.sum'

@@ -56,7 +56,9 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
   .withDocs({
+    operationId: "postApiEventsTrack",
     summary: "Record a user event",
+    requestBody: { schema: trackEventRESTParamsValidatorSchema },
     description:
       "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. " +
       "Predefined event types validate against their schemas; custom event types pass " +
@@ -93,6 +95,7 @@ export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
   .withDocs({
+    operationId: "postApiTrackEvent",
     summary: "Track an event (legacy path)",
     description:
       "Record a customer event against a trace or thread. Identical to `POST /api/events/track`, " +

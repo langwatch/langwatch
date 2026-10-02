@@ -11,14 +11,17 @@ from ...models.post_api_gateway_v1_cache_rules_response_401 import PostApiGatewa
 from ...models.post_api_gateway_v1_cache_rules_response_403 import PostApiGatewayV1CacheRulesResponse403
 from ...models.post_api_gateway_v1_cache_rules_response_409 import PostApiGatewayV1CacheRulesResponse409
 from ...models.post_api_gateway_v1_cache_rules_response_500 import PostApiGatewayV1CacheRulesResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
     body: PostApiGatewayV1CacheRulesBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -105,6 +108,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1CacheRulesBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1CacheRulesResponse201
     | PostApiGatewayV1CacheRulesResponse400
@@ -118,6 +122,7 @@ def sync_detailed(
      Matchers are ANDed across non-null fields; at least one matcher is required.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1CacheRulesBody):
 
     Raises:
@@ -130,6 +135,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = client.get_httpx_client().request(
@@ -143,6 +149,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1CacheRulesBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1CacheRulesResponse201
     | PostApiGatewayV1CacheRulesResponse400
@@ -157,6 +164,7 @@ def sync(
      Matchers are ANDed across non-null fields; at least one matcher is required.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1CacheRulesBody):
 
     Raises:
@@ -170,6 +178,7 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        idempotency_key=idempotency_key,
     ).parsed
 
 
@@ -177,6 +186,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1CacheRulesBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1CacheRulesResponse201
     | PostApiGatewayV1CacheRulesResponse400
@@ -190,6 +200,7 @@ async def asyncio_detailed(
      Matchers are ANDed across non-null fields; at least one matcher is required.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1CacheRulesBody):
 
     Raises:
@@ -202,6 +213,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -213,6 +225,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1CacheRulesBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1CacheRulesResponse201
     | PostApiGatewayV1CacheRulesResponse400
@@ -227,6 +240,7 @@ async def asyncio(
      Matchers are ANDed across non-null fields; at least one matcher is required.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1CacheRulesBody):
 
     Raises:
@@ -241,5 +255,6 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            idempotency_key=idempotency_key,
         )
     ).parsed

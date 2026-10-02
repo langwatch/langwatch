@@ -91,8 +91,9 @@ Feature: Explicit compatibility version namespaces
   Scenario: The dated and latest aliases are served but never documented
     Given the service declares documentable endpoints
     When the OpenAPI document is generated
-    Then it contains a path for /api/things/things.list
+    Then it contains a path for /api/v1/things/things.list
     And no documented path contains a dated namespace or the latest namespace
+    And the bare /api/things/things.list address is not a second documented path
 
   @unimplemented
   Scenario: Preview never reaches the document
@@ -103,8 +104,8 @@ Feature: Explicit compatibility version namespaces
   @unimplemented
   Scenario: One logical route reaches the document once
     When the OpenAPI document is generated
-    Then the bare path carries the declared operation id
-    And no dated, latest or /api/v1 address appears as a second operation
+    Then the /api/v1 address carries the declared operation id
+    And no dated, latest or bare address appears as a second operation
 
   @integration
   Scenario: A family serves one static generation instead of dated namespaces

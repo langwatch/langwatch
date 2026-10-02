@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    slug: str,
+    dataset_slug: str,
     *,
     body: DatasetPostEntries,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/dataset/{slug}/entries".format(
-            slug=quote(str(slug), safe=""),
+        "url": "/api/v1/dataset/{dataset_slug}/entries".format(
+            dataset_slug=quote(str(dataset_slug), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    slug: str,
+    dataset_slug: str,
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
@@ -69,7 +69,7 @@ def sync_detailed(
     """Add entries to a dataset
 
     Args:
-        slug (str):
+        dataset_slug (str):
         body (DatasetPostEntries):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        dataset_slug=dataset_slug,
         body=body,
     )
 
@@ -93,7 +93,7 @@ def sync_detailed(
 
 
 def sync(
-    slug: str,
+    dataset_slug: str,
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
@@ -101,7 +101,7 @@ def sync(
     """Add entries to a dataset
 
     Args:
-        slug (str):
+        dataset_slug (str):
         body (DatasetPostEntries):
 
     Raises:
@@ -113,14 +113,14 @@ def sync(
     """
 
     return sync_detailed(
-        slug=slug,
+        dataset_slug=dataset_slug,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    slug: str,
+    dataset_slug: str,
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
@@ -128,7 +128,7 @@ async def asyncio_detailed(
     """Add entries to a dataset
 
     Args:
-        slug (str):
+        dataset_slug (str):
         body (DatasetPostEntries):
 
     Raises:
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        slug=slug,
+        dataset_slug=dataset_slug,
         body=body,
     )
 
@@ -150,7 +150,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    slug: str,
+    dataset_slug: str,
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
@@ -158,7 +158,7 @@ async def asyncio(
     """Add entries to a dataset
 
     Args:
-        slug (str):
+        dataset_slug (str):
         body (DatasetPostEntries):
 
     Raises:
@@ -171,7 +171,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            slug=slug,
+            dataset_slug=dataset_slug,
             client=client,
             body=body,
         )

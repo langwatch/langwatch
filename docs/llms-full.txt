@@ -11838,19 +11838,14 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json`. Three routes serve it and the SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The OpenAPI document is generated from the route declarations and is not committed. The api builds it at boot and serves it at `/api/openapi.json`. The SDK clients and the copy published alongside these docs, `docs/api-reference/openapiLangWatch.json`, are generated from it and committed, and CI fails when they no longer match the routes.
 
 ```bash
-# from the repo root: check that every operation the document lists is still
-# served by a route. It never writes the checked-in artifact, which is edited
-# deliberately, with a diff in front of a person.
-pnpm --filter @langwatch/platform-api run openapi:check
+# from the repo root: write the document to specs/api-reference/openapi-document.json (gitignored)
+pnpm --filter @langwatch/platform-api run openapi:generate
 
-# from sdks/typescript/
-pnpm generate:openapi-types         # regenerate the TS generated client from that spec
-
-# from sdks/python/
-make generate/api-client            # regenerate the Python generated client
+# from the repo root: regenerate the TypeScript, Python and Go clients and the docs copy
+make sync-all-openapi
 ```
 
 The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
@@ -68994,6 +68989,15 @@ openapi: "PATCH /api/v1/annotations/{id}"
 
 ---
 
+# FILE: ./api-reference/api-keys/create-an-ingestion-api-key.mdx
+
+---
+title: "Create an ingestion API key"
+openapi: "POST /api/v1/api-keys/ingestion"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/create-api-key.mdx
 
 ---
@@ -69286,11 +69290,20 @@ openapi: "POST /api/v1/dataset/{slugOrId}/upload"
 
 ---
 
+# FILE: ./api-reference/datasets/create-a-dataset-from-an-uploaded-file.mdx
+
+---
+title: "Create a dataset from an uploaded file"
+openapi: "POST /api/v1/dataset/imports"
+---
+
+---
+
 # FILE: ./api-reference/datasets/create-attachments.mdx
 
 ---
 title: "Create Attachments"
-openapi: "POST /api/dataset/attachments"
+openapi: "POST /api/v1/dataset/attachments"
 ---
 
 ---
@@ -69353,7 +69366,7 @@ openapi: "GET /api/v1/dataset/{slugOrId}"
 
 ---
 title: "List entries of a dataset"
-openapi: "GET /api/dataset/{slug}/entries"
+openapi: "GET /api/v1/dataset/{datasetSlug}/entries"
 ---
 
 ---
@@ -69363,6 +69376,15 @@ openapi: "GET /api/dataset/{slug}/entries"
 ---
 title: "List records for a dataset"
 openapi: "GET /api/v1/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/import-an-uploaded-file-into-a-dataset.mdx
+
+---
+title: "Import an uploaded file into a dataset"
+openapi: "POST /api/v1/dataset/{slugOrId}/imports"
 ---
 
 ---
@@ -69393,7 +69415,7 @@ Manage datasets for evaluations, experiments, and fine-tuning. Create, update, u
 
 ---
 title: "Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation."
-openapi: "POST /api/v1/dataset/{slug}/entries"
+openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 ---
 
 ---
@@ -70443,6 +70465,42 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/grants/change-a-grant-s-role.mdx
+
+---
+title: "Change a grant's role"
+openapi: "PATCH /api/v1/grants/{grantId}"
+---
+
+---
+
+# FILE: ./api-reference/grants/get-a-grant.mdx
+
+---
+title: "Get a grant"
+openapi: "GET /api/v1/grants/{grantId}"
+---
+
+---
+
+# FILE: ./api-reference/grants/grant-a-role.mdx
+
+---
+title: "Grant a role"
+openapi: "POST /api/v1/grants"
+---
+
+---
+
+# FILE: ./api-reference/grants/list-grants.mdx
+
+---
+title: "List grants"
+openapi: "GET /api/v1/grants"
+---
+
+---
+
 # FILE: ./api-reference/grants/overview.mdx
 
 ---
@@ -70586,6 +70644,15 @@ langwatch grants revoke <grant_id>
 
 ---
 
+# FILE: ./api-reference/grants/revoke-a-grant.mdx
+
+---
+title: "Revoke a grant"
+openapi: "DELETE /api/v1/grants/{grantId}"
+---
+
+---
+
 # FILE: ./api-reference/graphs/create-graphs.mdx
 
 ---
@@ -70648,7 +70715,7 @@ openapi: "PATCH /api/v1/graphs/{id}"
 
 ---
 title: "Add group binding"
-openapi: "POST /api/v1/groups/{id}/bindings"
+openapi: "POST /api/v1/groups/{groupId}/bindings"
 ---
 
 ---
@@ -70657,7 +70724,7 @@ openapi: "POST /api/v1/groups/{id}/bindings"
 
 ---
 title: "Add group member"
-openapi: "POST /api/v1/groups/{id}/members"
+openapi: "POST /api/v1/groups/{groupId}/members"
 ---
 
 ---
@@ -70675,7 +70742,7 @@ openapi: "POST /api/v1/groups"
 
 ---
 title: "Delete group"
-openapi: "DELETE /api/v1/groups/{id}"
+openapi: "DELETE /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -70684,7 +70751,7 @@ openapi: "DELETE /api/v1/groups/{id}"
 
 ---
 title: "Get group"
-openapi: "GET /api/v1/groups/{id}"
+openapi: "GET /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -70693,7 +70760,7 @@ openapi: "GET /api/v1/groups/{id}"
 
 ---
 title: "List group bindings"
-openapi: "GET /api/v1/groups/{id}/bindings"
+openapi: "GET /api/v1/groups/{groupId}/bindings"
 ---
 
 ---
@@ -70711,7 +70778,7 @@ openapi: "GET /api/v1/groups"
 
 ---
 title: "List group members"
-openapi: "GET /api/v1/groups/{id}/members"
+openapi: "GET /api/v1/groups/{groupId}/members"
 ---
 
 ---
@@ -70836,7 +70903,7 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 
 ---
 title: "Remove group binding"
-openapi: "DELETE /api/v1/groups/{id}/bindings/{bindingId}"
+openapi: "DELETE /api/v1/groups/{groupId}/bindings/{bindingId}"
 ---
 
 ---
@@ -70845,7 +70912,7 @@ openapi: "DELETE /api/v1/groups/{id}/bindings/{bindingId}"
 
 ---
 title: "Remove group member"
-openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
+openapi: "DELETE /api/v1/groups/{groupId}/members/{userId}"
 ---
 
 ---
@@ -70854,7 +70921,7 @@ openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
 
 ---
 title: "Rename group"
-openapi: "PATCH /api/v1/groups/{id}"
+openapi: "PATCH /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -71173,7 +71240,7 @@ curl -X DELETE https://app.langwatch.ai/api/v1/organization/invites/<invite_id> 
 
 ---
 title: "Revoke invite"
-openapi: "DELETE /api/v1/organization/invites/{id}"
+openapi: "DELETE /api/v1/organization/invites/{inviteId}"
 ---
 
 ---
@@ -71503,7 +71570,7 @@ openapi: "POST /api/v1/organizations"
 
 ---
 title: "Get an organization"
-openapi: "GET /api/v1/organizations/{id}"
+openapi: "GET /api/v1/organizations/{organizationId}"
 ---
 
 ---
@@ -73460,7 +73527,7 @@ openapi: "PATCH /api/v1/suites/{id}"
 
 ---
 title: "Add team member"
-openapi: "POST /api/v1/teams/{id}/members"
+openapi: "POST /api/v1/teams/{teamId}/members"
 ---
 
 ---
@@ -73469,7 +73536,7 @@ openapi: "POST /api/v1/teams/{id}/members"
 
 ---
 title: "Archive team"
-openapi: "DELETE /api/v1/teams/{id}"
+openapi: "DELETE /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73487,7 +73554,7 @@ openapi: "POST /api/v1/teams"
 
 ---
 title: "Get team"
-openapi: "GET /api/v1/teams/{id}"
+openapi: "GET /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73496,7 +73563,7 @@ openapi: "GET /api/v1/teams/{id}"
 
 ---
 title: "List team members"
-openapi: "GET /api/v1/teams/{id}/members"
+openapi: "GET /api/v1/teams/{teamId}/members"
 ---
 
 ---
@@ -73505,7 +73572,7 @@ openapi: "GET /api/v1/teams/{id}/members"
 
 ---
 title: "List team projects"
-openapi: "GET /api/v1/teams/{id}/projects"
+openapi: "GET /api/v1/teams/{teamId}/projects"
 ---
 
 ---
@@ -73599,7 +73666,7 @@ curl -X POST https://app.langwatch.ai/api/projects \
 
 ---
 title: "Remove team member"
-openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
+openapi: "DELETE /api/v1/teams/{teamId}/members/{userId}"
 ---
 
 ---
@@ -73608,7 +73675,7 @@ openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
 
 ---
 title: "Update team"
-openapi: "PATCH /api/v1/teams/{id}"
+openapi: "PATCH /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73702,7 +73769,7 @@ openapi: "POST /api/trace/{id}/unshare"
 
 ---
 title: "Discover what the trace filter fields hold"
-openapi: "GET /api/traces/facets"
+openapi: "GET /api/v1/traces/facets"
 ---
 
 ---
@@ -74023,7 +74090,7 @@ openapi: "PATCH /api/v1/traces/{traceId}/metadata"
 
 ---
 title: "Pause an automation"
-openapi: "POST /api/triggers/{id}/disable"
+openapi: "POST /api/v1/triggers/{triggerId}/disable"
 ---
 
 ---
@@ -74032,7 +74099,7 @@ openapi: "POST /api/triggers/{id}/disable"
 
 ---
 title: "Resume an automation"
-openapi: "POST /api/triggers/{id}/enable"
+openapi: "POST /api/v1/triggers/{triggerId}/enable"
 ---
 
 ---
@@ -74041,7 +74108,7 @@ openapi: "POST /api/triggers/{id}/enable"
 
 ---
 title: "Send a test fire"
-openapi: "POST /api/triggers/{id}/test-fire"
+openapi: "POST /api/v1/triggers/{triggerId}/test-fire"
 ---
 
 ---
@@ -74068,7 +74135,7 @@ openapi: "POST /api/v1/triggers"
 
 ---
 title: "Delete a trigger"
-openapi: "DELETE /api/v1/triggers/{id}"
+openapi: "DELETE /api/v1/triggers/{triggerId}"
 ---
 
 ---
@@ -74077,7 +74144,7 @@ openapi: "DELETE /api/v1/triggers/{id}"
 
 ---
 title: "List an automation's fires"
-openapi: "GET /api/triggers/{id}/fires"
+openapi: "GET /api/v1/triggers/{triggerId}/fires"
 ---
 
 ---
@@ -74086,7 +74153,7 @@ openapi: "GET /api/triggers/{id}/fires"
 
 ---
 title: "Get a trigger by its ID"
-openapi: "GET /api/v1/triggers/{id}"
+openapi: "GET /api/v1/triggers/{triggerId}"
 ---
 
 ---
@@ -74095,7 +74162,7 @@ openapi: "GET /api/v1/triggers/{id}"
 
 ---
 title: "List Slack Connections"
-openapi: "GET /api/slack-connections"
+openapi: "GET /api/v1/slack-connections"
 ---
 
 ---
@@ -74307,7 +74374,7 @@ In the CLI, `--action-params` takes the channel's configuration as JSON, and `--
 
 ---
 title: "Update a trigger"
-openapi: "PATCH /api/v1/triggers/{id}"
+openapi: "PATCH /api/v1/triggers/{triggerId}"
 ---
 
 ---

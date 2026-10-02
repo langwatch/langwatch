@@ -52,7 +52,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetRoleResponse200]:
-    """Read one custom role. An id from another organization answers 404 custom_role_not_found.
+    """Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another
+    organization answers 404 custom_role_not_found.
 
     Args:
         id (str):
@@ -81,7 +82,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetRoleResponse200 | None:
-    """Read one custom role. An id from another organization answers 404 custom_role_not_found.
+    """Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another
+    organization answers 404 custom_role_not_found.
 
     Args:
         id (str):
@@ -105,7 +107,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetRoleResponse200]:
-    """Read one custom role. An id from another organization answers 404 custom_role_not_found.
+    """Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another
+    organization answers 404 custom_role_not_found.
 
     Args:
         id (str):
@@ -132,7 +135,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetRoleResponse200 | None:
-    """Read one custom role. An id from another organization answers 404 custom_role_not_found.
+    """Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another
+    organization answers 404 custom_role_not_found.
 
     Args:
         id (str):

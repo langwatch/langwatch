@@ -181,7 +181,6 @@ COPY modules/model-provider/contract/src/catalog/model-catalog.json /src/modules
 COPY modules/scenario/contract/src/suite-fields.ts /src/modules/scenario/contract/src/suite-fields.ts
 COPY modules/scenario/contract/src/evaluator-attachments.ts /src/modules/scenario/contract/src/evaluator-attachments.ts
 COPY packages/redaction/src                           /src/packages/redaction/src
-COPY specs/api-reference/openapi-document.json         /src/specs/api-reference/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
