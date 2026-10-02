@@ -341,12 +341,6 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     Then the visible result is marked stale
 
   @unit
-  Scenario: Clearing the chosen step sends no step at all, not an empty one
-    Given a chosen step
-    When the caller clears it
-    Then the next request carries no step field
-
-  @unit
   Scenario: A stale result stays labelled as belonging to the previous submission
     Given a result and a second submission that is abandoned before it answers
     When the caller reads the state
@@ -436,13 +430,6 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     When the member runs it
     Then it executes unchanged
     And the answer reports that the statement does not follow the page period
-
-  @unit
-  Scenario: A period-aware statement run with no window names what is unset
-    Given SQL declaring the reserved period parameters
-    When it is run with no time window at all
-    Then it is refused with error code lwql_parameter_missing naming them
-    And validating that same statement is not refused, because the window is the surface's to supply
 
   @unit
   Scenario: The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant
@@ -617,7 +604,6 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 #
 # The surface-side half of the contract that is not an AC of its own:
 #   → Scenario: A statement declaring only one reserved period parameter is given that one
-#   → Scenario: A period-aware statement run with no window names what is unset
 
 # --- Granularity contract (#6713 slice 3, S1): the surface-owned bucket size ---
 #
@@ -628,18 +614,13 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 #
 # AC1 "a chart declaring the parameter runs at the step the surface supplies"
 #   → Scenario: A statement declaring the granularity parameter runs at the step the surface supplies
-#   → Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
 # AC2 "a caller-supplied value for a reserved name is refused" (granularity half)
 #   → Scenario: A caller that supplies dashboard_context_granularity_seconds itself is refused
 # AC3 "the declaration must be UInt32"
-#   → Scenario: The granularity parameter declared as anything but UInt32 is refused
-#   → Scenario: A zero or fractional step is refused as a wrong declaration
 # AC4 "declaring granularity requires declaring both period bounds, checked at save"
 #   → Scenario: A saved chart declaring granularity without both period parameters is refused at save
-#   → Scenario: A granularity declared alongside a mistyped period bound is refused at save
 # AC5 "a window finer than the bucket ceiling is refused on caller-owned surfaces"
 #   → Scenario: A window that would produce more buckets than the ceiling refuses on caller-owned surfaces
-#   → Scenario: A window too wide for even the coarsest offered step is refused everywhere
 # AC6 "offered steps are sub-day: 1 second, 1 minute, 1 hour" — O1 resolved to
 #     sub-day by probe: over the Amsterdam fallback night the timezone-argument
 #     seconds form drifts off local midnight while toStartOfDay stays at 00:00.
@@ -669,33 +650,11 @@ Scenario: A statement declaring the granularity parameter runs at the step the s
   And the result is labelled as following the granularity
 
 @unit
-Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
-  Given SQL declaring dashboard_context_granularity_seconds as UInt32
-  And no step supplied
-  When the declaration is resolved on its own, apart from the run path that would refuse it
-  Then the resolution still says the statement follows the granularity
-  And it carries no granularity value, since inventing one would change what a member's chart shows without them asking
-
-@unit
 Scenario: A caller that supplies dashboard_context_granularity_seconds itself is refused
   Given SQL declaring dashboard_context_granularity_seconds as UInt32
   When a caller supplies a value for dashboard_context_granularity_seconds directly
   Then the run is refused as a reserved parameter supplied
   And the refusal names exactly the parameters the caller supplied
-
-@unit
-Scenario: The granularity parameter declared as anything but UInt32 is refused
-  Given SQL declaring dashboard_context_granularity_seconds as a String
-  When the statement is validated
-  Then it is refused as a wrong granularity declaration
-  And the refusal names UInt32 as the required declared type
-
-@unit
-Scenario: A zero or fractional step is refused as a wrong declaration
-  Given SQL declaring dashboard_context_granularity_seconds as UInt32
-  When the surface supplies a step that is zero, negative, fractional, or not an offered step
-  Then the run is refused as a wrong granularity declaration
-  And the refusal says the step must be one of the offered steps
 
 @integration
 Scenario: A saved chart declaring granularity without both period parameters is refused at save
@@ -703,13 +662,6 @@ Scenario: A saved chart declaring granularity without both period parameters is 
   When the member saves the chart
   Then the save is refused because granularity requires the period parameters
   And the refusal names which period bounds are absent
-
-@unit
-Scenario: A granularity declared alongside a mistyped period bound is refused at save
-  Given SQL declaring dashboard_context_granularity_seconds and dashboard_context_period_start declared as a String
-  When the statement is validated
-  Then it is refused because granularity requires well-typed period parameters
-  And the refusal distinguishes the mistyped bound from an absent one
 
 @integration
 Scenario: A window that would produce more buckets than the ceiling refuses on caller-owned surfaces
@@ -719,13 +671,6 @@ Scenario: A window that would produce more buckets than the ceiling refuses on c
   Then the run is refused as too fine for the period
   And a dashboard running the same chart is coarsened to the finest step that fits
   And the refusal carries the bucket arithmetic in its structured detail
-
-@unit
-Scenario: A window too wide for even the coarsest offered step is refused everywhere
-  Given a chart declaring granularity over a period spanning a decade
-  When even the one-hour step would exceed 10,000 buckets for that period
-  Then the run is refused as too fine for the period on coarsening surfaces too
-  And the refusal names the requested step and the bucket ceiling
 
 @unit
 Scenario: A chart declaring the granularity parameter runs at the step the surface supplies

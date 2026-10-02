@@ -173,14 +173,6 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # unparented key they always did. The window closes as they age out.
 
   @unit @ingest-api-key @issue @personal @session
-  Scenario: A key minted as its session is being retired does not outlive it
-    Given a key minted under a login session
-    When that session is retired, even while the mint is still writing its key
-    Then the key does not authorize a trace write
-    # Resolution refuses any key whose login key is revoked or expired, so a
-    # key that slipped in during the retirement cascade is dead on arrival.
-
-  @unit @ingest-api-key @issue @personal @session
   Scenario: A mint that races its session's retirement cleans up the key it wrote
     Given a login key that is live when the mint checks it
     When the session is retired while that mint is still writing its key

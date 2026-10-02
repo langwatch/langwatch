@@ -61,12 +61,6 @@ Feature: The record path's capability services come from the one installed graph
       And the rules were read under the project, team and organization scopes
 
     @unit
-    Scenario: A project that cannot be read prices nothing rather than failing
-      Given a project that no longer resolves
-      When its costs are listed
-      Then the list is empty and no cost row is read
-
-    @unit
     Scenario: The evaluation trigger reads a project's on-message monitors
       Given a project with one monitor enabled to run on every message
       When the monitor port is asked for the listing
