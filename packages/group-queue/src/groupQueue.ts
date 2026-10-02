@@ -1,8 +1,32 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks here are deliberate no-ops.
-
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { performance } from "node:perf_hooks";
+
+const LATENCY_SAMPLE_SIZE = 200;
+const LATENCY_MINUTE_BUCKET_TTL_SECONDS = 2 * 60 * 60;
+const LATENCY_HOUR_BUCKET_TTL_SECONDS = 8 * 24 * 60 * 60;
+
+function latencyBucketField(durationMs: number): string {
+  for (let power = 1; power <= 524_288; power *= 2) {
+    if (durationMs <= power) return String(power);
+    if (durationMs <= power * 1.5) return String(power * 1.5);
+  }
+  return "+Inf";
+}
+
+function latencyMinuteBucketKey(queueName: string, nowMs: number): string {
+  return `${queueName}:gq:stats:lat-hist:m:${Math.floor(nowMs / 60_000)}`;
+}
+
+function latencyHourBucketKey(queueName: string, nowMs: number): string {
+  return `${queueName}:gq:stats:lat-hist:h:${Math.floor(nowMs / 3_600_000)}`;
+}
+
+function latencyAllTimeKey(queueName: string): string {
+  return `${queueName}:gq:stats:lat-hist:all`;
+}
+
 // Imported rather than read off the global: the constructor destructures a
 // `process` handler out of the queue definition, and a class field initializer
 // runs inside that same scope — so a bare `process.pid` here resolves to the
@@ -48,15 +72,6 @@ import {
   readJobRoutingMeta,
   withJobAttempt,
 } from "./jobEnvelope.ts";
-import {
-  LATENCY_HOUR_BUCKET_TTL_SECONDS,
-  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
-  LATENCY_SAMPLE_SIZE,
-  latencyAllTimeKey,
-  latencyBucketField,
-  latencyHourBucketKey,
-  latencyMinuteBucketKey,
-} from "./latency.ts";
 import {
   gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
