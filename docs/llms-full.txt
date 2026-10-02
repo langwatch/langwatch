@@ -62759,7 +62759,7 @@ helm uninstall langwatch --namespace langwatch
 ```
 
 <Warning>
-This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted, together with the uploaded files and datasets on it. Back it up first.
+This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted. With the `Delete` reclaim policy, the default for most dynamically provisioned storage classes, the uploaded files and datasets on it are deleted too. With `Retain`, the PersistentVolume and its data stay behind and need manual cleanup. Back it up first.
 
 With `autogen.enabled=true`, the generated app Secret and the PostgreSQL and Redis password Secrets are deleted too; see the warning under [Quick Start](#quick-start). Delete the remaining claims manually if you want a clean removal:
 
@@ -63881,7 +63881,7 @@ To let Langy clone and push (open PRs), you enable egress. The pod's traffic the
 
 LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gateway](/ai-gateway/self-hosting/helm).
 
-The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is opt-in and needs the Cilium CNI. The details are below and in [The sandbox](/langy/security/sandbox).
+The one boundary to understand before you rely on this in a regulated environment: once `networkPolicy.allowExternalHttps` is `true`, the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is opt-in and needs the Cilium CNI. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
 **Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
@@ -63976,7 +63976,7 @@ An operator can also place the pod on an opt-in public-subnet node group (a node
 State this plainly for a regulated review. Today (ADR-053, Proposed):
 
 - **Shipped.** The L3/L4 NetworkPolicy is deny-by-default: `:443` to anywhere is off unless you enable it, and private ranges, CGNAT, and cloud metadata are blocked regardless. The default service-account token is dropped. Node placement on a public subnet with no route to the data tier is available. The L7 adapter's require-TLS, SNI cross-check, and FQDN floor apply to traffic that goes through the proxy.
-- **Cooperative, not mandatory.** The L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
+- **Cooperative, not mandatory.** With `networkPolicy.allowExternalHttps: true`, the L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
 - **Opt-in, Cilium only.** `langyagent.egress.cilium.enabled: true` renders a `CiliumNetworkPolicy` with `toFQDNs` on the floor, which a worker cannot bypass. It needs the Cilium CNI and is off by default. It enforces the operator floor only; per-project allow-lists stay with the L7 adapter.
 - **Designed, not shipped.** A per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`), the equivalent for clusters without Cilium.
 
@@ -65435,7 +65435,9 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
 **SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
 
-**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key. Older project keys are stored as-is on the project and compared directly.
+**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key.
+
+Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-256 hash until their next use, when it is rewritten as HMAC; older project keys are stored as-is on the project and compared directly.
 
 ## Encryption
 
@@ -65468,7 +65470,7 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 **Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
 
 - Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
-- Every API key in the current format stops authenticating and has to be recreated. Older project keys keep working.
+- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
 - In-flight signed tokens are rejected and the user starts that flow again.
 
 The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.

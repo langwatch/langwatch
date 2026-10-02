@@ -523,7 +523,7 @@ helm uninstall langwatch --namespace langwatch
 ```
 
 <Warning>
-This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted, together with the uploaded files and datasets on it. Back it up first.
+This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted. With the `Delete` reclaim policy, the default for most dynamically provisioned storage classes, the uploaded files and datasets on it are deleted too. With `Retain`, the PersistentVolume and its data stay behind and need manual cleanup. Back it up first.
 
 With `autogen.enabled=true`, the generated app Secret and the PostgreSQL and Redis password Secrets are deleted too; see the warning under [Quick Start](#quick-start). Delete the remaining claims manually if you want a clean removal:
 

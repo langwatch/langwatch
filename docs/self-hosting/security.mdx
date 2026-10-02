@@ -19,7 +19,9 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
 **SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
 
-**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key. Older project keys are stored as-is on the project and compared directly.
+**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key.
+
+Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-256 hash until their next use, when it is rewritten as HMAC; older project keys are stored as-is on the project and compared directly.
 
 ## Encryption
 
@@ -52,7 +54,7 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 **Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
 
 - Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
-- Every API key in the current format stops authenticating and has to be recreated. Older project keys keep working.
+- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
 - In-flight signed tokens are rejected and the user starts that flow again.
 
 The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.
