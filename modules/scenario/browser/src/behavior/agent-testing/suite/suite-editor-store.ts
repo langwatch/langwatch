@@ -5,8 +5,8 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import type { EvaluatorAttachment, SuiteFieldType } from "@langwatch/scenario-contract";
-import { create } from "zustand";
 
 /** One row of the fields section. */
 export type SuiteFieldRow = {
@@ -46,12 +46,15 @@ type SuiteEditorStore = {
   clear: () => void;
 };
 
-export const useSuiteEditorStore = create<SuiteEditorStore>((set) => ({
-  suiteId: null,
-  draft: null,
-  pendingAttachmentId: null,
-  seed: ({ suiteId, draft }) => set({ suiteId, draft }),
-  update: (change) => set((state) => (state.draft ? { draft: change(state.draft) } : state)),
-  setPendingAttachmentId: (attachmentId) => set({ pendingAttachmentId: attachmentId }),
-  clear: () => set({ suiteId: null, draft: null, pendingAttachmentId: null }),
-}));
+export const useSuiteEditorStore = defineSlice<SuiteEditorStore>({
+  name: "scenario:suite-editor",
+  create: (set) => ({
+    suiteId: null,
+    draft: null,
+    pendingAttachmentId: null,
+    seed: ({ suiteId, draft }) => set({ suiteId, draft }),
+    update: (change) => set((state) => (state.draft ? { draft: change(state.draft) } : state)),
+    setPendingAttachmentId: (attachmentId) => set({ pendingAttachmentId: attachmentId }),
+    clear: () => set({ suiteId: null, draft: null, pendingAttachmentId: null }),
+  }),
+});

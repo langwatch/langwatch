@@ -1,6 +1,5 @@
 export {
   COMPUTE_METRICS_RETRY_DELAY_MS,
-  ComputeRunMetricsAdapter,
   ComputeRunMetricsCommand,
   scenarioDeferredComputeRunMetricsJob,
 } from "./eventing/compute-run-metrics.commands.ts";

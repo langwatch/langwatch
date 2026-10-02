@@ -204,7 +204,9 @@ export class ScenarioExecutorService {
   #withoutExecutor(reason: "no-telemetry-endpoint" | "no-nlp-engine"): void {
     logger.warn(
       { reason },
-      "worker composed no scenario executor: the simulation pipeline's execute intent refuses a queued run into the outbox, and the run starts only once a pod that composes one takes it",
+      "worker composed no scenario executor: the simulation pipeline's execute intent " +
+        "refuses a queued run into the outbox, and the run starts only once a pod that " +
+        "composes one takes it",
     );
   }
 }

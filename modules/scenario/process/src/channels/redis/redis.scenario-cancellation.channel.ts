@@ -36,20 +36,6 @@ export class RedisScenarioCancellationPublisherChannel implements CancellationPu
   }
 }
 
-export class UnavailableCancellationPublisherAdapter implements CancellationPublisherPort {
-  static create(): UnavailableCancellationPublisherAdapter {
-    return new UnavailableCancellationPublisherAdapter();
-  }
-
-  private constructor() {}
-
-  publish(message: CancellationMessage): Promise<void> {
-    return Promise.reject(
-      new Error(`Cancellation transport unavailable for scenarioRunId=${message.scenarioRunId}`),
-    );
-  }
-}
-
 export class RedisScenarioCancellationSubscriberChannel implements CancellationSubscriberPort {
   static create(
     subscriber: CancellationSubscriberClient,

@@ -27,7 +27,10 @@ export const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
 const SCENARIO_GENERATE_MAX_RETRIES = 1;
 const logger = createLogger("langwatch:scenario:generation");
 
-const SYSTEM_PROMPT = `You are a scenario generation assistant for LangWatch. Your job is to help users create behavioral test scenarios for their AI agents. You will respond with a JSON object containing the scenario details.
+const SYSTEM_PROMPT =
+  `You are a scenario generation assistant for LangWatch. Your job is to help users ` +
+  `create behavioral test scenarios for their AI agents. You will respond with a JSON ` +
+  `object containing the scenario details.
 
 Given a description of an agent and desired scenario, generate:
 

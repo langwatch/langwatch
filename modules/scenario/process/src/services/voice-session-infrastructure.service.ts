@@ -114,6 +114,30 @@ function createCredentialReader(
   };
 }
 
+function createExistingRunReader(
+  simulations: VoiceSessionServices["simulations"],
+): VoiceSessionInfrastructure["findExistingRun"] {
+  return async ({ projectId, scenarioRunId }) => {
+    const run = await simulations.findScenarioRunData({
+      projectId,
+      scenarioRunId,
+    });
+    if (!run) return null;
+    // The status decides whether a retried finish short-circuits (written)
+    // or re-drives a half-written run (#7973). The persisted source,
+    // recording and set let a terminal retry report the original run's
+    // transcript origin, Play control and deep link (AC14).
+    return {
+      ...narrowPersistedRunFields(run.metadata),
+      status: run.status,
+      // The scenario and set the run landed under, reused on a re-drive so a
+      // scenario archived between attempts cannot break the retry (#7973 AC1).
+      scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
+      scenarioSetId: typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
+    };
+  };
+}
+
 /**
  * Compose the infrastructure from already-built collaborators. Every
  * production caller goes through the module's composition, which supplies the
@@ -157,25 +181,7 @@ function createVoiceSessionInfrastructureFromServices({
       });
     },
 
-    async findExistingRun({ projectId, scenarioRunId }) {
-      const run = await simulations.findScenarioRunData({
-        projectId,
-        scenarioRunId,
-      });
-      if (!run) return null;
-      // The status decides whether a retried finish short-circuits (written)
-      // or re-drives a half-written run (#7973). The persisted source,
-      // recording and set let a terminal retry report the original run's
-      // transcript origin, Play control and deep link (AC14).
-      return {
-        ...narrowPersistedRunFields(run.metadata),
-        status: run.status,
-        // The scenario and set the run landed under, reused on a re-drive so a
-        // scenario archived between attempts cannot break the retry (#7973 AC1).
-        scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
-        scenarioSetId: typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
-      };
-    },
+    findExistingRun: createExistingRunReader(simulations),
 
     async createVoiceAgent({ projectId, name, transport, agentId }) {
       // Deduped by identity key inside the service, so a retried finish for a

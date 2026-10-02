@@ -1,8 +1,4 @@
-import {
-  type UiScenarioRunDetailDrawerProps,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { Chip } from "@langwatch/design-system/chip";
 import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
@@ -45,6 +41,11 @@ function formatResultsForCopy(results: unknown): string {
 }
 
 export { formatResultsForCopy };
+
+/** What a caller hands scenario's run detail drawer; the run itself travels as URL params. */
+export type UiScenarioRunDetailDrawerProps = {
+  open?: boolean;
+};
 
 /**
  * The run detail drawer. The Agent Testing pages open the same registry key

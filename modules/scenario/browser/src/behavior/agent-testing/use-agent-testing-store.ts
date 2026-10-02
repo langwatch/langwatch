@@ -2,11 +2,9 @@
  * Ephemeral view state for the Agent Testing page.
  */
 
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import type { TargetValue } from "../../model/scenario-target.ts";
-
-export const AGENT_TESTING_RAIL_COLLAPSED_KEY = "agent-testing-rail-collapsed" as const;
 
 export type AgentTestingViewMode = "table" | "grid";
 
@@ -70,25 +68,6 @@ export interface AgentTestingState {
   hydrateFromUrl: (query: QueryLike) => void;
 }
 
-function readStoredRailCollapsed(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(AGENT_TESTING_RAIL_COLLAPSED_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function storeRailCollapsed(isCollapsed: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(AGENT_TESTING_RAIL_COLLAPSED_KEY, String(isCollapsed));
-  } catch {
-    // localStorage unavailable
-    return;
-  }
-}
-
 /**
  * Every param the address already carries, including the route params the
  * catch-all page needs ("project" and the "path" array).
@@ -109,14 +88,13 @@ function extractStringParam(query: QueryLike, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-/**
- * Creates a fresh store. Exported so a test gets its own instance; components
- * use the shared `useAgentTestingStore` below.
- */
-export function createAgentTestingStore() {
-  return create<AgentTestingState>((set, get) => ({
+/** The page's view state; only the rail pick persists, per reader (§10.2). */
+export const useAgentTestingStore = defineSlice<AgentTestingState>({
+  name: "scenario:agent-testing",
+  persist: { partialize: ({ railCollapsed }) => ({ railCollapsed }) },
+  create: (set, get) => ({
     viewMode: "table",
-    railCollapsed: readStoredRailCollapsed(),
+    railCollapsed: false,
     expandedTestSuiteIds: new Set<string>(),
     lastRunTarget: null,
     pendingRun: null,
@@ -125,16 +103,9 @@ export function createAgentTestingStore() {
 
     setViewMode: (value) => set({ viewMode: value }),
 
-    setRailCollapsed: (isCollapsed) => {
-      storeRailCollapsed(isCollapsed);
-      set({ railCollapsed: isCollapsed });
-    },
+    setRailCollapsed: (isCollapsed) => set({ railCollapsed: isCollapsed }),
 
-    toggleRailCollapsed: () => {
-      const next = !get().railCollapsed;
-      storeRailCollapsed(next);
-      set({ railCollapsed: next });
-    },
+    toggleRailCollapsed: () => set({ railCollapsed: !get().railCollapsed }),
 
     setTestSuiteExpanded: (testSuiteId, expanded) => {
       set((state) => {
@@ -185,11 +156,8 @@ export function createAgentTestingStore() {
       const view = extractStringParam(query, "view");
       set({ viewMode: isViewMode(view) ? view : "table" });
     },
-  }));
-}
-
-/** Shared store for the page. */
-export const useAgentTestingStore = createAgentTestingStore();
+  }),
+});
 
 function expandedTestSuites(
   current: Set<string>,

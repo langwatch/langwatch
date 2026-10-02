@@ -47,6 +47,37 @@ function toMessages(
   }));
 }
 
+/** The run metadata a scenario call is written with. */
+function runMetadata({
+  agentDisplayName,
+  agentRowId,
+  record,
+}: {
+  agentDisplayName: string;
+  agentRowId: string;
+  record: CallRecord;
+}) {
+  return {
+    name: agentDisplayName,
+    caller: "You",
+    // The results table and run header read the caller off langwatch
+    // metadata, the same place a simulated run records "simulated" (AC24),
+    // so a scenario call shows "You" in the scenario's run list beside them.
+    langwatch: {
+      targetType: "voice" as const,
+      targetReferenceId: agentRowId,
+      callerKind: HUMAN_CALLER_KIND,
+      isCutAtLimit: record.isCutAtLimit,
+    },
+    callerKind: HUMAN_CALLER_KIND,
+    source: record.source,
+    transport: record.transport,
+    conversationId: record.conversationId,
+    agentId: agentRowId,
+    ...(record.audioUrl ? { audioUrl: record.audioUrl } : {}),
+  };
+}
+
 /**
  * The scenario a "Call it myself" run is written under, and the set it shares
  * with that scenario's simulated runs. Always present: only a scenario call is
@@ -98,25 +129,7 @@ function createVoiceCallRunWriter(
     const scenarioId = scenario.scenarioId;
     const scenarioSetId = scenario.scenarioSetId;
 
-    const metadata = {
-      name: agentDisplayName,
-      caller: "You",
-      // The results table and run header read the caller off langwatch
-      // metadata, the same place a simulated run records "simulated" (AC24),
-      // so a scenario call shows "You" in the scenario's run list beside them.
-      langwatch: {
-        targetType: "voice" as const,
-        targetReferenceId: agentRowId,
-        callerKind: HUMAN_CALLER_KIND,
-        isCutAtLimit: record.isCutAtLimit,
-      },
-      callerKind: HUMAN_CALLER_KIND,
-      source: record.source,
-      transport: record.transport,
-      conversationId: record.conversationId,
-      agentId: agentRowId,
-      ...(record.audioUrl ? { audioUrl: record.audioUrl } : {}),
-    };
+    const metadata = runMetadata({ agentDisplayName, agentRowId, record });
 
     await collaborators.simulations.startRun({
       tenantId: projectId,
