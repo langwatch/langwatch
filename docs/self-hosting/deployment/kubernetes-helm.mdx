@@ -44,7 +44,9 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on the first install. This is fine for testing but not for production. `helm upgrade` reads the existing Secrets back and keeps every value.
+
+`helm uninstall` deletes the app Secret, so a reinstall generates new values: sessions end, stored model provider keys can no longer be decrypted, and API keys and virtual keys stop working (see [Credentials secret](/self-hosting/security#credentials-secret)). The chart-managed PostgreSQL also gets a new password while its retained volume keeps the old one. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ### Operator access and feature flags
@@ -79,7 +81,7 @@ See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for w
 
 ## Low-Resources Deployment
 
-The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
+The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.8 CPU and ~6.9 Gi RAM**:
 
 ```bash
 helm pull langwatch/langwatch --untar
@@ -128,7 +130,7 @@ Every key name can be changed to match your secret store, for example the dashed
 | `password` | Always |
 | `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
 
-**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords. With `autogen.enabled=false` the render fails without them, because a generated password would change on every Argo CD sync.
+**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords, with the key names in `redis.auth.secretKeys.passwordKey` and `postgresql.auth.secretKeys.*`. With `autogen.enabled=false` the render fails without them (or an inline `redis.auth.password` / `postgresql.auth.password`), because a generated password would change on every Argo CD sync.
 
 A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead. Argo CD renders without cluster access, so under Argo CD only the pod error shows it.
 
@@ -171,7 +173,7 @@ kubectl create secret generic langwatch-redis \
 
 ### 2. Create a Values File
 
-Start from the production example and customize. This configuration requests approximately **~8.5 CPU and ~28 Gi RAM** across all pods:
+Start from the production example and customize. This configuration requests approximately **~8.4 CPU and ~32 Gi RAM** across all pods:
 
 ```yaml
 # values-production.yaml
@@ -192,6 +194,14 @@ app:
     limits: { cpu: 1000m, memory: 4Gi }
   podDisruptionBudget:
     minAvailable: 1
+  # More than one app or worker replica cannot share the default
+  # local-filesystem volume, so the chart refuses to render until object
+  # storage is on. Credentials come from app.dataplane.providers.awsS3.*,
+  # or from IRSA on the ServiceAccount set in global.serviceAccount.
+  dataplane:
+    enabled: true
+    provider: awsS3
+    bucket: langwatch-objects
 
 workers:
   enabled: true
@@ -298,7 +308,7 @@ Then follow [First run](/self-hosting/first-run) to create the first account, ad
 
 ## High-Availability Deployment
 
-For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:
+For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~31 CPU and ~88 Gi RAM** across all pods:
 
 ```yaml
 # values-ha.yaml (extends production values above)
@@ -380,8 +390,9 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
 | _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2.6 CPU, ~6.7 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~8.7 CPU, ~23 Gi |
+| `size-minimal.yaml` | CI smoke tests, tiny demos | ~2.6 CPU, ~5.2 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2.8 CPU, ~6.9 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~8.9 CPU, ~23 Gi |
 | `size-ha.yaml` | HA production, replicated CH | ~23 CPU, ~85 Gi |
 
 ### Access Overlays
@@ -401,6 +412,9 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
 | `cold-storage-s3.yaml` | S3 cold storage + backups |
 | `local-images.yaml` | Local images with `pullPolicy: Never` |
+| `langy-disabled.yaml` | Runs without the Langy assistant pod |
+| `langy-gvisor.yaml` | Runs Langy under the gVisor sandbox runtime |
+| `strict-admission.yaml` | Pod Security Admission `restricted` clusters |
 
 ### Composing Overlays
 
@@ -414,6 +428,8 @@ helm install langwatch langwatch/langwatch \
   -f examples/overlays/postgres-external.yaml \
   -f examples/overlays/redis-external.yaml \
   -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-data \
+  --set clickhouse.objectStorage.region=us-east-1 \
   --set autogen.enabled=true
 ```
 
@@ -444,7 +460,7 @@ clickhouse:
     url:
       value: "http://user:password@clickhouse-host:8123/langwatch"
     # For replicated instances:
-    clusterName: "my_cluster"
+    cluster: "my_cluster"
 ```
 
 The chart-managed ClickHouse is pinned to a version the release is tested
@@ -476,7 +492,7 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are a HorizontalPodAutoscaler running 2 to 10 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
@@ -507,7 +523,9 @@ helm uninstall langwatch --namespace langwatch
 ```
 
 <Warning>
-This does not delete PersistentVolumeClaims. Your data in PostgreSQL, ClickHouse, and Redis PVCs is preserved. Delete them manually if you want a clean removal:
+This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted. With the `Delete` reclaim policy, the default for most dynamically provisioned storage classes, the uploaded files and datasets on it are deleted too. With `Retain`, the PersistentVolume and its data stay behind and need manual cleanup. Back it up first.
+
+With `autogen.enabled=true`, the generated app Secret and the PostgreSQL and Redis password Secrets are deleted too; see the warning under [Quick Start](#quick-start). Delete the remaining claims manually if you want a clean removal:
 
 ```bash
 kubectl -n langwatch delete pvc --all
@@ -518,9 +536,9 @@ kubectl -n langwatch delete pvc --all
 
 ### Istio, Service Mesh
 
-If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
+If you're using Istio or another service mesh with automatic sidecar injection, Job pods may never finish because the sidecar keeps the pod alive after the main container exits.
 
-Disable sidecar injection for CronJobs:
+The chart ships no CronJobs of its own (`cronjobs.jobs` is empty by default). If you add jobs there, disable sidecar injection for them:
 
 ```yaml
 cronjobs:
@@ -528,6 +546,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ### Two installs in one cluster
 
@@ -563,6 +583,6 @@ redis:
 
 For clusters without internet access:
 1. Push LangWatch images to your private registry
-2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
-3. Set `imagePullSecrets` if your registry requires authentication
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
+3. If your registry requires authentication, attach the pull secret to the ServiceAccount the pods use. The chart has no chart-wide `imagePullSecrets` value; see [Private Registries](/self-hosting/deployment/docker-images#private-registries)
 4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`

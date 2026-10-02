@@ -59886,11 +59886,11 @@ If you're using the chart-managed PostgreSQL (development/small deployments), us
 
 ```bash
 # Create a backup
-kubectl exec -n langwatch deploy/langwatch-postgresql -- \
+kubectl exec -n langwatch statefulset/langwatch-postgresql -- \
   pg_dump -U postgres langwatch > backup-$(date +%Y%m%d).sql
 
 # Restore from backup
-kubectl exec -i -n langwatch deploy/langwatch-postgresql -- \
+kubectl exec -i -n langwatch statefulset/langwatch-postgresql -- \
   psql -U postgres langwatch < backup-20260407.sql
 ```
 
@@ -59937,8 +59937,12 @@ Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and ba
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-prod.yaml \
-  -f examples/overlays/cold-storage-s3.yaml
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-backups \
+  --set clickhouse.objectStorage.region=us-east-1
 ```
+
+The overlay leaves `bucket` and `region` empty, and the chart refuses to render without them.
 
 ### S3 Authentication
 
@@ -59962,8 +59966,8 @@ clickhouse:
     credentials:
       secretKeyRef:
         name: clickhouse-s3-creds    # K8s secret name
-        accessKeyKey: "accessKey"
-        secretKeyKey: "secretKey"
+        accessKeyId: "accessKey"       # key in the secret that holds the access key ID
+        secretAccessKey: "secretKey"   # key in the secret that holds the secret access key
 ```
 
 ### Backup Schedule
@@ -59973,7 +59977,7 @@ clickhouse:
 | Full | `0 */12 * * *` (every 12h) | Complete database backup |
 | Incremental | `0 * * * *` (every 1h) | Only changes since last full backup |
 
-Both are implemented as Kubernetes CronJobs that run `clickhouse-client` commands inside the ClickHouse pod.
+Both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network.
 
 ### Restore from Backup
 
@@ -60297,18 +60301,23 @@ When using the Helm chart, you rarely need to set environment variables directly
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection | No | `180` |
 | `REDIS_URL` | Redis connection string | Yes | - |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes | - |
-| `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
-| `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
+| `BASE_HOST` | Public URL of the application, used in invite links, emails and the links the app hands out | Yes | - |
+| `NEXTAUTH_URL` | Public URL the sign-in layer checks every request origin and callback against. Must match the address users open | Yes | - (Helm: same as `BASE_HOST`) |
+| `LANGWATCH_ENDPOINT` | Address the app hands out as itself: callback URL for the NLP engine, Langy and scenario runs, and the endpoint shown in setup snippets | Yes | - |
+| `START_WORKERS` | `true` starts a workers process next to the app in the same container. Leave unset when workers run as their own container or Deployment | No | `false` |
 
 ## Secrets
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
-| `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key | Yes |
-| `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
+| `NEXTAUTH_SECRET` | Signs sessions, keys the sign-in lock-out records and unsubscribe links, and encrypts two-step verification backup codes. Changing it signs every user out | Yes |
+| `CREDENTIALS_SECRET` | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes |
+| `CRON_API_KEY` | Bearer secret the scheduled jobs send to the app's internal cron routes. Unset, those routes refuse every call. The Helm chart generates it | For scheduled jobs |
+| `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure | For erasure |
+| `LANGWATCH_INSTANCE_ADMIN_API_KEY` | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404 | No |
+| `API_TOKEN_JWT_SECRET` | Not used by any feature. Startup validation still asks for a non-empty value when `SKIP_ENV_VALIDATION` is unset, so any random string works | Only without `SKIP_ENV_VALIDATION` |
+
+The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` and `LW_VIRTUAL_KEY_PEPPER`. Set all three or none. See [AI Gateway security](/ai-gateway/security).
 
 <Warning>
 Never commit secrets to version control. In production, use a secrets manager (AWS Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
@@ -60325,16 +60334,29 @@ Never commit secrets to version control. In production, use a secrets manager (A
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
+| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works | `email` |
+| `LOCAL_PASSWORDS_ENABLED` | `on` keeps local passwords available next to a configured identity provider | `off` |
+| `PASSKEYS_ENABLED` | `off` removes passkey sign-in and its routes. Registered passkeys are kept | `on` |
+| `MFA_ENROLLMENT_OPEN` | `on` turns on two-step verification | `off` |
 
-A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
+A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `AUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
+
+## Network and Access
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BLOCK_LOCAL_HTTP_CALLS` | `true` blocks user-configured outbound HTTP calls to private IPs, localhost and hostnames that resolve to private IPs. Cloud metadata addresses are always blocked | `false` |
+| `ALLOWED_PROXY_HOSTS` | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true` | - |
+| `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4 CIDR ranges of the proxies allowed to set `X-Forwarded-For`. Sign-in rate limits key on the client IP read from it. Unset, the header is read only from private, loopback and link-local peers | - |
+| `SSO_TRUSTED_IDP_ORIGINS` | Comma or whitespace separated origins of identity providers inside a private network. Without an entry here, sign-in refuses a provider whose address is not publicly routable | - |
 
 ## Services
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LANGWATCH_NLP_SERVICE` | URL of the NLP service | `http://langwatch-nlp:5561` |
+| `LANGWATCH_NLP_SERVICE` | URL of the NLP service. Required | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | - |
-| `LANGEVALS_ENDPOINT` | URL of the LangEvals service | `http://langevals:5562` |
+| `LANGEVALS_ENDPOINT` | URL of the LangEvals service | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`) |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 
@@ -60356,7 +60378,7 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | - |
 | `S3_ACCESS_KEY_ID` | S3 access key ID | - |
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key | - |
-| `S3_KEY_SALT` | Optional key salt for S3 object keys | - |
+| `S3_KEY_SALT` | Salt for the per-project cache key the optimization studio sends to the NLP engine. Unset, no cache key is sent | - |
 | `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
 
 <Note>
@@ -60389,7 +60411,7 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
 
-An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic.
+An incomplete active Azure configuration fails with an error and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic.
 
 Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
@@ -60462,7 +60484,7 @@ Whichever identity you use, grant it **Storage Blob Data Contributor** on the st
 
 Three rules before you configure it:
 
-- **There is no fallback.** If an identity mode is selected and the identity is missing or unauthorised, storage fails loudly and stays down until it is fixed. It never quietly reverts to an account key, because that would reverse your security decision at the moment you are least likely to notice.
+- **There is no fallback.** If an identity mode is selected and the identity is missing or unauthorised, storage fails with an error and stays down until it is fixed. It never quietly reverts to an account key, because that would reverse your security decision at the moment you are least likely to notice.
 - **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
 - **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
 
@@ -60539,15 +60561,14 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 </Note>
 
 
-## Evaluator Providers
+## PII Redaction (Google DLP)
+
+Model providers for evaluators, including Azure OpenAI, are configured per project in **Settings > Model Providers**, not through environment variables.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | - |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | - |
-| `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
+| `GOOGLE_APPLICATION_CREDENTIALS` | The contents of a Google service account JSON key (the JSON itself, not a file path), with a `project_id`. Enables Google DLP PII redaction | - |
+| `LANGWATCH_DISABLE_GOOGLE_DLP` | `true` turns Google DLP redaction off even when credentials are set | `false` |
 
 ## Voice Agents
 
@@ -60565,15 +60586,15 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
-| `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup | `false` |
+| `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup. Any non-empty value skips it, including `false` | unset |
+| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
 
 ## Telemetry
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
-| `METRICS_API_KEY` | API key for metrics collection | - |
+| `METRICS_API_KEY` | Bearer token Prometheus sends to scrape `/metrics`. With `NODE_ENV=production` and no key, `/metrics` refuses every request | - |
 
 ## Langy (optional)
 
@@ -60591,12 +60612,13 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.http.langwatchEndpoint` | `LANGWATCH_ENDPOINT` |
 | `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
-| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.nextAuth.provider` | `AUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
-| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
+| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION`. The chart always renders a value, so validation is skipped whether this is `true` or `false` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
@@ -60608,12 +60630,10 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.providers.smtp.user` | `SMTP_USER` |
 | `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
 | `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
-| `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
-| `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
-| `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
-| `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
-| `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
+| `app.evaluators.azureOpenAI.endpoint.value` / `.apiKey.value` | `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY` when `app.evaluators.azureOpenAI.enabled` is on. The app does not read them; configure Azure OpenAI in **Settings > Model Providers** |
+| `app.evaluators.google.credentials.value` | `GOOGLE_APPLICATION_CREDENTIALS` when `app.evaluators.google.enabled` is on |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
+| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY` when `app.telemetry.metrics.enabled` is on |
 | `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
@@ -60626,10 +60646,9 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
 | `app.dataplane.legacyAzureRead` | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers |
-| `app.governance.erasurePseudonymSecret.value` | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET`. Derives the stand-in that replaces an erased identifier. Optional until somebody is erased; required in the app and the workers alike afterwards, with the same value in both |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
-| `workers.enabled` | Inverse of `START_WORKERS` |
+| `workers.enabled` | Deploys the separate workers Deployment. The chart never sets `START_WORKERS` |
 | `langwatch_nlp.secrets.internalSecretKey` | Key of the app Secret the app, the workers and the NLP service read `LANGWATCH_NLP_INTERNAL_SECRET` from |
 
 <Tip>
@@ -60682,8 +60701,10 @@ prometheus:
 
 | Component | Port | Endpoint | Metrics |
 |-----------|------|----------|---------|
-| App | 5560 | `/metrics` | HTTP request latency, error rates, active connections |
-| Workers | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
+| App | 5560 | `/metrics` | Trace ingestion, ClickHouse query latency, event loop lag |
+| Workers | 2999 | `/metrics` | Queue backlog, job processing time, job success/failure rates |
+
+Both scrape jobs keep only pods annotated `prometheus.io/scrape: "true"`. The chart adds that annotation to the app pods when `app.telemetry.metrics.enabled` is `true`, and never to the workers pods. Without it the chart-managed Prometheus does not reach the workers' `/metrics`. Both `/metrics` endpoints answer 500 until `app.telemetry.metrics.enabled` is on with an API key, and then require that key as a bearer token.
 
 ### Access Prometheus
 
@@ -60710,13 +60731,14 @@ prometheus:
       password: "password"
 ```
 
-You'll need to configure your external Prometheus to scrape the LangWatch pods. Pods are annotated with:
+You'll need to configure your external Prometheus to scrape the LangWatch pods, sending the metrics API key as a bearer token. With `app.telemetry.metrics.enabled: true`, the app pods are annotated with:
 
 ```yaml
 prometheus.io/scrape: "true"
-prometheus.io/port: "5560"    # or 2999 for workers
-prometheus.io/path: "/metrics"
+prometheus.io/port: "5560"
 ```
+
+The workers pods carry no scrape annotations. Scrape them on port `2999`, path `/metrics`, or add annotations through `workers.pod.annotations`.
 
 ## Grafana
 
@@ -60725,27 +60747,25 @@ Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
 ### Key Dashboards
 
 Set up dashboards for:
-- **Trace throughput**: traces ingested per minute
-- **Worker queue depth**: BullMQ queue backlog (indicates processing bottleneck)
+- **Span throughput**: spans ingested per minute
+- **Worker queue backlog**: groups waiting to be processed and the age of the oldest pending job (indicates processing bottleneck)
 - **ClickHouse query latency**: p50/p95/p99 query times
-- **Error rates**: HTTP 5xx responses from App and Workers
 - **Resource utilization**: CPU and memory per component
 
 ### Example Queries
 
 ```promql
-# Trace ingestion rate (per minute)
-rate(langwatch_traces_ingested_total[5m]) * 60
+# Span ingestion rate (per minute), by outcome
+sum by (outcome) (rate(trace_ingestion_spans_total[5m])) * 60
 
-# Worker queue depth
-langwatch_worker_queue_depth
+# Worker queue backlog
+sum by (queue_name) (gq_pending_groups)
 
-# HTTP error rate
-rate(http_requests_total{status=~"5.."}[5m])
-  / rate(http_requests_total[5m])
+# Age of the oldest due job, in seconds, including groups held in retry backoff
+max by (queue_name) (gq_oldest_backlog_age_milliseconds) / 1000
 
 # ClickHouse query p95 latency
-histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_bucket[5m])))
 ```
 
 ## Health & Readiness Checks
@@ -60759,33 +60779,35 @@ histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
 
 ### Kubernetes Probes
 
-The Helm chart configures probes automatically. Default configuration:
+The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows time for migrations)
+# Startup probe (allows up to 40 minutes for migrations)
 startupProbe:
   httpGet:
     path: /api/health
-    port: 5560
-  periodSeconds: 5
-  failureThreshold: 30    # Up to 150s for startup
-
-# Liveness probe (restarts unhealthy pods)
-livenessProbe:
-  httpGet:
-    path: /api/health
-    port: 5560
-  periodSeconds: 10
-  failureThreshold: 5
+    port: http
+  periodSeconds: 15
+  failureThreshold: 160
 
 # Readiness probe (removes from service if unhealthy)
 readinessProbe:
   httpGet:
     path: /api/health
-    port: 5560
-  periodSeconds: 5
-  failureThreshold: 3
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# Liveness probe (restarts unhealthy pods)
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 30
+  timeoutSeconds: 5
 ```
+
+The workers use the same startup budget and a liveness probe every 30 seconds, both on `/healthz` at port 2999. They have no readiness probe.
 
 ### Manual Health Check
 
@@ -60805,8 +60827,8 @@ Set up alerts for these critical conditions:
 
 | Alert | Condition | Severity |
 |-------|-----------|----------|
-| Worker queue backlog | Queue depth > 10,000 for 5 min | Warning |
-| Worker queue backlog (critical) | Queue depth > 100,000 for 5 min | Critical |
+| Worker queue backlog | Oldest pending job older than 5 min | Warning |
+| Worker queue backlog (critical) | Oldest pending job older than 30 min | Critical |
 | ClickHouse memory | Memory usage > 80% of limit | Warning |
 | ClickHouse disk | Hot storage > 85% full | Critical |
 | PostgreSQL connections | Active connections > 80% of max | Warning |
@@ -60820,13 +60842,12 @@ groups:
   - name: langwatch
     rules:
       - alert: WorkerQueueBacklog
-        expr: langwatch_worker_queue_depth > 10000
-        for: 5m
+        expr: max by (queue_name) (gq_oldest_backlog_age_milliseconds) > 300000
         labels:
           severity: warning
         annotations:
           summary: "Worker queue backlog is high"
-          description: "Queue depth is {{ $value }}. Workers may need scaling."
+          description: "Oldest pending job is {{ $value }} ms old. Workers may need scaling."
 ```
 
 ## Prometheus Configuration Reference
@@ -60873,10 +60894,12 @@ These are the default resource requests and limits from the Helm chart (`values.
 
 | Component | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
 |-----------|-------------|-----------|----------------|--------------|---------|
-| LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch App | 250m | 1000m | 2Gi | 4Gi | 10Gi stored objects, shared with the workers |
 | LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
 | LangWatch NLP | 250m | 1000m | 256Mi | 1Gi | --- |
 | LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
+| AI Gateway (2 to 10 replicas, autoscaled) | 200m | 1000m | 256Mi | 512Mi | --- |
+| Langy | 500m | 2000m | 1Gi | 4Gi | --- |
 | PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
 | ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
 | Redis | 250m | 500m | 256Mi | 512Mi | 10Gi |
@@ -60898,29 +60921,29 @@ For development, demos and small teams.
 - LangWatch Workers: 1 replica, 250m/1 CPU, 768Mi/2Gi memory
 - LangWatch NLP: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
 - LangEvals: 1 replica, 100m/500m CPU, 768Mi/4Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 1 CPU, 2Gi memory, 5Gi storage
 - PostgreSQL: 100m/500m CPU, 256Mi/512Mi memory, 2Gi storage
 - Redis: 50m/250m CPU, 64Mi/256Mi memory, 1Gi storage
-- Prometheus: 50m/250m CPU, 128Mi/512Mi memory
-- Total: ~2.6 CPU, ~6.7 Gi RAM requests
+- Prometheus: 50m/250m CPU, 128Mi/512Mi memory, 7d retention, 2Gi storage
+- Total: ~2.8 CPU, ~6.9 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-dev.yaml \
   --set autogen.enabled=true
 ```
 
-`examples/values-local.yaml` is the same sizing without Prometheus (~2.6 CPU, ~6.6 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
+`examples/values-local.yaml` is the same sizing without Prometheus (~2.75 CPU, ~6.8 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
 
 ### Minimal (`size-minimal.yaml`)
 
-The smallest configuration the platform still boots in. Trims the app, NLP, PostgreSQL and Redis further and drops ClickHouse to 1Gi.
+The smallest configuration the platform still boots in. Trims the app, NLP, PostgreSQL and Redis further, drops ClickHouse to 1Gi and turns off Prometheus.
 
-- Total: ~2.4 CPU, ~4.9 Gi RAM requests
+- Total: ~2.6 CPU, ~5.2 Gi RAM requests
 
-LangEvals is the one thing this overlay does not shrink much. A single worker holding every local model needs roughly 2.6 Gi resident, so its limit stays at 4Gi. The limit is a ceiling rather than a reservation, so it costs nothing until an evaluator actually loads a model.
+LangEvals is the one thing this overlay does not shrink much. A single worker holding every local model needs roughly 2.6 Gi resident, so its limit stays at 4Gi. The limit is a ceiling rather than a reservation, so the node only spends that memory once an evaluator loads a model.
 
 ### Production (`size-prod.yaml`)
 
@@ -60930,15 +60953,15 @@ For production with single-node ClickHouse.
 - LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
 - LangWatch NLP: 1 replica, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
 - Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.7 CPU, ~22.8 Gi RAM requests
+- Total: ~8.9 CPU, ~23 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml
@@ -60952,21 +60975,25 @@ For production with replicated ClickHouse.
 - LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
 - LangWatch NLP: 2 replicas, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
-- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- AI Gateway: 2 replicas (autoscaled up to 10), 200m/1 CPU, 256Mi/512Mi memory
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
 - Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.7 CPU, ~84.5 Gi RAM requests
+- Total: ~22.9 CPU, ~84.8 Gi RAM requests
 
-```yaml
+```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
   -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-data \
+  --set clickhouse.objectStorage.region=us-east-1
 ```
+
+Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
 ## Scaling Guidelines
 
@@ -61231,28 +61258,11 @@ LangWatch evaluators use external LLM providers for model-based evaluations (LLM
 
 ### Azure OpenAI
 
-Used for jailbreak detection and content safety evaluators.
+Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The chart still accepts `app.evaluators.azureOpenAI`, which sets `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` on the app and workers, but the app does not read them.
 
-```yaml
-app:
-  evaluators:
-    azureOpenAI:
-      enabled: true
-      endpoint:
-        secretKeyRef: { name: langwatch-evaluators, key: azureEndpoint }
-      apiKey:
-        secretKeyRef: { name: langwatch-evaluators, key: azureApiKey }
-```
+### Google Cloud DLP
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_OPENAI_EVALUATOR_ENABLED` | `true` to enable |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |
-
-### Google AI
-
-Used for PII detection evaluators.
+Used for PII redaction of incoming traces.
 
 ```yaml
 app:
@@ -61265,8 +61275,7 @@ app:
 
 | Variable | Description |
 |----------|-------------|
-| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable |
-| `GOOGLE_CREDENTIALS_JSON` | Service account credentials JSON |
+| `GOOGLE_APPLICATION_CREDENTIALS` | The contents of a Google service account JSON key (the JSON itself, not a file path), with a `project_id`. Set on the app and workers when `app.evaluators.google.enabled` is on |
 
 <Note>
 You don't need to configure evaluator providers to use LangWatch. They're only required if you want to use built-in evaluators that rely on specific LLM providers. You can always configure your own LLM provider API keys in the LangWatch UI for evaluations.
@@ -61690,14 +61699,15 @@ If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kuber
 
 ## Quick start
 
-The langwatch chart needs two operator-managed Secrets in your target namespace before the first sync:
+The langwatch chart needs these operator-managed Secrets in your target namespace before the first sync:
 
 - `langwatch-app-secrets` holds the app keys + the AI Gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
+- A PostgreSQL Secret (`postgresql.auth.existingSecret`, key `postgres-password`) and a Redis Secret (`redis.auth.existingSecret`, key `password`), when the chart runs those databases. With `autogen.enabled=false` the render fails without them. Skip them if you set `postgresql.chartManaged: false` and `redis.chartManaged: false`.
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
-Create both Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
+Create the Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
 
 Then apply the Application manifest:
 
@@ -61726,6 +61736,12 @@ spec:
         clickhouse:
           auth:
             existingSecret: langwatch-clickhouse-creds
+        postgresql:
+          auth:
+            existingSecret: langwatch-postgresql-creds
+        redis:
+          auth:
+            existingSecret: langwatch-redis-creds
         # Add your other overrides here. See "Production overrides" below.
   syncPolicy:
     automated:
@@ -61736,7 +61752,7 @@ spec:
       - ServerSideApply=true
 ```
 
-If you change the release name or set `autogen.secretNames.app` to a non-default value, also set `gateway.secrets.existingSecretName` to the same Secret name (the chart fails fast at render time if it does not match).
+The app Secret name does not depend on the release name. If you set `secrets.existingSecret` or `autogen.secretNames.app` to a name other than `langwatch-app-secrets`, also set `gateway.secrets.existingSecretName` and `langyagent.secrets.existingSecretName` to that name (the chart fails fast at render time if they do not match).
 
 Apply:
 
@@ -61789,7 +61805,9 @@ Topic-specific configuration pages:
 
 You can use an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
 
-The Secret can land in the same sync as the chart. The chart ships no `PreSync` hook that reads it, so pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
+The Secret can land in the same sync as the chart, with one ordering rule.
+
+With chart-managed ClickHouse, the LangWatchQL render Job runs at sync wave `-1` and reads the app, PostgreSQL and ClickHouse Secrets. Argo waits for that Job before it applies wave `0`, and the Job fails after 5 minutes if a Secret is missing. Put your `ExternalSecret` (or equivalent) at an earlier wave, for example `argocd.argoproj.io/sync-wave: "-3"`. Other pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
 
 <Note>
 **Azure Key Vault:** secret names allow only letters, digits and `-`, so keys like `LW_GATEWAY_INTERNAL_SECRET` cannot be stored under that name. Map them in the `ExternalSecret`:
@@ -61812,7 +61830,8 @@ When you use the operator-managed pattern from the quick-start (`autogen.enabled
 After the first sync completes, verify the pods are running on the credentials you provided:
 
 ```bash
-kubectl -n langwatch get pods -l 'app.kubernetes.io/component in (app, gateway)' -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-app -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=gateway -o wide
 argocd app diff langwatch
 ```
 
@@ -61852,6 +61871,8 @@ spec:
         - /data
 ```
 
+The block above covers only the app Secret. The chart-managed database Secrets follow the same rule, so add `<release>-clickhouse`, `<release>-postgresql` and `<release>-redis` to `ignoreDifferences` the same way. The LangWatchQL password Secret (`<release>-lwql-passwords`) is a Helm hook, which Argo recreates on every sync with new values and `ignoreDifferences` does not cover. Set `lwql.enabled: false` on this path, or move to operator-managed Secrets.
+
 The recommended path is to flip `autogen.enabled` to `false`, provide the Secrets per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
 
 ## Reference
@@ -61883,14 +61904,16 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd platform/app
+cd langwatch
 
-# Copy the example environment file
+# Copy the example environment file, then replace its placeholder secrets (see Configuration)
 cp platform/app/.env.example platform/app/.env
 
 # Start all services
-docker compose up
+docker compose -f infra/compose.yml --project-directory . up
 ```
+
+The compose file lives at `infra/compose.yml` and reads `platform/app/.env` relative to the repository root, so run every `docker compose` command from the repository root with `-f infra/compose.yml --project-directory .`. The commands below use that form.
 
 LangWatch is available at **http://localhost:5560**.
 
@@ -61919,10 +61942,12 @@ Services with no host port bind no port on the host's interfaces, so they do not
 Edit `platform/app/.env` to customize your deployment. Key variables:
 
 ```bash
-# Required: generate a secret for each
-API_TOKEN_JWT_SECRET=your-jwt-secret
-CREDENTIALS_SECRET=your-encryption-key
+# Required: replace the placeholders that .env.example ships
+# Signs sessions. Generate with: openssl rand -base64 32
 NEXTAUTH_SECRET=your-session-secret
+# Encrypts stored credentials and peppers API key hashes.
+# Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
+CREDENTIALS_SECRET=your-64-hex-character-key
 
 # Optional: shared credential the app authenticates to the NLP service with.
 # Every container in the stack reads this file, so one value covers both sides.
@@ -61935,44 +61960,44 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
 ### Start in the background
 
 ```bash
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### View logs
 
 ```bash
 # All services
-docker compose logs -f
+docker compose -f infra/compose.yml --project-directory . logs -f
 
 # Specific service
-docker compose logs -f app
+docker compose -f infra/compose.yml --project-directory . logs -f app
 ```
 
 ### Stop services
 
 ```bash
-docker compose down
+docker compose -f infra/compose.yml --project-directory . down
 ```
 
 ### Update to latest version
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . pull
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### Reset data
 
 ```bash
-docker compose down -v  # Removes volumes (all data)
-docker compose up
+docker compose -f infra/compose.yml --project-directory . down -v  # Removes volumes (all data)
+docker compose -f infra/compose.yml --project-directory . up
 ```
 
 ## Customization
@@ -62064,7 +62089,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 | **Workers** | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
 
 **What it does:**
-- Serves the LangWatch web UI (Next.js)
+- Serves the LangWatch web UI
 - Exposes REST and OTel APIs for trace ingestion from SDKs
 - Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
@@ -62073,19 +62098,19 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 
 ### langwatch/langwatch_nlp
 
-Python service for natural language processing tasks.
+Go service (`nlpgo`) that runs workflows. The image keeps a Python interpreter only for code blocks.
 
 | | |
 |---|---|
 | **Port** | 5561 |
-| **Base** | Python |
+| **Base** | `gcr.io/distroless/python3-debian12` |
 | **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
 
 **What it does:**
-- Runs workflows
-- Executes topic clustering algorithms
+- Runs Optimization Studio workflows
 - Handles custom evaluator execution
-- Processes NLP tasks (embeddings, text analysis)
+- Runs Python code blocks in a sandboxed process
+- Proxies LLM calls from the playground and prompts
 
 ### langwatch/langevals
 
@@ -62113,6 +62138,9 @@ LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run mod
 The Helm chart also deploys:
 
 - `langwatch/clickhouse-serverless`, Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
+- `langwatch/ai-gateway`, the AI Gateway (`gateway.image.repository`, on by default)
+- `langwatch/langyagent`, the Langy assistant (`langyagent.image.repository`, on by default)
+- `postgres`, `redis` and the Prometheus server image, when the chart runs those services
 
 ## Service Communication
 
@@ -62129,7 +62157,6 @@ graph LR
     NLP -->|LLM calls| LLMs
     App -->|queries| CH
     App -->|control plane| PG["PostgreSQL<br/>:5432"]
-    CronJobs["CronJobs"] -->|HTTP trigger| App
 ```
 
 ## Image Tags
@@ -62174,10 +62201,34 @@ images:
   langevals:
     repository: registry.example.com/langwatch/langevals
     tag: "3.20.1" # x-release-please-version
-
-imagePullSecrets:
-  - name: registry-credentials
 ```
+
+Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
+
+The chart has no chart-wide `imagePullSecrets` value. If your registry needs credentials, attach the pull secret to the ServiceAccount the pods run as. The NLP, LangEvals, gateway, Langy, PostgreSQL and Redis pods use the namespace `default` ServiceAccount. The app and workers use it too, unless `global.serviceAccount.create` or `global.serviceAccount.name` gives them their own, in which case patch that one as well:
+
+```bash
+kubectl -n langwatch patch serviceaccount default \
+  -p '{"imagePullSecrets": [{"name": "registry-credentials"}]}'
+```
+
+Three workloads run under their own ServiceAccount and take the pull secret as a value instead:
+
+```yaml
+clickhouse:
+  imagePullSecrets:
+    - name: registry-credentials
+lwql:
+  imagePullSecrets:
+    - name: registry-credentials
+app:
+  storedObjects:
+    localFilesystem:
+      serializeUpgradesPullSecrets:
+        - name: registry-credentials
+```
+
+The ClickHouse preflight Job (`clickhouse.preflight.enabled`, off by default in this chart) runs `clickhouse.preflight.image` under its own ServiceAccount and has no pull secret value. If you turn it on, mirror that image to a registry that needs no credentials.
 
 ---
 
@@ -62229,7 +62280,9 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on the first install. This is fine for testing but not for production. `helm upgrade` reads the existing Secrets back and keeps every value.
+
+`helm uninstall` deletes the app Secret, so a reinstall generates new values: sessions end, stored model provider keys can no longer be decrypted, and API keys and virtual keys stop working (see [Credentials secret](/self-hosting/security#credentials-secret)). The chart-managed PostgreSQL also gets a new password while its retained volume keeps the old one. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ### Operator access and feature flags
@@ -62264,7 +62317,7 @@ See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for w
 
 ## Low-Resources Deployment
 
-The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
+The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.8 CPU and ~6.9 Gi RAM**:
 
 ```bash
 helm pull langwatch/langwatch --untar
@@ -62313,7 +62366,7 @@ Every key name can be changed to match your secret store, for example the dashed
 | `password` | Always |
 | `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
 
-**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords. With `autogen.enabled=false` the render fails without them, because a generated password would change on every Argo CD sync.
+**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords, with the key names in `redis.auth.secretKeys.passwordKey` and `postgresql.auth.secretKeys.*`. With `autogen.enabled=false` the render fails without them (or an inline `redis.auth.password` / `postgresql.auth.password`), because a generated password would change on every Argo CD sync.
 
 A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead. Argo CD renders without cluster access, so under Argo CD only the pod error shows it.
 
@@ -62356,7 +62409,7 @@ kubectl create secret generic langwatch-redis \
 
 ### 2. Create a Values File
 
-Start from the production example and customize. This configuration requests approximately **~8.5 CPU and ~28 Gi RAM** across all pods:
+Start from the production example and customize. This configuration requests approximately **~8.4 CPU and ~32 Gi RAM** across all pods:
 
 ```yaml
 # values-production.yaml
@@ -62377,6 +62430,14 @@ app:
     limits: { cpu: 1000m, memory: 4Gi }
   podDisruptionBudget:
     minAvailable: 1
+  # More than one app or worker replica cannot share the default
+  # local-filesystem volume, so the chart refuses to render until object
+  # storage is on. Credentials come from app.dataplane.providers.awsS3.*,
+  # or from IRSA on the ServiceAccount set in global.serviceAccount.
+  dataplane:
+    enabled: true
+    provider: awsS3
+    bucket: langwatch-objects
 
 workers:
   enabled: true
@@ -62483,7 +62544,7 @@ Then follow [First run](/self-hosting/first-run) to create the first account, ad
 
 ## High-Availability Deployment
 
-For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:
+For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~31 CPU and ~88 Gi RAM** across all pods:
 
 ```yaml
 # values-ha.yaml (extends production values above)
@@ -62565,8 +62626,9 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
 | _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2.6 CPU, ~6.7 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~8.7 CPU, ~23 Gi |
+| `size-minimal.yaml` | CI smoke tests, tiny demos | ~2.6 CPU, ~5.2 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2.8 CPU, ~6.9 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~8.9 CPU, ~23 Gi |
 | `size-ha.yaml` | HA production, replicated CH | ~23 CPU, ~85 Gi |
 
 ### Access Overlays
@@ -62586,6 +62648,9 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
 | `cold-storage-s3.yaml` | S3 cold storage + backups |
 | `local-images.yaml` | Local images with `pullPolicy: Never` |
+| `langy-disabled.yaml` | Runs without the Langy assistant pod |
+| `langy-gvisor.yaml` | Runs Langy under the gVisor sandbox runtime |
+| `strict-admission.yaml` | Pod Security Admission `restricted` clusters |
 
 ### Composing Overlays
 
@@ -62599,6 +62664,8 @@ helm install langwatch langwatch/langwatch \
   -f examples/overlays/postgres-external.yaml \
   -f examples/overlays/redis-external.yaml \
   -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-data \
+  --set clickhouse.objectStorage.region=us-east-1 \
   --set autogen.enabled=true
 ```
 
@@ -62629,7 +62696,7 @@ clickhouse:
     url:
       value: "http://user:password@clickhouse-host:8123/langwatch"
     # For replicated instances:
-    clusterName: "my_cluster"
+    cluster: "my_cluster"
 ```
 
 The chart-managed ClickHouse is pinned to a version the release is tested
@@ -62661,7 +62728,7 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are a HorizontalPodAutoscaler running 2 to 10 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
@@ -62692,7 +62759,9 @@ helm uninstall langwatch --namespace langwatch
 ```
 
 <Warning>
-This does not delete PersistentVolumeClaims. Your data in PostgreSQL, ClickHouse, and Redis PVCs is preserved. Delete them manually if you want a clean removal:
+This does not delete the PostgreSQL, ClickHouse and Redis PersistentVolumeClaims, so that data is preserved. The stored-objects claim (`<release>-stored-objects`, rendered by default and whenever `app.dataplane` is off) is part of the release and is deleted. With the `Delete` reclaim policy, the default for most dynamically provisioned storage classes, the uploaded files and datasets on it are deleted too. With `Retain`, the PersistentVolume and its data stay behind and need manual cleanup. Back it up first.
+
+With `autogen.enabled=true`, the generated app Secret and the PostgreSQL and Redis password Secrets are deleted too; see the warning under [Quick Start](#quick-start). Delete the remaining claims manually if you want a clean removal:
 
 ```bash
 kubectl -n langwatch delete pvc --all
@@ -62703,9 +62772,9 @@ kubectl -n langwatch delete pvc --all
 
 ### Istio, Service Mesh
 
-If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
+If you're using Istio or another service mesh with automatic sidecar injection, Job pods may never finish because the sidecar keeps the pod alive after the main container exits.
 
-Disable sidecar injection for CronJobs:
+The chart ships no CronJobs of its own (`cronjobs.jobs` is empty by default). If you add jobs there, disable sidecar injection for them:
 
 ```yaml
 cronjobs:
@@ -62713,6 +62782,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ### Two installs in one cluster
 
@@ -62748,8 +62819,8 @@ redis:
 
 For clusters without internet access:
 1. Push LangWatch images to your private registry
-2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
-3. Set `imagePullSecrets` if your registry requires authentication
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
+3. If your registry requires authentication, attach the pull secret to the ServiceAccount the pods use. The chart has no chart-wide `imagePullSecrets` value; see [Private Registries](/self-hosting/deployment/docker-images#private-registries)
 4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`
 
 ---
@@ -62775,7 +62846,7 @@ Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) clus
 - [Helm](https://helm.sh/docs/intro/install/) 3.12+
 - `make` (included on macOS and most Linux distributions)
 
-> **Note:** The first image build (especially the Next.js app) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
+> **Note:** The first image build (especially the app image) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
 
 ## Quick Start
 
@@ -62833,6 +62904,7 @@ make deps
 
 # Install with local values
 helm upgrade --install lw . \
+  --namespace lw-local --create-namespace \
   -f examples/values-local.yaml \
   --wait --timeout 10m
 ```
@@ -62876,10 +62948,12 @@ The `values-local.yaml` profile deploys:
 | PostgreSQL | 1 | Chart-managed |
 | ClickHouse | 1 | Chart-managed, standalone |
 | Redis | 1 | Chart-managed |
+| AI Gateway | 2 to 10 | Autoscaled, image pulled from Docker Hub |
+| Langy assistant | 1 | Image pulled from Docker Hub |
 
 - `autogen.enabled: true`, secrets are auto-generated
-- `pullPolicy: Never`, uses locally-built images
-- Prometheus is disabled to save resources
+- `pullPolicy: Never` for the app, NLP, LangEvals and ClickHouse images, so they must be built and loaded first
+- Prometheus and CronJobs are disabled to save resources
 
 ## Teardown
 
@@ -62954,7 +63028,9 @@ Envoy and Traefik stream responses without buffering and pass WebSocket upgrades
 
 ## Chart Ingress
 
-The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress. It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
+The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress, minus the nginx `rewrite-target`, `use-regex` and `app-root` annotations, which would break the gateway paths.
+
+It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
 
 On ingress-nginx:
 
@@ -63192,7 +63268,7 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server, the external entry point for everything except AI Gateway traffic:
+Node.js server, the external entry point for everything except AI Gateway traffic:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -63388,7 +63464,7 @@ The App is exposed externally. The AI Gateway is exposed only when you set `ingr
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
-| App | Ingress, LoadBalancer | Yes |
+| App | ClusterIP (`app.service.type`), plus an Ingress when `ingress.enabled` is set | Yes |
 | Workers | None (no Service needed) | No |
 | NLP | ClusterIP | No |
 | LangEvals | ClusterIP | No |
@@ -63404,7 +63480,7 @@ LangEvals, NLP and the AI Gateway make outbound calls to external LLM providers 
 
 ### Connected agents
 
-A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound WebSocket to the App. Three requirements:
+A [connected agent](/agent-testing/connect-your-agent) is the customer's own process holding an outbound connection to the App, a WebSocket by default with HTTP long polling as the fallback. The first three requirements apply to the WebSocket transport, the last one to long polling:
 
 - **WebSocket upgrade on `/api/v1/agents/connect`.** The App serves it on its normal HTTP listener, next to `/api/trpc-ws`. An ingress that already passes `/api/trpc-ws` needs no change; one that terminates or rewrites upgrades must pass this path through.
 - **A read timeout above 15 seconds.** The App pings every 15 seconds to keep the connection alive. A shorter idle timeout closes the connection between pings, and the agent flaps between Online and Offline. The `access-ingress.yaml` overlay sets `proxy-read-timeout: 120`.
@@ -63473,7 +63549,7 @@ keywords:
   - langy_internal_secret
 ---
 
-The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `LANGY_MIRROR_PROJECT_ID`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -63487,9 +63563,9 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
-| `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
+| `LANGY_INTERNAL_SECRET` | Shared bearer secret for calls in both directions between the app and the agent. Frames the worker streams back are signed separately, with a per-conversation key. Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
 | `LANGY_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
-| `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
+| `ENVIRONMENT` | Deployment environment. The agent refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` unless this is `local`, `dev`, `development` or `test`, so keep it production-like. | No | `production` (chart) |
 
 <Warning>
 `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
@@ -63502,7 +63578,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
-| `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | Yes | `/workspace` |
+| `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 
 ## Egress
 
@@ -63523,7 +63599,7 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 |---|---|---|---|
 | `LANGY_MIRROR_TRACE_ENDPOINT` | LangWatch base URL the mirror ships to. Set via `langyagent.mirror.traceEndpoint` only to mirror into a different deployment. | No | the install's own app |
 | `LANGY_MIRROR_TRACE_KEY` | The mirror project's API key (a normal project key), read from the Secret named by `langyagent.mirror.existingSecretName`. | No | unset (mirror off) |
-| `LANGY_MIRROR_PROJECT_ID` | The mirror project id referenced in the mirror config. | No | unset |
+| `LANGY_MIRROR_PROJECT_ID` | The mirror project's id, set on the app. A turn running inside that project is never mirrored into itself. The chart does not set it; use `app.extraEnvs`. | No | unset |
 
 <Warning>
 `LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret (`mirror.existingSecretName`), not inline in `values.yaml`.
@@ -63531,7 +63607,7 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 
 ## GitHub
 
-Set these on the control plane to enable bot-authored pull requests and coding-agent pull request linkage. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
+Set these on the control plane to enable bot-authored pull requests and coding-agent pull request linkage. The GitHub feature stays off until `GITHUB_LANGY_APP_ID`, `GITHUB_LANGY_PRIVATE_KEY` and `GITHUB_LANGY_APP_SLUG` are all set. See [Register the GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
@@ -63540,7 +63616,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Falls back to `NEXTAUTH_SECRET` when unset. Already required, so GitHub adds no new variable. See [Security](/self-hosting/security#credentials-secret). | Yes | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
@@ -63805,7 +63881,7 @@ To let Langy clone and push (open PRs), you enable egress. The pod's traffic the
 
 LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gateway](/ai-gateway/self-hosting/helm).
 
-The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
+The one boundary to understand before you rely on this in a regulated environment: once `networkPolicy.allowExternalHttps` is `true`, the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is opt-in and needs the Cilium CNI. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
 **Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
@@ -63854,16 +63930,17 @@ The developer authenticates with their device session to approve a request, and 
 
 ## Enable outbound egress
 
-The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:
+The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on in your `langwatch` chart values:
 
-```bash title="values.langyagent.yaml"
-networkPolicy:
-  allowExternalHttps: true
+```yaml title="values.yaml"
+langyagent:
+  networkPolicy:
+    allowExternalHttps: true
 ```
 
 With it on, the pod may open `:443` to anywhere at L3/L4, and the L7 adapter is what narrows that to the allowed destinations. The FQDN floor (`github.com`, `api.github.com`, `codeload.github.com`) works without further changes.
 
-Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service or VPC CIDR you actually need to reach. The defaults already include `100.64.0.0/10` (CGNAT) for EKS custom networking.
+Make sure `langyagent.networkPolicy.privateExcept` and `privateExceptV6` include any non-RFC1918 service or VPC CIDR you actually need to reach. The defaults already include `100.64.0.0/10` (CGNAT) for EKS custom networking.
 
 ## The L7 egress adapter
 
@@ -63882,13 +63959,14 @@ See [Environment variables](/self-hosting/langy/environment-variables#egress) fo
 
 For a tighter perimeter than "`:443` to anywhere, narrowed at L7", flip `allowExternalHttps` back to `false` and add an explicit allow-list of the three GitHub FQDNs at the CNI layer, so the L3/L4 policy itself only permits GitHub:
 
-```bash title="values.langyagent.yaml"
-networkPolicy:
-  allowExternalHttps: false
-egress:
-  enforceFloor: true
-  cilium:
-    enabled: true
+```yaml title="values.yaml"
+langyagent:
+  networkPolicy:
+    allowExternalHttps: false
+  egress:
+    enforceFloor: true
+    cilium:
+      enabled: true
 ```
 
 An operator can also place the pod on an opt-in public-subnet node group (a node group with no route to the private data tier) via `nodeSelector`, `affinity`, and `tolerations`.
@@ -63898,8 +63976,9 @@ An operator can also place the pod on an opt-in public-subnet node group (a node
 State this plainly for a regulated review. Today (ADR-053, Proposed):
 
 - **Shipped.** The L3/L4 NetworkPolicy is deny-by-default: `:443` to anywhere is off unless you enable it, and private ranges, CGNAT, and cloud metadata are blocked regardless. The default service-account token is dropped. Node placement on a public subnet with no route to the data tier is available. The L7 adapter's require-TLS, SNI cross-check, and FQDN floor apply to traffic that goes through the proxy.
-- **Cooperative, not mandatory.** The L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
-- **Designed, not shipped.** Mandatory enforcement, which would make the bypass impossible, is the Cilium `toFQDNs` policy on the floor or a per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`). These are designed and not shipped in the stock chart.
+- **Cooperative, not mandatory.** With `networkPolicy.allowExternalHttps: true`, the L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
+- **Opt-in, Cilium only.** `langyagent.egress.cilium.enabled: true` renders a `CiliumNetworkPolicy` with `toFQDNs` on the floor, which a worker cannot bypass. It needs the Cilium CNI and is off by default. It enforces the operator floor only; per-project allow-lists stay with the L7 adapter.
+- **Designed, not shipped.** A per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`), the equivalent for clusters without Cilium.
 
 If your threat model requires that a compromised worker cannot reach an arbitrary external host, enable the Cilium `toFQDNs` path rather than relying on the cooperative adapter alone. See [The sandbox](/langy/security/sandbox) for the full boundary map.
 
@@ -63956,7 +64035,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one [agent wor
   - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
   - EKS has no managed option: install gVisor on a node group ([Setup](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group)).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
-- **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
+- **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself. Under plain `helm` the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
 ## Optional components
 
@@ -64320,8 +64399,10 @@ kubectl -n langwatch patch secret langwatch-app-secrets \
   -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
 ```
 
-The install checks for the key and stops with a message naming it, rather than
-leaving three pods in `CreateContainerConfigError`.
+Under plain `helm`, the install reads the existing Secret, checks for the key and
+stops with a message naming it, rather than leaving three pods in
+`CreateContainerConfigError`. Argo CD renders without cluster access, so there
+the pods wait in `CreateContainerConfigError` naming the key instead.
 
 ## Turning it off
 
@@ -65199,11 +65280,11 @@ helm install langwatch ./langwatch \
   --wait --timeout 10m
 ```
 
-That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets, so you have no secret to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.8 CPU and 6.9 Gi of requests, and generates its own secrets, so you have no secret to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
 
 Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
 
-`examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
+`examples/values-local.yaml` is a different thing and is not the one to start with: it pins the app, NLP and LangEvals images to a `local` tag and sets `pullPolicy: Never` on those and on ClickHouse, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
 Langy, the AI assistant, is part of this install and runs on the node's normal container runtime. To harden it with a sandboxed runtime on EKS, see [installing gVisor on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
@@ -65354,7 +65435,9 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
 **SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
 
-**API tokens** are signed with JWT (`API_TOKEN_JWT_SECRET`) for SDK authentication.
+**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key.
+
+Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-256 hash until their next use, when it is rewritten as HMAC; older project keys are stored as-is on the project and compared directly.
 
 ## Encryption
 
@@ -65367,7 +65450,32 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 | S3 | Server-side encryption (SSE-S3 or SSE-KMS) |
 | Stored credentials | Application-level encryption via `CREDENTIALS_SECRET` |
 
-The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+### Credentials secret
+
+`CREDENTIALS_SECRET` is the application-level encryption key, applied on top of database-level encryption. The app and workers read it. The Helm chart always sets it, from `app.credentialsEncryptionKey` or from the `credentialsEncryptionKey` key of the app Secret, and fails to render when no value, Secret or autogen provides one.
+
+**Format.** 64 hex characters (32 bytes). Generate one with `openssl rand -hex 32`. Any other value makes every encrypt and decrypt call fail. When `CREDENTIALS_SECRET` is unset the app falls back to `NEXTAUTH_SECRET`, which then has to meet the same format. Set `CREDENTIALS_SECRET` explicitly.
+
+**What it encrypts.** Values are stored as AES-256-GCM ciphertext in PostgreSQL:
+
+- Model provider API keys and custom provider settings
+- Project secrets and scenario run secret values
+- Project and organization S3 storage credentials
+- SSO connection credentials
+- Webhook signing secrets and Slack integration credentials
+- Stored MCP and agent API keys, Langy virtual keys, and API idempotency receipts
+
+**What else it keys.** The same value is the HMAC pepper for API keys (see Authentication & Authorization above) and signs short-lived tokens (voice session tokens, GitHub App install state).
+
+**Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
+
+- Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
+- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
+- In-flight signed tokens are rejected and the user starts that flow again.
+
+The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.
+
+Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable.
 
 ### In Transit
 
@@ -65377,7 +65485,7 @@ The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and cr
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
-| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS). App and workers authenticate to NLP with `LANGWATCH_NLP_INTERNAL_SECRET` |
 
 <Tip>
 For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
@@ -65387,7 +65495,9 @@ For inter-service encryption, deploy a service mesh like Istio or Linkerd. This 
 
 ### Development (Auto-Generated)
 
-For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production, secrets change on reinstall.
+`autogen.enabled: true` (off by default) generates random values for the app Secret on first install. `helm upgrade` keeps the values already in the Secret and only generates keys that are missing. The Secret is deleted with `helm uninstall`, so a reinstall generates a new `credentialsEncryptionKey` and the stored credentials become unreadable (see [Changing it](#credentials-secret)).
+
+GitOps tools that render without cluster access, such as Argo CD, cannot see the existing Secret; use a pre-created Secret there (see [Argo CD](/self-hosting/deployment/argocd)). Use autogen for evaluation installs, not production.
 
 ### Production (Kubernetes Secrets)
 
@@ -65398,14 +65508,27 @@ kubectl create secret generic langwatch-secrets \
   --namespace langwatch \
   --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
   --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32)
+  --from-literal=cronApiKey=$(openssl rand -hex 32) \
+  --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGWATCH_NLP_INTERNAL_SECRET=$(openssl rand -hex 32)
 ```
 
-Reference in `values.yaml`:
+The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `LANGWATCH_NLP_INTERNAL_SECRET` is optional: without it the NLP service accepts unauthenticated requests from inside the cluster. `helm install` prints the exact list for your values (section "Required Secrets").
+
+Reference in `values.yaml`. The gateway and the Langy agent mount the same Secret, so point them at it too:
 
 ```yaml
 secrets:
   existingSecret: langwatch-secrets
+gateway:
+  secrets:
+    existingSecretName: langwatch-secrets
+langyagent:
+  secrets:
+    existingSecretName: langwatch-secrets
 ```
 
 ### Production (External Secret Managers)
@@ -65522,10 +65645,10 @@ spec:
 | App | PostgreSQL | 5432 | TCP |
 | App, Workers | ClickHouse | 8123 | HTTP |
 | App, Workers | Redis | 6379 | TCP |
-| Workers | NLP | 5561 | HTTP |
-| Workers | LangEvals | 5562 | HTTP |
+| App, Workers | NLP | 5561 | HTTP |
+| App, Workers | LangEvals | 5562 | HTTP |
 | NLP, LangEvals | External LLMs | 443 | HTTPS |
-| CronJobs | App | 5560 | HTTP |
+| CronJobs you add under `cronjobs.jobs` | App | 5560 | HTTP |
 
 ## Pod Security
 
@@ -65584,8 +65707,9 @@ In-cluster datastores satisfy read-only-root policies, but managed databases (th
 
 LangWatch includes a built-in PII redaction pipeline step that automatically detects and masks personally identifiable information in traces before storage.
 
-- **Enabled by default** in the Helm chart
-- `app.features.disableStrictPiiRedaction: true` skips only the strict pass (the Presidio analysis service). Secrets and essential PII redaction still run (not recommended)
+- **On by default** at the essential level (secrets and common identifiers), configurable per project
+- The strict level adds a pass through the Presidio analysis service in LangEvals
+- `app.features.disableStrictPiiRedaction: true` skips only that strict pass. Secrets and essential PII redaction still run (not recommended)
 - Runs as part of the event sourcing pipeline in workers
 
 ## Multitenancy
@@ -65594,7 +65718,7 @@ LangWatch enforces tenant isolation at the application level:
 
 - Every ClickHouse query includes `WHERE TenantId = ...` as the first predicate
 - PostgreSQL queries include `projectId` in WHERE clauses
-- API tokens are scoped to a specific project
+- Project keys are scoped to one project; API keys are limited to the organization, team and project role bindings they were created with
 - Cross-tenant data access is prevented at the query layer
 
 ## Supply Chain
@@ -65770,9 +65894,7 @@ Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
 
 ### Istio, Service Mesh
 
-CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
-
-Fix: disable sidecar injection for CronJobs:
+Job pods may hang after completion because the Istio sidecar keeps the pod alive. The chart ships no CronJobs of its own; if you add jobs under `cronjobs.jobs`, disable sidecar injection for them:
 
 ```yaml
 cronjobs:
@@ -65780,6 +65902,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ## ClickHouse Issues
 
@@ -65882,7 +66006,7 @@ Verify the connection string:
 
 ```bash
 # For chart-managed PostgreSQL
-kubectl -n langwatch exec deploy/langwatch-postgresql -- \
+kubectl -n langwatch exec statefulset/langwatch-postgresql -- \
   pg_isready -U postgres
 
 # For external PostgreSQL, test from the app pod
@@ -65944,13 +66068,13 @@ See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm#production-depl
 
 ### Can I run without LangEvals or NLP?
 
-Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can scale them to zero:
+Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can leave them out. `enabled: false` removes the Deployment, Service and PodDisruptionBudget:
 
 ```yaml
 langwatch_nlp:
-  replicaCount: 0
+  enabled: false
 langevals:
-  replicaCount: 0
+  enabled: false
 ```
 
 ### How do I disable telemetry?
@@ -65988,21 +66112,21 @@ kubectl -n langwatch get pods -o jsonpath='{.items[*].spec.containers[*].image}'
 
 ---
 title: Dataset Storage Migration
-description: "Upgrade guide for Helm deployments: datasets move to object storage, with a one-time automatic migration"
+description: "Upgrade guide for Helm deployments: datasets move to object storage, with a one-time migration you run once"
 ---
 
-Datasets are now stored in object storage instead of PostgreSQL. This makes large datasets faster to load, cheaper to store, and enables direct browser uploads. When you upgrade to a chart version that includes this change, a one-time migration runs automatically and moves your existing datasets to the new storage backend.
+Datasets are now stored in object storage instead of PostgreSQL. This makes large datasets faster to load, cheaper to store, and enables direct browser uploads. New datasets go to the new storage backend as soon as you upgrade. Existing datasets keep working from PostgreSQL until you run the one-time migration that moves them.
 
 <Tip>
-The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a fallback, so you can roll back safely. It is also safe to re-run: if it is interrupted or a dataset fails to migrate, the next `helm upgrade` picks up where it left off.
+The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a fallback, so you can roll back safely. It is also safe to re-run: if it is interrupted or a dataset fails to migrate, the next run picks up where it left off.
 </Tip>
 
 ## What Changed
 
 - **Dataset storage**: dataset content is written to object storage (a persistent volume by default, or S3-compatible storage if configured)
-- **Migration Job**: a Helm post-install/post-upgrade Job migrates existing datasets automatically
+- **Migration task**: a one-off task moves existing datasets. The chart does not run it; you start it once after the upgrade, see [Running the migration](#running-the-migration)
 - **Local storage constraints**: with the default local storage, the app and workers now restart together during upgrades, and workers are limited to a single replica
-- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md) for the full `app.dataplane`, `app.storedObjects`, and `datasetS3Migration` parameter reference
+- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md) for the full `app.dataplane` and `app.storedObjects` parameter reference
 
 ## Before You Upgrade
 
@@ -66010,7 +66134,7 @@ Pick the path that matches your deployment. If you run more than one worker repl
 
 ### Path A: Default local storage
 
-If you have not configured S3-compatible storage, datasets are stored on the same persistent volume the chart already uses for attachments and file uploads. **Nothing to configure**, but be aware of three things:
+If you have not configured S3-compatible storage, datasets are stored on the same persistent volume the chart already uses for attachments and file uploads. No configuration is needed, but be aware of three things:
 
 **1. Check volume headroom.** The migration writes your existing datasets to the stored-objects volume (10Gi by default, shared with attachments and staged uploads). Before upgrading, compare your dataset sizes in PostgreSQL against the free space on that volume. To estimate dataset size:
 
@@ -66029,7 +66153,7 @@ app:
 
 **2. Expect a brief restart during upgrades.** With local storage, the app and workers restart together on each upgrade (the volume can only be attached to one node at a time). This means a short window of downtime per upgrade. If you need zero-downtime upgrades, use [Path B](#path-b-s3-compatible-object-storage).
 
-**3. Pods are scheduled together.** Workers and the migration Job share the app's volume, so they are placed on the same node as the app pod automatically.
+**3. Pods are scheduled together.** The workers share the app's volume, so they are placed on the same node as the app pod automatically.
 
 ### Path B: S3-compatible object storage
 
@@ -66056,7 +66180,7 @@ app:
 
 With object storage enabled, none of the local-storage constraints apply: no persistent volume, no single-node scheduling, no restart window, and no worker replica limit.
 
-Three requirements for the bucket:
+Two requirements for the bucket:
 
 1. **CORS**: the browser uploads dataset files directly to the bucket, so your CORS policy must allow `PUT` requests from your LangWatch app origin:
 
@@ -66074,12 +66198,7 @@ Three requirements for the bucket:
 
 2. **Lifecycle rule**: in-progress uploads are staged under the `staging/` prefix before being committed. Add a lifecycle rule that expires objects under `staging/` after 1 to 7 days so abandoned uploads do not accumulate.
 
-3. **EKS with IRSA**: if your cluster authenticates to S3 through IAM roles for service accounts instead of access keys, point the migration Job at the same ServiceAccount your app and workers use:
-
-```yaml
-datasetS3Migration:
-  serviceAccountName: "your-irsa-service-account"
-```
+On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`global.serviceAccount`). The migration runs inside a workers pod, so it uses the same identity.
 
 ## Multiple Worker Replicas Require Object Storage
 
@@ -66097,7 +66216,7 @@ This is deliberate: the local volume can only be safely written from one node. *
 
 ## Running the Upgrade
 
-Use `--wait` when crossing this version boundary:
+Use `--wait` when crossing this version boundary, so the new pods are serving before you migrate:
 
 ```bash
 helm upgrade langwatch langwatch/langwatch \
@@ -66106,55 +66225,42 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 15m
 ```
 
+New datasets created after the upgrade go straight to the new storage backend. Existing datasets keep working from PostgreSQL until you migrate them.
+
+## Running the Migration
+
+Run the migration once, after every old-version pod is gone, ideally off-peak. It runs inside a workers pod, which already has the database settings, the storage settings and, with local storage, the shared volume:
+
+```bash
+kubectl -n langwatch exec deploy/langwatch-workers -- \
+  sh -c 'cd /app/platform/app && HOME=/tmp pnpm run task backfillDatasetContentToS3'
+```
+
 <Warning>
-Without `--wait`, the migration can move a dataset while an old-version pod is still serving traffic. Any dataset edits made through that old pod after its dataset was migrated do not appear in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual). `--wait` ensures the new pods are serving before the migration starts.
+Do not run it while an old-version pod still serves traffic. Dataset edits made through an old pod after its dataset was migrated do not appear in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual).
 </Warning>
-
-**ArgoCD and Flux users**: no action needed. The migration hook maps to a PostSync hook, which already waits for a healthy rollout before running.
-
-### What happens during the upgrade
-
-1. Database schema migrations run as usual
-2. New pods roll out
-3. The migration Job starts and moves existing datasets to the new storage backend, one at a time
-4. New datasets created after the upgrade go straight to object storage
 
 The migration is resilient by design:
 
-- **Safe to re-run**: interrupted or partial runs resume on the next upgrade
-- **Non-destructive**: PostgreSQL rows are kept as a fallback, nothing is deleted
-- **Handles concurrent edits**: if someone edits a dataset while it is being migrated, that dataset is skipped and retried on the next upgrade
-- **Failures do not block the release**: if an individual dataset fails to migrate, it is logged and retried on the next upgrade; your deployment still succeeds
+- **Safe to re-run**: an interrupted or partial run resumes on the next run
+- **Non-destructive**: PostgreSQL rows are kept as a fallback and are not deleted
+- **Detects most concurrent edits**: a dataset whose records change while it is being copied is skipped, and the next run migrates it. The check is best-effort: an edit in the moment between the final check and the switch can be missed, so run the migration when nobody is editing datasets
+- **Per-dataset failures do not stop the run**: a dataset that fails is logged and stays on PostgreSQL, readable as before
 
-Check the migration output:
-
-```bash
-kubectl -n langwatch logs job/langwatch-dataset-s3-migration
-```
+The summary at the end of the output lists how many datasets moved, were skipped or failed.
 
 ### Dry run
 
-To see what would be migrated without writing anything:
+To see what would be migrated without writing anything, add `DATASET_S3_MIGRATE_DRY_RUN=1`:
 
-```yaml
-datasetS3Migration:
-  extraEnvs:
-    - name: DATASET_S3_MIGRATE_DRY_RUN
-      value: "1"
+```bash
+kubectl -n langwatch exec deploy/langwatch-workers -- \
+  sh -c 'cd /app/platform/app && HOME=/tmp DATASET_S3_MIGRATE_DRY_RUN=1 pnpm run task backfillDatasetContentToS3'
 ```
 
-Run the upgrade, review the Job logs, then remove the variable and upgrade again to migrate for real.
+### Not migrating yet
 
-### Opting out
-
-To keep datasets in PostgreSQL for now and skip the migration entirely:
-
-```yaml
-datasetS3Migration:
-  skip: true
-```
-
-Existing datasets keep working from PostgreSQL. Remove the value on a later upgrade to migrate then.
+Existing datasets keep working from PostgreSQL if you never run the task. Run it on a later upgrade to migrate then.
 
 ## Rolling Back
 
@@ -66175,15 +66281,11 @@ app:
       storageClassName: "your-storage-class"
 ```
 
-### Migration Job failed
+### Migration failed
 
-The Job retries transient failures automatically, and anything left unmigrated is retried on the next `helm upgrade`. Check the logs for the specific dataset and error:
+Anything left unmigrated stays readable from PostgreSQL and is picked up when you run the task again. The task output names the dataset and the error.
 
-```bash
-kubectl -n langwatch logs job/langwatch-dataset-s3-migration
-```
-
-If the Job reports that it is waiting for schema migrations, it means the database schema has not been updated yet; it completes on the next upgrade once migrations have run.
+If the task reports that the dataset chunk-layout columns are not present yet, the database schema has not been updated. Wait for the new app pods to finish their startup migrations, then run it again.
 
 ## Getting Help
 
@@ -66365,6 +66467,8 @@ LangWatch uses TTL rules to manage data retention and tiered storage in ClickHou
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
+A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
+
 #### Docker Compose
 
 Add to your app and workers environment:
@@ -66373,10 +66477,10 @@ Add to your app and workers environment:
 services:
   app:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
   workers:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
 ```
 
 Then restart:
@@ -66387,15 +66491,12 @@ docker compose up -d
 
 #### Helm Chart
 
+The chart sets `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` on the app and workers from `clickhouse.cold.defaultTtlDays` when cold storage is on. Raise that value instead of adding the variable through `extraEnvs`:
+
 ```yaml
-app:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
-workers:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
+clickhouse:
+  cold:
+    defaultTtlDays: 9999
 ```
 
 Then upgrade:
@@ -66411,7 +66512,7 @@ The TTL reconciler runs on startup and updates the ClickHouse table metadata wit
 
 #### After Migration: Restore TTLs
 
-Once the migration is complete, set `TIERED_STORAGE_DEFAULT_HOT_DAYS` back to your desired retention value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
+Once the migration is complete, set `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` (Helm: `clickhouse.cold.defaultTtlDays`) back to your desired value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
 
 <Tip>
 We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with ClickHouse partition boundaries for more efficient data management.
@@ -66593,6 +66694,7 @@ description: "How to upgrade LangWatch to the latest version"
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. See [Credentials secret](/self-hosting/security#credentials-secret)
 
 ## Automatic identity and access migration
 
