@@ -7,10 +7,10 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { describe, expect, it } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = {
   id: "project-1",
@@ -168,10 +168,9 @@ describe("the key doors' actor", () => {
       });
     });
 
-    it("is the person on the key door", async () => {
-      expect(await actorThrough(identities.api_key, headers)).toEqual({
-        type: "user",
-        id: "user-3",
+    it("is refused on the key door", async () => {
+      await expect(actorThrough(identities.api_key, headers)).rejects.toMatchObject({
+        code: "invalid_credentials",
       });
     });
   });
