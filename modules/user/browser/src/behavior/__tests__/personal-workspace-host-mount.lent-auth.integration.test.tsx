@@ -4,6 +4,11 @@
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
 import {
+  PasskeyCeremoniesToken,
+  SignInMethodLinkingToken,
+  TwoStepCeremoniesToken,
+} from "@langwatch/auth-contract";
+import {
   UiCapabilityContextProvider,
   UiScope,
   UiSession,
@@ -89,11 +94,12 @@ const signInMethodLinking = {
 const AUTH: UiDeclaringModule = {
   name: "auth",
   installation: {
-    capabilities: {
-      passkeys: { load: async () => ({ default: passkeys }) },
-      twoStepVerification: { load: async () => ({ default: twoStepVerification }) },
-      signInMethodLinking: { load: async () => ({ default: signInMethodLinking }) },
-    },
+    capabilities: {},
+    lends: [
+      { token: PasskeyCeremoniesToken, load: async () => ({ default: passkeys }) },
+      { token: TwoStepCeremoniesToken, load: async () => ({ default: twoStepVerification }) },
+      { token: SignInMethodLinkingToken, load: async () => ({ default: signInMethodLinking }) },
+    ],
   },
 };
 

@@ -3,7 +3,12 @@
  * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
-import { SsoTestSignInToken } from "@langwatch/auth-contract";
+import {
+  PasskeyCeremoniesToken,
+  SignInMethodLinkingToken,
+  SsoTestSignInToken,
+  TwoStepCeremoniesToken,
+} from "@langwatch/auth-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const authWeb = defineBrowserModule("auth")
@@ -54,14 +59,14 @@ export const authWeb = defineBrowserModule("auth")
     frontDoorTheme: { load: () => import("./model/front-door-theme.ts") },
     /** The front door's host port, which the shell's auth layout implements. */
     host: { load: () => import("./model/auth-host.ts") },
-    /** The reader's own passkeys, for the personal workspace's security screen. */
-    passkeys: { load: () => import("./behavior/passkey-capability.ts") },
-    /** Setting two-step verification up, and fresh backup codes. */
-    twoStepVerification: { load: () => import("./behavior/two-step-capability.ts") },
-    /** Linking another sign-in method to the reader's own account. */
-    signInMethodLinking: {
-      load: () => import("./behavior/sign-in-method-linking-capability.ts"),
-    },
   })
   /** SSO's "Test sign-in": a sign-in that names a connection. */
-  .lends(SsoTestSignInToken, { load: () => import("./behavior/sign-in-capability.ts") });
+  .lends(SsoTestSignInToken, { load: () => import("./behavior/sign-in-capability.ts") })
+  /** The reader's own passkeys, for the personal workspace's security screen. */
+  .lends(PasskeyCeremoniesToken, { load: () => import("./behavior/passkey-capability.ts") })
+  /** Setting two-step verification up, and fresh backup codes. */
+  .lends(TwoStepCeremoniesToken, { load: () => import("./behavior/two-step-capability.ts") })
+  /** Linking another sign-in method to the reader's own account. */
+  .lends(SignInMethodLinkingToken, {
+    load: () => import("./behavior/sign-in-method-linking-capability.ts"),
+  });

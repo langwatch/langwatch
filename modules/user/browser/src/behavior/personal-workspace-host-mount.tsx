@@ -192,37 +192,37 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   /** Where auth lent no passkey ceremonies, empty is the honest reading. */
   async listPasskeys(): Promise<readonly HeldPasskey[]> {
     if (!this.lent.passkeys) return [];
-    const { default: ceremonies } = await this.lent.passkeys.load();
+    const ceremonies = await this.lent.passkeys();
     return ceremonies.list();
   }
 
   async registerPasskey(): Promise<PasskeyOutcome> {
     if (!this.lent.passkeys) return { ok: false, cancelled: false };
-    const { default: ceremonies } = await this.lent.passkeys.load();
+    const ceremonies = await this.lent.passkeys();
     return ceremonies.register();
   }
 
   async renamePasskey(input: { id: string; name: string }): Promise<PasskeyOutcome> {
     if (!this.lent.passkeys) return { ok: false, cancelled: false };
-    const { default: ceremonies } = await this.lent.passkeys.load();
+    const ceremonies = await this.lent.passkeys();
     return ceremonies.rename(input);
   }
 
   async removePasskey(input: { id: string }): Promise<PasskeyOutcome> {
     if (!this.lent.passkeys) return { ok: false, cancelled: false };
-    const { default: ceremonies } = await this.lent.passkeys.load();
+    const ceremonies = await this.lent.passkeys();
     return ceremonies.remove(input);
   }
 
   async startTwoStepSetup(input: { password?: string }): Promise<TwoStepAnswer<TwoStepSetup>> {
     if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
-    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    const ceremonies = await this.lent.twoStepVerification();
     return ceremonies.start(input);
   }
 
   async confirmTwoStepSetup(input: { code: string }): Promise<TwoStepAnswer<{ confirmed: true }>> {
     if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
-    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    const ceremonies = await this.lent.twoStepVerification();
     return ceremonies.confirm(input);
   }
 
@@ -230,7 +230,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     password?: string;
   }): Promise<TwoStepAnswer<{ backupCodes: readonly string[] }>> {
     if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
-    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    const ceremonies = await this.lent.twoStepVerification();
     return ceremonies.regenerateBackupCodes(input);
   }
 
@@ -238,7 +238,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     if (!this.lent.signInMethodLinking) {
       return { ok: false, reason: "Linking a sign-in method is not available here." };
     }
-    const { default: linking } = await this.lent.signInMethodLinking.load();
+    const linking = await this.lent.signInMethodLinking();
     return linking.link({ provider });
   }
 
