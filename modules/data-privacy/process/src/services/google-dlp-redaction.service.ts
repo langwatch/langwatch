@@ -44,7 +44,9 @@ export class GoogleDlpRedactionService {
 
     if (this.disabled) {
       throw new Error(
-        "Google DLP redaction requested but it is disabled via LANGWATCH_DISABLE_GOOGLE_DLP. Unset that variable to re-enable DLP, or lower the data-privacy PII level for this scope.",
+        "Google DLP redaction requested but it is disabled via LANGWATCH_DISABLE_GOOGLE_DLP. " +
+          "Unset that variable to re-enable DLP, or lower the data-privacy PII level " +
+          "for this scope.",
       );
     }
     const findings = await this.dlp.inspect({
