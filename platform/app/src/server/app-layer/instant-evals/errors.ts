@@ -65,7 +65,8 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
  *
  * `meta.deployment` says which, because the two read differently: an
  * enterprise plan is switched on by us, and a self-hosted install gets
- * Instant Evals from its license.
+ * Instant Evals from its license, or from its operator's release flag when it
+ * judges with its own key.
  *
  * @see ./opt-in.ts
  */
@@ -80,7 +81,7 @@ export class InstantEvalOptInNotOfferedError extends HandledError {
     super(
       "instant_eval_opt_in_not_offered",
       deployment === "self_hosted"
-        ? "A self-hosted install gets Instant Evals from its license, not from this switch. Contact us to add them to your license."
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
         : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
       {
         httpStatus: 403,

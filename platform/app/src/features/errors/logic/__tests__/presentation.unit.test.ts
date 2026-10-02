@@ -871,7 +871,7 @@ describe("agent_payload_too_large", () => {
 
 describe("instant_eval_opt_in_not_offered", () => {
   describe("when a self-hosted install is refused the switch", () => {
-    it("says the license is what adds Instant Evals", () => {
+    it("says the license, or the operator of an install with its own judge key, is what adds Instant Evals", () => {
       const { description } = explainHandledError(
         shape({
           code: "instant_eval_opt_in_not_offered",
@@ -881,7 +881,7 @@ describe("instant_eval_opt_in_not_offered", () => {
       );
 
       expect(description).toBe(
-        "A self-hosted install gets Instant Evals from its license, not from this switch. Contact us to add them to your license.",
+        "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
       );
     });
   });

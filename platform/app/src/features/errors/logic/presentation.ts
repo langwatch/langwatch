@@ -531,7 +531,7 @@ const presentations = {
     title: "Ask us to switch Instant Evals on",
     describe: (error) =>
       error.meta.deployment === "self_hosted"
-        ? "A self-hosted install gets Instant Evals from its license, not from this switch. Contact us to add them to your license."
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
         : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_invalid: {
