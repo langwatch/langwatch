@@ -107,13 +107,11 @@ function SelectedFileAction({
 }
 
 export function UploadCSVDrawer({
-  isOpen: isOpen_,
   onClose: onClose_,
   onSuccess,
   onCreateFromScratch,
   enableDirectUpload = true,
 }: {
-  isOpen?: boolean;
   onClose?: () => void;
   onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
   onCreateFromScratch?: () => void;
@@ -128,10 +126,8 @@ export function UploadCSVDrawer({
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const onClose = onClose_ ?? closeDrawer;
-  const isOpen = isOpen_ ?? true;
 
   const addDatasetDrawer = useDisclosure();
-  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
   const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(undefined);
   // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
   // parsed columns + the resume callback and render the confirm drawer. Null
@@ -148,29 +144,20 @@ export function UploadCSVDrawer({
   // so the whole async flow is observable without leaving the drawer.
   const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(null);
 
-  const uploadCSVData = () => {
-    setLocalIsOpen(false);
-    addDatasetDrawer.onOpen();
-  };
+  const uploadCSVData = () => addDatasetDrawer.onOpen();
 
   const handleClose = () => {
     setProcessingDatasetId(null);
     onClose();
   };
 
-  useEffect(() => {
-    setLocalIsOpen(isOpen);
-    if (!isOpen) {
-      setUploadedDataset(undefined);
-      setProcessingDatasetId(null);
-      addDatasetDrawer.onClose();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
   return (
     <>
-      <Drawer.Root open={localIsOpen} onOpenChange={({ open }) => !open && handleClose()} size="xl">
+      <Drawer.Root
+        open={!addDatasetDrawer.open}
+        onOpenChange={({ open }) => !open && handleClose()}
+        size="xl"
+      >
         <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
@@ -211,6 +198,8 @@ export function UploadCSVDrawer({
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
+      {/* Nested panels, not routed drawers: each holds a parsed CSV or a paused
+          upload in memory, which the address cannot carry. */}
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
         open={addDatasetDrawer.open}
