@@ -4,6 +4,7 @@ import {
   isHandledByGlobalHandler,
 } from "@langwatch/browser-host/errors";
 import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
+import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
@@ -17,7 +18,10 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { type CodedExecutionFailure, type WorkflowStore } from "../../../behavior/workflow-store.ts";
+import {
+  type CodedExecutionFailure,
+  type WorkflowStore,
+} from "../../../behavior/workflow-store.ts";
 import { explainExecutionStateError, reportableExecutionFailure } from "./execution-state-error.ts";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
@@ -45,9 +49,11 @@ export const PostEventProvider = ({ children }: { children: React.ReactNode }) =
     })),
   );
   const { postEvent } = usePostEvent();
+  const isVisible = usePageVisibility();
 
   useEffect(() => {
-    if (!project) return;
+    // A hidden tab makes no calls; the effect re-arms when it is shown again.
+    if (!project || !isVisible) return;
 
     const pythonReconnect = () => {
       pythonDisconnectedTimeout = setTimeout(() => {
@@ -73,7 +79,7 @@ export const PostEventProvider = ({ children }: { children: React.ReactNode }) =
     return () => {
       clearInterval(interval);
     };
-  }, [postEvent, project, setSocketStatus, socketStatus]);
+  }, [isVisible, postEvent, project, setSocketStatus, socketStatus]);
 
   return <>{children}</>;
 };

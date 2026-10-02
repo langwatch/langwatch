@@ -1,3 +1,4 @@
+import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
@@ -108,20 +109,19 @@ function useHeartbeat({
 }) {
   const projectId = target?.projectId;
   const sessionId = target?.sessionId;
+  const isVisible = usePageVisibility();
   useEffect(() => {
-    if (!projectId || !sessionId) return;
+    if (!projectId || !sessionId || !isVisible) return;
     const resend = () => {
       const last = announcement.lastLocation.current;
-      if (document.visibilityState !== "visible" || !last) return;
+      if (!last) return;
       void announcement.update.current({ projectId, sessionId, location: last });
     };
+    // Becoming visible re-runs this effect, so the tab re-announces at once.
+    resend();
     const interval = setInterval(resend, HEARTBEAT_INTERVAL_MS);
-    document.addEventListener("visibilitychange", resend);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", resend);
-    };
-  }, [announcement, projectId, sessionId]);
+    return () => clearInterval(interval);
+  }, [announcement, projectId, sessionId, isVisible]);
 }
 
 /**
