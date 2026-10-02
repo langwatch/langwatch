@@ -207,6 +207,7 @@ describe("given the identifier-first sign-in screen", () => {
     publicEnvRef.current = { IS_SAAS: true };
     priorSessionRef.current = undefined;
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => cleanup());
@@ -298,25 +299,77 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
-  /** @scenario "A sole SSO provider waits for a sign-in gesture" */
-  it("waits for an explicit click before using the sole provider", async () => {
-    routeMock.mockResolvedValue({
+  describe("when a self-hosted deployment has one live connection", () => {
+    const soleConnection: RoutingDecision = {
       outcome: "redirect_to_connection",
-      connectionId: "org:acme",
       methodSet: [oktaMethod],
-      reasonCode: "sole_connection",
+      reasonCode: "sole_active_connection",
+    };
+
+    /** @scenario "A self-hosted sign-in page goes straight to the sole live connection" */
+    it("starts the provider sign-in without a click", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      expect(signInMock).toHaveBeenCalledWith(
+        "okta",
+        expect.objectContaining({ callbackUrl: undefined }),
+      );
     });
-    renderScreen();
-    const continueButton = await screen.findByRole("button", {
-      name: /continue with okta/i,
+
+    /** @scenario "The sole connection is not dialed twice in a row" */
+    it("offers a button instead when it already sent this tab there moments ago", async () => {
+      routeMock.mockResolvedValue(soleConnection);
+      const first = renderScreen();
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledTimes(1);
+      });
+      first.unmount();
+      signInMock.mockClear();
+
+      renderScreen();
+      const continueButton = await screen.findByRole("button", {
+        name: /continue with okta/i,
+      });
+      expect(signInMock).not.toHaveBeenCalled();
+      await userEvent.click(continueButton);
+      expect(signInMock).toHaveBeenCalledTimes(1);
     });
-    expect(signInMock).not.toHaveBeenCalled();
-    await userEvent.click(continueButton);
-    expect(signInMock).toHaveBeenCalledTimes(1);
-    expect(signInMock).toHaveBeenCalledWith(
-      "okta",
-      expect.objectContaining({ callbackUrl: undefined }),
-    );
+
+    /** @scenario "A failed sign-in return never redirects to the sole connection" */
+    it("shows the error and starts no provider sign-in", async () => {
+      searchParamsRef.current = new URLSearchParams("error=sign_in_failed");
+      routeMock.mockResolvedValue(soleConnection);
+      renderScreen();
+
+      await waitFor(() => {
+        expect(routeMock).toHaveBeenCalled();
+      });
+      expect(
+        await screen.findByRole("link", { name: /try sign in again/i }),
+      ).toBeInTheDocument();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The break-glass sign-in page never redirects to the sole connection" */
+    it("renders the local sign-in for the break-glass parameter", async () => {
+      searchParamsRef.current = new URLSearchParams("local=1");
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [passwordMethod],
+        reasonCode: "break_glass",
+      } satisfies RoutingDecision);
+      renderScreen();
+
+      expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+      expect(routeMock).toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: null, breakGlass: true }),
+      );
+      expect(signInMock).not.toHaveBeenCalled();
+    });
   });
 
   describe("when an address routes to an identity provider", () => {
