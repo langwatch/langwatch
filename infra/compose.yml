@@ -68,8 +68,7 @@ services:
     image: langwatch/langwatch_nlp:latest
     env_file:
       - platform/app/.env
-    ports:
-      - "5561:5561"
+    # No host port - accessed via docker network as "langwatch_nlp:5561"
     restart: always
     pull_policy: always
     environment:

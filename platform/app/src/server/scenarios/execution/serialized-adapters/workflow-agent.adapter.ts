@@ -23,6 +23,7 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
+import { nlpgoInternalHeaders } from "../../../nlpgo/internalSecret";
 import {
   createNlpFetchDispatcher,
   type FetchInitWithDispatcher,
@@ -281,7 +282,10 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     try {
       const fetchInit: FetchInitWithDispatcher = {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...nlpgoInternalHeaders(),
+        },
         body,
         signal,
         dispatcher: createNlpFetchDispatcher({ timeoutMs }),

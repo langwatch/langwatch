@@ -77,6 +77,12 @@ Feature: nlpgo internal authentication — only the LangWatch app may call the e
       Then the request reaches the engine and is executed
 
     @unit
+    Scenario: a blank or whitespace secret counts as unconfigured
+      Given the operator's configuration carries the variable with no value
+      When the engine reads its configuration
+      Then the engine treats the secret as unset rather than demanding a blank one
+
+    @unit
     Scenario: an unconfigured engine reports the gap at startup
       Given the engine is configured with no internal secret
       When the engine starts

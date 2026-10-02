@@ -142,6 +142,9 @@ describe("SerializedWorkflowAgentAdapter", () => {
     // Stubbed, not assigned: a raw assignment here outlives the file and
     // reaches whatever else shares this vitest worker.
     vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
+    // Pin the internal secret off by default so the header assertions below
+    // describe one install shape, not whatever the ambient .env carries.
+    vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", "");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -172,6 +175,40 @@ describe("SerializedWorkflowAgentAdapter", () => {
         projectApiKey: apiKey,
       });
       expect(adapter.name).toBe("SerializedWorkflowAgentAdapter");
+    });
+  });
+
+  describe("when the nlpgo internal secret is configured", () => {
+    /** @scenario "the shared helper carries the secret when one is configured" */
+    it("sends the secret as X-LangWatch-NLP-Secret", async () => {
+      vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", "s3cr3t");
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(mockFetch.mock.calls[0]![1].headers).toMatchObject({
+        "X-LangWatch-NLP-Secret": "s3cr3t",
+      });
+    });
+
+    /** @scenario "the shared helper carries nothing when none is configured" */
+    it("sends no secret header when the variable is unset", async () => {
+      vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", undefined);
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(mockFetch.mock.calls[0]![1].headers).not.toHaveProperty(
+        "X-LangWatch-NLP-Secret",
+      );
     });
   });
 

@@ -22,20 +22,7 @@ import (
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, playground httpapi.PlaygroundProxy) error {
 	deps.Logger.Info("nlpgo_starting", zap.String("addr", cfg.Server.Addr))
 
-	// Say out loud which of the two postures this process is in. The engine
-	// runs user-authored code for whichever project the request body names
-	// and authenticates no project itself, so an operator reading the log on
-	// an unguarded install should see that stated rather than inferred.
-	if cfg.InternalSecret == "" {
-		deps.Logger.Warn("nlpgo_internal_auth_disabled",
-			zap.String("variable", "LANGWATCH_NLP_INTERNAL_SECRET"),
-			zap.String("effect", "/go routes accept any caller that can reach this address"),
-		)
-	} else {
-		deps.Logger.Info("nlpgo_internal_auth_enabled",
-			zap.String("header", httpapi.InternalSecretHeader),
-		)
-	}
+	logInternalAuthPosture(deps.Logger, cfg.InternalSecret)
 
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := httpapi.NewRouter(newRouterDeps(routerDepsInput{
@@ -63,6 +50,26 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 	)
 	g.Add(buildServices(deps, srv)...)
 	return g.Run(ctx)
+}
+
+// logInternalAuthPosture says out loud which of the two postures this process
+// is in. The engine runs user-authored code for whichever project the request
+// body names and authenticates no project itself, so an operator reading the
+// log of an unguarded install should find that stated rather than have to
+// infer it from the absence of a line.
+//
+// Separate from Serve so the posture is assertable without binding a listener.
+func logInternalAuthPosture(logger *zap.Logger, secret string) {
+	if secret == "" {
+		logger.Warn("nlpgo_internal_auth_disabled",
+			zap.String("variable", "LANGWATCH_NLP_INTERNAL_SECRET"),
+			zap.String("effect", "/go routes accept any caller that can reach this address"),
+		)
+		return
+	}
+	logger.Info("nlpgo_internal_auth_enabled",
+		zap.String("header", httpapi.InternalSecretHeader),
+	)
 }
 
 // routerDepsInput carries everything newRouterDeps needs to map the

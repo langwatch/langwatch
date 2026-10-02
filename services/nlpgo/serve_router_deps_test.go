@@ -1,8 +1,13 @@
 package nlpgo
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -163,5 +168,75 @@ func TestNewRouterDeps_UnsetInternalSecretStaysUnset(t *testing.T) {
 	if got.InternalSecret != "" {
 		t.Errorf("InternalSecret = %q; want empty so an unconfigured install keeps serving",
 			got.InternalSecret)
+	}
+}
+
+// @scenario "an unconfigured engine reports the gap at startup"
+func TestLogInternalAuthPosture_WarnsWhenNoSecretIsConfigured(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+
+	logInternalAuthPosture(zap.New(core), "")
+
+	entries := logs.FilterMessage("nlpgo_internal_auth_disabled").All()
+	if len(entries) != 1 {
+		t.Fatalf("got %d nlpgo_internal_auth_disabled entries; want 1 so an operator reading the log of an unguarded install finds it stated", len(entries))
+	}
+	fields := entries[0].ContextMap()
+	if got := fields["variable"]; got != "LANGWATCH_NLP_INTERNAL_SECRET" {
+		t.Errorf("variable = %v; the warning must name the variable that turns the guard on", got)
+	}
+	if entries[0].Level != zapcore.WarnLevel {
+		t.Errorf("level = %v; want warn, so the line survives a deployment logging at warn and above", entries[0].Level)
+	}
+}
+
+// TestLogInternalAuthPosture_StaysQuietAtWarnWhenConfigured keeps the warning
+// meaningful: a guarded install must not emit it, or an operator learns to
+// ignore the one line that tells them they are unguarded.
+func TestLogInternalAuthPosture_StaysQuietAtWarnWhenConfigured(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+
+	logInternalAuthPosture(zap.New(core), "shared-with-the-app")
+
+	if n := logs.Len(); n != 0 {
+		t.Errorf("got %d warn-or-worse entries on a configured install; want none: %v", n, logs.All())
+	}
+}
+
+// @scenario "a blank or whitespace secret counts as unconfigured"
+func TestLoadConfig_BlankInternalSecretCountsAsUnconfigured(t *testing.T) {
+	// .env.example ships the key with no value and compose passes a blank
+	// line through as an empty string, so "present but blank" is the shape an
+	// unconfigured install actually has. Whitespace is the same intent typed
+	// less carefully. Either reaching the router as a secret would make the
+	// engine demand a value nothing can present and refuse every request the
+	// app makes.
+	for _, raw := range []string{"", "   ", "\t\n"} {
+		t.Setenv("LANGWATCH_NLP_INTERNAL_SECRET", raw)
+
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig(%q): %v", raw, err)
+		}
+		if cfg.InternalSecret != "" {
+			t.Errorf("InternalSecret = %q for input %q; want empty so the install keeps serving",
+				cfg.InternalSecret, raw)
+		}
+	}
+}
+
+// @scenario "a request carrying the configured secret is served"
+func TestLoadConfig_SurroundingWhitespaceIsTrimmedFromTheSecret(t *testing.T) {
+	// A value pasted into a .env or a Secret commonly arrives with a trailing
+	// newline. Keeping it would mean the engine expects a secret the app, which
+	// trims its own copy, never sends.
+	t.Setenv("LANGWATCH_NLP_INTERNAL_SECRET", "  shared-with-the-app\n")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.InternalSecret != "shared-with-the-app" {
+		t.Errorf("InternalSecret = %q; want the trimmed value", cfg.InternalSecret)
 	}
 }

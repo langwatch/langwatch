@@ -17,6 +17,7 @@ import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
+import { nlpgoInternalHeaders } from "../../../nlpgo/internalSecret";
 import {
   createNlpFetchDispatcher,
   type FetchInitWithDispatcher,
@@ -498,7 +499,10 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
           try {
             const fetchInit: FetchInitWithDispatcher = {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...nlpgoInternalHeaders(),
+              },
               body: JSON.stringify(event),
               signal: controller.signal,
               dispatcher: createNlpFetchDispatcher({

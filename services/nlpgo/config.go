@@ -8,6 +8,7 @@ package nlpgo
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
@@ -155,6 +156,13 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	// An operator who has not set the secret usually has the variable present
+	// and blank rather than absent: .env.example ships the key with no value,
+	// and compose passes a blank line through as an empty string. Whitespace
+	// is the same intent typed less carefully. All of it has to mean "not
+	// configured", or the engine starts demanding a secret nothing can
+	// present and refuses every request the app makes.
+	cfg.InternalSecret = strings.TrimSpace(cfg.InternalSecret)
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err
