@@ -218,9 +218,4 @@ export interface DataPrivacyScopeFacts {
   departmentId: string | null;
   isPersonal: boolean;
 }
-export interface DataPrivacyRow {
-  scopeType: DataPrivacyScopeType;
-  scopeId: string;
-  personalOnly: boolean;
-  config: DataPrivacyConfig;
-}
+export type DataPrivacyRow = z.infer<typeof dataPrivacyRowSchema>;

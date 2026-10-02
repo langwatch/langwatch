@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-feature-flags.ts";
+import { frontendFeatureFlagSchema } from "./frontend-feature-flags.ts";
 
 /**
  * The targets an experiment can be evaluated for. `system` is deliberately
@@ -56,14 +56,6 @@ export type ExperimentTenantScope = z.infer<typeof experimentTenantScopeSchema>;
  * Why an experiment resolved the way it did, for the dialog to explain and
  * for tests to assert against something other than a bare boolean.
  */
-export type ExperimentDecision =
-  | "unavailable"
-  | "tenant-disabled"
-  | "tenant-enabled"
-  | "user-enrolled"
-  | "user-not-enrolled"
-  | "anonymous-bucket";
-
 export const experimentDecisionSchema = z.enum([
   "unavailable",
   "tenant-disabled",
@@ -72,25 +64,12 @@ export const experimentDecisionSchema = z.enum([
   "user-not-enrolled",
   "anonymous-bucket",
 ]);
+export type ExperimentDecision = z.infer<typeof experimentDecisionSchema>;
 
 /**
  * One experiment as a viewer sees it (only those with true base availability
  * for that viewer).
  */
-export interface ExperimentCatalogueEntry {
-  key: FrontendFeatureFlag;
-  title: string;
-  summary: string;
-  catalogueVersion: number;
-  enabled: boolean;
-  decision: ExperimentDecision;
-  /** The viewer's own opt-in, independent of any tenant policy. */
-  userEnrolled: boolean;
-  /** Present only for a viewer authorised to manage that scope. */
-  projectPolicy?: ExperimentTenantPolicy;
-  organizationPolicy?: ExperimentTenantPolicy;
-}
-
 export const experimentCatalogueEntrySchema = z
   .object({
     key: frontendFeatureFlagSchema,
@@ -99,11 +78,14 @@ export const experimentCatalogueEntrySchema = z
     catalogueVersion: z.number().int().positive(),
     enabled: z.boolean(),
     decision: experimentDecisionSchema,
+    /** The viewer's own opt-in, independent of any tenant policy. */
     userEnrolled: z.boolean(),
+    /** Present only for a viewer authorised to manage that scope. */
     projectPolicy: experimentTenantPolicySchema.optional(),
     organizationPolicy: experimentTenantPolicySchema.optional(),
   })
   .strict();
+export type ExperimentCatalogueEntry = z.infer<typeof experimentCatalogueEntrySchema>;
 
 /**
  * Whether this target may see the experiment at all. A signed-out visitor

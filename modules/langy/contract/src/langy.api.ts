@@ -14,7 +14,6 @@ import type * as jsonModule from "./json.ts";
 import type {
   LangyConversationDetail,
   LangyConversationEventPage,
-  LangyConversationListCursor,
   LangyConversationListPage,
   LangyMessageRow,
   LangyRelayConnection,
@@ -189,13 +188,7 @@ export type LangyTurnSettlementWait =
   | { kind: "awaiting_user"; question: string }
   | { kind: "stopped" };
 
-export type LangyGetPageInput = {
-  projectId: string;
-  userId: string;
-  limit: number;
-  cursor?: LangyConversationListCursor;
-  query?: string;
-};
+export type LangyGetPageInput = z.infer<typeof langyListInputSchema> & { userId: string };
 export type LangyGetEventsAfterInput = {
   projectId: string;
   conversationId: string;

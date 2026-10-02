@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/module";
+import type { z } from "zod";
 
 import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
@@ -6,6 +7,7 @@ import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
   ModelProviderCodexSignInCompletion,
   ModelProviderCodexSignInCompletionInput,
+  modelProviderCodexSignInStartSchema,
 } from "./model-provider.trpc-schemas.ts";
 import type {
   Model,
@@ -156,12 +158,9 @@ export interface ModelProviderPlaygroundCompletion {
   readonly body: AsyncIterable<Uint8Array>;
 }
 /** Codex step 1: the device code the browser shows, and how often to poll. */
-export interface ModelProviderCodexDeviceSignIn {
-  readonly userCode: string;
-  readonly deviceAuthId: string;
-  readonly verificationUrl: string;
-  readonly intervalSeconds: number;
-}
+export type ModelProviderCodexDeviceSignIn = Readonly<
+  z.infer<typeof modelProviderCodexSignInStartSchema>
+>;
 /** Codex step 2..n: one poll of the pending device authorization. */
 export type ModelProviderCodexDeviceApproval =
   | Readonly<{ status: "pending" }>
