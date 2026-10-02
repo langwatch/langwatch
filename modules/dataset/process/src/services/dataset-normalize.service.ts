@@ -15,6 +15,7 @@ import {
   type FileFormat,
   type DatasetNormalizePayload,
   UploadNotPendingError,
+  UploadValidationError,
 } from "@langwatch/dataset-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import Papa from "papaparse";
@@ -80,9 +81,9 @@ async function deleteFlushedChunks({
  * Thrown when a staged `.json` array is too large to buffer; surfaced to the
  * user as the dataset's `statusError`. Convert to JSONL to stream it instead.
  */
-export class LargeJsonUnsupportedError extends Error {
+export class LargeJsonUnsupportedError extends UploadValidationError {
   constructor(message = "Large .json files are not supported — convert to JSONL") {
-    super(message);
+    super(message, "file_too_large");
     this.name = "LargeJsonUnsupportedError";
   }
 }
@@ -330,17 +331,33 @@ const applyTargetBinding = (
   return out;
 };
 
+/** Unparseable uploaded JSON is the customer's file, not a server fault. */
+const parseUploadedJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new UploadValidationError(
+      `The file is not valid JSON: ${error.message}`,
+      "unsupported_format",
+    );
+  }
+};
+
 // I-MEM: bound a pathological no-newline / giant-line file. `readline`
 // already buffers a line at a time; this caps that buffer's size.
 const parseJsonlLine = (
   rawLine: string,
 ): { kind: "record"; record: Record<string, unknown> } | { kind: "blank" } => {
   if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
-    throw new Error("JSONL line exceeds max size — malformed file");
+    throw new UploadValidationError(
+      "JSONL line exceeds max size — malformed file",
+      "file_too_large",
+    );
   }
   const line = scrubNullBytes(rawLine).trim();
   if (line.length === 0) return { kind: "blank" };
-  return { kind: "record", record: JSON.parse(line) as Record<string, unknown> };
+  return { kind: "record", record: parseUploadedJson(line) as Record<string, unknown> };
 };
 
 /** A JSON-array source, size-guarded and buffered whole; it must be an array of records. */
@@ -355,9 +372,12 @@ const readJsonArray = async ({
     throw new LargeJsonUnsupportedError();
   }
   const content = scrubNullBytes(await streamToString(stream, LARGE_JSON_MAX_BYTES)).trim();
-  const parsed = JSON.parse(content);
+  const parsed = parseUploadedJson(content);
   if (!Array.isArray(parsed)) {
-    throw new Error("JSON content must be an array of objects");
+    throw new UploadValidationError(
+      "JSON content must be an array of objects",
+      "unsupported_format",
+    );
   }
   return parsed as Record<string, unknown>[];
 };
@@ -570,7 +590,7 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
       // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
       // matches the legacy upload contract (which rejects an empty file).
       if (meta.rowCount === 0) {
-        throw new Error("Uploaded file is empty");
+        throw new UploadValidationError("Uploaded file is empty", "empty_file");
       }
 
       // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run

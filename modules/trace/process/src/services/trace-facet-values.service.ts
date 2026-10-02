@@ -117,7 +117,7 @@ export class TraceFacetValuesService {
     const normalized = trimmed.startsWith(TRACE_ATTRIBUTE_PREFIX)
       ? `${TRACE_ATTRIBUTE_PREFIX_LEGACY}${trimmed.slice(TRACE_ATTRIBUTE_PREFIX.length)}`
       : trimmed;
-    const drillableKeys = this.facets.registry.filter((d) => d.kind !== "range").map((d) => d.key);
+    const drillableKeys = this.drillableKeys();
 
     for (const prefix of STORE_ATTRIBUTE_PREFIXES) {
       if (!normalized.startsWith(prefix)) continue;
@@ -142,6 +142,10 @@ export class TraceFacetValuesService {
       `No facet named \`${trimmed}\` has values to list. Call this endpoint with no field to see which facets this project has, or GET /api/v1/query/reference for every filter field.`,
       drillableKeys,
     );
+  }
+
+  private drillableKeys(): string[] {
+    return this.facets.registry.filter((d) => d.kind !== "range").map((d) => d.key);
   }
 
   /** Whether a resolved facet key names an arbitrary attribute rather than a registry dimension. */
@@ -248,11 +252,19 @@ export class TraceFacetValuesService {
 
     const def = this.facets.registry.find((d) => d.key === params.facetKey);
     if (!def) {
-      throw new Error(`Unknown facet: ${params.facetKey}`);
+      throw unknownFacetError(
+        params.facetKey,
+        `No facet named \`${params.facetKey}\`.`,
+        this.drillableKeys(),
+      );
     }
 
     if (def.kind === "range") {
-      throw new Error("Cannot drill into range facet");
+      throw unknownFacetError(
+        params.facetKey,
+        `\`${params.facetKey}\` is a range facet and has no values to list.`,
+        this.drillableKeys(),
+      );
     }
 
     let result: CategoricalFacetResult;
@@ -302,7 +314,11 @@ export class TraceFacetValuesService {
   ): Promise<FacetValuesResult> {
     const attributeKey = params.facetKey.slice(facetPrefix.length);
     if (!attributeKey || !ATTRIBUTE_KEY_REGEX.test(attributeKey)) {
-      throw new Error(`Invalid attribute key: ${attributeKey}`);
+      throw unknownFacetError(
+        params.facetKey,
+        `Invalid attribute key: \`${attributeKey}\`.`,
+        this.drillableKeys(),
+      );
     }
 
     return find({

@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import {
   datasetNormalizePayloadSchema,
   type DatasetNormalizePayload,
+  UploadValidationError,
 } from "@langwatch/dataset-contract";
 import {
   storedObjectMetadataSchema,
@@ -381,7 +382,7 @@ describe("DatasetNormalizeService", () => {
         storedObjects: noStoredObjects,
       });
 
-      await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
+      await expect(handler(basePayload)).rejects.toThrow(UploadValidationError);
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
       expect(update.data.statusError).toBeTruthy();
@@ -411,7 +412,7 @@ describe("DatasetNormalizeService", () => {
           storedObjects: noStoredObjects,
         });
 
-        await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
+        await expect(handler(basePayload)).rejects.toThrow(UploadValidationError);
         // Chunks really were flushed (orphan risk is real, not hypothetical).
         expect(writeChunks).toHaveBeenCalled();
         // …and the catch reaps them all.
