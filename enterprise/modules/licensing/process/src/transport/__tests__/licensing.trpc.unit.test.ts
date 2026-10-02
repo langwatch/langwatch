@@ -4,15 +4,13 @@
  * @see specs/licensing/license-router.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { createTestLicensingApp, EXPIRED_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { licenseTrpcTransport } from "../licensing.trpc.ts";
-import {
-  licensingTrpcTestMembers,
-  type LicensingTrpcTestContext,
-} from "./licensing.trpc.harness.ts";
+import type { LicensingTrpcTestContext } from "./licensing.trpc.harness.ts";
 
 async function mount(options: { permits?: (permission: string) => boolean } = {}) {
   const licensing = await createTestLicensingApp();
@@ -20,7 +18,7 @@ async function mount(options: { permits?: (permission: string) => boolean } = {}
   const router = createTrpcRuntime<LicensingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: licensingTrpcTestMembers(options.permits ?? (() => true)),
+    members: trpcTestMembers<LicensingTrpcTestContext>({ permits: options.permits }),
   }).mount(licenseTrpcTransport, () => licensing);
 
   return { router, caller: router.createCaller({ actor: { id: "user-123" } }) };

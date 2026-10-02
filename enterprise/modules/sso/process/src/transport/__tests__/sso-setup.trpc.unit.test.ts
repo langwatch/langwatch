@@ -8,6 +8,7 @@ import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/ide
  * (specs/identity/sso-connection-history.feature).
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,33 +29,10 @@ function runtimePorts(
   permits: (permission: string) => boolean,
   enterprise: boolean,
 ): TrpcRuntimeMembers<TestContext> {
-  return {
-    entitlements: { holds: async () => enterprise },
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: permits(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => permits(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  return trpcTestMembers<TestContext>({
+    permits,
+    overrides: { entitlements: { holds: async () => enterprise } },
+  });
 }
 
 /** A cutover half-way through: the replacement registered, sign-in still on

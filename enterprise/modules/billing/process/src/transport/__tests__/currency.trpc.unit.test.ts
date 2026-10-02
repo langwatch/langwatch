@@ -6,12 +6,13 @@
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { Currency } from "@langwatch/enterprise-billing-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { CurrencyService } from "../../services/currency.service.ts";
 import { currencyRequestHeadersFact, currencyTrpcTransport } from "../currency.trpc.ts";
-import { billingTrpcTestMembers, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
 
@@ -21,7 +22,7 @@ const currency = CurrencyService.create();
 const router = createTrpcRuntime<BillingTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
-  members: billingTrpcTestMembers(),
+  members: trpcTestMembers<BillingTrpcTestContext>(),
 }).mount(currencyTrpcTransport, () => ({ detectCurrency: (request) => currency.detect(request) }), {
   // The headers are the PROCESS's to read, off the transport it authenticated.
   facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)],
@@ -109,7 +110,7 @@ describe("given a deployment that serves no currency detection", () => {
   const selfHosted = createTrpcRuntime<BillingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: billingTrpcTestMembers(),
+    members: trpcTestMembers<BillingTrpcTestContext>(),
   }).mount(
     currencyTrpcTransport,
     () => ({

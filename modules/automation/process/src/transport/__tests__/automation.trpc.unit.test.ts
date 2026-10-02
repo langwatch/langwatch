@@ -6,14 +6,12 @@
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { automationCallerEmailFact, automationTrpcTransport } from "../automation.trpc.ts";
-import {
-  automationTrpcTestMembers,
-  type AutomationTrpcTestContext,
-} from "./automation.trpc.harness.ts";
+import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
 
 function mount(
   options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {},
@@ -22,7 +20,7 @@ function mount(
   const router = createTrpcRuntime<AutomationTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: automationTrpcTestMembers(options.permits ?? (() => true)),
+    members: trpcTestMembers<AutomationTrpcTestContext>({ permits: options.permits }),
   }).mount(automationTrpcTransport, () => options.app as AutomationApi, {
     facts: [bindTrpcFact(automationCallerEmailFact, (ctx) => ctx.email ?? null)],
   });

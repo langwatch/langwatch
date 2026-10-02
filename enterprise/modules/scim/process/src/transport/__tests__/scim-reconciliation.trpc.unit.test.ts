@@ -8,6 +8,7 @@
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { ScimSyncActivityEntry } from "@langwatch/enterprise-scim-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -32,33 +33,10 @@ function testPorts(
   permits: (permission: string) => boolean,
   enterprise: boolean,
 ): TrpcRuntimeMembers<ScimTrpcTestContext> {
-  return {
-    entitlements: { holds: async () => enterprise },
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: permits(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => permits(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
+  return trpcTestMembers<ScimTrpcTestContext>({
+    permits,
+    overrides: { entitlements: { holds: async () => enterprise } },
+  });
 }
 
 const OKTA: OrganizationSsoConnection = {

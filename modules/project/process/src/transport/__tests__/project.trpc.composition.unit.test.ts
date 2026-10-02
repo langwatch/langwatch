@@ -14,6 +14,7 @@ import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
@@ -24,7 +25,7 @@ import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
-import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const ACTOR_ID = "user-1";
@@ -212,7 +213,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: projectTrpcTestMembers(),
+    members: trpcTestMembers<ProjectTrpcTestContext>(),
   }).mount(projectTrpcTransport, () => browser);
 
   return { ...built, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };

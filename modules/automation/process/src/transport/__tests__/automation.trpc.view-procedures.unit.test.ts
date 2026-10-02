@@ -12,16 +12,14 @@ import { createTestLogger } from "@langwatch/test-harness";
  * twin), and when the automation acts next. Each is gated by `triggers:view`.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTriggerLatestEvaluationRepository } from "../../repositories/memory/memory.trigger-latest-evaluation.repository.ts";
 import { TriggerLatestEvaluationService } from "../../services/trigger-latest-evaluation.service.ts";
 import { automationCallerEmailFact, automationTrpcTransport } from "../automation.trpc.ts";
-import {
-  automationTrpcTestMembers,
-  type AutomationTrpcTestContext,
-} from "./automation.trpc.harness.ts";
+import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
 
 const SCOPE = { projectId: "project_1", triggerId: "trigger_1" };
 
@@ -36,7 +34,7 @@ function mount({
   const router = createTrpcRuntime<AutomationTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: automationTrpcTestMembers(permits),
+    members: trpcTestMembers<AutomationTrpcTestContext>({ permits }),
   }).mount(automationTrpcTransport, () => createApiFixture<AutomationApi>(app), {
     facts: [bindTrpcFact(automationCallerEmailFact, () => null)],
   });

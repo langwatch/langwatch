@@ -8,11 +8,12 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { builtinRoleGrants, type BuiltinRoleKey } from "@langwatch/authz-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { testSuiteTrpcTransport } from "../test-suite.trpc.ts";
-import { suiteTrpcTestMembers, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
+import type { SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const PROJECT_ID = "project_1";
 const TEST_SUITE = {
@@ -47,7 +48,9 @@ function callerAs(role: BuiltinRoleKey) {
   const router = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: suiteTrpcTestMembers((permission) => builtinRoleGrants({ role, permission })),
+    members: trpcTestMembers<SuiteTrpcTestContext>({
+      permits: (permission) => builtinRoleGrants({ role, permission }),
+    }),
   }).mount(testSuiteTrpcTransport, () => app);
 
   return {

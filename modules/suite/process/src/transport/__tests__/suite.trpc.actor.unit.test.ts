@@ -5,11 +5,12 @@
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { SuiteApi, SuiteRunResult } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteTrpcTransport } from "../suite.trpc.ts";
-import { suiteTrpcTestMembers, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
+import type { SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const runResult: SuiteRunResult = {
   batchRunId: "batch_1",
@@ -26,7 +27,7 @@ function harness(run = vi.fn().mockResolvedValue(runResult)) {
   const router = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: suiteTrpcTestMembers(),
+    members: trpcTestMembers<SuiteTrpcTestContext>(),
   }).mount(suiteTrpcTransport, () => app);
 
   return { caller: router.createCaller({ actor: { id: "user_lena" } }), run };

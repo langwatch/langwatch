@@ -7,11 +7,12 @@ import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contra
  * behind the request, and that an impersonator billing cannot name is refused.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { connectedBillingTrpcTransport, operatorFact } from "../connected-billing.trpc.ts";
-import { billingTrpcTestMembers, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const CUSTOMER = { id: "user_customer", email: "admin@acme.example" };
 
@@ -28,7 +29,7 @@ function mounted() {
   const router = createTrpcRuntime<BillingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: billingTrpcTestMembers(),
+    members: trpcTestMembers<BillingTrpcTestContext>(),
   }).mount(connectedBillingTrpcTransport, () => billing, {
     facts: [bindTrpcFact(operatorFact, (ctx) => ctx.operator ?? null)],
   });

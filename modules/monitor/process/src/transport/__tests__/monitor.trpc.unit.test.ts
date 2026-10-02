@@ -8,6 +8,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -21,7 +22,7 @@ import {
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import { previousPeriodStartMs } from "../../rules/monitor-performance-window.rules.ts";
 import { monitorTrpcTransport } from "../monitor.trpc.ts";
-import { monitorTrpcTestMembers, type MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
+import type { MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
 
 const PROJECT_ID = "project-1";
 const NOW = new Date("2026-08-24T00:00:00.000Z");
@@ -78,7 +79,7 @@ function mount(
   const router = createTrpcRuntime<MonitorTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: monitorTrpcTestMembers(options.permits ?? (() => true)),
+    members: trpcTestMembers<MonitorTrpcTestContext>({ permits: options.permits }),
   }).mount(monitorTrpcTransport, () => app);
 
   return {

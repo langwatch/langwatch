@@ -6,12 +6,13 @@
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteTrpcTransport } from "../suite.trpc.ts";
 import { testSuiteTrpcTransport } from "../test-suite.trpc.ts";
-import { suiteTrpcTestMembers, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
+import type { SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const PROJECT_ID = "project_1";
 const TEST_SUITE = {
@@ -43,7 +44,7 @@ function composedRoot() {
   const runtime = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: suiteTrpcTestMembers(),
+    members: trpcTestMembers<SuiteTrpcTestContext>(),
   });
 
   const testSuites = runtime.mount(testSuiteTrpcTransport, () => app);

@@ -1,4 +1,4 @@
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `gatewaySpendEvents.list` transport is a thin handler over
@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,38 +23,6 @@ import { GatewayModule } from "../../app/gateway.app.ts";
 import { gatewaySpendEventTrpcTransport } from "../gateway-spend-event.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
-
-/** The process members a mounted declaration runs on, as this suite supplies them. */
-function testPorts(
-  permits: (permission: AuthzPermission) => boolean = () => true,
-): TrpcRuntimeMembers<GatewayTrpcTestContext> {
-  return {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: permits(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => permits(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
-}
 
 /** A peer that answers nothing: the composition resolves it, no test call reaches it. */
 function peer(name: string): never {
@@ -173,7 +142,7 @@ async function caller(permits?: (permission: AuthzPermission) => boolean) {
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: testPorts(permits),
+    members: trpcTestMembers<GatewayTrpcTestContext>({ permits }),
   }).mount(gatewaySpendEventTrpcTransport, () => app);
 
   return router.createCaller({ actor: { id: "usr_1" } });

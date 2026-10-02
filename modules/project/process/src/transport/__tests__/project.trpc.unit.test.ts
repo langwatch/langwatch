@@ -15,12 +15,13 @@ import {
   type ProjectApi,
 } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectRequestService } from "../../services/project-request.service.ts";
 import { projectTrpcTransport, type ProjectBrowserApi } from "../project.trpc.ts";
-import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 
 const ACTOR_ID = "test-user-id";
 
@@ -94,7 +95,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: projectTrpcTestMembers(permits),
+    members: trpcTestMembers<ProjectTrpcTestContext>({ permits }),
   }).mount(projectTrpcTransport, () => browser);
 
   return {

@@ -8,13 +8,13 @@ import {
   integrationsCheckStatusSchema,
   type IntegrationsCheckStatus,
 } from "@langwatch/onboarding-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { integrationsChecksTrpcTransport } from "../integrations-checks.trpc.ts";
 
 type TestContext = { actor: { id: string } };
-type TestMembers = Parameters<typeof createTrpcRuntime<TestContext>>[0]["members"];
 
 const NOTHING_DONE: IntegrationsCheckStatus = {
   workflows: 0,
@@ -30,35 +30,6 @@ const NOTHING_DONE: IntegrationsCheckStatus = {
   guidedOnboarding: { variant: null, paths: [], donePaths: [] },
 };
 
-function members(permits: (permission: string) => boolean): TestMembers {
-  return {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
-    authorization: {
-      forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: permits(permission),
-          organizationRole: null,
-        }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => permits(permission)),
-          organizationRole: null,
-        }),
-        checkScopeLineage: async () => ({ kind: "consistent" }),
-      }),
-    },
-    denials: {
-      membershipDisabled: () => new Error("membership disabled"),
-      liteMemberRestricted: () => new Error("lite member"),
-    },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
-    errors: {
-      report: () => {},
-      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
-      translate: () => undefined,
-    },
-  };
-}
-
 function mount({ permits = () => true }: { permits?: (permission: string) => boolean } = {}) {
   const asked: string[] = [];
   const reader = vi.fn(async (_input: { projectId: string }) => NOTHING_DONE);
@@ -66,9 +37,11 @@ function mount({ permits = () => true }: { permits?: (permission: string) => boo
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: members((permission) => {
-      asked.push(permission);
-      return permits(permission);
+    members: trpcTestMembers<TestContext>({
+      permits: (permission) => {
+        asked.push(permission);
+        return permits(permission);
+      },
     }),
   }).mount(integrationsChecksTrpcTransport, () => ({ getCheckStatus: reader }));
 

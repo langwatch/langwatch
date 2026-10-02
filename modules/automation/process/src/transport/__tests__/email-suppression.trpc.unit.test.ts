@@ -7,14 +7,12 @@
  */
 import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { emailSuppressionTrpcTransport } from "../email-suppression.trpc.ts";
-import {
-  automationTrpcTestMembers,
-  type AutomationTrpcTestContext,
-} from "./automation.trpc.harness.ts";
+import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
 
 function mount(
   options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {},
@@ -24,7 +22,7 @@ function mount(
     root: trpc,
     procedure: trpc.procedure,
     anonymousProcedure: trpc.procedure,
-    members: automationTrpcTestMembers(options.permits ?? (() => true)),
+    members: trpcTestMembers<AutomationTrpcTestContext>({ permits: options.permits }),
   }).mount(emailSuppressionTrpcTransport, () => options.app as AutomationApi, {
     facts: [bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null)],
   });
