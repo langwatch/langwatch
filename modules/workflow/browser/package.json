@@ -51,7 +51,6 @@
     "@trpc/client": "catalog:",
     "@trpc/react-query": "catalog:",
     "@xyflow/react": "catalog:",
-    "emoji-picker-react": "^4.19.1",
     "fast-deep-equal": "catalog:",
     "langwatch": "workspace:*",
     "liquidjs": "catalog:",

@@ -59,12 +59,12 @@ export default function WorkflowsScreen() {
           icon={<Workflow size={24} />}
           color="blue.500"
         >
-          <PageLayout.HeaderButton onClick={onOpen} marginTop={4}>
+          <PageLayout.HeaderButton onClick={onOpen}>
             <Plus size={16} /> Create your first workflow
           </PageLayout.HeaderButton>
         </NoDataInfoBlock>
       ) : (
-        <PageLayout.Container>
+        <PageLayout.Container paddingTop={6}>
           <VStack gap={6} width="full" align="start">
             <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
               {workflows.isLoading &&

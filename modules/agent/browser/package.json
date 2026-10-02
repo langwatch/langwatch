@@ -29,7 +29,6 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",
-    "emoji-picker-react": "^4.19.1",
     "lucide-react": "catalog:",
     "monaco-editor": "catalog:",
     "monacopilot": "catalog:",

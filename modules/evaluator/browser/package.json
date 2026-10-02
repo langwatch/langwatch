@@ -46,7 +46,6 @@
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@xyflow/react": "catalog:",
-    "emoji-picker-react": "^4.19.1",
     "langwatch": "workspace:*",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
