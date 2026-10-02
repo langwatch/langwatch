@@ -11,7 +11,7 @@ import { nextAgentId } from "../rules/agent-id.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 
 type AgentHttpSecretsOptions = {
-  secrets: Pick<SecretApi, "getValues" | "create">;
+  secrets: Pick<SecretApi, "list" | "getValuesByName" | "create">;
   agents: Pick<AgentService, "getById">;
 };
 
@@ -56,7 +56,11 @@ export class AgentHttpSecretsService {
       config: parsed.data,
       owner,
       reference: createSecretReferencer({
-        values: () => this.options.secrets.getValues({ projectId }),
+        values: async () => {
+          const names = (await this.options.secrets.list({ projectId })).map(({ name }) => name);
+
+          return this.options.secrets.getValuesByName({ projectId, names });
+        },
         create: async ({ name, value }) => {
           await this.options.secrets.create({ projectId, name, value });
         },

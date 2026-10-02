@@ -18,6 +18,11 @@ export interface SecretIdentity {
   readonly id: string;
 }
 
+export interface NamedSecretsScope {
+  readonly projectId: string;
+  readonly names: readonly string[];
+}
+
 export interface CreateStoredSecretInput {
   readonly projectId: string;
   readonly name: string;
@@ -35,6 +40,7 @@ export interface UpdateStoredSecretInput {
 export interface SecretRepository {
   findAll(input: SecretProjectScope): Promise<Secret[]>;
   findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]>;
+  findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]>;
   findById(input: SecretIdentity): Promise<Secret | undefined>;
   count(input: SecretProjectScope): Promise<number>;
   create(input: CreateStoredSecretInput): Promise<Secret>;

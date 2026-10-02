@@ -57,10 +57,11 @@ function build(
   const agentUpdates: unknown[] = [];
   const latest = versionOf("v-latest", options.latestNodes ?? [node("n1", TOKEN)]);
   const published = versionOf("v-published", options.publishedNodes ?? [node("n1", TOKEN)]);
-  const rowOf = (name: string) =>
-    createApiFixture<SecretRow>({ id: `id-${name}`, name });
+  const rowOf = (name: string) => createApiFixture<SecretRow>({ id: `id-${name}`, name });
   const secretApi = createApiFixture<SecretApi>({
-    getValues: async () => ({ ...secrets }),
+    list: async () => Object.keys(secrets).map(rowOf),
+    getValuesByName: async ({ names }) =>
+      Object.fromEntries(Object.entries(secrets).filter(([name]) => names.includes(name))),
     create: async (input) => {
       if (Object.keys(secrets).length >= (options.limit ?? 50)) throw new Error("secret limit");
       secrets[input.name] = input.value;

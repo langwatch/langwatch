@@ -8,7 +8,7 @@ import {
 } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { SecretApi } from "@langwatch/secret-contract";
+import { referencedSecretNames, type SecretApi } from "@langwatch/secret-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
@@ -44,14 +44,14 @@ type HttpAgentTestPeers = {
   workflows: WorkflowApi;
   traces: TraceApi;
   agents: Pick<AgentService, "getById">;
-  secrets: Pick<SecretApi, "getValues">;
+  secrets: Pick<SecretApi, "getValuesByName">;
 };
 
 export class HttpAgentTestService {
   readonly #workflows: WorkflowApi;
   readonly #traces: TraceApi;
   readonly #agents: Pick<AgentService, "getById">;
-  readonly #secrets: Pick<SecretApi, "getValues">;
+  readonly #secrets: Pick<SecretApi, "getValuesByName">;
 
   static create(peers: HttpAgentTestPeers): HttpAgentTestService {
     return new HttpAgentTestService(peers);
@@ -65,8 +65,7 @@ export class HttpAgentTestService {
   }
 
   async execute(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
-    const values = await this.#secrets.getValues({ projectId: input.projectId });
-    const { call: filled, secrets } = await this.#withStoredCredentials({ input, values });
+    const { call: filled, secrets } = await this.#withStoredCredentials({ input });
     const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = filled;
     const traceIds = agentId ? generateTraceIds() : void 0;
     const traceparent = traceIds
@@ -109,8 +108,12 @@ export class HttpAgentTestService {
         spanId: traceIds?.spanId,
         testContext: buildTraceTestContext(input),
         requestBody: result.renderedBody ?? "",
-        // As typed, before stored values filled the blanks: a trace never holds a stored credential.
-        requestHeaders: tracedRequestHeaders([...(input.headers ?? []), ...traceparent], input.auth),
+        // As typed, before stored values filled the blanks:
+        // a trace never holds a stored credential.
+        requestHeaders: tracedRequestHeaders(
+          [...(input.headers ?? []), ...traceparent],
+          input.auth,
+        ),
         customAuthHeaderName: input.auth?.type === "api_key" ? input.auth.header : void 0,
         result,
       });
@@ -138,15 +141,17 @@ export class HttpAgentTestService {
    */
   async #withStoredCredentials<T extends HttpAgentTestInput>({
     input,
-    values,
   }: {
     input: T;
-    values: Record<string, string>;
   }): Promise<{ call: T; secrets: Record<string, string> }> {
     const unfilled: { call: T; secrets: Record<string, string> } = { call: input, secrets: {} };
     if (!input.agentId) return unfilled;
     const stored = await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
     if (stored.type !== "http") return unfilled;
+    const values = await this.#secrets.getValuesByName({
+      projectId: input.projectId,
+      names: referencedSecretNames([stored.config, input.url]),
+    });
 
     const saved = { ...stored.config, url: withSecretValues({ text: stored.config.url, values }) };
     const requested = { ...input, url: withSecretValues({ text: input.url, values }) };

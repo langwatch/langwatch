@@ -4,7 +4,7 @@ import { dslStoringHttpSecrets } from "@langwatch/workflow-contract";
 
 import type { WorkflowHttpSecrets } from "../app/workflow.app.ts";
 
-type HttpSecretWriter = Pick<SecretApi, "getValues" | "create">;
+type HttpSecretWriter = Pick<SecretApi, "list" | "getValuesByName" | "create">;
 
 /** Stores the token typed into an HTTP node as a project secret, leaving its reference. */
 export class WorkflowHttpSecretsService implements WorkflowHttpSecrets {
@@ -24,7 +24,11 @@ export class WorkflowHttpSecretsService implements WorkflowHttpSecrets {
     return dslStoringHttpSecrets({
       dsl: input.dsl,
       reference: createSecretReferencer({
-        values: () => this.secrets.getValues({ projectId }),
+        values: async () => {
+          const names = (await this.secrets.list({ projectId })).map(({ name }) => name);
+
+          return this.secrets.getValuesByName({ projectId, names });
+        },
         create: async ({ name, value }) => {
           await this.secrets.create(
             { projectId, name, value },

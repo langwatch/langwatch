@@ -4,6 +4,7 @@ import {
   SecretLimitReachedError,
   SecretNotFoundError,
   SecretReservedNameError,
+  SecretUnreadableError,
 } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,6 +15,7 @@ import {
 import { MemorySecretRepository } from "../../repositories/memory/memory.secret.repository.ts";
 import type {
   CreateStoredSecretInput,
+  NamedSecretsScope,
   SecretIdentity,
   SecretRepository,
   StoredSecretValue,
@@ -53,6 +55,14 @@ class RecordingSecretRepository implements SecretRepository {
     return Promise.resolve(this.values);
   }
 
+  readonly findValuesCall = vi.fn();
+
+  findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]> {
+    this.findValuesCall(input);
+
+    return Promise.resolve(this.values.filter((value) => input.names.includes(value.name)));
+  }
+
   // Scoped like the real repository: a secret is addressed by project AND id,
   // so a lookup from the wrong project finds nothing.
   findById({ projectId, id }: SecretIdentity): Promise<Secret | undefined> {
@@ -84,6 +94,15 @@ class RecordingSecretRepository implements SecretRepository {
   }
 }
 
+/** Refuses one stored value, as a row written under another key would be refused. */
+class EncryptionRefusingCorruptRows extends ReversibleTestSecretEncryption {
+  override decrypt(value: string): string {
+    if (value === "corrupt") throw new Error("unsupported state or unable to authenticate data");
+
+    return super.decrypt(value);
+  }
+}
+
 function createService(options?: {
   reservedNames?: readonly string[];
   maximumPerProject?: number;
@@ -92,7 +111,7 @@ function createService(options?: {
   const repository = new RecordingSecretRepository();
   const service = SecretService.create({
     repository,
-    encryption: new ReversibleTestSecretEncryption(),
+    encryption: new EncryptionRefusingCorruptRows(),
     reservedNames: options?.reservedNames ?? ["LANGY_KEY"],
     maximumPerProject: options?.maximumPerProject,
     ...teamWithMembers(options?.teamMembers ?? []),
@@ -121,6 +140,73 @@ describe("SecretService", () => {
     await expect(service.getValues({ projectId: "project-1" })).resolves.toEqual({
       OPENAI_API_KEY: "openai",
       LANGY_KEY: "internal",
+    });
+  });
+
+  describe("when a process reads the secrets a config names", () => {
+    function storedValues() {
+      const { repository, service } = createService();
+      repository.values.push(
+        { name: "OPENAI_API_KEY", encryptedValue: "encrypted(openai)" },
+        { name: "OTHER_KEY", encryptedValue: "encrypted(other)" },
+        { name: "BROKEN_KEY", encryptedValue: "corrupt" },
+        { name: "LANGY_KEY", encryptedValue: "encrypted(internal)" },
+      );
+
+      return { repository, service };
+    }
+
+    /** @scenario "A process reads only the secrets a config names" */
+    it("decrypts only the named secrets", async () => {
+      const { service } = storedValues();
+
+      await expect(
+        service.getValuesByName({ projectId: "project-1", names: ["OPENAI_API_KEY", "MISSING"] }),
+      ).resolves.toEqual({ OPENAI_API_KEY: "openai" });
+    });
+
+    /** @scenario "A process reads only the secrets a config names" */
+    it("answers a reserved name as one nothing is stored under", async () => {
+      const { repository, service } = storedValues();
+
+      await expect(
+        service.getValuesByName({ projectId: "project-1", names: ["LANGY_KEY", "OTHER_KEY"] }),
+      ).resolves.toEqual({ OTHER_KEY: "other" });
+      expect(repository.findValuesCall).toHaveBeenCalledWith({
+        projectId: "project-1",
+        names: ["OTHER_KEY"],
+      });
+    });
+
+    /** @scenario "A process reads only the secrets a config names" */
+    it("reads nothing when the config names no secret", async () => {
+      const { repository, service } = storedValues();
+
+      await expect(service.getValuesByName({ projectId: "project-1", names: [] })).resolves.toEqual(
+        {},
+      );
+      expect(repository.findValuesCall).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A secret the config does not name cannot fail the read" */
+    it("is not failed by an unreadable secret the config does not name", async () => {
+      const { service } = storedValues();
+
+      await expect(
+        service.getValuesByName({ projectId: "project-1", names: ["OPENAI_API_KEY"] }),
+      ).resolves.toEqual({ OPENAI_API_KEY: "openai" });
+    });
+
+    /** @scenario "A secret the config does not name cannot fail the read" */
+    it("refuses with a handled error naming an unreadable secret the config names", async () => {
+      const { service } = storedValues();
+
+      await expect(
+        service.getValuesByName({ projectId: "project-1", names: ["BROKEN_KEY"] }),
+      ).rejects.toBeInstanceOf(SecretUnreadableError);
+      await expect(
+        service.getValuesByName({ projectId: "project-1", names: ["BROKEN_KEY"] }),
+      ).rejects.toMatchObject({ code: "secret_unreadable", meta: { name: "BROKEN_KEY" } });
     });
   });
 

@@ -56,6 +56,22 @@ export type Secret = z.infer<typeof secretSchema>;
 export const listSecretsInputSchema = z.object({ projectId: secretProjectIdSchema }).strict();
 export type ListSecretsInput = z.infer<typeof listSecretsInputSchema>;
 
+/** Reads only the secrets a config names; a reserved name answers as an unknown one. */
+export const getSecretValuesByNameInputSchema = z
+  .object({ projectId: secretProjectIdSchema, names: z.array(storedSecretNameSchema) })
+  .strict();
+export type GetSecretValuesByNameInput = z.infer<typeof getSecretValuesByNameInputSchema>;
+
+/** A `{{ secrets.NAME }}` reference, spelled as the workflow engine resolves it. */
+export const SECRET_REFERENCE = /\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/** Every secret name the `{{ secrets.NAME }}` references anywhere in `referencing` name. */
+export function referencedSecretNames(referencing: unknown): string[] {
+  const text = JSON.stringify(referencing) ?? "";
+
+  return [...new Set(Array.from(text.matchAll(SECRET_REFERENCE), ([, name = ""]) => name))];
+}
+
 export const getSecretInputSchema = z
   .object({ projectId: secretProjectIdSchema, id: secretIdSchema })
   .strict();

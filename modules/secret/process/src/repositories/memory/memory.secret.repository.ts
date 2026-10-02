@@ -11,6 +11,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type {
   CreateStoredSecretInput,
   SecretIdentity,
+  NamedSecretsScope,
   SecretProjectScope,
   SecretRepository,
   StoredSecretValue,
@@ -44,6 +45,12 @@ export class MemorySecretRepository implements SecretRepository {
       name: row.secret.name,
       encryptedValue: row.encryptedValue,
     }));
+  }
+
+  async findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]> {
+    const values = await this.findAllValues({ projectId: input.projectId });
+
+    return values.filter((value) => input.names.includes(value.name));
   }
 
   async findById(input: SecretIdentity): Promise<Secret | undefined> {

@@ -40,6 +40,20 @@ export class SecretLimitReachedError extends HandledError {
   }
 }
 
+/** A named secret whose stored value cannot be read under this deployment's key. */
+export class SecretUnreadableError extends HandledError {
+  declare readonly code: "secret_unreadable";
+
+  constructor(name: string) {
+    super("secret_unreadable", `The project secret "${name}" cannot be read`, {
+      meta: { name },
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "SecretUnreadableError";
+  }
+}
+
 export class SecretDuplicateError extends HandledError {
   declare readonly code: "secret_already_exists";
 

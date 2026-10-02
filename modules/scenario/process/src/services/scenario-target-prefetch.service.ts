@@ -20,7 +20,7 @@ import type {
   WorkflowAgentData,
   VoiceAgentData,
 } from "@langwatch/scenario-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
+import { referencedSecretNames, type SecretApi } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -172,12 +172,21 @@ export class ScenarioTargetPrefetchService {
     }
   }
 
-  private async executionSecrets(
-    projectId: string,
-    runSecretValues: Record<string, string>,
-  ): Promise<Record<string, string>> {
+  /** Code reads `secrets.NAME` by any spelling, so without `names` every listed secret travels. */
+  private async executionSecrets({
+    projectId,
+    runSecretValues,
+    names,
+  }: {
+    projectId: string;
+    runSecretValues: Record<string, string>;
+    names?: string[];
+  }): Promise<Record<string, string>> {
+    const read = names ?? (await this.options.secrets.list({ projectId })).map(({ name }) => name);
+    if (read.length === 0) return { ...runSecretValues };
+
     return {
-      ...(await this.options.secrets.getValues({ projectId })),
+      ...(await this.options.secrets.getValuesByName({ projectId, names: read })),
       ...runSecretValues,
     };
   }
@@ -236,7 +245,11 @@ export class ScenarioTargetPrefetchService {
     // Loaded once for the whole run, the same way the code and workflow paths
     // load them: the child process has no database access, so a secret the url,
     // a header or an auth field references has to travel with the job.
-    const secretValues = await this.executionSecrets(projectId, runSecretValues);
+    const secretValues = await this.executionSecrets({
+      projectId,
+      runSecretValues,
+      names: referencedSecretNames(config),
+    });
 
     return {
       type: "http",
@@ -290,7 +303,7 @@ export class ScenarioTargetPrefetchService {
       return null;
     }
 
-    const secretValues = await this.executionSecrets(projectId, runSecretValues);
+    const secretValues = await this.executionSecrets({ projectId, runSecretValues });
 
     return {
       type: "code",
@@ -354,7 +367,7 @@ export class ScenarioTargetPrefetchService {
     const dsl = await this.workflowAgentSecrets.fill({ dsl: hydrateResult.dsl, projectId });
     const { inputs, outputs } = this.options.workflowHydrator.extractWorkflowIO(dsl);
 
-    const secretValues = await this.executionSecrets(projectId, runSecretValues);
+    const secretValues = await this.executionSecrets({ projectId, runSecretValues });
 
     const data: WorkflowAgentData = {
       type: "workflow",

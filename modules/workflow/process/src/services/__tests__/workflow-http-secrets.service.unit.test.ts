@@ -24,8 +24,10 @@ const secretRow = (name: string) => ({
 function build() {
   const values: Record<string, string> = {};
   const writers: (string | undefined)[] = [];
-  const secrets: Pick<SecretApi, "getValues" | "create"> = {
-    getValues: async () => ({ ...values }),
+  const secrets: Pick<SecretApi, "list" | "getValuesByName" | "create"> = {
+    list: async () => Object.keys(values).map(secretRow),
+    getValuesByName: async ({ names }) =>
+      Object.fromEntries(Object.entries(values).filter(([name]) => names.includes(name))),
     create: async (input, by) => {
       values[input.name] = input.value;
       writers.push(by?.id);

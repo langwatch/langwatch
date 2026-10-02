@@ -87,3 +87,18 @@ Feature: Canonical project-secret lifecycle
     When a caller lists, reads, updates, deletes, or creates that name
     Then listing omits it
     And direct access does not confirm that it exists
+
+  @unit
+  Scenario: A process reads only the secrets a config names
+    Given a project stores several secrets, one of them under a reserved name
+    When a process reads the secrets an agent or workflow config references
+    Then only the named secrets are decrypted and returned
+    And a reserved name is answered as a name nothing is stored under
+    And a config that names no secret reads nothing
+
+  @unit
+  Scenario: A secret the config does not name cannot fail the read
+    Given a project stores a secret that cannot be read under the deployment's key
+    When a process reads secrets a config names, and that one is not among them
+    Then the read succeeds with the named values
+    And naming that secret is refused with the handled code secret_unreadable

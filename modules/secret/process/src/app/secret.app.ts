@@ -14,6 +14,7 @@ import {
   type CreateSecretInput,
   type DeleteSecretInput,
   type GetSecretInput,
+  type GetSecretValuesByNameInput,
   type ListSecretsInput,
   type Secret,
   type SecretApi as SecretApiContract,
@@ -89,6 +90,11 @@ export class SecretModule implements SecretApiContract {
   /** Every stored value, decrypted, for a process that runs on them. */
   getValues(input: ListSecretsInput): Promise<Record<string, string>> {
     return this.#secrets.getValues(input);
+  }
+
+  /** Only the named values, decrypted; a reserved name is never among them. */
+  getValuesByName(input: GetSecretValuesByNameInput): Promise<Record<string, string>> {
+    return this.#secrets.getValuesByName(input);
   }
 
   /** Removes one secret from the project. */

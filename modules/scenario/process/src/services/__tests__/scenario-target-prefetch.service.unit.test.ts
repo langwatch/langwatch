@@ -22,6 +22,7 @@ type Answers = {
   agent?: Agent | "missing" | "down";
   prompt?: Record<string, unknown> | null;
   projectSecrets?: Record<string, string>;
+  secretReads?: string[][];
 };
 
 function serviceAnswering(answers: Answers = {}) {
@@ -88,7 +89,23 @@ function serviceAnswering(answers: Answers = {}) {
   });
 
   const secrets = createApiFixture<SecretApi>({
-    getValues: async () => answers.projectSecrets ?? {},
+    list: async ({ projectId }) =>
+      Object.keys(answers.projectSecrets ?? {}).map((name) => ({
+        id: name,
+        projectId,
+        name,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        createdBy: { name: null },
+        updatedBy: { name: null },
+      })),
+    getValuesByName: async ({ names }) => {
+      answers.secretReads?.push(names);
+
+      return Object.fromEntries(
+        Object.entries(answers.projectSecrets ?? {}).filter(([name]) => names.includes(name)),
+      );
+    },
   });
 
   return ScenarioTargetPrefetchService.create({
@@ -211,7 +228,14 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
   });
 
   describe("given an http agent", () => {
-    const agent = httpAgent({ url: "https://acme.test/chat", method: "POST" });
+    const agent = httpAgent({
+      url: "https://acme.test/chat",
+      method: "POST",
+      headers: [
+        { key: "Authorization", value: "Bearer {{ secrets.TOKEN }}" },
+        { key: "X-Other", value: "{{ secrets.OTHER }}" },
+      ],
+    });
 
     it("packs the request the run will make", async () => {
       const service = serviceAnswering({ agent });
@@ -249,6 +273,33 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       await expect(fetchFor(service, "http", { TOKEN: "from-run" })).resolves.toMatchObject({
         secrets: { TOKEN: "from-run", OTHER: "kept" },
       });
+    });
+
+    it("reads only the project secrets its config names", async () => {
+      const secretReads: string[][] = [];
+      const service = serviceAnswering({
+        agent,
+        projectSecrets: { TOKEN: "from-project", UNUSED: "never-sent" },
+        secretReads,
+      });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).toMatchObject({ secrets: { TOKEN: "from-project" } });
+      expect(adapter).not.toMatchObject({ secrets: { UNUSED: "never-sent" } });
+      expect(secretReads).toEqual([["TOKEN", "OTHER"]]);
+    });
+
+    it("reads no secret when its config names none", async () => {
+      const secretReads: string[][] = [];
+      const service = serviceAnswering({
+        agent: httpAgent({ url: "https://acme.test/chat", method: "POST" }),
+        projectSecrets: { TOKEN: "from-project" },
+        secretReads,
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({ secrets: {} });
+      expect(secretReads).toEqual([]);
     });
 
     it("throws target not found when the configuration will not parse", async () => {

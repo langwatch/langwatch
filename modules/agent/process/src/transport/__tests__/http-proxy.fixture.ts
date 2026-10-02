@@ -21,7 +21,10 @@ export function createHttpProxyCaller(
     agents: createApiFixture<Pick<AgentService, "getById">>({
       getById: async () => agentFixture(),
     }),
-    secrets: createApiFixture<SecretApi>({ getValues: async () => ({}), list: async () => [] }),
+    secrets: createApiFixture<SecretApi>({
+      getValuesByName: async () => ({}),
+      list: async () => [],
+    }),
   });
   const app = createApiFixture<AgentApi>({ executeHttpTest: (input) => testing.execute(input) });
 

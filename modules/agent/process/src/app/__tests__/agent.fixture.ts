@@ -52,7 +52,8 @@ export function secretStoreFixture(initial: Record<string, string> = {}) {
     updatedBy: { name: null },
   });
   const secrets = createApiFixture<SecretApi>({
-    getValues: async () => ({ ...values }),
+    getValuesByName: async ({ names }) =>
+      Object.fromEntries(Object.entries(values).filter(([name]) => names.includes(name))),
     list: async ({ projectId }) => Object.keys(values).map((name) => rowOf({ projectId, name })),
     create: async (input) => {
       values[input.name] = input.value;

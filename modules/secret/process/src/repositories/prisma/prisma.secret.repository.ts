@@ -5,6 +5,7 @@ import { SecretDuplicateError, SecretNotFoundError, type Secret } from "@langwat
 import type {
   CreateStoredSecretInput,
   SecretIdentity,
+  NamedSecretsScope,
   SecretProjectScope,
   SecretRepository,
   StoredSecretValue,
@@ -41,6 +42,13 @@ export class PrismaSecretRepository
   findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]> {
     return this.prisma.projectSecret.findMany({
       where: { projectId: input.projectId },
+      select: { name: true, encryptedValue: true },
+    });
+  }
+
+  findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]> {
+    return this.prisma.projectSecret.findMany({
+      where: { projectId: input.projectId, name: { in: [...input.names] } },
       select: { name: true, encryptedValue: true },
     });
   }

@@ -444,9 +444,22 @@ export function createTestScenarioExecutionPrefetcherService(
     projects: projectService(deps),
     modelProviders: modelProviderService(deps),
     secrets: fakeService<SecretApi>({
-      getValues: ({ projectId }: { projectId: string }) =>
-        deps.projectSecretsFetcher.getSecrets(projectId),
-      list: async () => [],
+      getValuesByName: async ({ projectId, names }: { projectId: string; names: string[] }) =>
+        Object.fromEntries(
+          Object.entries(await deps.projectSecretsFetcher.getSecrets(projectId)).filter(([name]) =>
+            names.includes(name),
+          ),
+        ),
+      list: async ({ projectId }: { projectId: string }) =>
+        Object.keys(await deps.projectSecretsFetcher.getSecrets(projectId)).map((name) => ({
+          id: name,
+          projectId,
+          name,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          createdBy: { name: null },
+          updatedBy: { name: null },
+        })),
     }),
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>

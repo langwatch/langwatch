@@ -11,6 +11,7 @@ import type {
   CreateSecretInput,
   DeleteSecretInput,
   GetSecretInput,
+  GetSecretValuesByNameInput,
   ListSecretsInput,
   Secret,
   UpdateSecretInput,
@@ -23,6 +24,8 @@ export interface SecretApi {
   list(input: ListSecretsInput): Promise<Secret[]>;
   get(input: GetSecretInput): Promise<Secret>;
   getValues(input: ListSecretsInput): Promise<Record<string, string>>;
+  /** Decrypts only the named secrets; an unknown or reserved name is left out of the answer. */
+  getValuesByName(input: GetSecretValuesByNameInput): Promise<Record<string, string>>;
   delete(input: DeleteSecretInput): Promise<void>;
   /** With no caller, the write is attributed to the first member of the project's team. */
   create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret>;

@@ -2,16 +2,19 @@ import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
+  getSecretValuesByNameInputSchema,
   listSecretsInputSchema,
   MAX_SECRETS_PER_PROJECT,
   SecretDuplicateError,
   SecretLimitReachedError,
   SecretNotFoundError,
   SecretReservedNameError,
+  SecretUnreadableError,
   type CreateReservedSecretInput,
   type CreateSecretInput,
   type DeleteSecretInput,
   type GetSecretInput,
+  type GetSecretValuesByNameInput,
   type ListSecretsInput,
   type Secret,
   type SecretCaller,
@@ -61,6 +64,28 @@ export class SecretService {
         const message = error instanceof Error ? error.message : String(error);
 
         throw new Error(`Failed to decrypt project secret "${row.name}": ${message}`);
+      }
+    }
+
+    return values;
+  }
+
+  /** A reserved name is never read: it answers exactly as a name nothing is stored under. */
+  async getValuesByName(input: GetSecretValuesByNameInput): Promise<Record<string, string>> {
+    const parsed = getSecretValuesByNameInputSchema.parse(input);
+    const names = parsed.names.filter((name) => !this.reservedNames.has(name));
+    if (names.length === 0) return {};
+
+    const rows = await this.options.repository.findValuesByName({
+      projectId: parsed.projectId,
+      names,
+    });
+    const values: Record<string, string> = {};
+    for (const row of rows) {
+      try {
+        values[row.name] = this.options.encryption.decrypt(row.encryptedValue);
+      } catch {
+        throw new SecretUnreadableError(row.name);
       }
     }
 
