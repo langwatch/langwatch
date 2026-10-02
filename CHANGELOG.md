@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.20.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.0...langwatch@v3.20.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **sso:** self-hosted sign-in sends colleagues straight to the sole live connection ([#8411](https://github.com/langwatch/langwatch/issues/8411)) ([82be095](https://github.com/langwatch/langwatch/commit/82be095b69a5d5bdcdb3b03f673ab232779ab3f5))
+
+
+### Miscellaneous
+
+* review nits on the test doubles and the discovery example ([99e4f0e](https://github.com/langwatch/langwatch/commit/99e4f0e06383ba04228197549262e8f2e6a0b9c9))
+* **sso:** review nits on the discovery example and the test doubles ([#8410](https://github.com/langwatch/langwatch/issues/8410)) ([99e4f0e](https://github.com/langwatch/langwatch/commit/99e4f0e06383ba04228197549262e8f2e6a0b9c9))
+
 ## [3.20.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.4...langwatch@v3.20.0) (2026-10-01)
 
 
