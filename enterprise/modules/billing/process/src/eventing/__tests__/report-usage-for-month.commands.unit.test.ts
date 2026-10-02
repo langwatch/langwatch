@@ -751,14 +751,15 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given unexpected error in skip conditions", () => {
-    it("catches error and returns empty events", async () => {
+    /** @scenario A usage report that cannot read the organization is retried, not dropped */
+    it("reports the error and raises it so the command is retried", async () => {
       mockOrganizations.getOrganizationForBilling.mockRejectedValue(new Error("database offline"));
       const handler = await createHandler();
 
-      const result = await handler.handle(makeCommand());
+      await expect(handler.handle(makeCommand())).rejects.toThrow("database offline");
 
-      expect(result).toEqual([]);
       expect(mockCaptureException).toHaveBeenCalled();
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
     });
   });
 

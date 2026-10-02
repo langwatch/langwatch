@@ -52,6 +52,13 @@ Feature: Composing the monthly billing roll-up
     Then both degrade to the database rather than failing the month
 
   @unit
+  Scenario: A usage report that cannot read the organization is retried, not dropped
+    Given the organization's billing details cannot be read
+    When the month's usage report runs
+    Then the failure is reported and raised so the report is retried
+    And nothing is sent to Stripe
+
+  @unit
   Scenario: The worker reads the month's total by organization, not by tenant
     Given a worker composing the roll-up over its own tenant-keyed ClickHouse client
     When the month's total for a private-instance customer is read

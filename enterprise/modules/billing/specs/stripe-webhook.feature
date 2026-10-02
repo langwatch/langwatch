@@ -46,6 +46,13 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Then the plan is still granted and the failure is logged, not surfaced to Stripe
 
   @unit
+  Scenario: A checkout whose follow-up fails still grants the plan and is redelivered
+    Given a paid checkout whose chosen currency or pending invites cannot be recorded
+    When the webhook handles the checkout
+    Then the organization is on the paid plan and its trials are cancelled
+    And the delivery fails so Stripe redelivers it, and the redelivery records what was missed
+
+  @unit
   Scenario: A subscription update recalculates the quantity for every priced item
     Given a subscription carrying seat and usage prices
     When Stripe reports the subscription as updated

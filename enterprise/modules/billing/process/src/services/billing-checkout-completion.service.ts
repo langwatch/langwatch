@@ -167,6 +167,9 @@ export class BillingCheckoutCompletionService {
 
     const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
+    // A failed follow-up still lets the plan land, then fails the delivery so
+    // Stripe redelivers it: every step here is safe to repeat.
+    const failures: unknown[] = [];
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
       try {
@@ -175,10 +178,11 @@ export class BillingCheckoutCompletionService {
           currency: normalizedCurrency,
         });
       } catch (err) {
-        logger.warn(
+        logger.error(
           { subscriptionId, selectedCurrency: normalizedCurrency, err },
-          "[stripeWebhook] Failed to persist selected currency on checkout completion",
+          "[stripeWebhook] Failed to persist selected currency on checkout completion; the delivery will be retried",
         );
+        failures.push(err);
       }
     }
 
@@ -192,8 +196,9 @@ export class BillingCheckoutCompletionService {
       } catch (err) {
         logger.error(
           { subscriptionId, err },
-          "[stripeWebhook] Failed to approve PAYMENT_PENDING invites after checkout, manual resolution may be needed",
+          "[stripeWebhook] Failed to approve PAYMENT_PENDING invites after checkout; the delivery will be retried",
         );
+        failures.push(err);
       }
     }
 
@@ -203,6 +208,8 @@ export class BillingCheckoutCompletionService {
     }
 
     await this.trySetAnnualEventsBillingThreshold(subscriptionId);
+
+    if (failures.length > 0) throw failures[0];
 
     return { earlyReturn: false };
   }

@@ -237,7 +237,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     const { organizationId, billingMonth, tenantId, billableEvents, countedEventId } = command.data;
 
     // Assigned on every path that reaches the dispatch below: the catch
-    // returns, so there is no third outcome to default to.
+    // throws, so there is no third outcome to default to.
     let shouldSelfDispatch: boolean;
     try {
       // 1. Skip conditions
@@ -296,17 +296,18 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           })) || shouldSelfDispatch;
       }
     } catch (error) {
-      // Never propagate to framework — log and return empty events
+      // Each meter keeps its own failure; one before them (the organization
+      // lookup) is raised so the command is retried, never a lost month's tick.
       logger.error(
         { organizationId, billingMonth, error },
-        "unexpected error in usage reporting command handler",
+        "unexpected error in usage reporting command handler; the command will be retried",
       );
       this.deps.errorReporter.capture(toError(error), {
         handler: "reportUsageForMonth",
         organizationId,
         billingMonth,
       });
-      return [];
+      throw error;
     }
 
     // 3. Self-dispatch for convergence (outside try/catch so failures propagate). It

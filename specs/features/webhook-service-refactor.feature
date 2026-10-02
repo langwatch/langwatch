@@ -37,6 +37,7 @@ Feature: Stripe webhook billing event handling
     When the checkout completed event arrives
     Then the subscription is still activated
     And trial subscriptions are still cancelled
+    And the failure is raised so Stripe redelivers the event
 
   @unit
   Scenario: Checkout succeeds even when invite approval fails
@@ -45,6 +46,7 @@ Feature: Stripe webhook billing event handling
     When the checkout completed event arrives
     Then the subscription is still activated
     And trial subscriptions are still cancelled
+    And the failure is raised so Stripe redelivers the event
 
   @unit
   Scenario: Checkout succeeds without an invite approval mechanism

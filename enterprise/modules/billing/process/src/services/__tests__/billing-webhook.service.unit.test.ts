@@ -253,7 +253,8 @@ describe("EEWebhookService", () => {
       });
 
       /** @scenario Checkout succeeds even when currency persistence fails */
-      it("continues when currency update fails", async () => {
+      /** @scenario A checkout whose follow-up fails still grants the plan and is redelivered */
+      it("still activates, then raises when the currency update fails", async () => {
         subRepo.linkStripeId.mockResolvedValue({ count: 1 });
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
@@ -269,9 +270,10 @@ describe("EEWebhookService", () => {
           clientReferenceId: "subscription_setup_sub_db_1",
           selectedCurrency: "EUR",
         });
+        promise.catch(() => undefined);
 
         await vi.advanceTimersByTimeAsync(2000);
-        await promise;
+        await expect(promise).rejects.toThrow("DB error");
 
         expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
@@ -331,9 +333,8 @@ describe("EEWebhookService", () => {
         });
       });
 
-      /** @scenario "A best-effort side effect that throws does not abandon the webhook" */
       /** @scenario Checkout succeeds even when invite approval fails */
-      it("continues when invite approval fails", async () => {
+      it("still activates, then raises when invite approval fails", async () => {
         const mockInviteApprover = {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
@@ -360,9 +361,10 @@ describe("EEWebhookService", () => {
           subscriptionId: "sub_stripe_1",
           clientReferenceId: "subscription_setup_sub_db_1",
         });
+        promise.catch(() => undefined);
 
         await vi.advanceTimersByTimeAsync(2000);
-        await promise;
+        await expect(promise).rejects.toThrow("invite error");
 
         expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
@@ -437,6 +439,7 @@ describe("EEWebhookService", () => {
         });
       });
 
+      /** @scenario "A best-effort side effect that throws does not abandon the webhook" */
       /** @scenario A failure setting the threshold never fails the checkout */
       it("still links and activates when the threshold update fails", async () => {
         setupLinkedCheckout();
