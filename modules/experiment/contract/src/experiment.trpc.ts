@@ -250,11 +250,21 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   )
   .withOutput(dSPyStepSchema)
 
-  .query("getExperimentBatchEvaluationRuns")
+  // Batch runs are appended under their project, so they hint under their own tenant.
+  .query("getExperimentBatchEvaluationRuns", {
+    invalidatedBy: ["lw.experiment_run.started", "lw.experiment_run.completed"],
+  })
   .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string() }))
   .withOutput(experimentRunListSchema)
 
-  .query("getExperimentBatchEvaluationRun")
+  .query("getExperimentBatchEvaluationRun", {
+    invalidatedBy: [
+      "lw.experiment_run.target_result",
+      "lw.experiment_run.evaluator_result",
+      "lw.experiment_run.trace_metrics_computed",
+      "lw.experiment_run.completed",
+    ],
+  })
   .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string(), runId: z.string() }))
   .withOutput(experimentRunWithItemsSchema.nullable())
 
