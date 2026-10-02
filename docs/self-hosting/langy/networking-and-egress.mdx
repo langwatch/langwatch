@@ -62,7 +62,7 @@ The developer authenticates with their device session to approve a request, and 
 
 ## Push notifications
 
-Langy's browser notifications are Web Push messages. The LangWatch app and workers send them over HTTPS (`:443`) straight to the push service of each subscribed browser. The agent pod is not involved, and there is nothing to configure: the install generates its own VAPID key pair on first use and stores it encrypted in the database.
+Langy's browser notifications are Web Push messages. The LangWatch app and workers send them over HTTPS (`:443`) straight to the push service of each subscribed browser. The agent pod is not involved, and push needs no configuration: the install generates its own VAPID key pair on first use and stores it encrypted in the database.
 
 | Browser | Push service host |
 |---|---|
