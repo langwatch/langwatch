@@ -114,12 +114,16 @@ export function RailAddButton({
       width="full"
       paddingX="10px"
       paddingY="6px"
+      marginTop={1}
       borderRadius="lg"
+      border="1px dashed"
+      borderColor="border.emphasized"
       textAlign="left"
       cursor="pointer"
       fontSize="12px"
+      fontWeight="medium"
       color={FG_MUTED}
-      _hover={{ background: "bg.muted/60", color: FG_MUTED }}
+      _hover={{ background: "bg.muted/60", borderStyle: "solid", color: "fg" }}
     >
       {icon}
       <Text>{label}</Text>

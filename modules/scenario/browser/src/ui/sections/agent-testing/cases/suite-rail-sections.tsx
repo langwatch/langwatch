@@ -5,7 +5,7 @@
  */
 
 import { Icon, Skeleton, VStack } from "@langwatch/design-system/primitives";
-import { Folder, FolderCode, FolderPlus } from "lucide-react";
+import { Folder, FolderCode, Plus } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
@@ -40,7 +40,7 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
       {canManage && !collapsed && (
         <RailAddButton
           label="New Test Suite"
-          icon={<Icon as={FolderPlus} boxSize="13px" />}
+          icon={<Icon as={Plus} boxSize="13px" />}
           onClick={props.onNewSuite}
           testId="agent-testing-rail-new-suite"
         />

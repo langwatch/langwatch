@@ -560,7 +560,7 @@ describe("<RunPlanDetail/>", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Open the conversation" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Rerun this scenario" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Run again" })).toBeInTheDocument();
   });
 
   /** @scenario "A run plan is run again from the header of its results" */

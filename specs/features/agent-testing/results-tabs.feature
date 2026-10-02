@@ -580,7 +580,7 @@ Feature: The Results tab
     Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Open the conversation"
-    And it offers "Rerun this scenario"
+    And it offers "Run again"
 
   @integration
   Scenario: A run plan is run again from the header of its results

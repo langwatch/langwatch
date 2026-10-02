@@ -6,6 +6,7 @@
 
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
@@ -21,7 +22,9 @@ import { LastResultLabel } from "../../../elements/agent-testing/shared/last-res
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
 import { callerLabel, runCallerKind } from "./caller-display.ts";
 import { evaluationsOf, isAwaitingEvaluations } from "./evaluation-summaries.ts";
+import { RUN_AGAIN_LABEL } from "./run-plan-detail-header.tsx";
 import type { RunResultsTableProps } from "./run-results-table.tsx";
+import { canRunAgain, RUN_AGAIN_FROM_CODE_REASON } from "./use-run-plan-run-dialog.ts";
 
 export type RunResultRowProps = Pick<
   RunResultsTableProps,
@@ -48,11 +51,14 @@ function ResultRowActionsMenu({
   displayName,
   onOpenConversation,
   onRerunCase,
+  isRerunDisabled,
   onEditCase,
 }: {
   displayName: string;
   onOpenConversation: () => void;
   onRerunCase?: () => void;
+  /** True for a run from code, which the platform cannot run again. */
+  isRerunDisabled: boolean;
   onEditCase?: () => void;
 }) {
   const stop = (event: React.MouseEvent) => event.stopPropagation();
@@ -83,15 +89,18 @@ function ResultRowActionsMenu({
           <MessageSquare size={13} /> Open the conversation
         </Menu.Item>
         {onRerunCase && (
-          <Menu.Item
-            value="rerun-test-case"
-            onClick={(event) => {
-              stop(event);
-              onRerunCase();
-            }}
-          >
-            <Play size={13} /> Rerun this scenario
-          </Menu.Item>
+          <Tooltip content={RUN_AGAIN_FROM_CODE_REASON} disabled={!isRerunDisabled}>
+            <Menu.Item
+              value="rerun-test-case"
+              disabled={isRerunDisabled}
+              onClick={(event) => {
+                stop(event);
+                onRerunCase();
+              }}
+            >
+              <Play size={13} /> {RUN_AGAIN_LABEL}
+            </Menu.Item>
+          </Tooltip>
         )}
         {onEditCase && (
           <Menu.Item
@@ -286,6 +295,7 @@ export function RunResultRow({
           displayName={displayName}
           onOpenConversation={() => onScenarioRunClick(scenarioRun)}
           onRerunCase={onRerunCase ? () => onRerunCase(scenarioRun) : undefined}
+          isRerunDisabled={!canRunAgain({ scenarioRun })}
           onEditCase={onEditCase ? () => onEditCase(scenarioRun) : undefined}
         />
       </HStack>

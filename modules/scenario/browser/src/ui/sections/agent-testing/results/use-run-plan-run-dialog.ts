@@ -25,6 +25,39 @@ export type RunPlanRunDialog = {
   rerunCase: (scenarioRun: ScenarioRunData) => void;
 };
 
+type RunAgainSource = Pick<ScenarioRunData, "scenarioId" | "name" | "metadata">;
+
+/** Why a run pushed from code offers Run again disabled. */
+export const RUN_AGAIN_FROM_CODE_REASON =
+  "This run came from code, so the platform cannot run it again. Rerun it from your test suite.";
+
+/** True when the platform launched the run, so it holds the scenario and target. */
+export function canRunAgain({ scenarioRun }: { scenarioRun: RunAgainSource }): boolean {
+  return !!scenarioRun.metadata?.langwatch;
+}
+
+/**
+ * The run dialog subject for running one scenario again, preselecting the
+ * target the run used and falling back to the one last chosen for the scenario.
+ */
+export function runAgainSubjectOf({
+  scenarioRun,
+  projectId,
+}: {
+  scenarioRun: RunAgainSource;
+  projectId: string;
+}): RunDialogSubject {
+  const langwatch = scenarioRun.metadata?.langwatch;
+  return {
+    kind: "case",
+    scenarioId: scenarioRun.scenarioId,
+    name: scenarioRun.name ?? scenarioRun.scenarioId,
+    initialTarget: langwatch
+      ? { type: langwatch.targetType, id: langwatch.targetReferenceId }
+      : readScenarioTarget({ projectId, scenarioId: scenarioRun.scenarioId }),
+  };
+}
+
 export function useRunPlanRunDialog({
   plan,
   canManage,
@@ -51,15 +84,7 @@ export function useRunPlanRunDialog({
 
   const rerunCase = useCallback(
     (scenarioRun: ScenarioRunData) => {
-      setSubject({
-        kind: "case",
-        scenarioId: scenarioRun.scenarioId,
-        name: scenarioRun.name ?? scenarioRun.scenarioId,
-        initialTarget: readScenarioTarget({
-          projectId,
-          scenarioId: scenarioRun.scenarioId,
-        }),
-      });
+      setSubject(runAgainSubjectOf({ scenarioRun, projectId }));
     },
     [projectId],
   );

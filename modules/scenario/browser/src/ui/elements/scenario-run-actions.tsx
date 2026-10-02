@@ -1,5 +1,5 @@
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
 
@@ -127,7 +127,6 @@ export function ScenarioRunActions({
           </Menu.Content>
         </Menu.Root>
       )}
-      <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
     </HStack>
   );
 }

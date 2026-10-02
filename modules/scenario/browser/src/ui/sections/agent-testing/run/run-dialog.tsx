@@ -165,7 +165,15 @@ function useRunDialogState({
   // its editor instead, so the fix is one click away and nothing is queued
   // that the server would refuse.
   const offender = form.offender;
-  const onRun = offender ? form.openOffender : () => void controller.run();
+  // One scenario has no stored target to fall back on, so Run without one is
+  // answered here, once tried, rather than by a refusal from the server.
+  const [hasTriedWithoutTarget, setHasTriedWithoutTarget] = useState(false);
+  const isTargetMissing = subject?.kind === "case" && form.runTargets.length === 0;
+  const onRun = () => {
+    if (offender) return form.openOffender();
+    if (isTargetMissing) return setHasTriedWithoutTarget(true);
+    void controller.run();
+  };
 
   return {
     isNameListOpen,
@@ -176,6 +184,7 @@ function useRunDialogState({
     controller,
     offender,
     onRun,
+    isTargetMissingShown: hasTriedWithoutTarget && isTargetMissing,
   };
 }
 
@@ -190,6 +199,7 @@ function RunDialogContent({
   controller,
   offender,
   onRun,
+  isTargetMissingShown,
 }: {
   subject: RunDialogSubject;
   onClose: () => void;
@@ -234,7 +244,11 @@ function RunDialogContent({
             <RunDialogFooter
               controller={controller}
               isRunBlocked={isRunBlocked({ form, controller })}
-              blockedReason={runBlockedReason({ subject, form, controller })}
+              blockedReason={
+                isTargetMissingShown
+                  ? "Choose an agent or prompt to test."
+                  : runBlockedReason({ subject, form, controller })
+              }
               warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
               onRun={onRun}
               {...(voiceCall ? { onCallItMyself: () => setIsCalling(true) } : {})}

@@ -57,9 +57,8 @@ function RunDrawerBody({
 }
 
 /**
- * The header offers Edit Scenario alone, so the drawer starts no run of its
- * own. A rerun goes through the run dialog, which is the one place a run plan
- * name is resolved.
+ * The drawer starts no run of its own: Run again opens the run dialog, which
+ * is the one place a run plan name is resolved.
  */
 export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
   const { closeDrawer } = useDrawer();

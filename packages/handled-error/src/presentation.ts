@@ -3753,8 +3753,7 @@ const presentations = {
   },
   suite_targets_required: {
     title: "Choose an agent to run against",
-    describe: () =>
-      "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
+    describe: () => "This run has no agent or prompt to test yet. Choose one, then run again.",
   },
   suite_field_identifier_invalid: {
     title: "That field name cannot be used",

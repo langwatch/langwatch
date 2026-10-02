@@ -46,7 +46,7 @@ export function RunDialogFooter({
   caseCount: number | null;
   /** How many targets the run goes against. */
   targetCount: number;
-  /** Why the run cannot start, when it cannot. Printed beside the button. */
+  /** Why the run cannot start, printed beside the button. */
   blockedReason: string | null;
   /** What holds Run instead of running: the button stays enabled and says so. */
   warning?: string | null;
@@ -57,7 +57,7 @@ export function RunDialogFooter({
   onClose: () => void;
 }) {
   const reasonId = useId();
-  const reason = isRunBlocked && blockedReason ? blockedReason : null;
+  const reason = blockedReason;
   const runButton = (
     <SmallButton
       variant="solid"
