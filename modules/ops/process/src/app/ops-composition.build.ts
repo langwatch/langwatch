@@ -33,6 +33,7 @@ import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repos
 import { NullBlobStoreRepository } from "../repositories/blob-store.repository.ts";
 import { EventExplorerClickHouseRepository } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
+import { ClickHouseStorageFootprintRepository } from "../repositories/clickhouse/clickhouse.storage-footprint.repository.ts";
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
 import {
@@ -75,10 +76,7 @@ import { QueueService } from "../services/queue.service.ts";
 import { ReplayRetentionService } from "../services/replay-retention.service.ts";
 import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
-import type {
-  StorageStatsClickHouseClient,
-  StorageStatsInstance,
-} from "../services/storage-stats-collection.service.ts";
+import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
 import { buildSystemMigrations } from "./ops-system-migrations-composition.build.ts";
 import type {
   OpsExplorers,
@@ -182,30 +180,11 @@ class QueueOpsMetricsSource extends OpsQueueMetricsSourceRepository {
   }
 }
 
-/** The storage-stats reads, unscoped, on the shared server (`tenantId: ""`) as main read them. */
-class SharedStorageStatsClickHouseClient implements StorageStatsClickHouseClient {
-  constructor(private readonly clickhouse: ClickHouseQueryClient) {}
-
-  async query<Row>(input: {
-    query: string;
-    query_params?: Record<string, readonly string[]>;
-    unscoped?: { reason: string };
-  }): Promise<{ data: Row[] }> {
-    const result = await this.clickhouse.query<Row>({
-      tenantId: "",
-      sql: input.query,
-      ...(input.query_params ? { params: input.query_params } : {}),
-      ...(input.unscoped ? { unscoped: input.unscoped } : {}),
-    });
-    return { data: result.rows };
-  }
-}
-
 /** The one endpoint storage stats measure: the shared ClickHouse, as main's worker did. */
 export function sharedStorageStatsInstance(
   clickhouse: ClickHouseQueryClient,
 ): StorageStatsInstance {
-  return { target: "shared", client: new SharedStorageStatsClickHouseClient(clickhouse) };
+  return { target: "shared", storage: ClickHouseStorageFootprintRepository.create({ clickhouse }) };
 }
 
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */

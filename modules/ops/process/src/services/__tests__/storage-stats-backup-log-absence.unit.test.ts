@@ -7,11 +7,9 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryStorageFootprintRepository } from "../../repositories/memory/memory.storage-footprint.repository.ts";
 import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
-import {
-  StorageStatsCollectionService,
-  type StorageStatsClickHouseClient,
-} from "../storage-stats-collection.service.ts";
+import { StorageStatsCollectionService } from "../storage-stats-collection.service.ts";
 
 const INFO = 30;
 const WARN = 40;
@@ -24,19 +22,16 @@ function unknownTable(): Error & { code: string; type: string } {
   });
 }
 
-function clientRefusingBackupLog(failure: () => Error): StorageStatsClickHouseClient {
-  return {
-    query: async ({ query }) => {
-      if (query.includes("system.backup_log")) throw failure();
-      return { data: [] };
-    },
-  } as StorageStatsClickHouseClient;
+function endpointRefusingBackupLog(failure: () => Error): MemoryStorageFootprintRepository {
+  const storage = MemoryStorageFootprintRepository.create();
+  storage.refusals.backups = failure;
+  return storage;
 }
 
-function collectorOver(client: StorageStatsClickHouseClient) {
+function collectorOver(storage: MemoryStorageFootprintRepository) {
   const { logger, lines } = createTestLogger();
   const collector = StorageStatsCollectionService.create({
-    resolveInstances: async () => [{ target: "shared", client }],
+    resolveInstances: async () => [{ target: "shared", storage }],
     readings: MemoryStorageStatsReadingsRepository.create({ store: MemoryOpsStore.create() }),
     collectBackups: true,
     logger,
@@ -48,7 +43,7 @@ describe("given a ClickHouse that has never taken a backup", () => {
   describe("when the collector ticks repeatedly", () => {
     /** @scenario "an instance with no backup log names the absence once at info" */
     it("names the absent table once at info and never warns", async () => {
-      const { collector, lines } = collectorOver(clientRefusingBackupLog(unknownTable));
+      const { collector, lines } = collectorOver(endpointRefusingBackupLog(unknownTable));
 
       await collector.collect();
       await collector.collect();
@@ -67,7 +62,7 @@ describe("given a backup log that fails for any other reason", () => {
     /** @scenario "transient backup-log failure warns once until recovery" */
     it("still warns once for the failure streak", async () => {
       const { collector, lines } = collectorOver(
-        clientRefusingBackupLog(() => new Error("connection refused")),
+        endpointRefusingBackupLog(() => new Error("connection refused")),
       );
 
       await collector.collect();

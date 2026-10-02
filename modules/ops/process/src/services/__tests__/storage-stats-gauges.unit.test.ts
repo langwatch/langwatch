@@ -4,11 +4,9 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryStorageFootprintRepository } from "../../repositories/memory/memory.storage-footprint.repository.ts";
 import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
-import {
-  type StorageStatsClickHouseClient,
-  StorageStatsCollectionService,
-} from "../storage-stats-collection.service.ts";
+import { StorageStatsCollectionService } from "../storage-stats-collection.service.ts";
 import { StorageStatsGaugesService } from "../storage-stats-gauges.service.ts";
 
 let provider = createRecordingMeterProvider();
@@ -19,14 +17,10 @@ beforeEach(() => {
 });
 afterEach(() => provider.uninstall());
 
-function clickhouse(rows: string): StorageStatsClickHouseClient {
-  return {
-    query: async ({ query }) => ({
-      data: query.includes("system.parts")
-        ? [{ table: "stored_spans", total_rows: rows, total_bytes: "2048", parts_count: "3" }]
-        : [],
-    }),
-  } as StorageStatsClickHouseClient;
+function clickhouse(rows: number): MemoryStorageFootprintRepository {
+  const storage = MemoryStorageFootprintRepository.create();
+  storage.tables = [{ table: "stored_spans", rows, bytes: 2048, parts: 3 }];
+  return storage;
 }
 
 describe("given an api and a worker reading the same shared readings", () => {
@@ -39,7 +33,7 @@ describe("given an api and a worker reading the same shared readings", () => {
       StorageStatsGaugesService.create({ readings: shared }).publish();
       StorageStatsGaugesService.create({ readings: shared }).publish();
       const measuring = StorageStatsCollectionService.create({
-        resolveInstances: async () => [{ target: "shared", client: clickhouse("10") }],
+        resolveInstances: async () => [{ target: "shared", storage: clickhouse(10) }],
         readings: shared,
         collectBackups: false,
         logger: createTestLogger().logger,
@@ -61,15 +55,15 @@ describe("given an api and a worker reading the same shared readings", () => {
         store: MemoryOpsStore.create(),
       });
       StorageStatsGaugesService.create({ readings: shared }).publish();
-      let rows = "10";
+      let rows = 10;
       const measuring = StorageStatsCollectionService.create({
-        resolveInstances: async () => [{ target: "shared", client: clickhouse(rows) }],
+        resolveInstances: async () => [{ target: "shared", storage: clickhouse(rows) }],
         readings: shared,
         collectBackups: false,
         logger: createTestLogger().logger,
       });
       await measuring.collect();
-      rows = "25";
+      rows = 25;
 
       await measuring.collect();
       await provider.collect();

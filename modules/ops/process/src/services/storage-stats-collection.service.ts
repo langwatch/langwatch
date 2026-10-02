@@ -7,6 +7,10 @@ import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
 import type {
+  BackupStatusRow,
+  StorageFootprintRepository,
+} from "../repositories/storage-footprint.repository.ts";
+import type {
   StorageStatsReading,
   StorageStatsReadingsRepository,
 } from "../repositories/storage-stats-readings.repository.ts";
@@ -24,19 +28,10 @@ const MONITORED_TABLES = [
   "stored_objects",
 ] as const;
 
-/** The narrow read a system-table query needs, as this service asks it. */
-export interface StorageStatsClickHouseClient {
-  query<Row>(input: {
-    query: string;
-    query_params?: Record<string, readonly string[]>;
-    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
-  }): Promise<{ data: Row[] }>;
-}
-
+/** One ClickHouse endpoint the collection measures, read through its own footprint repository. */
 export interface StorageStatsInstance {
   target: string;
-  client: StorageStatsClickHouseClient;
+  storage: StorageFootprintRepository;
 }
 
 export interface StorageStatsCollectionOptions {
@@ -87,41 +82,13 @@ export class StorageStatsCollectionService {
   }
 
   private async collectInstance(instance: StorageStatsInstance): Promise<void> {
-    const tableRows = await instance.client.query<{
-      table: string;
-      total_rows: string;
-      total_bytes: string;
-      parts_count: string;
-    }>({
-      query: `
-        SELECT
-          table,
-          sum(rows) as total_rows,
-          sum(bytes_on_disk) as total_bytes,
-          count() as parts_count
-        FROM system.parts
-        WHERE database = currentDatabase()
-          AND active = 1
-          AND table IN ({tables:Array(String)})
-        GROUP BY table
-      `,
-      query_params: { tables: [...MONITORED_TABLES] },
-      unscoped: {
-        reason:
-          "system.parts carries no tenant column: this is per-table storage size for the operator's dashboards.",
-      },
-    });
+    const tables = await instance.storage.findTables({ tables: MONITORED_TABLES });
 
     // Saved only once the table read has resolved, so a failed read keeps the
     // last known values rather than zeroing a live table.
     const reading: StorageStatsReading = {
       instance: instance.target,
-      tables: tableRows.data.map((row) => ({
-        table: row.table,
-        rows: Number.parseInt(row.total_rows, 10),
-        bytes: Number.parseInt(row.total_bytes, 10),
-        parts: Number.parseInt(row.parts_count, 10),
-      })),
+      tables,
       disks: await this.readDisks(instance),
       backupStatuses: [],
     };
@@ -134,26 +101,7 @@ export class StorageStatsCollectionService {
 
   private async readDisks(instance: StorageStatsInstance): Promise<StorageStatsReading["disks"]> {
     try {
-      const rows = await instance.client.query<{
-        name: string;
-        total_space: string;
-        free_space: string;
-        used_space: string;
-      }>({
-        query: `
-          SELECT name, total_space, free_space, (total_space - free_space) as used_space
-          FROM system.disks
-        `,
-        unscoped: {
-          reason: "system.disks carries no tenant column: this is the instance's disk capacity.",
-        },
-      });
-      return rows.data.map((row) => ({
-        disk: row.name,
-        totalBytes: Number.parseInt(row.total_space, 10),
-        usedBytes: Number.parseInt(row.used_space, 10),
-        freeBytes: Number.parseInt(row.free_space, 10),
-      }));
+      return await instance.storage.findDisks();
     } catch (error) {
       this.options.logger.debug(
         { error, instance: instance.target },
@@ -174,28 +122,9 @@ export class StorageStatsCollectionService {
     reading: StorageStatsReading;
   }): Promise<void> {
     try {
-      const rows = await instance.client.query<{
-        status: string;
-        cnt: string;
-        last_success_time: string;
-        last_success_size: string;
-      }>({
-        query: `
-          SELECT
-            status,
-            count() as cnt,
-            maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-            argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-          FROM system.backup_log
-          GROUP BY status
-        `,
-        unscoped: {
-          reason:
-            "system.backup_log carries no tenant column: this is the instance's backup history.",
-        },
-      });
+      const rows = await instance.storage.findBackupStatuses();
 
-      for (const row of rows.data) {
+      for (const row of rows) {
         this.readBackupRow({ reading, row });
       }
 
@@ -218,22 +147,21 @@ export class StorageStatsCollectionService {
     row,
   }: {
     reading: StorageStatsReading;
-    row: { status: string; cnt: string; last_success_time: string; last_success_size: string };
+    row: BackupStatusRow;
   }): void {
-    reading.backupStatuses.push({ status: row.status, count: Number.parseInt(row.cnt, 10) });
-    if (row.status !== "BACKUP_CREATED" || !row.last_success_time) {
+    reading.backupStatuses.push({ status: row.status, count: row.count });
+    if (row.status !== "BACKUP_CREATED" || !row.lastSuccessTime) {
       return;
     }
 
-    const succeededAtSeconds = toEpochMs(row.last_success_time) / 1000;
+    const succeededAtSeconds = toEpochMs(row.lastSuccessTime) / 1000;
     if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) {
       return;
     }
 
-    const sizeBytes = Number.parseInt(row.last_success_size, 10);
     reading.lastBackup = {
       succeededAtSeconds,
-      sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : 0,
+      sizeBytes: Number.isFinite(row.lastSuccessSizeBytes) ? row.lastSuccessSizeBytes : 0,
     };
   }
 

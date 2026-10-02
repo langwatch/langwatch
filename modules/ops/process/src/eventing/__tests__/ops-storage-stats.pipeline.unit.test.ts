@@ -6,11 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryStorageFootprintRepository } from "../../repositories/memory/memory.storage-footprint.repository.ts";
 import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
-import {
-  type StorageStatsClickHouseClient,
-  StorageStatsCollectionService,
-} from "../../services/storage-stats-collection.service.ts";
+import { StorageStatsCollectionService } from "../../services/storage-stats-collection.service.ts";
 import { STORAGE_STATS_PROCESS_NAME } from "../ops-storage-stats.intent.ts";
 import {
   STORAGE_STATS_PIPELINE_NAME,
@@ -89,15 +87,10 @@ describe("given ops's storage-stats declaration", () => {
       const readings = MemoryStorageStatsReadingsRepository.create({
         store: MemoryOpsStore.create(),
       });
-      const client = {
-        query: async ({ query }: { query: string }) => ({
-          data: query.includes("system.parts")
-            ? [{ table: "event_log", total_rows: "7", total_bytes: "64", parts_count: "1" }]
-            : [],
-        }),
-      } as StorageStatsClickHouseClient;
+      const storage = MemoryStorageFootprintRepository.create();
+      storage.tables = [{ table: "event_log", rows: 7, bytes: 64, parts: 1 }];
       const service = StorageStatsCollectionService.create({
-        resolveInstances: async () => [{ target: "shared", client }],
+        resolveInstances: async () => [{ target: "shared", storage }],
         readings,
         collectBackups: false,
         logger: createTestLogger().logger,
