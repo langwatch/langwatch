@@ -72,7 +72,9 @@ import {
 /** The portable part of a feature API token; no kernel dependency. */
 export type FeatureApiWitness<Api> = ModuleApiToken<Api>;
 
-type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
+type ObjectSource = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
+/** An object, a union of objects, or two of those intersected: every one parses to an object. */
+type SourceSchema = ObjectSource | z.ZodIntersection<ObjectSource, ObjectSource>;
 type Missing = undefined;
 type RouteSource = SourceSchema | RestRawBodyDeclared | RestMultipartDeclared | Missing;
 /** `:id{.+?}` declares a Hono regex constraint; the parameter's name is the part before it. */
@@ -1660,6 +1662,10 @@ function assertDistinctSources(
 }
 
 function sourceKeys(schema: SourceSchema): string[] {
+  if (schema instanceof z.ZodIntersection) {
+    return [...sourceKeys(schema.def.left), ...sourceKeys(schema.def.right)];
+  }
+
   return schema instanceof z.ZodObject
     ? Object.keys(schema.shape)
     : schema.options.flatMap((option) => Object.keys(option.shape));

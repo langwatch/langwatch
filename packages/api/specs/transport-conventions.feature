@@ -35,6 +35,13 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then it is refused with 400 and the code malformed_request, never a 500
       And the handler is not reached
 
+    @integration
+    Scenario: An input intersecting an object with a union of objects is validated by the runtime
+      Given a route whose JSON input is an object intersected with a discriminated union of objects
+      When it is called with a body matching both sides
+      Then the handler is handed the fields of both sides
+      And malformed JSON is refused with 400 malformed_request and a body missing a side with 422 validation_error
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration

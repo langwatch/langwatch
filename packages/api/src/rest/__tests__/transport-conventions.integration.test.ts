@@ -59,6 +59,21 @@ const actions = defineRestRouter(ActionApi)
   .withOutput(ok)
   .handle(async ({ app, input }) => app.run(input))
 
+  .post("/tag", "tagAnnotation")
+  .withInput(
+    z
+      .object({ turnId: z.string() })
+      .and(
+        z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("label"), label: z.string() }),
+          z.object({ kind: z.literal("score"), score: z.number() }),
+        ]),
+      ),
+  )
+  .withPermission("annotations:manage")
+  .withOutput(ok)
+  .handle(async ({ app, input }) => app.run(input))
+
   .post("/refuse", "refuseAnnotation")
   .withInput(z.object({ waitMs: z.unknown().optional(), status: z.number().optional() }))
   .withPermission("annotations:manage")
@@ -213,6 +228,40 @@ describe("a declared action called with a body", () => {
 
     expect(response.status).toBe(200);
     expect(run).toHaveBeenCalledWith({ reason: "duplicate" });
+  });
+});
+
+describe("a declared action whose input intersects an object with a union", () => {
+  /** @scenario "An input intersecting an object with a union of objects is validated by the runtime" */
+  it("hands the handler the fields of both sides", async () => {
+    const { app, run } = actionsApp();
+    const body = { turnId: "turn-1", kind: "score", score: 3 };
+    const response = await app.request(`${BASE}/tag`, {
+      method: "POST",
+      headers: JSON_TYPE,
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    expect(run).toHaveBeenCalledWith(body);
+  });
+
+  /** @scenario "An input intersecting an object with a union of objects is validated by the runtime" */
+  it.each([
+    ["malformed JSON", "{", 400, "malformed_request"],
+    [
+      "a body missing a side",
+      JSON.stringify({ kind: "label", label: "x" }),
+      422,
+      "validation_error",
+    ],
+  ])("refuses %s before the handler", async (_label, body, status, code) => {
+    const { app, run } = actionsApp();
+    const response = await app.request(`${BASE}/tag`, { method: "POST", headers: JSON_TYPE, body });
+
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toMatchObject({ code });
+    expect(run).not.toHaveBeenCalled();
   });
 });
 
