@@ -27,6 +27,13 @@ type Config struct {
 	Log                           clog.Config   `env:"LOG"`
 	OTel                          config.OTel   `env:"OTEL"`
 
+	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
+	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
+	// SpanSync swaps the per-tenant batch processor for a synchronous one so
+	// integration tests can assert on persisted spans (nlpgo-eval-trace-id-roundtrip).
+	// Production leaves it off: batching keeps the hot path off collector RTT.
+	SpanSync bool `env:"NLPGO_SPAN_SYNC"`
+
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
 }

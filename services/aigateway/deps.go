@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -73,7 +72,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	}
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
-	nodeID := resolveNodeID(ctx)
+	nodeID := otelsetup.ResolveNodeID(logger)
 
 	// Built first so every adapter below can be handed the recorder it
 	// reports into. Holds no resources and starts no goroutines.
@@ -329,14 +328,4 @@ func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, si
 		}
 	}
 	return out, next, nil
-}
-
-func resolveNodeID(ctx context.Context) string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		id := ulid.Make().String()
-		clog.Get(ctx).Warn("hostname_unavailable", zap.Error(err), zap.String("fallback_node_id", id))
-		return id
-	}
-	return hostname
 }
