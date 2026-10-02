@@ -268,10 +268,21 @@ export function JoinPolicyCard({
     lock.locked && value !== "off" && value !== domainJoin;
 
   const parsedDomains = splitDomains(domains);
+
+  /**
+   * A live connection admits people whatever the domain door says, and they
+   * land on this seat too, so the choice stays offered while the door is shut
+   * as long as that other door is open. When neither door is open the seat is
+   * not shown, and a choice the reader can no longer see is never saved: the
+   * seat already in force goes out instead.
+   */
+  const seatShown = selected !== "off" || ssoLive;
+  const seatToSave = seatShown ? seat : joinerRole;
+
   const unchanged =
     selected === domainJoin &&
     parsedDomains.join(",") === joinDomains.join(",") &&
-    seat === joinerRole;
+    seatToSave === joinerRole;
 
   return (
     <SettingsCard
@@ -297,7 +308,7 @@ export function JoinPolicyCard({
             onSave({
               domainJoin: selected,
               domains: parsedDomains,
-              joinerRole: seat,
+              joinerRole: seatToSave,
             })
           }
         >
@@ -338,10 +349,7 @@ export function JoinPolicyCard({
         </VStack>
       )}
 
-      {/* A live connection admits people whatever the domain door says, and
-          they land on this seat too, so the choice stays offered while the
-          door is shut as long as that other door is open. */}
-      {(selected !== "off" || ssoLive) && (
+      {seatShown && (
         <JoinerSeatOptions seat={seat} saving={saving} onSelect={setSeat} />
       )}
 

@@ -210,4 +210,24 @@ describe("given the seat newcomers receive (ADR-143)", () => {
       expect(screen.getByTestId("joiner-seat-DEVELOPER")).toBeTruthy();
     });
   });
+
+  describe("when the door is shut after a seat was picked", () => {
+    /** @scenario Shutting the door keeps the joiner seat an administrator can no longer see */
+    it("saves the seat already in force, not the one it stopped showing", async () => {
+      const { onSave } = renderCard({ domainJoin: "request" });
+      const user = userEvent.setup();
+
+      await user.click(screen.getByText("Developer"));
+      await user.click(screen.getByText("Invite only"));
+      expect(screen.queryByText("Seat for people who join")).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith({
+        domainJoin: "off",
+        domains: [],
+        joinerRole: "MEMBER",
+      });
+    });
+  });
 });
