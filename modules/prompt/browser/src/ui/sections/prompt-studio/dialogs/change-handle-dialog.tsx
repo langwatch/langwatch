@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Button,

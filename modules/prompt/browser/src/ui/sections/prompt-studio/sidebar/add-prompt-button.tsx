@@ -17,9 +17,8 @@ interface AddPromptButtonProps {
 export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();
   const { hasPermission } = usePromptProject();
-  // `platform/app` opened the restriction modal from a module-level zustand
-  // store the whole application shares; a package may not reach it, so the host
-  // is asked to offer the upgrade instead.
+  // The restriction modal belongs to the shell, so the host is asked to offer
+  // the upgrade.
   const host = usePromptHost();
 
   const handleClick = () => {

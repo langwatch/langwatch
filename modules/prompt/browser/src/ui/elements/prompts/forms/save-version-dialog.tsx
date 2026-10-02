@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Field, Input } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Button, Field, Input } from "@langwatch/design-system/primitives";
 import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -81,6 +81,7 @@ export function SaveVersionDialog({
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
+                data-testid="prompt-save-version-message"
 
                 maxLength={200}
                 {...register("commitMessage", {
@@ -99,6 +100,7 @@ export function SaveVersionDialog({
           </Button>
           <Button
             colorPalette="green"
+            data-testid="prompt-save-version-submit"
             onClick={() => void handleSubmit(submitCallback)()}
             loading={isSubmitting}
             disabled={!isDirty}

@@ -43,9 +43,9 @@ import { useRegisterDrawerFooter } from "../../elements/workflow/studio-drawer-f
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
 import { PromptMessagesField } from "../prompt-studio/fields/prompt-messages-field.tsx";
 import { FormVariablesSection } from "../variables/form-variables-section.tsx";
-import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
+import { ChangeHandleDialog } from "../prompt-studio/dialogs/change-handle-dialog.tsx";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
-import { PromptEditorHeader } from "./prompt-editor-header.tsx";
+import { PromptEditorHeader } from "../prompt-studio/prompt-editor-header.tsx";
 
 export type PromptEditorDrawerProps = UiPromptEditorDrawerProps;
 

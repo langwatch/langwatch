@@ -6,8 +6,8 @@ import type { LLMConfig } from "@langwatch/workflow-contract";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
-import { AddModelProviderKey } from "./add-model-provider-key.tsx";
+import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
+import { AddModelProviderKey } from "../../../elements/llmPromptConfigs/add-model-provider-key.tsx";
 import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
 
 type LLMConfigFieldProps = {

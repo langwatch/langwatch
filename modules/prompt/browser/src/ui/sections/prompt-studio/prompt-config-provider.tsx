@@ -7,7 +7,7 @@ import type { PromptConfigContextType } from "../../../model/prompt-config-opera
 import { isLimitExceeded, isLiteMemberRestriction } from "../../../model/trpc-error-signals.ts";
 import type { ChangeHandleFormValues } from "../../../prompt-form.ts";
 import { ChangeHandleDialog } from "./dialogs/change-handle-dialog.tsx";
-import { type SaveDialogFormValues, SaveVersionDialog } from "./dialogs/save-version-dialog.tsx";
+import { type SaveDialogFormValues, SaveVersionDialog } from "../../elements/prompts/forms/save-version-dialog.tsx";
 
 /** Keeps the dialog open when a global handler will show its own modal. */
 function closeUnlessHandledGlobally({

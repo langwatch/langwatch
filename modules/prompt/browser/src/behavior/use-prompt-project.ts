@@ -1,7 +1,7 @@
 /**
- * The project this screen is about, read from the host - `platform/app`'s
- * session client and org graph are sealed off from a feature-web package
- * (ADR-004). `project` is `undefined` until one is in scope, as before.
+ * The project this screen is about, read from the host's session: a
+ * browser module never reaches the shell's session client directly.
+ * `project` is `undefined` until one is in scope.
  */
 
 import { useMemo } from "react";

@@ -2,16 +2,12 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { AvailableSource, FieldMapping } from "@langwatch/workflow-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  type AvailableSource,
-  type FieldMapping,
-  type Variable,
-  VariablesSection,
-} from "../variables-section.tsx";
+import { type Variable, VariablesSection } from "../variables-section.tsx";
 
 const mockSources: AvailableSource[] = [
   {

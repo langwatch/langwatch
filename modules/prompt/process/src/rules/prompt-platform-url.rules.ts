@@ -1,7 +1,7 @@
 /**
  * The platform's deep link to the prompt library, built from the app's publicBaseUrl
  * config. REST declarations are static, so links compose from config at module load time.
- * Path: /${projectSlug}/prompts (from prompt-routes.ts).
+ * Path: /${projectSlug}/prompts (the prompt browser module's library screen).
  */
 const PROMPTS_PATH = "/prompts";
 

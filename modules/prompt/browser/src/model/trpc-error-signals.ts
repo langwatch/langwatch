@@ -1,6 +1,6 @@
 /**
  * The two refusals that must not close a dialog, recognised structurally
- * (a feature-web package may not import `@trpc/client`, ADR-004). A
+ * (a browser module may not import `@trpc/client`, ADR-004). A
  * plan-limit/lite-member refusal shows as a MODAL, so the dialog stays open under it.
  */
 

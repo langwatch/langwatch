@@ -5,8 +5,8 @@ import { useFormContext } from "react-hook-form";
 
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { GeneratePromptApiSnippetDialog } from "../prompt-studio/dialogs/generate-prompt-api-snippet-dialog.tsx";
-import { SavePromptButton } from "./save-prompt-button.tsx";
-import { VersionHistoryButton } from "./version-history-button.tsx";
+import { SavePromptButton } from "../prompt-studio/save-prompt-button.tsx";
+import { VersionHistoryButton } from "../prompt-studio/version-history-button.tsx";
 
 export type PromptEditorFooterProps = {
   /** Callback when save button is clicked */

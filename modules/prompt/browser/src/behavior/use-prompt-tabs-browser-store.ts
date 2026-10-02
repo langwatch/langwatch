@@ -1,6 +1,6 @@
 /**
  * The tab store, bound to the project in scope and to the host's browser.
- * A feature-web package may not name `window.localStorage` or a real
+ * A browser module may not name `window.localStorage` or a real
  * logger directly, so the HOST answers both through `tabCapabilities()`.
  */
 

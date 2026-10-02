@@ -1,7 +1,6 @@
 /**
- * Opening a traced LLM call as a prompt tab. A NARROWED copy of
- * `useLoadSpanIntoPromptPlayground.ts` — only the READING half travels here;
- * the URL-building half stays in `platform/app`.
+ * Opening a traced LLM call as a prompt tab: the reading half only. The
+ * URL that points here is built by whoever links to the studio.
  */
 
 import {
@@ -112,10 +111,8 @@ export function createDefaultPromptFormValues(
     handle: null,
     scope: "PROJECT",
     version: {
-      // A LIVE DEFECT THIS MOVE FOUND: `formSchema`'s `version.parameters` had
-      // its schema default REMOVED, and this builder never supplied one, so
-      // `formSchema.parse` threw on every unmanaged-prompt hand-off. Both
-      // covering suites were red in `platform/app`, one in no test lane at all.
+      // `formSchema`'s `version.parameters` has no schema default; without
+      // this, `formSchema.parse` throws on every unmanaged-prompt hand-off.
       parameters: {},
       configData: {
         prompt: systemPrompt,

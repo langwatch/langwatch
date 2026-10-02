@@ -6,7 +6,7 @@ import { useAllPromptsForProject } from "../../../../behavior/use-all-prompts-fo
 import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
-import { modelProviderIcons } from "../model-selection/model-provider-icons.tsx";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { Sidebar, SidebarEmptyState } from "../studio-internals.ts";
 import { PublishedPromptContent } from "./published-prompt-content.tsx";
 

@@ -14,13 +14,6 @@ export const EvaluationExecutionMode = {
 export type EvaluationExecutionMode =
   (typeof EvaluationExecutionMode)[keyof typeof EvaluationExecutionMode];
 
-/** Who a prompt belongs to. */
-export const PromptScope = {
-  PROJECT: "PROJECT",
-  ORGANIZATION: "ORGANIZATION",
-} as const;
-export type PromptScope = (typeof PromptScope)[keyof typeof PromptScope];
-
 /** The project row, as the surfaces that moved read it. */
 export type Project = {
   id: string;

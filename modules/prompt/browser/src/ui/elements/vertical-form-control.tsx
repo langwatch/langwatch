@@ -1,7 +1,6 @@
 /**
- * A labelled field, stacked, with errors under the input - a narrowed,
- * family-local copy of the two-direction `VerticalFormControl` (only the
- * vertical branch travels). `FormErrorDisplay`'s message walk comes with it.
+ * A labelled field, stacked, with errors under the input, including
+ * `FormErrorDisplay`'s message walk.
  */
 
 import {

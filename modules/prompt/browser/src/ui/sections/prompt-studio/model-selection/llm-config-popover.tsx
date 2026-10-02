@@ -1,15 +1,15 @@
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
+import { ModelSelector } from "../../../../behavior/lent-model-provider.tsx";
 import { useLlmConfigPopoverState } from "../../../../behavior/use-llm-config-popover-state.ts";
-import { allModelOptions } from "../../../../behavior/use-model-selection-options.ts";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { type LLMConfigValues } from "../../llm-parameters/llm-config-values.types.ts";
 import { getParameterConfigWithModelOverrides } from "../../llm-parameters/parameter-config.ts";
 import { ParameterRow } from "../../llm-parameters/parameter-row.tsx";
 import { getParamValue } from "../../llm-parameters/parameter-value.utils.ts";
-import { ModelSelector } from "./model-selector.tsx";
-import { type Output, OutputsSection, type OutputType } from "./outputs-section.tsx";
+import { type Output, OutputsSection, type OutputType } from "../../../elements/outputs/outputs-section.tsx";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };

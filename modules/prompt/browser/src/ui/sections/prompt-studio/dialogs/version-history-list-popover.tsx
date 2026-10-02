@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Avatar } from "@langwatch/design-system/avatar";
+import { HistoryIcon } from "@langwatch/design-system/history-icon";
 import { Menu } from "@langwatch/design-system/menu";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -28,7 +29,6 @@ import {
   type PromptVersionSnapshot,
 } from "../../../../model/prompt-version-diff.ts";
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
-import { HistoryIcon } from "../../../elements/history-icon.tsx";
 import { VersionChanges } from "../../../elements/prompts/version-changes.tsx";
 
 type VersionLoadRequest = {

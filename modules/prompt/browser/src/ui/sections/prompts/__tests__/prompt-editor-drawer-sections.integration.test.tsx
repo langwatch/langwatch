@@ -71,7 +71,7 @@ vi.mock("../../../elements/workflow/studio-drawer-footer.tsx", async (importOrig
 // The model control the sticky header carries, stubbed to something nameable:
 // what the header scenario is about is where the control sits, not which models
 // the project has configured.
-vi.mock("../../../elements/prompts/forms/fields/model-select-field-mini.tsx", () => ({
+vi.mock("../../prompt-studio/fields/model-select-field-mini.tsx", () => ({
   ModelSelectFieldMini: () => <button data-testid="model-select">gpt-5-mini</button>,
 }));
 

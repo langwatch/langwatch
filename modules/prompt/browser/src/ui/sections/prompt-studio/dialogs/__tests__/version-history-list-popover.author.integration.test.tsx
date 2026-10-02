@@ -4,18 +4,15 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
-
-vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),
+const mockHost = { succeeded: vi.fn(), failed: vi.fn() };
+vi.mock("../../../../../model/prompt-host.ts", () => ({
+  usePromptHost: () => mockHost,
 }));
-vi.mock("@langwatch/browser-host/toaster", () => ({
-  toaster: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
+  usePromptProject: () => ({ project: { id: "proj_1" } }),
 }));
-vi.mock("@langwatch/browser-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
 vi.mock("../../../../../behavior/prompt-api.ts", () => ({
@@ -28,6 +25,8 @@ vi.mock("@langwatch/prompt-client", () => ({
     },
   },
 }));
+
+import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 type Author = { name: string | null; email?: string | null; image?: string | null } | null;
 
@@ -43,9 +42,8 @@ const versionWithAuthor = (author: Author) => [
 
 const renderWithAuthor = async (author: Author) => {
   mockUseQuery.mockReturnValue({ data: versionWithAuthor(author), isLoading: false });
-  renderWithDesignSystem(<VersionHistoryListPopover configId="config-1" />);
-  const user = userEvent.setup();
-  await user.click(screen.getByTestId("version-history-button"));
+  renderWithDesignSystem(<VersionHistoryListPopover configId="config-1" initialOpen />);
+  await screen.findByText("Initial version");
 };
 
 const hover = (element: HTMLElement) => {
@@ -53,7 +51,7 @@ const hover = (element: HTMLElement) => {
   fireEvent.pointerMove(element, { pointerType: "mouse" });
 };
 
-describe("VersionHistoryListPopover author display", () => {
+describe("<VersionHistoryListPopover/> author display", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

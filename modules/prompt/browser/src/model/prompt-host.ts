@@ -95,9 +95,8 @@ export abstract class PromptHostApi {
   abstract failed(failure: PromptFailureNotice): void;
 
   /**
-   * `platform/app` dedupes a refusal already rendered as a modal via a
-   * `WeakSet` its interceptors write to. That cache doesn't wrap the
-   * `apps/ui` build, so this always answers `false` here — a recorded gap.
+   * Whether a refusal was already rendered globally as a modal. `apps/ui`
+   * keeps no such record yet, so this answers `false` (a known gap).
    */
   abstract isReportedGlobally(error: unknown): boolean;
 
@@ -115,9 +114,8 @@ export abstract class PromptHostApi {
   abstract tabCapabilities(): PromptTabsCapabilities;
 
   /**
-   * `platform/app` opens this from a module-level zustand store the whole
-   * application shares; a package may not reach it directly, and the
-   * prompt limit is the one place this screen hits it.
+   * Offers the reader an upgrade. The shell owns that prompt and a module may
+   * not reach it directly; the prompt limit is the one place this screen needs it.
    */
   abstract requestUpgrade(): void;
 

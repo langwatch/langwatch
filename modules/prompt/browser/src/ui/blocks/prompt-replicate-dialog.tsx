@@ -1,6 +1,6 @@
 /**
  * Replicates one prompt into another project. The toast and log line do NOT
- * travel: a feature-web package may reach neither a toaster nor a logger, so
+ * travel: a browser module may reach neither a toaster nor a logger, so
  * the outcome is handed back to the caller, which tells the host.
  */
 

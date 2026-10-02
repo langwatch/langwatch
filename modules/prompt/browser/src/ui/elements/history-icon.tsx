@@ -1,7 +1,6 @@
 /**
- * The clock-with-arrow mark on the version-history button, family-local
- * (see `platform/app/.../History.tsx`, still rendered by one other surface).
- * The Design System publishes no equivalent.
+ * The clock-with-arrow mark on the version-history button. The Design
+ * System publishes no equivalent.
  */
 
 export function HistoryIcon({ size }: { size: number }) {

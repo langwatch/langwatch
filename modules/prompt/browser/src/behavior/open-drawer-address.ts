@@ -1,6 +1,6 @@
 import type { UiRoute } from "@langwatch/browser-host/capabilities";
 
-/** Writes a `platform/app` drawer's address, clearing stale `drawer.*` keys. */
+/** Writes a drawer's address, clearing stale `drawer.*` keys. */
 export function openDrawerAddress({
   drawer,
   params,

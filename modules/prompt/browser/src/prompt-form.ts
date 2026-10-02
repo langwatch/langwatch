@@ -1,7 +1,7 @@
 /**
  * The prompt form contract: schema, values, stored-prompt mapping, and the
  * comparisons deciding whether an edit is savable. A surface, not
- * screen-private code - Prompt Studio, the drawer and the workflow studio share it.
+ * screen-private code - Prompt Studio and the prompt editor drawer share it.
  */
 export {
   areFormValuesEqual,

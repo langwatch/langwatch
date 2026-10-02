@@ -1,7 +1,6 @@
 /**
- * `?promptId=` - the address that opens one prompt in a new tab, family-local
- * (see `platform/app/.../usePromptIdQueryParam.ts`). The host answers the
- * address; it is READ rather than mirrored into state.
+ * `?promptId=` - the address that opens one prompt in a new tab. The host
+ * answers the address; it is READ rather than mirrored into state.
  */
 
 import { useCallback } from "react";

@@ -17,8 +17,6 @@ import { PromptTabbedSection } from "./prompt-tabbed-section.tsx";
 const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
-export { useTabId } from "../../studio-internals.ts";
-
 /**
  * Window content for a prompt tab. Initializes the active tab's form and
  * renders header, messages, and tabbed sections.

@@ -8,8 +8,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useMemo } from "react";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 
-import { modelProviderIcons } from "../ui/sections/prompt-studio/model-selection/model-provider-icons.tsx";
 import { promptApi } from "./prompt-api.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 
@@ -21,18 +21,6 @@ export type ModelOption = {
   mode?: "chat" | "embedding" | undefined;
   isCustom?: boolean;
 };
-
-export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
-  ([key, value]) => ({
-    label: key,
-    value: key,
-    icon: modelProviderIcons[key.split("/")[0] as keyof typeof modelProviderIcons],
-    isDisabled: false,
-    mode: value.mode as "chat" | "embedding",
-  }),
-);
-
-export const allModelOptions = modelSelectorOptions.map((option) => option.value);
 
 export type ModelOptionGroup = {
   provider: string;
@@ -250,7 +238,7 @@ export const useModelSelectionOptions = ({
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
   // The application's copy carries a dev-only `?__no_models=1` escape hatch,
-  // gated on `import.meta.env.PROD`. Neither travels: a feature-web package
+  // gated on `import.meta.env.PROD`. Neither travels: a browser module
   // reads no build-time environment, and the screen's own suites construct the
   // empty case directly rather than through a URL.
   const forceEmpty = false;

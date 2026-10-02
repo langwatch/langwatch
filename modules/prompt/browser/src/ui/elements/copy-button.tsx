@@ -1,5 +1,5 @@
 /**
- * Copies one value and tells the caller what happened. A feature-web package may not reach the
+ * Copies one value and tells the caller what happened. A browser module may not reach the
  * toast singleton directly (unlike the application's own copy-button), so the outcome is handed
  * back through `onCopied` / `onRefused` and the host decides the words a reader sees.
  */

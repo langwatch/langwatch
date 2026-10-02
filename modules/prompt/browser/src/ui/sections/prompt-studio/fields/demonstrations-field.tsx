@@ -9,9 +9,8 @@ import { VerticalFormControl } from "../../../elements/vertical-form-control.tsx
 import { DatasetPreview } from "./dataset-preview.tsx";
 
 /**
- * The few-shot examples a prompt carries, shown read-only - a narrowed
- * family-local copy of `platform/app`'s `DemonstrationsField.tsx`. Still
- * edited through the prompt editor drawer, opened from workflow studio/experiments.
+ * The few-shot examples a prompt carries, shown read-only. They are edited
+ * through the prompt editor drawer, opened from workflow studio/experiments.
  */
 export function DemonstrationsField() {
   const { watch, formState } = useFormContext<PromptConfigFormValues>();

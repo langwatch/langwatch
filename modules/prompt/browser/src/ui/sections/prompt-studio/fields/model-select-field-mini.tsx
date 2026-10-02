@@ -1,22 +1,20 @@
+import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import { type LlmConfigOutputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { ChevronDown } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "../../../../behavior/use-model-selection-options.ts";
+import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
+import { useModelSelectionOptions } from "../../../../behavior/use-model-selection-options.ts";
 import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "../model-selection/llm-config-popover.tsx";
-import { LLMModelDisplay } from "../model-selection/llm-model-display.tsx";
-import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout.tsx";
 
 type ModelSelectFieldMiniProps = {
   /** Whether to show the structured outputs section in the config popover */
