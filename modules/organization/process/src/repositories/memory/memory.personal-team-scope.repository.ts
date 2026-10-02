@@ -13,6 +13,13 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
     return new MemoryPersonalTeamScopeRepository(options.memory);
   }
 
+  /** Every team the organization shares: all but each member's personal workspace. */
+  async findSharedTeamIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    return [...this.memory.teams.values()]
+      .filter((team) => team.organizationId === organizationId && !team.isPersonal)
+      .map((team) => team.id);
+  }
+
   async findPersonalTeamsInScopes(input: {
     scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<{ name: string }[]> {

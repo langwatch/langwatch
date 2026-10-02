@@ -1,4 +1,5 @@
-import type { Project } from "@langwatch/project-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * The `/api/teams` family against the real composed application, not a
@@ -27,7 +28,6 @@ import { OrganizationService } from "../../services/organization.service.ts";
 import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../../services/team-identity.service.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   CREDENTIAL,
   KEY_ID,
@@ -224,9 +224,11 @@ function application() {
     role: "ADMIN",
   });
 
-  const projects = TestProjectApi.create({
-    byTeam: { [SHARED_TEAM_ID]: [projectRow()] },
-  });
+  const sharedProjects = [projectRow()];
+  const projects = createApiFixture<ProjectApi>(
+    { listByTeam: async (input) => (input.teamId === SHARED_TEAM_ID ? [...sharedProjects] : []) },
+    "ProjectApi",
+  );
 
   const organizations = OrganizationService.create({
     repository: MemoryOrganizationRepository.create({ memory }),

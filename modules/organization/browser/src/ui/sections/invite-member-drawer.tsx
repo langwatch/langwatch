@@ -1,6 +1,5 @@
 // biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
 
-import type { UiInviteMemberDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type React from "react";
 
@@ -10,6 +9,12 @@ import { useInviteActions } from "../../behavior/use-invite-actions.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { AddMembersForm } from "./add-members-form.tsx";
+
+/** What a caller hands organization's invite drawer: the address to prefill, when it has one. */
+export type UiInviteMemberDrawerProps = {
+  open?: boolean;
+  initialEmail?: string;
+};
 
 /** Invite drawer: stable deep-link from members page, command bar, or inline box. */
 export function InviteMemberDrawer({

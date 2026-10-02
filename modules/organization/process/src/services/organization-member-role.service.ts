@@ -241,24 +241,7 @@ export class OrganizationMemberRoleService {
     await this.dependencies.ceiling.assertWithinCaller({
       organizationId,
       caller,
-      grants: [
-        ...(role === OrganizationUserRole.EXTERNAL
-          ? []
-          : [
-              {
-                role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
-                scopeType: GrantScopeTier.ORGANIZATION,
-                scopeId: organizationId,
-              },
-            ]),
-        ...effectiveTeamRoleUpdates.map((update) =>
-          intendedTeamGrant({
-            teamId: update.teamId,
-            role: update.role,
-            customRoleId: update.customRoleId,
-          }),
-        ),
-      ],
+      grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
     await this.dependencies.seats.assertRoleChangeAllowed({
@@ -410,6 +393,36 @@ export class OrganizationMemberRoleService {
   /**
    * Returns paginated, enriched audit log entries for an organization.
    */
+}
+
+/** The grants a member-role change writes: the organization role (none if EXTERNAL), then teams. */
+function intendedRoleChangeGrants({
+  organizationId,
+  role,
+  effectiveTeamRoleUpdates,
+}: {
+  organizationId: string;
+  role: OrganizationUserRole;
+  effectiveTeamRoleUpdates: EffectiveTeamRoleUpdate[];
+}): OrganizationIntendedGrant[] {
+  return [
+    ...(role === OrganizationUserRole.EXTERNAL
+      ? []
+      : [
+          {
+            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+            scopeType: GrantScopeTier.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        ]),
+    ...effectiveTeamRoleUpdates.map((update) =>
+      intendedTeamGrant({
+        teamId: update.teamId,
+        role: update.role,
+        customRoleId: update.customRoleId,
+      }),
+    ),
+  ];
 }
 
 /** The team grant a requested role resolves to: a built-in role, or `custom:<id>` with its id. */

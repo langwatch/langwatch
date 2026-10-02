@@ -77,7 +77,7 @@ export type {
   OrganizationSignals,
 } from "./app/organization.members.ts";
 export { groupsRest } from "./transport/group.rest.ts";
-export { teamsRest, TeamManagementApi } from "./transport/team.rest.ts";
+export { teamsRest } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 export type { InviteDisplayStatus } from "./rules/invite-display-status.rules.ts";
 export type {
