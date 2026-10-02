@@ -25,7 +25,9 @@ import { createInnerTRPCContext } from "../../trpc";
 wireDefaultTestApp();
 
 // A hosted self-serve organization, so the switch is offered and only the
-// caller's `organization:manage` authority separates the two answers.
+// caller's `organization:manage` authority separates the two answers. The
+// plan is stated per describe, so one can turn the organization enterprise.
+const plan = vi.hoisted(() => ({ type: "FREE" }));
 vi.mock("~/server/app-layer/instant-evals/opt-in", async (importOriginal) => {
   const original =
     await importOriginal<
@@ -33,7 +35,7 @@ vi.mock("~/server/app-layer/instant-evals/opt-in", async (importOriginal) => {
     >();
   const hostedSelfServe = {
     isSaas: () => true,
-    planTypeOf: async () => "FREE",
+    planTypeOf: async () => plan.type,
   };
   return {
     ...original,
@@ -227,6 +229,47 @@ describe("tracesV2.instantEval opt-in procedures", () => {
           targetKind: "organization",
           targetId: ORG_ID,
           error: null,
+        },
+      ]);
+    });
+  });
+
+  describe("given an enterprise organization", () => {
+    beforeAll(() => {
+      plan.type = "ENTERPRISE";
+    });
+    afterAll(() => {
+      plan.type = "FREE";
+    });
+
+    it("refuses the admin's switch and leaves one audit row naming the organization and the refusal", async () => {
+      await expect(
+        callerFor(ADMIN_ID).tracesV2.instantEval.enable({
+          projectId: PROJECT_ID,
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+      const failed = await prisma.auditLog.findMany({
+        where: {
+          userId: ADMIN_ID,
+          action: "tracesV2.instantEval.enable",
+          error: { not: null },
+        },
+        select: {
+          organizationId: true,
+          projectId: true,
+          targetKind: true,
+          targetId: true,
+          error: true,
+        },
+      });
+      expect(failed).toEqual([
+        {
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          targetKind: "organization",
+          targetId: ORG_ID,
+          error: expect.stringContaining("Contact us"),
         },
       ]);
     });
