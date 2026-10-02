@@ -4,103 +4,49 @@
  * @see specs/features/simulation-runs-batch-filter.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  databaseUrl,
+  simulationRunRow,
+  useSimulationClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-batch-completion-${nanoid()}`;
-const now = Date.now();
 
+/** A completion row: its status and run id are the point, it carries no messages or criteria. */
 function makeRunRow({
   scenarioSetId,
   batchRunId,
   status = "SUCCESS",
   scenarioRunId = `run-${nanoid()}`,
-  startedAt = new Date(now - 5000),
 }: {
   scenarioSetId: string;
   batchRunId: string;
   status?: string;
   scenarioRunId?: string;
-  startedAt?: Date;
 }) {
   return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
+    ...simulationRunRow({ tenantId, scenarioSetId, batchRunId, metadata: null }),
     ScenarioRunId: scenarioRunId,
-    ScenarioId: `scenario-${nanoid()}`,
-    BatchRunId: batchRunId,
-    ScenarioSetId: scenarioSetId,
-    Version: "v1",
     Status: status,
-    Name: "Refund Flow",
-    Description: null,
-    Metadata: null,
     "Messages.Id": [],
     "Messages.Role": [],
     "Messages.Content": [],
     "Messages.TraceId": [],
     "Messages.Rest": [],
-    TraceIds: [],
-    Verdict: "success",
     Reasoning: null,
     MetCriteria: [],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: "1500",
-    StartedAt: startedAt,
-    CreatedAt: startedAt,
-    UpdatedAt: new Date(startedAt.getTime() + 1000),
-    FinishedAt: new Date(startedAt.getTime() + 1000),
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: new Date(0),
   };
 }
 
-let client: ClickHouseClient | undefined;
-let repo: SimulationClickHouseRepository;
-
-async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
-  if (!client) throw new Error("ClickHouse integration environment is unavailable");
-  await client.insert({
-    table: "simulation_runs",
-    values: rows,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
-
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-  repo = SimulationClickHouseRepository.create(async () => client!);
-});
-
-afterAll(async () => {
-  if (!client) return;
-  await client.exec({
-    query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-    query_params: { tenantId },
-  });
-  await client.close();
-  client = undefined;
-});
+const ch = useSimulationClickHouse({ tenantId });
 
 async function seedBatch(statuses: string[]) {
   const scenarioSetId = `set-${nanoid()}`;
   const batchRunId = `batch-${nanoid()}`;
-  await insertRows(statuses.map((status) => makeRunRow({ scenarioSetId, batchRunId, status })));
+  await ch.insertRows(statuses.map((status) => makeRunRow({ scenarioSetId, batchRunId, status })));
   return { scenarioSetId, batchRunId };
 }
 
@@ -111,7 +57,7 @@ describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
       it("counts the queued run as running and the finished one as settled", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await ch.repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.totalCount).toBe(2);
         expect(summary?.runningCount).toBe(1);
@@ -122,7 +68,7 @@ describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
       it("leaves allCompletedAt null while the queued run waits", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await ch.repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.allCompletedAt).toBeNull();
       });
@@ -135,7 +81,7 @@ describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
       it("settles every run and carries a completion timestamp", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
 
-        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await ch.repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.runningCount).toBe(0);
         expect(summary?.settledCount).toBe(summary?.totalCount);
@@ -154,12 +100,12 @@ describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
         const batchRunId = `batch-only-${nanoid()}`;
         const wantedRunId = `run-only-${nanoid()}`;
 
-        await insertRows([
+        await ch.insertRows([
           makeRunRow({ scenarioSetId, batchRunId, scenarioRunId: wantedRunId }),
           makeRunRow({ scenarioSetId, batchRunId: `batch-other-${nanoid()}` }),
         ]);
 
-        const result = await repo.findRunDataForBatchRun({ projectId: tenantId, batchRunId });
+        const result = await ch.repo.findRunDataForBatchRun({ projectId: tenantId, batchRunId });
 
         expect(result.changed).toBe(true);
         if (!result.changed) throw new Error("expected changed");
@@ -174,7 +120,7 @@ describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
         const batchRunId = `batch-both-${nanoid()}`;
         const wantedRunId = `run-both-${nanoid()}`;
 
-        await insertRows([
+        await ch.insertRows([
           makeRunRow({ scenarioSetId, batchRunId, scenarioRunId: wantedRunId }),
           makeRunRow({
             scenarioSetId: `set-elsewhere-${nanoid()}`,
@@ -182,7 +128,7 @@ describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
           }),
         ]);
 
-        const result = await repo.findRunDataForBatchRun({
+        const result = await ch.repo.findRunDataForBatchRun({
           projectId: tenantId,
           scenarioSetId,
           batchRunId,
@@ -205,7 +151,7 @@ describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
         const legacyDefaultRunId = `run-legacy-default-${nanoid()}`;
         const namedDefaultRunId = `run-named-default-${nanoid()}`;
 
-        await insertRows([
+        await ch.insertRows([
           makeRunRow({ scenarioSetId: "", batchRunId, scenarioRunId: legacyDefaultRunId }),
           makeRunRow({
             scenarioSetId: "default",
@@ -215,7 +161,7 @@ describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
           makeRunRow({ scenarioSetId: `set-named-${nanoid()}`, batchRunId }),
         ]);
 
-        const result = await repo.findRunDataForBatchRun({
+        const result = await ch.repo.findRunDataForBatchRun({
           projectId: tenantId,
           scenarioSetId: "",
           batchRunId,

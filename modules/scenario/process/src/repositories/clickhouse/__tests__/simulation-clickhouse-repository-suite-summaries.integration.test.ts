@@ -4,97 +4,19 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  databaseUrl,
+  simulationRunRow,
+  useSimulationClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-suite-results-${nanoid()}`;
-const now = Date.now();
 
-function makeRunRow({
-  scenarioSetId,
-  batchRunId,
-  metadata,
-  startedAt = new Date(now - 5000),
-}: {
-  scenarioSetId: string;
-  batchRunId: string;
-  metadata: Record<string, unknown> | null;
-  startedAt?: Date;
-}) {
-  return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    ScenarioRunId: `run-${nanoid()}`,
-    ScenarioId: `scenario-${nanoid()}`,
-    BatchRunId: batchRunId,
-    ScenarioSetId: scenarioSetId,
-    Version: "v1",
-    Status: "SUCCESS",
-    Name: "Refund Flow",
-    Description: null,
-    Metadata: metadata === null ? null : JSON.stringify(metadata),
-    "Messages.Id": ["msg-1"],
-    "Messages.Role": ["user"],
-    "Messages.Content": ["hello"],
-    "Messages.TraceId": ["trace-1"],
-    "Messages.Rest": ["{}"],
-    TraceIds: [],
-    Verdict: "success",
-    Reasoning: "All good",
-    MetCriteria: ["criterion-1"],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: "1500",
-    StartedAt: startedAt,
-    CreatedAt: startedAt,
-    UpdatedAt: new Date(startedAt.getTime() + 1000),
-    FinishedAt: new Date(startedAt.getTime() + 1000),
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: new Date(0),
-  };
-}
-
-let client: ClickHouseClient | undefined;
-let repo: SimulationClickHouseRepository;
-
-async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
-  if (!client) throw new Error("ClickHouse integration environment is unavailable");
-  await client.insert({
-    table: "simulation_runs",
-    values: rows,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
-
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-  repo = SimulationClickHouseRepository.create(async () => client!);
-});
-
-afterAll(async () => {
-  if (!client) return;
-  await client.exec({
-    query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-    query_params: { tenantId },
-  });
-  await client.close();
-  client = undefined;
-});
+const ch = useSimulationClickHouse({ tenantId });
 
 describe.skipIf(databaseUrl === null)("a test suite's runs in the results view", () => {
   describe("when a test suite's internal run set holds a finished batch", () => {
@@ -102,11 +24,16 @@ describe.skipIf(databaseUrl === null)("a test suite's runs in the results view",
     it("lists the run plan that run resolved among the internal suite sets", async () => {
       const testSuiteId = `suite-${nanoid(6)}`;
       const setId = getSuiteSetId(testSuiteId);
-      await insertRows([
-        makeRunRow({ scenarioSetId: setId, batchRunId: `batch-${nanoid(6)}`, metadata: null }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId: setId,
+          batchRunId: `batch-${nanoid(6)}`,
+          metadata: null,
+        }),
       ]);
 
-      const summaries = await repo.findInternalSuiteSummaries({ projectId: tenantId });
+      const summaries = await ch.repo.findInternalSuiteSummaries({ projectId: tenantId });
 
       const suiteSummary = summaries.find((summary) => summary.scenarioSetId === setId);
       expect(suiteSummary).toBeDefined();
@@ -118,12 +45,22 @@ describe.skipIf(databaseUrl === null)("a test suite's runs in the results view",
       const testSuiteId = `suite-open-${nanoid(6)}`;
       const setId = getSuiteSetId(testSuiteId);
       const batchRunId = `batch-open-${nanoid(6)}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId: setId, batchRunId, metadata: null }),
-        makeRunRow({ scenarioSetId: setId, batchRunId, metadata: null }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId: setId,
+          batchRunId,
+          metadata: null,
+        }),
+        simulationRunRow({
+          tenantId,
+          scenarioSetId: setId,
+          batchRunId,
+          metadata: null,
+        }),
       ]);
 
-      const history = await repo.listBatchHistoryForScenarioSet({
+      const history = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId: setId,
         limit: 10,
@@ -140,11 +77,16 @@ describe.skipIf(databaseUrl === null)("a test suite's runs in the results view",
     /** @scenario "A test suite run appears in the results view under the test suite's name" */
     it("keeps the suite's set out of the external sets the Simulations pages read", async () => {
       const setId = getSuiteSetId(`suite-external-${nanoid(6)}`);
-      await insertRows([
-        makeRunRow({ scenarioSetId: setId, batchRunId: `batch-ext-${nanoid(6)}`, metadata: null }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId: setId,
+          batchRunId: `batch-ext-${nanoid(6)}`,
+          metadata: null,
+        }),
       ]);
 
-      const external = await repo.findExternalSetSummaries({ projectId: tenantId });
+      const external = await ch.repo.findExternalSetSummaries({ projectId: tenantId });
 
       expect(external.map((summary) => summary.scenarioSetId)).not.toContain(setId);
     });

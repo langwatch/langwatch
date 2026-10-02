@@ -5,96 +5,19 @@
  * @see specs/suites/run-note-metadata-convention.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  databaseUrl,
+  simulationRunRow,
+  useSimulationClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-run-note-${nanoid()}`;
-const now = Date.now();
 
-function makeRunRow({
-  scenarioSetId,
-  batchRunId,
-  metadata,
-  startedAt = new Date(now - 5000),
-}: {
-  scenarioSetId: string;
-  batchRunId: string;
-  metadata: Record<string, unknown> | null;
-  startedAt?: Date;
-}) {
-  return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    ScenarioRunId: `run-${nanoid()}`,
-    ScenarioId: `scenario-${nanoid()}`,
-    BatchRunId: batchRunId,
-    ScenarioSetId: scenarioSetId,
-    Version: "v1",
-    Status: "SUCCESS",
-    Name: "Refund Flow",
-    Description: null,
-    Metadata: metadata === null ? null : JSON.stringify(metadata),
-    "Messages.Id": ["msg-1"],
-    "Messages.Role": ["user"],
-    "Messages.Content": ["hello"],
-    "Messages.TraceId": ["trace-1"],
-    "Messages.Rest": ["{}"],
-    TraceIds: [],
-    Verdict: "success",
-    Reasoning: "All good",
-    MetCriteria: ["criterion-1"],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: "1500",
-    StartedAt: startedAt,
-    CreatedAt: startedAt,
-    UpdatedAt: new Date(startedAt.getTime() + 1000),
-    FinishedAt: new Date(startedAt.getTime() + 1000),
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: new Date(0),
-  };
-}
-
-let client: ClickHouseClient | undefined;
-let repo: SimulationClickHouseRepository;
-
-async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
-  if (!client) throw new Error("ClickHouse integration environment is unavailable");
-  await client.insert({
-    table: "simulation_runs",
-    values: rows,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
-
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-  repo = SimulationClickHouseRepository.create(async () => client!);
-});
-
-afterAll(async () => {
-  if (!client) return;
-  await client.exec({
-    query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-    query_params: { tenantId },
-  });
-  await client.close();
-  client = undefined;
-});
+const ch = useSimulationClickHouse({ tenantId });
 
 describe.skipIf(databaseUrl === null)("the note of a batch", () => {
   describe("when every run of the batch carries the same note", () => {
@@ -102,20 +25,22 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports the note on the batch in the history page", async () => {
       const scenarioSetId = `set-note-${nanoid()}`;
       const batchRunId = `batch-note-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "switched judge to the stricter criterion" },
         }),
-        makeRunRow({
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "switched judge to the stricter criterion" },
         }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -129,15 +54,16 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports the note on the summary of that one batch", async () => {
       const scenarioSetId = `set-note-summary-${nanoid()}`;
       const batchRunId = `batch-note-summary-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "nightly regression" },
         }),
       ]);
 
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -151,15 +77,16 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports no note in the history page", async () => {
       const scenarioSetId = `set-no-note-${nanoid()}`;
       const batchRunId = `batch-no-note-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { parameters: { account_tier: "gold" } },
         }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -173,9 +100,16 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports no note on the summary of that one batch", async () => {
       const scenarioSetId = `set-no-note-summary-${nanoid()}`;
       const batchRunId = `batch-no-note-summary-${nanoid()}`;
-      await insertRows([makeRunRow({ scenarioSetId, batchRunId, metadata: null })]);
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: null,
+        }),
+      ]);
 
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -188,16 +122,22 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports the first note it finds in the history page", async () => {
       const scenarioSetId = `set-mixed-note-${nanoid()}`;
       const batchRunId = `batch-mixed-note-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId, metadata: null }),
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: null,
+        }),
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "retry after the timeout fix" },
         }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -210,16 +150,22 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
     it("reports that note on the summary of that one batch", async () => {
       const scenarioSetId = `set-mixed-note-summary-${nanoid()}`;
       const batchRunId = `batch-mixed-note-summary-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId, metadata: null }),
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: null,
+        }),
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "retry after the timeout fix" },
         }),
       ]);
 
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -234,16 +180,22 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
       const scenarioSetId = `set-some-notes-${nanoid()}`;
       const noted = `batch-noted-${nanoid()}`;
       const unnoted = `batch-unnoted-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId: noted,
           metadata: { note: "before the criterion change" },
         }),
-        makeRunRow({ scenarioSetId, batchRunId: unnoted, metadata: null }),
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId: unnoted,
+          metadata: null,
+        }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -263,15 +215,16 @@ describe.skipIf(databaseUrl === null)("a batch produced by an SDK or CI run", ()
     it("reports the note for a set that has no run plan behind it", async () => {
       const scenarioSetId = `ci-nightly-${nanoid()}`;
       const batchRunId = `batch-external-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "abc1234", environment: "staging" },
         }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -285,14 +238,15 @@ describe.skipIf(databaseUrl === null)("a batch produced by an SDK or CI run", ()
     it("keeps the note and the other metadata keys the caller set", async () => {
       const scenarioSetId = `ci-kept-${nanoid()}`;
       const batchRunId = `batch-kept-${nanoid()}`;
-      const row = makeRunRow({
+      const row = simulationRunRow({
+        tenantId,
         scenarioSetId,
         batchRunId,
         metadata: { note: "abc1234", environment: "staging", attempt: 2 },
       });
-      await insertRows([row]);
+      await ch.insertRows([row]);
 
-      const run = await repo.findScenarioRunData({
+      const run = await ch.repo.findScenarioRunData({
         projectId: tenantId,
         scenarioRunId: row.ScenarioRunId,
       });
@@ -312,8 +266,9 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
     it("reads the note only in the query already bounded to the page", async () => {
       const scenarioSetId = `set-bounded-${nanoid()}`;
       const batchRunId = `batch-bounded-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { note: "nightly regression" },
@@ -321,7 +276,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
       ]);
 
       const captured: string[] = [];
-      const recordingClient = new Proxy(client!, {
+      const recordingClient = new Proxy(ch.client, {
         get(target, prop, receiver) {
           if (prop === "query") {
             return (args: { query: string }) => {

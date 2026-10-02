@@ -5,64 +5,17 @@
  * @see specs/scenarios/run-actor-on-runs.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  databaseUrl,
+  simulationRunRow,
+  useSimulationClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-run-actor-${nanoid()}`;
-const now = Date.now();
-
-function makeRunRow({
-  scenarioSetId,
-  batchRunId,
-  metadata,
-  startedAt = new Date(now - 5000),
-}: {
-  scenarioSetId: string;
-  batchRunId: string;
-  metadata: Record<string, unknown> | null;
-  startedAt?: Date;
-}) {
-  return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    ScenarioRunId: `run-${nanoid()}`,
-    ScenarioId: `scenario-${nanoid()}`,
-    BatchRunId: batchRunId,
-    ScenarioSetId: scenarioSetId,
-    Version: "v1",
-    Status: "SUCCESS",
-    Name: "Refund Flow",
-    Description: null,
-    Metadata: metadata === null ? null : JSON.stringify(metadata),
-    "Messages.Id": ["msg-1"],
-    "Messages.Role": ["user"],
-    "Messages.Content": ["hello"],
-    "Messages.TraceId": ["trace-1"],
-    "Messages.Rest": ["{}"],
-    TraceIds: [],
-    Verdict: "success",
-    Reasoning: "All good",
-    MetCriteria: ["criterion-1"],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: "1500",
-    StartedAt: startedAt,
-    CreatedAt: startedAt,
-    UpdatedAt: new Date(startedAt.getTime() + 1000),
-    FinishedAt: new Date(startedAt.getTime() + 1000),
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: new Date(0),
-  };
-}
 
 /** The reserved namespace of a run started by a person. */
 function startedBy(id: string, label: string) {
@@ -76,37 +29,7 @@ function startedBy(id: string, label: string) {
   };
 }
 
-let client: ClickHouseClient | undefined;
-let repo: SimulationClickHouseRepository;
-
-async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
-  if (!client) throw new Error("ClickHouse integration environment is unavailable");
-  await client.insert({
-    table: "simulation_runs",
-    values: rows,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
-
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-  repo = SimulationClickHouseRepository.create(async () => client!);
-});
-
-afterAll(async () => {
-  if (!client) return;
-  await client.exec({
-    query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-    query_params: { tenantId },
-  });
-  await client.close();
-  client = undefined;
-});
+const ch = useSimulationClickHouse({ tenantId });
 
 describe.skipIf(databaseUrl === null)("who started a batch", () => {
   describe("when every run of the batch names the same person", () => {
@@ -114,12 +37,22 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
     it("reports that person on the batch in the history page", async () => {
       const scenarioSetId = `set-actor-${nanoid()}`;
       const batchRunId = `batch-actor-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_lena", "user") }),
-        makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_lena", "user") }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: startedBy("user_lena", "user"),
+        }),
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: startedBy("user_lena", "user"),
+        }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -133,11 +66,16 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
     it("reports that person on the summary of that one batch", async () => {
       const scenarioSetId = `set-actor-summary-${nanoid()}`;
       const batchRunId = `batch-actor-summary-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_omar", "cli") }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: startedBy("user_omar", "cli"),
+        }),
       ]);
 
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -151,20 +89,21 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
     it("reports no actor in the history page and on the summary", async () => {
       const scenarioSetId = `set-no-actor-${nanoid()}`;
       const batchRunId = `batch-no-actor-${nanoid()}`;
-      await insertRows([
-        makeRunRow({
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
           scenarioSetId,
           batchRunId,
           metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "http" } },
         }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
       });
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -178,14 +117,21 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
     it("reports no actor for a batch recorded with no metadata at all", async () => {
       const scenarioSetId = `set-null-actor-${nanoid()}`;
       const batchRunId = `batch-null-actor-${nanoid()}`;
-      await insertRows([makeRunRow({ scenarioSetId, batchRunId, metadata: null })]);
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: null,
+        }),
+      ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
       });
-      const summary = await repo.findBatchSummary({
+      const summary = await ch.repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -202,12 +148,22 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
       const scenarioSetId = `set-mixed-actor-${nanoid()}`;
       const named = `batch-named-${nanoid()}`;
       const unnamed = `batch-unnamed-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId: named, metadata: startedBy("user_lena", "user") }),
-        makeRunRow({ scenarioSetId, batchRunId: unnamed, metadata: null }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId: named,
+          metadata: startedBy("user_lena", "user"),
+        }),
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId: unnamed,
+          metadata: null,
+        }),
       ]);
 
-      const result = await repo.listBatchHistoryForScenarioSet({
+      const result = await ch.repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -226,12 +182,17 @@ describe.skipIf(databaseUrl === null)("the cost of reading who started a batch",
     it("reads the actor only in the query already bounded to the page", async () => {
       const scenarioSetId = `set-actor-bounded-${nanoid()}`;
       const batchRunId = `batch-actor-bounded-${nanoid()}`;
-      await insertRows([
-        makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_lena", "user") }),
+      await ch.insertRows([
+        simulationRunRow({
+          tenantId,
+          scenarioSetId,
+          batchRunId,
+          metadata: startedBy("user_lena", "user"),
+        }),
       ]);
 
       const captured: string[] = [];
-      const recordingClient = new Proxy(client!, {
+      const recordingClient = new Proxy(ch.client, {
         get(target, prop, receiver) {
           if (prop === "query") {
             return (args: { query: string }) => {
