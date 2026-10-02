@@ -407,6 +407,13 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then the provider receives the decoded JSON body
       And the forwarded upstream headers carry no "Content-Encoding"
 
+    @unit
+    Scenario: the passthrough lane never forwards a key query parameter
+      Given a valid VK
+      When I call /v1beta/models/gemini-2.5-flash:streamGenerateContent with the query "alt=sse;x=1&key=<vk>"
+      Then the provider receives the query "alt=sse;x=1"
+      And every other query byte reaches the provider exactly as sent
+
     @integration
     Scenario: a content coding the gateway cannot decode is a bad request
       Given a valid VK

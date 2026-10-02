@@ -174,6 +174,9 @@ type entry struct {
 	// in-flight guard so at most one background config fetch runs per entry.
 	configFetchedAt  time.Time
 	configRefreshing bool
+	// authRefreshing is the same guard for the near-expiry auth refresh:
+	// at most one background ResolveKey per entry.
+	authRefreshing bool
 	// configConfirmedAt is the last time the control plane actually answered
 	// for this config (a fetch or a 304). Failures never stamp it; it is what
 	// bounds the last-known fallback.
@@ -300,6 +303,24 @@ func (e *entry) tryBeginConfigRefresh() bool {
 	}
 	e.configRefreshing = true
 	return true
+}
+
+// tryBeginAuthRefresh claims the per-entry auth-refresh slot.
+func (e *entry) tryBeginAuthRefresh() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.authRefreshing {
+		return false
+	}
+	e.authRefreshing = true
+	return true
+}
+
+// endAuthRefresh releases the auth-refresh slot.
+func (e *entry) endAuthRefresh() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.authRefreshing = false
 }
 
 // endConfigRefresh releases the slot and stamps configFetchedAt so a
@@ -604,7 +625,9 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		// Serve, maybe trigger background refresh on near-expiry.
 		s.recordHit()
 		if e.nearSoftExpiry(s.refreshThreshold) {
-			go s.refreshBackground(lk.key, lk.hash) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			if e.tryBeginAuthRefresh() {
+				go s.refreshBackground(lk.key, lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			}
 		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		}
@@ -1023,53 +1046,86 @@ func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard 
 // embeds its own short pause server-side so a transient control-plane
 // blip just produces a few quick retry passes here, not a tight spin.
 func (s *Service) changeFeedLoop(ctx context.Context) {
+	// One long-poll loop per active org, so a revoke reaches the cache in one
+	// poll's time however many orgs this node serves.
+	started := map[string]bool{}
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
 	for {
+		s.activeOrgs.Range(func(key, value any) bool {
+			orgID, _ := key.(string)
+			cursor, _ := value.(*orgCursor)
+			if !started[orgID] {
+				started[orgID] = true
+				go s.orgChangeFeedLoop(ctx, orgID, cursor)
+			}
+			return true
+		})
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.stopCh:
 			return
-		default:
+		case <-tick.C:
 		}
-		s.activeOrgs.Range(func(key, value any) bool {
-			orgID, _ := key.(string)
-			cursor, _ := value.(*orgCursor)
-			changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
-			if err != nil {
-				s.logger.Warn("change_feed_poll_failed",
-					zap.String("organization_id", orgID),
-					zap.Error(err),
-				)
-				// Tiny pause so a tight error loop doesn't burn CPU
-				// when the control plane is down. Server long-poll is
-				// the primary brake for the success path.
-				time.Sleep(2 * time.Second)
-				return true
-			}
-			for _, ch := range changes {
-				s.applyChange(orgID, ch)
-			}
-			if nextRev != "" {
-				cursor.since = nextRev
-			}
-			return true
-		})
-		// If no orgs are active yet (first request hasn't landed), back
-		// off briefly so we don't spin on Range() over an empty map.
-		empty := true
-		s.activeOrgs.Range(func(_, _ any) bool {
-			empty = false
-			return false
-		})
-		if empty {
-			select {
-			case <-ctx.Done():
-				return
-			case <-s.stopCh:
-				return
-			case <-time.After(5 * time.Second):
-			}
+	}
+}
+
+// orgChangeFeedLoop long-polls one org's change feed until the service stops.
+// The cursor is touched only by this goroutine.
+func (s *Service) orgChangeFeedLoop(ctx context.Context, orgID string, cursor *orgCursor) {
+	for !s.isStopping(ctx) {
+		err := s.pollOrgChanges(ctx, orgID, cursor)
+		if err == nil {
+			continue
 		}
+		s.logger.Warn("change_feed_poll_failed",
+			zap.String("organization_id", orgID),
+			zap.Error(err),
+		)
+		// Pause so a down control plane is not polled in a tight loop.
+		if !s.waitUnlessStopping(ctx, 2*time.Second) {
+			return
+		}
+	}
+}
+
+// pollOrgChanges runs one long poll for an org and applies what it returns.
+func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgCursor) error {
+	changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
+	if err != nil {
+		return err
+	}
+	for _, ch := range changes {
+		s.applyChange(orgID, ch)
+	}
+	if nextRev != "" {
+		cursor.since = nextRev
+	}
+	return nil
+}
+
+// isStopping reports, without blocking, whether the service is shutting down.
+func (s *Service) isStopping(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	case <-s.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
+// waitUnlessStopping waits for d and reports false if the service stops first.
+func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-s.stopCh:
+		return false
+	case <-time.After(d):
+		return true
 	}
 }
 
@@ -1248,7 +1304,8 @@ func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
 // fire-and-forget when the entry has less than RefreshThreshold left
 // before softExpiresAt. Same classification as foreground:
 // AuthRejection evicts; TransportFailure bumps the existing entry.
-func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
+func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started *entry) {
+	defer started.endAuthRefresh()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	bundle, err := s.resolver.ResolveKey(ctx, key)
@@ -1267,6 +1324,12 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
 			// poison a perfectly healthy cache entry into answering
 			// no_provider_configured until expiry.
 			s.bumpEntryAfterTransportFailure(h, cfgErr)
+			return
+		}
+		// Same guard as refreshConfigBackground: an entry evicted or replaced
+		// while the refresh was in flight stays gone.
+		if cur, ok := s.l1.Peek(h); !ok || cur != started {
+			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
 		s.storeL1(h, bundle, etag)

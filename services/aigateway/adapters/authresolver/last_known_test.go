@@ -290,7 +290,7 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		h := hashKey(domain.PresentedKey{Token: rawKey})
 		svc.storeL1(h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
 
-		svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
+		refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
 		_, ok := svc.l1.Peek(h)
 		assert.False(t, ok, "a deleted key is evicted by the background refresh too")

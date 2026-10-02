@@ -624,7 +624,7 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	beforeE, _ := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	_, beforeSoft, _ := beforeE.snapshot()
 
-	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
 
 	afterE, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	if !ok {
@@ -656,7 +656,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 	originalExp := time.Now().Add(30 * time.Second)
 	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgrevoked", originalExp), "")
 
-	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
 
 	if _, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 		t.Fatal("entry should be evicted on background auth-rejection")

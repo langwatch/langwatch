@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -1241,7 +1242,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 		meta := domain.PassthroughRequest{
 			Method:   r.Method,
 			Path:     path,
-			RawQuery: r.URL.RawQuery,
+			RawQuery: forwardedPassthroughQuery(r.URL.RawQuery),
 			Headers:  forwardedPassthroughHeaders(r.Header),
 			Stream:   isStream,
 		}
@@ -1296,7 +1297,7 @@ func geminiModelFromPath(path string) string {
 }
 
 // forwardedPassthroughHeaders selects client headers safe to forward
-// upstream. Authorization + x-api-key + x-goog-api-key are dropped (the
+// upstream. Every header a virtual key may arrive in, and cookies, are dropped (the
 // gateway already resolved the VK secret and Bifrost injects the real
 // provider key). Hop-by-hop headers are dropped per RFC 7230 §6.1.
 func forwardedPassthroughHeaders(h http.Header) map[string]string {
@@ -1312,6 +1313,9 @@ func forwardedPassthroughHeaders(h http.Header) map[string]string {
 		case "authorization",
 			"x-api-key",
 			"x-goog-api-key",
+			"xi-api-key",
+			"cookie",
+			"x-langwatch-instance",
 			"host",
 			"content-length",
 			"connection",
@@ -1327,6 +1331,40 @@ func forwardedPassthroughHeaders(h http.Header) map[string]string {
 		out[k] = vals[0]
 	}
 	return out
+}
+
+// forwardedPassthroughQuery drops every `key` parameter, where a client may
+// carry its virtual key; the provider's real key is injected upstream. Both
+// `&` and `;` separate pairs, and every other byte is forwarded as sent.
+func forwardedPassthroughQuery(raw string) string {
+	var b strings.Builder
+	sep, rest, kept := "", raw, false
+	for {
+		i := strings.IndexAny(rest, "&;")
+		segment := rest
+		if i >= 0 {
+			segment = rest[:i]
+		}
+		if !namesKeyParameter(segment) {
+			if kept {
+				b.WriteString(sep)
+			}
+			b.WriteString(segment)
+			kept = true
+		}
+		if i < 0 {
+			return b.String()
+		}
+		sep, rest = rest[i:i+1], rest[i+1:]
+	}
+}
+
+// namesKeyParameter reports whether a query pair is named `key` in any case or
+// escaping. A name that does not unescape is treated as one, so it is dropped.
+func namesKeyParameter(segment string) bool {
+	name, _, _ := strings.Cut(segment, "=")
+	unescaped, err := url.QueryUnescape(name)
+	return err != nil || strings.EqualFold(unescaped, "key")
 }
 
 func modelsHandler(deps RouterDeps) http.HandlerFunc {
