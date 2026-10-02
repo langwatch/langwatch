@@ -1,5 +1,6 @@
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 import { lambdaFetch } from "../../utils/lambdaFetch";
+import { nlpgoInternalHeaders } from "./internalSecret";
 
 /**
  * Origin tag for the X-LangWatch-Origin header. Set at the request
@@ -112,8 +113,9 @@ export interface NLPGOFetchResult<T> {
  * Send a request to the nlpgo service. nlpgo serves the Go engine under
  * the `/go` prefix, so the caller's `path` (e.g. "/studio/execute_sync")
  * is rewritten to "/go/studio/execute_sync" and tagged with
- * X-LangWatch-Origin. There is no auth on this hop: the TS app and nlpgo
- * share the Lambda function URL boundary.
+ * X-LangWatch-Origin. The hop carries the shared internal secret as
+ * X-LangWatch-NLP-Secret whenever LANGWATCH_NLP_INTERNAL_SECRET is set
+ * (see internalSecret.ts).
  *
  * Topic clustering runs on langevals, not nlpgo, so it MUST NOT call this
  * helper (see topicClustering.ts).
@@ -127,6 +129,7 @@ export async function nlpgoFetch<T = unknown>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
+    ...nlpgoInternalHeaders(),
   };
 
   // Causality depth: forwarded to nlpgo only when the caller is part of
