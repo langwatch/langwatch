@@ -1,19 +1,23 @@
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { EqualsIcon, LLMIcon, WeaviateIcon } from "@langwatch/design-system/icons";
+import { WeaviateIcon } from "@langwatch/design-system/icons";
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
-import { Bot, Database } from "lucide-react";
 import {
   BookOpen,
+  Bot,
   Box as BoxIcon,
-  Check,
-  Code,
+  CodeXml,
+  Database,
+  Equal,
   Flag,
   GitBranch,
   Globe,
-  Home,
+  type LucideIcon,
+  MessageSquareText,
+  Play,
   Shield,
-} from "react-feather";
+  Sparkles,
+  SquareCheck,
+} from "lucide-react";
 
 const sizeMap = {
   xs: "16px",
@@ -31,13 +35,14 @@ const fontSizeMap = {
   xl: "20px",
 };
 
+/** A node-kind tile: `colorPalette` tokens, after identity-provider-tile.tsx:72. */
 export function ColorfulBlockIcon({
-  color,
+  colorPalette,
   size,
   icon,
   ...props
 }: {
-  color: string;
+  colorPalette: StudioPalette;
   size: "xs" | "sm" | "md" | "lg" | "xl";
   icon: React.ReactNode;
 } & BoxProps) {
@@ -51,13 +56,14 @@ export function ColorfulBlockIcon({
 
   return (
     <Box
-      backgroundColor={color}
+      colorPalette={colorPalette}
+      backgroundColor="colorPalette.solid"
       borderRadius="4px"
       fontSize={fontSizeMap[size]}
       display="flex"
       alignItems="center"
       justifyContent="center"
-      color="white"
+      color="colorPalette.contrast"
       _icon={{
         padding: paddingMap[size],
         minWidth: sizeMap[size],
@@ -80,16 +86,11 @@ export function WorkflowIcon({
   icon: React.ReactNode;
   size: "xs" | "md" | "lg";
 } & BoxProps) {
-  const bgColor = useColorModeValue("#F2F4F8", "#19191d");
-  const dotColor = useColorModeValue("#E5E7EB", "#2e3038");
-  const reactflowBg = `<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="6" height="6" fill="${bgColor}"/>
-  <rect x="3" y="3" width="2" height="2" fill="${dotColor}"/>
-</svg>`;
-
   return (
     <Box
-      background={`url('data:image/svg+xml;utf8,${encodeURIComponent(reactflowBg)}')`}
+      backgroundColor="bg.subtle"
+      backgroundImage="radial-gradient(circle at 4px 4px, var(--chakra-colors-border) 1px, transparent 1px)"
+      backgroundSize="6px 6px"
       borderRadius="4px"
       border="1px solid"
       borderColor="border"
@@ -100,7 +101,7 @@ export function WorkflowIcon({
       display="flex"
       alignItems="center"
       justifyContent="center"
-      color="white"
+      color="fg"
       fontSize={fontSizeMap[size]}
       {...props}
     >
@@ -109,29 +110,38 @@ export function WorkflowIcon({
   );
 }
 
-export function EvaluatorIcon({ cls }: { cls?: string }) {
-  const iconMap: Record<string, React.ReactNode> = {
-    ExactMatchEvaluator: <EqualsIcon />,
-    "azure/prompt_injection": <Shield />,
-    "openai/moderation": <Shield />,
-  };
+export type StudioPalette =
+  | "blue"
+  | "purple"
+  | "cyan"
+  | "orange"
+  | "pink"
+  | "green"
+  | "teal"
+  | "yellow"
+  | "gray";
 
-  if (!iconMap[cls ?? ""]) {
-    return <Check />;
-  }
-  return iconMap[cls ?? ""];
-}
+/** The one map of node kind to icon and palette; studio surfaces read it via ComponentIcon. */
+const STUDIO_NODE_KINDS: Record<ComponentType, { icon: LucideIcon; palette: StudioPalette }> = {
+  signature: { icon: MessageSquareText, palette: "blue" },
+  code: { icon: CodeXml, palette: "purple" },
+  http: { icon: Globe, palette: "cyan" },
+  if_else: { icon: GitBranch, palette: "orange" },
+  agent: { icon: Bot, palette: "pink" },
+  evaluator: { icon: SquareCheck, palette: "green" },
+  retriever: { icon: BookOpen, palette: "teal" },
+  prompting_technique: { icon: Sparkles, palette: "yellow" },
+  entry: { icon: Play, palette: "gray" },
+  end: { icon: Flag, palette: "gray" },
+  custom: { icon: BoxIcon, palette: "gray" },
+};
 
-export function RetrieverIcon({ cls }: { cls?: string }) {
-  const iconMap: Record<string, React.ReactNode> = {
-    WeaviateRM: <WeaviateIcon />,
-  };
-
-  if (!iconMap[cls ?? ""]) {
-    return <BookOpen />;
-  }
-  return iconMap[cls ?? ""];
-}
+const CLASS_ICONS: Record<string, React.ReactNode> = {
+  ExactMatchEvaluator: <Equal />,
+  "azure/prompt_injection": <Shield />,
+  "openai/moderation": <Shield />,
+  WeaviateRM: <WeaviateIcon />,
+};
 
 export const ComponentIcon = ({
   type,
@@ -144,46 +154,17 @@ export const ComponentIcon = ({
   size: "xs" | "md" | "lg";
   behave_as?: "evaluator";
 }) => {
-  const componentIconMap: Record<ComponentType, React.ReactNode> = {
-    signature: <LLMIcon />,
-    entry: <Home />,
-    code: <Code />,
-    http: <Globe />,
-    agent: <Bot size={16} />,
-    retriever: <RetrieverIcon cls={cls} />,
-    prompting_technique: <BoxIcon />,
-    evaluator: <EvaluatorIcon cls={cls} />,
-    end: <Flag />,
-    custom: <BoxIcon />,
-    if_else: <GitBranch />,
-  };
+  const kind = STUDIO_NODE_KINDS[behave_as ?? type];
+  const Icon = STUDIO_NODE_KINDS[type].icon;
+  const icon = CLASS_ICONS[cls ?? ""] ?? <Icon />;
 
-  const componentColorMap: Record<ComponentType, string> = {
-    signature: "green.emphasized",
-    entry: "blue.emphasized",
-    code: "cyan.emphasized",
-    http: "orange.emphasized",
-    agent: "purple.emphasized",
-    retriever: "purple.emphasized",
-    prompting_technique: "teal.emphasized",
-    evaluator: "green.emphasized",
-    end: "orange.emphasized",
-    custom: "gray.emphasized",
-    if_else: "yellow.emphasized",
-  };
-
-  let color = componentColorMap[type];
-  if (behave_as === "evaluator") {
-    color = "green.solid";
-  }
-
-  return <ColorfulBlockIcon color={color} size={size} icon={componentIconMap[type]} />;
+  return <ColorfulBlockIcon colorPalette={kind.palette} size={size} icon={icon} />;
 };
 
 /** A variable source's icon, for the prompt kit's `renderSourceIcon` prop. */
 export function renderSourceTypeIcon(type: SourceType): React.ReactNode {
   if (type === "dataset") {
-    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
+    return <ColorfulBlockIcon colorPalette="blue" size="xs" icon={<Database />} />;
   }
   return <ComponentIcon type={type} size="xs" />;
 }

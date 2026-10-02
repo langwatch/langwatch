@@ -1,4 +1,3 @@
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { WeaviateIcon } from "@langwatch/design-system/icons";
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
@@ -87,16 +86,11 @@ export function WorkflowIcon({
   icon: React.ReactNode;
   size: "xs" | "md" | "lg";
 } & BoxProps) {
-  const bgColor = useColorModeValue("#F2F4F8", "#19191d");
-  const dotColor = useColorModeValue("#E5E7EB", "#2e3038");
-  const reactflowBg = `<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="6" height="6" fill="${bgColor}"/>
-  <rect x="3" y="3" width="2" height="2" fill="${dotColor}"/>
-</svg>`;
-
   return (
     <Box
-      background={`url('data:image/svg+xml;utf8,${encodeURIComponent(reactflowBg)}')`}
+      backgroundColor="bg.subtle"
+      backgroundImage="radial-gradient(circle at 4px 4px, var(--chakra-colors-border) 1px, transparent 1px)"
+      backgroundSize="6px 6px"
       borderRadius="4px"
       border="1px solid"
       borderColor="border"
@@ -107,7 +101,7 @@ export function WorkflowIcon({
       display="flex"
       alignItems="center"
       justifyContent="center"
-      color="white"
+      color="fg"
       fontSize={fontSizeMap[size]}
       {...props}
     >
@@ -116,7 +110,7 @@ export function WorkflowIcon({
   );
 }
 
-type StudioPalette =
+export type StudioPalette =
   | "blue"
   | "purple"
   | "cyan"

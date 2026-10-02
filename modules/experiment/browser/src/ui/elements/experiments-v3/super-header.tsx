@@ -1,11 +1,11 @@
 import { HStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-import { ColorfulBlockIcon } from "../workflow/workflow-icons.tsx";
+import { ColorfulBlockIcon, type StudioPalette } from "../workflow/workflow-icons.tsx";
 
 type SuperHeaderProps = {
   colSpan: number;
-  color: string;
+  colorPalette: StudioPalette;
   icon: ReactNode;
   children: ReactNode;
   paddingLeft?: string;
@@ -17,7 +17,7 @@ type SuperHeaderProps = {
  */
 export function SuperHeader({
   colSpan,
-  color,
+  colorPalette,
   icon,
   children,
   paddingLeft = "12px",
@@ -35,7 +35,7 @@ export function SuperHeader({
       }}
     >
       <HStack gap={2}>
-        <ColorfulBlockIcon color={color} size="sm" icon={icon} />
+        <ColorfulBlockIcon colorPalette={colorPalette} size="sm" icon={icon} />
         {children}
       </HStack>
     </th>

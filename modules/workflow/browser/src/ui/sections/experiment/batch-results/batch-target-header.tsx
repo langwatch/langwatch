@@ -16,6 +16,7 @@ import {
   LuTriangleRight,
 } from "react-icons/lu";
 
+import { ColorfulBlockIcon, type StudioPalette } from "../../../elements/workflow-icons.tsx";
 import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
 import type { BatchTargetColumn } from "../batch-evaluation-results.types.ts";
 import {
@@ -332,11 +333,12 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
     return <LuFileText size={12} />;
   };
 
-  const getTargetColor = () => {
-    if (target.type === "prompt") return "green.emphasized";
-    if (target.type === "agent") return "cyan.emphasized";
-    if (target.type === "evaluator") return "green.emphasized";
-    return "gray.emphasized";
+  /** Palettes follow the studio node kinds in workflow-icons.tsx. */
+  const getTargetPalette = (): StudioPalette => {
+    if (target.type === "prompt") return "blue";
+    if (target.type === "agent") return "pink";
+    if (target.type === "evaluator") return "green";
+    return "gray";
   };
 
   return (
@@ -346,24 +348,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
         {colorIndicator && (
           <Box width="10px" height="10px" borderRadius="sm" bg={colorIndicator} flexShrink={0} />
         )}
-        <Box
-          backgroundColor={getTargetColor()}
-          borderRadius="4px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          color="white"
-          fontSize="12px"
-          _icon={{
-            padding: "2px",
-            minWidth: "16px",
-            minHeight: "16px",
-            maxWidth: "16px",
-            maxHeight: "16px",
-          }}
-        >
-          {getTargetIcon()}
-        </Box>
+        <ColorfulBlockIcon colorPalette={getTargetPalette()} size="xs" icon={getTargetIcon()} />
         <Text fontSize="13px" fontWeight="medium" truncate>
           {target.displayName ?? target.name}
         </Text>

@@ -58,7 +58,10 @@ import type {
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 import { VersionBadge } from "../../../elements/prompt/version-badge.tsx";
-import { ColorfulBlockIcon } from "../../../elements/workflow/workflow-icons.tsx";
+import {
+  ColorfulBlockIcon,
+  type StudioPalette,
+} from "../../../elements/workflow/workflow-icons.tsx";
 import { TargetSummary } from "./target-summary.tsx";
 
 /**
@@ -223,11 +226,22 @@ const useShowsOlderVersion = (target: TargetConfig): boolean => {
   );
 };
 
-/** The header's accent: purple for a comparison, green for prompts and evaluators, else cyan. */
-const targetColorOf = (target: TargetConfig): string => {
-  if (target.type === "evaluator" && isComparisonEvaluator(target)) return "purple.emphasized";
-  if (target.type === "prompt" || target.type === "evaluator") return "green.emphasized";
-  return "cyan.emphasized";
+/** Agent palettes follow the studio node kinds in workflow-icons.tsx. */
+const AGENT_TYPE_PALETTES: Record<AgentTypeEnum, StudioPalette> = {
+  code: "purple",
+  signature: "blue",
+  http: "cyan",
+  workflow: "pink",
+  connected: "pink",
+};
+
+/** The header's accent: the studio node kind's palette; a comparison stays purple. */
+const targetPaletteOf = (target: TargetConfig): StudioPalette => {
+  if (target.type === "evaluator") return isComparisonEvaluator(target) ? "purple" : "green";
+  if (target.type === "prompt") return "blue";
+  if (target.type === "workflow") return "pink";
+  if (target.type === "agent" && target.agentType) return AGENT_TYPE_PALETTES[target.agentType];
+  return "purple";
 };
 
 /**
@@ -395,7 +409,7 @@ export const TargetHeader = memo(function TargetHeader({
             data-target-name={headerName}
           >
             <ColorfulBlockIcon
-              color={targetColorOf(target)}
+              colorPalette={targetPaletteOf(target)}
               size="xs"
               icon={<TargetTypeIcon target={target} />}
               // Align icon with text for evaluators.

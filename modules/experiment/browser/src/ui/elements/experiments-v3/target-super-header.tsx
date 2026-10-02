@@ -24,7 +24,7 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
   isLoading,
 }: TargetSuperHeaderProps) {
   return (
-    <SuperHeader colSpan={colSpan} color="green.emphasized" icon={<LLMIcon />}>
+    <SuperHeader colSpan={colSpan} colorPalette="green" icon={<LLMIcon />}>
       {isLoading ? (
         <>
           <Text fontWeight="semibold" fontSize="sm" color="fg">

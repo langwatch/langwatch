@@ -70,7 +70,7 @@ export const DatasetSuperHeader = React.memo(function DatasetSuperHeader({
   return (
     <SuperHeader
       colSpan={colSpan}
-      color="blue.emphasized"
+      colorPalette="blue"
       icon={<Database size={14} />}
       paddingLeft="52px"
     >
