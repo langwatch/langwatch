@@ -1,6 +1,9 @@
 import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type {
+  OrganizationUserRole,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
   probeOrganizationPermission,
@@ -244,7 +247,11 @@ export async function assertCanOperateOnAnyScope(
 
 /**
  * The set of scopes a user can reach by *membership* within one org:
- *   - `isOrgMember`  — has an OrganizationUser row for the org.
+ *   - `isOrgMember`  — holds an active seat that shares in the org's keys:
+ *                      a Full seat or an administrator. A Lite Member sees
+ *                      no gateway page and a Developer (ADR-143) nothing
+ *                      shared, so neither sees an organization-scoped key
+ *                      through membership alone.
  *   - `teamIds`      — teams in the org the user belongs to (TeamUser).
  *   - `projectIds`   — projects living in any of those teams.
  *
@@ -261,6 +268,16 @@ export type MembershipSet = {
   projectIds: Set<string>;
 };
 
+/**
+ * Whether a seat takes part in the organization's shared gateway keys. The
+ * seat is the gate because neither restricted seat holds a binding at the
+ * organization scope, so no permission check can tell them apart from a
+ * Full member who simply lacks `virtualKeys:view` there.
+ */
+function seatSharesOrganizationKeys(role: OrganizationUserRole): boolean {
+  return role !== "DEVELOPER" && role !== "EXTERNAL";
+}
+
 export async function loadMembershipSet(
   prisma: PrismaClient,
   organizationId: string,
@@ -268,10 +285,10 @@ export async function loadMembershipSet(
 ): Promise<MembershipSet> {
   const member = await prisma.organizationUser.findFirst({
     where: { userId, organizationId, disabledAt: null },
-    select: { userId: true },
+    select: { userId: true, role: true },
   });
   const empty: MembershipSet = {
-    isOrgMember: member !== null,
+    isOrgMember: member !== null && seatSharesOrganizationKeys(member.role),
     canViewAllScopes: false,
     teamIds: new Set(),
     projectIds: new Set(),

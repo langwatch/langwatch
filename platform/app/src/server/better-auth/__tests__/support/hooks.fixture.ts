@@ -106,7 +106,7 @@ export const hooksOver = ({
       occurredAtMs: 1_756_000_000_000,
       state: "pending",
     };
-    return "created" as const;
+    return { outcome: "created", seat: "MEMBER" } as const;
   });
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
   const requestFromSsoArrival = vi.fn().mockResolvedValue(null);

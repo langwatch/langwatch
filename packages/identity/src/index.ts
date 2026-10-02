@@ -359,10 +359,13 @@ export {
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
+  DEFAULT_JOINER_ROLE,
   DOMAIN_JOIN_SETTINGS,
   type DomainJoinSetting,
   isPublicEmailDomain,
   JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD,
+  JOINER_ROLES,
+  type JoinerRole,
   type JoinCandidateOrganization,
   type JoinLookupDecision,
   type JoinLookupInput,
@@ -371,6 +374,7 @@ export {
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
+  readJoinerRole,
   resolveJoinLookup,
 } from "./join-matching";
 export {

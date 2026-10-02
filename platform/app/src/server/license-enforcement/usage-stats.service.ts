@@ -112,6 +112,8 @@ export interface UsageStats {
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
+  /** Developer seats (ADR-143): shown beside the metered seats, never capped. */
+  membersDeveloperCount: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -164,6 +166,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      membersDeveloperCount,
       usageUnit,
     ] = await Promise.all([
       this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
@@ -172,6 +175,7 @@ export class UsageStatsService {
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
+      this.repository.getMembersDeveloperCount(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -203,6 +207,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      membersDeveloperCount,
       messageLimitInfo,
       usageUnit,
     };
