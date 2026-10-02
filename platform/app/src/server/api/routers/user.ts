@@ -21,6 +21,7 @@ import {
   addressRoutesToConnection,
   credentialAccounts,
   localSignUpDecision,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -304,6 +305,11 @@ export const userRouter = createTRPCRouter({
       // Storing a different shape makes the new account unreachable by the
       // identifier the front door resolves.
       const email = normalizeIdentifierValue(input.email);
+
+      // Who may create an account at all on this installation
+      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). Checked before the address
+      // proof is spent, so a refused visitor keeps it.
+      await signUpPolicy().assertSignUp({ email });
 
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the

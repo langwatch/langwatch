@@ -50,8 +50,28 @@ Never commit secrets to version control. In production, use a secrets manager (A
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
+| `SIGN_UP_MODE` | Who can create an account. `open` lets anybody who can reach the install sign up. `invite_only` lets only invited addresses sign up. See [Restricting sign-up](#restricting-sign-up). | `open` |
+| `SIGN_UP_ALLOWED_DOMAINS` | Comma-separated email domains that can sign up, such as `acme.com,acme.io`. Empty allows any domain. | - |
 
 A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
+
+### Restricting sign-up
+
+By default anybody who can reach the install can create an account and then create an organization of their own. To close that:
+
+- `SIGN_UP_MODE=invite_only` allows an account only for an address with a pending invitation. Members join the organizations that invited them. Only the operators in `ADMIN_EMAILS` can create a new organization, apart from the first organization on an install that has none.
+- `SIGN_UP_ALLOWED_DOMAINS` allows an account only for the listed email domains. It works with either mode.
+
+An invited address can always sign up, whatever its domain. An address in `ADMIN_EMAILS` can always sign up.
+
+The first administrator on an invite-only install:
+
+1. Set `ADMIN_EMAILS` to your address, then sign up with it. Nobody else can sign up without an invitation.
+2. Create the first organization and invite the rest of your team from **Settings > Members**.
+
+With `ADMIN_EMAILS` empty, the first account on an install with no users is still allowed, so the install can be set up. Anybody who reaches the install before you can take that account, so set `ADMIN_EMAILS` on an install that is reachable from outside your network.
+
+The restriction applies to email and password sign-up, passkey sign-up, and first sign-in through a deployment-wide identity provider (`NEXTAUTH_PROVIDER`). It does not apply to an organization's own single sign-on connection or to SCIM provisioning: those are the organization's decision. Existing accounts are not affected.
 
 ## Services
 
@@ -312,6 +332,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
 | `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.signUp.mode` | `SIGN_UP_MODE` |
+| `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |

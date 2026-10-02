@@ -491,6 +491,14 @@ export function createEnvConfig() {
       // deployment already in email mode needs nothing from this: it issues
       // its own passwords by definition, and every site reads that first.
       LOCAL_PASSWORDS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // Who may create an account (specs/auth/sign-up-restriction.feature).
+      // `open` lets anybody who reaches the installation sign up;
+      // `invite_only` admits only addresses holding a pending invitation, plus
+      // ADMIN_EMAILS and, with ADMIN_EMAILS empty, the very first account.
+      SIGN_UP_MODE: z.enum(["open", "invite_only"]).optional().default("open"),
+      // Comma-separated email domains allowed to sign up. Empty means any.
+      // Invited addresses and ADMIN_EMAILS are admitted whatever their domain.
+      SIGN_UP_ALLOWED_DOMAINS: z.string().optional(),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
@@ -889,6 +897,10 @@ export function createEnvConfig() {
         process.env.LANGWATCH_CONNECT_INSTANCE_ID || undefined,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
+      // Blank means unset, so a templated deployment line with no value keeps
+      // the default rather than failing the enum.
+      SIGN_UP_MODE: process.env.SIGN_UP_MODE || undefined,
+      SIGN_UP_ALLOWED_DOMAINS: process.env.SIGN_UP_ALLOWED_DOMAINS || undefined,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,

@@ -12,6 +12,7 @@ import {
   localSignUpDecision,
   priorSession,
   signInRouter,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -85,6 +86,9 @@ export const authRouter = createTRPCRouter({
         "returns enrollment methods only to a visitor holding this address's proof",
     })
     .mutation(async ({ input }) => {
+      // A link minted before the installation closed sign-up is refused here,
+      // where the screen can still say why.
+      await signUpPolicy().assertSignUp({ email: input.email });
       const verification = signUpVerification();
       const proof = { token: input.addressProof, email: input.email };
       if (await verification.validateAddressProof(proof)) {
@@ -250,6 +254,9 @@ export const authRouter = createTRPCRouter({
       if (isOrganizationManagedDecision(decision)) {
         throw new DirectRegistrationUnavailableError();
       }
+      // Refused before a link goes out: an address the installation will not
+      // admit should not be mailed a sign-up it can never finish.
+      await signUpPolicy().assertSignUp({ email: input.email });
 
       const verification = signUpVerification();
       const withoutEmail = isEmailUnconfigured();

@@ -113,6 +113,7 @@ vi.mock(
     decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),
     signUpIdentifier: () => ({}),
+    signUpPolicy: () => ({}),
     signUpVerification: () => ({}),
     scimOversight: () => ({}),
     scimReconciliation: () => ({}),

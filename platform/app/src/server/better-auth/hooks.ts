@@ -179,6 +179,15 @@ export interface DatabaseHookConnectionRoutingPort {
   }): Promise<{ connectionId: string } | null>;
 }
 
+/**
+ * Whether the installation admits a new account at this address
+ * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). Named here for the same reason
+ * as the ports above.
+ */
+export interface DatabaseHookSignUpPolicyPort {
+  checkSignUp(args: { email: string }): Promise<{ allowed: boolean }>;
+}
+
 export interface BetterAuthDatabaseHooksDeps {
   users: DatabaseHookUsersPort;
   organizations: DatabaseHookOrganizationsPort;
@@ -195,6 +204,8 @@ export interface BetterAuthDatabaseHooksDeps {
   federationAllowed: () => Promise<boolean>;
   /** ADR-117 §3. Optional so a hook can be driven without the rule. */
   signInEvidence?: DatabaseHookSignInEvidencePort;
+  /** Optional so a hook can be driven without the rule. */
+  signUpPolicy?: DatabaseHookSignUpPolicyPort;
   analytics: DatabaseHookAnalyticsPort;
   nurturing: DatabaseHookNurturingPort;
 }
@@ -251,6 +262,40 @@ export class BetterAuthDatabaseHooks {
     // Otherwise a no-op: org auto-assignment happens in the after-create hook so
     // that we have a real user id to link with.
     return undefined;
+  }
+
+  /**
+   * Refuses an account the installation's sign-up policy does not admit, on
+   * every path that creates one through better-auth: the social and generic
+   * OAuth callbacks and the single sign-on plugin.
+   *
+   * An address an organization's own connection governs is that
+   * organization's to admit, so the policy is not asked about it: the
+   * organization set its connection up for exactly these people.
+   *
+   * Thrown as an `APIError` so the OAuth callback carries the code to
+   * `/auth/error`, which renders the registry's copy for it.
+   */
+  async refuseRestrictedSignUp({
+    user,
+  }: {
+    user: { email: string };
+  }): Promise<void> {
+    const policy = this.deps.signUpPolicy;
+    if (!policy || !user.email) return;
+    const governing = await this.deps.connectionRouting.connectionGoverning({
+      email: user.email,
+    });
+    if (governing) return;
+    if ((await policy.checkSignUp({ email: user.email })).allowed) return;
+
+    logger.info(
+      "Refused a new account: the installation's sign-up policy does not admit the address",
+    );
+    throw APIError.from("FORBIDDEN", {
+      code: "auth_sign_up_restricted",
+      message: "auth_sign_up_restricted",
+    });
   }
 
   /**

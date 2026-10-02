@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  SignUpPolicy,
+  type SignUpPolicyConfig,
+} from "~/server/app-layer/identity/sign-up-policy";
 import { createInnerTRPCContext } from "../../trpc";
 
 /**
@@ -15,6 +19,19 @@ const { mockCreateAndAssign, mockStandingFor, mockActivateConfigured } =
     mockStandingFor: vi.fn(),
     mockActivateConfigured: vi.fn(),
   }));
+
+// The real policy over a fake installation: the config and the counts are
+// what each case below changes.
+const { policyState } = vi.hoisted(() => ({
+  policyState: {
+    config: {
+      mode: "open",
+      allowedDomains: [],
+      adminEmails: [],
+    } as SignUpPolicyConfig,
+    organizationExists: true,
+  },
+}));
 
 vi.mock(
   "~/server/app-layer/authz/permission-adapters",
@@ -45,6 +62,15 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   ssoTestArrival: () => ({ standingFor: mockStandingFor }),
+  signUpPolicy: () =>
+    new SignUpPolicy({
+      config: () => policyState.config,
+      repository: {
+        hasPendingInvite: async () => false,
+        anyUserExists: async () => true,
+        anyOrganizationExists: async () => policyState.organizationExists,
+      },
+    }),
 }));
 
 vi.mock("@ee/licensing/activation/configuredActivation", () => ({
@@ -57,11 +83,11 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 
 import { organizationRouter } from "../organization";
 
-function createCaller() {
+function createCaller(email = "jane@example.com") {
   return organizationRouter.createCaller(
     createInnerTRPCContext({
       session: {
-        user: { id: "user_1", name: "Jane Doe", email: "jane@example.com" },
+        user: { id: "user_1", name: "Jane Doe", email },
         expires: "1",
       },
       permissionChecked: false,
@@ -72,6 +98,8 @@ function createCaller() {
 describe("organization.createAndAssign", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    policyState.config = { mode: "open", allowedDomains: [], adminEmails: [] };
+    policyState.organizationExists = true;
     mockStandingFor.mockResolvedValue(null);
     mockActivateConfigured.mockResolvedValue({ outcome: "not_configured" });
     mockCreateAndAssign.mockResolvedValue({
@@ -121,6 +149,53 @@ describe("organization.createAndAssign", () => {
       expect(
         mockActivateConfigured.mock.invocationCallOrder[0],
       ).toBeGreaterThan(mockCreateAndAssign.mock.invocationCallOrder[0]!);
+    });
+  });
+
+  describe("when the installation is invite-only", () => {
+    beforeEach(() => {
+      policyState.config = {
+        mode: "invite_only",
+        allowedDomains: [],
+        adminEmails: ["ops@acme.com"],
+      };
+    });
+
+    describe("when a member who is not an instance administrator creates one", () => {
+      it("refuses with the restricted code, and creates nothing", async () => {
+        await expect(
+          createCaller("jane@example.com").createAndAssign({
+            orgName: "Side Org",
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          cause: { code: "organization_creation_restricted" },
+        });
+
+        expect(mockCreateAndAssign).not.toHaveBeenCalled();
+        expect(mockActivateConfigured).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an instance administrator creates one", () => {
+      it("creates the organization", async () => {
+        const result = await createCaller("ops@acme.com").createAndAssign({
+          orgName: "Acme Corp",
+        });
+        expect(result.success).toBe(true);
+        expect(mockCreateAndAssign).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the installation has no organization yet", () => {
+      it("lets the first account create it", async () => {
+        policyState.organizationExists = false;
+        const result = await createCaller("founder@acme.com").createAndAssign({
+          orgName: "Acme Corp",
+        });
+        expect(result.success).toBe(true);
+        expect(mockCreateAndAssign).toHaveBeenCalled();
+      });
     });
   });
 
