@@ -17,16 +17,6 @@ import { Secret } from "@langwatch/secrets/secret";
 import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
-/** The governance module's configuration slice. */
-export const governanceAppConfigSchema = z.object({
-  /** Where an issued personal virtual key tells its holder to send traffic. */
-  gatewayBaseUrl: z.string().min(1),
-  /** This deployment's public origin; the CLI family's links are built on it. */
-  publicBaseUrl: z.string().min(1),
-});
-
-export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;
-
 /** Every stored erasure digest is a function of this value: set it once, never change it. */
 export const governanceSecrets = {
   erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
