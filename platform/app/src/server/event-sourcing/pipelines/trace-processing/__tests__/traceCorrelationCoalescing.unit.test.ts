@@ -96,14 +96,14 @@ describe("trace correlation append coalescing", () => {
     describe("when the correlation commands are registered", () => {
       it("bounds a log contribution batch at the trace correlation bound", () => {
         expect(
-          traceCommandRegistration("recordLogContribution")?.options
+          traceCommandRegistration("recordLogContribution").options
             ?.coalesceMaxBatch,
         ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
       });
 
       it("bounds a metric correlation batch at the same bound", () => {
         expect(
-          traceCommandRegistration("recordMetricCorrelation")?.options
+          traceCommandRegistration("recordMetricCorrelation").options
             ?.coalesceMaxBatch,
         ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
       });
@@ -115,18 +115,15 @@ describe("trace correlation append coalescing", () => {
       //
       // Read the grouping the way queueManager resolves it — the registration
       // option OR a static on the handler class — so a group key added to
-      // either place is caught. Resolve the registration first: `?.options`
-      // on a missing command is undefined too, so without this the assertion
-      // would pass for a command that is no longer registered at all.
+      // either place is caught. traceCommandRegistration throws for a command
+      // that is no longer registered, so an absent key here is a real absence.
       it("leaves both grouped on the trace, naming no group key of their own", () => {
         for (const [name, handlerClass] of [
           ["recordLogContribution", RecordLogContributionCommand],
           ["recordMetricCorrelation", RecordMetricCorrelationCommand],
         ] as const) {
-          const registration = traceCommandRegistration(name);
-          expect(registration).toBeDefined();
           expect(
-            registration?.options?.getGroupKey ??
+            traceCommandRegistration(name).options?.getGroupKey ??
               (handlerClass as { getGroupKey?: unknown }).getGroupKey,
           ).toBeUndefined();
         }
