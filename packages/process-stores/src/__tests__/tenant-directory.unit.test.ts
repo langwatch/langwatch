@@ -89,6 +89,7 @@ describe("the tenant directory", () => {
       await expect(directory.organizationForTenant(SCHEDULED_SINGLETON_PROJECT_ID)).resolves.toBe(
         PLATFORM_TENANT,
       );
+      await expect(directory.organizationForTenant("platform")).resolves.toBe(PLATFORM_TENANT);
       expect(asked).toEqual([]);
     });
   });

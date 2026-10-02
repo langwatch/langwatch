@@ -8,6 +8,9 @@ import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 
 export type { TenantDirectory };
 
+/** The tenant platform-tier grants are written under: authz's `PLATFORM_TENANT_ID`. */
+const PLATFORM_GRANT_TENANT = "platform";
+
 type RowById<Select, Row> = {
   findUnique(args: { where: { id: string }; select: Select }): PromiseLike<Row | null>;
 };
@@ -31,7 +34,9 @@ export function prismaTenantDirectory(prisma: TenantDirectoryRows): TenantDirect
   return {
     async organizationForTenant(tenantId: string): Promise<string | null> {
       if (tenantId === "") return null;
-      if (tenantId === SCHEDULED_SINGLETON_PROJECT_ID) return PLATFORM_TENANT;
+      if (tenantId === SCHEDULED_SINGLETON_PROJECT_ID || tenantId === PLATFORM_GRANT_TENANT) {
+        return PLATFORM_TENANT;
+      }
 
       const project = await prisma.project.findUnique({
         where: { id: tenantId },
