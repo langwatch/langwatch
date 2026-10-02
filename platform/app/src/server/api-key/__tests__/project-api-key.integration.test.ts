@@ -103,13 +103,13 @@ describe("Feature: Project API keys are stored as hashes", () => {
 
   afterAll(async () => {
     await prisma.apiKey
-      .deleteMany({ where: { organizationId } })
+      .deleteMany({ where: { organization: { slug: `--test-org-${ns}` } } })
       .catch(() => {});
     await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
+      .deleteMany({ where: { organization: { slug: `--test-org-${ns}` } } })
       .catch(() => {});
     await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
+      .deleteMany({ where: { organization: { slug: `--test-org-${ns}` } } })
       .catch(() => {});
     await prisma.user
       .deleteMany({ where: { email: { startsWith: `${ns}-` } } })

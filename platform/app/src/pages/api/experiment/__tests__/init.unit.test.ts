@@ -30,6 +30,7 @@ vi.mock("~/env.mjs", () => ({
   env: {
     IS_SAAS: false,
     BASE_HOST: "https://app.langwatch.ai",
+    CREDENTIALS_SECRET: "test-credentials-secret",
   },
 }));
 
@@ -47,6 +48,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
+import { hashProjectApiKey } from "~/server/api-key/project-api-key";
 import { prisma } from "~/server/db";
 import handler from "../init";
 
@@ -55,7 +57,11 @@ describe("POST /api/experiment/init", () => {
     id: "project-123",
     slug: "my-project",
     teamId: "team-456",
-    apiKey: "test-api-key",
+    apiKey: null,
+    apiKeyHash: hashProjectApiKey("test-api-key"),
+    apiKeyHashedAt: new Date(),
+    archivedAt: null,
+    team: { id: "team-456", organizationId: "org-789" },
   };
 
   const existingExperiment = {

@@ -194,6 +194,11 @@ const mockUpdateHandle = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
+    apiKey: {
+      create: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
     publicEnv: {
       useQuery: () => ({
         data: { IS_SAAS: false },

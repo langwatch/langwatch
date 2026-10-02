@@ -25245,11 +25245,11 @@ type CreateOrganizationInvitesJSONBody struct {
 	Invites []struct {
 		Email openapi_types.Email                          `json:"email"`
 		Role  CreateOrganizationInvitesJSONBodyInvitesRole `json:"role"`
-		Teams []struct {
+		Teams *[]struct {
 			CustomRoleId *string                                           `json:"customRoleId,omitempty"`
 			Role         CreateOrganizationInvitesJSONBodyInvitesTeamsRole `json:"role"`
 			TeamId       string                                            `json:"teamId"`
-		} `json:"teams"`
+		} `json:"teams,omitempty"`
 	} `json:"invites"`
 }
 
