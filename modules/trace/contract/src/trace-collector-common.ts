@@ -502,8 +502,7 @@ export const flattenSpanTree = (
 
   const appendSpans = (nodeSpans: SpanWithChildren[]) => {
     nodeSpans.forEach((span) => {
-      const spanWithoutChildren: Span = { ...span };
-      //@ts-expect-error: `children` only exists on SpanWithChildren, and is being dropped here
+      const spanWithoutChildren: Span & { children?: unknown } = { ...span };
       delete spanWithoutChildren.children;
       result.push(spanWithoutChildren);
     });

@@ -285,15 +285,16 @@ function applyServerMessage({
     case "done":
       logger.debug("stream completed (done event received)");
       break;
-    default:
+    default: {
+      const unhandled: { type: string } = message;
       toaster.create({
         title: "Unknown message type on client",
-        //@ts-expect-error: exhaustive switch; message is never in default
-        description: message.type,
+        description: unhandled.type,
         type: "warning",
         duration: 5000,
       });
       break;
+    }
   }
 }
 

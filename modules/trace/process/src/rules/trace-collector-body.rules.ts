@@ -297,21 +297,18 @@ export function isCollectorRejection<T>(
 function applyLegacySpanOutputs(span: Span): void {
   if (typeof span.output !== "undefined") return;
   if (!("outputs" in span)) return;
-  if (typeof span.outputs === "undefined") return;
+  const outputs = span.outputs;
+  if (!Array.isArray(outputs)) return;
 
-  //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-  if (span.outputs.length === 0) {
+  if (outputs.length === 0) {
     span.output = null;
     return;
   }
-  //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-  if (span.outputs.length === 1) {
-    //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-    span.output = span.outputs[0];
+  if (outputs.length === 1) {
+    span.output = outputs[0];
     return;
   }
-  //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-  span.output = { type: "list", value: span.outputs };
+  span.output = { type: "list", value: outputs };
 }
 
 function normaliseContext<T extends Record<string, unknown>>(context: T): T {

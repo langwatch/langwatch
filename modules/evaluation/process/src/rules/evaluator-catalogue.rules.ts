@@ -27,11 +27,8 @@ function isPublishedEvaluator(key: string): boolean {
  * FORM; `unrepresentable: "any"` keeps one exotic setting from emptying the catalogue.
  */
 export function evaluatorSettingsJsonSchema(key: string): Record<string, unknown> {
-  const settings =
-    // @ts-expect-error `key` indexes the union of every evaluator type, so
-    // `.shape.settings` resolves to a heterogeneous union that resolves at
-    // runtime but TypeScript cannot narrow.
-    evaluatorsSchema.shape[key]?.shape.settings as z.ZodType | undefined;
+  const evaluators: Record<string, z.ZodObject | undefined> = evaluatorsSchema.shape;
+  const settings: z.ZodType | undefined = evaluators[key]?.shape.settings;
   if (!settings) return {};
   const schema = z.toJSONSchema(settings, {
     io: "input",

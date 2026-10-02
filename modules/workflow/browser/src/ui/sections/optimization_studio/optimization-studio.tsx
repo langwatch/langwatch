@@ -170,8 +170,7 @@ export default function OptimizationStudio() {
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
-        // @ts-expect-error: debugging hook — `state` is not part of the Window type
-        window.state = state;
+        Object.assign(window, { state });
       }
       return {
         name: state.name,

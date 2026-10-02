@@ -16,7 +16,7 @@ function CurrentValue({
   format,
 }: {
   current?: number | string;
-  format?: ((value: number) => string) | ((value: string) => string) | string;
+  format?: ((value: number) => string) | string;
 }) {
   if (current === undefined) {
     return (
@@ -26,9 +26,7 @@ function CurrentValue({
     );
   }
   if (typeof format === "function") {
-    // @ts-expect-error the metric's `format` is a string or a formatter, and
-    // the narrowing above does not reach through the union's declaration.
-    return <>{format(current)}</>;
+    return <>{format(Number(current))}</>;
   }
 
   return <>{numeral(current).format(format ?? "0a")}</>;
@@ -61,7 +59,7 @@ export function SummaryMetric({
   label: string;
   current?: number | string;
   previous?: number;
-  format?: ((value: number) => string) | ((value: string) => string) | string;
+  format?: ((value: number) => string) | string;
   tooltip?: string;
   increaseIs?: "good" | "bad" | "neutral";
   noDataUrl?: string;
@@ -128,7 +126,7 @@ export function SummaryMetricValue({
 }: {
   current?: number | string;
   previous?: number;
-  format?: ((value: number) => string) | ((value: string) => string) | string;
+  format?: ((value: number) => string) | string;
   increaseIs?: "good" | "bad" | "neutral";
   noDataUrl?: string;
 }) {
@@ -181,8 +179,6 @@ export function SummaryMetricValue({
 
   const formatPreviousValue = (value: number) => {
     if (typeof format === "function") {
-      // @ts-expect-error the metric's `format` is a string or a formatter, and
-      // the narrowing above does not reach through the union's declaration.
       return format(value);
     }
     return numeral(value).format(format ?? "0a");
