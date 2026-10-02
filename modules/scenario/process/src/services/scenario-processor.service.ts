@@ -93,8 +93,39 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     });
 
     await runWithContext(requestContext, async () => {
-      await this.executeInContext(jobData);
+      try {
+        await this.executeInContext(jobData);
+      } catch (error) {
+        await this.finishThrownRun({ jobData, error });
+
+        throw error;
+      }
     });
+  }
+
+  /** A run whose execution threw still ends terminal, as `drain` ends one: no reader waits. */
+  private async finishThrownRun({
+    jobData,
+    error,
+  }: {
+    jobData: ExecutionJobData;
+    error: unknown;
+  }): Promise<void> {
+    this.options.metrics.failed();
+    try {
+      if (this.options.pool.wasCancelled(jobData.scenarioRunId)) {
+        await this.handleCancelled(jobData, void 0);
+
+        return;
+      }
+
+      await this.handleFailed(jobData, error instanceof Error ? error.message : String(error));
+    } catch (finishError) {
+      logger.error(
+        { error: finishError, scenarioRunId: jobData.scenarioRunId },
+        "Failed to finish a Scenario run whose execution threw",
+      );
+    }
   }
 
   skipCancelled(jobData: ExecutionJobData): void {

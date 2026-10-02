@@ -353,6 +353,28 @@ describe("ScenarioProcessorService", () => {
     );
   });
 
+  it("finishes the run as failed when preparation throws", async () => {
+    const fixture = processorFixture();
+    const thrown = new Error("Failed to decrypt project secret");
+    const result = deferred<ScenarioExecutionPrefetchResult>();
+    fixture.execution.prepare = vi.fn().mockReturnValue({
+      childEnvironment: Promise.resolve(null),
+      result: result.promise,
+    });
+
+    const execution = fixture.processor.execute(job("prefetch-throws"));
+    result.reject(thrown);
+
+    await expect(execution).rejects.toBe(thrown);
+
+    expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
+      expect.objectContaining({ scenarioRunId: "prefetch-throws", error: thrown.message }),
+    );
+    expect(fixture.finishUnsuccessfulRun).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cancelled: true }),
+    );
+  });
+
   it("releases the pool when preparation fails before a child starts", async () => {
     const fixture = processorFixture();
     fixture.execution.prepare = vi.fn().mockReturnValue({
