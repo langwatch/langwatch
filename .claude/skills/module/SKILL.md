@@ -27,57 +27,39 @@ Enterprise modules mirror this exactly under `enterprise/modules/` (§3, §11).
 
 ## Rules that matter
 
-1. **Dependency direction, no exceptions.** apps -> `*-process` / `*-browser`
-   -> `*-contract`. Browser never imports process. Process never imports
-   browser. Contract imports no framework and no other half (§3).
-2. **Another module imports only your contract** and names your `*Api` token.
-   Never your service, repository, channel, table or browser package, even
-   when the import resolves.
-3. **One owner per subject.** `modules/catalogue.json` maps every subject to
-   exactly one module. The owner serves the endpoints and runs the
-   collection. A tRPC namespace belongs to one module (§3).
-4. **A module is installed by editing the catalogue, never a root.** Add an
-   entry, run `pnpm generate:modules`. It rewrites
-   the generated module list inside each app (process halves into `api`,
-   `worker` and `tasks`, browser halves into `ui`). Never hand-edit a generated file. Uninstalling a module
-   another one depends on fails to compile, naming the dependent (§5).
-5. **Specs first.** `specs/*.feature` is the requirement. No scenario for your
-   change: write one first, error paths included (CLAUDE.md, §13).
-6. **A decision goes in `adrs/`**, with a row in its `README.md`. Comments stay
-   at five lines; longer reasoning is an ADR.
-7. **Package names are `@langwatch/<name>-contract|process|browser|client`**,
-   all `private: true`, `"type": "module"`, source-resolved (`main` points at
-   `./src/index.ts`). Copy `modules/monitor/*/package.json`.
-8. **Process exports the installer and transport declarations, nothing
-   else.** `modules/monitor/process/src/index.ts` is three lines. See
-   `process-module`.
-9. **A browser package exports `./declaration` and nothing else** (§3.4).
-   See `modules/monitor/browser/package.json`.
-10. **A folder past 30 source files groups into concerns**
-    (`process/src/features/<concern>/`, `contract/src/features/<concern>/`,
-    one level only; §3.4, ruled 2026-10-01). No module has landed it yet.
-    The grammar already accepts it
-    (`packages/oxlint-rules/grammar/feature-layout-policy.mjs`).
+Each rule lives in the record or CLAUDE.md; this table only points at it.
+
+| Rule                                                                                    | Record       |
+| --------------------------------------------------------------------------------------- | ------------ |
+| Dependency direction: apps -> process/browser -> contract, never sideways               | §3           |
+| Others import only your contract and call your `*Api` token                             | §3           |
+| One owner per subject, mapped in `modules/catalogue.json`                               | §3           |
+| Install by catalogue entry + `pnpm generate:modules`; never hand-edit a generated list  | §1, §5       |
+| Specs first, error paths included                                                       | CLAUDE.md    |
+| Decisions in `adrs/` with a README row; comments five lines max                         | CLAUDE.md    |
+| Package names, `private`, source-resolved `main`: copy `modules/monitor/*/package.json` | (convention) |
+| Process exports the installer and transports only (`process-module`)                    | §3.2         |
+| Browser exports `./declaration` only                                                    | §3.4         |
+| Past 30 source files, group into `features/<concern>/`, one level                       | §3.4         |
 
 ## Worked example: monitor (minimal)
 
 `modules/monitor` is the smallest complete module. Read it in this order:
 
-| Step | File | What it shows |
-|---|---|---|
-| 1 | `modules/catalogue.json` (entry `"monitor"`) | id, root, `classification`, `subjects` |
-| 2 | `contract/src/monitor.api.ts` | the `MonitorApi` interface and token |
-| 3 | `contract/src/monitor.errors.ts` | `HandledError` subclasses |
-| 4 | `contract/src/monitor.trpc.ts` | every procedure declared once |
-| 5 | `process/src/monitor.module.ts` | the installer: repositories, module class, transports |
-| 6 | `process/src/transport/monitor.{rest,trpc}.ts` | permission and handler per route |
-| 7 | `process/src/repositories/` | interface, `prisma/`, `memory/`, registry |
-| 8 | `process/src/services/monitor.service.ts` | behaviour over the repository |
+| Step | File                                           | What it shows                                         |
+| ---- | ---------------------------------------------- | ----------------------------------------------------- |
+| 1    | `modules/catalogue.json` (entry `"monitor"`)   | id, root, `classification`, `subjects`                |
+| 2    | `contract/src/monitor.api.ts`                  | the `MonitorApi` interface and token                  |
+| 3    | `contract/src/monitor.errors.ts`               | `HandledError` subclasses                             |
+| 4    | `contract/src/monitor.trpc.ts`                 | every procedure declared once                         |
+| 5    | `process/src/monitor.module.ts`                | the installer: repositories, module class, transports |
+| 6    | `process/src/transport/monitor.{rest,trpc}.ts` | permission and handler per route                      |
+| 7    | `process/src/repositories/`                    | interface, `prisma/`, `memory/`, registry             |
+| 8    | `process/src/services/monitor.service.ts`      | behaviour over the repository                         |
 
 For a module with eventing, channels and tasks read `modules/automation`. For
 a module with many transports and contract files read `modules/organization`.
 For a module with a `client/` package read `modules/dataset/client`.
-(`modules/automation/README.md` is stale: it names `server/` and `web/`.)
 
 ## New module checklist
 
@@ -111,6 +93,5 @@ For a module with a `client/` package read `modules/dataset/client`.
 
 ## Not here
 
-What a module may demand of its process (peers, config slice, supply tokens,
-members, entitlements): the future `module-dependencies` skill.
-Composing a process (`main.ts`, boot): the future `process-composition` skill.
+What a module may demand of its process (peers, config, supply, entitlements;
+§3.3) and composing a process (`main.ts`, `boot()`; §4, §5): `backend`.

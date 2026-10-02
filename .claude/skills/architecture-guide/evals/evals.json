@@ -16,7 +16,7 @@
     {
       "id": 3,
       "prompt": "A process needs to boot with one new module installed. What changes, and what must not change?",
-      "expected_output": "Installing a module edits modules/catalogue.json and regenerates the installed-modules lists (pnpm generate:modules); the composition root does not grow. Names the ruled chain - createApp({ role }).withModules(serverModules).withConfig(...).with<store>(...).withObservability(...).withTransportAuth(...).boot() - where boot() takes no arguments and an unsupplied requirement is a MissingSupply compile refusal. Rejects editing a per-process host file, adding a bespoke member bag, or any deleted spelling (withProvided, withMemoryRepositories, reads statics).",
+      "expected_output": "Installing a module edits modules/catalogue.json and regenerates each app's generated module list (apps/*/src/process-modules.generated.ts, apps/ui/src/browser-modules.generated.ts; pnpm generate:modules); the composition root does not grow. Names the ruled chain - createApp({ role }).withModules(serverModules).withConfig(...).with<store>(...).withObservability(...).withTransportAuth(...).boot() - where boot() takes no arguments and an unsupplied requirement is a MissingSupply compile refusal. Rejects editing a per-process host file, adding a bespoke member bag, or any deleted spelling (withProvided, withMemoryRepositories, reads statics).",
       "files": []
     }
   ]

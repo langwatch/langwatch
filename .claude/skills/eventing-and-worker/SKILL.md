@@ -7,10 +7,10 @@ user-invocable: true
 # Eventing and the worker role
 
 Record: `dev/docs/ARCHITECTURE.md` section 9 (eventing), 9.1 (purge, erase, retention), the "Projection cursor
-reads" paragraph of 10.1, section 4 for the roles. Rulings are there; this skill points and warns.
+reads" paragraph of 10, section 4 for the roles. Rulings are there; this skill points and warns.
 
 Not here: how modules are installed, how a pipeline gets its stores, peers or secrets, and how `boot()`
-wires roles. Those are the future `process-composition` and `module-dependencies` skills. Do not
+wires roles. Those are §3.3, §4 and §5, taught by `backend`. Do not
 hand-wire a consumer into the api role; the types refuse it.
 
 ## The model in five lines
@@ -29,31 +29,20 @@ hand-wire a consumer into the api role; the types refuse it.
 
 ## The rules that matter
 
-1. **Idempotent handlers.** A subscriber may see the same event twice. Throw to be retried; do not swallow.
-2. **Background work is a scheduled process manager.**
-   `.withProcessManager(name, (pm) => pm.state(schema, initial).schedule({ everyMs }).onWake(handler).intent(...))`.
-   `onWake` sends the module's own intent through the outbox; the worker ticks it once across the fleet.
-   There is no `.withJobs`, no `withWorkers`, no module timer loop, no `/api/cron` route (a test refuses one).
-3. **Keyed calendar work** (a report's cron, per-entity timers) is a process manager keyed by the entity.
-   The eventing `ScheduledJob` scheduler is retired.
-4. **Fact events, not trigger events.** The owner records the fact on its own pipeline (ids and
-   point-in-time, non-personal data). Reacting modules subscribe to it. No relay module, no owner that
-   knows its consumers. A module that needs more state reads it through the owner's `*Api` at handling.
-5. **React to a peer with `.withPeerSubscriber`** on your own pipeline, naming the owner's event type and
-   data schema. Your one edge is the owner's contract. It rides the global registry, at least once, ordered
-   per aggregate, never replayed. Write your own read-model row directly; send your own command only when
-   the reaction is itself a fact others react to.
-6. **A delivery is not a reaction.** A producer calls the destination kind's `requestDelivery`
-   (ADR-167). Retry, dead-letter and redrive are the outbox's.
-7. **Work that spans modules is commanded by the owners** (section 9.1). The initiator records one fact;
-   each owner removes or rewrites only its own rows, idempotently. Never `ALTER` or delete another
-   module's table, never loop over other modules' tables.
-8. **Nothing runs in a request that takes time.** A long run is a command plus a process manager that
-   emits intents; a poll reads the fold. Return 200 once the command is written.
-9. **Types stay typed.** No `any` in events, commands or projection state. A queued payload is `unknown`
-   until its schema parses it once. No casts to reach a handler's type.
-10. **Eventual consistency is handled, never fixed with a reverse read.** Write optimistically, or answer
-    "pending". Never a peer cycle.
+Each rule lives in §9; this table only points at it.
+
+| Rule                                                                                                             | Record      |
+| ---------------------------------------------------------------------------------------------------------------- | ----------- |
+| Idempotent handlers: throw to be retried, never swallow                                                          | §9          |
+| Background work is a scheduled process manager (`.schedule({ everyMs }).onWake`); no jobs, timers or cron routes | §9          |
+| Keyed calendar work is a process manager keyed by the entity (`nextWakeAt`); `ScheduledJob` is retired           | §9, §15     |
+| Fact events, not trigger events: the owner records the fact, no relay module                                     | §9          |
+| React to a peer with `.withPeerSubscriber`; write your own rows                                                  | §9          |
+| A delivery is `requestDelivery`, not a reaction                                                                  | §9, ADR-167 |
+| Cross-module work is commanded by the owners, each touching only its own rows                                    | §9.1        |
+| Nothing slow in a request: a command plus a process manager; a poll reads the fold                               | §9          |
+| No `any` in events, commands or state; a queued payload is `unknown` until parsed once                           | §9          |
+| Eventual consistency: write optimistically or answer "pending"; never a peer cycle                               | §3, §5      |
 
 ## Worked example: automation's `automations` pipeline
 
@@ -100,21 +89,20 @@ see `modules/authz/process/src/eventing/authz-grant.pipeline.ts` (`.withClickHou
 
 - A contract names what makes a read stale: `.query(name, { invalidatedBy: [EVENT_TYPE] })`. One
   framework subscriber turns each committed event into a hint on the tenant channel. See `api-transports`.
-- A projection-backed read declares `fromProjection`. The **cursor is the event id alone**. Event ids are
-  KSUIDs, k-sortable, so a plain string compare orders them and max wins. Never a `(timestamp, id)` tuple.
-  KSUIDs order only to the second: an answer sharing the hint's second is fresh only when its id equals
-  the hint's. The cursor is stored per (projection, tenant) and per (projection, key) in the process store.
+- A projection-backed read declares `fromProjection`. The **cursor is the event id alone**, never a
+  `(timestamp, id)` tuple. Freshness is `freshnessOf`, which decodes the KSUID's seconds; never compare
+  ids as plain strings, and a newer id does not prove older events applied (§10, "Projection cursor reads").
 - Only projections a read names advance a cursor. Hints are sent from the cursor advance. Erasure and
   retention go through events the projection applies. Time-relative reads stay off this path.
 - Specs: `packages/eventing/specs/projection-cursor-reads.feature`, `packages/api/specs/read-hints.feature`.
 
 ## The three roles
 
-| | api | worker | tasks |
-| --- | --- | --- | --- |
-| commands | send | send | send |
+|                                                       | api       | worker | tasks     |
+| ----------------------------------------------------- | --------- | ------ | --------- |
+| commands                                              | send      | send   | send      |
 | projections, subscribers, process managers, schedules | not built | hosted | not built |
-| transports | yes | none | none |
+| transports                                            | yes       | none   | none      |
 
 Consumers register drain-first, so shutdown drains the worker before the api closes. A stack missing the
 worker serves pages and silently processes no jobs.
@@ -127,15 +115,15 @@ Run by the `tasks` app. Recurring work is a scheduled process manager instead.
 
 ## Traps
 
-| Trap | Instead |
-| --- | --- |
-| a reactor, or a subscriber that writes another module's rows | peer subscriber writing your own rows |
-| `setInterval` or a cron route for a sweep | scheduled process manager |
-| a reverse `*Api` read to learn "did it happen" | subscribe to the owner's fact |
-| a handler that is not safe to run twice | key the write on the event or intent id |
-| renaming an event, aggregate or pipeline string born before this drive | leave it; new ones may change |
-| a projection touching another module's table | the owner exposes an event or `*Api` read |
-| polling a run's status from the UI on a timer | read hints plus the fold |
+| Trap                                                                   | Instead                                   |
+| ---------------------------------------------------------------------- | ----------------------------------------- |
+| a reactor, or a subscriber that writes another module's rows           | peer subscriber writing your own rows     |
+| `setInterval` or a cron route for a sweep                              | scheduled process manager                 |
+| a reverse `*Api` read to learn "did it happen"                         | subscribe to the owner's fact             |
+| a handler that is not safe to run twice                                | key the write on the event or intent id   |
+| renaming an event, aggregate or pipeline string born before this drive | leave it; new ones may change             |
+| a projection touching another module's table                           | the owner exposes an event or `*Api` read |
+| polling a run's status from the UI on a timer                          | read hints plus the fold                  |
 
 ## Tests
 

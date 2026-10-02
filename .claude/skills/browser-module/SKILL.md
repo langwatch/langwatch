@@ -9,8 +9,8 @@ argument-hint: "<screen, drawer, hook or state question>"
 
 Read `dev/docs/ARCHITECTURE.md` §3.4, §10 and §10.2. This skill is the short
 version. Exemplar: `modules/organization/browser` (screens, drawers, hooks,
-features/ nesting, a colocated test). New code uses the left column of §16;
-the declaration is `defineBrowserModule` from `@langwatch/browser`. The declaration stem stays `<name>.web.ts`.
+features/ nesting, a colocated test). §16 says per row whether the new name has
+landed; the declaration is `defineBrowserModule` from `@langwatch/browser`. The declaration stem stays `<name>.web.ts`.
 
 ## The shape
 
@@ -31,43 +31,24 @@ component is a section, not a feature.
 
 ## Rules that matter
 
-1. **Closed package.** Nothing imports `@langwatch/organization-browser`. The
-   exports map is `./declaration` only, so a side door cannot exist. Types
-   cross (`import type`), values do not (§3.4).
-2. **No kits.** Repeated in one module: stays. Repeated across modules: the
-   design system (props or a query result in, never fetches). Another module's
-   data: its `<name>-client` (see `module-client`). Pure logic: the owner's
-   contract. A framework hook: `browser-host`.
-3. **Screens are declared, guarded by the router.** `.withScreens({ key: {
-   path, within, requires: "organization:manage", load } })` in
-   `organization.web.ts`. A screen never guards itself and never names its URL.
-4. **Drawers are URL-routed singletons with a stack.** Declared with
-   `.withDrawers({ name: { load } })`; the name is the wire
-   (`?drawer.open=person`), so renaming one is a regression. A sub-flow
-   navigates and passes `onClose`, never `closeDrawer` (it clears the stack).
-   Keep the caller's draft in a store that survives its unmount.
-5. **The URL is the truth** for filters, tabs and drawers (§10.2 tier 2). A
-   link in-app is `@langwatch/browser-host/link`, never a bare anchor.
-6. **Four state tiers, one home each** (§10.2, ADR-169). Server data stays in
-   React Query, never in `useState` or a store. Address state in the router.
-   Shared client state in the **one global UI store**, a slice per module,
-   named `<module>:<key>` (`defineSlice` in `@langwatch/browser-host/global-store`):
-   write only your own prefix, read any. Local state is `useState`, derived
-   during render. No Redux.
-7. **A screen expects missing data.** Frame renders at once, each block shows a
-   skeleton in its final shape, held data stays while reloading, an error shows
-   inline with Retry. Empty, loading and error never look alike.
-8. **Every read is cached; the cache is not yours to tune.** React Query in
-   memory plus the sealed IndexedDB mirror (§10.2: default, LRU-bounded). No
-   per-read tiers, no `staleTime` at a call site. A server SSE read hint or a
-   newer session version marks a read stale; a 5-minute safety refetch backs it.
-9. **No polling.** Follow events instead. The one exception is a
-   user-chosen dashboard auto-refresh. Only the focused tab talks to the
-   server; hidden tabs make no calls (React Query's focus manager,
-   `@langwatch/browser-host/page-visibility`, never your own `visibilitychange`).
-10. **Deployment facts come from `useUiDeployment()`**
-    (`@langwatch/browser-host/capabilities`), or the module's own `*HostApi`.
-    Never `import.meta.env`, `process.env`, a fetch, or a meta-tag parse.
+Each rule lives in the record; this table only points at it.
+
+| Rule                                                                                          | Record |
+| --------------------------------------------------------------------------------------------- | ------ |
+| Closed package: exports `./declaration` only; types cross, values do not                      | §3.4   |
+| No kits: shared UI to the design system, another module's data to its `<name>-client`         | §3.4   |
+| Screens declared with `.withScreens`, guarded by the router, never self-guarded               | §10    |
+| Drawers are URL-routed singletons (`?drawer.open=<name>`); the name is the wire               | §10    |
+| A screen expects missing data: skeleton in final shape, held data stays, inline Retry         | §3.4   |
+| Four state tiers: React Query, router, the one global UI store (`<module>:<key>`), `useState` | §10.2  |
+| Every read cached (React Query + IndexedDB mirror); no `staleTime` at a call site             | §10    |
+| No polling; visible tabs stay live, hidden tabs make no calls                                 | §10    |
+| Deployment facts from `useUiDeployment()` or the module's `*HostApi`, never env               | §6     |
+| Reads take an opaque id plus tenant scope; mutations `setData`, never hand-invalidate         | §10.2  |
+
+Two habits the table does not show: a sub-flow passes `onClose`, never
+`closeDrawer` (it clears the stack); an in-app link is
+`@langwatch/browser-host/link`, never a bare anchor.
 
 ## Worked example: a hook over the derived client
 
@@ -75,9 +56,10 @@ component is a section, not a feature.
 // modules/organization/browser/src/behavior/use-department-column.ts
 import { api } from "./organization-api.ts";
 const listQuery = api.departments.list.useQuery({ organizationId }, { enabled });
-const utils = api.useUtils();
-refetch: () => utils.departments.assignments.invalidate({ organizationId });
 ```
+
+No `invalidate` at the call site: a cursor-backed read goes stale through its key,
+any other through SSE hints (§10, "A write makes reads stale through the key").
 
 `organization-api.ts` is `createModuleApi<…>()` over the contract's declared
 procedures, never `AppRouter`. The declaration names it:
@@ -103,15 +85,13 @@ secret comes back only from a mutation. A mutation writes the entity with
   the owner's drawer by name. Not all landed in the tree yet: check §16.
 - **Host services are not "capabilities".** §3.5 reserves that word for the
   four layers; §16 renames the browser-host list to host services.
-- **Pattern docs lag.** `dev/docs/best_practices/react.md` still says `web`
-  packages and `screens/`. The record wins.
 - **A banner, toast or fatal error built by hand.** Use the design system and
   the code-keyed error presentation (§12), never `error.message`.
 
 ## References
 
-Host wiring (host services, lending, `*HostApi` mounts, entitlement): the
-future `module-dependencies` skill. Layout of a screen:
+Host wiring (host services, lending, `*HostApi` mounts, entitlement): §3.3,
+§10.1 and the `frontend` skill. Layout of a screen:
 `dev/docs/design/guidelines.md` §4. Specs: `specs/ui/ui-page-composition.feature`,
 `specs/ui/browser-query-caching.feature`, `specs/ui/in-app-links.feature`.
 Tests sit in a colocated `__tests__/` beside the code (§13). The module

@@ -39,7 +39,7 @@ disagree, the linter wins (§17).
    no `process*` package in a web graph (§2). A contract imports no framework
    beyond `@langwatch/module`.
 5. **Generated lists are never edited.** The module list each app carries
-   (process halves in `api`, `worker`, `tasks`; browser halves in `ui`) is written by
+   (process halves in `apps/{api,worker,tasks}/src/process-modules.generated.ts`; browser halves in `apps/ui/src/browser-modules.generated.ts`) is written by
    `pnpm generate:modules` from the catalogue. Add a module by editing
    `modules/catalogue.json`, then run the generator.
 6. **Shared browser code has three homes, no kits.** Component: the design

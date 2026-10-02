@@ -31,38 +31,33 @@ contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQu
 
 ## Rules that matter
 
-1. **Derived, never hand-written, never `AppRouter`** (ADR-130). Types come from
-   `ContractApiMap<typeof <name>Trpc>`; inputs and outputs are never `any`.
-2. **A client holds only the hooks `createModuleApi` derives, plus at most a
-   few thin convenience hooks.** Never a component.
-3. **It imports its own contract and `@langwatch/api/web`, nothing else**: no
-   other client, no browser package, no `@langwatch/browser`, no `browser-host`. A hook that
-   combines two modules lives in the screen that needs it.
-4. **One call per request over `httpLink`.** Each answer carries its own
-   status, session version and schema hash. The record rules batching out
-   (§10, "No request batching"): do not reach for `httpBatchLink`, and do not
-   build a client that assumes batched responses. The server refuses batches.
-5. **Caching is the contract's and the kernel's, not the client's.** A read is
-   cached in memory and in the sealed IndexedDB mirror, goes stale on an SSE
-   hint, and never takes a per-read `staleTime`. A cursor-backed read carries
-   its cursor in the key. A query never returns a credential.
-6. **One entity, one key.** Detail reads take the opaque id plus tenant scope
-   (`projectId` / `organizationId`); hints never enter a key (§10.2).
-7. **A procedure another module owns, that you still call, is a borrowed
-   one-off.** It sits in a `BorrowedProcedures` type that says so, until that
-   module's contract declares it. Treat it as debt, not a pattern.
+Each rule lives in the record or an ADR; this table only points at it.
+
+| Rule                                                                                          | Source                                          |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`       | ADR-130 (`130-the-api-router-type-is-declared`) |
+| Holds the derived hooks plus a few thin ones, never a component                               | §3.4                                            |
+| Imports its own contract and `@langwatch/api/web` only; a two-module hook lives in the screen | §3.4                                            |
+| One call per request over `httpLink`; no batching, the server refuses it                      | §10                                             |
+| Caching is the contract's and kernel's; no per-read `staleTime`; no credential in a query     | §10                                             |
+| One entity, one key: opaque id plus tenant scope; hints never enter a key                     | §10.2                                           |
+| A procedure another module owns sits in a `BorrowedProcedures` type: debt, not a pattern      | (convention)                                    |
 
 ## Worked example
 
 ```ts
 // modules/prompt/client/src/prompt-client.ts
-import { type ContractApiMap, createModuleApi, type ModuleApi, type OutputsFromMap }
-  from "@langwatch/api/web";
+import {
+  type ContractApiMap,
+  createModuleApi,
+  type ModuleApi,
+  type OutputsFromMap,
+} from "@langwatch/api/web";
 import type { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 
 type PromptApiMap = ContractApiMap<typeof promptTagTrpc> & ContractApiMap<typeof promptTrpc>;
 export const promptClient: ModuleApi<PromptApiMap> = createModuleApi<PromptApiMap>();
-export type PromptOutputs = OutputsFromMap<PromptApiMap>;   // PromptInputs likewise
+export type PromptOutputs = OutputsFromMap<PromptApiMap>; // PromptInputs likewise
 ```
 
 `src/index.ts` re-exports the three names and nothing else. `package.json`
@@ -89,7 +84,5 @@ evaluator, prompt and scenario have one.
 - **Calling a procedure by path from a typed hook's key.** A surface too wide
   for a typed hook uses the shell's `UiRpc`; never re-enter the cache under the
   key being resolved (§10).
-- **`@langwatch/browser` still says "batching" in §2.** The record contradicts itself
-  there; the `No request batching` ruling (§10) is the newer one.
-- Host-service wiring, lending and entitlement are not here: the future
-  `module-dependencies` skill. Where the hook is used: `browser-module`.
+- Host-service wiring, lending and entitlement are not here: §3.3, §10.1 and
+  the `frontend` skill. Where the hook is used: `browser-module`.
