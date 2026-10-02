@@ -5,6 +5,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * Spec: specs/identity/directory-administration.feature
  */
 import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { TabCount } from "@langwatch/design-system/tab-count";
 import { Suspense } from "react";
 
 import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
@@ -16,7 +17,6 @@ import {
 } from "../../../model/directory-tabs.ts";
 import { useOrganizationHost, type OrganizationHostApi } from "../../../model/organization-host.ts";
 import { PermissionAlert } from "../../elements/permission-alert.tsx";
-import { TabCount } from "../../elements/tab-count.tsx";
 import DepartmentsScreen from "./departments.screen.tsx";
 import GroupsScreen from "./groups.screen.tsx";
 import MembersScreen from "./members.screen.tsx";

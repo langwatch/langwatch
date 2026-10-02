@@ -107,7 +107,7 @@ function ProviderRow({
             {providerIcon}
           </Box>
           <VStack gap={0} align="start">
-            <Text>{provider.name}</Text>
+            <Text fontWeight="medium">{provider.name}</Text>
             <ConnectionTestVerdict
               state={provider.id ? connectionTests.results[provider.id] : void 0}
             />
@@ -130,11 +130,12 @@ function ProviderRow({
                 <Menu.Trigger asChild>
                   <Button
                     variant="ghost"
+                    size="sm"
                     disabled={!!rowActionsDisabledReason}
                     data-testid={`model-provider-row-menu-${provider.provider}`}
                     aria-label={`Actions for ${provider.name}`}
                   >
-                    <MoreVertical />
+                    <MoreVertical size={16} />
                   </Button>
                 </Menu.Trigger>
               </TriggerAnchor>
@@ -458,10 +459,11 @@ export default function ModelProvidersScreen() {
           onPick={(providerKey) => openProviderEditor({ providerKey, modelProviderId: "new" })}
         >
           <PageLayout.HeaderButton
+            variant="solid"
             disabled={!!addProviderDisabledReason}
             data-testid="model-provider-add"
           >
-            <Plus /> Add Model Provider
+            <Plus size={14} /> Add Model Provider
           </PageLayout.HeaderButton>
         </AddModelProviderMenu>
       </PageLayout.Header>

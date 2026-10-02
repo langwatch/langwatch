@@ -12,9 +12,9 @@ import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./
  * one vendor mark.
  *
  * Shared rather than written twice, because the honesty rule lives inside the
- * figure. A table that drew its own dash would be one edit away from drawing a
- * bare "—" with no sentence behind it, and the sentence is the whole reason
- * the dash is acceptable.
+ * figure. A table that drew its own placeholder would be one edit away from drawing a
+ * bare placeholder with no sentence behind it, and the sentence is the whole reason
+ * the placeholder is acceptable.
  *
  * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
  */
@@ -22,10 +22,10 @@ import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./
 /**
  * One figure, wherever it is drawn.
  *
- * An absent value draws an em dash carrying the sentence that says why. Two
+ * An absent value draws a quiet "No data" carrying the sentence that says why. Two
  * different sentences reach it — a row the tool has but nothing measures yet,
  * and a row the tool does not have at all — and the caller has already picked
- * which; see `toolCardMissingReason`. Rendering the dash as a `Tooltip`
+ * which; see `toolCardMissingReason`. Rendering it as a `Tooltip`
  * trigger rather than a `title=` attribute is deliberate: the sentences are
  * the honest half of this screen and they have to survive on touch, where
  * `title` never opens.
@@ -38,7 +38,7 @@ export function ToolCardFigure({
 }: {
   label: string;
   value: string | number | undefined;
-  /** What the em dash says when `value` is absent. Never optional. */
+  /** What "No data" says when `value` is absent. Never optional. */
   emptyReason: string;
   align?: "start" | "end";
 }) {
@@ -54,13 +54,10 @@ export function ToolCardFigure({
           fontSize="xs"
           color="fg.subtle"
           cursor="help"
-          textDecoration="underline"
-          textDecorationStyle="dotted"
-          textUnderlineOffset="3px"
           textAlign={align}
           aria-label={`${label} not measured. ${emptyReason}`}
         >
-          —
+          No data
         </Text>
       </Tooltip>
     );

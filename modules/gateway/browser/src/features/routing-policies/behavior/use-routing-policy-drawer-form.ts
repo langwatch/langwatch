@@ -170,7 +170,7 @@ function useScopeOptions(teams: OrganizationShape["teams"]) {
       teams?.flatMap((team) =>
         team.projects.map((project) => ({
           id: project.id,
-          name: `${project.name} · ${team.name}`,
+          name: project.name,
           teamId: team.id,
         })),
       ) ?? [],

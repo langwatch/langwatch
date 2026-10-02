@@ -37,9 +37,7 @@ export function RolesTabs({
         <PageLayout.Heading>Roles &amp; access</PageLayout.Heading>
       </PageLayout.Header>
       <VStack align="start" width="full" gap={6} paddingTop={4}>
-        <Text color="fg.muted" fontSize="sm">
-          What a role can do, and who holds one where.
-        </Text>
+        <Text color="fg.muted">What a role can do, and who holds one where.</Text>
 
         <Tabs.Root
           value={tab}

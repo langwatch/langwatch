@@ -168,7 +168,7 @@ describe("given sam, a delegated viewer, opens the People page", () => {
     it("selects the People tab, requests the table and writes no tab parameter", () => {
       const { host } = renderPage();
 
-      expect(screen.getByRole("tab", { name: "People" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: /^People/ })).toHaveAttribute("aria-selected", "true");
       expect(harness.requested).toContain("activityMonitor.spendByUser");
       expect(harness.requested).toContain("governancePeople.list");
       expect(host.recording.queries.filter((write) => "tab" in write.next)).toEqual([]);
@@ -180,7 +180,7 @@ describe("given sam, a delegated viewer, opens the People page", () => {
     it("selects the Departments tab and requests the department list", () => {
       renderPage({ query: { tab: "departments" } });
 
-      expect(screen.getByRole("tab", { name: "Departments" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: /^Departments/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );

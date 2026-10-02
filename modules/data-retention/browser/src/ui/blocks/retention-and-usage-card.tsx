@@ -1,11 +1,13 @@
 import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
-import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
-import { OverviewCard, SettingRow } from "@langwatch/design-system/settings-card";
+import { HStack, Skeleton, Text } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
+import { Clock, HardDrive } from "lucide-react";
 
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 import { formatBytes, formatDays } from "../../model/retention-format.ts";
 import { renderPolicySummary } from "../../model/retention-grouping.ts";
 
+/** The page's summary row: how long data is kept, and how much space it takes. */
 export function RetentionAndUsageCard({
   effective,
   isLoading,
@@ -15,45 +17,39 @@ export function RetentionAndUsageCard({
   effective: Partial<Record<RetentionCategory, number>>;
   isLoading: boolean;
   data?: { totalBytes: number; projectCount?: number };
-  /** Scope-aware copy for the storage row — the storage total tracks the
-   *  page's scope selector, so the sentence must match (project / team / org /
-   *  everything you can see). */
+  /** Scope-aware copy for the storage tile: it tracks the page's scope selector. */
   storageDescription?: string;
 }) {
   const summary = renderPolicySummary(effective);
+  const perCategory = retentionCategories
+    .map((category) => {
+      const days = effective[category];
+      return `${CATEGORY_LABELS[category]} ${days === undefined ? "—" : formatDays(days)}`;
+    })
+    .join(" · ");
+
   return (
-    <OverviewCard
-      title="Data retention"
-      hint="How long this project's data is kept before deletion, and how much space it uses."
-    >
-      <SettingRow label="Retention">
-        <Text fontSize="13px" fontWeight="500">
-          {summary}
-        </Text>
-      </SettingRow>
-      {summary === "Mixed" &&
-        retentionCategories.map((category) => (
-          <SettingRow key={category} label={CATEGORY_LABELS[category]}>
-            <Text fontSize="13px" color="fg.muted">
-              {effective[category] !== undefined ? formatDays(effective[category]!) : "—"}
-            </Text>
-          </SettingRow>
-        ))}
-      <SettingRow label="Data storage" hint={storageDescription}>
-        {isLoading && <Spinner size="sm" />}
+    <StatTileGrid columns={2}>
+      <StatTile
+        label="Retention"
+        icon={<Clock size={14} />}
+        hint={summary === "Mixed" ? perCategory : "How long data is kept before deletion."}
+      >
+        <StatTileFigure>{summary}</StatTileFigure>
+      </StatTile>
+      <StatTile label="Data storage" icon={<HardDrive size={14} />} hint={storageDescription}>
+        {isLoading && <Skeleton height="5" width="24" />}
         {!isLoading && data && (
-          <HStack gap={1.5} align="baseline">
-            <Text fontSize="13px" fontWeight="500">
-              {formatBytes(data.totalBytes)}
-            </Text>
+          <HStack gap={1.5} align="baseline" minWidth={0}>
+            <StatTileFigure>{formatBytes(data.totalBytes)}</StatTileFigure>
             {data.projectCount !== undefined && data.projectCount > 1 && (
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="sm" color="fg.muted">
                 · {data.projectCount} projects
               </Text>
             )}
           </HStack>
         )}
-      </SettingRow>
-    </OverviewCard>
+      </StatTile>
+    </StatTileGrid>
   );
 }

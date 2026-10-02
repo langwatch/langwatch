@@ -18,12 +18,15 @@ import {
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import {
   Archive,
+  Building2,
   ChevronDown,
   ExternalLink,
   MoreVertical,
   Pencil,
   Plus,
+  UserRoundX,
   Users,
+  UserX,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -48,7 +51,10 @@ import {
   mergePeopleRows,
   type PeopleRow,
 } from "../../../features/people/model/people-rows.ts";
-import { summarizePeople } from "../../../features/people/model/people-summary.ts";
+import {
+  type PeopleSummary,
+  summarizePeople,
+} from "../../../features/people/model/people-summary.ts";
 import {
   SAMPLE_DEPARTMENTS,
   samplePeopleRows,
@@ -73,6 +79,7 @@ import {
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
+import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
@@ -437,13 +444,15 @@ function usePeopleScreen() {
 function PeoplePage() {
   const { tab, selectTab } = usePeopleTab();
   const screen = usePeopleScreen();
-  const { canManage, runMatch, sample, departmentTab, allRows, reads } = screen;
+  const { canManage, runMatch, sample, allRows, reads } = screen;
 
   const bodyOffersMatch =
     tab === "people" &&
     screen.canReadActivity &&
     allRows.length === 0 &&
     (sample.active || !(reads.spend.isLoading || reads.people.isLoading));
+
+  const summary = usePeopleSummary(screen);
 
   const [assigning, setAssigning] = useState<PeopleRow | null>(null);
   // Local state opens it; `?add=1` opens it too, via the deep-link hook.
@@ -466,14 +475,14 @@ function PeoplePage() {
         <VStack align="stretch" gap={6} width="full">
           <PeopleSampleBanner active={sample.active} />
 
-          <PeopleSummaryStrip
-            rows={allRows}
-            departmentCount={departmentTab.recordCount}
-            sampleActive={sample.active}
-            reads={reads}
-          />
+          <Text color="fg.muted">
+            Who uses AI across the organization, which department they sit in, and what it costs.
+          </Text>
+
+          <PeopleSummaryStrip summary={summary} />
 
           <PeopleTabsSection
+            summary={summary}
             tab={tab}
             onSelectTab={selectTab}
             screen={screen}
@@ -508,11 +517,13 @@ function PeoplePage() {
  * fifteen props that would all pass straight through unchanged.
  */
 function PeopleTabsSection({
+  summary,
   tab,
   onSelectTab,
   screen,
   onAssignDepartment,
 }: {
+  summary: PeopleSummary;
   tab: PeopleTab;
   onSelectTab: (next: string) => void;
   screen: ReturnType<typeof usePeopleScreen>;
@@ -540,7 +551,7 @@ function PeopleTabsSection({
       lazyMount
       unmountOnExit
     >
-      <PeopleTabsList />
+      <PeopleTabsList summary={summary} />
       <Tabs.Content value="people" paddingTop={4}>
         <PeopleTabPane
           orgId={orgId}
@@ -576,7 +587,7 @@ function PeopleTabsSection({
 }
 
 /** The two tab triggers, factored out so the styling repeats only once. */
-function PeopleTabsList() {
+function PeopleTabsList({ summary }: { summary: PeopleSummary }) {
   return (
     <Tabs.List>
       <Tabs.Trigger
@@ -584,14 +595,14 @@ function PeopleTabsList() {
         color="fg.muted"
         _selected={{ color: "fg", fontWeight: "semibold" }}
       >
-        People
+        <GovernanceTabLabel label="People" count={summary.people} />
       </Tabs.Trigger>
       <Tabs.Trigger
         value="departments"
         color="fg.muted"
         _selected={{ color: "fg", fontWeight: "semibold" }}
       >
-        Departments
+        <GovernanceTabLabel label="Departments" count={summary.departments} />
       </Tabs.Trigger>
     </Tabs.List>
   );
@@ -615,28 +626,23 @@ function PeopleSampleBanner({ active }: { active: boolean }) {
  * read that has not answered leaves its figure unmeasured (an em dash), never
  * a lying zero.
  */
-function PeopleSummaryStrip({
-  rows,
-  departmentCount,
-  sampleActive,
+/** The four figures, counted once for the strip and the tab counts alike. */
+function usePeopleSummary({
+  allRows,
+  departmentTab,
+  sample,
   reads,
-}: {
-  rows: PeopleRow[];
-  departmentCount: number;
-  sampleActive: boolean;
-  reads: ReturnType<typeof usePeopleReads>;
-}) {
-  const peopleMeasured =
-    sampleActive || (reads.spend.data !== undefined && reads.people.data !== undefined);
-  const departmentsMeasured = sampleActive || reads.departments.data !== undefined;
-
-  const summary = summarizePeople({
-    rows,
-    departmentCount,
-    peopleMeasured,
-    departmentsMeasured,
+}: ReturnType<typeof usePeopleScreen>): PeopleSummary {
+  return summarizePeople({
+    rows: allRows,
+    departmentCount: departmentTab.recordCount,
+    peopleMeasured:
+      sample.active || (reads.spend.data !== undefined && reads.people.data !== undefined),
+    departmentsMeasured: sample.active || reads.departments.data !== undefined,
   });
+}
 
+function PeopleSummaryStrip({ summary }: { summary: PeopleSummary }) {
   return (
     <GovernanceSummaryBar
       testId="people-summary-strip"
@@ -645,24 +651,28 @@ function PeopleSummaryStrip({
           key: "people",
           value: summary.people,
           label: "people",
+          icon: <Users size={14} />,
           hint: "Metered by the gateway or named by a source",
         },
         {
           key: "departments",
           value: summary.departments,
           label: "departments",
+          icon: <Building2 size={14} />,
           hint: "The ones you created",
         },
         {
           key: "unmatched",
           value: summary.unmatched,
           label: "unmatched",
+          icon: <UserX size={14} />,
           hint: "No account is tied to them yet",
         },
         {
           key: "unassigned",
           value: summary.unassigned,
           label: "without a department",
+          icon: <UserRoundX size={14} />,
         },
       ]}
     />

@@ -38,9 +38,10 @@ export function CostPanel({
       align="stretch"
       gap={3}
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
+      borderColor="border.muted"
+      borderRadius="xl"
       backgroundColor="bg.panel"
+      boxShadow="md"
       padding={4}
     >
       <HStack gap={2}>

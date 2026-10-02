@@ -5,16 +5,18 @@
 
 import type { WireOf } from "@langwatch/api/web";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
-  Card,
+  HStack,
   Input,
   Spacer,
   Skeleton,
+  SkeletonText,
   Table,
   Text,
   VStack,
@@ -84,13 +86,20 @@ function SecretRow({
   return (
     <Table.Row data-testid="secret-row">
       <Table.Cell>
-        <Text fontFamily="mono">{secret.name}</Text>
+        <HStack gap={3}>
+          <Box color="fg.muted" flexShrink={0}>
+            <Key size={16} />
+          </Box>
+          <Text fontFamily="mono" fontWeight="medium">
+            {secret.name}
+          </Text>
+        </HStack>
       </Table.Cell>
       <Table.Cell>
         <Text>{secret.createdBy?.name ?? "-"}</Text>
       </Table.Cell>
       <Table.Cell>
-        <Text>{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
+        <Text color="fg.muted">{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
       </Table.Cell>
       <Table.Cell textAlign="right">
         {canManage && (
@@ -102,7 +111,7 @@ function SecretRow({
                 aria-label={`Actions for ${secret.name}`}
                 data-testid="secret-row-actions"
               >
-                <MoreVertical />
+                <MoreVertical size={16} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
@@ -118,7 +127,7 @@ function SecretRow({
               </Menu.Item>
               <Menu.Item
                 value="delete"
-                color="red"
+                color="fg.error"
                 data-testid="secret-row-delete"
                 onClick={() => onDelete({ id: secret.id, name: secret.name })}
               >
@@ -132,6 +141,47 @@ function SecretRow({
         )}
       </Table.Cell>
     </Table.Row>
+  );
+}
+
+function SecretsTableHeader() {
+  return (
+    <Table.Header>
+      <Table.Row>
+        <Table.ColumnHeader>Name</Table.ColumnHeader>
+        <Table.ColumnHeader>Created by</Table.ColumnHeader>
+        <Table.ColumnHeader>Last updated</Table.ColumnHeader>
+        <Table.ColumnHeader width={16} />
+      </Table.Row>
+    </Table.Header>
+  );
+}
+
+/** The list's own shape while it loads, so nothing jumps when rows arrive. */
+function SecretsTableSkeleton() {
+  return (
+    <ListTable width="full" containerProps={{ width: "full" }} data-testid="secrets-loading">
+      <SecretsTableHeader />
+      <Table.Body>
+        {[0, 1, 2].map((row) => (
+          <Table.Row key={row}>
+            <Table.Cell>
+              <HStack gap={3}>
+                <Skeleton boxSize={4} borderRadius="sm" />
+                <SkeletonText noOfLines={1} width="160px" />
+              </HStack>
+            </Table.Cell>
+            <Table.Cell>
+              <SkeletonText noOfLines={1} width="100px" />
+            </Table.Cell>
+            <Table.Cell>
+              <SkeletonText noOfLines={1} width="80px" />
+            </Table.Cell>
+            <Table.Cell />
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }
 
@@ -220,6 +270,7 @@ export default function SecretsScreen() {
         {canManageSecrets && (
           <Tooltip content="Add a new secret for use in code blocks" disabled={false}>
             <PageLayout.HeaderButton
+              variant="solid"
               onClick={() => setIsAddDialogOpen(true)}
               data-testid="secret-add"
             >
@@ -230,7 +281,7 @@ export default function SecretsScreen() {
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">Encrypted values your code blocks can read at run time.</Text>
-        {secretsQuery.isLoading && <Skeleton width="full" height="120px" />}
+        {secretsQuery.isLoading && <SecretsTableSkeleton />}
         {showEmpty && (
           <NoDataInfoBlock
             title="No secrets configured"
@@ -239,34 +290,23 @@ export default function SecretsScreen() {
           />
         )}
         {showSecrets && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Created By</Table.ColumnHeader>
-                    <Table.ColumnHeader>Last Updated</Table.ColumnHeader>
-                    <Table.ColumnHeader />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {secrets.map((secret) => (
-                    <SecretRow
-                      key={secret.id}
-                      secret={secret}
-                      canManage={canManageSecrets}
-                      onUpdate={(picked) => {
-                        setSecretToUpdate(picked);
-                        setUpdateValue("");
-                      }}
-                      onDelete={setSecretToDelete}
-                    />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+          <ListTable width="full" containerProps={{ width: "full", overflowX: "auto" }}>
+            <SecretsTableHeader />
+            <Table.Body>
+              {secrets.map((secret) => (
+                <SecretRow
+                  key={secret.id}
+                  secret={secret}
+                  canManage={canManageSecrets}
+                  onUpdate={(picked) => {
+                    setSecretToUpdate(picked);
+                    setUpdateValue("");
+                  }}
+                  onDelete={setSecretToDelete}
+                />
+              ))}
+            </Table.Body>
+          </ListTable>
         )}
 
         {/* Add Secret Dialog */}
@@ -314,7 +354,6 @@ export default function SecretsScreen() {
                 <Button variant="outline">Cancel</Button>
               </Dialog.ActionTrigger>
               <Button
-                variant="outline"
                 colorPalette="orange"
                 loading={createMutation.isPending}
                 disabled={!newSecretName || !newSecretValue}
@@ -390,7 +429,6 @@ export default function SecretsScreen() {
                 <Button variant="outline">Cancel</Button>
               </Dialog.ActionTrigger>
               <Button
-                variant="outline"
                 colorPalette="orange"
                 loading={updateMutation.isPending}
                 disabled={!updateValue}

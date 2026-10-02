@@ -6,7 +6,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { Heading, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -34,7 +34,7 @@ import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { IssuerRow } from "../elements/issuer-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
-import { SetupStep, SetupSteps } from "../elements/setup-step.tsx";
+import { SetupStep, SetupSteps, SetupStepsSkeleton } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
 import { BreakGlassSection } from "./break-glass.section.tsx";
 import {
@@ -93,7 +93,7 @@ export default function SsoSetupScreen() {
 function SsoSetupPage({ organizationId }: { organizationId: string }) {
   const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId });
 
-  if (setup.isLoading) return <Skeleton height="220px" width="full" />;
+  if (setup.isLoading) return <SetupStepsSkeleton />;
 
   // A read that failed is not an organization without single sign-on: the
   // journey's first step would invite somebody to register a second provider.

@@ -12,6 +12,7 @@ import {
   Collapsible,
   HStack,
   Heading,
+  Skeleton,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -43,6 +44,27 @@ export function SetupSteps({ children }: { children: ReactNode }) {
         {children}
       </VStack>
     </Card.Root>
+  );
+}
+
+/** The journey before its read lands, in the steps' own geometry. */
+export function SetupStepsSkeleton({ steps = 5 }: { steps?: number }) {
+  return (
+    <SetupSteps>
+      <VStack align="stretch" gap={0} aria-busy="true" aria-label="Loading">
+        {Array.from({ length: steps }, (_, index) => (
+          <HStack
+            key={index}
+            gap={`${MARKER_GAP}px`}
+            paddingX={`${PADDING_X}px`}
+            paddingY={`${PADDING_Y}px`}
+          >
+            <Skeleton boxSize={`${MARKER}px`} borderRadius="full" flexShrink={0} />
+            <Skeleton height="14px" width={index % 2 === 0 ? "36%" : "28%"} />
+          </HStack>
+        ))}
+      </VStack>
+    </SetupSteps>
   );
 }
 

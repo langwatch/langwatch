@@ -4,6 +4,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -52,21 +53,20 @@ function AnnotationScoresTable({
   onDelete: (scoreId: string) => void;
 }) {
   return (
-    <Box width="full" overflowX="auto">
-      <Table.Root variant="line" width="full">
+    <Box width="full">
+      <ListTable containerProps={{ overflowX: "auto" }} width="full">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Description</Table.ColumnHeader>
             <Table.ColumnHeader>Score Type</Table.ColumnHeader>
             <Table.ColumnHeader>Score Options</Table.ColumnHeader>
-            <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-            {canManage && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
+            <Table.ColumnHeader width="1%">Enabled</Table.ColumnHeader>
+            {canManage && <Table.ColumnHeader width="1%" aria-label="Actions" />}
           </Table.Row>
         </Table.Header>
         <Table.Body>
           {isLoading ? (
-            <LoadingScoreRows colSpan={canManage ? 6 : 5} />
+            <LoadingScoreRows canManage={canManage} />
           ) : (
             scores?.map((score) => (
               <AnnotationScoreRow
@@ -80,17 +80,38 @@ function AnnotationScoresTable({
             ))
           )}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }
 
-function LoadingScoreRows({ colSpan }: { colSpan: number }) {
+/** Three rows in the table's own shape while the scores load. */
+function LoadingScoreRows({ canManage }: { canManage: boolean }) {
   return Array.from({ length: 3 }, (_, index) => (
     <Table.Row key={index}>
-      <Table.Cell colSpan={colSpan}>
-        <Skeleton height="20px" />
+      <Table.Cell>
+        <VStack align="start" gap={1.5}>
+          <Skeleton height="14px" width="40%" />
+          <Skeleton height="12px" width="70%" />
+        </VStack>
       </Table.Cell>
+      <Table.Cell>
+        <Skeleton height="14px" width="96px" />
+      </Table.Cell>
+      <Table.Cell>
+        <HStack gap={2}>
+          <Skeleton height="20px" width="48px" />
+          <Skeleton height="20px" width="48px" />
+        </HStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton height="20px" width="36px" borderRadius="full" />
+      </Table.Cell>
+      {canManage && (
+        <Table.Cell>
+          <Skeleton height="24px" width="24px" />
+        </Table.Cell>
+      )}
     </Table.Row>
   ));
 }
@@ -110,8 +131,16 @@ function AnnotationScoreRow({
 }) {
   return (
     <Table.Row data-testid={`annotation-score-row-${score.name}`}>
-      <Table.Cell>{score.name}</Table.Cell>
-      <Table.Cell>{score.description}</Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={0.5}>
+          <Text fontWeight="medium">{score.name}</Text>
+          {score.description && (
+            <Text fontSize="sm" color="fg.muted" lineClamp={2}>
+              {score.description}
+            </Text>
+          )}
+        </VStack>
+      </Table.Cell>
       <Table.Cell width="20%">
         <Text lineClamp={1}>
           {score.dataType === AnnotationScoreDataType.CHECKBOX ? "Checkbox" : "Multiple choice"}
@@ -155,7 +184,7 @@ function ScoreActions({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost" aria-label={`Actions for score ${scoreName}`}>
+        <Button variant="ghost" size="sm" aria-label={`Actions for score ${scoreName}`}>
           <MoreVertical />
         </Button>
       </Menu.Trigger>
@@ -175,7 +204,7 @@ function ScoreActions({
           onClick={() => onDelete(scoreId)}
           data-testid="annotation-score-action-delete"
         >
-          <Box display="flex" alignItems="center" gap={2} color="red.600">
+          <Box display="flex" alignItems="center" gap={2} color="fg.error">
             <Trash size={14} />
             Delete
           </Box>
@@ -328,7 +357,7 @@ const ScoreOptions = ({ options }: { options: unknown[] }) => {
   );
 
   return (
-    <HStack flexWrap="wrap" gap={4}>
+    <HStack flexWrap="wrap" gap={2}>
       {visibleOptions.map((option) => (
         <Badge key={option.value}>{option.label}</Badge>
       ))}

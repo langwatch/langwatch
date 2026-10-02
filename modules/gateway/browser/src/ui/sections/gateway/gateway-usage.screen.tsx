@@ -10,7 +10,6 @@ import {
   Heading,
   HStack,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -47,6 +46,7 @@ import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 /** A query bag as a query string, dropping the keys that have no value. */
 function queryString(query: Readonly<Record<string, string | undefined>>): string {
@@ -332,7 +332,10 @@ function GatewayUsagePage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          {isLoadingUsage && <Spinner />}
+          <Text color="fg.muted" marginBottom={6}>
+            What your virtual keys spent, by key, model and provider, over the window you pick.
+          </Text>
+          {isLoadingUsage && <ListSkeleton />}
           {showUsageError && (
             <GatewayErrorPanel
               title="Failed to load usage"

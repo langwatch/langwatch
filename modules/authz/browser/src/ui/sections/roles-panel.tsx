@@ -3,18 +3,20 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Alert,
   Box,
   Button,
   Heading,
   HStack,
+  Skeleton,
   Spacer,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Plus } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { authzApi, type RouterOutputs } from "../../behavior/authz-api.ts";
@@ -132,7 +134,7 @@ export function RolesPanel({
             >
               <Button
                 size="sm"
-                colorPalette="blue"
+                colorPalette="orange"
                 onClick={() => setDialog({ kind: "create" })}
                 disabled={!canManage}
                 data-testid="authz-role-create"
@@ -228,20 +230,27 @@ function CustomRoleCards({
   onEdit: (role: Role) => void;
   onDelete: (role: Role) => void;
 }) {
-  if (roles?.length === 0) {
+  if (!roles) {
     return (
-      <Box width="full" borderWidth="1px" borderColor="border.muted" borderRadius="xl" padding={8}>
-        <Text fontSize="sm" color="fg.muted">
-          No custom roles yet. Write one when somebody needs a narrower slice of access than Admin,
-          Member or Viewer gives them.
-        </Text>
-      </Box>
+      <VStack align="stretch" width="full" gap={4}>
+        <Skeleton height="96px" borderRadius="xl" />
+        <Skeleton height="96px" borderRadius="xl" />
+      </VStack>
+    );
+  }
+  if (roles.length === 0) {
+    return (
+      <NoDataInfoBlock
+        title="No custom roles yet"
+        description="Write one when somebody needs a narrower slice of access than Admin, Member or Viewer gives them."
+        icon={<ShieldCheck />}
+      />
     );
   }
 
   return (
     <VStack align="stretch" width="full" gap={4}>
-      {roles?.map((role) => {
+      {roles.map((role) => {
         const input = { assignments: assignments ?? [], customRoleId: role.id };
         return (
           <CustomRoleCard

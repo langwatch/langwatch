@@ -1,6 +1,6 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Lightbulb, Plus } from "lucide-react";
@@ -19,6 +19,7 @@ import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 /**
  * Routing policy editor uses drawer registry (drawer.open=routingPolicy), not its own query key.
@@ -70,7 +71,7 @@ export function RoutingPoliciesPage() {
         <VStack align="stretch" gap={6} width="full">
           <PageDescription />
 
-          {policiesQuery.isLoading && <Spinner size="sm" />}
+          {policiesQuery.isLoading && <ListSkeleton />}
 
           <HandledErrorAlert
             error={policiesQuery.error}
@@ -163,7 +164,7 @@ function DeletePolicyDialog({
 
 function PageDescription() {
   return (
-    <Text color="fg.muted" fontSize="sm">
+    <Text color="fg.muted">
       Decide which providers and models your keys reach, and what the model tiers mean here. A
       project policy wins over a team policy, which wins over the organization policy.
     </Text>

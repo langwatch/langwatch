@@ -9,7 +9,14 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Card,
+  Skeleton,
+  SkeletonText,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import {
   ScopeChipPicker,
   type ScopeChipPickerScopeType,
@@ -95,9 +102,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   const setRuleAddress = (next: string | undefined) =>
     host.setQuery({ ...query, [PRIVACY_RULE_QUERY_KEY]: next });
 
-  if (snapshotQuery.isLoading) {
-    return <Skeleton width="full" height="200px" />;
-  }
+  if (snapshotQuery.isLoading) return <DataPrivacyLoading />;
 
   const snapshot = snapshotQuery.data;
   const canWrite = canWritePrivacyRules(available);
@@ -138,13 +143,11 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           />
         )}
         {canWrite && snapshot?.rules.length !== 0 && (
-          <PageLayout.HeaderButton variant="solid" colorPalette="blue" onClick={openAdd}>
-            Add privacy rule
-          </PageLayout.HeaderButton>
+          <PageLayout.HeaderButton onClick={openAdd}>Add privacy rule</PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
-        <Text fontSize="sm" color="fg.muted">
+        <Text color="fg.muted">
           Control what trace content LangWatch stores, who can see it, and how secrets and PII are
           scrubbed, at any scope, inherited down to projects.
         </Text>
@@ -180,6 +183,29 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             onSaved={() => void invalidate()}
           />
         )}
+      </VStack>
+    </>
+  );
+}
+
+/** The page while its snapshot loads: the header and the rules table, unfilled. */
+function DataPrivacyLoading() {
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Data Privacy</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+        <SkeletonText noOfLines={1} width="md" />
+        <Card.Root width="full">
+          <Card.Body>
+            <VStack gap={4} align="stretch">
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} height="5" />
+              ))}
+            </VStack>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </>
   );

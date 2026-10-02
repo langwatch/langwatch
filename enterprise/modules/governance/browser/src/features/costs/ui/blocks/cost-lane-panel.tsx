@@ -114,9 +114,10 @@ export function CostLanePanel({
     <Box
       data-testid={testId}
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
+      borderColor="border.muted"
+      borderRadius="xl"
       backgroundColor="bg.panel"
+      boxShadow="md"
       padding={4}
     >
       <VStack align="start" gap={1} height="full">
@@ -221,9 +222,10 @@ export function SeatLanePanel({
     <Box
       data-testid={testId}
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
+      borderColor="border.muted"
+      borderRadius="xl"
       backgroundColor="bg.panel"
+      boxShadow="md"
       borderStyle={reported ? "solid" : "dashed"}
       padding={4}
     >

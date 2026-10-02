@@ -3,7 +3,7 @@ import { Link } from "@langwatch/browser-host/link";
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
-import { Alert, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
@@ -225,20 +225,36 @@ export function SubscriptionPage() {
     activePlanType: plan?.type,
   });
 
-  if (!organization || activePlan.isLoading || isCurrencyLoading) {
-    return <Skeleton width="full" height="200px" />;
-  }
-
-  if (activePlan.isError || !plan) {
+  const isPlanLoading = !organization || activePlan.isLoading || isCurrencyLoading;
+  if (isPlanLoading || activePlan.isError || !plan) {
     return (
-      <Alert.Root status="error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>
-            Failed to load subscription information. Please try again later.
-          </Alert.Title>
-        </Alert.Content>
-      </Alert.Root>
+      <>
+        <SubscriptionPageHeader
+          showPlanPickers={false}
+          billingPeriod={billingPeriod}
+          onBillingPeriodChange={setBillingPeriod}
+          currency={currency}
+          onCurrencyChange={setSelectedCurrency}
+        />
+        <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+          {isPlanLoading ? (
+            <>
+              <SkeletonText noOfLines={1} width="320px" />
+              <Skeleton width="full" height="180px" borderRadius="lg" />
+              <Skeleton width="full" height="140px" borderRadius="lg" />
+            </>
+          ) : (
+            <Alert.Root status="error">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>
+                  Failed to load subscription information. Please try again later.
+                </Alert.Title>
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        </VStack>
+      </>
     );
   }
 

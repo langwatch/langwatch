@@ -67,11 +67,13 @@ export function InvoicesBlock({
       }
     >
       {invoices.isLoading && (
-        <VStack data-testid="invoices-loading" gap={2} width="full">
-          <Skeleton height="20px" width="100%" />
-          <Skeleton height="20px" width="100%" />
-          <Skeleton height="20px" width="100%" />
-        </VStack>
+        <Card.Root data-testid="invoices-loading" width="full" padding={4}>
+          <VStack gap={4} width="full">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} height="20px" width="100%" />
+            ))}
+          </VStack>
+        </Card.Root>
       )}
 
       {invoices.isError && (
@@ -93,64 +95,63 @@ export function InvoicesBlock({
 
       {rows && rows.length > 0 && (
         <Card.Root width="full" overflow="hidden">
-          <Table.Root size="sm">
-            <Table.Header>
-              <Table.Row>
-                {["Invoice #", "Date", "Amount", "Status", "Actions"].map((column) => (
-                  <Table.ColumnHeader
-                    key={column}
-                    fontSize="xs"
-                    textTransform="uppercase"
-                    letterSpacing="wide"
-                    color="fg.muted"
-                  >
-                    {column}
-                  </Table.ColumnHeader>
-                ))}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {rows.map((invoice) => (
-                <Table.Row key={invoice.id}>
-                  <Table.Cell>
-                    <Text fontSize="sm">{invoice.number ?? "--"}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text fontSize="sm">{formatInvoiceDate(invoice.date)}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text fontSize="sm">
-                      {formatInvoiceAmount({
-                        amountCents: invoice.amountDue,
-                        currency: invoice.currency,
-                      })}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <StatusChip
-                      label={invoice.status}
-                      tone={TONE_OF_PALETTE[getInvoiceStatusColor(invoice.status)] ?? "neutral"}
-                    />
-                  </Table.Cell>
-                  <Table.Cell>
-                    {invoice.pdfUrl && (
-                      <Link
-                        data-testid={`invoice-pdf-${invoice.id}`}
-                        href={invoice.pdfUrl}
-                        isExternal
-                        aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
-                      >
-                        <HStack gap={1} color="orange.fg" fontSize="sm">
-                          <Download size={14} />
-                          <Text>PDF</Text>
-                        </HStack>
-                      </Link>
-                    )}
-                  </Table.Cell>
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+            <Table.Root variant="line" size="md" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Invoice</Table.ColumnHeader>
+                  <Table.ColumnHeader>Date</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Amount</Table.ColumnHeader>
+                  <Table.ColumnHeader>Status</Table.ColumnHeader>
+                  <Table.ColumnHeader width="80px" textAlign="right" />
                 </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
+              </Table.Header>
+              <Table.Body>
+                {rows.map((invoice) => (
+                  <Table.Row key={invoice.id}>
+                    <Table.Cell>
+                      <HStack gap={3}>
+                        <Receipt size={16} />
+                        <Text fontWeight="medium">{invoice.number ?? "--"}</Text>
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text color="fg.muted">{formatInvoiceDate(invoice.date)}</Text>
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      <Text fontVariantNumeric="tabular-nums">
+                        {formatInvoiceAmount({
+                          amountCents: invoice.amountDue,
+                          currency: invoice.currency,
+                        })}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <StatusChip
+                        label={invoice.status}
+                        tone={TONE_OF_PALETTE[getInvoiceStatusColor(invoice.status)] ?? "neutral"}
+                      />
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      {invoice.pdfUrl && (
+                        <Link
+                          data-testid={`invoice-pdf-${invoice.id}`}
+                          href={invoice.pdfUrl}
+                          isExternal
+                          aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
+                        >
+                          <HStack gap={1} color="orange.fg" justify="end">
+                            <Download size={14} />
+                            <Text>PDF</Text>
+                          </HStack>
+                        </Link>
+                      )}
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
         </Card.Root>
       )}
     </SettingsSection>

@@ -202,7 +202,7 @@ export function VirtualKeyCreateDrawer({
       organization?.teams?.flatMap((t) =>
         t.projects.map((p) => ({
           id: p.id,
-          name: `${p.name} · ${t.name}`,
+          name: p.name,
           teamId: t.id,
         })),
       ) ?? [],

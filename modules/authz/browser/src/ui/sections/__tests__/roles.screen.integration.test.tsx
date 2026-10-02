@@ -177,9 +177,8 @@ describe("the Roles screen", () => {
     it("says so when no custom role has been defined", () => {
       renderWithAuthzHost(<RolesScreen />);
 
-      expect(
-        screen.getByText(/^No custom roles yet\. Write one when somebody needs/),
-      ).toBeVisible();
+      expect(screen.getByText("No custom roles yet")).toBeVisible();
+      expect(screen.getByText(/^Write one when somebody needs/)).toBeVisible();
     });
 
     it("counts each custom role's permissions", () => {

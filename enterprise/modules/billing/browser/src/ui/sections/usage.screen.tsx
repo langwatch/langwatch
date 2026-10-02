@@ -77,6 +77,29 @@ function messagesLabelFor({
   return RESOURCE_LABELS.eventsPerMonth;
 }
 
+type ReadState = { isLoading: boolean; isError: boolean; data?: unknown };
+
+/** Whether the limits are still being read, or failed, for this deployment. */
+function limitsReadState({
+  isSaaS,
+  usage,
+  licenseStatus,
+}: {
+  isSaaS: boolean | undefined;
+  usage: ReadState;
+  licenseStatus: ReadState;
+}) {
+  if (isSaaS === undefined) return { isLoadingLimits: true, hasLimitsError: false };
+  if (isSaaS) {
+    return { isLoadingLimits: usage.isLoading && !usage.data, hasLimitsError: usage.isError };
+  }
+  return {
+    isLoadingLimits:
+      (licenseStatus.isLoading || usage.isLoading) && !licenseStatus.data && !usage.data,
+    hasLimitsError: licenseStatus.isError || usage.isError,
+  };
+}
+
 export default function UsageScreen() {
   const host = useBillingHost();
   const organization = host.organization();
@@ -107,12 +130,7 @@ export default function UsageScreen() {
     organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
 
   const isSelfHosted = isSaaS === false;
-  const isLoadingLimits =
-    isSelfHosted &&
-    (licenseStatus.isLoading || usage.isLoading) &&
-    !licenseStatus.data &&
-    !usage.data;
-  const hasLimitsError = isSelfHosted && (licenseStatus.isError || usage.isError);
+  const { isLoadingLimits, hasLimitsError } = limitsReadState({ isSaaS, usage, licenseStatus });
   const hasValidLicense =
     isSelfHosted && licenseStatus.data?.hasLicense && "plan" in licenseStatus.data;
   const isUnlicensed =

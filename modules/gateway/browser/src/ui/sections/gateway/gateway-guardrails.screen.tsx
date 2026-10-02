@@ -28,6 +28,7 @@ import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 type GuardrailRow = {
   id: string;
@@ -179,14 +180,14 @@ function GuardrailsPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={4}>
-          <Text fontSize="sm" color="fg.muted">
+        <VStack align="stretch" gap={6}>
+          <Text color="fg.muted">
             Project-scoped LangWatch evaluators that run on every gateway request bound to this
             project. Pick a direction (pre / post / stream_chunk) and a failure mode (default fail
             closed). The VK opt-in lives in the virtual-key drawer.
           </Text>
 
-          {isLoadingGuardrails && <Spinner />}
+          {isLoadingGuardrails && <ListSkeleton />}
           {showGuardrailsEmpty && (
             <GuardrailsEmptyState hasGuardrailEvaluators={guardrailEvaluators.length > 0} />
           )}

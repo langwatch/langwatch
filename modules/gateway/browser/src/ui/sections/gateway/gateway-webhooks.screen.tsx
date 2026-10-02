@@ -36,6 +36,7 @@ import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/we
 import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
 import { readableDate } from "../../../model/readable-date.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 type EventTypesView = RouterOutputs["webhookEndpoints"]["eventTypes"];
@@ -342,20 +343,19 @@ function WebhookEndpointsPanel({
         <PageLayout.Heading>Webhooks</PageLayout.Heading>
         <Spacer />
         {actions.canManage && (
-          <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="orange"
-            onClick={actions.dialogs.openCreate}
-            data-testid="webhook-new"
-          >
+          <PageLayout.HeaderButton onClick={actions.dialogs.openCreate} data-testid="webhook-new">
             <Plus size={14} /> New endpoint
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack gap={6} width="full" align="start">
-          {isLoading && <Spinner size="sm" />}
+        <VStack gap={6} width="full" align="stretch">
+          <Text color="fg.muted">
+            Your systems that receive signed gateway events: billing, budgets and key lifecycle,
+            with retries and delivery history.
+          </Text>
+          {isLoading && <ListSkeleton />}
 
           {endpoints && endpoints.length === 0 && <NoWebhookEndpointsState />}
 

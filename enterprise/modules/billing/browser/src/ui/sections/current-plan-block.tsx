@@ -2,7 +2,7 @@ import { Link } from "@langwatch/browser-host/link";
 /**
  * Current Plan Block - displays the active subscription
  */
-import { Alert, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import {
   SettingList,
   SettingRow,
@@ -117,11 +117,12 @@ export function CurrentPlanBlock({
           data-testid="current-plan-features-grid"
           templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
           gap={2}
-          color="fg.muted"
         >
           {features.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Check size={16} />
+              <Box color="green.fg" flexShrink={0} paddingTop="2px">
+                <Check size={16} />
+              </Box>
               <Text fontSize="sm">{feature}</Text>
             </HStack>
           ))}

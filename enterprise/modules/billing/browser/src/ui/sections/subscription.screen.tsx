@@ -6,7 +6,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/primitives";
 import { Server } from "lucide-react";
 
 import { useBillingHost } from "../../model/billing-host.ts";
@@ -15,25 +15,33 @@ import { SubscriptionPage } from "./subscription-page.tsx";
 export default function SubscriptionScreen() {
   const host = useBillingHost();
 
-  if (!host.isDeploymentSettled()) return <Skeleton width="full" height="200px" />;
-  if (host.isSaaS()) return <SubscriptionPage />;
+  const isSettled = host.isDeploymentSettled();
+  if (isSettled && host.isSaaS()) return <SubscriptionPage />;
 
   return (
     <>
       <PageLayout.Header>
         <PageLayout.Heading>Subscription</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack width="full" gap={6} align="start" paddingTop={4}>
-        <Text color="fg.muted">What running LangWatch yourself means for billing.</Text>
-        <NoDataInfoBlock
-          icon={<Server />}
-          title="You run this LangWatch yourself"
-          description="This is the self-hosted version of LangWatch and all the costs and maintenance are managed by yourself. If you want to use the cloud version, please visit"
-        >
-          <Link href="https://langwatch.ai" isExternal color="orange.fg">
-            langwatch.ai
-          </Link>
-        </NoDataInfoBlock>
+      <VStack width="full" gap={6} align="stretch" paddingTop={4}>
+        {isSettled ? (
+          <Text color="fg.muted">What running LangWatch yourself means for billing.</Text>
+        ) : (
+          <SkeletonText noOfLines={1} width="320px" />
+        )}
+        {isSettled ? (
+          <NoDataInfoBlock
+            icon={<Server />}
+            title="You run this LangWatch yourself"
+            description="This is the self-hosted version of LangWatch and all the costs and maintenance are managed by yourself. If you want to use the cloud version, please visit"
+          >
+            <Link href="https://langwatch.ai" isExternal color="orange.fg">
+              langwatch.ai
+            </Link>
+          </NoDataInfoBlock>
+        ) : (
+          <Skeleton width="full" height="180px" borderRadius="lg" />
+        )}
       </VStack>
     </>
   );

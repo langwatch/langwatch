@@ -5,7 +5,7 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Skeleton, VStack } from "@langwatch/design-system/primitives";
+import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
 
 import { useGithubHost } from "../../model/github-host.ts";
@@ -41,7 +41,10 @@ export default function IntegrationsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Integrations</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack align="stretch" gap={6} paddingTop={4}>
+      <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+        <Text color="fg.muted">
+          Connect the tools your team already uses, so automations and Langy can reach them.
+        </Text>
         {organizationId ? (
           <>
             <SlackCard />

@@ -359,7 +359,8 @@ describe("given keys bound at different scopes", () => {
       const grants = new Set(["organization:view"]);
       state.keys = [];
       const { unmount } = renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost({ grants }));
-      expect(screen.getByText("No API keys. Create one to get started.")).toBeInTheDocument();
+      expect(screen.getByText("No API keys")).toBeInTheDocument();
+      expect(screen.getByText("Create one to get started.")).toBeInTheDocument();
       unmount();
 
       state.keys = [keyRow({ grants: [] })];

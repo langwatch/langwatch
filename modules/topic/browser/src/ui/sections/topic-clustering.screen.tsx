@@ -1,10 +1,10 @@
 /**
- * The topic-clustering schedule, at `/settings/topic-clustering`. THREE CARDS OVER TWO READS:
- * what the last run did and when the next one is due, a button that asks for one now, and the
- * log of recent runs.
+ * The topic-clustering schedule, at `/settings/topic-clustering`. THREE PARTS OVER TWO READS:
+ * stat tiles for the last and next run, a card that asks for a run now, and the log of runs.
  */
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
@@ -18,6 +18,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  StatTile,
+  StatTileFigure,
+  StatTileGrid,
+  StatTileSkeleton,
+} from "@langwatch/design-system/stat-tile";
 import type {
   ClusteringErrorCode,
   TopicClusteringRunHistoryEntry,
@@ -78,9 +84,9 @@ export default function TopicClusteringScreen() {
         <PageLayout.Heading>Topic Clustering</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
-        <Text fontSize="sm" color="fg.muted">
-          Choose the model and embeddings used for topic clustering in{" "}
-          <strong>Settings → Model Providers → Default Models</strong>.
+        <Text color="fg.muted">
+          Groups your traces into topics and subtopics on a schedule, so you can see what your users
+          talk about.
         </Text>
 
         <TopicClusteringCard project={project} />
@@ -126,7 +132,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   });
 
   return (
-    <VStack gap={6} width="full" align="start" paddingBottom={12}>
+    <VStack gap={6} width="full" align="stretch" paddingBottom={12}>
       <ClusteringStatusCard projectId={project.id} />
       <Card.Root width="full">
         <Card.Header>
@@ -136,7 +142,8 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
           <VStack align="start" gap={4}>
             <Text>
               Group your recent traces into topics and subtopics without waiting for the next
-              scheduled run.
+              scheduled run. Choose the model and embeddings it uses in{" "}
+              <strong>Settings → Model Providers → Default Models</strong>.
             </Text>
 
             <Alert.Root>
@@ -150,7 +157,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
             </Alert.Root>
 
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={() => triggerClustering.mutate({ projectId: project.id })}
               loading={triggerClustering.isPending}
             >
@@ -203,22 +210,36 @@ function ClusteringStatusBody({
   isLoading: boolean;
   data: TopicClusteringStatus | undefined;
 }) {
-  if (isLoading) {
-    return (
-      <VStack align="start" gap={2} width="full">
-        <Skeleton height="20px" width="60%" />
-        <Skeleton height="20px" width="40%" />
-      </VStack>
-    );
-  }
+  if (isLoading) return <StatTileSkeleton columns={3} />;
   if (!data) return <Text color="fg.muted">Clustering status is unavailable.</Text>;
+  const completed = data.lastRunOutcome === "completed";
   return (
-    <VStack align="start" gap={3}>
-      <HStack gap={3}>
-        <Text fontWeight="medium">Last run</Text>
-        {outcomeBadge(data.lastRunOutcome, data.isRunInFlight)}
-        {data.lastRunAt && <Text color="fg.muted">{formatTimeAgo(data.lastRunAt) ?? ""}</Text>}
-      </HStack>
+    <VStack align="stretch" gap={3} width="full">
+      <StatTileGrid columns={3}>
+        <StatTile
+          label="Last run"
+          hint={data.lastRunAt ? (formatTimeAgo(data.lastRunAt) ?? void 0) : void 0}
+        >
+          <HStack>{outcomeBadge(data.lastRunOutcome, data.isRunInFlight)}</HStack>
+        </StatTile>
+        <StatTile label="Next scheduled run">
+          <StatTileFigure muted={!data.nextRunAt}>
+            {data.nextRunAt ? (formatTimeAgo(data.nextRunAt) ?? "") : "Not scheduled yet"}
+          </StatTileFigure>
+        </StatTile>
+        <StatTile
+          label="Topics"
+          hint={
+            completed
+              ? `${data.lastRunSubtopicsCount} subtopics from ${data.lastRunTracesProcessed} traces`
+              : void 0
+          }
+        >
+          <StatTileFigure muted={!completed}>
+            {completed ? data.lastRunTopicsCount : "None yet"}
+          </StatTileFigure>
+        </StatTile>
+      </StatTileGrid>
       {data.lastRunOutcome === "completed" && (
         <Text fontSize="sm" color="fg.muted">
           {/* The mode is only trustworthy on a completed run: a failure
@@ -256,12 +277,6 @@ function ClusteringStatusBody({
             </Text>
           );
         })()}
-      <HStack gap={3}>
-        <Text fontWeight="medium">Next scheduled run</Text>
-        <Text color="fg.muted">
-          {data.nextRunAt ? (formatTimeAgo(data.nextRunAt) ?? "") : "Not scheduled yet"}
-        </Text>
-      </HStack>
     </VStack>
   );
 }
@@ -269,16 +284,7 @@ function ClusteringStatusBody({
 function ClusteringStatusCard({ projectId }: { projectId: string }) {
   const status = useClusteringStatus({ projectId });
 
-  return (
-    <Card.Root width="full">
-      <Card.Header>
-        <Heading>Schedule</Heading>
-      </Card.Header>
-      <Card.Body width="full">
-        <ClusteringStatusBody isLoading={status.isLoading} data={status.data} />
-      </Card.Body>
-    </Card.Root>
-  );
+  return <ClusteringStatusBody isLoading={status.isLoading} data={status.data} />;
 }
 
 /**
@@ -328,23 +334,15 @@ function RunHistoryBody({
   isLoading: boolean;
   runs: TopicClusteringRunHistoryEntry[];
 }) {
-  if (isLoading) {
+  if (runs.length === 0 && !isLoading) {
     return (
-      <VStack align="start" gap={2} width="full" padding={6}>
-        <Skeleton height="20px" width="80%" />
-        <Skeleton height="20px" width="70%" />
-      </VStack>
-    );
-  }
-  if (runs.length === 0) {
-    return (
-      <Text color="fg.muted" padding={6}>
+      <Text color="fg.muted" textAlign="center" width="full" paddingY={8}>
         No runs yet. History appears here after the first scheduled or manual run.
       </Text>
     );
   }
   return (
-    <Table.Root variant="line" size="sm" width="full">
+    <ListTable size="sm" width="full" containerProps={{ overflowX: "auto" }}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>When</Table.ColumnHeader>
@@ -354,6 +352,7 @@ function RunHistoryBody({
         </Table.Row>
       </Table.Header>
       <Table.Body>
+        {isLoading && <LoadingRunRows />}
         {runs.map((run) => (
           <Table.Row key={run.runId}>
             <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt) ?? ""}</Table.Cell>
@@ -369,21 +368,37 @@ function RunHistoryBody({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
+}
+
+/** Two rows in the history's own shape while it loads. */
+function LoadingRunRows() {
+  return Array.from({ length: 2 }, (_, index) => (
+    <Table.Row key={index}>
+      <Table.Cell>
+        <Skeleton height="14px" width="72px" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton height="14px" width="64px" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton height="20px" width="80px" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton height="14px" width="70%" />
+      </Table.Cell>
+    </Table.Row>
+  ));
 }
 
 function RunHistoryCard({ projectId }: { projectId: string }) {
   const history = useClusteringRunHistory({ projectId });
 
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Header>
-        <Heading>Run history</Heading>
-      </Card.Header>
-      <Card.Body width="full" paddingX={0} paddingY={0} overflowX="auto">
-        <RunHistoryBody isLoading={history.isLoading} runs={history.data ?? []} />
-      </Card.Body>
-    </Card.Root>
+    <VStack align="stretch" gap={3} width="full">
+      <Heading size="md">Run history</Heading>
+      <RunHistoryBody isLoading={history.isLoading} runs={history.data ?? []} />
+    </VStack>
   );
 }

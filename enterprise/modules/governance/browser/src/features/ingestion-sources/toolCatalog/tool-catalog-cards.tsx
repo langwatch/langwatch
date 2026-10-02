@@ -49,9 +49,10 @@ export function ToolCatalogCard({
       data-testid={`tool-card-${card.id}`}
       borderWidth="1px"
       borderColor="border.muted"
-      borderRadius="md"
+      borderRadius="xl"
       padding={4}
       background="bg.panel"
+      boxShadow="md"
       display="flex"
       flexDirection="column"
       gap={3}

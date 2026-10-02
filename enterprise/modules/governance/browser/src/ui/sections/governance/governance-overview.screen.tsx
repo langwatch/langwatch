@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Box, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
@@ -50,17 +50,16 @@ function GovernanceOverviewPage() {
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
-      <PageLayout.Header>
-        <PageLayout.Heading>AI Governance</PageLayout.Heading>
-        <Badge colorPalette="purple" size="sm" variant="surface">
-          Preview
-        </Badge>
-        <Spacer />
-        <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-      </PageLayout.Header>
-
       <PageLayout.Container>
         <VStack align="stretch" gap={8} width="full" maxW={HOME_MEASURE} marginX="auto">
+          <HStack gap={2} height="48px">
+            <PageLayout.Heading>AI Governance</PageLayout.Heading>
+            <Badge colorPalette="purple" size="sm" variant="surface">
+              Preview
+            </Badge>
+            <Spacer />
+            <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
+          </HStack>
           <VStack align="stretch" gap={6}>
             {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 

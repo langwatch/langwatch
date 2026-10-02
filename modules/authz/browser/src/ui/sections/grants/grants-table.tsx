@@ -5,9 +5,10 @@
  */
 
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Box, Button, Spinner, Table, Text } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Badge, Box, Button, SkeletonText, Table, Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
-import { MoreVertical } from "lucide-react";
+import { KeyRound, MoreVertical } from "lucide-react";
 
 import { type GrantRow, grantPrincipalText, grantScopeText } from "../../../model/grants/grants.ts";
 
@@ -32,8 +33,8 @@ export function GrantsTable({
 }: GrantsTableProps) {
   if (isLoading) {
     return (
-      <Box padding={8} display="flex" justifyContent="center">
-        <Spinner />
+      <Box padding={4} data-testid="grants-loading">
+        <SkeletonText noOfLines={4} gap={4} />
       </Box>
     );
   }
@@ -46,9 +47,11 @@ export function GrantsTable({
   }
   if (grants.length === 0) {
     return (
-      <Box padding={8} textAlign="center">
-        <Text color="fg.muted">Nobody has been granted a role here yet.</Text>
-      </Box>
+      <NoDataInfoBlock
+        title="Nobody has been granted a role here yet."
+        description="Grant a role to give somebody access to an organization, team or project."
+        icon={<KeyRound />}
+      />
     );
   }
 

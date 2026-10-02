@@ -67,7 +67,7 @@ export function ConnectionRemovalSection({
           gap={3}
           flexDirection={{ base: "column", sm: "row" }}
         >
-          <Text fontSize="13px" color="fg.muted" maxWidth="64ch">
+          <Text fontSize="sm" color="fg.muted" maxWidth="64ch">
             {copy.explanation}
           </Text>
           {confirming ? (

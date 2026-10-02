@@ -4,7 +4,8 @@
  * Spec: specs/settings/settings-page-chrome.feature
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, calls } = vi.hoisted(() => ({
@@ -109,7 +110,7 @@ describe("when the reader may only view the triggers of this project", () => {
     );
 
     expect(screen.getByText("someone@example.com")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Remove suppression" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions for someone@example.com" })).toBeNull();
   });
 });
 
@@ -117,7 +118,9 @@ describe("when the reader may manage the triggers of this project", () => {
   it("removes the row and says delivery resumed", async () => {
     const { host } = renderWithNotificationHost(<EmailSuppressionsScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove suppression" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Actions for someone@example.com" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Remove suppression" }));
 
     expect(calls.remove).toHaveBeenCalledWith({ projectId: "project-1", id: "sup-1" });
     // The notice waits on the list being re-read, so that the reader is not

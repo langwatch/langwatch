@@ -11,7 +11,6 @@ import {
   HStack,
   Progress,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -36,6 +35,7 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
 
@@ -210,7 +210,10 @@ function BudgetsPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          {isLoading && <Spinner />}
+          <Text color="fg.muted" marginBottom={6}>
+            Spend ceilings that stop or warn before a team, project, key or member overspends.
+          </Text>
+          {isLoading && <ListSkeleton />}
           {showError && (
             <GatewayErrorPanel
               title="Failed to load budgets"
@@ -225,12 +228,7 @@ function BudgetsPage() {
               icon={<Gauge size={32} />}
             >
               {canCreate && (
-                <PageLayout.HeaderButton
-                  variant="solid"
-                  colorPalette="orange"
-                  onClick={() => setCreateOpen(true)}
-                  marginTop={4}
-                >
+                <PageLayout.HeaderButton onClick={() => setCreateOpen(true)} marginTop={4}>
                   <Plus size={14} /> New budget
                 </PageLayout.HeaderButton>
               )}

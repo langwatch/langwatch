@@ -9,7 +9,6 @@ import {
   Card,
   HStack,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -24,6 +23,7 @@ import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections
 import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 type CacheRuleListRow = {
   id: string;
@@ -130,13 +130,13 @@ function CacheRulesPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          <Text fontSize="sm" color="fg.muted" mb={4}>
+          <Text color="fg.muted" marginBottom={6}>
             Rules are evaluated first-match-wins by priority (highest first). A per-request{" "}
             <code>X-LangWatch-Cache</code> header always wins over matching rules, and a matched
             rule always wins over the per-virtual-key default. Changes propagate to the gateway
             within 30 s via the /changes long-poll.
           </Text>
-          {isLoadingRules && <Spinner />}
+          {isLoadingRules && <ListSkeleton />}
           {showRulesError && (
             <GatewayErrorPanel
               title="Failed to load cache rules"

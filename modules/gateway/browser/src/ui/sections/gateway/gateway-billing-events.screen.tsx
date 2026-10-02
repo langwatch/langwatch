@@ -8,7 +8,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -27,6 +26,7 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { spendKeyLabel } from "../../../model/spend-key-label.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
 const PRESETS: { label: string; days: number }[] = [
   { label: "Last 24h", days: 1 },
@@ -423,10 +423,13 @@ function BillingEventsPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack gap={6} width="full" align="start">
+        <VStack gap={6} width="full" align="stretch">
+          <Text color="fg.muted">
+            Every billable request the gateway recorded for this project, with its cost.
+          </Text>
           <BillingEventFilters ledger={ledger} />
 
-          {ledger.query.isLoading && <Spinner size="sm" />}
+          {ledger.query.isLoading && <ListSkeleton />}
 
           {ledger.query.data?.clickHouseDisabled && (
             <Text fontSize="sm" color="fg.muted">

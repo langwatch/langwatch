@@ -12,18 +12,19 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   HStack,
   Spacer,
   Skeleton,
+  SkeletonText,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
 import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -228,9 +229,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
       host.failed({ error, fallbackTitle: "Couldn't cancel the retroactive update" }),
   });
 
-  if (rulesQuery.isLoading) {
-    return <Skeleton width="full" height="200px" />;
-  }
+  if (rulesQuery.isLoading) return <DataRetentionLoading />;
 
   const snapshot = rulesQuery.data;
   const available = snapshot?.available;
@@ -411,6 +410,30 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   );
 }
 
+/** The page while its rules load: the header, the summary tiles and the table, unfilled. */
+function DataRetentionLoading() {
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Data Retention</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+        <SkeletonText noOfLines={1} width="sm" />
+        <StatTileSkeleton columns={2} />
+        <Card.Root width="full">
+          <Card.Body>
+            <VStack gap={4} align="stretch">
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} height="5" />
+              ))}
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      </VStack>
+    </>
+  );
+}
+
 type RetentionPolicyListProps = {
   ruleCount: number;
   scopeGroups: RetentionScopeGroup[];
@@ -446,13 +469,11 @@ function RetentionPolicyList({
   }
   if (scopeGroups.length === 0) {
     return (
-      <Card.Root width="full">
-        <Card.Body>
-          <Text fontSize="sm" color="fg.muted" textAlign="center">
-            No retention policies match the current scope filter.
-          </Text>
-        </Card.Body>
-      </Card.Root>
+      <NoDataInfoBlock
+        title="No matching policies"
+        description="No retention policies match the current scope filter."
+        icon={<DatabaseBackup size={24} />}
+      />
     );
   }
   return (
@@ -472,12 +493,14 @@ function RetentionPolicyList({
               return (
                 <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
                   <Table.Cell>
-                    <HStack gap={2}>
-                      <Icon size={14} />
-                      <Text>{group.name}</Text>
-                      <Badge size="sm" colorPalette="gray">
-                        {group.scopeType.toLowerCase()}
-                      </Badge>
+                    <HStack gap={3}>
+                      <Icon size={16} />
+                      <VStack align="start" gap={0}>
+                        <Text fontWeight="medium">{group.name}</Text>
+                        <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
+                          {group.scopeType.toLowerCase()}
+                        </Text>
+                      </VStack>
                     </HStack>
                   </Table.Cell>
                   <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>

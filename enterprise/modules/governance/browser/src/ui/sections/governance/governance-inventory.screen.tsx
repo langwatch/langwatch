@@ -85,6 +85,7 @@ import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-stat
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
+import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
@@ -916,19 +917,6 @@ function useInventoryTab() {
 }
 
 /** A tab label with the count beside it, once the count is known. */
-function InventoryTabLabel({ label, count }: { label: string; count?: number }) {
-  return (
-    <HStack gap={2}>
-      <Text as="span">{label}</Text>
-      {count !== undefined && (
-        <Badge size="sm" variant="surface" colorPalette="gray">
-          {count}
-        </Badge>
-      )}
-    </HStack>
-  );
-}
-
 /**
  * The inventory's tab shell.
  *
@@ -971,21 +959,21 @@ function InventoryTabs({
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          <InventoryTabLabel label="Catalog" count={catalogCount} />
+          <GovernanceTabLabel label="Catalog" count={catalogCount} />
         </Tabs.Trigger>
         <Tabs.Trigger
           value="environments"
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          <InventoryTabLabel label="Environments" count={environmentCount} />
+          <GovernanceTabLabel label="Environments" count={environmentCount} />
         </Tabs.Trigger>
         <Tabs.Trigger
           value="sources"
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          <InventoryTabLabel label="Sources" count={sourceCount} />
+          <GovernanceTabLabel label="Sources" count={sourceCount} />
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="catalog" paddingTop={4}>

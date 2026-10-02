@@ -66,14 +66,14 @@ function EligibleProviderRow({
   return (
     <HStack
       borderWidth="1px"
-      borderColor={isSelected ? "blue.400" : "border.subtle"}
+      borderColor={isSelected ? "orange.muted" : "border.subtle"}
       borderRadius="md"
       paddingX={2}
       paddingY={1.5}
       gap={2}
       cursor={interactive ? "pointer" : "default"}
-      background={isSelected ? "blue.subtle" : undefined}
-      _hover={interactive ? { background: isSelected ? "blue.subtle" : "bg.subtle" } : undefined}
+      background={isSelected ? "orange.subtle" : undefined}
+      _hover={interactive ? { background: isSelected ? "orange.subtle" : "bg.subtle" } : undefined}
       onClick={interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined}
       title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
     >
@@ -109,6 +109,7 @@ function EligibleProviderRow({
       <Box flex={1} />
       <ProviderScopeChips
         size="xs"
+        tone="neutral"
         scopes={[
           {
             scopeType: mp.definedAt.scopeType,
@@ -323,7 +324,7 @@ export function ConfigureModelProvidersLink({ scopes }: { scopes: VirtualKeyScop
   }, [scopes]);
 
   return (
-    <Link href={href} target="_blank" rel="noopener noreferrer" color="blue.600" fontSize="xs">
+    <Link href={href} target="_blank" rel="noopener noreferrer" fontSize="xs">
       <HStack gap={1} alignItems="center">
         <Text as="span">Configure</Text>
         <ExternalLink size={11} />

@@ -5,6 +5,7 @@
 import type { WireOf } from "@langwatch/api/web";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
@@ -14,7 +15,6 @@ import {
   Input,
   NativeSelect,
   Spacer,
-  Skeleton,
   Table,
   Text,
   VStack,
@@ -25,7 +25,7 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import { formatDistanceToNow, nowInstant } from "@langwatch/time";
-import { ArrowLeft, Download, Search } from "lucide-react";
+import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
 
@@ -57,6 +57,7 @@ import { useOrganizationHost } from "../../../model/organization-host.ts";
 import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-footer.tsx";
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
+import { SettingsRowsSkeleton } from "../../../ui/elements/settings-rows-skeleton.tsx";
 
 function auditLogsView({
   isLoading,
@@ -116,7 +117,7 @@ export default function AuditLogScreen() {
   const utils = organizationApi.useUtils();
 
   if (!organizationId || host.isPlanLoading()) {
-    return <Skeleton width="full" height="200px" />;
+    return <SettingsRowsSkeleton rows={8} />;
   }
 
   if (!isEnterprise) {
@@ -234,8 +235,8 @@ export default function AuditLogScreen() {
             </Link>
           )}
           <Text color="fg.muted">
-            View all audit logs for your organization. Filter by project, user, action type, or date
-            range.
+            Every change made in this organization: who made it, what changed and when. Filter by
+            project, user, action or date range.
           </Text>
           {target && (
             <Badge
@@ -314,15 +315,25 @@ export default function AuditLogScreen() {
           </VStack>
         </HStack>
 
-        {logsView === "loading" && <Skeleton width="full" height="200px" />}
+        {logsView === "loading" && <SettingsRowsSkeleton rows={8} />}
         {logsView === "empty" && (
-          <VStack padding={8}>
-            <Text color="fg.muted">No audit logs found</Text>
-          </VStack>
+          <Box width="full">
+            <NoDataInfoBlock
+              title="No audit logs found"
+              description="Nothing was recorded for these filters. Try a wider date range or clear a filter."
+              icon={<ScrollText size={24} />}
+            />
+          </Box>
         )}
         {logsView === "table" && (
           <>
-            <Box width="full" overflowX="auto">
+            <Box
+              width="full"
+              overflowX="auto"
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="lg"
+            >
               <Table.Root variant="line" width="full">
                 <Table.Header>
                   <Table.Row>
@@ -448,7 +459,7 @@ function AuditLogRow({
       </Table.Cell>
       <Table.Cell>
         {log.error ? (
-          <Text fontSize="sm" color="red.600">
+          <Text fontSize="sm" color="fg.error">
             {log.error}
           </Text>
         ) : (

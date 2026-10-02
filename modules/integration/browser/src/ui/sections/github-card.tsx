@@ -88,6 +88,7 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
             <Button
               data-testid="github-connect"
               variant="solid"
+              colorPalette="orange"
               onClick={onInstall}
               disabled={!installAddress}
               alignSelf="flex-start"

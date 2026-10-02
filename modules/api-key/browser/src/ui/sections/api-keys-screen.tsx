@@ -7,6 +7,7 @@ import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contra
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   Button,
   Card,
   HStack,
+  Skeleton,
   Spacer,
   Table,
   Text,
@@ -100,17 +102,39 @@ function PermissionBadge({ permissionMode }: { permissionMode: ApiKeyRow["permis
   );
 }
 
-function NoKeysRow({ filtered }: { filtered: boolean }) {
+function NoMatchingKeysRow() {
   return (
     <Table.Row>
       <Table.Cell colSpan={9}>
         <Text color="fg.muted" textAlign="center" paddingY={4}>
-          {filtered
-            ? "No keys match the current scope. Change the filter above to see other keys."
-            : "No API keys. Create one to get started."}
+          No keys match the current scope. Change the filter above to see other keys.
         </Text>
       </Table.Cell>
     </Table.Row>
+  );
+}
+
+/** Rows in the table's own shape while the keys load, so nothing jumps on arrival. */
+function LoadingKeyRows() {
+  return (
+    <>
+      {Array.from({ length: 3 }, (_, index) => (
+        <Table.Row key={index} aria-busy="true">
+          <Table.Cell>
+            <VStack align="start" gap={1}>
+              <Skeleton height="12px" width="140px" />
+              <Skeleton height="10px" width="200px" />
+            </VStack>
+          </Table.Cell>
+          {Array.from({ length: 7 }, (_, cell) => (
+            <Table.Cell key={cell}>
+              <Skeleton height="12px" width="64px" />
+            </Table.Cell>
+          ))}
+          <Table.Cell />
+        </Table.Row>
+      ))}
+    </>
   );
 }
 
@@ -132,11 +156,11 @@ function ApiKeyTableRow({
     <Table.Row id={apiKeyRowAnchorId(apiKey.id)}>
       <Table.Cell>
         <HStack align="start">
-          <Box paddingTop={1}>
+          <Box paddingTop={1} color="fg.muted">
             <Key size={14} />
           </Box>
           <VStack align="start" gap={0}>
-            <Text>{apiKey.name}</Text>
+            <Text fontWeight="medium">{apiKey.name}</Text>
             {apiKey.description && (
               <Text fontSize="xs" color="fg.muted">
                 {apiKey.description}
@@ -220,7 +244,7 @@ function ApiKeyTableRow({
               </Menu.Item>
               <Menu.Item
                 value="revoke"
-                color="red.500"
+                color="fg.error"
                 data-testid="api-key-revoke"
                 onClick={() => onRevoke(apiKey.id)}
               >
@@ -446,24 +470,24 @@ export default function ApiKeysScreen() {
           Create new secret key
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack gap={4} width="full" align="stretch" paddingTop={4}>
-        <Text fontSize="sm" color="fg.muted">
-          Manage credentials used to authenticate with the LangWatch API.
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+        <Text color="fg.muted">
+          Keys that let your code and tools talk to LangWatch. Do not share your API keys or expose
+          them in the browser or other client-side code.
         </Text>
 
         {hasLegacyKey && <LegacyProjectKeyBanner />}
 
         <VStack gap={8} width="full" align="stretch">
-          {/* Personal + service keys (ingestSourceType == null). The page
-            heading titles this table, so the section carries no heading of
-            its own. The "Create API key" flow and scope filter sit in the header. */}
-          <VStack gap={4} width="full" align="start">
-            <HStack width="full" flexWrap="wrap" gap={2}>
-              <Text fontSize="sm" color="fg.muted">
-                Do not share your API keys or expose them in the browser or other client-side code.
-              </Text>
-            </HStack>
-
+          {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
+          {!isLoadingKeys && serviceApiKeys.length === 0 ? (
+            <NoDataInfoBlock
+              title="No API keys"
+              description="Create one to get started."
+              icon={<Key size={24} />}
+              testId="api-keys-empty"
+            />
+          ) : (
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0} overflowX="auto">
                 <Table.Root variant="line" size="md" width="full">
@@ -481,7 +505,7 @@ export default function ApiKeysScreen() {
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {/* User-scoped API key rows */}
+                    {isLoadingKeys && <LoadingKeyRows />}
                     {filteredKeys.map((apiKey) => (
                       <ApiKeyTableRow
                         key={apiKey.id}
@@ -493,14 +517,12 @@ export default function ApiKeysScreen() {
                       />
                     ))}
 
-                    {filteredKeys.length === 0 && (
-                      <NoKeysRow filtered={scopeFilter.kind !== "all"} />
-                    )}
+                    {!isLoadingKeys && filteredKeys.length === 0 && <NoMatchingKeysRow />}
                   </Table.Body>
                 </Table.Root>
               </Card.Body>
             </Card.Root>
-          </VStack>
+          )}
 
           {/* Ingestion keys render below the API keys table. */}
           <IngestionKeysSection

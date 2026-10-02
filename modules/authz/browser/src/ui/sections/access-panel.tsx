@@ -121,9 +121,15 @@ function FilterGroup<T extends string>({
       {filters.map((filter) => (
         <Button
           key={filter.label}
-          size="sm"
+          size="xs"
           variant={selected === filter.value ? "subtle" : "ghost"}
-          colorPalette={selected === filter.value ? "blue" : "gray"}
+          colorPalette={selected === filter.value ? "orange" : "gray"}
+          borderRadius="full"
+          borderWidth="1px"
+          borderColor={selected === filter.value ? "colorPalette.emphasized" : "transparent"}
+          color={selected === filter.value ? "colorPalette.fg" : "fg.muted"}
+          fontWeight={selected === filter.value ? "semibold" : "normal"}
+          paddingX={3}
           aria-pressed={selected === filter.value}
           onClick={() => onSelect(filter.value)}
         >
