@@ -246,13 +246,35 @@ func pumpBedrockChunksAsResponsesEvents(
 
 	if err := bedrock.Err(); err != nil && !errors.Is(err, context.Canceled) {
 		select {
-		case ch <- &bfschemas.BifrostStreamChunk{BifrostError: &bfschemas.BifrostError{
-			IsBifrostError: false,
-			Error:          &bfschemas.ErrorField{Message: err.Error()},
-		}}:
+		case ch <- &bfschemas.BifrostStreamChunk{BifrostError: bedrockStreamBifrostError(err)}:
 		case <-ctx.Done():
 		}
 	}
+}
+
+// bedrockStreamBifrostError carries a mid-stream Bedrock failure onto the
+// Responses lane. The exception name stays in the message, and the exception's
+// status picks the Anthropic error type the client reads (429 reads as
+// rate_limit_error, not api_error).
+func bedrockStreamBifrostError(err error) *bfschemas.BifrostError {
+	berr := &bfschemas.BifrostError{
+		IsBifrostError: false,
+		Error:          &bfschemas.ErrorField{Message: err.Error()},
+	}
+	var ue *domain.UpstreamError
+	if !errors.As(err, &ue) {
+		return berr
+	}
+	if ue.ErrorType != "" {
+		berr.Error.Message = ue.ErrorType + ": " + ue.Message
+	} else if ue.Message != "" {
+		berr.Error.Message = ue.Message
+	}
+	if ue.StatusCode > 0 {
+		status := ue.StatusCode
+		berr.StatusCode = &status
+	}
+	return berr
 }
 
 // chunkCarriesFinish reports whether any choice on the chunk carries a finish

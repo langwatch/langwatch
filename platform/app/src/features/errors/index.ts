@@ -26,6 +26,7 @@ export {
   explainHandledError,
   explainSerializedError,
   PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
   PROVIDER_MODEL_MISSING_REASONS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "./logic/presentation";
