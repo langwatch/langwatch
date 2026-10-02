@@ -36,7 +36,7 @@ const T0 = 1_756_000_000_000;
 const HOSTED_OPTED_IN: SsoSelfServeContext = {
   deployment: "hosted",
   licensed: false,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: true,
   singleOrganization: false,
   actorIsPlatformOperator: false,
@@ -48,7 +48,7 @@ const HOSTED_OPTED_IN: SsoSelfServeContext = {
 const SELF_HOSTED_LICENSED: SsoSelfServeContext = {
   deployment: "self-hosted",
   licensed: true,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: false,
   singleOrganization: false,
   actorIsPlatformOperator: false,
@@ -437,7 +437,7 @@ describe("self-serve single sign-on setup", () => {
       context.set({
         deployment: "self-hosted",
         licensed: false,
-        licenseActivatedSinceStart: false,
+        licenseActivationPending: false,
         optedIn: false,
         singleOrganization: false,
         actorIsPlatformOperator: false,
@@ -474,14 +474,14 @@ describe("self-serve single sign-on setup", () => {
       );
     });
 
-    /** @scenario "A licence activated while the installation is running takes effect at the next restart" */
-    it("stays unavailable after a licence is activated, and says a restart is needed", async () => {
+    /** @scenario "A licence activated while the installation is running reaches setup within a minute" */
+    it("stays unavailable until the gate reads a licence just activated, and says it is on its way", async () => {
       context.set({
         deployment: "self-hosted",
         licensed: false,
-        // Genuine, and activated after this process decided what it
-        // federates — which is the whole of why the answer is "restart".
-        licenseActivatedSinceStart: true,
+        // Genuine, and stored after this process's gate last denied, which
+        // is why the answer is "within a minute" and not "no licence".
+        licenseActivationPending: true,
         optedIn: false,
         singleOrganization: false,
         actorIsPlatformOperator: false,
@@ -490,10 +490,10 @@ describe("self-serve single sign-on setup", () => {
       const view = await selfServe.getSetup({ organizationId: ORG });
       expect(view.availability).toEqual({
         available: false,
-        refusal: "license_restart_required",
+        refusal: "license_activation_pending",
       });
       // And it does not pretend otherwise: the refusal is distinct from the
-      // never-licensed one, so the screen can say "restart" rather than
+      // never-licensed one, so the screen can say "within a minute" rather than
       // "activate a licence" to somebody who just did.
       await expect(
         selfServe.claimDomain({

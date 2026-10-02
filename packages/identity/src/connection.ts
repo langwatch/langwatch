@@ -99,6 +99,28 @@ export function isSsoConnectionInSetup(state: string): boolean {
 }
 
 /**
+ * The states in which a connection's identity provider settings may be
+ * replaced: every setup state, where a wrong issuer stops the test sign-in,
+ * and the live pair, where it stops everybody. A connection on its way out
+ * (TEARDOWN_PENDING) is not dialed again, and DISCARDED and TORN_DOWN are
+ * history.
+ */
+export const SSO_IDP_EDITABLE_STATES: readonly SsoConnectionLifecycleState[] = [
+  "DRAFT",
+  "CLAIMED",
+  "APPROVED",
+  "REJECTED",
+  "VERIFICATION_PENDING",
+  "VERIFIED",
+  "ACTIVE",
+  "SUSPENDED",
+];
+
+export function ssoConnectionIdpIsEditable(state: string): boolean {
+  return (SSO_IDP_EDITABLE_STATES as readonly string[]).includes(state);
+}
+
+/**
  * How a domain claim is proved. A self-hosted installation proves a claimed
  * domain with its license (`license-token`), with nothing to publish; on an
  * installation with several organizations only a platform operator may.
@@ -423,6 +445,19 @@ export const CONNECTION_TORN_DOWN_EVENT_TYPE =
  */
 export const CONNECTION_RENAMED_EVENT_TYPE =
   "lw.identity.connection_renamed" as const;
+/**
+ * The identity provider's dialing information, replaced on an existing
+ * connection: the issuer and the credential references (OIDC) or the
+ * configuration reference (SAML).
+ *
+ * The connection id stays, so the redirect address registered at the
+ * identity provider (`/api/auth/sso/callback/<connection id>`) keeps working,
+ * and the domains, their proofs, the arrival policy and every account linked
+ * through the connection are untouched. The name is a separate fact
+ * (`connection_renamed`) and is not carried here.
+ */
+export const CONNECTION_IDP_UPDATED_EVENT_TYPE =
+  "lw.identity.connection_idp_updated" as const;
 /** Who this connection admits, changed after registration stated it. */
 export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
   "lw.identity.connection_arrival_policy_set" as const;
@@ -455,6 +490,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
   MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
@@ -723,6 +759,22 @@ export const connectionRenamedPayloadSchema = z.object({
   ...sourced,
 });
 
+/**
+ * What an identity provider update replaces: everything the engine dials,
+ * and not the name (`providerId`), which is the rename's fact.
+ */
+export const ssoIdpDialingSchema = ssoIdpMetadataSchema.omit({
+  providerId: true,
+});
+export type SsoIdpDialing = z.infer<typeof ssoIdpDialingSchema>;
+
+export const connectionIdpUpdatedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  idp: ssoIdpDialingSchema,
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 export const connectionArrivalPolicySetPayloadSchema = z.object({
   connectionId: z.string().min(1),
   policy: ssoArrivalPolicySchema,
@@ -811,6 +863,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
     data: connectionRenamedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTION_IDP_UPDATED_EVENT_TYPE),
+    data: connectionIdpUpdatedPayloadSchema,
   }),
   z.object({
     type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
@@ -1431,6 +1487,16 @@ export function reduceSsoConnection({
       return {
         ...touched,
         idpMetadata: { ...touched.idpMetadata, providerId: fact.data.name },
+      };
+    case CONNECTION_IDP_UPDATED_EVENT_TYPE:
+      // Replaces what the engine dials and keeps the name, which is the
+      // rename's fact.
+      return {
+        ...touched,
+        idpMetadata: {
+          ...fact.data.idp,
+          providerId: touched.idpMetadata.providerId,
+        },
       };
     case CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE:
       return {

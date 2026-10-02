@@ -28,6 +28,16 @@ export {
   orphanedIdentifierRows,
 } from "./backfill";
 export {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
+} from "./email-verification-claims";
+export {
+  canonicalEntraIssuer,
+  entraEndpointOrigins,
+  entraMultiTenantSegment,
+  isEntraIssuer,
+} from "./entra-issuer";
+export {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -87,6 +97,12 @@ export {
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
   connectionRenamedPayloadSchema,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
+  connectionIdpUpdatedPayloadSchema,
+  ssoIdpDialingSchema,
+  type SsoIdpDialing,
+  SSO_IDP_EDITABLE_STATES,
+  ssoConnectionIdpIsEditable,
   connectionArrivalPolicySetPayloadSchema,
   SSO_ARRIVAL_POLICIES,
   SSO_CONNECTION_EVENT_TYPES,
@@ -231,6 +247,9 @@ export {
   setArrivalPolicyCommandDataSchema,
   renameConnectionCommandDataSchema,
   type RenameConnectionCommandData,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  updateConnectionIdpCommandDataSchema,
+  type UpdateConnectionIdpCommandData,
   SSO_CONNECTION_COMMAND_TYPES,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionCommand,
@@ -328,6 +347,8 @@ export {
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
   SsoExistingAccountUnconfirmedError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   SsoLicenseRequiredError,
   SsoSamlMetadataInvalidError,

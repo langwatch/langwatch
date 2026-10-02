@@ -31,6 +31,25 @@ Feature: LangWatch as an upstream provider for a self-hosted gateway
     When a request names model "langwatch/gpt-5-mini"
     Then the provider is "langwatch" and the model is "gpt-5-mini"
 
+  @unit
+  Scenario: A langwatch-prefixed model routes to the langwatch provider
+    Given the virtual key also holds an "openai" provider
+    When a request names model "langwatch/gpt-5-mini"
+    Then only the "langwatch" provider is tried
+
+  @unit
+  Scenario: A model name without the langwatch prefix never reaches LangWatch
+    When a request names a model with no provider prefix
+    Then the "langwatch" provider is left out of the providers that may serve it, including every fallback
+    And the other providers are chosen as if the "langwatch" provider were absent
+    But when "langwatch" is the only provider, the request is refused with code "model_not_recognized"
+
+  @unit
+  Scenario: A call for another provider never falls back to LangWatch
+    Given the virtual key also holds "openai" providers
+    When a request for "openai/gpt-5-mini" fails with a 429, 5xx or 404 on every "openai" provider
+    Then the "langwatch" provider is never tried
+
   @integration
   Scenario: Forwarded calls are metered under the customer organization
     When a call is forwarded and answered

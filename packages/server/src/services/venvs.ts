@@ -6,6 +6,7 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
+import { ensureLangevalsTiktokenCache } from "./offline-defaults.ts";
 import { resolveEffectiveFeatures } from "../shared/features.ts";
 
 type VenvSpec = {
@@ -36,29 +37,55 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       // the spec adds new extras. Pure-lockfile hashing missed this and
       // left langevals with no evaluator routes registered.
       const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().sort().join(",")}`;
-      if (existsSync(venvDir) && readFileSafely(hashFile) === expected) return;
-
-      bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
-      const start = Date.now();
-
-      mkdirSync(venvDir, { recursive: true });
-      const extraArgs = (spec.extras ?? []).flatMap((e) => ["--extra", e]);
-      await execAndPipe(
+      if (!(existsSync(venvDir) && readFileSafely(hashFile) === expected)) {
+        await syncVenv({ spec, venvDir, hashFile, expected, uvBin, bus });
+      }
+      await ensureLangevalsTiktokenCache({
+        paths: ctx.paths,
         bus,
-        `prepare:${spec.name}`,
         uvBin,
-        ["sync", "--project", spec.projectDir, ...extraArgs],
-        {
-          env: {
-            ...process.env,
-            UV_PROJECT_ENVIRONMENT: venvDir,
-          },
-        },
-      );
-      writeFileSync(hashFile, expected);
-      bus.emit({ type: "healthy", service: `prepare:${spec.name}` as never, durationMs: Date.now() - start });
+        projectDir: spec.projectDir,
+        venvDir,
+        lockFile: spec.lockFile,
+      });
     }),
   );
+}
+
+async function syncVenv({
+  spec,
+  venvDir,
+  hashFile,
+  expected,
+  uvBin,
+  bus,
+}: {
+  spec: VenvSpec;
+  venvDir: string;
+  hashFile: string;
+  expected: string;
+  uvBin: string;
+  bus: EventBus;
+}): Promise<void> {
+  bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
+  const start = Date.now();
+
+  mkdirSync(venvDir, { recursive: true });
+  const extraArgs = (spec.extras ?? []).flatMap((e) => ["--extra", e]);
+  await execAndPipe(
+    bus,
+    `prepare:${spec.name}`,
+    uvBin,
+    ["sync", "--project", spec.projectDir, ...extraArgs],
+    {
+      env: {
+        ...process.env,
+        UV_PROJECT_ENVIRONMENT: venvDir,
+      },
+    },
+  );
+  writeFileSync(hashFile, expected);
+  bus.emit({ type: "healthy", service: `prepare:${spec.name}` as never, durationMs: Date.now() - start });
 }
 
 // The extras every install gets (see services/langevals/pyproject.toml for the full
