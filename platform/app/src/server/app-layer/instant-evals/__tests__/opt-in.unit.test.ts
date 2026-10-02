@@ -201,7 +201,7 @@ describe("given an organization that is offered a word with us", () => {
       expect(updateMany).not.toHaveBeenCalled();
     });
 
-    it("says the license is what says no on a self-hosted install", async () => {
+    it("names the license, or the operator of an install with its own judge key, on a self-hosted install", async () => {
       const updateMany = vi.fn(async () => ({ count: 1 }));
       const prisma = {
         organization: { updateMany },
@@ -219,6 +219,11 @@ describe("given an organization that is offered a word with us", () => {
       await expect(refused).rejects.toMatchObject({
         meta: { deployment: "self_hosted" },
         message: expect.stringContaining("from its license"),
+      });
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining(
+          "from whoever runs it when it has its own judge key",
+        ),
       });
       expect(updateMany).not.toHaveBeenCalled();
     });

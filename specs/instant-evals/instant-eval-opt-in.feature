@@ -155,4 +155,4 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       When a request tries to throw the switch anyway
       Then it is refused as not offered, and nothing is recorded
-      And the refusal says whether the plan or the self-hosted license is what says no
+      And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has its own judge key
