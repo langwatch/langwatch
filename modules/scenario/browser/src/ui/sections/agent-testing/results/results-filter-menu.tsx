@@ -9,6 +9,8 @@ import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { TOOLBAR_BUTTON_PROPS } from "../../../elements/agent-testing/shared/toggle-button.tsx";
+import type { ResultFilters } from "./result-atoms.ts";
 
 export type ResultsFilterOption = {
   value: string;
@@ -40,6 +42,60 @@ function summarize({
   return `${selected.length} selected`;
 }
 
+/** The closed control every filter of the row shares: "Label: All ▾". */
+function filterTrigger({ label, summary }: { label: string; summary: string }) {
+  return (
+    <Button {...TOOLBAR_BUTTON_PROPS} data-testid={`results-filter-${label.toLowerCase()}`}>
+      <Text as="span" color={FG_MUTED} fontWeight="normal">
+        {label}:
+      </Text>
+      <Text as="span" maxWidth="150px" truncate>
+        {summary}
+      </Text>
+      <ChevronDown size={13} />
+    </Button>
+  );
+}
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "passed", label: "Passed" },
+  { value: "failed", label: "Failed" },
+] satisfies { value: ResultFilters["status"]; label: string }[];
+
+export type ResultsStatusMenuProps = {
+  status: ResultFilters["status"];
+  onChange: (status: ResultFilters["status"]) => void;
+};
+
+/** The status filter: one pick at a time, drawn like the other filters. */
+export function ResultsStatusMenu({ status, onChange }: ResultsStatusMenuProps) {
+  const summary = STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "All";
+
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild aria-label="Filter by status">
+        {filterTrigger({ label: "Status", summary })}
+      </Menu.Trigger>
+      <Menu.Content minWidth="160px">
+        <Menu.RadioItemGroup
+          value={status}
+          onValueChange={({ value }) => {
+            const picked = STATUS_OPTIONS.find((option) => option.value === value);
+            if (picked) onChange(picked.value);
+          }}
+        >
+          {STATUS_OPTIONS.map((option) => (
+            <Menu.RadioItem key={option.value} value={option.value}>
+              <Text fontSize="12.5px">{option.label}</Text>
+            </Menu.RadioItem>
+          ))}
+        </Menu.RadioItemGroup>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 export function ResultsFilterMenu({ label, options, selected, onChange }: ResultsFilterMenuProps) {
   const toggle = (value: string) => {
     onChange(
@@ -50,24 +106,7 @@ export function ResultsFilterMenu({ label, options, selected, onChange }: Result
   return (
     <Menu.Root closeOnSelect={false}>
       <Menu.Trigger asChild>
-        <Button
-          size="xs"
-          variant="outline"
-          height="32px"
-          paddingX="10px"
-          fontSize="12.5px"
-          fontWeight="normal"
-          gap={1.5}
-          data-testid={`results-filter-${label.toLowerCase()}`}
-        >
-          <Text as="span" color={FG_MUTED}>
-            {label}:
-          </Text>
-          <Text as="span" fontWeight="medium" maxWidth="150px" truncate>
-            {summarize({ options, selected })}
-          </Text>
-          <ChevronDown size={13} />
-        </Button>
+        {filterTrigger({ label, summary: summarize({ options, selected }) })}
       </Menu.Trigger>
 
       <Menu.Content minWidth="260px" maxHeight="300px" overflowY="auto">

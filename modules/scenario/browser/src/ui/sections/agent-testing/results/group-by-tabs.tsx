@@ -36,9 +36,17 @@ export function GroupByTabs({ grouping, onGroupingChange }: GroupByTabsProps) {
       </Text>
       <SegmentedControl
         size="sm"
-        // The size recipe sets the label size on the item, so the toolbar's
-        // 12.5px is set on the part rather than inherited from the enclosure.
-        css={{ "& [data-part='item-text']": { fontSize: "12.5px" } }}
+        // Drawn to the toolbar's 32px, 12.5px and radius, with a quiet active
+        // segment: a filled panel with no second border inside the enclosure.
+        height="32px"
+        padding="2px"
+        borderRadius="lg"
+        css={{
+          "--segment-radius": "radii.md",
+          "& [data-part='item']": { height: "26px", paddingInline: "10px" },
+          "& [data-part='item-text']": { fontSize: "12.5px", fontWeight: "medium" },
+          "& [data-part='indicator']": { borderWidth: "0", boxShadow: "xs" },
+        }}
         value={grouping}
         items={items}
         aria-label="Group results by"

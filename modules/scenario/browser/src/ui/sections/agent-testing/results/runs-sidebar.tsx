@@ -5,7 +5,7 @@
  * @see specs/suites/run-notes.feature
  */
 
-import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
@@ -32,6 +32,23 @@ export type RunsSidebarProps = {
   onBack: () => void;
   periodControls: PeriodControls;
 };
+
+/** Runs of the rail while they load, drawn to an entry's title and result lines. */
+export function RunEntriesSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => (
+        <VStack key={index} align="stretch" gap={1.5} paddingX={3} paddingY={2}>
+          <HStack justify="space-between">
+            <Skeleton height="12px" width="52px" />
+            <Skeleton height="10px" width="24px" />
+          </HStack>
+          <Skeleton height="10px" width="76px" />
+        </VStack>
+      ))}
+    </>
+  );
+}
 
 function PendingEntry() {
   return (
@@ -61,6 +78,8 @@ function RunsList({
 
   return (
     <>
+      {isLoading && batchRuns.length === 0 ? <RunEntriesSkeleton /> : null}
+
       {batchRuns.map((batch, index) => (
         <RunsSidebarBatchEntry
           key={batch.batchRunId}

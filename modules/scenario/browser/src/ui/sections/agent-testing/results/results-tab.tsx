@@ -22,6 +22,7 @@ import { useOpenRunPlan } from "../run/run-plan-dialog-host.tsx";
 import { useNewRunPlanFlow } from "../use-agent-testing-page-flows.ts";
 import { ResultsList } from "./results-list.tsx";
 import { RunPlanDetail } from "./run-plan-detail.tsx";
+import { RunPlanDetailSkeleton } from "./run-plan-results-states.tsx";
 
 export type ResultsTabProps = {
   /** While the live stream is up the fallback polling stands down. */
@@ -191,7 +192,7 @@ function ResultsListView({
   return (
     <AgentTestingTabLayout reserveRailSpace={false} data-testid="agent-testing-results-tab">
       {isResolvingPlan ? (
-        <TabSkeleton rows={3} flex={1} testId="agent-testing-run-plan-loading" />
+        <RunPlanDetailSkeleton testId="agent-testing-run-plan-loading" />
       ) : (
         <ResultsList
           {...listProps}

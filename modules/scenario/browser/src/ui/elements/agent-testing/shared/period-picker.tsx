@@ -13,6 +13,7 @@ import {
   PeriodSelector,
   type RelativePresetKey,
 } from "../../analytics/period-selector.tsx";
+import { TOOLBAR_BUTTON_PROPS } from "./toggle-button.tsx";
 
 /**
  * How many days the window spans, counted the way the shared period control
@@ -87,11 +88,12 @@ export function AgentTestingPeriodPicker({
               color: FG_MUTED,
             }
           : {
-              height: "32px",
-              fontSize: "12.5px",
-              fontWeight: "medium",
-              borderRadius: "lg",
-              background: "bg.panel",
+              height: TOOLBAR_BUTTON_PROPS.height,
+              paddingX: TOOLBAR_BUTTON_PROPS.paddingX,
+              fontSize: TOOLBAR_BUTTON_PROPS.fontSize,
+              fontWeight: TOOLBAR_BUTTON_PROPS.fontWeight,
+              borderRadius: TOOLBAR_BUTTON_PROPS.borderRadius,
+              background: TOOLBAR_BUTTON_PROPS.background,
             }),
       }}
     />

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, NativeSelect } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { ChartColumn } from "lucide-react";
 
@@ -22,15 +22,11 @@ import {
   type ResultFilters,
   type ResultGrouping,
 } from "./result-atoms.ts";
-import { ResultsFilterMenu, type ResultsFilterOption } from "./results-filter-menu.tsx";
-
-/**
- * The height and the type size every control of the row shares. The filter
- * chips, the status select, the Charts toggle and the period picker sit on
- * one line, so one of them at another height reads as a mistake.
- */
-const TOOLBAR_CONTROL_HEIGHT = "32px";
-const TOOLBAR_FONT_SIZE = "12.5px";
+import {
+  ResultsFilterMenu,
+  type ResultsFilterOption,
+  ResultsStatusMenu,
+} from "./results-filter-menu.tsx";
 
 export type ResultsFilterRowProps = {
   grouping: ResultGrouping;
@@ -89,33 +85,17 @@ export function ResultsFilterRow({
         onChange={(targetKeys) => onFiltersChange({ ...filters, targetKeys })}
       />
 
-      <NativeSelect.Root size="sm" width="auto" minWidth="120px">
-        <NativeSelect.Field
-          height={TOOLBAR_CONTROL_HEIGHT}
-          fontSize={TOOLBAR_FONT_SIZE}
-          value={filters.status}
-          aria-label="Filter by status"
-          data-testid="results-filter-status"
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              status: event.target.value as ResultFilters["status"],
-            })
-          }
-        >
-          <option value="all">All statuses</option>
-          <option value="passed">Passed</option>
-          <option value="failed">Failed</option>
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <ResultsStatusMenu
+        status={filters.status}
+        onChange={(status) => onFiltersChange({ ...filters, status })}
+      />
 
       {isNarrowed(filters) ? (
         <Button
           size="xs"
           variant="ghost"
           height="32px"
-          fontSize="11.5px"
+          fontSize="12.5px"
           fontWeight="medium"
           color={FG_MUTED}
           onClick={() => onFiltersChange(EMPTY_RESULT_FILTERS)}
