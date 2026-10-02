@@ -9,8 +9,9 @@ import {
 } from "@langwatch/design-system-internal";
 import { useState } from "react";
 
-import type { HubStack, Surface } from "../shared/contract.ts";
-import { formatAge, formatBytes } from "../shared/format.ts";
+import { msOf } from "../shared/clock.ts";
+import type { HubAnalytics, HubStack, Surface } from "../shared/contract.ts";
+import { formatAge, formatBytes, formatCount } from "../shared/format.ts";
 import { logsPath } from "../shared/route.ts";
 import { ownSurfaces, surfaceState } from "../shared/surfaces.ts";
 import { DestroyDialog } from "./destroy-dialog.tsx";
@@ -64,6 +65,16 @@ const summaryOf = ({ stack, now }: { stack: HubStack; now: number }) => {
     .join(" · ");
 };
 
+/** The analyticssim line: live while an event arrived in the last minute. */
+const ActivityLine = ({ analytics, now }: { analytics: HubAnalytics; now: number }) => {
+  const at = analytics.lastReceivedAt;
+  const recent = at !== null && now - msOf({ iso: at }) < 60_000;
+  const last =
+    at === null ? "no events yet" : `last ${analytics.lastName} ${formatAge({ at, now })}`;
+  const label = `${formatCount({ count: analytics.lastFiveMinutes })} events / 5m · ${formatCount({ count: analytics.distinctIds })} users · ${last}`;
+  return <StatusDot state={recent ? "live" : "unknown"} label={label} />;
+};
+
 export type StackCardProps = {
   stack: HubStack;
   now: number;
@@ -84,6 +95,12 @@ export const StackCard = ({ stack, now, busy, onRestart, onDown, onDestroy }: St
         <span title={`${stack.facts.worktreeDir}\n${summary}`}>
           <StatusDot state={stack.live ? "live" : "down"} label={stack.live ? "Live" : "Stale"} />
           {` · ${summary}`}
+          {stack.analytics !== undefined && (
+            <>
+              <br />
+              <ActivityLine analytics={stack.analytics} now={now} />
+            </>
+          )}
         </span>
       }
       actions={

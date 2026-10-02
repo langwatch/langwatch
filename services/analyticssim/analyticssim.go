@@ -84,7 +84,11 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	}
 	s := &Server{cfg: cfg, records: newStore(cfg.MaxRecords, cfg.MaxRawBytes), now: time.Now, console: newConsole(bundle)}
 	if cfg.Seed {
-		s.records.add(seedRecords(), s.now())
+		seeds := seedRecords()
+		for i := range seeds {
+			seeds[i].seeded = true
+		}
+		s.records.add(seeds, s.now())
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
@@ -265,9 +269,10 @@ func (s *Server) handleCustomerIOTrack(w http.ResponseWriter, r *http.Request) {
 
 // consoleStatus is what the console header says about this simulator.
 type consoleStatus struct {
-	Stack   string `json:"stack"`
-	Records int    `json:"records"`
-	BaseURL string `json:"baseUrl"`
+	Stack    string   `json:"stack"`
+	Records  int      `json:"records"`
+	BaseURL  string   `json:"baseUrl"`
+	Activity Activity `json:"activity"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +282,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, consoleStatus{
 		Stack: s.cfg.Stack, Records: s.records.count(), BaseURL: scheme + "://" + r.Host,
+		Activity: s.records.activity(s.now().Add(-activityWindow)),
 	})
 }
 

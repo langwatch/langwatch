@@ -79,6 +79,16 @@ export type StackHome = z.infer<typeof stackHomeSchema>;
 export const notFoundSchema = z.object({ error: z.string(), slug: z.string(), hubUrl: z.string() });
 export type NotFound = z.infer<typeof notFoundSchema>;
 
+/** The stack's analyticssim activity: who is driving its app right now. */
+export const hubAnalyticsSchema = z.object({
+  total: z.number(),
+  lastFiveMinutes: z.number(),
+  distinctIds: z.number(),
+  lastReceivedAt: z.string().nullable(),
+  lastName: z.string(),
+});
+export type HubAnalytics = z.infer<typeof hubAnalyticsSchema>;
+
 export const hubStackSchema = z.object({
   slug: z.string(),
   live: z.boolean(),
@@ -89,6 +99,7 @@ export const hubStackSchema = z.object({
   canRestart: z.boolean(),
   canDown: z.boolean(),
   canDestroy: z.boolean(),
+  analytics: hubAnalyticsSchema.optional(),
 });
 export type HubStack = z.infer<typeof hubStackSchema>;
 

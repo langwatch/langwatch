@@ -196,7 +196,13 @@ export const hub = ({ now }: { now: number }): Hub => {
       otherRssBytes: 9.6 * GB,
       pressure: "amber",
     },
-    stacks: [hubStack({ home: feat, appUrl: `https://app.feat-x.${DOMAIN}` }), hubStack({ home: long, appUrl: "" })],
+    stacks: [
+      {
+        ...hubStack({ home: feat, appUrl: `https://app.feat-x.${DOMAIN}` }),
+        analytics: { total: 40, lastFiveMinutes: 12, distinctIds: 2, lastReceivedAt: ago({ now, seconds: 8 }), lastName: "$pageview" },
+      },
+      hubStack({ home: long, appUrl: "" }),
+    ],
     worktrees: [
       { name: "langwatch", slug: "", branch: "main", dir: "/Users/someone/Source/github.com/langwatch/langwatch", isPrimary: true, isCurrent: false, homeUrl: "", canStart: true },
       { name: "stopped", slug: "stopped", branch: "feat/stopped-stack-home", dir: "/Users/someone/Source/github.com/langwatch/langwatch/.worktrees/stopped", isPrimary: false, isCurrent: true, homeUrl: `https://stopped.${DOMAIN}`, canStart: true },

@@ -30,6 +30,7 @@ type Record struct {
 	Properties map[string]any  `json:"properties"`
 	ReceivedAt time.Time       `json:"receivedAt"`
 	Raw        json.RawMessage `json:"raw"`
+	seeded     bool            // sample content, left out of Activity
 }
 
 // Filter narrows a listing; an empty field matches everything.
@@ -113,4 +114,46 @@ func (s *store) clear() {
 	defer s.mu.Unlock()
 	clear(s.ring)
 	s.head, s.size = 0, 0
+}
+
+// activityWindow is how far back Activity's recent counts look.
+const activityWindow = 5 * time.Minute
+
+// Activity is how busy the stack's app has been, seeded records left out: the
+// hub reads it to show whether anyone is driving that worktree right now.
+type Activity struct {
+	Total           int        `json:"total"`
+	LastFiveMinutes int        `json:"lastFiveMinutes"`
+	DistinctIDs     int        `json:"distinctIds"`
+	LastReceivedAt  *time.Time `json:"lastReceivedAt"`
+	LastName        string     `json:"lastName"`
+}
+
+// activity summarises the records, counting those received at or after since as recent.
+// ponytail: O(n) scan of the ring (5000 by default) per status call; keep running counters in add if it shows.
+func (s *store) activity(since time.Time) Activity {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := Activity{}
+	ids := map[string]bool{}
+	for i := s.size - 1; i >= 0; i-- {
+		r := s.at(i)
+		if r.seeded {
+			continue
+		}
+		out.Total++
+		if out.LastReceivedAt == nil {
+			at := r.ReceivedAt
+			out.LastReceivedAt, out.LastName = &at, r.Name
+			if out.LastName == "" {
+				out.LastName = r.Kind
+			}
+		}
+		if !r.ReceivedAt.Before(since) {
+			out.LastFiveMinutes++
+			ids[r.DistinctID] = true
+		}
+	}
+	out.DistinctIDs = len(ids)
+	return out
 }

@@ -1,8 +1,14 @@
 package dashboard
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -10,6 +16,10 @@ import (
 
 // maxHubEvents caps the daemon's reclamations the hub lists, newest first.
 const maxHubEvents = 12
+
+// analyticsTimeout bounds the whole fan-out to the stacks' analyticssims, so a
+// stuck sim never slows /api/hub.
+const analyticsTimeout = 300 * time.Millisecond
 
 // The JSON the hub reads: the whole machine apps/haven-web draws, as raw
 // values (bytes, seconds, RFC 3339 times) rather than display strings.
@@ -50,6 +60,17 @@ type hubStackJSON struct {
 	CanRestart bool          `json:"canRestart"`
 	CanDown    bool          `json:"canDown"`
 	CanDestroy bool          `json:"canDestroy"`
+	// Analytics is the stack's analyticssim activity; absent when it has no sim or the sim did not answer.
+	Analytics *hubAnalyticsJSON `json:"analytics,omitempty"`
+}
+
+// hubAnalyticsJSON is the activity part of analyticssim's GET /_sim/api/status.
+type hubAnalyticsJSON struct {
+	Total           int        `json:"total"`
+	LastFiveMinutes int        `json:"lastFiveMinutes"`
+	DistinctIDs     int        `json:"distinctIds"`
+	LastReceivedAt  *time.Time `json:"lastReceivedAt"`
+	LastName        string     `json:"lastName"`
 }
 
 type hubWorktreeJSON struct {
@@ -75,7 +96,7 @@ type hubActionsJSON struct {
 	CanStart   bool `json:"canStart"`
 }
 
-func (s *Server) handleHub(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleHub(w http.ResponseWriter, r *http.Request) {
 	extras := s.extras()
 	writeJSON(w, http.StatusOK, hubJSON{
 		Shared: sharedJSON{
@@ -84,7 +105,7 @@ func (s *Server) handleHub(w http.ResponseWriter, _ *http.Request) {
 			TelemetryURL:     s.config.SharedURL("telemetry"),
 		},
 		Machine:   machineView(extras.Summary),
-		Stacks:    s.hubStacks(extras),
+		Stacks:    s.hubStacks(r.Context(), extras),
 		Worktrees: s.hubWorktrees(extras.Worktrees),
 		Events:    hubEvents(extras.Events),
 		Actions:   hubActionsJSON{CanRestart: s.config.Actions.Restart != nil, CanStart: s.config.Actions.Start != nil},
@@ -103,9 +124,13 @@ func machineView(sum SummaryView) machineJSON {
 	}
 }
 
-func (s *Server) hubStacks(extras Extras) []hubStackJSON {
+func (s *Server) hubStacks(ctx context.Context, extras Extras) []hubStackJSON {
 	out := []hubStackJSON{}
-	stacks := s.config.Stacks()
+	// By name, so a stack doesn't jump about the hub each time it's touched;
+	// the registry itself hands them back most recently updated first.
+	stacks := slices.SortedStableFunc(slices.Values(s.config.Stacks()), func(a, b domain.Stack) int {
+		return strings.Compare(a.Slug, b.Slug)
+	})
 	for i := range stacks {
 		h := homeState{stack: stacks[i], registered: true, live: s.isLive(stacks[i])}
 		out = append(out, hubStackJSON{
@@ -117,7 +142,42 @@ func (s *Server) hubStacks(extras Extras) []hubStackJSON {
 			CanDestroy: s.config.Actions.Destroy != nil,
 		})
 	}
+	fillAnalytics(ctx, stacks, out)
 	return out
+}
+
+// fillAnalytics asks every live stack's analyticssim for its activity at once.
+func fillAnalytics(ctx context.Context, stacks []domain.Stack, out []hubStackJSON) {
+	ctx, cancel := context.WithTimeout(ctx, analyticsTimeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	for i := range stacks {
+		svc, has := findService(stacks[i], domain.AnalyticsService)
+		if out[i].Live && has && svc.Port != 0 {
+			wg.Go(func() { out[i].Analytics = fetchAnalytics(ctx, svc.Port) })
+		}
+	}
+	wg.Wait()
+}
+
+// fetchAnalytics is the sim's activity over loopback, or nil on any failure.
+func fetchAnalytics(ctx context.Context, port int) *hubAnalyticsJSON {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/_sim/api/status", port), nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var status struct {
+		Activity *hubAnalyticsJSON `json:"activity"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&status) != nil {
+		return nil
+	}
+	return status.Activity
 }
 
 func (s *Server) hubWorktrees(worktrees []WorktreeView) []hubWorktreeJSON {

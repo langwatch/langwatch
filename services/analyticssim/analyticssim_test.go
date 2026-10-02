@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -249,5 +250,34 @@ func TestSeedLoadsSampleRecordsFromBothProviders(t *testing.T) {
 	}
 	if !providers[ProviderPostHog] || !providers[ProviderCustomerIO] {
 		t.Fatalf("seed should load both providers, got %v", providers)
+	}
+}
+
+func TestStatusSummarisesActivityWithoutTheSeed(t *testing.T) {
+	now := time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC)
+	s := newServer(Config{Stack: "feat-x", Seed: true}, fstest.MapFS{"index.html": {Data: []byte("<div id=root></div>")}})
+	s.now = func() time.Time { return now }
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+	status := func() consoleStatus {
+		t.Helper()
+		var out consoleStatus
+		if err := json.NewDecoder(send(t, http.MethodGet, srv.URL+"/_sim/api/status", nil, nil).Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if got := status().Activity; got.Total != 0 || got.LastReceivedAt != nil {
+		t.Fatalf("seeded only: activity %+v, want empty", got)
+	}
+	send(t, http.MethodPost, srv.URL+"/batch/", nil, []byte(`{"batch":[
+	 {"event":"$pageview","distinct_id":"agent_1"},{"event":"trace_viewed","distinct_id":"agent_2"}]}`))
+	got := status().Activity
+	if got.Total != 2 || got.LastFiveMinutes != 2 || got.DistinctIDs != 2 || got.LastName != "trace_viewed" || got.LastReceivedAt == nil || !got.LastReceivedAt.Equal(now) {
+		t.Errorf("activity %+v", got)
+	}
+	now = now.Add(10 * time.Minute)
+	if got := status().Activity; got.Total != 2 || got.LastFiveMinutes != 0 || got.DistinctIDs != 0 {
+		t.Errorf("ten minutes on: activity %+v", got)
 	}
 }

@@ -57,6 +57,7 @@ describe("the hub", () => {
         .map((row) => within(row).getAllByRole("cell")[1]?.textContent);
       expect(names).not.toContain("observability");
       expect(names).not.toContain("clickhouse");
+      expect(screen.getByText(/^12 events \/ 5m · 2 users · last \$pageview/)).toBeDefined();
       expect(screen.getByRole("link", { name: "feat-x" }).getAttribute("href")).toBe(
         "https://feat-x.langwatch.localhost",
       );
