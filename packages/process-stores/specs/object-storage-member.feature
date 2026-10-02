@@ -88,7 +88,28 @@ Feature: The object-storage member
     And removing one project's object leaves the other's in place
 
   @unit
-  Scenario: An object keeps being read where it was recorded after the backend moves
-    Given an object written under one filesystem root
-    When the deployment now writes under another root
-    Then the object is still read, digested and removed at the root it was recorded under
+  Scenario: A recorded location resolves to the project's own backend or the shared one
+    Given object storage with an organization on its own S3 account beside a shared bucket
+    When an object recorded on the organization's own bucket is read or signed for download
+    And an object recorded on the shared bucket before the organization moved is read the same way
+    Then each resolves to the bucket it was recorded on
+
+  @unit
+  Scenario: A recorded location outside the project's own and shared backends is refused
+    Given object storage with two organizations on their own S3 accounts
+    When a project names a recorded location on the other organization's bucket
+    And a project names a bucket or filesystem root this deployment is not configured for
+    Then read, digest, remove and download signing are refused with UnreachableStorageLocationError
+    And nothing is read from that location
+
+  @unit
+  Scenario: An object key that leaves its root or container is refused
+    Given object storage on the filesystem or on Azure Blob
+    When a key holds an empty, "." or ".." segment
+    Then the operation is refused before any file is opened or any request is signed
+
+  @unit
+  Scenario: An Azure key segment is encoded into the blob path
+    Given object storage on Azure Blob
+    When a key segment holds a space, "?", "#" or "%"
+    Then the request and the signed URL name the blob with each segment percent-encoded

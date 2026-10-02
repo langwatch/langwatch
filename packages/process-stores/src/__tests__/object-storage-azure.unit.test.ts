@@ -149,6 +149,42 @@ describe("given object storage on Azure Blob with an account key", () => {
       expect(received).toEqual([]);
     });
   });
+
+  describe("when a key segment holds characters a URL reads as syntax", () => {
+    /** @scenario "An Azure key segment is encoded into the blob path" */
+    it("requests and signs the blob with each segment encoded", async () => {
+      status = 202;
+      const odd = { projectId: "project-1", key: "project-1/a b?c#d%e" };
+      await backend().remove(odd);
+      const url = new URL(
+        await backend().signDownload(odd, {
+          expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z"),
+        }),
+      );
+
+      expect(received.map((request) => request.url)).toEqual([
+        "/devstoreaccount1/objects/project-1/a%20b%3Fc%23d%25e",
+      ]);
+      expect(url.pathname).toBe("/devstoreaccount1/objects/project-1/a%20b%3Fc%23d%25e");
+      expect([...url.searchParams.keys()]).not.toContain("c");
+    });
+  });
+
+  describe("when a key steps outside the container", () => {
+    /** @scenario "An object key that leaves its root or container is refused" */
+    it("refuses before any request or signature", async () => {
+      for (const key of ["project-1/../other/object", "./object", "project-1//object", ""]) {
+        const outside = { projectId: "project-1", key };
+        await expect(backend().read(outside)).rejects.toThrow(/does not name a blob/);
+        await expect(
+          backend().signDownload(outside, {
+            expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z"),
+          }),
+        ).rejects.toThrow(/does not name a blob/);
+      }
+      expect(received).toEqual([]);
+    });
+  });
 });
 
 describe("given STORED_OBJECTS_BACKEND=azure with an incomplete block", () => {

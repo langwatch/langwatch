@@ -193,8 +193,15 @@ async function refusal(response: IncomingMessage, operation: string): Promise<Er
   return new Error(`Azure Blob ${operation} failed: ${status}.`);
 }
 
-const blobPath = (place: AzurePlace, at: StoredObjectAddress) =>
-  `/${place.credentials.container}/${at.key}`;
+/** A key names one blob inside the container: no empty, `.` or `..` segment, each one encoded. */
+function blobPath(place: AzurePlace, at: StoredObjectAddress): string {
+  const segments = at.key.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    throw new Error(`The object key "${at.key}" does not name a blob in the container.`);
+  }
+  const encoded = segments.map((segment) => encodeURIComponent(segment)).join("/");
+  return `/${place.credentials.container}/${encoded}`;
+}
 
 async function readBlob(place: AzurePlace, at: StoredObjectAddress): Promise<IncomingMessage> {
   const response = await call(place, { method: "GET", path: blobPath(place, at) });
@@ -347,6 +354,7 @@ async function signedBlobUrl(options: {
 }): Promise<string> {
   const { place, at, permissions, expiresAt } = options;
   secondsUntil({ expiresAt, now: place.clock.now() });
+  const path = blobPath(place, at);
   const { credentials } = place;
   const terms: SasTerms = {
     permissions,
@@ -358,7 +366,7 @@ async function signedBlobUrl(options: {
     credentials.mode === "sharedKey"
       ? serviceSas(credentials, terms)
       : await delegationSas(place, terms);
-  const url = new URL(`${credentials.endpoint}${blobPath(place, at)}`);
+  const url = new URL(`${credentials.endpoint}${path}`);
   for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
   return url.toString();
 }

@@ -25,13 +25,11 @@ import { filesystemBackend } from "./object-storage-filesystem.ts";
 import { s3Backend, s3Client } from "./object-storage-s3.ts";
 import type { TenantDirectory } from "./tenant-directory.ts";
 
-type SharedPlace = Readonly<{ backend: ObjectBackend; s3?: S3Client }>;
-
 function sharedBackend(options: {
   config: ObjectStorageConfig;
   clock: Clock;
   clients: S3Client[];
-}): SharedPlace {
+}): ObjectBackend {
   const { config, clock, clients } = options;
   switch (config.backend) {
     case "s3": {
@@ -40,16 +38,14 @@ function sharedBackend(options: {
         throw new Error("Object storage selected S3 without a bucket name (S3_BUCKET_NAME).");
       const client = s3Client(config.s3);
       clients.push(client);
-      return { backend: s3Backend({ client, bucket, clock }), s3: client };
+      return s3Backend({ client, bucket, clock });
     }
     case "azure":
-      return {
-        backend: azureBackend({ credentials: resolveAzureCredentials(config.azure), clock }),
-      };
+      return azureBackend({ credentials: resolveAzureCredentials(config.azure), clock });
     case "file": {
       const root = config.root.trim();
       if (!root) throw new Error("Object storage selected the filesystem without a root.");
-      return { backend: filesystemBackend({ root }) };
+      return filesystemBackend({ root });
     }
   }
 }
@@ -93,36 +89,6 @@ function privateBackends(options: {
   return backends;
 }
 
-/** A recorded location's backend: one configured, or one reached without new credentials. */
-function backendAt(options: {
-  location: ObjectStorageDestination;
-  configured: readonly ObjectBackend[];
-  recorded: Map<string, ObjectBackend>;
-  sharedS3: S3Client | undefined;
-  clock: Clock;
-}): ObjectBackend | undefined {
-  const { location, recorded, sharedS3, clock } = options;
-  const known = [...options.configured, ...recorded.values()];
-  const held = known.find((backend) => sameDestination(backend.destination, location));
-  if (held) return held;
-  const reached = reachable({ location, sharedS3, clock });
-  if (reached) recorded.set(JSON.stringify(location), reached);
-  return reached;
-}
-
-function reachable(options: {
-  location: ObjectStorageDestination;
-  sharedS3: S3Client | undefined;
-  clock: Clock;
-}): ObjectBackend | undefined {
-  const { location, sharedS3, clock } = options;
-  if (location.kind === "file") return filesystemBackend({ root: location.root });
-  if (location.kind === "s3" && sharedS3) {
-    return s3Backend({ client: sharedS3, bucket: location.bucket, clock });
-  }
-  return undefined;
-}
-
 async function placeProject(options: {
   projectId: string;
   shared: ObjectBackend;
@@ -147,18 +113,18 @@ export function buildObjectStorage(options: {
 }): BuiltMember<ObjectStorage> {
   const { config, directory, clock } = options;
   const clients: S3Client[] = [];
-  const { backend: shared, s3: sharedS3 } = sharedBackend({ config, clock, clients });
+  const shared = sharedBackend({ config, clock, clients });
   const accounts = privateBackends({ accounts: config.privateAccounts ?? [], clock, clients });
-  const recorded = new Map<string, ObjectBackend>();
-  const configured = [shared, ...accounts.values()];
 
   const place = (projectId: string) => placeProject({ projectId, shared, accounts, directory });
 
+  /** A recorded location resolves only to the project's placed backend or the shared one. */
   const locate = async (at: StoredObjectAddress): Promise<ObjectBackend> => {
     const placed = await place(at.projectId);
-    if (!at.location || sameDestination(placed.destination, at.location)) return placed;
-    const backend = backendAt({ location: at.location, configured, recorded, sharedS3, clock });
-    if (!backend) throw new UnreachableStorageLocationError(at.location.kind, at.key);
+    const { location } = at;
+    if (!location) return placed;
+    const backend = [placed, shared].find((held) => sameDestination(held.destination, location));
+    if (!backend) throw new UnreachableStorageLocationError(location.kind, at.key);
     return backend;
   };
 
