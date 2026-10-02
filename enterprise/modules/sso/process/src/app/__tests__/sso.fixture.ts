@@ -277,6 +277,15 @@ export class RecordingSsoSetupCommands implements SsoSetupCommandsApi {
     async () => {},
   );
   readonly rename = vi.fn<SsoSetupCommandsApi["rename"]>(async () => {});
+  readonly getIdentityProvider = vi.fn<SsoSetupCommandsApi["getIdentityProvider"]>(async () => ({
+    protocol: "oidc" as const,
+    issuer: "https://acme.okta.com",
+    clientId: "client",
+    hasClientSecret: true,
+  }));
+  readonly updateIdentityProvider = vi.fn<SsoSetupCommandsApi["updateIdentityProvider"]>(
+    async () => {},
+  );
   readonly setArrivals = vi.fn<SsoSetupCommandsApi["setArrivals"]>(async () => {});
   readonly activate = vi.fn<SsoSetupCommandsApi["activate"]>(async () => {});
   readonly discardConnection = vi.fn<SsoSetupCommandsApi["discardConnection"]>(async () => {});

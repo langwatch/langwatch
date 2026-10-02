@@ -45,6 +45,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             },
           },
           getHistory: { invalidate: () => {} },
+          identityProvider: { invalidate: () => {} },
           breakGlassBindings: {
             invalidate: () => {
               state.breakGlassInvalidated += 1;
@@ -54,10 +55,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
       }),
       ssoSetup: {
         getSetup: {
-          useQuery: (
-            _input: unknown,
-            options?: { enabled?: boolean },
-          ) => {
+          useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
             state.polls.push(options);
             return {
               data: state.view,
@@ -68,6 +66,19 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           },
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+        identityProvider: {
+          useQuery: () => ({
+            data: {
+              protocol: "oidc",
+              issuer: "https://acme.okta.com",
+              clientId: "client_acme",
+              hasClientSecret: true,
+            },
+            isLoading: false,
+            error: null,
+          }),
+        },
+        updateIdentityProvider: mutation("updateIdentityProvider"),
         getMigrationProgress: {
           useQuery: () => ({ data: void 0, isLoading: false, isError: false, refetch: () => {} }),
         },
@@ -358,6 +369,26 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("connection-name")).toBeInTheDocument();
       expect(screen.queryByTestId("connection-name-edit")).toBeNull();
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+
+    /** @scenario "The settings card offers the edit prefilled with the current settings" */
+    it("offers the identity provider settings for editing, prefilled, on the same card", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      fireEvent.click(screen.getByTestId("identity-provider-edit"));
+
+      const form = screen.getByTestId("edit-identity-provider");
+      expect(within(form).getByLabelText("Issuer address")).toHaveValue("https://acme.okta.com");
+      expect(within(form).getByLabelText("Client id")).toHaveValue("client_acme");
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+
+    it("offers no edit on a live connection that is on its way out", () => {
+      state.view = setupView({ connection: connectionView({ state: "TEARDOWN_PENDING" }) });
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
     });
   });
 

@@ -1002,6 +1002,43 @@ export class SsoIssuerUnreachableError extends SsoConnectionCommandRefusedError 
   }
 }
 
+/** The issuer a provider names (discovery at registration, the ID token's
+ *  `iss` at sign-in) is not the connection's. Both are public, so the refusal
+ *  names them: the fix is to make one equal the other. */
+export class SsoIssuerMismatchError extends SsoConnectionCommandRefusedError {
+  constructor({ expected, received }: { expected: string; received: string }) {
+    super("sso_issuer_mismatch", "sso_issuer_mismatch", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { expected, received },
+      reasons: [
+        new Error(
+          `the discovery document names issuer ${received}, the connection was registered with ${expected}`,
+        ),
+      ],
+    });
+    this.name = "SsoIssuerMismatchError";
+  }
+}
+
+/** An Entra ID multi-tenant endpoint (`common`, `organizations`, `consumers`)
+ *  offered as the issuer: no token carries it, so the tenant's own is needed. */
+export class SsoIssuerMultiTenantError extends SsoConnectionCommandRefusedError {
+  constructor({ issuer, segment }: { issuer: string; segment: string | null }) {
+    super("sso_issuer_multi_tenant", "sso_issuer_multi_tenant", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { issuer },
+      reasons: [
+        new Error(
+          `${issuer} is a multi-tenant endpoint${segment ? ` (${segment})` : ""}, not a tenant issuer`,
+        ),
+      ],
+    });
+    this.name = "SsoIssuerMultiTenantError";
+  }
+}
+
 /** The document pasted in is not an identity provider descriptor, or carries
  *  no signing certificate to trust assertions against. */
 export class SsoSamlMetadataInvalidError extends SsoConnectionCommandRefusedError {

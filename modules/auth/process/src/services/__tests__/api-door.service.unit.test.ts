@@ -7,10 +7,10 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { describe, expect, it } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = {
   id: "project-1",

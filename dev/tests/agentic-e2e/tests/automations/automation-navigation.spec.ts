@@ -11,9 +11,7 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   // Automations and alerts are one list now (ADR-093 §1), so there is no
   // Alerts tab to navigate to.
   await expect(page.locator(`a[href="${basePath}/alerts"]`)).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Overview", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByText("Recent activity")).toBeVisible();
   await expect(page.getByText("Error spike")).toBeVisible();
   await expect(page.getByText("Traffic drop")).toBeVisible();
@@ -33,9 +31,7 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   // redirecting, so the URL must survive too.
   await expect(page).toHaveURL(`${basePath}/alerts`);
   await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "New automation" }),
-  ).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "New automation" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("alerts.png") });
 
   // The tab is called Reports; the path it shipped under keeps answering, so
@@ -43,9 +39,7 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   await page.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(`${basePath}/schedules`);
   await expect(page.locator("h1", { hasText: "Reports" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New report" })).toHaveCount(
-    1,
-  );
+  await expect(page.getByRole("button", { name: "New report" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
   await page.getByRole("link", { name: "Automations", exact: true }).last().click();

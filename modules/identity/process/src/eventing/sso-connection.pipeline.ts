@@ -76,6 +76,7 @@ import {
   connectionTornDownEventSchema,
   connectionArrivalPolicySetEventSchema,
   connectionRenamedEventSchema,
+  connectionIdpUpdatedEventSchema,
   replacementConnectionRegisteredEventSchema,
   migrationRouteSelectedEventSchema,
   migrationFinalizationStartedEventSchema,
@@ -93,6 +94,7 @@ import {
   RegisterConnectionCommand,
   RegisterReplacementConnectionCommand,
   RenameConnectionCommand,
+  UpdateConnectionIdpCommand,
   SelectMigrationRouteCommand,
   BeginMigrationFinalizationCommand,
   FinalizeMigrationCommand,
@@ -143,6 +145,7 @@ const CONNECTION_COMMANDS = [
   "completeTeardown",
   "grandfatherConnection",
   "renameConnection",
+  "updateConnectionIdp",
   "registerReplacementConnection",
   "selectMigrationRoute",
   "beginMigrationFinalization",
@@ -209,6 +212,7 @@ export function defineSsoConnectionPipeline(
       connectionTornDownEventSchema,
       connectionArrivalPolicySetEventSchema,
       connectionRenamedEventSchema,
+      connectionIdpUpdatedEventSchema,
       replacementConnectionRegisteredEventSchema,
       migrationRouteSelectedEventSchema,
       migrationFinalizationStartedEventSchema,
@@ -298,6 +302,11 @@ export function defineSsoConnectionPipeline(
       name: "renameConnection",
       handlerClass: RenameConnectionCommand,
       instance: new RenameConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "updateConnectionIdp",
+      handlerClass: UpdateConnectionIdpCommand,
+      instance: new UpdateConnectionIdpCommand(deps.connectionGuards),
     })
     .withCommandInstance({
       name: "registerReplacementConnection",
@@ -480,7 +489,8 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.ssoConnectionPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
+    app.ssoConnectionPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

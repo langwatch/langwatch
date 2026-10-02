@@ -74,6 +74,7 @@ import { auth0PasswordChannels } from "../channels/auth0-password-channels.regis
 import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
+import { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -299,6 +300,8 @@ export class AuthModule implements AuthApiContract {
    * browser-session identity. Every caller shares {@link AuthModule.#betterAuth}.
    */
   #composeBetterAuth: (() => Promise<BetterAuthTransport>) | null = null;
+  /** Shared by the Better Auth logger and the door, per request. */
+  #idTokenIssuerRefusals = IdTokenIssuerRefusalChannel.create();
   #betterAuth: Promise<BetterAuthTransport> | null = null;
   /** The identity {@link AuthModule.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
@@ -408,6 +411,8 @@ export class AuthModule implements AuthApiContract {
       verifyBrowserSession: (input) => this.verifyBrowserSession(input),
       resolveBrowserSession: (input) => this.resolveBrowserSession(input),
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
+      idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
+      connectionIssuers,
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
       now: members.now ?? nowInstant,
     });
@@ -598,6 +603,7 @@ export class AuthModule implements AuthApiContract {
         app.#composeBetterAuth = () =>
           buildBetterAuth({
             identity,
+            idTokenIssuerRefusals: app.#idTokenIssuerRefusals,
             signupAnnouncements,
             lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({

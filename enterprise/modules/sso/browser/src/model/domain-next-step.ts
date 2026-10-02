@@ -103,11 +103,7 @@ function provedStep({
   };
 }
 
-function getRecordStep({
-  provesWithLicense,
-}: {
-  provesWithLicense: boolean;
-}): DomainNextStep {
+function getRecordStep({ provesWithLicense }: { provesWithLicense: boolean }): DomainNextStep {
   if (provesWithLicense) {
     return {
       kind: "get-record",

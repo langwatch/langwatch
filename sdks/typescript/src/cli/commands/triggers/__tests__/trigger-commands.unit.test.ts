@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,14 +16,14 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTriggersCommand } from "../list";
-import { getTriggerCommand } from "../get";
 import { createTriggerCommand } from "../create";
-import { updateTriggerCommand } from "../update";
 import { deleteTriggerCommand } from "../delete";
+import { triggerFiresCommand } from "../fires";
+import { getTriggerCommand } from "../get";
+import { listTriggersCommand } from "../list";
 import { setTriggerActiveCommand } from "../setActive";
 import { testFireTriggerCommand } from "../testFire";
-import { triggerFiresCommand } from "../fires";
+import { updateTriggerCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -291,9 +295,9 @@ describe("createTriggerCommand()", () => {
 
   describe("when invalid action is provided", () => {
     it("exits with code 1", async () => {
-      await expect(
-        createTriggerCommand("Bad", { action: "INVALID" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createTriggerCommand("Bad", { action: "INVALID" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
   describe("when an alert on a graph is created", () => {

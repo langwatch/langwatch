@@ -1,6 +1,6 @@
+import type { SessionCaller } from "@langwatch/api/hosting";
 import type { AuthApi, BrowserSessionVerification } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SessionCaller } from "@langwatch/api/hosting";
 
 const logger = createLogger("langwatch:api:auth");
 

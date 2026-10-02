@@ -1,3 +1,4 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   ConnectServiceNotEntitledError,
@@ -15,7 +16,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { connectHostedRest } from "../connect-hosted.rest.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 const gatewayDoor: RestIdentity = {
   authenticate: () => {

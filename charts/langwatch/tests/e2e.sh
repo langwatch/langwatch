@@ -433,18 +433,17 @@ test_app() {
 # multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
 # The LWQL access model is DELIVERED by the <release>-lwql-access-render Job
-# (revision-suffixed name; main-phase on install, pre-upgrade hook on upgrade so
+# (named by a hash of its spec; main-phase on install, pre-upgrade hook on upgrade so
 # the new Secret lands before the pod roll). `helm --wait` does not wait for Jobs, and the
 # ClickHouse mount is required, so a failed render leaves ClickHouse stuck rather
 # than silently accessless — but assert Complete explicitly anyway, and dump the
 # Job/pod events on failure so a broken render is diagnosable without a re-run.
 assert_render_job_complete() {
   local job
-  job=$(kc get jobs -o name 2>/dev/null | sed 's|.*/||' \
-    | grep -E "^${RELEASE}-lwql-access-render-[0-9]+$" \
-    | awk -F- '{print $NF, $0}' | sort -rn | head -1 | cut -d' ' -f2)
+  job=$(kc get jobs --sort-by=.metadata.creationTimestamp -o name 2>/dev/null | sed 's|.*/||' \
+    | grep -E "^${RELEASE}-lwql-access-render-[0-9a-f]{10}$" | tail -1)
   if [ -z "$job" ]; then
-    fail "LWQL render Job not found (expected ${RELEASE}-lwql-access-render-<rev>)"
+    fail "LWQL render Job not found (expected ${RELEASE}-lwql-access-render-<spec hash>)"
     return
   fi
   if kc wait --for=condition=complete "job/${job}" --timeout="${TIMEOUT}s" 2>/dev/null; then

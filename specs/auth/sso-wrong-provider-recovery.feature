@@ -52,7 +52,7 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     Given a user whose email domain no ACTIVE connection has verified
     When they hit the same wrong-method sign-in error
     Then the page still offers to sign out of the identity provider and try again
-    And the guidance falls back to signing in with the method used originally
+    And the guidance falls back to signing in with the method used before
 
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that

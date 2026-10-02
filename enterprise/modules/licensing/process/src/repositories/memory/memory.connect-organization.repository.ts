@@ -36,6 +36,14 @@ export class MemoryConnectOrganizationRepository implements ConnectOrganizationR
     return [...this.#rows.values()].filter((row) => row.license).map((row) => row.organizationId);
   }
 
+  /** Seed order stands for creation order. */
+  async findAllOldestFirst(): Promise<{ organizationId: string; license: string | null }[]> {
+    return [...this.#rows.values()].map((row) => ({
+      organizationId: row.organizationId,
+      license: row.license,
+    }));
+  }
+
   /** Refuses an unknown organization the way the unique key does. */
   async setServicesDisabled({
     organizationId,

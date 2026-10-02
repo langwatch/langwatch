@@ -84,7 +84,11 @@ import type {
   SelfServeIssuedDnsRecord,
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
-import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
+import type {
+  SsoIdentityProviderView,
+  SsoIdpRegistration,
+  SsoIdpUpdate,
+} from "./sso-idp-registration.ts";
 import type {
   SsoMigrationAccountLinkDecision,
   SsoMigrationAuthenticationDecision,
@@ -293,6 +297,10 @@ export interface SsoIssuerDirectoryApi {
   /** The issuer of the connection that proved this domain. Empty where the
    *  domain is unproved, or its connection is not one anybody may dial. */
   findIssuersForDomain(args: { domain: string }): Promise<string[]>;
+  /** The origins these issuers' discovery documents serve their endpoints
+   *  from, each public https (Google's `*.googleapis.com`, a Cognito hosted
+   *  UI). Empty for an issuer that has no document or does not answer. */
+  findEndpointOrigins(args: { issuers: readonly string[] }): Promise<string[]>;
 }
 
 /**
@@ -498,6 +506,15 @@ export interface SsoSetupCommandsApi {
   selectMigrationRoute(args: SsoSetupCommand & { route: SsoMigrationRoute }): Promise<void>;
   /** The word on the card; nothing routes on it. */
   rename(args: SsoSetupCommand & { name: string }): Promise<void>;
+  /** The connection's current identity provider settings, for the edit form.
+   *  Null for one with none of its own (a grandfathered one). Never the secret. */
+  getIdentityProvider(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SsoIdentityProviderView>;
+  /** Replaces what the connection dials, keeping its id and so the redirect
+   *  address at the provider. Checked exactly as a registration is. */
+  updateIdentityProvider(args: SsoSetupCommand & { idp: SsoIdpUpdate }): Promise<void>;
   setArrivals(args: SsoSetupCommand & { arrivalPolicy: SsoArrivalPolicy }): Promise<void>;
   /** Takes the connection live on the strength of the test sign-in it
    *  recorded: the account is resolved here, never supplied by a caller. */

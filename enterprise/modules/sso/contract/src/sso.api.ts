@@ -27,8 +27,10 @@ import type {
   SsoSetupRegistered,
   SsoSetupRegisterInput,
   SsoSetupRemovalInput,
+  SsoSetupIdentityProviderView,
   SsoSetupRenameInput,
   SsoSetupStartMigrationInput,
+  SsoSetupUpdateIdentityProviderInput,
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
@@ -196,6 +198,17 @@ export interface SsoApi {
   setupFinalizeLegacyMigration(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   /** The word on the card, which routes nothing and is never plan-gated. */
   setupRename(input: SsoSetupRenameInput, by: SsoAdministrator): Promise<void>;
+  /** The settings the edit form is prefilled with, never the client secret.
+   *  Null for a grandfathered connection, which has none of its own. */
+  findIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | null>;
+  /** Replaces what the connection dials on the same id, so the redirect
+   *  address registered at the provider stays. Plan-gated like registering. */
+  setupUpdateIdentityProvider(
+    input: SsoSetupUpdateIdentityProviderInput,
+    by: SsoAdministrator,
+  ): Promise<void>;
   setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void>;
   /** Turn the connection on, on the strength of what it has already recorded:
    *  the test sign-in's account is resolved where the facts are, never

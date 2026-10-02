@@ -183,8 +183,9 @@ function SignInErrorDescription({
       <Alert.Description>
         <VStack gap={1} align="start">
           <Text>
-            This email is already registered with a different sign-in method. To get back in, sign
-            out completely and sign in again using the method you used originally.
+            An account with this email address already exists, and this sign-in method can&apos;t be
+            added to it because the provider didn&apos;t confirm the address. Sign in with the
+            method you used before, then connect this one in Settings &gt; Security.
             <br />
             <br />
             If your organization uses single sign-on, enter your work email and choose your company

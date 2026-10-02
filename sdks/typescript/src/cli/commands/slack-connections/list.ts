@@ -1,14 +1,16 @@
 import chalk from "chalk";
+
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
-import { createSpinner } from "../../utils/spinner.ts";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import { formatTable } from "../../utils/formatting.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
 import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 interface SlackConnection {
   id: string;

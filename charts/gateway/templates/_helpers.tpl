@@ -64,3 +64,34 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- fail (printf "terminationGracePeriodSeconds is %d, too short for the configured drain: shutdown.preDrainWaitSeconds (%d) + shutdown.timeoutSeconds (%d) + %ds of slack needs at least %d. Raise terminationGracePeriodSeconds to %d or more, or lower the drain timing." $granted $drain $timeout $slack $required $required) }}
 {{- end }}
 {{- end }}
+
+{{/*
+A PodDisruptionBudget field as a pod count, the way Kubernetes resolves it:
+an integer as written, a percentage of `replicas` rounded up (Kubernetes
+rounds both minAvailable and maxUnavailable percentages up).
+Usage: {{ include "gateway.pdbPods" (dict "value" $v "replicas" $replicas) | int }}
+*/}}
+{{- define "gateway.pdbPods" -}}
+{{- $v := toString .value -}}
+{{- if hasSuffix "%" $v -}}
+{{- $pct := int (trimSuffix "%" $v) -}}
+{{- div (add (mul $pct (int .replicas)) 99) 100 -}}
+{{- else -}}
+{{- int $v -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+  This chart renders no Ingress. The langwatch chart publishes the gateway
+  from its own app Ingress (ingress.gateway.host), so a leftover ingress block
+  here would otherwise be dropped without a word and the public route with it.
+  `ingress.enabled: false` on its own asks for nothing and is accepted.
+*/}}
+{{- define "gateway.validateIngressValues" -}}
+{{- with .Values.ingress }}
+{{- $rest := omit . "enabled" }}
+{{- if or .enabled $rest }}
+{{- fail "gateway ingress values (gateway.ingress.* in the langwatch chart) are no longer supported: the gateway chart renders no Ingress. In the langwatch chart set ingress.gateway.host (and ingress.gateway.tls.secretName) to publish the gateway on the app Ingress, with the same className and annotations. Installed on its own, route to this chart's Service yourself. Remove the gateway ingress block. See https://docs.langwatch.ai/self-hosting/deployment/routing" }}
+{{- end }}
+{{- end }}
+{{- end -}}

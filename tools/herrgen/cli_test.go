@@ -24,9 +24,9 @@ var _ = NodeError{Type: "http_error"}
 func oneCode(t *testing.T) string {
 	t.Helper()
 	return tree(t, map[string]string{
-		"packages/handled-error/src/.keep": "",
-		"pkg/herr/herr.go":                      herrPackage,
-		"services/nlpgo/app/engine/http.go":     nodeErrorLiteral,
+		"packages/handled-error/src/.keep":  "",
+		"pkg/herr/herr.go":                  herrPackage,
+		"services/nlpgo/app/engine/http.go": nodeErrorLiteral,
 		"services/nlpgo/domain/errors.go": `package domain
 
 import (
@@ -178,7 +178,7 @@ var _ = NodeError{Type: "invalid_dataset"}
 		// exiting 0 is how a mistyped root deletes every code.
 		root := tree(t, map[string]string{
 			"packages/handled-error/src/.keep": "",
-			"pkg/herr/herr.go":                      herrPackage,
+			"pkg/herr/herr.go":                 herrPackage,
 		})
 
 		var stdout, stderr strings.Builder
@@ -200,7 +200,7 @@ var _ = NodeError{Type: "invalid_dataset"}
 		// then the drift check demanded the emptied file be committed.
 		root := tree(t, map[string]string{
 			"packages/handled-error/src/.keep": "",
-			"pkg/herr/herr.go":                      herrPackage,
+			"pkg/herr/herr.go":                 herrPackage,
 			"services/nlpgo/domain/errors.go": `package domain
 
 import "example.com/repo/pkg/herr"
@@ -229,9 +229,9 @@ const ErrNotFound = herr.Code("not_found")
 		// it. This used to render in both objects with two unrelated doc blocks
 		// and a warning per code on every run.
 		root := tree(t, map[string]string{
-			"packages/handled-error/src/.keep": "",
-			"pkg/herr/herr.go":                      herrPackage,
-			"services/nlpgo/app/engine/http.go":     nodeErrorLiteral,
+			"packages/handled-error/src/.keep":  "",
+			"pkg/herr/herr.go":                  herrPackage,
+			"services/nlpgo/app/engine/http.go": nodeErrorLiteral,
 			"services/nlpgo/domain/errors.go": `package domain
 
 import "example.com/repo/pkg/herr"
@@ -299,7 +299,7 @@ const ErrNotFound = herr.Code("not_found")
 	t.Run("exits 2 and writes nothing when two consts disagree on a status", func(t *testing.T) {
 		root := tree(t, map[string]string{
 			"packages/handled-error/src/.keep": "",
-			"pkg/herr/herr.go":                      herrPackage,
+			"pkg/herr/herr.go":                 herrPackage,
 			"services/nlpgo/domain/errors.go": `package domain
 
 import (

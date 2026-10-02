@@ -1503,7 +1503,9 @@ function deviceFlowWorld(
 /** A person's own CLI session, bound to no project, as a plain `langwatch login` holds one. */
 async function personSession(world: ReturnType<typeof deviceFlowWorld>) {
   const api = mount(world);
-  const grant = deviceGrantSchema.parse(await (await api.post("/api/auth/cli/device-code", {})).json());
+  const grant = deviceGrantSchema.parse(
+    await (await api.post("/api/auth/cli/device-code", {})).json(),
+  );
   await api.post("/api/auth/cli/approve", {
     user_code: grant.user_code,
     organization_id: ORGANIZATION_ID,

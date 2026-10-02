@@ -4,11 +4,11 @@
  * Spec: specs/navigation/destination-route-registration.feature
  */
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const {

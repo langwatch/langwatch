@@ -99,6 +99,7 @@ func TestSeedInboxDeliversSampleMessagesWithLinks(t *testing.T) {
 }
 
 func benchStore(b *testing.B, n int) *Store {
+	b.Helper()
 	st, _ := NewBoundedStore("", n)
 	for i := range n {
 		_ = st.Deliver(&Message{Summary: Summary{To: []string{fmt.Sprintf("u%d@stack.local", i%500)}, Subject: "Verify your email"}})

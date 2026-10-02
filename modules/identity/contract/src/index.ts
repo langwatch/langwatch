@@ -63,6 +63,12 @@ export {
   SSO_MIGRATION_ROUTES,
   CONNECTION_RENAMED_EVENT_TYPE,
   connectionRenamedPayloadSchema,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
+  connectionIdpUpdatedPayloadSchema,
+  ssoIdpDialingSchema,
+  type SsoIdpDialing,
+  SSO_IDP_EDITABLE_STATES,
+  ssoConnectionIdpIsEditable,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   replacementConnectionRegisteredPayloadSchema,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
@@ -130,11 +136,26 @@ export {
   type SsoTestArrivalStanding,
   ssoTestArrivalStandingSchema,
 } from "./sso-admission.ts";
+export {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
+} from "./sso-email-verification.ts";
+export {
+  canonicalEntraIssuer,
+  entraEndpointOrigins,
+  type EntraTenancy,
+  entraTenancyOf,
+  isEntraIssuer,
+} from "./sso-entra-issuer.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
   parseSamlIdpConfig,
+  type SsoIdentityProviderView,
   type SsoIdpRegistration,
   ssoIdpRegistrationSchema,
+  type SsoIdpUpdate,
+  ssoIdpUpdateSchema,
+  ssoOidcUpdateSchema,
   type SsoOidcRegistration,
   ssoOidcRegistrationSchema,
   type SsoSamlIdpConfig,
@@ -235,6 +256,9 @@ export {
   RENAME_CONNECTION_COMMAND_TYPE,
   type RenameConnectionCommandData,
   renameConnectionCommandDataSchema,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
+  updateConnectionIdpCommandDataSchema,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   selectMigrationRouteCommandDataSchema,
@@ -340,6 +364,8 @@ export {
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
   SsoExistingAccountUnconfirmedError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   SsoSamlMetadataInvalidError,
   SsoSamlNotSelfServeError,

@@ -115,6 +115,46 @@ describe("given an OIDC connection whose credentials the vault holds", () => {
     });
   });
 
+  /** @scenario "A Microsoft Entra ID connection stored with a trailing slash signs in after the upgrade" */
+  it("writes an Entra ID issuer stored with a trailing slash the way its tokens carry it", async () => {
+    const entra = "https://login.microsoftonline.com/8f3c2a8e-1b7d-4c0f-9a51-3e6f2d7b9c10/v2.0";
+    const store = MemoryIdentityStore.create();
+    const credentials = MemorySsoCredentialRepository.create(store);
+    const [clientIdRef, secretRef] = await Promise.all([
+      credentials.put({
+        organizationId: "org_1",
+        connectionId: "connection_1",
+        kind: "oidc-client-id",
+        value: "client-1",
+      }),
+      credentials.put({
+        organizationId: "org_1",
+        connectionId: "connection_1",
+        kind: "oidc-client-secret",
+        value: "shhh",
+      }),
+    ]);
+    const service = await serviceOver(store);
+
+    await service.project({
+      connection: connectionOf({
+        idpMetadata: {
+          issuer: `${entra}/`,
+          providerId: "entra",
+          clientIdRef,
+          secretRef,
+          certRefs: [],
+        },
+      }),
+    });
+
+    const row = store.ssoEngineProviders.get("connection_1");
+    expect(row?.issuer).toBe(entra);
+    expect(JSON.parse(cipher.open(row?.oidcConfig ?? "")).discoveryEndpoint).toBe(
+      `${entra}/.well-known/openid-configuration`,
+    );
+  });
+
   it("keeps the client secret out of the row it writes", async () => {
     const store = MemoryIdentityStore.create();
     const credentials = MemorySsoCredentialRepository.create(store);

@@ -82,17 +82,76 @@ const errorSerializer = (error: unknown): SerializedError => {
     string,
     unknown
   >;
-  return { ...base, ...own };
+  return redactCommandCredentials({ ...base, ...own });
 };
 
+/** Redis commands whose arguments carry a password. */
+const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
+
 /**
- * Every key a cause may be logged under, mapped to the same serializer: pino
- * matches serializers by exact property name, and an unregistered key
+ * The password among a command's arguments: the last one of `AUTH [user] pass`,
+ * the one after the username in `HELLO protover AUTH user pass`. A username is
+ * not a secret, and masking `default` would blank unrelated text.
+ */
+function credentialValues(name: string, args: unknown): string[] {
+  if (!Array.isArray(args)) return [];
+  let password: unknown;
+  if (name === "auth") {
+    password = args[args.length - 1];
+  } else {
+    const at = args.findIndex((a) => typeof a === "string" && a.toLowerCase() === "auth");
+    password = at < 0 ? undefined : args[at + 2];
+  }
+  return typeof password === "string" && password.length > 0 ? [password] : [];
+}
+
+/**
+ * A server that does not know the command echoes its first arguments, cut at
+ * about 128 bytes, so an exact match can miss the password. The list goes.
+ */
+const ECHOED_ARGUMENTS = /(with args beginning with:)[^\n]*/g;
+
+/** Replaces the password, and any echoed argument list, in a text. */
+function maskValues(text: unknown, values: string[]): unknown {
+  if (typeof text !== "string") return text;
+  const masked = values.reduce((out, value) => out.split(value).join("[redacted]"), text);
+  return masked.replace(ECHOED_ARGUMENTS, "$1 [redacted]");
+}
+
+/**
+ * ioredis attaches the failed command to a reply error as `command`, so a
+ * failed AUTH carries the password in `args` (and maybe the message). Returns
+ * the serialized error with those values replaced; others pass unchanged.
+ */
+function redactCommandCredentials<T extends object>(serialized: T): T {
+  const command = (serialized as { command?: unknown }).command;
+  if (!command || typeof command !== "object") return serialized;
+  const { name, args } = command as { name?: unknown; args?: unknown };
+  if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
+    return serialized;
+  }
+  const values = credentialValues(name.toLowerCase(), args);
+  const { message, stack } = serialized as { message?: unknown; stack?: unknown };
+  return {
+    ...serialized,
+    message: maskValues(message, values),
+    stack: maskValues(stack, values),
+    command: {
+      ...command,
+      args: Array.isArray(args) ? args.map(() => "[redacted]") : "[redacted]",
+    },
+  };
+}
+
+/**
+ * Every key a cause may be logged under (`reason` for unhandled rejections):
+ * pino matches serializers by exact property name, and an unregistered key
  * serialises an `Error` to `{}` (no message, no stack).
  */
 export const NODE_LOG_SERIALIZERS = {
   error: errorSerializer,
   [REQUEST_CAUSE_FIELD]: errorSerializer,
+  reason: errorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {

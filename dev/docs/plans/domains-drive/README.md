@@ -11,11 +11,11 @@ Manifests: `.claude/manifests/dd-NN-*.md`. Collected state: `.claude/coordinator
 
 ## Gates (nothing starts before its gate)
 
-| Gate | Opens when | Blocks |
-|---|---|---|
-| G0 clean base | The in-flight lanes are collected and the dirty tree is committed; fewer than 8 lanes running | Wave 1 |
-| G1 rulings | Alex rules on `domain-map.md` (five questions, and the cut table as one batch) | Wave 2 |
-| G2 merge landed | The origin/main merge drive has landed | Wave 3 |
+| Gate            | Opens when                                                                                    | Blocks |
+| --------------- | --------------------------------------------------------------------------------------------- | ------ |
+| G0 clean base   | The in-flight lanes are collected and the dirty tree is committed; fewer than 8 lanes running | Wave 1 |
+| G1 rulings      | Alex rules on `domain-map.md` (five questions, and the cut table as one batch)                | Wave 2 |
+| G2 merge landed | The origin/main merge drive has landed                                                        | Wave 3 |
 
 ## Waves
 
@@ -25,23 +25,23 @@ G1 ─► W2  dd-07 dd-08 dd-09 dd-10 dd-11 dd-12 dd-13          (7 at once)
 G2 ─► W3  dd-14 ──► dd-15                                    (serial)
 ```
 
-| Lane | Work | Agent | Wave |
-|---|---|---|---|
-| dd-01 | Nurturing inversion: owners stop knowing nurturing | lane-sonnet | 1 |
-| dd-02 | Auth off enterprise (sso sign-in providers, licensing reads) | lane-opus (high: sign-in) | 1 |
-| dd-03 | Entitlement reads sources supplied by billing and licensing | lane-sonnet | 1 |
-| dd-04 | Remaining core → enterprise edges (coding-agent, model-provider, ops, user, organization → governance and billing) | lane-sonnet | 1 |
-| dd-05 | Browser hubs, expand: owner contracts gain declaration, drawer and client types | lane-opus-medium | 1 |
-| dd-06 | Browser hubs, switch and delete: 157 declaration/drawer importers, about 98 workflow-api importers, slots | lane-sonnet (tslsp) | 1b |
-| dd-07 | Routes into modules: `ui-route-table.ts` (947 lines) becomes composition only | lane-sonnet | 2 |
-| dd-08 | process-server transport reads supplied credential, permission and session tokens | lane-opus (high: auth) | 2 |
-| dd-09 | Tenancy: sessions, membership, personal workspace, scim/identity | lane-opus (high: authz) | 2 |
-| dd-10 | Project hub: api-key, share, data-privacy, langy, role, audit-log edges | lane-opus-medium | 2 |
-| dd-11 | Commercial: `usage` module, bounds source, platform admin move, spend events | lane-opus-medium | 2 |
-| dd-12 | Authoring cascade: archive/copy as events across workflow, agent, evaluator, monitor, experiment, dataset | lane-sonnet | 2 |
-| dd-13 | Ingest seams: span contributors, trace reactions as subscribers, log merged into trace, evaluation edges | lane-opus-medium | 2 |
-| dd-14 | Merge suite into scenario | lane-sonnet | 3 |
-| dd-15 | Renames: one vocabulary, kernel split, §16 deleted, `#/` aliases | lane-sonnet (tslsp) | 3 |
+| Lane  | Work                                                                                                               | Agent                     | Wave |
+| ----- | ------------------------------------------------------------------------------------------------------------------ | ------------------------- | ---- |
+| dd-01 | Nurturing inversion: owners stop knowing nurturing                                                                 | lane-sonnet               | 1    |
+| dd-02 | Auth off enterprise (sso sign-in providers, licensing reads)                                                       | lane-opus (high: sign-in) | 1    |
+| dd-03 | Entitlement reads sources supplied by billing and licensing                                                        | lane-sonnet               | 1    |
+| dd-04 | Remaining core → enterprise edges (coding-agent, model-provider, ops, user, organization → governance and billing) | lane-sonnet               | 1    |
+| dd-05 | Browser hubs, expand: owner contracts gain declaration, drawer and client types                                    | lane-opus-medium          | 1    |
+| dd-06 | Browser hubs, switch and delete: 157 declaration/drawer importers, about 98 workflow-api importers, slots          | lane-sonnet (tslsp)       | 1b   |
+| dd-07 | Routes into modules: `ui-route-table.ts` (947 lines) becomes composition only                                      | lane-sonnet               | 2    |
+| dd-08 | process-server transport reads supplied credential, permission and session tokens                                  | lane-opus (high: auth)    | 2    |
+| dd-09 | Tenancy: sessions, membership, personal workspace, scim/identity                                                   | lane-opus (high: authz)   | 2    |
+| dd-10 | Project hub: api-key, share, data-privacy, langy, role, audit-log edges                                            | lane-opus-medium          | 2    |
+| dd-11 | Commercial: `usage` module, bounds source, platform admin move, spend events                                       | lane-opus-medium          | 2    |
+| dd-12 | Authoring cascade: archive/copy as events across workflow, agent, evaluator, monitor, experiment, dataset          | lane-sonnet               | 2    |
+| dd-13 | Ingest seams: span contributors, trace reactions as subscribers, log merged into trace, evaluation edges           | lane-opus-medium          | 2    |
+| dd-14 | Merge suite into scenario                                                                                          | lane-sonnet               | 3    |
+| dd-15 | Renames: one vocabulary, kernel split, §16 deleted, `#/` aliases                                                   | lane-sonnet (tslsp)       | 3    |
 
 That's 8 Sonnet lanes and 7 Opus lanes (three on high effort, four on medium).
 Sonnet lanes spawn with no model override.
@@ -79,16 +79,16 @@ Collect in wave order, and within a wave in lane number order.
 
 ## Meters (report after each collection)
 
-| Meter | Start | Target |
-|---|---|---|
-| Peer-cycle findings | 351 | 0 |
-| Two-way pairs | 43 | 0 |
-| Core → enterprise imports (non-test) | 69 | 0 |
-| Packages → feature contracts | 20+ | 0 |
-| browser-host declaration/drawer importers | 157 | 0 |
-| workflow-api importers | about 98 | 0 |
-| Lines in `ui-route-table.ts` | 947 | composition only |
-| Uses of `defineServerModule` / `defineWebModule` | 83 / 51 | 0 |
+| Meter                                            | Start    | Target           |
+| ------------------------------------------------ | -------- | ---------------- |
+| Peer-cycle findings                              | 351      | 0                |
+| Two-way pairs                                    | 43       | 0                |
+| Core → enterprise imports (non-test)             | 69       | 0                |
+| Packages → feature contracts                     | 20+      | 0                |
+| browser-host declaration/drawer importers        | 157      | 0                |
+| workflow-api importers                           | about 98 | 0                |
+| Lines in `ui-route-table.ts`                     | 947      | composition only |
+| Uses of `defineServerModule` / `defineWebModule` | 83 / 51  | 0                |
 
 ## Lints to add first (coordinator, before W1)
 

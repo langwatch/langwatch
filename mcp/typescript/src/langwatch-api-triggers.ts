@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { makeRequest } from "./langwatch-api.ts";
 import {
   deletedTriggerSchema,
@@ -52,9 +53,7 @@ type UpdateTriggerInput = Partial<
 };
 
 export async function listTriggers(): Promise<Trigger[]> {
-  return z
-    .array(triggerSchema)
-    .parse(await makeRequest("GET", "/api/v1/triggers"));
+  return z.array(triggerSchema).parse(await makeRequest("GET", "/api/v1/triggers"));
 }
 
 export async function getTrigger(id: string): Promise<Trigger> {
@@ -63,9 +62,7 @@ export async function getTrigger(id: string): Promise<Trigger> {
   );
 }
 
-export async function createTrigger(
-  input: CreateTriggerInput,
-): Promise<Trigger> {
+export async function createTrigger(input: CreateTriggerInput): Promise<Trigger> {
   return triggerSchema.parse(
     await makeRequest("POST", "/api/v1/triggers", {
       ...input,
@@ -74,10 +71,7 @@ export async function createTrigger(
   );
 }
 
-export async function updateTrigger({
-  id,
-  ...data
-}: UpdateTriggerInput): Promise<Trigger> {
+export async function updateTrigger({ id, ...data }: UpdateTriggerInput): Promise<Trigger> {
   return triggerSchema.parse(
     await makeRequest("PATCH", `/api/v1/triggers/${encodeURIComponent(id)}`, data),
   );
@@ -86,10 +80,7 @@ export async function updateTrigger({
 /** Send the automation's message to the destination it is saved with. */
 export async function testFireTrigger(id: string): Promise<TestFireResult> {
   return testFireResultSchema.parse(
-    await makeRequest(
-      "POST",
-      `/api/v1/triggers/${encodeURIComponent(id)}/test-fire`,
-    ),
+    await makeRequest("POST", `/api/v1/triggers/${encodeURIComponent(id)}/test-fire`),
   );
 }
 
@@ -109,16 +100,11 @@ export async function listTriggerFires({
   if (cursor) query.set("cursor", cursor);
   const search = query.toString() ? `?${query.toString()}` : "";
   return triggerFirePageSchema.parse(
-    await makeRequest(
-      "GET",
-      `/api/v1/triggers/${encodeURIComponent(id)}/fires${search}`,
-    ),
+    await makeRequest("GET", `/api/v1/triggers/${encodeURIComponent(id)}/fires${search}`),
   );
 }
 
-export async function deleteTrigger(
-  id: string,
-): Promise<z.infer<typeof deletedTriggerSchema>> {
+export async function deleteTrigger(id: string): Promise<z.infer<typeof deletedTriggerSchema>> {
   return deletedTriggerSchema.parse(
     await makeRequest("DELETE", `/api/v1/triggers/${encodeURIComponent(id)}`),
   );

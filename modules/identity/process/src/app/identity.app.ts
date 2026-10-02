@@ -53,6 +53,7 @@ import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
+import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -143,6 +144,7 @@ import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
+import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
 import {
   SsoLegacyIdentityRetirementService,
   type SsoLegacyAccessRetirement,
@@ -538,8 +540,21 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
             history: () => ssoConnectionHistory,
           })
         : null;
+    // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
+    const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
+    // The same fence the published-proof reads go through: an issuer is a
+    // string an administrator typed.
+    const issuerDiscovery = ssoIssuerDiscoveryChannels.live.create({
+      policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+      dialableInternalOrigins: dialableIdpOrigins,
+    });
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
+      endpointOrigins: SsoIssuerEndpointOriginsService.create({
+        discovery: issuerDiscovery,
+        resolveHost: systemHostAddresses,
+        dialableInternalOrigins: dialableIdpOrigins,
+      }),
     });
     // The ceremony and the sweep read the SAME published evidence where it
     // lives, so they share one pair of live channels rather than each
@@ -647,16 +662,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           activity: setup.repositories.ssoMigrationEvidence,
           credentials: setup.repositories.ssoCredentials,
           breakGlass,
-          registrations: SsoIdpRegistrationService.create({
-            // The same fence the published-proof reads go through: an issuer
-            // is a string an administrator typed.
-            discovery: ssoIssuerDiscoveryChannels.live.create({
-              policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
-              // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-              dialableInternalOrigins: () =>
-                setup.dependencies.auth.findDialableIdentityProviderOrigins(),
-            }),
-          }),
+          registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
             evidence: ssoMigrationProgress,
@@ -735,6 +741,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         }),
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,
+        accountAddress: async ({ userId }) => {
+          const user = await setup.dependencies.users.findById({ id: userId });
+          return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
+        },
+        hasMailDelivery: async () =>
+          (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
       }),
       microsoftAccountRekey: MicrosoftAccountRekeyService.create({
         accounts: setup.repositories.accountRekey,

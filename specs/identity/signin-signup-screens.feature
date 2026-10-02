@@ -638,13 +638,17 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And finishing lands me on the same "check your email" the sign-up door shows
     And I can go back to the address step for a mistyped address
 
+  # The log-in door turns an unknown address into a sign-up by mailing it a
+  # confirmation link. An installation with no email provider cannot send one,
+  # so the screen does not offer it and says what is missing instead.
   @integration
-  Scenario: An address with no account on an installation that cannot send email goes to the password step
+  Scenario: An address with no account on an installation that cannot send email is told what is missing
     Given the installation has no email provider configured
-    When I enter an email address no account holds on the log-in screen
-    And I continue with the sign-up it offers
-    Then no confirmation link is sent and I am not told to check my email
-    And the sign-up door opens on the password step for that address, marked unconfirmed
+    When I enter an email address no account holds
+    Then the screen says there is no account for that address yet
+    And it says an administrator needs to set up email, or that I can sign in with single sign-on once it is set up
+    And no confirmation link is offered
+    And I can go back to the address step for a mistyped address
 
   @integration
   Scenario: A late instance-methods answer does not undo the carried address routing

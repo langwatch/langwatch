@@ -120,5 +120,5 @@ func TestExecute_DropsRefererOnCrossOriginRedirect(t *testing.T) {
 	_, err := executorAllowing(origin).Execute(context.Background(), httpblock.Request{URL: origin.URL + "/x?page=2"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "", referer.Load())
+	assert.Empty(t, referer.Load())
 }

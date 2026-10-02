@@ -116,6 +116,7 @@ const deployment = (
         azureAdClientId: CLIENT_ID,
         azureAdClientSecret: "azure-secret",
         azureAdTenantId: TENANT,
+        baseUrl: BASE_URL,
       },
       { onMicrosoftProfile },
     ),
@@ -135,6 +136,10 @@ async function signInWithMicrosoft(auth: ReturnType<typeof deployment>): Promise
     }),
   );
   const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
+  // Azure returns to the redirect URI the sign-in named; the door hands that path to `microsoft`.
+  expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+    `${BASE_URL}/api/auth/callback/azure-ad`,
+  );
   const callback = new URL(`${BASE_URL}/api/auth/callback/microsoft`);
   callback.searchParams.set("code", "code-1");
   callback.searchParams.set("state", authorizationUrl.searchParams.get("state") ?? "");
@@ -151,6 +156,31 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("given Microsoft sign-in configured by the deployment", () => {
+  describe("when a sign-in starts", () => {
+    /** @scenario "Microsoft sign-in sends the redirect URI registered with Azure" */
+    it("names /api/auth/callback/azure-ad as the redirect URI", async () => {
+      const db = legacyRows();
+      const started = await deployment(db, moveOver(db)).handler(
+        new Request(`${BASE_URL}/api/auth/sign-in/social`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "microsoft",
+            callbackURL: `${BASE_URL}/`,
+            disableRedirect: true,
+          }),
+        }),
+      );
+      const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
+
+      expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+        `${BASE_URL}/api/auth/callback/azure-ad`,
+      );
+    });
+  });
 });
 
 describe("given a user whose Microsoft account is still on its pre-3.17 key", () => {

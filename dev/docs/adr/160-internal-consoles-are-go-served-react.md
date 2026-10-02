@@ -28,15 +28,15 @@ never renders HTML itself, beyond a one-line page saying the bundle is not
 built. No Vite server runs to serve a console; `vite dev` with a proxy to the
 Go API is only for working on the console itself.
 
-| App                | Served by                               | Hostnames                                               |
-| ------------------ | --------------------------------------- | ------------------------------------------------------- |
-| `apps/haven-web`   | the haven daemon (`adapters/dashboard`) | `hub.langwatch.localhost`, `<slug>.langwatch.localhost` |
-| `apps/idpsim-web`  | `services/idpsim`                       | `idp[.<slug>].langwatch.localhost`                      |
-| `apps/mailsim-web` | `services/mailsim`                      | `mail.<slug>.langwatch.localhost`                       |
-| `apps/storagesim-web`   | `services/storagesim`              | `storage.<slug>.langwatch.localhost`                    |
-| `apps/llmsim-web`       | `services/llmsim`                  | `llm.<slug>.langwatch.localhost`                        |
-| `apps/analyticssim-web` | `services/analyticssim`            | `analytics.<slug>.langwatch.localhost`                  |
-| `apps/voicesim-web`     | `services/voicesim`                | `voice.<slug>.langwatch.localhost`                      |
+| App                     | Served by                               | Hostnames                                               |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------- |
+| `apps/haven-web`        | the haven daemon (`adapters/dashboard`) | `hub.langwatch.localhost`, `<slug>.langwatch.localhost` |
+| `apps/idpsim-web`       | `services/idpsim`                       | `idp[.<slug>].langwatch.localhost`                      |
+| `apps/mailsim-web`      | `services/mailsim`                      | `mail.<slug>.langwatch.localhost`                       |
+| `apps/storagesim-web`   | `services/storagesim`                   | `storage.<slug>.langwatch.localhost`                    |
+| `apps/llmsim-web`       | `services/llmsim`                       | `llm.<slug>.langwatch.localhost`                        |
+| `apps/analyticssim-web` | `services/analyticssim`                 | `analytics.<slug>.langwatch.localhost`                  |
+| `apps/voicesim-web`     | `services/voicesim`                     | `voice.<slug>.langwatch.localhost`                      |
 
 All of them, plus the mail room's chrome and the Storybook manager theme, draw
 from one package, `@langwatch/design-system-internal` (and read the clock through

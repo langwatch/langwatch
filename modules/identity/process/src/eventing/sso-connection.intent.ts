@@ -36,6 +36,9 @@ import {
   RENAME_CONNECTION_COMMAND_TYPE,
   type RenameConnectionCommandData,
   renameConnectionCommandDataSchema,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
+  updateConnectionIdpCommandDataSchema,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   selectMigrationRouteCommandDataSchema,
@@ -268,6 +271,14 @@ export const RenameConnectionCommand = connectionCommand({
   verb: "renameConnection",
 });
 export type RenameConnectionPayload = RenameConnectionCommandData;
+
+export const UpdateConnectionIdpCommand = connectionCommand({
+  type: UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  schema: updateConnectionIdpCommandDataSchema,
+  description: "Replace the identity provider settings a connection dials",
+  verb: "updateConnectionIdp",
+});
+export type UpdateConnectionIdpPayload = UpdateConnectionIdpCommandData;
 
 export const RegisterReplacementConnectionCommand = connectionCommand({
   type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,

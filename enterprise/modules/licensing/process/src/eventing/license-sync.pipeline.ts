@@ -8,8 +8,13 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type PeerSubscriberDefinition,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  organizationSignedUpEventDataSchema,
+} from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { LicensingModule } from "../app/licensing.app.ts";
@@ -23,13 +28,30 @@ import {
 } from "./license-sync.process.ts";
 
 export const LICENSE_SYNC_PIPELINE_NAME = "license_sync";
+export const CONFIGURED_LICENSE_ON_SIGN_UP = "configuredLicenseOnSignUp";
+
+/**
+ * An activation code in LANGWATCH_LICENSE_KEY on a fresh install waits for the
+ * first organization to store its license on; a no-op once one holds a license.
+ */
+export function configuredLicenseOnSignUp(
+  app: Pick<LicensingModule, "activateConfiguredLicense">,
+): PeerSubscriberDefinition<typeof organizationSignedUpEventDataSchema> {
+  return {
+    eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+    data: organizationSignedUpEventDataSchema,
+    handle: async () => {
+      await app.activateConfiguredLicense();
+    },
+  };
+}
 
 /** The pipeline, over only the one app operation it calls. */
 export function buildLicenseSync({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<LicensingModule, "syncLicenses">> & {
+}: EventingSetup<unknown, Pick<LicensingModule, "syncLicenses" | "activateConfiguredLicense">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -37,6 +59,7 @@ export function buildLicenseSync({
     aggregate: defineAggregate({ type: "global" }),
   })
     .withEvents([])
+    .withPeerSubscriber(CONFIGURED_LICENSE_ON_SIGN_UP, configuredLicenseOnSignUp(app))
     .withProcessManager(LICENSE_SYNC_PROCESS_NAME, (pm) =>
       pm
         .state(licenseSyncStateSchema, LICENSE_SYNC_INITIAL_STATE)

@@ -4,9 +4,7 @@ import type { Trigger } from "../schemas/triggers.ts";
 /**
  * Handles the platform_list_triggers MCP tool invocation.
  */
-export async function handleListTriggers(params: {
-  format?: "digest" | "json";
-}): Promise<string> {
+export async function handleListTriggers(params: { format?: "digest" | "json" }): Promise<string> {
   const triggers = await apiListTriggers();
   if (params.format === "json") return JSON.stringify(triggers, null, 2);
   if (triggers.length === 0) {

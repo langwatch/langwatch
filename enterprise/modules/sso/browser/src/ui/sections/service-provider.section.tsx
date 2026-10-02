@@ -21,12 +21,15 @@ export function ServiceProviderSection({
   protocol,
   addresses,
   connected,
+  deploymentSignIn,
 }: {
   /** Which protocol's values to show; the other's are noise to this reader. */
   protocol: SsoConnectionType;
   addresses: ServiceProviderAddresses;
   /** Whether a connection exists yet, which is what fills the placeholder. */
   connected: boolean;
+  /** The deployment's own sign-in, whose redirect address is a second one to register. */
+  deploymentSignIn?: { name: string; redirectUrl: string } | null;
 }) {
   const rows = serviceProviderRowsFor({ protocol, addresses });
   const one = rows.length === 1;
@@ -50,6 +53,13 @@ export function ServiceProviderSection({
           <CopyValueRow key={row.label} label={row.label} hint={row.hint} value={row.value} />
         ))}
       </VStack>
+      {protocol === "oidc" && deploymentSignIn && (
+        <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+          The sign-in page also offers {deploymentSignIn.name}, set up by this installation&apos;s
+          deployment. That sign-in returns to <code>{deploymentSignIn.redirectUrl}</code>. If it
+          uses the same application in your identity provider, register both addresses there.
+        </Text>
+      )}
     </SettingsCard>
   );
 }

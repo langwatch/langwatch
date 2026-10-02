@@ -51,6 +51,9 @@ import {
   RENAME_CONNECTION_COMMAND_TYPE,
   type RenameConnectionCommandData,
   CONNECTION_RENAMED_EVENT_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
@@ -892,6 +895,43 @@ export class SsoConnectionGuardsService {
   }
 
   /**
+   * The dialing information, replaced on the same connection id; the caller checked
+   * and stored the values. Grandfathered connections and protocol changes are
+   * refused, and identical settings cost no fact.
+   */
+  async updateConnectionIdp(
+    data: UpdateConnectionIdpCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.checks.require(data, UPDATE_CONNECTION_IDP_COMMAND_TYPE);
+    if (state.source !== "self-serve") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} is grandfathered and has no identity provider settings to replace`,
+      );
+    }
+    const { idp } = data;
+    const fitsProtocol =
+      state.type === "oidc"
+        ? idp.issuer !== null &&
+          idp.clientIdRef !== null &&
+          idp.secretRef !== null &&
+          idp.certRefs.length === 0
+        : idp.clientIdRef === null && idp.secretRef === null && idp.certRefs.length === 1;
+    if (!fitsProtocol) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    if (dialsTheSame({ current: state.idpMetadata, next: idp })) return [];
+
+    return [
+      {
+        type: CONNECTION_IDP_UPDATED_EVENT_TYPE,
+        data: { connectionId: data.connectionId, idp, actor: data.actor, source: data.source },
+      },
+    ];
+  }
+
+  /**
    * The one direct replacement an organization may run beside its
    * grandfathered connection. The proofs that still qualify come with it, so
    * a customer never re-proves a domain they have already proved.
@@ -1062,4 +1102,19 @@ export class SsoConnectionGuardsService {
       );
     }
   }
+}
+
+/** Whether an identity provider update would dial exactly what is stored. */
+function dialsTheSame({
+  current,
+  next,
+}: {
+  current: UpdateConnectionIdpCommandData["idp"];
+  next: UpdateConnectionIdpCommandData["idp"];
+}): boolean {
+  if (current.issuer !== next.issuer) return false;
+  if (current.clientIdRef !== next.clientIdRef) return false;
+  if (current.secretRef !== next.secretRef) return false;
+  if (current.certRefs.length !== next.certRefs.length) return false;
+  return current.certRefs.every((ref, index) => ref === next.certRefs[index]);
 }

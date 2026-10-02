@@ -42,9 +42,7 @@ export async function handleCreateTrigger(
 }
 
 /** A flag value that must be a JSON object; undefined for anything else. */
-export function parseJsonObject(
-  raw: string,
-): Record<string, unknown> | undefined {
+export function parseJsonObject(raw: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {

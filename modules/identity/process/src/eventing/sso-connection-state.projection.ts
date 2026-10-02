@@ -11,6 +11,8 @@ import {
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
   connectionRenamedPayloadSchema,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
+  connectionIdpUpdatedPayloadSchema,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   replacementConnectionRegisteredPayloadSchema,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
@@ -193,6 +195,13 @@ export const connectionRenamedEventSchema = EventSchema.safeExtend({
 });
 export type ConnectionRenamedEvent = z.infer<typeof connectionRenamedEventSchema>;
 
+/** What the engine dials, replaced on the same connection id. */
+export const connectionIdpUpdatedEventSchema = EventSchema.safeExtend({
+  type: z.literal(CONNECTION_IDP_UPDATED_EVENT_TYPE),
+  data: connectionIdpUpdatedPayloadSchema,
+});
+export type ConnectionIdpUpdatedEvent = z.infer<typeof connectionIdpUpdatedEventSchema>;
+
 export const replacementConnectionRegisteredEventSchema = EventSchema.safeExtend({
   type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
   data: replacementConnectionRegisteredPayloadSchema,
@@ -241,6 +250,7 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
   connectionRenamedEventSchema,
+  connectionIdpUpdatedEventSchema,
   replacementConnectionRegisteredEventSchema,
   migrationRouteSelectedEventSchema,
   migrationFinalizationStartedEventSchema,
@@ -272,6 +282,7 @@ const ssoConnectionEvents = [
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
   connectionRenamedEventSchema,
+  connectionIdpUpdatedEventSchema,
   replacementConnectionRegisteredEventSchema,
   migrationRouteSelectedEventSchema,
   migrationFinalizationStartedEventSchema,
@@ -358,6 +369,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionRenamed(
     event: ConnectionRenamedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionIdpUpdated(
+    event: ConnectionIdpUpdatedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

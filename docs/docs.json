@@ -984,6 +984,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/first-run",
               "self-hosting/licensing",
               "self-hosting/connect",
               "self-hosting/data-and-telemetry",
@@ -1013,7 +1014,8 @@
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
               "self-hosting/deployment/kubernetes-local",
-              "self-hosting/deployment/argocd"
+              "self-hosting/deployment/argocd",
+              "self-hosting/deployment/routing"
             ]
           },
           {

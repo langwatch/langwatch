@@ -509,9 +509,17 @@ export class CliDeviceSessionService {
     });
     const memberKeys = [cliAccessTokenKey(accessToken), cliRefreshTokenKey(refreshToken)];
     const ttlMs = this.refreshTokenTtlSeconds * 1000;
-    await this.store.indexTokens({ indexKey: cliUserTokensIndexKey(input.userId), memberKeys, ttlMs });
+    await this.store.indexTokens({
+      indexKey: cliUserTokensIndexKey(input.userId),
+      memberKeys,
+      ttlMs,
+    });
     if (input.parentFamilyId) {
-      await this.store.indexTokens({ indexKey: familyIndexKey(input.parentFamilyId), memberKeys, ttlMs });
+      await this.store.indexTokens({
+        indexKey: familyIndexKey(input.parentFamilyId),
+        memberKeys,
+        ttlMs,
+      });
     }
 
     return {
@@ -681,7 +689,9 @@ export class CliDeviceSessionService {
         throw error;
       });
       const record =
-        raw === undefined ? null : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+        raw === undefined
+          ? null
+          : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
       if (record) parents.push(record);
     }
     // A revoked session's forks go with it.

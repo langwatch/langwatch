@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  consolePathFor,
   IDENTITY_PROVIDER_PRESETS,
   identityProviderPreset,
   identityProvidersIn,
@@ -34,5 +35,32 @@ describe("the providers an administrator picks from", () => {
 
   it("refuses a tile nobody listed rather than answering for it", () => {
     expect(() => identityProviderPreset("ping")).toThrow(/unknown identity provider preset/);
+  });
+});
+
+describe("where the application is created in the provider's console", () => {
+  describe("when Microsoft Entra ID is set up over OpenID Connect", () => {
+    /** @scenario "The registration form says where Microsoft Entra ID shows its issuer" */
+    it("points at App registrations", () => {
+      expect(consolePathFor({ preset: identityProviderPreset("entra"), protocol: "oidc" })).toBe(
+        "App registrations → New registration",
+      );
+    });
+  });
+
+  describe("when Microsoft Entra ID is set up over SAML", () => {
+    it("points at Enterprise applications", () => {
+      expect(consolePathFor({ preset: identityProviderPreset("entra"), protocol: "saml" })).toBe(
+        "Enterprise applications → New application",
+      );
+    });
+  });
+
+  describe("when the provider keeps both protocols in one place", () => {
+    it("points at the same path for either", () => {
+      const okta = identityProviderPreset("okta");
+
+      expect(consolePathFor({ preset: okta, protocol: "saml" })).toBe(okta.consolePath);
+    });
   });
 });

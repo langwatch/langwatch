@@ -52,6 +52,7 @@ function createWorld({
   membership = "active",
   state = "ACTIVE",
   proof = PROOF,
+  confirmed = false,
 }: {
   hosted?: boolean;
   proved?: boolean;
@@ -60,6 +61,7 @@ function createWorld({
   membership?: Membership;
   state?: SsoConnectionState["state"];
   proof?: SsoDomainVerification;
+  confirmed?: boolean;
 } = {}) {
   const store = MemoryIdentityStore.create();
   const connection: SsoConnectionState = {
@@ -74,7 +76,7 @@ function createWorld({
   store.users.set(USER_ID, {
     id: USER_ID,
     email: EMAIL,
-    emailVerified: false,
+    emailVerified: confirmed,
     createdAtMs: 0,
     userHashKey: null,
     payload: {},
@@ -113,6 +115,7 @@ function assertion(over: Partial<SsoUserResolutionInput> = {}): SsoUserResolutio
     accountKey: { issuer: ISSUER, accountId: SUBJECT },
     email: EMAIL,
     emailVerified: true,
+    emailVerification: "verified",
     ...over,
   };
 }
@@ -158,6 +161,10 @@ const LINKED_AND_CONFIRMED = {
 const LINKED = { action: "link", userId: USER_ID, profile: "preserve" } as const;
 const NOT_LINKED = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const UNCONFIRMED = { action: "reject", code: "sso_existing_account_unconfirmed" } as const;
+/** The provider said the address is not verified. */
+const UNVERIFIED_ASSERTION = assertion({ emailVerified: false, emailVerification: "unverified" });
+/** Entra ID without `xms_edov`: no verification claim at all. */
+const UNASSERTED_ASSERTION = assertion({ emailVerified: false, emailVerification: "unasserted" });
 
 describe("given a member this connection's directory provisioned", () => {
   describe("when its verified provider signs them in for the first time", () => {
@@ -189,7 +196,9 @@ describe("given a member this connection's directory provisioned", () => {
       const { service } = createWorld();
 
       await expect(
-        service.resolveUser(assertion({ protocol: "saml", emailVerified: false })),
+        service.resolveUser(
+          assertion({ protocol: "saml", emailVerified: false, emailVerification: "unasserted" }),
+        ),
       ).resolves.toEqual(LINKED);
     });
   });
@@ -337,15 +346,45 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
-  describe("when the provider does not vouch for the address", () => {
-    /** @scenario "An identity provider that does not vouch for the address does not link an unconfirmed account" */
+  describe("when the provider says the address is not verified", () => {
+    /** @scenario "An identity provider that says the address is not verified does not link an unconfirmed account" */
+    /** @scenario "Microsoft Entra ID's xms_edov false does not link an unconfirmed account" */
     it("refuses by name although the domain is verified", async () => {
       const { store, service } = createWorld({ owners: [], proved: true });
 
-      await expect(service.resolveUser(assertion({ emailVerified: false }))).resolves.toEqual(
-        UNCONFIRMED,
-      );
+      await expect(service.resolveUser(UNVERIFIED_ASSERTION)).resolves.toEqual(UNCONFIRMED);
       expect(store.users.get(USER_ID)?.emailVerified).toBe(false);
+    });
+  });
+
+  describe("when the provider sends no verification claim", () => {
+    /** @scenario "Microsoft Entra ID links an unconfirmed password account without sending email_verified" */
+    it("links the existing account and asks for its address to be confirmed", async () => {
+      const { service } = createWorld({ owners: [], proved: true });
+
+      await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual(
+        LINKED_AND_CONFIRMED,
+      );
+    });
+
+    /** @scenario "An unconfirmed account on a domain the connection has not verified is not linked" */
+    it("refuses by name when the domain is not verified", async () => {
+      const { service } = createWorld({ owners: [] });
+
+      await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual(UNCONFIRMED);
+    });
+  });
+
+  describe("when a SAML connection signs the address in", () => {
+    /** @scenario "A SAML connection links an unconfirmed password account on a verified domain" */
+    it("links the existing account and asks for its address to be confirmed", async () => {
+      const { service } = createWorld({ owners: [], proved: true });
+
+      await expect(
+        service.resolveUser(
+          assertion({ protocol: "saml", emailVerified: false, emailVerification: "unasserted" }),
+        ),
+      ).resolves.toEqual(LINKED_AND_CONFIRMED);
     });
   });
 
@@ -381,7 +420,7 @@ describe("given a password account whose address was never confirmed", () => {
       const { store, service } = createWorld({ owners: [], proved: true });
       bind({ store });
 
-      await expect(service.resolveUser(assertion({ emailVerified: false }))).resolves.toEqual({
+      await expect(service.resolveUser(UNVERIFIED_ASSERTION)).resolves.toEqual({
         action: "continue",
       });
     });
@@ -402,6 +441,55 @@ describe("given a password account whose address was never confirmed", () => {
 
       await expect(service.resolveUser(assertion())).resolves.toEqual({ action: "continue" });
       expect(store.users.get(USER_ID)?.emailVerified).toBe(false);
+    });
+
+    /** @scenario "On LangWatch Cloud a provider that sends no email_verified does not link an existing account" */
+    it("leaves a provider that sends no email_verified to the library's own rule", async () => {
+      const { service } = createWorld({ hosted: true, owners: [], proved: true });
+
+      await expect(
+        service.resolveUser(assertion({ emailVerified: false, emailVerification: "verified" })),
+      ).resolves.toEqual({ action: "continue" });
+    });
+  });
+});
+
+describe("given a password account whose address is confirmed", () => {
+  describe("when the provider sends no email_verified and the connection proved the domain", () => {
+    /** @scenario "A confirmed password account links when the provider sends no email_verified" */
+    it("links the existing account", async () => {
+      const { service } = createWorld({ owners: [], proved: true, confirmed: true });
+
+      await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual(LINKED);
+    });
+  });
+
+  describe("when the connection has not verified the domain", () => {
+    /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+    it("refuses with the missing domain proof named", async () => {
+      const { service } = createWorld({ owners: [], confirmed: true });
+
+      await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual({
+        action: "reject",
+        code: "sso_domain_not_verified",
+      });
+    });
+
+    /** @scenario "Microsoft Entra ID's xms_edov true links a confirmed account without a domain proof" */
+    it("links the existing account on Entra ID's verified domain claim", async () => {
+      const { service } = createWorld({ owners: [], confirmed: true });
+
+      await expect(
+        service.resolveUser(assertion({ emailVerified: false, emailVerification: "verified" })),
+      ).resolves.toEqual(LINKED);
+    });
+  });
+
+  describe("when the provider sends email_verified true", () => {
+    it("keeps the library's own link", async () => {
+      const { service } = createWorld({ owners: [], proved: true, confirmed: true });
+
+      await expect(service.resolveUser(assertion())).resolves.toEqual({ action: "continue" });
     });
   });
 });
