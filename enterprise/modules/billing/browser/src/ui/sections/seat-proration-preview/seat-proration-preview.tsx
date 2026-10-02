@@ -15,7 +15,6 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { billingApi } from "../../../behavior/billing-api.ts";
-import { formatBillingPeriod } from "./billing-period.ts";
 
 // The contract answers this one with the provider's own shape, deliberately
 // opaque, so the screen states what it reads and checks the answer against it.
@@ -192,4 +191,24 @@ export function SeatProrationPreview({
       </Dialog.Footer>
     </>
   );
+}
+
+/**
+ * The billing period, spelled out next to an amount the customer is about
+ * to confirm. Every provider period gets its own words; an unrecognised
+ * one says nothing rather than showing a wrong period as "per month".
+ */
+function formatBillingPeriod(interval: string): string {
+  switch (interval) {
+    case "year":
+      return " per year";
+    case "month":
+      return " per month";
+    case "week":
+      return " per week";
+    case "day":
+      return " per day";
+    default:
+      return "";
+  }
 }

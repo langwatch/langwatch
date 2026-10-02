@@ -1,4 +1,9 @@
-import { readableDate } from "./display-formatters.ts";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+function readableDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
+}
 
 /**
  * Pure utility functions for invoice display.

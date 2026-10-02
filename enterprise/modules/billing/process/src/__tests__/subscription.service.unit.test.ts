@@ -14,6 +14,7 @@ import { type BillingAccountFactsRepository } from "../repositories/billing-acco
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
+import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
 import {
   type SeatCheckoutInvites,
   SeatEventSubscriptionService,
@@ -21,10 +22,7 @@ import {
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
-import {
-  BillingSubscriptionService,
-  RECENT_INVOICES_LIMIT,
-} from "../services/subscription.service.ts";
+import { BillingSubscriptionService } from "../services/subscription.service.ts";
 
 const subscriptionRecord = (
   overrides: Partial<BillingSubscriptionRecord>,

@@ -26,6 +26,7 @@ import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
 } from "../repositories/subscription.repository.ts";
+import { BillingInvoicesService } from "./billing-invoices.service.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 import {
@@ -34,8 +35,6 @@ import {
 } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionService");
-
-export const RECENT_INVOICES_LIMIT = 4;
 
 /**
  * Enterprise Stripe subscription lifecycle. Provider, persistence, and
@@ -50,6 +49,7 @@ export class BillingSubscriptionService {
   private readonly seatEventService: SeatEventSubscriptionService | undefined;
   private readonly notifier: BillingSubscriptionNotifier;
   private readonly stripeErrors: StripeErrorTranslator;
+  private readonly invoices: BillingInvoicesService;
 
   private constructor({
     repository,
@@ -75,6 +75,7 @@ export class BillingSubscriptionService {
     this.seatEventService = seatEventService;
     this.notifier = notifier;
     this.stripeErrors = stripeErrors;
+    this.invoices = BillingInvoicesService.create({ organizationRepository, stripe, stripeErrors });
   }
 
   static create(options: {
@@ -363,38 +364,8 @@ export class BillingSubscriptionService {
     return { success: true };
   }
 
-  async listInvoices({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<BillingDisplayInvoice[]> {
-    const stripeCustomerId = await this.organizationRepository.findStripeCustomerId(organizationId);
-    if (!stripeCustomerId) {
-      return [];
-    }
-
-    let invoices: Stripe.ApiList<Stripe.Invoice>;
-    try {
-      invoices = await this.stripe.invoices.list({
-        customer: stripeCustomerId,
-        limit: RECENT_INVOICES_LIMIT,
-      });
-    } catch (error) {
-      throw this.stripeErrors.translate(error);
-    }
-
-    return invoices.data
-      .filter((invoice) => invoice.status !== "draft")
-      .map((invoice) => ({
-        id: invoice.id,
-        number: invoice.number ?? null,
-        date: invoice.created,
-        amountDue: invoice.amount_due,
-        currency: invoice.currency,
-        status: invoice.status ?? "unknown",
-        pdfUrl: invoice.invoice_pdf ?? null,
-        hostedUrl: invoice.hosted_invoice_url ?? null,
-      }));
+  listInvoices({ organizationId }: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
+    return this.invoices.listInvoices({ organizationId });
   }
 
   private async cancelSubscription({

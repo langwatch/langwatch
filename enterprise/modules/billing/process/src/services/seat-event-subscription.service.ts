@@ -233,6 +233,35 @@ export class SeatEventSubscriptionService {
       invitations,
     });
 
+    return this.openCheckoutSession({
+      customerId,
+      baseUrl,
+      checkoutCurrency,
+      billingInterval,
+      lineItems,
+      isUpgradeFromTiered,
+      subscriptionId: subscription.id,
+    });
+  };
+
+  /** The provider checkout session, anchored to the 1st of next month. */
+  private async openCheckoutSession({
+    customerId,
+    baseUrl,
+    checkoutCurrency,
+    billingInterval,
+    lineItems,
+    isUpgradeFromTiered,
+    subscriptionId,
+  }: {
+    customerId: string;
+    baseUrl: string;
+    checkoutCurrency: Currency;
+    billingInterval: BillingInterval;
+    lineItems: ReturnType<typeof createCheckoutLineItems>;
+    isUpgradeFromTiered: boolean;
+    subscriptionId: string;
+  }): Promise<{ url: string | null }> {
     const selectedOptionsMetadata = {
       selectedCurrency: checkoutCurrency,
       selectedBillingInterval: billingInterval,
@@ -274,12 +303,12 @@ export class SeatEventSubscriptionService {
       subscription_data: subscriptionData,
       success_url: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
       cancel_url: `${baseUrl}/settings/subscription`,
-      client_reference_id: `subscription_setup_${subscription.id}`,
+      client_reference_id: `subscription_setup_${subscriptionId}`,
       allow_promotion_codes: true,
     });
 
     return { url: session.url };
-  };
+  }
 
   /**
    * Cancels the PENDING subscriptions abandoned checkouts left behind, and the

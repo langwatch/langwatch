@@ -1,5 +1,6 @@
 import { StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { LIMIT_TYPE_DISPLAY_LABELS, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { UsageStats } from "@langwatch/entitlement-contract";
 import type { ReactNode } from "react";
 
 import { ResourceLimitRow } from "../../../behavior/lent-resource-limit-row.tsx";
@@ -55,11 +56,10 @@ interface LicenseStatusWithPlan {
 }
 
 /** Input type for usage data from the limits.getUsage query */
-interface UsageData {
-  membersCount: number;
-  membersLiteCount: number;
-  currentMonthMessagesCount: number | null;
-}
+type UsageData = Pick<
+  UsageStats,
+  "membersCount" | "membersLiteCount" | "currentMonthMessagesCount"
+>;
 
 /**
  * Maps license status data to ResourceLimits format.

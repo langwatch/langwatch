@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const STRIPE_PRICE_NAMES = [
   "PRO",
   "GROWTH",
@@ -43,23 +45,6 @@ export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
 
 export type StripeEnvironment = "test" | "live";
 
-export type StripePriceDetail = {
-  id: string;
-  active: boolean;
-  livemode: boolean;
-  product: string | null;
-  unitAmount: number | null;
-  currency: string;
-  type: "one_time" | "recurring";
-  recurring: {
-    interval: "day" | "week" | "month" | "year";
-    intervalCount: number;
-  } | null;
-  nickname: string | null;
-  lookupKey: string | null;
-  metadata: Record<string, string>;
-};
-
 export type StripePriceMapping = Record<
   StripePriceName,
   Partial<Record<StripeEnvironment, string>> | undefined
@@ -93,8 +78,6 @@ export type StripePriceMap = Partial<Record<StripePriceName, string>> &
     string
   >;
 
-import { z } from "zod";
-
 export const stripePriceRecurringSchema = z.object({
   interval: z.enum(["day", "week", "month", "year"]),
   intervalCount: z.number(),
@@ -113,6 +96,8 @@ export const stripePriceDetailSchema = z.object({
   lookupKey: z.string().nullable(),
   metadata: z.record(z.string(), z.string()),
 });
+
+export type StripePriceDetail = z.infer<typeof stripePriceDetailSchema>;
 
 const stripeEnvironmentMappingSchema = z.object({
   test: z.string(),

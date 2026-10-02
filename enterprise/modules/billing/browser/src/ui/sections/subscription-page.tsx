@@ -41,8 +41,6 @@ import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
 import { SubscriptionPageHeader } from "./subscription-page-header.tsx";
-import { SubscriptionSuccessNotice } from "./subscription-success-notice.tsx";
-import { useCheckoutReturn } from "./use-checkout-return.ts";
 import { useDrawerSave } from "./use-drawer-save.ts";
 import { useSubscriptionActions } from "./use-subscription-actions.ts";
 import { useSubscriptionCurrency } from "./use-subscription-currency.ts";
@@ -385,4 +383,36 @@ export function SubscriptionPage() {
       />
     </>
   );
+}
+
+/** The banner a checkout returns to, with the proration note after a plan change. */
+function SubscriptionSuccessNotice({ showUpgradeCredit }: { showUpgradeCredit: boolean }) {
+  return (
+    <Alert.Root status="success" data-testid="subscription-success">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Subscription activated successfully!</Alert.Title>
+        {showUpgradeCredit && (
+          <Alert.Description data-testid="credit-notice">
+            Your previous plan has been prorated. Any unused credit has been applied to your account
+            and will offset future invoices.
+          </Alert.Description>
+        )}
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/** Whether the page was returned to from a checkout, and from a plan change with credit. */
+function useCheckoutReturn() {
+  const query = useBillingHost().routeQuery();
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showUpgradeCredit, setShowUpgradeCredit] = useState(false);
+
+  useEffect(() => {
+    if (query.success !== void 0) setShowSuccess(true);
+    if (query.upgraded_from !== void 0) setShowUpgradeCredit(true);
+  }, [query.success, query.upgraded_from]);
+
+  return { showSuccess, showUpgradeCredit };
 }
