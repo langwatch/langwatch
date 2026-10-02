@@ -391,6 +391,10 @@
       "types": "./dist/components/chip.d.ts",
       "default": "./src/components/chip.tsx"
     },
+    "./filter-chips": {
+      "types": "./dist/components/filter-chips.d.ts",
+      "default": "./src/components/filter-chips.tsx"
+    },
     "./suggestion-panel": {
       "types": "./dist/components/suggestion-panel.d.ts",
       "default": "./src/components/suggestion-panel.tsx"

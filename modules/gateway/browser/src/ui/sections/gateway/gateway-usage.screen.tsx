@@ -1,4 +1,5 @@
 import { neutralizeRows } from "@langwatch/csv";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -70,6 +71,8 @@ const PRESETS: { label: string; days: number | "mtd" }[] = [
   { label: "Last 90 days", days: 90 },
   { label: "This month", days: "mtd" },
 ];
+
+const RANGE_CHIPS = PRESETS.map((p) => ({ value: String(p.days), label: p.label }));
 
 /**
  * The period the Trace Explorer should open on for the period being read. Three of the five map
@@ -318,7 +321,12 @@ function GatewayUsagePage() {
             <Text color="fg.muted">
               What your virtual keys spent, by key, model and provider, over the window you pick.
             </Text>
-            <RangePills days={days} onSelect={setDays} />
+            <FilterChips
+              groupLabel="Time range"
+              value={String(days)}
+              items={RANGE_CHIPS}
+              onChange={(next) => setDays(next === "mtd" ? "mtd" : Number(next))}
+            />
             {isLoadingUsage && (
               <>
                 <StatTileSkeleton columns={4} />
@@ -556,50 +564,6 @@ function formatAvgCost(raw: string | number): string {
   if (n >= 1) return `$${n.toFixed(4)}`;
   if (n >= 0.01) return `$${n.toFixed(5)}`;
   return `$${n.toFixed(6)}`;
-}
-
-/** The window presets as pills, like Directory's filters; only the chosen one carries colour. */
-function RangePills({
-  days,
-  onSelect,
-}: {
-  days: number | "mtd";
-  onSelect: (next: number | "mtd") => void;
-}) {
-  return (
-    <HStack
-      as="fieldset"
-      border="none"
-      margin={0}
-      padding={0}
-      minWidth={0}
-      gap={1}
-      wrap="wrap"
-      aria-label="Time range"
-    >
-      {PRESETS.map((p) => {
-        const isActive = days === p.days;
-        return (
-          <Button
-            key={p.days}
-            size="xs"
-            variant={isActive ? "subtle" : "ghost"}
-            colorPalette={isActive ? "orange" : "gray"}
-            borderRadius="full"
-            borderWidth="1px"
-            borderColor={isActive ? "colorPalette.emphasized" : "transparent"}
-            color={isActive ? "colorPalette.fg" : "fg.muted"}
-            fontWeight={isActive ? "semibold" : "normal"}
-            paddingX={3}
-            aria-pressed={isActive}
-            onClick={() => onSelect(p.days)}
-          >
-            {p.label}
-          </Button>
-        );
-      })}
-    </HStack>
-  );
 }
 
 export default GatewayUsagePage;

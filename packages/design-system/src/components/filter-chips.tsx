@@ -1,15 +1,18 @@
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Text } from "../primitives.ts";
 
-/** One chip: the cut it selects, what it is called, and how many rows it holds. */
+/** One chip: the cut it selects, what it is called, and optionally how many rows it holds. */
 export interface FilterChipItem {
   value: string;
   label: string;
-  count: number;
+  count?: number;
 }
 
+type CountNoun = { singular: string; plural: string };
+
 /**
- * Pill-shaped filter chips above a list, each carrying the number of rows it
- * would leave on screen. Controlled; only the selected chip carries colour.
+ * Pill-shaped filter chips above a list or chart, optionally each carrying the
+ * number of rows it would leave on screen. Controlled; only the selected chip
+ * carries colour.
  */
 export function FilterChips({
   value,
@@ -22,16 +25,26 @@ export function FilterChips({
 }: {
   value: string;
   onChange: (next: string) => void;
-  items: FilterChipItem[];
+  items: readonly FilterChipItem[];
   /** Names the whole row for assistive technology, e.g. "Filter keys by scope". */
   groupLabel: string;
   /** What the counts count, so a chip reads "Team, 1 key" rather than "Team1". */
-  countNoun: { singular: string; plural: string };
+  countNoun?: CountNoun;
   colorPalette?: string;
   testId?: string;
 }) {
   return (
-    <HStack gap={1} wrap="wrap" role="group" aria-label={groupLabel} data-testid={testId}>
+    <HStack
+      as="fieldset"
+      border="none"
+      margin={0}
+      padding={0}
+      minWidth={0}
+      gap={1}
+      wrap="wrap"
+      aria-label={groupLabel}
+      data-testid={testId}
+    >
       {items.map((item) => (
         <FilterChip
           key={item.value}
@@ -47,6 +60,12 @@ export function FilterChips({
   );
 }
 
+function countLabel({ item, countNoun }: { item: FilterChipItem; countNoun?: CountNoun }) {
+  if (item.count === undefined || !countNoun) return undefined;
+  const noun = item.count === 1 ? countNoun.singular : countNoun.plural;
+  return `${item.label}, ${item.count} ${noun}`;
+}
+
 function FilterChip({
   item,
   isActive,
@@ -57,13 +76,11 @@ function FilterChip({
 }: {
   item: FilterChipItem;
   isActive: boolean;
-  countNoun: { singular: string; plural: string };
+  countNoun?: CountNoun;
   colorPalette: string;
   testId?: string;
   onSelect: () => void;
 }) {
-  const noun = item.count === 1 ? countNoun.singular : countNoun.plural;
-
   return (
     <Button
       size="xs"
@@ -76,20 +93,24 @@ function FilterChip({
       fontWeight={isActive ? "semibold" : "normal"}
       paddingX={3}
       aria-pressed={isActive}
-      aria-label={`${item.label}, ${item.count} ${noun}`}
+      aria-label={countLabel({ item, countNoun })}
       data-testid={testId}
       onClick={onSelect}
     >
-      <HStack gap={1.5}>
-        <Text>{item.label}</Text>
-        <Text
-          fontVariantNumeric="tabular-nums"
-          color={isActive ? "colorPalette.fg" : "fg.subtle"}
-          aria-hidden
-        >
-          {item.count}
-        </Text>
-      </HStack>
+      {item.count === undefined ? (
+        item.label
+      ) : (
+        <HStack gap={1.5}>
+          <Text>{item.label}</Text>
+          <Text
+            fontVariantNumeric="tabular-nums"
+            color={isActive ? "colorPalette.fg" : "fg.subtle"}
+            aria-hidden
+          >
+            {item.count}
+          </Text>
+        </HStack>
+      )}
     </Button>
   );
 }

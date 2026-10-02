@@ -1,3 +1,4 @@
+import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -32,6 +33,8 @@ const PRESETS: { label: string; days: number }[] = [
   { label: "Last 7 days", days: 7 },
   { label: "Last 30 days", days: 30 },
 ];
+
+const RANGE_CHIPS = PRESETS.map((p) => ({ value: String(p.days), label: p.label }));
 
 type SpendEventsPage = RouterOutputs["gatewaySpendEvents"]["list"];
 type SpendRow = SpendEventsPage["rows"][number];
@@ -199,49 +202,6 @@ function FilterInput({
           <X size={12} />
         </Button>
       )}
-    </HStack>
-  );
-}
-
-function PresetRangeButtons({
-  days,
-  onSelect,
-}: {
-  days: number;
-  onSelect: (days: number) => void;
-}) {
-  return (
-    <HStack
-      as="fieldset"
-      border="none"
-      margin={0}
-      padding={0}
-      minWidth={0}
-      gap={1}
-      wrap="wrap"
-      aria-label="Time range"
-    >
-      {PRESETS.map((preset) => {
-        const isActive = days === preset.days;
-        return (
-          <Button
-            key={preset.label}
-            size="xs"
-            variant={isActive ? "subtle" : "ghost"}
-            colorPalette={isActive ? "orange" : "gray"}
-            borderRadius="full"
-            borderWidth="1px"
-            borderColor={isActive ? "colorPalette.emphasized" : "transparent"}
-            color={isActive ? "colorPalette.fg" : "fg.muted"}
-            fontWeight={isActive ? "semibold" : "normal"}
-            paddingX={3}
-            aria-pressed={isActive}
-            onClick={() => onSelect(preset.days)}
-          >
-            {preset.label}
-          </Button>
-        );
-      })}
     </HStack>
   );
 }
@@ -445,7 +405,12 @@ function BillingEventsPage() {
             Every billable request the gateway recorded for this project, with its cost.
           </Text>
           <HStack gap={4} flexWrap="wrap" justify="space-between">
-            <PresetRangeButtons days={ledger.days} onSelect={ledger.setDays} />
+            <FilterChips
+              groupLabel="Time range"
+              value={String(ledger.days)}
+              items={RANGE_CHIPS}
+              onChange={(next) => ledger.setDays(Number(next))}
+            />
             <BillingEventFilters ledger={ledger} />
           </HStack>
 

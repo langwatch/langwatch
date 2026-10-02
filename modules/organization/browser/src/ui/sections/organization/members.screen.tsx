@@ -5,6 +5,7 @@
 
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -50,7 +51,6 @@ import type { OrganizationUserRole } from "../../../model/prisma-types.ts";
 import { JoinRequestRow } from "../../../ui/blocks/join-requests-table.tsx";
 import { AutomaticJoinsNotice } from "../../../ui/elements/automatic-joins-notice.tsx";
 import { CopyInput } from "../../../ui/elements/copy-input.tsx";
-import { FilterChips } from "../../../ui/elements/filter-chips.tsx";
 import { IdentityChip, IdentityRowList } from "../../../ui/elements/identity-row.tsx";
 import { ProvenanceChip } from "../../../ui/elements/member-provenance.tsx";
 import { orgRoleOptions } from "../../../ui/elements/organization-user-role-field.tsx";
