@@ -46,6 +46,26 @@ export function telemetryEnvVarNames(tool: string): string[] {
 	return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
+/**
+ * Env var names langwatch USED to write for `tool` but no longer does, so an
+ * install/refresh/logout run can strip them from a previously-written block
+ * on upgrade. The merge-only install path never prunes on its own, and once a
+ * key leaves buildOtelEnvBlock it also leaves telemetryEnvVarNames, so a
+ * dropped key would otherwise linger in an existing settings file forever.
+ *   - claude: OTEL_LOG_RAW_API_BODIES — replaced by the lighter
+ *     OTEL_LOG_ASSISTANT_RESPONSES; we stopped defaulting the full-body
+ *     export (#8284). Kept here so upgrading users get it removed on their
+ *     next `langwatch claude` / `langwatch instrument claude`.
+ */
+export function legacyTelemetryEnvVarNames(tool: string): string[] {
+	switch (tool) {
+		case "claude":
+			return ["OTEL_LOG_RAW_API_BODIES"];
+		default:
+			return [];
+	}
+}
+
 export function buildOtelEnvBlock(
 	tool: string,
 	endpoint: string,
@@ -74,32 +94,31 @@ export function buildOtelEnvBlock(
 			//     below, which unlocks the real span-tracing signal (see note).
 			//     Tool I/O on the logs path also still comes from
 			//     TOOL_DETAILS + RAW_API_BODIES.
-			//   OTEL_LOG_RAW_API_BODIES - emits two NEW event types
-			//     `api_request_body` + `api_response_body` carrying the
-			//     FULL JSON of every message (system prompts + user content
-			//     + assistant text + tool_use blocks). THIS IS THE ONLY
-			//     surface that carries the assistant response text - every
-			//     other event (api_request, user_prompt, tool_*) is
-			//     metadata only. Andre's live-dogfood (proxy intercept on
-			//     :4318) found "UNLOCK-KNOBS-TEST-PROOF-7777" in
-			//     api_response_body.content[].text with this flag set. Also
-			//     the heaviest payload class (system prompts can be 100KB+,
-			//     message history grows turn-over-turn) - same fat-payload
-			//     class as the CH merge memory-ceiling incident
-			//     [[project_skai_ch_merge_memory_ceiling_outage]].
+			//   OTEL_LOG_ASSISTANT_RESPONSES - emits the light
+			//     `claude_code.assistant_response` log event carrying just
+			//     the assistant reply text, added in claude-code 2.1.193
+			//     (25 Jun). This is the surface we use for the response
+			//     text; the receiver already reads it
+			//     (trace-io-accumulation.service.ts). We deliberately do
+			//     NOT set OTEL_LOG_RAW_API_BODIES: that flag makes claude
+			//     serialise the ENTIRE request (the whole conversation, up
+			//     to 1M tokens) plus the whole response to JSON on every
+			//     model call - avoidable CPU/memory that grows with every
+			//     turn, for content we already get from the light events
+			//     (user_prompt + tool_* + assistant_response). Claude's own
+			//     changelog describes RAW_API_BODIES as "for debugging"; a
+			//     user who wants the full request JSON can still set it
+			//     themselves and the receiver keeps reading it when present
+			//     (#8284).
 			//
-			// Default policy: ALL FOUR knobs ON. rchaves "fix everything,
-			// collect all humanly possible". Payload risk is bounded:
-			// claude 2.x caps api_request_body + api_response_body at 60KB
-			// INLINE per event (inline is the default; the optional
-			// file:<dir> mode that writes untruncated bodies to disk is NOT
-			// enabled). Alexis ships a complementary receiver-side guard
-			// in the same PR as defense-in-depth on fold accumulation +
-			// a Body cap in case future claude versions remove the 60KB
-			// inline limit. PII / logging-opt-out controls already live on
-			// the platform settings page. Note: extended-thinking content
-			// is ALWAYS redacted by claude from raw bodies - we cannot
-			// capture it regardless of flag state.
+			// Default policy: the light content set - USER_PROMPTS +
+			// TOOL_DETAILS + TOOL_CONTENT + ASSISTANT_RESPONSES. This keeps
+			// prompts, tool calls/results, assistant replies, cost, tokens,
+			// model, latency and the span tree, and drops only the heavy
+			// full-body export. PII / logging-opt-out controls live on the
+			// platform settings page. Note: extended-thinking content is
+			// ALWAYS redacted by claude, so it is never captured regardless
+			// of flag state.
 			//
 			// CLAUDE_CODE_ENHANCED_TELEMETRY_BETA unlocks the real span-tracing
 			// signal (scope com.anthropic.claude_code.tracing): claude_code
@@ -121,7 +140,7 @@ export function buildOtelEnvBlock(
 				OTEL_LOG_USER_PROMPTS: "1",
 				OTEL_LOG_TOOL_DETAILS: "1",
 				OTEL_LOG_TOOL_CONTENT: "1",
-				OTEL_LOG_RAW_API_BODIES: "1",
+				OTEL_LOG_ASSISTANT_RESPONSES: "1",
 				...base,
 				OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
 			};
