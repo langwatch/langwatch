@@ -159,10 +159,16 @@ def execute():
 // @scenario "each execution gets its own temporary directory, removed afterwards"
 func TestCodeBlock_RunDirectoryIsRemovedAfterATimeout(t *testing.T) {
 	requirePython(t)
+
+	// A private temp root, so the count is this executor's directories and
+	// nothing else. Reading the shared system root instead would make the
+	// assertion depend on what else is running on the machine: several
+	// worktrees run this package's tests at once, each creating directories
+	// under the same prefix, and the count would move for reasons that have
+	// nothing to do with cleanup.
+	root := withPrivateTempRoot(t)
 	exe, err := codeblock.New(codeblock.Options{DefaultTimeout: 300 * time.Millisecond})
 	require.NoError(t, err)
-
-	before := countRunDirs(t)
 
 	res, err := exe.Execute(context.Background(), codeblock.Request{
 		Code:            "import time\n\ndef execute():\n    time.sleep(30)\n    return {'ok': True}\n",
@@ -171,24 +177,34 @@ func TestCodeBlock_RunDirectoryIsRemovedAfterATimeout(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, res.TimedOut, "expected the run to time out")
 
-	assert.LessOrEqual(t, countRunDirs(t), before,
+	assert.Empty(t, runDirsIn(t, root),
 		"a timed-out execution left its directory behind")
 }
 
-// countRunDirs counts the executor's per-execution directories currently in
-// the temp root. Other tests in this package run in the same process, so the
-// assertion that uses it compares against its own baseline rather than zero.
-func countRunDirs(t *testing.T) int {
+// withPrivateTempRoot points os.MkdirTemp's default root at a directory
+// belonging to this test alone, and returns it.
+//
+// t.Setenv rules out t.Parallel for the caller, which is why this is opt-in per
+// test rather than applied to the package.
+func withPrivateTempRoot(t *testing.T) string {
 	t.Helper()
-	entries, err := os.ReadDir(os.TempDir())
+	root := t.TempDir()
+	t.Setenv("TMPDIR", root)
+	return root
+}
+
+// runDirsIn returns the executor's per-execution directories left under root.
+func runDirsIn(t *testing.T, root string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(root)
 	require.NoError(t, err)
-	count := 0
+	var dirs []string
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), "nlpgo-codeblock-run-") {
-			count++
+			dirs = append(dirs, entry.Name())
 		}
 	}
-	return count
+	return dirs
 }
 
 // @scenario "user code cannot change what a later execution runs"
