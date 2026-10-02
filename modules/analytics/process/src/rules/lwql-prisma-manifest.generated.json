@@ -17893,6 +17893,15 @@
           "documentation": ""
         },
         {
+          "name": "lastCountedEventId",
+          "columnName": "lastCountedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",

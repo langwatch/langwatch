@@ -1595,6 +1595,7 @@ export interface LwqlPrismaRows {
     readonly lastReportedTotal: "Int";
     readonly pendingReportedTotal: "Int?";
     readonly consecutiveFailures: "Int";
+    readonly lastCountedEventId: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly VirtualKey: {
