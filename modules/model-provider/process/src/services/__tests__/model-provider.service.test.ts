@@ -788,6 +788,9 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
       throw new ModelProviderCredentialsUnreadableError("openai");
     }
   }
+  endpointMoved(): boolean {
+    return false;
+  }
   mergeHeaders(input: {
     incoming: { key: string; value: string }[];
     stored: { key: string; value: string }[];

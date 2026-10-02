@@ -61,9 +61,16 @@ export abstract class ModelProviderCredentialPolicy {
     stored: Record<string, unknown> | null;
     storedCredentialsUnreadable: boolean;
   }): void;
+  /** Whether a credential write names an endpoint other than the stored one. */
+  abstract endpointMoved(input: {
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+  }): boolean;
+  /** A masked header value is restored only while the endpoint stays where it was. */
   abstract mergeHeaders(input: {
     incoming: { key: string; value: string }[];
     stored: { key: string; value: string }[];
+    endpointMoved: boolean;
   }): { key: string; value: string }[];
   abstract maskHeaders(value: { key: string; value: string }[]): { key: string; value: string }[];
 }

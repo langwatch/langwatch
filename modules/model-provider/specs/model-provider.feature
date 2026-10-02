@@ -94,3 +94,19 @@ Feature: Model Provider service
     Given an organization whose Bedrock is not managed and not configured
     When the organization's providers are listed
     Then Bedrock is not listed
+
+  @unit
+  Scenario: Moving a provider to another endpoint does not carry its stored secret along
+    Given a provider saved with an API key and a base URL
+    When the provider is saved with a different base URL and the key left masked
+    Then the stored key is not kept
+    And its masked extra header values are not kept
+    And saving with a newly typed key keeps the new key with the new base URL
+
+  @unit
+  Scenario: A stored key is checked only against the endpoint it was saved with
+    Given a provider saved with an API key and a base URL
+    When its stored key is checked against a different base URL
+    Then the check is refused as having no key, and nothing is sent
+    And checking against the saved base URL uses the stored key
+    And the deployment's own key is only checked against the provider's default endpoint

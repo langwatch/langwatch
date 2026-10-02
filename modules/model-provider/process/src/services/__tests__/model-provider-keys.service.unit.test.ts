@@ -13,6 +13,7 @@ describe("ModelProviderKeysService", () => {
   it("restores masked header values by key", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored,
         incoming: stored.map(({ key }) => ({ key, value: MASKED_KEY_PLACEHOLDER })),
       }),
@@ -22,6 +23,7 @@ describe("ModelProviderKeysService", () => {
   it("uses an unclaimed positional value when a header is renamed", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored,
         incoming: [
           { key: "X-Auth", value: MASKED_KEY_PLACEHOLDER },
@@ -37,6 +39,7 @@ describe("ModelProviderKeysService", () => {
   it("does not assign a claimed secret to a new header after reordering", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored,
         incoming: [
           { key: "X-New", value: MASKED_KEY_PLACEHOLDER },
@@ -49,6 +52,7 @@ describe("ModelProviderKeysService", () => {
   it("drops unmatched placeholders and retains explicit values", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored,
         incoming: [
           { key: "Authorization", value: "Bearer replacement" },
@@ -65,6 +69,7 @@ describe("ModelProviderKeysService", () => {
   it("does not persist a masked value on a new row", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored: [],
         incoming: [
           { key: "Authorization", value: MASKED_KEY_PLACEHOLDER },
@@ -77,6 +82,7 @@ describe("ModelProviderKeysService", () => {
   it("strips whitespace around a header name and value", () => {
     expect(
       policy.mergeHeaders({
+        endpointMoved: false,
         stored: [],
         incoming: [{ key: " X-Real ", value: " real-value " }],
       }),
@@ -149,17 +155,19 @@ describe("ModelProviderKeysService merge", () => {
     it("restores the stored value and takes the edited one", () => {
       const result = policy.merge({
         incoming: {
-          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-          OPENAI_BASE_URL: "https://new-url.com",
+          AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          AZURE_API_GATEWAY_VERSION: "2024-06-01",
         },
         stored: {
-          OPENAI_API_KEY: "sk-actual-secret",
-          OPENAI_BASE_URL: "https://old-url.com",
+          AZURE_OPENAI_API_KEY: "sk-actual-secret",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
         },
       });
 
-      expect(result.OPENAI_API_KEY).toBe("sk-actual-secret");
-      expect(result.OPENAI_BASE_URL).toBe("https://new-url.com");
+      expect(result.AZURE_OPENAI_API_KEY).toBe("sk-actual-secret");
+      expect(result.AZURE_API_GATEWAY_VERSION).toBe("2024-06-01");
     });
 
     /** @scenario Preserve original subscription key when saving with masked placeholder */
@@ -224,7 +232,7 @@ describe("ModelProviderKeysService merge", () => {
     /** @scenario "Credential fields are secret unless the registry declares them public" */
     it("keeps a stored secret", () => {
       const result = policy.merge({
-        incoming: { AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com" },
+        incoming: { AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com" },
         stored: {
           AZURE_OPENAI_API_KEY: "sk-stored",
           AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
@@ -233,7 +241,7 @@ describe("ModelProviderKeysService merge", () => {
 
       expect(result).toEqual({
         AZURE_OPENAI_API_KEY: "sk-stored",
-        AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com",
+        AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
       });
     });
 
@@ -248,8 +256,24 @@ describe("ModelProviderKeysService merge", () => {
       });
     });
 
-    /** @scenario Switching Azure to its API gateway keeps the key and drops the direct endpoint */
+    /** @scenario "Credential fields are secret unless the registry declares them public" */
     it("drops a stored field that is not a secret", () => {
+      const result = policy.merge({
+        incoming: { AZURE_API_GATEWAY_VERSION: "2024-05-01-preview" },
+        stored: {
+          AZURE_OPENAI_API_KEY: "sk-stored",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        },
+      });
+
+      expect(result).toEqual({
+        AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+        AZURE_OPENAI_API_KEY: "sk-stored",
+      });
+    });
+
+    /** @scenario Switching Azure to its API gateway asks for the key again and drops the direct endpoint */
+    it("drops the stored key and the direct endpoint when switching to the gateway", () => {
       const result = policy.merge({
         incoming: {
           AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
@@ -264,7 +288,6 @@ describe("ModelProviderKeysService merge", () => {
       expect(result).toEqual({
         AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
         AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
-        AZURE_OPENAI_API_KEY: "sk-stored",
       });
     });
   });
@@ -365,5 +388,101 @@ describe("ModelProviderKeysService read masking", () => {
         { key: "X-Tenant", value: MASKED_KEY_PLACEHOLDER },
       ]);
     });
+  });
+});
+
+/** @scenario Moving a provider to another endpoint does not carry its stored secret along */
+describe("ModelProviderKeysService merge when the endpoint changes", () => {
+  const keys = ModelProviderKeysService.create();
+  const stored = { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://api.openai.com/v1" };
+
+  it("drops the stored secret when the base URL moves and the key is left masked", () => {
+    const merged = keys.merge({
+      incoming: {
+        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+        OPENAI_BASE_URL: "https://elsewhere.example",
+      },
+      stored,
+    });
+    expect(merged).toEqual({ OPENAI_BASE_URL: "https://elsewhere.example" });
+  });
+
+  it("keeps the stored secret when the base URL is unchanged", () => {
+    const merged = keys.merge({
+      incoming: {
+        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+        OPENAI_BASE_URL: "https://api.openai.com/v1",
+      },
+      stored,
+    });
+    expect(merged.OPENAI_API_KEY).toBe("sk-stored");
+  });
+
+  it("saves a newly typed secret alongside the new base URL", () => {
+    const merged = keys.merge({
+      incoming: { OPENAI_API_KEY: "sk-new", OPENAI_BASE_URL: "https://elsewhere.example" },
+      stored,
+    });
+    expect(merged).toEqual({
+      OPENAI_API_KEY: "sk-new",
+      OPENAI_BASE_URL: "https://elsewhere.example",
+    });
+  });
+
+  it.each([
+    ["ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY"],
+    ["CUSTOM_BASE_URL", "CUSTOM_API_KEY"],
+    ["AZURE_CONTENT_SAFETY_ENDPOINT", "AZURE_CONTENT_SAFETY_KEY"],
+  ])("drops the stored secret when %s moves", (endpointField, secretField) => {
+    const merged = keys.merge({
+      incoming: {
+        [secretField]: MASKED_KEY_PLACEHOLDER,
+        [endpointField]: "https://elsewhere.example",
+      },
+      stored: { [secretField]: "stored-secret", [endpointField]: "https://home.example" },
+    });
+    expect(merged).toEqual({ [endpointField]: "https://elsewhere.example" });
+  });
+
+  it("drops the stored secret when a base URL is added where none was stored", () => {
+    const merged = keys.merge({
+      incoming: {
+        ANTHROPIC_API_KEY: MASKED_KEY_PLACEHOLDER,
+        ANTHROPIC_BASE_URL: "https://elsewhere.example",
+      },
+      stored: { ANTHROPIC_API_KEY: "stored-secret" },
+    });
+    expect(merged).toEqual({ ANTHROPIC_BASE_URL: "https://elsewhere.example" });
+  });
+
+  it("does not count a masked endpoint echoed back as a move", () => {
+    const merged = keys.merge({
+      incoming: {
+        ELEVENLABS_API_KEY: MASKED_KEY_PLACEHOLDER,
+        ELEVENLABS_BASE_URL: MASKED_KEY_PLACEHOLDER,
+      },
+      stored: {
+        ELEVENLABS_API_KEY: "stored-secret",
+        ELEVENLABS_BASE_URL: "https://api.elevenlabs.io",
+      },
+    });
+    expect(merged.ELEVENLABS_API_KEY).toBe("stored-secret");
+  });
+
+  it("drops masked extra headers once the endpoint has moved", () => {
+    const endpointMoved = keys.endpointMoved({
+      incoming: { OPENAI_BASE_URL: "https://elsewhere.example" },
+      stored,
+    });
+    expect(
+      keys.mergeHeaders({
+        incoming: [
+          { key: "api-key", value: MASKED_KEY_PLACEHOLDER },
+          { key: "X-Typed", value: "typed-value" },
+        ],
+        stored: [{ key: "api-key", value: "stored-header-secret" }],
+        endpointMoved,
+      }),
+    ).toEqual([{ key: "X-Typed", value: "typed-value" }]);
   });
 });

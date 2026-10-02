@@ -459,13 +459,22 @@ export class ModelProviderCommandService {
     input: ModelProviderWriteInput,
     existing: ModelProvider | null,
   ): { key: string; value: string }[] {
+    const policy = this.options.credentialPolicy;
+    const endpointMoved = policy.endpointMoved({
+      incoming:
+        input.customKeys === undefined
+          ? null
+          : policy.normalizeKeys(input.provider, input.customKeys),
+      stored: existing?.customKeys ?? null,
+    });
     if (input.extraHeaders === undefined) {
-      return existing?.extraHeaders ?? [];
+      return endpointMoved ? [] : (existing?.extraHeaders ?? []);
     }
 
-    return this.options.credentialPolicy.mergeHeaders({
+    return policy.mergeHeaders({
       incoming: input.extraHeaders ?? [],
       stored: existing?.extraHeaders ?? [],
+      endpointMoved,
     });
   }
 

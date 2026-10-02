@@ -186,14 +186,14 @@ Feature: Model Provider Configuration
     Then the endpoint is updated
     And the stored API key is preserved
 
-  # Everything else is on screen, so a save states it in full. That is how the
-  # API gateway option switches over, and it must not take the key with it.
+  # Everything else is on screen, so a save states it in full. Switching to the
+  # API gateway changes where the key goes, so the key is asked for again.
   @integration
-  Scenario: Switching Azure to its API gateway keeps the key and drops the direct endpoint
+  Scenario: Switching Azure to its API gateway asks for the key again and drops the direct endpoint
     Given I have "azure" provider configured with an API key and an endpoint
-    When I switch the provider to its API gateway and save
+    When I switch the provider to its API gateway and save without retyping the key
     Then the direct endpoint gives way to the gateway address
-    And the stored API key is preserved
+    And the stored API key is not kept
 
   @integration @unimplemented
   Scenario: Configure API keys from environment variables

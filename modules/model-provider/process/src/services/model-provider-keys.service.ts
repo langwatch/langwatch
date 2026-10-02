@@ -12,6 +12,23 @@ import { ModelProviderCredentialPolicy } from "../app/model-provider.members.ts"
 
 type Header = { key: string; value: string };
 
+type CredentialWrite = {
+  incoming: Record<string, unknown> | null;
+  stored: Record<string, unknown> | null;
+};
+
+const isEndpointField = (key: string): boolean => /_(BASE_URL|ENDPOINT)$/.test(key);
+
+/** A write names an endpoint other than the stored one; an echoed mask names none. */
+function endpointMoved({ incoming, stored }: CredentialWrite): boolean {
+  return Object.entries(incoming ?? {}).some(
+    ([key, value]) =>
+      isEndpointField(key) &&
+      value !== MASKED_KEY_PLACEHOLDER &&
+      (value ?? "") !== (stored?.[key] ?? ""),
+  );
+}
+
 const managedKeysSchema = z.object({ MANAGED: z.string() });
 const normalizedKeysSchema = z.record(z.string(), z.unknown());
 
@@ -46,7 +63,14 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
       return edited;
     }
 
-    const preserved = Object.entries(input.stored).filter(([key, value]) => {
+    // A stored secret is only ever sent to the endpoint it was saved with.
+    const stored = input.stored;
+    const moved = endpointMoved({ incoming: input.incoming, stored });
+
+    const preserved = Object.entries(stored).filter(([key, value]) => {
+      if (moved && isSecretCredentialField(key)) {
+        return false;
+      }
       if (input.incoming && key in input.incoming) {
         return input.incoming[key] === MASKED_KEY_PLACEHOLDER;
       }
@@ -112,12 +136,20 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     }
   }
 
-  mergeHeaders(input: { incoming: Header[]; stored: Header[] }): Header[] {
+  endpointMoved(input: CredentialWrite): boolean {
+    return endpointMoved(input);
+  }
+
+  mergeHeaders(input: { incoming: Header[]; stored: Header[]; endpointMoved: boolean }): Header[] {
     const incomingKeys = new Set(input.incoming.map(({ key }) => key));
 
     const merged = input.incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) {
         return [header];
+      }
+      // Header values are masked like secrets, so they stay with the endpoint too.
+      if (input.endpointMoved) {
+        return [];
       }
 
       const storedByKey = input.stored.find(({ key }) => key === header.key);

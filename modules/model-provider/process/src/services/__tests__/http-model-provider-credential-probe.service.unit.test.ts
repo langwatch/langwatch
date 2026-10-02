@@ -1,7 +1,9 @@
 import { RedirectRefusedError } from "@langwatch/egress";
 import {
   MASKED_KEY_PLACEHOLDER,
+  ProviderKeyMissingError,
   ProviderUnreachableError,
+  type ModelProvider,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1182,5 +1184,108 @@ describe("given a deployment that points a provider's probe at its own API root"
     });
 
     expect(mockFetch).toHaveBeenCalledWith("https://api.deepseek.com/v1/models", expect.anything());
+  });
+});
+
+/** @scenario A stored key is checked only against the endpoint it was saved with */
+describe("validateKeyWithCustomUrl", () => {
+  const probeStored = ({
+    stored,
+    customBaseUrl,
+    environment = {},
+  }: {
+    stored: Record<string, string> | null;
+    customBaseUrl?: string;
+    environment?: Record<string, string>;
+  }) =>
+    HttpModelProviderCredentialProbeService.validateKeyWithCustomUrl({
+      projectId: "project-1",
+      provider: "openai",
+      customBaseUrl,
+      modelProviders: {
+        findProviderForProject: async (): Promise<ModelProvider | null> =>
+          stored
+            ? {
+                id: "provider-1",
+                organizationId: "organization-1",
+                provider: "openai",
+                name: "OpenAI",
+                enabled: true,
+                routingHandle: null,
+                scopes: [],
+                customKeys: stored,
+                customModels: [],
+                customEmbeddingsModels: [],
+                extraHeaders: [],
+                rateLimitRpm: null,
+                rateLimitTpm: null,
+                rateLimitRpd: null,
+                fallbackPriorityGlobal: null,
+                providerConfig: null,
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+              }
+            : null,
+      },
+      environment,
+      egress,
+    });
+  const missingKey = new ProviderKeyMissingError({ provider: "openai" }).serialize().code;
+  const codeOf = (result: ModelProviderCredentialVerdict) =>
+    result.valid ? undefined : result.domainError.code;
+  const sentTo = () => mockFetch.mock.calls.map(([url, init]) => ({ url: String(url), init }));
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "{}",
+      json: async () => ({}),
+    });
+  });
+
+  it("refuses to send the stored key to another address", async () => {
+    const result = await probeStored({
+      stored: { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://home.example/v1" },
+      customBaseUrl: "https://elsewhere.example/v1",
+    });
+    expect(codeOf(result)).toBe(missingKey);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses to send the deployment's key to another address", async () => {
+    const result = await probeStored({
+      stored: null,
+      customBaseUrl: "https://elsewhere.example/v1",
+      environment: { OPENAI_API_KEY: "sk-deployment" },
+    });
+    expect(codeOf(result)).toBe(missingKey);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses to send the deployment's key to a stored custom address", async () => {
+    const result = await probeStored({
+      stored: { OPENAI_BASE_URL: "https://home.example/v1" },
+      environment: { OPENAI_API_KEY: "sk-deployment" },
+    });
+    expect(codeOf(result)).toBe(missingKey);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("checks the stored key against its own address, however the slash is spelled", async () => {
+    await probeStored({
+      stored: { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://home.example/v1" },
+      customBaseUrl: " https://home.example/v1/ ",
+    });
+    expect(sentTo().length).toBeGreaterThan(0);
+    expect(sentTo().every(({ url }) => url.startsWith("https://home.example/v1"))).toBe(true);
+    expect(JSON.stringify(sentTo()[0]?.init)).toContain("sk-stored");
+  });
+
+  it("checks the deployment's key against the default address when nothing is named", async () => {
+    await probeStored({ stored: null, environment: { OPENAI_API_KEY: "sk-deployment" } });
+    expect(sentTo().length).toBeGreaterThan(0);
+    expect(sentTo().every(({ url }) => url.startsWith("https://api.openai.com/v1"))).toBe(true);
   });
 });

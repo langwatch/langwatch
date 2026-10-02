@@ -743,6 +743,28 @@ function detectUncheckableReason({
   return null;
 }
 
+function defaultBaseUrlFor({
+  provider,
+  deployedBaseUrls,
+}: {
+  provider: string;
+  deployedBaseUrls: DeployedBaseUrls;
+}): string {
+  return (
+    deployedBaseUrls[provider]?.trim() ||
+    (providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "")
+  );
+}
+
+/**
+ * Two endpoint spellings name the same address once trimmed of edge whitespace and
+ * trailing slashes.
+ */
+function sameEndpoint(left: string, right: string): boolean {
+  const normalize = (url: string) => url.trim().replace(/\/+$/, "");
+  return normalize(left) === normalize(right);
+}
+
 /**
  * The catalogue's credential probe, over the process's guarded egress.
  */
@@ -793,12 +815,23 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
         (entry): entry is [string, string] => typeof entry[1] === "string",
       ),
     );
-    let apiKey = storedKeys[apiKeyField]?.trim() ?? "";
-
-    // Fallback to env var if no stored key
-    if (!apiKey) {
-      apiKey = environment[apiKeyField]?.trim() ?? "";
-    }
+    // A stored key goes only to the stored (or default) endpoint, the deployment's own key only
+    // to the default one. A probe against any other address takes the key typed with it,
+    // through validateProviderApiKey.
+    const defaultBaseUrl = defaultBaseUrlFor({
+      provider,
+      deployedBaseUrls: deployedBaseUrls ?? {},
+    });
+    const storedBaseUrl = endpointField ? (storedKeys[endpointField]?.trim() ?? "") : "";
+    const endpoint = (endpointField ? customBaseUrl?.trim() : "") || storedBaseUrl;
+    const target = endpoint || defaultBaseUrl;
+    const storedKey = sameEndpoint(target, storedBaseUrl || defaultBaseUrl)
+      ? (storedKeys[apiKeyField]?.trim() ?? "")
+      : "";
+    const environmentKey = sameEndpoint(target, defaultBaseUrl)
+      ? (environment[apiKeyField]?.trim() ?? "")
+      : "";
+    const apiKey = storedKey || environmentKey;
 
     if (!apiKey) {
       return refused(new ProviderKeyMissingError({ provider }).serialize());
@@ -806,15 +839,14 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
 
     // Start from what's stored, not a blank object: rebuilding from scratch silently dropped
     // extra credential fields (Agent Platform's project/location) and misdiagnosed an unrelated
-    // edit as an unreachable provider. The resolved key and custom URL still win, layered on top.
+    // edit as an unreachable provider. The resolved key and endpoint still win, layered on top.
     const customKeys: Record<string, string> = {
       ...storedKeys,
       [apiKeyField]: apiKey,
     };
-    if (endpointField && customBaseUrl) {
-      customKeys[endpointField] = customBaseUrl;
+    if (endpointField && endpoint) {
+      customKeys[endpointField] = endpoint;
     }
-    // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
 
     return HttpModelProviderCredentialProbeService.validateProviderApiKey({
       provider,
@@ -860,9 +892,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     // Get auth strategy (default to bearer) and base URL
     const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
     const deployedBaseUrl = deployedBaseUrls[provider]?.trim() ?? "";
-    const defaultBaseUrl =
-      deployedBaseUrl ||
-      (providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "");
+    const defaultBaseUrl = defaultBaseUrlFor({ provider, deployedBaseUrls });
 
     const agentPlatform = agentPlatformPair({ provider, customKeys });
 
