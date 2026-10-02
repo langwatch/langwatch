@@ -18,9 +18,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../modules/data-retention/contract/tsconfig.build.json"
-    },
-    {
       "path": "../observability/tsconfig.build.json"
     },
     {
