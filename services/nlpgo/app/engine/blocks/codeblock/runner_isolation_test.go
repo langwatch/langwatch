@@ -224,13 +224,15 @@ func TestCodeBlock_DevRunnerOverrideIsReadOnceAndNotReread(t *testing.T) {
 // @scenario "each execution gets its own temporary directory, removed afterwards"
 func TestCodeBlock_RunDirectoryIsRemovedEvenWhenUserCodeLocksASubdirectory(t *testing.T) {
 	requirePython(t)
+	requireUnprivileged(t)
 	exe := newExec(t)
 
 	// Unlinking a file needs write permission on the directory holding it, so
 	// user code that leaves a read-only directory behind defeats a plain
 	// RemoveAll. The next execution gets a fresh directory either way, so
 	// isolation holds; what leaks is disk, which on a long-lived engine
-	// accumulates until the volume fills.
+	// accumulates until the volume fills. The shipped image runs on
+	// distroless' `nonroot` tag, so this is the posture a real deployment has.
 	//
 	// Only a NESTED directory is locked. Locking the run directory itself
 	// stops the runner writing its own result file, so that execution simply
@@ -261,4 +263,18 @@ def execute():
 	_, statErr := os.Stat(dir)
 	assert.True(t, os.IsNotExist(statErr),
 		"run directory %s survived because user code left a read-only directory in it (stat error: %v)", dir, statErr)
+}
+
+// requireUnprivileged skips a test whose subject is a file permission.
+//
+// uid 0 bypasses the permission check entirely, so a root test runner removes
+// a 0500 directory without ever entering the recovery path such a test exists
+// to cover: it would keep passing after that path regressed. Skipping says so
+// out loud rather than banking a pass that means nothing. CI runs unprivileged,
+// so the coverage is real there.
+func requireUnprivileged(t *testing.T) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: uid 0 ignores the directory permissions this test turns on")
+	}
 }

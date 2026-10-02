@@ -116,6 +116,12 @@ describe("buildChildEnvironment", () => {
   describe("given no internal secret on the parent", () => {
     describe("when a child is started", () => {
       it("binds nothing, so the child sends no secret header either", () => {
+        // Stubbed rather than assumed absent: vitest.config.ts loads
+        // platform/app/.env into the test process, and the env scaffolder
+        // generates this variable, so reading the ambient value would make
+        // this pass in CI and fail on a developer machine.
+        vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", undefined);
+
         const result = buildChildEnvironment({
           jobData: jobData("http"),
           labels: [],
