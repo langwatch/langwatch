@@ -3,6 +3,8 @@
  *
  * @see specs/nlp-go/lambda-invoke-payload-staging.feature
  */
+import { createDecipheriv } from "node:crypto";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -117,9 +119,14 @@ describe("given the NLP engine is a per-project Lambda", () => {
       expect(staging.calls[0]!.projectId).toBe("project_b");
       expect(staging.calls[0]!.keyPrefix).toBe("nlpgo-staging/project_b");
       expect(staging.calls[0]!.ttlSeconds).toBe(600);
-      expect(staging.calls[0]!.serialized.toString("utf-8")).toBe(bigBody);
 
       const envelope = lastEnvelope();
+      expect(
+        openSealed({
+          sealed: staging.calls[0]!.serialized,
+          key: envelope.headers["X-Payload-Key"],
+        }),
+      ).toBe(bigBody);
       expect(envelope.body).toBe("");
       expect(envelope.headers["X-Payload-S3-URL"]).toContain("https://s3.example/");
       // The rewritten envelope must be comfortably under the 6 MiB cap.
@@ -249,3 +256,16 @@ describe("given a plain HTTP NLP target instead of a Lambda ARN", () => {
     });
   });
 });
+
+/** Opens a body sealed by sealStagedPayload: nonce (12), ciphertext, GCM tag (16). */
+function openSealed({ sealed, key }: { sealed: Buffer; key: string | undefined }): string {
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    Buffer.from(key ?? "", "base64"),
+    sealed.subarray(0, 12),
+  );
+  decipher.setAuthTag(sealed.subarray(-16));
+  return Buffer.concat([decipher.update(sealed.subarray(12, -16)), decipher.final()]).toString(
+    "utf-8",
+  );
+}

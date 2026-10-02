@@ -66,6 +66,7 @@ describe("optimization.chat", () => {
         workflowId: "workflow_1",
         projectId: "project_1",
         body: { input: "hello" },
+        principal: { userId: "user_1" },
       });
     });
 
@@ -180,7 +181,11 @@ describe("optimization.getPublishedWorkflow", () => {
                 parameters: [
                   { identifier: "agent_type", type: "str", value: "http" },
                   { identifier: "auth_token", type: "str", value: "token-secret" },
-                  { identifier: "headers", type: "dict", value: { "x-tenant": "tenant-secret" } },
+                  {
+                    identifier: "headers",
+                    type: "dict",
+                    value: { "x-api-key": "key-secret", "x-tenant": "acme" },
+                  },
                 ],
               },
             },
@@ -198,8 +203,9 @@ describe("optimization.getPublishedWorkflow", () => {
     });
 
     expect(JSON.stringify(answered)).not.toContain("token-secret");
-    expect(JSON.stringify(answered)).not.toContain("tenant-secret");
-    expect(JSON.stringify(answered)).toContain("x-tenant");
+    expect(JSON.stringify(answered)).not.toContain("key-secret");
+    // Only credential-named headers are blanked; any other header is answered as typed.
+    expect(JSON.stringify(answered)).toContain('"x-tenant":"acme"');
     expect(answered).toMatchObject({ version: "1" });
   });
 

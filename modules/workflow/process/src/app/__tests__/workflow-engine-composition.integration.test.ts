@@ -62,7 +62,7 @@ async function appAt({
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
-      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({ mintRunKey: async () => "run-key" }, "ApiKeyApi"),
       projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),

@@ -13,6 +13,7 @@ import {
   type NlpLambdaStreamChunk,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
+  STAGED_PAYLOAD_KEY_HEADER,
   type StagedNlpPayload,
   type WorkflowStudioStreamInput,
 } from "../nlp-lambda.channel.ts";
@@ -229,8 +230,10 @@ describe("given a project whose studio runs on its own Lambda", () => {
       };
       expect(envelope.body).toBe("");
       expect(envelope.headers[STAGED_PAYLOAD_HEADER]).toBe("https://s3.example/staged?signed=yes");
+      expect(envelope.headers[STAGED_PAYLOAD_KEY_HEADER]).toEqual(expect.any(String));
+      // The parked object is sealed: 19 plain bytes plus nonce (12) and GCM tag (16).
       expect(staging.staged).toEqual([
-        { projectId: "project-1", keyPrefix: "studio-staging/project-1", bytes: 19 },
+        { projectId: "project-1", keyPrefix: "studio-staging/project-1", bytes: 47 },
       ]);
       expect(staging.discards).toBe(1);
     });
