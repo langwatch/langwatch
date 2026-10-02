@@ -25,7 +25,8 @@ function isInAppHref(href: string | undefined): href is string {
 
 /** Whether the browser should be left to handle this click itself. */
 function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
-  const { target } = event.currentTarget;
+  // `asChild` onto a button leaves `target` undefined, which is not a new-tab request.
+  const target = event.currentTarget.target ?? "";
   return (
     event.defaultPrevented ||
     event.button !== 0 ||

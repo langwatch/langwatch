@@ -72,6 +72,18 @@ describe("Link", () => {
       expect(followed).toBe(false);
     });
 
+    it("routes a click on a button it wraps with asChild, which carries no target", () => {
+      mounted(
+        <Link href="/checkout/experiments" asChild>
+          <button type="button">Open Experiment</button>
+        </Link>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Open Experiment" }));
+
+      expect(navigate).toHaveBeenCalledWith("/checkout/experiments");
+    });
+
     /** @scenario "A link to the API's own address is a document load" */
     it("leaves an API address to the browser", () => {
       mounted(<Link href="/api/auth/logout">Sign out</Link>);
