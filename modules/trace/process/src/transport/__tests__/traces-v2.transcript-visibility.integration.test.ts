@@ -16,9 +16,9 @@ import {
 import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { TraceLogRecordReadRow } from "../../../app/trace.app.ts";
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
-import { TraceTranscriptReadService } from "../../../services/trace-transcript-read.service.ts";
+import type { TraceLogRecordReadRow } from "../../app/trace.app.ts";
+import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TraceTranscriptReadService } from "../../services/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,

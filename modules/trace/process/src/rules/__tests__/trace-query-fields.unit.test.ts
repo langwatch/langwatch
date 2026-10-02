@@ -8,7 +8,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FIELD_DEFS, KNOWN_FIELDS } from "../clickhouse.trace-query-fields.repository.ts";
+import { FIELD_DEFS, KNOWN_FIELDS } from "../trace-query-fields.rules.ts";
 
 const summary = {
   traceId: "trace-1",

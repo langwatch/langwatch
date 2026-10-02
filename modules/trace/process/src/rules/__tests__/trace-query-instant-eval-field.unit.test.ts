@@ -12,10 +12,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FIELD_DEFS } from "../clickhouse.trace-query-fields.repository.ts";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
+import { FIELD_DEFS } from "../trace-query-fields.rules.ts";
+import { translateFilter } from "../trace-query.rules.ts";
 
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 const TENANT = "project-1";
 const WINDOW = { from: 1_000, to: 2_000 };
 
@@ -29,7 +28,7 @@ const run = (overrides: Partial<ResolvedInstantEvalRun> = {}): ResolvedInstantEv
 });
 
 const compile = (queryText: string, evalRuns?: ResolvedInstantEvalRun[]) =>
-  traceQueryRepository.translateFilter({
+  translateFilter({
     queryText,
     tenantId: TENANT,
     timeRange: WINDOW,

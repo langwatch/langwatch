@@ -139,7 +139,9 @@ export class TraceFacetValuesService {
 
     throw unknownFacetError(
       trimmed,
-      `No facet named \`${trimmed}\` has values to list. Call this endpoint with no field to see which facets this project has, or GET /api/v1/query/reference for every filter field.`,
+      `No facet named \`${trimmed}\` has values to list. Call this endpoint with no ` +
+        `field to see which facets this project has, or GET /api/v1/query/reference ` +
+        `for every filter field.`,
       drillableKeys,
     );
   }

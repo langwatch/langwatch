@@ -185,8 +185,6 @@ import {
   buildTraceProjectMilestonesPipeline,
   type TraceProjectMilestonesDefinition,
 } from "../eventing/trace-project-milestones.pipeline.ts";
-import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
-import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceExportSlotRepository } from "../repositories/redis/redis.trace-export-slot.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
@@ -227,6 +225,8 @@ import {
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
 import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
+import { compile as compileLangWatchQLTraceFilter } from "../rules/trace-query-langwatch-ql.rules.ts";
+import { extractFreeTextTerms, translateFilter } from "../rules/trace-query.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
 import { renderThreadConversation } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
@@ -234,6 +234,7 @@ import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enri
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
 import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
@@ -245,9 +246,7 @@ import { TraceExportDownloadService } from "../services/trace-export-download.se
 import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
-import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
-import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -255,6 +254,7 @@ import { TraceProcessingCommandsService } from "../services/trace-processing-com
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
+import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
 import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
@@ -680,14 +680,6 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
  * import the licensing contract.
  */
 const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
-
-/**
- * The query-language translator behind `translateTraceFilter`/`extractTraceFreeTextTerms`.
- * Stateless (no store, no client), so one instance serves every request.
- */
-const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
-/** The same language compiled against the LangWatchQL trace view; stateless too. */
-const langWatchQLTraceFilter = ClickHouseTraceQueryLangWatchQLRepository.create();
 
 /**
  * The store members this process opens, plus the two facts the process itself
@@ -1919,7 +1911,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
-    return traceQueryTranslator.translateFilter({
+    return translateFilter({
       queryText: input.query,
       tenantId: input.tenantId,
       timeRange: input.timeRange,
@@ -1936,7 +1928,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The filter compiled against the LangWatchQL trace view, for a statement a caller runs. */
   compileLangWatchQLTraceFilter(input: { filter: string }): LangWatchQLTraceFilter {
-    return langWatchQLTraceFilter.compile(input);
+    return compileLangWatchQLTraceFilter(input);
   }
 
   /**
@@ -1991,7 +1983,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The query's positive bare-word terms, for a content (log-body) search. */
   extractTraceFreeTextTerms(query: string): string[] {
-    return traceQueryTranslator.extractFreeTextTerms(query);
+    return extractFreeTextTerms(query);
   }
 
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */

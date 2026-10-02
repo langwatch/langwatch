@@ -7,12 +7,12 @@
 import { explorerHiddenOrigins, LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
   HIDDEN_ORIGINS_PARAM,
 } from "../trace-filter-hidden-origins.rules.ts";
+import { translateFilter } from "../trace-query.rules.ts";
 
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
@@ -86,7 +86,7 @@ describe("findHiddenOriginConditions", () => {
   describe("given origins to hide and a compiled filter", () => {
     /** @scenario "The list leaves out Langy's turns by default" */
     it("keeps the filter whole and ANDs the exclusion after it", () => {
-      const compiled = ClickHouseTraceQueryRepository.create().translateFilter({
+      const compiled = translateFilter({
         queryText: "status:error OR model:gpt-5-mini",
         tenantId: "project_test",
         timeRange,

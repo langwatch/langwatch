@@ -10,12 +10,10 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
-
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
+import { translateFilter } from "../trace-query.rules.ts";
 
 const compile = (queryText: string) =>
-  traceQueryRepository.translateFilter({
+  translateFilter({
     queryText,
     tenantId: "project-1",
     timeRange: { from: 1_000, to: 2_000 },

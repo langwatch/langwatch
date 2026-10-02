@@ -18,18 +18,17 @@ import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
 } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { createFacetFilterResolver } from "../../rules/trace-facet-filter.rules.ts";
 import {
   explorerOriginExclusion,
   HIDDEN_ORIGINS_PARAM,
   type TraceFilterWhere,
 } from "../../rules/trace-filter-hidden-origins.rules.ts";
+import { translateFilter } from "../../rules/trace-query.rules.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const TENANT = "tenant-1";
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
-const translator = ClickHouseTraceQueryRepository.create();
 
 type BatchCall = {
   table: string;
@@ -94,8 +93,7 @@ async function facetsFor({
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
-        translator.translateFilter({ queryText: text, tenantId: TENANT, timeRange: window }) ??
-        undefined,
+        translateFilter({ queryText: text, tenantId: TENANT, timeRange: window }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
     }),
   });
@@ -111,7 +109,7 @@ function carrying(calls: readonly BatchCall[], key: string): BatchCall {
 }
 
 const compiled = (query: string) =>
-  translator.translateFilter({ queryText: query, tenantId: TENANT, timeRange })?.sql ?? "";
+  translateFilter({ queryText: query, tenantId: TENANT, timeRange })?.sql ?? "";
 
 describe("the sidebar's facet counts", () => {
   describe("given a query naming two facet fields", () => {

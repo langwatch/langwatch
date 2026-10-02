@@ -2,8 +2,26 @@ import { z } from "zod";
 
 import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
-import { traceIngressEventEnvelopeSchema } from "./trace-ingress.event-envelope.ts";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
+
+/** Portable envelope for Trace's durable raw ingress fact. */
+const traceIngressEventEnvelopeSchema = z.object({
+  id: z.string(),
+  aggregateId: z.string(),
+  aggregateType: z.string().trim().min(1),
+  tenantId: z
+    .string()
+    .trim()
+    .min(1, "[SECURITY] TenantId must be a non-empty string for tenant isolation")
+    .brand<"TenantId">(),
+  createdAt: z.number().int().nonnegative(),
+  occurredAt: z.number().int().nonnegative(),
+  type: z.string().trim().min(1),
+  version: z.string().date(),
+  data: z.unknown(),
+  metadata: z.object({ processingTraceparent: z.string().optional() }).passthrough().optional(),
+  idempotencyKey: z.string().optional(),
+});
 
 export const spanReceivedEventMetadataSchema = z
   .object({

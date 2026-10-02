@@ -20,8 +20,8 @@ import {
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+import { translateFilter } from "../../../rules/trace-query.rules.ts";
 import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -29,7 +29,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -95,7 +94,7 @@ function compiled({
   queryText: string;
   evalRuns?: ResolvedInstantEvalRun[];
 }): TraceFilterWhere {
-  const filter = traceQueryRepository.translateFilter({
+  const filter = translateFilter({
     queryText,
     tenantId,
     timeRange,

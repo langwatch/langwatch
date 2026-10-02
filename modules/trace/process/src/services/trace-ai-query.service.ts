@@ -128,7 +128,9 @@ export class TraceAiQueryService {
       messages.push({ role: "assistant", content: text });
       messages.push({
         role: "user",
-        content: `That query failed to parse: ${validation.error}\n\nReturn a valid query. Output ONLY the query, with no quotes, no prose, no leading or trailing punctuation.`,
+        content:
+          `That query failed to parse: ${validation.error}\n\nReturn a valid query. ` +
+          `Output ONLY the query, with no quotes, no prose, no leading or trailing punctuation.`,
       });
     }
     return { ok: false, lastQuery, lastError, attempts: MAX_ATTEMPTS };

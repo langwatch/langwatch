@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
+import { translateFilter } from "../trace-query.rules.ts";
 
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
-  return traceQueryRepository.translateFilter({
+  return translateFilter({
     queryText: query,
     tenantId: TENANT,
     timeRange: TIME_RANGE,

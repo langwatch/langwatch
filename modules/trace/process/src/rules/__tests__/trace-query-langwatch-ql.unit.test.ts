@@ -7,17 +7,15 @@
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
+import { FACET_REGISTRY } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import {
-  ClickHouseTraceQueryLangWatchQLRepository,
   LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS,
   LANGWATCH_QL_TRACE_FILTER_FIELDS,
-} from "../clickhouse.trace-query-langwatch-ql.repository.ts";
-
-const dialect = ClickHouseTraceQueryLangWatchQLRepository.create();
+  compile,
+} from "../trace-query-langwatch-ql.rules.ts";
 
 function compiled(filter: string): Extract<LangWatchQLTraceFilter, { kind: "compiled" }> {
-  const result = dialect.compile({ filter });
+  const result = compile({ filter });
   if (result.kind !== "compiled") throw new Error(`"${filter}" compiled to ${result.kind}`);
   return result;
 }
@@ -25,7 +23,7 @@ function compiled(filter: string): Extract<LangWatchQLTraceFilter, { kind: "comp
 describe("given a filter compiled against the LangWatchQL trace view", () => {
   describe("when there is nothing to compile", () => {
     it("answers with no condition", () => {
-      expect(dialect.compile({ filter: "   " })).toEqual({ kind: "empty" });
+      expect(compile({ filter: "   " })).toEqual({ kind: "empty" });
     });
   });
 
@@ -82,7 +80,7 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
     });
 
     it("refuses ok, which it would have to guess at", () => {
-      expect(dialect.compile({ filter: "status:ok" })).toMatchObject({
+      expect(compile({ filter: "status:ok" })).toMatchObject({
         kind: "refused",
         field: "status",
         reason: expect.stringMatching(/only ask for status:error/),
@@ -135,7 +133,7 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
   describe("when the filter names a field this dialect cannot answer", () => {
     /** @scenario "A refusal for a field the trace view cannot answer is told apart from any other refusal" */
     it("answers unsupported, naming the field and what it can answer", () => {
-      expect(dialect.compile({ filter: "evaluator:my-eval" })).toEqual({
+      expect(compile({ filter: "evaluator:my-eval" })).toEqual({
         kind: "unsupported",
         field: "evaluator",
         supportedFields: LANGWATCH_QL_TRACE_FILTER_FIELDS,
@@ -144,14 +142,14 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
 
     it("answers unsupported for every field that reaches outside the trace row", () => {
       for (const field of ["spanName", "eval", "annotation", "size"]) {
-        expect(dialect.compile({ filter: `${field}:whatever` }).kind).toBe("unsupported");
+        expect(compile({ filter: `${field}:whatever` }).kind).toBe("unsupported");
       }
     });
   });
 
   describe("when the filter cannot be parsed", () => {
     it("throws the language's own parse error, which carries no unsupported-field answer", () => {
-      expect(() => dialect.compile({ filter: 'service:"unclosed' })).toThrow(FilterParseError);
+      expect(() => compile({ filter: 'service:"unclosed' })).toThrow(FilterParseError);
     });
   });
 });
@@ -196,8 +194,7 @@ describe("the LangWatchQL trace filter dialect, given the facet registry", () =>
     it("compiles every field it publishes", () => {
       const broken = LANGWATCH_QL_TRACE_FILTER_FIELDS.filter(
         (field) =>
-          dialect.compile({ filter: `${field}:${field === "status" ? "error" : "1"}` }).kind !==
-          "compiled",
+          compile({ filter: `${field}:${field === "status" ? "error" : "1"}` }).kind !== "compiled",
       );
 
       expect(broken).toEqual([]);

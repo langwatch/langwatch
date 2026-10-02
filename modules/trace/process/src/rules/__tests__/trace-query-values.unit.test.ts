@@ -6,24 +6,24 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_ATTRIBUTE_KEY_LENGTH,
   MAX_VALUE_LENGTH,
-  ClickHouseTraceQueryValuesRepository,
-} from "../clickhouse.trace-query-values.repository.ts";
+  nextParam,
+  validateAttributeKey,
+  validateValueLength,
+} from "../trace-query-values.rules.ts";
 
-const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
-
-describe("traceQueryValuesRepository.validateAttributeKey", () => {
+describe("validateAttributeKey", () => {
   describe("given a key that reads like an identifier", () => {
     it.each(["model", "llm.model_name", "service/name", "http:status", "user-id", "a1"])(
       "accepts %s",
       (key) => {
-        expect(() => traceQueryValuesRepository.validateAttributeKey(key)).not.toThrow();
+        expect(() => validateAttributeKey(key)).not.toThrow();
       },
     );
   });
 
   describe("given a key that does not", () => {
     it("refuses one that is empty, rather than filtering on nothing", () => {
-      expect(() => traceQueryValuesRepository.validateAttributeKey("")).toThrow(/cannot be empty/i);
+      expect(() => validateAttributeKey("")).toThrow(/cannot be empty/i);
     });
 
     it.each(["has space", "quote'd", "semi;colon", "brace{}", "star*"])(
@@ -32,52 +32,46 @@ describe("traceQueryValuesRepository.validateAttributeKey", () => {
         // The message has to name the allowed set: the person typed this into
         // a filter box and the refusal is the only thing telling them what to
         // type instead.
-        expect(() => traceQueryValuesRepository.validateAttributeKey(key)).toThrow(
-          /invalid characters/i,
-        );
-        expect(() => traceQueryValuesRepository.validateAttributeKey(key)).toThrow(
-          /letters, digits/i,
-        );
+        expect(() => validateAttributeKey(key)).toThrow(/invalid characters/i);
+        expect(() => validateAttributeKey(key)).toThrow(/letters, digits/i);
       },
     );
 
     it("refuses one past the length bound", () => {
       const tooLong = "a".repeat(MAX_ATTRIBUTE_KEY_LENGTH + 1);
 
-      expect(() => traceQueryValuesRepository.validateAttributeKey(tooLong)).toThrow(/too long/i);
+      expect(() => validateAttributeKey(tooLong)).toThrow(/too long/i);
     });
 
     it("accepts one exactly at the bound, so the limit is inclusive", () => {
       const atBound = "a".repeat(MAX_ATTRIBUTE_KEY_LENGTH);
 
-      expect(() => traceQueryValuesRepository.validateAttributeKey(atBound)).not.toThrow();
+      expect(() => validateAttributeKey(atBound)).not.toThrow();
     });
   });
 });
 
-describe("traceQueryValuesRepository.validateValueLength", () => {
+describe("validateValueLength", () => {
   it("accepts a value at the bound", () => {
-    expect(() =>
-      traceQueryValuesRepository.validateValueLength("v".repeat(MAX_VALUE_LENGTH)),
-    ).not.toThrow();
+    expect(() => validateValueLength("v".repeat(MAX_VALUE_LENGTH))).not.toThrow();
   });
 
   it("refuses one past it, naming the limit", () => {
-    expect(() =>
-      traceQueryValuesRepository.validateValueLength("v".repeat(MAX_VALUE_LENGTH + 1)),
-    ).toThrow(new RegExp(`max ${MAX_VALUE_LENGTH} characters`));
+    expect(() => validateValueLength("v".repeat(MAX_VALUE_LENGTH + 1))).toThrow(
+      new RegExp(`max ${MAX_VALUE_LENGTH} characters`),
+    );
   });
 
   it("accepts an empty value, which is a filter for the empty string", () => {
-    expect(() => traceQueryValuesRepository.validateValueLength("")).not.toThrow();
+    expect(() => validateValueLength("")).not.toThrow();
   });
 });
 
-describe("traceQueryValuesRepository.nextParam", () => {
+describe("nextParam", () => {
   it("mints a fresh name each time, so two values cannot collide", () => {
     const ctx = { params: {} as Record<string, unknown>, paramIndex: 0 } as never;
-    const first = traceQueryValuesRepository.nextParam(ctx, "attrKey");
-    const second = traceQueryValuesRepository.nextParam(ctx, "attrKey");
+    const first = nextParam(ctx, "attrKey");
+    const second = nextParam(ctx, "attrKey");
 
     expect(first).not.toBe(second);
   });

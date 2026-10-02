@@ -12,8 +12,8 @@ import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwa
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { translateFilter } from "../../../rules/trace-query.rules.ts";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "./open-protections.ts";
 import {
@@ -22,7 +22,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 
 const tenantId = `test-filter-composition-${nanoid()}`;
 const now = Date.now();
@@ -84,7 +83,7 @@ async function search({
   input?: Partial<GetAllTracesForProjectInput>;
 }): Promise<string[]> {
   const filterWhere = queryText
-    ? traceQueryRepository.translateFilter({
+    ? translateFilter({
         queryText,
         tenantId,
         timeRange: { from: window.startDate, to: window.endDate },

@@ -13,22 +13,20 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
-import { FIELD_DEF_BY_NAME } from "../repositories/clickhouse/clickhouse.trace-query-fields.repository.ts";
-import { ClickHouseTraceQueryMetaFieldsRepository } from "../repositories/clickhouse/clickhouse.trace-query-meta-fields.repository.ts";
+import { FIELD_DEF_BY_NAME } from "./trace-query-fields.rules.ts";
+import { classifyExistenceSource } from "./trace-query-meta-fields.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
-  ClickHouseTraceQueryValuesRepository,
-} from "../repositories/clickhouse/clickhouse.trace-query-values.repository.ts";
-import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
+  extractStringValue,
+  readAttribute,
+} from "./trace-query-values.rules.ts";
+import { normalizeQuery, translateFilter } from "./trace-query.rules.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
-const traceQueryRepository = ClickHouseTraceQueryRepository.create();
-const traceQueryMetaFieldsRepository = ClickHouseTraceQueryMetaFieldsRepository.create();
-const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
 
 /**
  * Evaluates saved queries against traces in memory, mirroring the CH compiler.
@@ -43,7 +41,7 @@ export function traceMatchesQuery(queryText: string, trace: InMemoryTrace): bool
   // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
   let compiled: { sql: string; params: Record<string, unknown> } | null;
   try {
-    compiled = traceQueryRepository.translateFilter({
+    compiled = translateFilter({
       queryText,
       tenantId: "__in_memory__",
       timeRange: { from: 0, to: 0 },
@@ -59,7 +57,7 @@ export function traceMatchesQuery(queryText: string, trace: InMemoryTrace): bool
 
   let ast: LiqeQuery;
   try {
-    ast = parseTraceQuerySyntax(traceQueryRepository.normalizeQuery(queryText));
+    ast = parseTraceQuerySyntax(normalizeQuery(queryText));
   } catch {
     return false;
   }
@@ -96,7 +94,7 @@ export function traceQueryFieldNeeds(queryText: string): Set<FieldNeeds> {
   const needs = new Set<FieldNeeds>();
   let ast: LiqeQuery;
   try {
-    ast = parseTraceQuerySyntax(traceQueryRepository.normalizeQuery(queryText));
+    ast = parseTraceQuerySyntax(normalizeQuery(queryText));
   } catch {
     return needs;
   }
@@ -257,7 +255,7 @@ function evaluateFreeText(tag: TagToken, negated: boolean, trace: InMemoryTrace)
   // counts even when the other is NULL, but a negated filter never matches
   // a trace whose non-matching side has a NULL column. Span names need rows
   // the dispatcher may not load; absent, this is deliberately NARROWER than SQL.
-  const value = traceQueryValuesRepository.extractStringValue(tag).toLowerCase();
+  const value = extractStringValue(tag).toLowerCase();
   const inputMatch = computeIlikeContains(trace.summary.computedInput, value);
   const outputMatch = computeIlikeContains(trace.summary.computedOutput, value);
   // `?? ""` rather than a bare deref: the type says string, but the only place
@@ -311,8 +309,8 @@ function evaluateTraceAttribute({
     return UNSUPPORTED;
   }
 
-  const value = traceQueryValuesRepository.extractStringValue(tag);
-  const matched = traceQueryValuesRepository.readAttribute(trace.summary.attributes, key) === value;
+  const value = extractStringValue(tag);
+  const matched = readAttribute(trace.summary.attributes, key) === value;
 
   return negated ? !matched : matched;
 }
@@ -336,10 +334,8 @@ function evaluateEventAttribute({
     return UNSUPPORTED;
   }
 
-  const value = traceQueryValuesRepository.extractStringValue(tag);
-  const matched = trace.events.some(
-    (e) => traceQueryValuesRepository.readAttribute(e.attributes, key) === value,
-  );
+  const value = extractStringValue(tag);
+  const matched = trace.events.some((e) => readAttribute(e.attributes, key) === value);
 
   return negated ? !matched : matched;
 }
@@ -408,9 +404,7 @@ function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
   // from the value rather than a static `FieldDef.needs`.
   if (fieldName === "has" || fieldName === "none") {
     try {
-      const need = traceQueryMetaFieldsRepository.classifyExistenceSource(
-        traceQueryValuesRepository.extractStringValue(tag),
-      );
+      const need = classifyExistenceSource(extractStringValue(tag));
       if (need) {
         needs.add(need);
       }

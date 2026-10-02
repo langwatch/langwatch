@@ -22,13 +22,13 @@ import {
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import { ClickHouseTraceQueryRepository } from "#repositories/clickhouse/clickhouse.trace-query.repository";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
 } from "#rules/trace-filter-hidden-origins.rules";
 import type * as projectionCompileRules from "#rules/trace-projection-compile.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
+import { translateFilter } from "#rules/trace-query.rules";
 
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
@@ -36,8 +36,6 @@ vi.mock("#rules/trace-projection-compile.rules", async (importOriginal) => {
   const actual = await importOriginal<typeof projectionCompileRules>();
   return { ...actual, compileProjection: vi.fn(actual.compileProjection) };
 });
-
-const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
 
 /**
  * The real `TraceApi.compileExplorerTraceFilter` (`trace.app.ts`), rebuilt
@@ -51,7 +49,7 @@ function compileExplorerTraceFilter(input: {
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } {
-  const compiled = traceQueryTranslator.translateFilter({
+  const compiled = translateFilter({
     queryText: input.query,
     tenantId: input.tenantId,
     timeRange: input.timeRange,

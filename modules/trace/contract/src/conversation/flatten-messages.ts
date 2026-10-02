@@ -5,7 +5,19 @@ import type { ParsedLLMError } from "@langwatch/prompt-contract";
 import { coerceContentToArray } from "./coerce-content-to-array.ts";
 import { collapseAudioTranscript, decodeContentPart, type PartContext } from "./content-parts.ts";
 import type { ConversationTurn, DisplayPart } from "./display-part.ts";
-import { safeJsonParseOrStringFallback } from "./safe-json-parse.ts";
+
+/**
+ * Parses a JSON string, falling back to wrapping the raw text. Tool
+ * arguments/results arrive as strings that are *usually* JSON; when not,
+ * the raw text is wrapped rather than thrown away.
+ */
+const safeJsonParseOrStringFallback = (json: string): unknown => {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return { data: json };
+  }
+};
 
 /** A stored message keeps its provider-specific fields; playground chat messages fit it as is. */
 export type FlattenableMessage = {

@@ -1,5 +1,10 @@
+import { type ContractApiMap, createModuleApi } from "@langwatch/api/web";
+import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
+
 import { parseStoredObjectReference } from "../../model/stored-object/parse-stored-object-reference.ts";
-import { storedObjectApi } from "./stored-object-api.ts";
+
+/** The one procedure family this kit calls, derived from its owner's contract. */
+const storedObjectApi = createModuleApi<ContractApiMap<typeof storedObjectTrpc>>();
 
 /** The URL lapses after 15 minutes; ask again before that. */
 const MINT_STALE_MS = 10 * 60_000;

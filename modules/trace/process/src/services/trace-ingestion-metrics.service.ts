@@ -13,7 +13,9 @@ export class TraceIngestionMetricsService {
       counter({
         name: TRACE_INGESTION_SPANS_METRIC_NAME,
         description:
-          "OTLP collection span outcomes: collected means dispatched, failed means dispatch infrastructure failure, dropped means invalid or aged, deduped and filtered are intentional. Dispatch does not prove queryability.",
+          "OTLP collection span outcomes: collected means dispatched, failed means " +
+          "dispatch infrastructure failure, dropped means invalid or aged, deduped " +
+          "and filtered are intentional. Dispatch does not prove queryability.",
       }),
     );
   }

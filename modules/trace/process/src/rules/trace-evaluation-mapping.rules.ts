@@ -2,7 +2,18 @@ import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluati
 import { Temporal } from "@langwatch/time";
 import type { Evaluation } from "@langwatch/trace-contract";
 
-import { parseJsonSafely } from "./trace-safe-json.rules.ts";
+/**
+ * The object a stored JSON column holds, or null when the column was empty.
+ * A column we wrote that no longer parses is corruption, not absence, so it
+ * throws rather than reading back as "this row had no inputs".
+ */
+function parseJsonSafely(json: string | null): Record<string, unknown> | null {
+  if (!json) {
+    return null;
+  }
+
+  return JSON.parse(json);
+}
 
 /**
  * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).

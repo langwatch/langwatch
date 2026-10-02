@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
-import { createTranscriptApp } from "../../transport/api-trpc/__tests__/support/transcript-read.support.ts";
+import { createTranscriptApp } from "../../transport/__tests__/support/transcript-read.support.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
