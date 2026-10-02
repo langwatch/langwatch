@@ -3,8 +3,7 @@
  * What `/api/model-providers` publishes, and what it makes of a refusal.
  * @see specs/model-providers/provider-configuration.feature
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import {
   isSecretCredentialField,
   MASKED_KEY_PLACEHOLDER,
@@ -20,15 +19,6 @@ import { modelProviderRest } from "../model-provider.rest.ts";
 import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT_ID = "project-1";
-
-/** A handled refusal at its own status, carrying its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ error: error.code }, error.httpStatus as 400);
-  }
-
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 /**
  * The stored rows read back through the REAL credential policy — the same
@@ -105,7 +95,7 @@ function mount(modelProviders: Partial<ModelProviderApi>) {
   }).mount(modelProviderRest.router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
   });
 
   const send = (method: string, path: string, body?: unknown) =>
@@ -277,7 +267,7 @@ describe("the model-providers upsert route", () => {
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({
-        error: "model_provider_not_found",
+        code: "model_provider_not_found",
       });
     });
   });
@@ -295,7 +285,7 @@ describe("the model-providers upsert route", () => {
 
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toMatchObject({
-        error: "model_provider_routing_handle_taken",
+        code: "model_provider_routing_handle_taken",
       });
     });
   });

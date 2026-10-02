@@ -3,7 +3,7 @@
  * What `/api/model-defaults` refuses, and for whom.
  * @see specs/model-providers/model-default-config-cascade.feature
  */
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import type { AuthzPermission, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -23,15 +23,6 @@ import { mountableModelProviderApp } from "./model-provider.harness.ts";
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
 const TEAM = "team-1";
-
-/** A handled refusal at its own status, carrying its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ error: error.code }, error.httpStatus as 403);
-  }
-
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 /** The key's own ceiling refused it, exactly as the process's chain would. */
 class ApiKeyPermissionDeniedTestError extends HandledError {
@@ -83,7 +74,7 @@ function mount(
   }).mount(modelDefaultsRest.router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [bindRestMiddleware(modelDefaultsRestCredential, () => credential)],
   });
 
@@ -147,7 +138,7 @@ describe("given a project API key that names no user", () => {
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
-          error: "model_default_user_key_required",
+          code: "model_default_user_key_required",
         });
         expect(saveDefaultConfig).not.toHaveBeenCalled();
         expect(deleteDefaultConfig).not.toHaveBeenCalled();
@@ -170,7 +161,7 @@ describe("given an API key whose ceiling does not reach the write", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "api_key_permission_denied",
+        code: "api_key_permission_denied",
       });
       expect(saveDefaultConfig).not.toHaveBeenCalled();
       expect(asked).toContain("project:manage");
@@ -223,7 +214,7 @@ describe("given a project-restricted API key minted by an organization administr
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "model_default_scope_forbidden",
+        code: "model_default_scope_forbidden",
       });
       expect(saveDefaultConfig).not.toHaveBeenCalled();
     });
@@ -260,7 +251,7 @@ describe("given a project-bound access token", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "model_default_scope_forbidden",
+        code: "model_default_scope_forbidden",
       });
       expect(saveDefaultConfig).not.toHaveBeenCalled();
     });
@@ -297,7 +288,7 @@ describe("given a project-bound access token and an organization-scoped config",
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
-          error: "model_default_scope_forbidden",
+          code: "model_default_scope_forbidden",
         });
         expect(saveDefaultConfig).not.toHaveBeenCalled();
         expect(deleteDefaultConfig).not.toHaveBeenCalled();

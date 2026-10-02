@@ -15,7 +15,7 @@ import { ModelProviderWriteAuthorizationService } from "../services/model-provid
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
-  PrismaProjects,
+  createPrismaProjects,
   TestModelProviderCatalog,
   createTenancyFixture,
   cleanupTenancyFixture,
@@ -42,7 +42,7 @@ describe.skipIf(!DB_URL)(
       new IdentityModelProviderCredentialCodec(),
     );
     const scopes = ModelProviderScopeService.create({
-      projects: new PrismaProjects(prisma),
+      projects: createPrismaProjects(prisma),
       organizations: {
         getBillingProfile: async (input: { organizationId: string }) => ({
           id: input.organizationId,

@@ -1,11 +1,5 @@
-export {
-  PostgresModelProviderAdapter,
-  type PostgresModelProviderAdapterOptions,
-} from "./model-provider.module.ts";
-export {
-  PrismaModelCostCatalogRepository,
-  type ModelCostCatalogDatabase,
-} from "./model-provider.module.ts";
+export type { PostgresModelProviderAdapterOptions } from "./model-provider.module.ts";
+export type { ModelCostCatalogDatabase } from "./model-provider.module.ts";
 export type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 export type {
   CustomKeysRead,

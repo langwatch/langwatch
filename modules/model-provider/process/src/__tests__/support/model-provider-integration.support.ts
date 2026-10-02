@@ -19,12 +19,11 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ProjectNotFoundError,
+  type ProjectApi,
   projectSchema,
   projectWithTeamSchema,
   type PaginatedProjects,
   type ProjectIdentity,
-  type ProjectIdsByOrganizationInput,
-  type ProjectNamesByIdsInput,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -35,7 +34,6 @@ import {
   type CustomKeysRead,
 } from "../../app/model-provider.members.ts";
 import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
-import { TestProjectApi } from "./test-project-api.ts";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -56,68 +54,51 @@ export function testNamespace(prefix: string): string {
   return `${prefix}-${randomBytes(5).toString("hex")}`;
 }
 
-/**
- * Reads real project + team rows this integration suite created.
- */
-export class PrismaProjects extends TestProjectApi {
-  constructor(private readonly prisma: PrismaClient) {
-    super();
-  }
-
-  override async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    const project = await this.prisma.project.findUnique({
-      where: { id },
-      include: { team: true },
-    });
+/** Reads real project + team rows this integration suite created; other reads throw. */
+export function createPrismaProjects(prisma: PrismaClient): ProjectApi {
+  const findWithTeam = async (id: string): Promise<ProjectWithTeam | null> => {
+    const project = await prisma.project.findUnique({ where: { id }, include: { team: true } });
     return projectWithTeamSchema.nullable().parse(project);
-  }
-
-  override async getWithTeam(id: string): Promise<ProjectWithTeam> {
-    const project = await this.findWithTeam(id);
-    if (!project) throw new ProjectNotFoundError();
-    return project;
-  }
-
-  override async listByOrganization(input: {
-    organizationId: string;
-    page: number;
-    limit: number;
-    projectIds?: string[];
-  }): Promise<PaginatedProjects> {
-    const where = {
-      team: { organizationId: input.organizationId },
-      ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
-    };
-    const [data, total] = await Promise.all([
-      this.prisma.project.findMany({
-        where,
-        skip: (input.page - 1) * input.limit,
-        take: input.limit,
-      }),
-      this.prisma.project.count({ where }),
-    ]);
-    return {
-      data: projectSchema.array().parse(data),
-      pagination: { page: input.page, limit: input.limit, total },
-    };
-  }
-
-  override async listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]> {
-    const rows = await this.prisma.project.findMany({
-      where: { team: { organizationId: input.organizationId } },
-      select: { id: true },
-    });
-    return rows.map((row) => row.id);
-  }
-
-  override async listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]> {
-    const rows = await this.prisma.project.findMany({
-      where: { id: { in: input.projectIds } },
-      include: { team: true },
-    });
-    return rows.map(
-      (row) =>
-        ({
+  };
+  return createApiFixture<ProjectApi>(
+    {
+      findWithTeam,
+      getWithTeam: async (id) => {
+        const project = await findWithTeam(id);
+        if (!project) throw new ProjectNotFoundError();
+        return project;
+      },
+      listByOrganization: async (input): Promise<PaginatedProjects> => {
+        const where = {
+          team: { organizationId: input.organizationId },
+          ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
+        };
+        const [data, total] = await Promise.all([
+          prisma.project.findMany({
+            where,
+            skip: (input.page - 1) * input.limit,
+            take: input.limit,
+          }),
+          prisma.project.count({ where }),
+        ]);
+        return {
+          data: projectSchema.array().parse(data),
+          pagination: { page: input.page, limit: input.limit, total },
+        };
+      },
+      listIdsByOrganization: async (input) => {
+        const rows = await prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        return rows.map((row) => row.id);
+      },
+      listNamesByIds: async (input) => {
+        const rows = await prisma.project.findMany({
+          where: { id: { in: input.projectIds } },
+          include: { team: true },
+        });
+        return rows.map((row): ProjectIdentity => ({
           id: row.id,
           name: row.name,
           slug: row.slug,
@@ -125,9 +106,11 @@ export class PrismaProjects extends TestProjectApi {
           organizationId: row.team.organizationId,
           isPersonal: row.isPersonal,
           ownerUserId: row.ownerUserId,
-        }) satisfies ProjectIdentity,
-    );
-  }
+        }));
+      },
+    },
+    "ProjectApi",
+  );
 }
 
 /** Round-trips credentials as plain JSON — the tests below never assert on ciphertext shape. */

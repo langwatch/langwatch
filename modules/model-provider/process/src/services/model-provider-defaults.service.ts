@@ -16,6 +16,7 @@ import {
 import type { ModelProviderCatalog } from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
+import { inheritedChain, projectChain } from "../rules/model-default-scope-chain.rules.ts";
 import type { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
@@ -58,7 +59,7 @@ export class ModelProviderDefaultsService {
     });
     const effective = this.resolveEffective({
       configs,
-      chain: this.projectChain({
+      chain: projectChain({
         projectId: parsed.projectId,
         teamId: context.teamId,
         organizationId: context.organizationId,
@@ -104,7 +105,7 @@ export class ModelProviderDefaultsService {
     });
     this.assertScopesBelongToProject(input.scopes, available, context.organizationId);
 
-    const chain = ModelProviderDefaultsService.inheritedChain({
+    const chain = inheritedChain({
       reference,
       available,
       organizationId: context.organizationId,
@@ -457,20 +458,6 @@ export class ModelProviderDefaultsService {
     }
   }
 
-  private projectChain(input: {
-    projectId: string;
-    teamId: string | null;
-    organizationId: string | null;
-  }): ModelDefaultScope[] {
-    return [
-      { scopeType: "PROJECT", scopeId: input.projectId },
-      ...(input.teamId ? [{ scopeType: "TEAM" as const, scopeId: input.teamId }] : []),
-      ...(input.organizationId
-        ? [{ scopeType: "ORGANIZATION" as const, scopeId: input.organizationId }]
-        : []),
-    ];
-  }
-
   private static firstScope(scopes: ModelDefaultScope[]): ModelDefaultScope {
     const order = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 };
     const reference = [...scopes].toSorted(
@@ -481,31 +468,6 @@ export class ModelProviderDefaultsService {
     }
 
     return reference;
-  }
-
-  private static inheritedChain(input: {
-    reference: ModelDefaultScope;
-    available: DefaultAvailableScopes;
-    organizationId: string | null;
-  }): ModelDefaultScope[] {
-    const { reference, available, organizationId } = input;
-    if (reference.scopeType === "ORGANIZATION") {
-      return [reference];
-    }
-
-    const chain = [reference];
-    if (reference.scopeType === "PROJECT") {
-      const project = available.projects.find((candidate) => candidate.id === reference.scopeId);
-      if (project?.teamId) {
-        chain.push({ scopeType: "TEAM", scopeId: project.teamId });
-      }
-    }
-
-    if (organizationId) {
-      chain.push({ scopeType: "ORGANIZATION", scopeId: organizationId });
-    }
-
-    return chain;
   }
 
   private static async filterScopes<T>(

@@ -38,7 +38,6 @@ import type {
 } from "../../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../../repositories/model-provider.repository.ts";
 import { ModelProviderService } from "../model-provider.service.ts";
-import { TestProjectApi } from "./test-project-api.ts";
 
 const now = toDate(nowInstant());
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
@@ -370,35 +369,29 @@ const project = projectWithTeamSchema.parse({
   },
 });
 
-class Projects extends TestProjectApi {
-  override getWithTeam(): ReturnType<ProjectApi["getWithTeam"]> {
-    return Promise.resolve(project);
-  }
-
-  override findWithTeam(): ReturnType<ProjectApi["findWithTeam"]> {
-    return Promise.resolve(project);
-  }
-
-  override listNamesByIds(): ReturnType<ProjectApi["listNamesByIds"]> {
-    return Promise.resolve([
-      {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        teamId: project.teamId,
-        organizationId: project.team.organizationId,
-        // Part of the identity `listNamesByIds` answers with. Omitting them
-        // made this fake describe a project that cannot be personal, which is
-        // a distinction the model-provider paths do draw.
-        isPersonal: false,
-        ownerUserId: null,
-      },
-    ]);
-  }
-
-  override listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return Promise.resolve([project.id]);
-  }
+function createProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>(
+    {
+      getWithTeam: () => Promise.resolve(project),
+      findWithTeam: () => Promise.resolve(project),
+      listNamesByIds: () =>
+        Promise.resolve([
+          {
+            id: project.id,
+            name: project.name,
+            slug: project.slug,
+            teamId: project.teamId,
+            organizationId: project.team.organizationId,
+            // Part of the identity `listNamesByIds` answers with: the
+            // model-provider paths distinguish personal projects.
+            isPersonal: false,
+            ownerUserId: null,
+          },
+        ]),
+      listIdsByOrganization: () => Promise.resolve([project.id]),
+    },
+    "ProjectApi",
+  );
 }
 
 class Organizations extends OrganizationService {
@@ -835,7 +828,7 @@ function service(
 ) {
   return ModelProviderService.create({
     repository: providers,
-    projects: new Projects(),
+    projects: createProjects(),
     organizations: organizationApi(),
     credentialPolicy,
     codexTokenRefresher,
@@ -1380,7 +1373,7 @@ describe("ModelProviderService", () => {
     ];
     const modelProviders = ModelProviderService.create({
       repository: new Providers(),
-      projects: new Projects(),
+      projects: createProjects(),
       organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
@@ -1412,7 +1405,7 @@ describe("ModelProviderService", () => {
     const managed = new ManagedCatalog();
     const modelProviders = ModelProviderService.create({
       repository: providers,
-      projects: new Projects(),
+      projects: createProjects(),
       organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
@@ -1811,7 +1804,7 @@ describe("ModelProviderService", () => {
     const defaults = new Defaults();
     const modelProviders = ModelProviderService.create({
       repository: providers,
-      projects: new Projects(),
+      projects: createProjects(),
       organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
@@ -1859,7 +1852,7 @@ describe("ModelProviderService", () => {
 
     await ModelProviderService.create({
       repository: providers,
-      projects: new Projects(),
+      projects: createProjects(),
       organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),

@@ -17,7 +17,7 @@ import { ModelProviderWriteAuthorizationService } from "../services/model-provid
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
-  PrismaProjects,
+  createPrismaProjects,
   buildModelProvider,
   cleanupTenancyFixture,
   createTenancyFixture,
@@ -39,7 +39,7 @@ describe.skipIf(!DB_URL)("ModelProviderCommandService.delete (real Postgres)", (
     new IdentityModelProviderCredentialCodec(),
   );
   const scopes = ModelProviderScopeService.create({
-    projects: new PrismaProjects(prisma),
+    projects: createPrismaProjects(prisma),
     organizations: {} as never,
   });
   const writeAuthorization = ModelProviderWriteAuthorizationService.create(

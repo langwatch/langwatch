@@ -14,7 +14,7 @@ import { ModelProviderCostsService } from "../services/model-provider-costs.serv
 import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
 import {
   DB_URL,
-  PrismaProjects,
+  createPrismaProjects,
   TestModelProviderCatalog,
   cleanupTenancyFixture,
   createTenancyFixture,
@@ -37,7 +37,7 @@ describe.skipIf(!DB_URL)("model cost writes across scopes (real Postgres)", () =
   const prisma: PrismaClient = createTestPrismaClient();
   const costs = PrismaModelCostRepository.create(prisma);
   const scopes = ModelProviderScopeService.create({
-    projects: new PrismaProjects(prisma),
+    projects: createPrismaProjects(prisma),
     organizations: {
       getBillingProfile: async (input: { organizationId: string }) => ({
         id: input.organizationId,

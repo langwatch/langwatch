@@ -17,7 +17,7 @@ import { ModelProviderScopeService } from "../services/model-provider-scope.serv
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
-  PrismaProjects,
+  createPrismaProjects,
   TestModelProviderCatalog,
   createTestPrismaClient,
   createTestAuthzApi,
@@ -148,8 +148,8 @@ describe.skipIf(!DB_URL)(
           authorization: ModelProviderAuthorizationService.create(bindingComputingAuthz()),
           scopes: ModelProviderScopeService.create({
             projects: {
-              findWithTeam: (id: string) => new PrismaProjects(prisma).findWithTeam(id),
-              getWithTeam: (id: string) => new PrismaProjects(prisma).getWithTeam(id),
+              findWithTeam: (id: string) => createPrismaProjects(prisma).findWithTeam(id),
+              getWithTeam: (id: string) => createPrismaProjects(prisma).getWithTeam(id),
               listIdsByOrganization: async (input: { organizationId: string }) => {
                 const rows = await prisma.project.findMany({
                   where: { team: { organizationId: input.organizationId } },
