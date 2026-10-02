@@ -12,6 +12,24 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  * span — so we double-`arrayJoin` to flatten down to a single key column
  * before deduping.
  *
+ * Both the projection and the empty short-circuit go through the
+ * `.keys` subcolumn, never `Events.Attributes` itself:
+ *
+ *   - `Events.Attributes.keys` is `Array(Array(LowCardinality(String)))` —
+ *     the keys of every event's map, without the `String` values beside
+ *     them. Reading the Map itself pulls those values into memory to
+ *     produce a key list that never mentions them.
+ *   - `length(Events.Attributes.keys)` counts events exactly as
+ *     `length(Events.Attributes)` does, and reads the same lightweight
+ *     column the projection already needs.
+ *
+ * This is the same trap `span-attribute-keys.ts` and `metadata-keys.ts`
+ * document for their flat Maps. It survived here longer because the
+ * subcolumn has to be reached through the outer array, so the fix does not
+ * look identical to theirs. Untreated it is worth 2 GiB+ on a tenant with
+ * busy events, which is MEMORY_LIMIT_EXCEEDED against the ceiling in
+ * KEY_DISCOVERY_SETTINGS.
+ *
  * Mirrors `span-attribute-keys.ts`: returns just the key list, with values
  * loaded lazily once the user expands a key. Keeping discovery cheap is
  * the whole point — a tenant can have unbounded distinct event-attribute
@@ -36,10 +54,10 @@ export function buildEventAttributeKeysFacetQuery(
         count() AS cnt,
         count() OVER () AS total_distinct
       FROM (
-        SELECT arrayJoin(mapKeys(arrayJoin(\`Events.Attributes\`))) AS key
+        SELECT arrayJoin(arrayJoin(\`Events.Attributes\`.keys)) AS key
         FROM stored_spans
         WHERE ${where}
-          AND length(\`Events.Attributes\`) > 0
+          AND length(\`Events.Attributes\`.keys) > 0
       )
       WHERE key != ''
         ${prefixFilter}
