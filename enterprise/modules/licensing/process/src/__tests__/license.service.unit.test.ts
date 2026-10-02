@@ -8,16 +8,12 @@ import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  type LicenseLogger,
-  type LicenseStorage,
-  type LicenseRetention,
-  type LicenseUsage,
-  type StoredLicense,
-} from "../index.ts";
+import { type LicenseLogger, type LicenseUsage } from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import {
   EXPIRED_LICENSE_KEY,
+  MemoryLicenseStorage,
+  RecordingLicenseRetention,
   TAMPERED_LICENSE_KEY,
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
@@ -41,74 +37,11 @@ function mintLicenseKey(
 
 const ORGANIZATION_ID = "org_123";
 
-class MemoryLicenseRepository implements LicenseStorage {
-  readonly organizations = new Set([ORGANIZATION_ID]);
-  readonly stored = new Map<string, StoredLicense>();
-  memberCount = 3;
-  membersLiteCount = 2;
-  listCalls = 0;
-
-  async findOrganizationsWithLicense() {
-    this.listCalls++;
-    return [...this.stored].map(([organizationId, license]) => ({
-      organizationId,
-      licenseKey: license.licenseKey,
-    }));
-  }
-
-  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
-    return { licenseKey: this.stored.get(organizationId)?.licenseKey ?? null };
-  }
-
-  async organizationExists(organizationId: string): Promise<boolean> {
-    return this.organizations.has(organizationId);
-  }
-
-  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
-    this.stored.set(organizationId, license);
-  }
-
-  async removeLicense(organizationId: string): Promise<void> {
-    this.stored.delete(organizationId);
-  }
-
-  async getMemberCount(): Promise<number> {
-    return this.memberCount;
-  }
-
-  async getMembersLiteCount(): Promise<number> {
-    return this.membersLiteCount;
-  }
-}
-
 class FixedLicenseUsage implements LicenseUsage {
   constructor(private readonly count: number | "unknown" | "unlimited") {}
 
   async getCurrentMonthCount(): Promise<number | "unknown" | "unlimited"> {
     return this.count;
-  }
-}
-
-class MemoryLicenseRetention implements LicenseRetention {
-  rules: { scopeType: string; scopeId: string; category: string }[] = [];
-  readonly written: {
-    organizationId: string;
-    category: string;
-    retentionDays: number;
-  }[] = [];
-  failListing = false;
-
-  async listOrganizationRules() {
-    if (this.failListing) throw new Error("retention unavailable");
-    return this.rules;
-  }
-
-  async setForOrganization(input: {
-    organizationId: string;
-    category: string;
-    retentionDays: number;
-  }): Promise<void> {
-    this.written.push(input);
   }
 }
 
@@ -121,8 +54,8 @@ class RecordingLicenseLogger implements LicenseLogger {
 }
 
 describe("LicenseService", () => {
-  let repository: MemoryLicenseRepository;
-  let retention: MemoryLicenseRetention;
+  let repository: MemoryLicenseStorage;
+  let retention: RecordingLicenseRetention;
   let logger: RecordingLicenseLogger;
   let service: LicenseService;
 
@@ -137,8 +70,12 @@ describe("LicenseService", () => {
   }
 
   beforeEach(() => {
-    repository = new MemoryLicenseRepository();
-    retention = new MemoryLicenseRetention();
+    repository = MemoryLicenseStorage.create({
+      organizations: [ORGANIZATION_ID],
+      memberCount: 3,
+      membersLiteCount: 2,
+    });
+    retention = new RecordingLicenseRetention();
     logger = new RecordingLicenseLogger();
     service = LicenseService.create({
       repository,

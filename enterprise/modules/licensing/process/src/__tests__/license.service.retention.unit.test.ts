@@ -1,81 +1,31 @@
 import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type LicenseRetention, type LicenseStorage, type StoredLicense } from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
-import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "./testing.ts";
+import {
+  EXPIRED_LICENSE_KEY,
+  MemoryLicenseStorage,
+  RecordingLicenseRetention,
+  TEST_PUBLIC_KEY,
+  VALID_LICENSE_KEY,
+} from "./testing.ts";
 
 const ORGANIZATION_ID = "org_123";
 const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;
 const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
 
-class MemoryLicenseRepository implements LicenseStorage {
-  readonly organizations = new Set([ORGANIZATION_ID]);
-  readonly stored = new Map<string, StoredLicense>();
-
-  async findOrganizationsWithLicense() {
-    return [...this.stored].map(([organizationId, license]) => ({
-      organizationId,
-      licenseKey: license.licenseKey,
-    }));
-  }
-
-  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
-    return { licenseKey: this.stored.get(organizationId)?.licenseKey ?? null };
-  }
-
-  async organizationExists(organizationId: string): Promise<boolean> {
-    return this.organizations.has(organizationId);
-  }
-
-  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
-    this.stored.set(organizationId, license);
-  }
-
-  async removeLicense(organizationId: string): Promise<void> {
-    this.stored.delete(organizationId);
-  }
-
-  async getMemberCount(): Promise<number> {
-    return 3;
-  }
-
-  async getMembersLiteCount(): Promise<number> {
-    return 2;
-  }
-}
-
-class MemoryLicenseRetention implements LicenseRetention {
-  rules: { scopeType: string; scopeId: string; category: string }[] = [];
-  readonly written: {
-    organizationId: string;
-    category: string;
-    retentionDays: number;
-  }[] = [];
-  failListing = false;
-
-  async listOrganizationRules() {
-    if (this.failListing) throw new Error("retention store down");
-    return this.rules;
-  }
-
-  async setForOrganization(input: {
-    organizationId: string;
-    category: string;
-    retentionDays: number;
-  }): Promise<void> {
-    this.written.push(input);
-  }
-}
-
 describe("LicenseService retention provisioning", () => {
-  let repository: MemoryLicenseRepository;
-  let retention: MemoryLicenseRetention;
+  let repository: MemoryLicenseStorage;
+  let retention: RecordingLicenseRetention;
   let service: LicenseService;
 
   beforeEach(() => {
-    repository = new MemoryLicenseRepository();
-    retention = new MemoryLicenseRetention();
+    repository = MemoryLicenseStorage.create({
+      organizations: [ORGANIZATION_ID],
+      memberCount: 3,
+      membersLiteCount: 2,
+    });
+    retention = new RecordingLicenseRetention();
     service = LicenseService.create({
       repository,
       cryptography: NodeLicenseCryptographyService.create({

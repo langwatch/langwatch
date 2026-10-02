@@ -19,7 +19,12 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { LicensingModule } from "../app/licensing.app.ts";
-import { type LicenseStorage, type StoredLicense } from "../app/licensing.members.ts";
+import {
+  type LicenseRetention,
+  type LicenseRetentionRule,
+  type LicenseStorage,
+  type StoredLicense,
+} from "../app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /** Connect off, so no suite composing this app can make an outbound call. */
@@ -140,35 +145,93 @@ export const MALFORMED_BASE64 = "not-valid-base64!!!";
 export const INVALID_JSON_BASE64 = Buffer.from("not json").toString("base64");
 export const GARBAGE_DATA = "garbage-data";
 
-class TestLicenseStorage implements LicenseStorage {
-  private license: string | null = null;
+/**
+ * Licences held per organization. Only the seeded organizations exist, the
+ * seat counts are fixed at creation, and `listCalls` counts candidate scans.
+ */
+export class MemoryLicenseStorage implements LicenseStorage {
+  static create({
+    organizations,
+    memberCount = 0,
+    membersLiteCount = 0,
+  }: {
+    organizations: Iterable<string>;
+    memberCount?: number;
+    membersLiteCount?: number;
+  }): MemoryLicenseStorage {
+    return new MemoryLicenseStorage({
+      organizations: new Set(organizations),
+      memberCount,
+      membersLiteCount,
+    });
+  }
 
-  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
-    return { licenseKey: this.license };
+  readonly organizations: Set<string>;
+  readonly stored = new Map<string, StoredLicense>();
+  listCalls = 0;
+  private readonly memberCount: number;
+  private readonly membersLiteCount: number;
+
+  private constructor(seed: {
+    organizations: Set<string>;
+    memberCount: number;
+    membersLiteCount: number;
+  }) {
+    this.organizations = seed.organizations;
+    this.memberCount = seed.memberCount;
+    this.membersLiteCount = seed.membersLiteCount;
   }
 
   async findOrganizationsWithLicense() {
-    return this.license ? [{ organizationId: "org-456", licenseKey: this.license }] : [];
+    this.listCalls++;
+    return [...this.stored].map(([organizationId, license]) => ({
+      organizationId,
+      licenseKey: license.licenseKey,
+    }));
   }
 
-  async organizationExists(): Promise<boolean> {
-    return true;
+  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.stored.get(organizationId)?.licenseKey ?? null };
   }
 
-  async storeLicense(_organizationId: string, license: StoredLicense): Promise<void> {
-    this.license = license.licenseKey;
+  async organizationExists(organizationId: string): Promise<boolean> {
+    return this.organizations.has(organizationId);
   }
 
-  async removeLicense(): Promise<void> {
-    this.license = null;
+  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
+    this.stored.set(organizationId, license);
+  }
+
+  async removeLicense(organizationId: string): Promise<void> {
+    this.stored.delete(organizationId);
   }
 
   async getMemberCount(): Promise<number> {
-    return 0;
+    return this.memberCount;
   }
 
   async getMembersLiteCount(): Promise<number> {
-    return 0;
+    return this.membersLiteCount;
+  }
+}
+
+/** Records every policy written; set `failListing` to make the rule listing throw. */
+export class RecordingLicenseRetention implements LicenseRetention {
+  rules: LicenseRetentionRule[] = [];
+  readonly written: { organizationId: string; category: string; retentionDays: number }[] = [];
+  failListing = false;
+
+  async listOrganizationRules(): Promise<readonly LicenseRetentionRule[]> {
+    if (this.failListing) throw new Error("retention unavailable");
+    return this.rules;
+  }
+
+  async setForOrganization(input: {
+    organizationId: string;
+    category: string;
+    retentionDays: number;
+  }): Promise<void> {
+    this.written.push(input);
   }
 }
 
@@ -182,7 +245,7 @@ export function createTestLicensingApp(): Promise<LicensingModule> {
     },
     members: {
       infrastructure: {
-        repository: new TestLicenseStorage(),
+        repository: MemoryLicenseStorage.create({ organizations: ["org-456"] }),
         configuredAuthProvider: () => null,
         platformSsoAllowed: async () => true,
         authProviderIsMounted: () => true,
