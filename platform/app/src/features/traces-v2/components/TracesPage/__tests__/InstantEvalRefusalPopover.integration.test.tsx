@@ -77,7 +77,7 @@ describe("given the deployment has no classifier", () => {
       const copy = instantEvalRefusalCopy({ kind: "model" });
       expect(copy.title).toBe("Instant Evals can't run right now");
       expect(copy.body).toBe(
-        "The words are searched as a phrase in the meantime. Contact us if this keeps happening.",
+        "The words are searched as a phrase in the meantime. If it keeps happening, contact us.",
       );
       expect(copy.action).toEqual({
         label: "Contact us",

@@ -102,7 +102,7 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
     // model settings cannot fix either, so the way out is a word with us.
     return {
       title: "Instant Evals can't run right now",
-      body: `${meanwhile} Contact us if this keeps happening.`,
+      body: `${meanwhile} If it keeps happening, contact us.`,
       action: { label: "Contact us", href: CONTACT_US_HREF },
       dismiss: "Skip",
     };

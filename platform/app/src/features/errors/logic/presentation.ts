@@ -506,7 +506,7 @@ const presentations = {
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
     describe: () =>
-      "Your organization's Instant Evals are switched on by LangWatch. Contact us and we will activate them for you.",
+      "LangWatch turns on Instant Evals for enterprise organizations. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",

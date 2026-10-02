@@ -71,7 +71,7 @@ export class InstantEvalOptInNotOfferedError extends HandledError {
   constructor() {
     super(
       "instant_eval_opt_in_not_offered",
-      "Instant Evals are switched on for this organization by LangWatch. Contact us and we will activate them for you.",
+      "LangWatch turns on Instant Evals for enterprise organizations. Contact us to get them.",
       {
         httpStatus: 403,
         fault: "customer",
