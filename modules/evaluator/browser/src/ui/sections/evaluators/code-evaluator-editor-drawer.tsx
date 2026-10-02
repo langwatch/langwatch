@@ -1,4 +1,3 @@
-import type { UiCodeEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -30,11 +29,33 @@ import {
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
 import { type Variable, VariablesSection } from "../prompt/variables/variables-section.tsx";
 import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
-import { EvaluatorGateSection, type EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+import {
+  type EvaluatorGateConfig,
+  EvaluatorGateSection,
+  type EvaluatorMappingsConfig,
+} from "./evaluator-editor-shared.tsx";
 
 type EditableField = CodeEvaluatorField;
 
-export type CodeEvaluatorEditorDrawerProps = UiCodeEvaluatorEditorDrawerProps;
+/** What a caller hands evaluator's code evaluator editor drawer. */
+export type CodeEvaluatorEditorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  /** When set, the drawer edits this existing code evaluator instead of creating one. */
+  evaluatorId?: string;
+  /**
+   * Workbench mapping context. When present, the inputs render with their
+   * source mapping merged inline (like the prompt drawer); without it, the
+   * inputs are a plain identifier + type list.
+   */
+  mappingsConfig?: EvaluatorMappingsConfig;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+  /** Called with the saved evaluator; flow callbacks take precedence. */
+  onSave?: (evaluator: { id: string; name: string }) => void;
+  gate?: EvaluatorGateConfig;
+  onRequiredChange?: (required: boolean) => void;
+  onRemove?: () => void;
+};
 
 function seedFromSavedEvaluator(
   data: { name: string; config: unknown },

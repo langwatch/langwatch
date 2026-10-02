@@ -1,4 +1,3 @@
-import type { UiEvaluatorCategoryId } from "@langwatch/browser-host/drawer";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   Brain,
@@ -11,7 +10,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type EvaluatorCategoryId = UiEvaluatorCategoryId;
+/** The evaluator categories evaluator's pickers group the evaluator types under. */
+export type EvaluatorCategoryId = "expected_answer" | "llm_judge" | "rag" | "quality" | "safety";
 
 export const evaluatorCategoryNames: Record<EvaluatorCategoryId, string> = {
   expected_answer: "Expected Answer",

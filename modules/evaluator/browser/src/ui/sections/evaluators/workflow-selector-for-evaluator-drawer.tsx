@@ -1,4 +1,3 @@
-import type { UiWorkflowSelectorForEvaluatorDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -27,7 +26,14 @@ import { customEvaluatorTemplate } from "../../../model/workflow/templates/custo
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
 import { EmojiPickerModal } from "../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
-export type WorkflowSelectorForEvaluatorDrawerProps = UiWorkflowSelectorForEvaluatorDrawerProps;
+/** What a caller hands evaluator's drawer that creates a workflow-based evaluator. */
+export type WorkflowSelectorForEvaluatorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: (evaluator: { id: string; name: string; workflowId: string }) => void;
+  /** Name for the new evaluator (optional, prompts if not provided) */
+  evaluatorName?: string;
+};
 
 type FormData = {
   name: string;

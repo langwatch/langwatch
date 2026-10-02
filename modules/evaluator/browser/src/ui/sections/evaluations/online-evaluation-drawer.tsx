@@ -4,7 +4,6 @@ import {
   getDrawerStack,
   navigateToDrawer,
   setFlowCallbacks,
-  type UiOnlineEvaluationDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
@@ -77,7 +76,13 @@ import { serializeMappingsToMappingState } from "../../../model/evaluations/seri
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
-export type OnlineEvaluationDrawerProps = UiOnlineEvaluationDrawerProps;
+/** What a caller hands evaluator's online-evaluation drawer: the monitor to edit, if any. */
+export type OnlineEvaluationDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: () => void;
+  monitorId?: string;
+};
 
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let onlineEvaluationDrawerState: {

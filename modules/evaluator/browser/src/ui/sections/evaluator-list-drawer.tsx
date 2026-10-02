@@ -4,13 +4,12 @@
  * Evaluator"/"Edit" still open drawers in `platform/app`.
  */
 import type { WireOf } from "@langwatch/api/web";
-import type { UiEvaluatorListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
-import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { Evaluator, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
@@ -31,7 +30,18 @@ import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state.
  */
 export type EvaluatorListRow = WireOf<Evaluator>;
 
-export type EvaluatorListDrawerProps = UiEvaluatorListDrawerProps;
+/** What a caller hands evaluator's list drawer; a picked row arrives as the browser receives it. */
+export type EvaluatorListDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSelect?: (evaluator: WireOf<EvaluatorWithFields>) => void;
+  onCreateNew?: () => void;
+  filterEvaluatorType?: string;
+  hiddenEvaluatorIds?: string[];
+  title?: string;
+  createLabel?: string;
+  itemLabel?: string;
+};
 
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const host = useEvaluatorHost();

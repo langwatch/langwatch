@@ -1,8 +1,3 @@
-import type {
-  UiEvaluatorEditorDrawerProps,
-  UiEvaluatorGateConfig,
-  UiEvaluatorMappingsConfig,
-} from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
@@ -39,7 +34,7 @@ import type {
 import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { toEpochMs } from "@langwatch/time";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
+import type { AvailableSource, FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -50,6 +45,7 @@ import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
+import type { EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
@@ -70,16 +66,70 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   randomizeOrder: true,
 };
 
-export type EvaluatorMappingsConfig = UiEvaluatorMappingsConfig;
+/** The mapping context a caller opens evaluator's editors with. */
+export type EvaluatorMappingsConfig = {
+  level?: "trace" | "thread";
+  availableSources?: AvailableSource[];
+  initialMappings: Record<string, UIFieldMapping>;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+};
 
-export type EvaluatorGateConfig = UiEvaluatorGateConfig;
+/**
+ * Whether a failing result of this evaluator fails what it is attached
+ * to. A pass/fail evaluator can be required; a score-only evaluator
+ * reports but never gates, so its switch stays off and disabled.
+ */
+export type EvaluatorGateConfig = {
+  required: boolean;
+  canRequire: boolean;
+};
 
 export const REQUIRED_TO_PASS_LABEL = "Required to pass";
 export const REQUIRED_TO_PASS_COPY =
   "A failing required evaluator fails the scenario. An unrequired one reports its result beside the verdict.";
 export const SCORE_ONLY_COPY = "Scores report, they do not gate.";
 
-export type EvaluatorEditorDrawerProps = UiEvaluatorEditorDrawerProps;
+/** What a caller hands evaluator's editor drawer. */
+export type EvaluatorEditorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+    evaluatorType?: string;
+  }) => boolean | undefined | Promise<void> | Promise<boolean>;
+  evaluatorType?: string;
+  evaluatorId?: string;
+  category?: EvaluatorCategoryId;
+  mappingsConfig?: EvaluatorMappingsConfig;
+  saveButtonText?: string;
+  onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+  /**
+   * The gate of the attachment this evaluator is opened for. Present only
+   * when the evaluator is attached to something that runs it after each
+   * scenario, which is where a required pass or fail means anything.
+   */
+  gate?: EvaluatorGateConfig;
+  /** Called when the required switch is flipped. Flows through setFlowCallbacks. */
+  onRequiredChange?: (required: boolean) => void;
+  /** Called when the attachment is taken off. Flows through setFlowCallbacks. */
+  onRemove?: () => void;
+  initialLocalConfig?: LocalEvaluatorConfig;
+  /**
+   * Comparison drawer context. Non-serializable; flows through complexProps.
+   * When present, the drawer renders ComparisonConfigForm in place of the
+   * per-row mappings section.
+   */
+  comparisonContext?: {
+    initialComparison?: ComparisonEvaluatorConfig;
+    targets: { id: string }[];
+    datasetColumns: { id: string; name: string }[];
+    /** Active dataset's name, used only to qualify column labels as
+     * "Test Data.expected_output" — matching the mapping chips elsewhere. */
+    datasetName?: string;
+  };
+};
 
 type EvaluatorFormValues = {
   name: string;
@@ -910,7 +960,7 @@ function navigateAfterSave({
   onClose,
 }: {
   saved: { id: string; name: string; evaluatorType?: string };
-  onSave: EvaluatorEditorDrawerProps["onSave"];
+  onSave: ((saved: { id: string; name: string; evaluatorType?: string }) => unknown) | undefined;
   goBack: () => void;
   onClose: () => void;
 }) {

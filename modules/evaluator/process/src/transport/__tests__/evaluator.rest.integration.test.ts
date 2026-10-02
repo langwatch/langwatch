@@ -8,14 +8,13 @@ import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
+  canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluator,
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,29 +38,6 @@ const evaluator: Evaluator = {
 
 /** What the read routes answer with: the row plus its computed fields. */
 const enriched = { ...evaluator, fields: [], outputFields: [] };
-
-/**
- * The process's own boundary renderer, reduced to what these tests read back. A
- * handled error keeps its own status and code, and its `meta` is spread onto
- * the body — which is what puts `fields` beside `error` on a rejected request.
- */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      {
-        error: serialized.code,
-        message: error.message,
-        ...serialized.meta,
-        reasons: serialized.reasons,
-      },
-      serialized.httpStatus as 400,
-    );
-  }
-
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 function buildApi(overrides: Partial<EvaluatorApi> = {}) {
   const mocks = {
@@ -88,7 +64,7 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}) {
   const hono = runtime.mount(createEvaluatorRest().router(), {
     app: () => stub,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -178,7 +154,7 @@ describe("the evaluators REST family", () => {
       const response = await request(hono, "/api/evaluators/ghost");
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "evaluator_not_found" });
+      await expect(response.json()).resolves.toMatchObject({ code: "evaluator_not_found" });
     });
   });
 
@@ -239,7 +215,7 @@ describe("the evaluators REST family", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({
-        error: "evaluator_type_immutable",
+        code: "evaluator_type_immutable",
         message: expect.stringContaining("evaluatorType cannot be changed"),
       });
       expect(mocks.update).not.toHaveBeenCalled();
@@ -311,8 +287,8 @@ describe("the evaluators REST family", () => {
 
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({
-        error: "validation_error",
-        fields: ["config.evaluatorType"],
+        code: "validation_error",
+        meta: { fields: ["config.evaluatorType"] },
       });
       expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
     });
@@ -322,9 +298,9 @@ describe("the evaluators REST family", () => {
       const { hono } = buildApi();
 
       const body = (await (await post(hono, staleSlug)).json()) as {
-        reasons: { code: string; meta: Record<string, unknown> }[];
+        meta: { reasons: { code: string; meta: Record<string, unknown> }[] };
       };
-      const [reason] = body.reasons;
+      const [reason] = body.meta.reasons;
 
       expect(reason?.code).toBe("schema_failure");
       expect(reason?.meta.field).toBe("config.evaluatorType");
@@ -337,10 +313,10 @@ describe("the evaluators REST family", () => {
       const { hono } = buildApi();
 
       const body = (await (await post(hono, staleSlug)).json()) as {
-        reasons: { meta: { expected: string[] } }[];
+        meta: { reasons: { meta: { expected: string[] } }[] };
       };
 
-      expect(body.reasons[0]?.meta.expected).toContain("ragas/response_relevancy");
+      expect(body.meta.reasons[0]?.meta.expected).toContain("ragas/response_relevancy");
     });
 
     /** @scenario The accepted types stay out of the prose message */
@@ -348,10 +324,10 @@ describe("the evaluators REST family", () => {
       const { hono } = buildApi();
 
       const body = (await (await post(hono, staleSlug)).json()) as {
-        reasons: { meta: { message: string } }[];
+        meta: { reasons: { meta: { message: string } }[] };
       };
 
-      expect(body.reasons[0]?.meta.message).not.toContain("ragas/response_relevancy");
+      expect(body.meta.reasons[0]?.meta.message).not.toContain("ragas/response_relevancy");
     });
   });
 
@@ -363,11 +339,11 @@ describe("the evaluators REST family", () => {
 
       expect(response.status).toBe(422);
       const body = (await response.json()) as {
-        error: string;
-        reasons: { meta: { message: string } }[];
+        code: string;
+        meta: { reasons: { meta: { message: string } }[] };
       };
-      expect(body.error).toBe("validation_error");
-      expect(body.reasons[0]?.meta.message).toContain("evaluatorType");
+      expect(body.code).toBe("validation_error");
+      expect(body.meta.reasons[0]?.meta.message).toContain("evaluatorType");
     });
   });
 
