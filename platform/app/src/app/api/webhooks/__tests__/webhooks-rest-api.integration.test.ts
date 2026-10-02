@@ -22,6 +22,7 @@ import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledge
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import type { EventSourcing } from "~/server/event-sourcing";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_HEADER,
@@ -1131,6 +1132,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       );
       const destination = await new WebhookEndpointService({
         prisma,
+        processStore: new PrismaProcessStore(prisma),
       }).getDestinationConfig({
         organizationId: organization.id,
         endpointId: data.id,

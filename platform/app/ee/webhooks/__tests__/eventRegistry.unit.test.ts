@@ -63,6 +63,7 @@ describe("webhook event registry", () => {
     const service = new WebhookEndpointService({
       // Validation throws before any prisma call; an empty object proves it.
       prisma: {} as PrismaClient,
+      processStore: { requeueDeadMessages: async () => 0 },
     });
     await expect(
       service.create({
