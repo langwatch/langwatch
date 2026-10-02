@@ -622,8 +622,142 @@ test_failed_hook_does_not_block_the_next_upgrade() {
   echo "ok   [delete policy] all ${doc_count} hook documents replace themselves before the next attempt and keep a failed Job"
 }
 
+# Prints the whole shell script a hook Job runs, dedented out of the rendered
+# YAML literal block.
+hook_script() {
+  printf '%s\n' "$1" | awk '
+    /^            - \|$/ { grab = 1; next }
+    !grab { next }
+    /^$/ { print ""; next }
+    /^              / { print substr($0, 15); next }
+    { exit }
+  '
+}
+
+fingerprint_of() {
+  printf '%s' "$1" | awk -F'"' '/^ *fingerprint=/ { print $2; exit }'
+}
+
+# Runs a hook script against a fake kubectl. Every kubectl call is logged to
+# $workdir/calls. The live workers fingerprint is FAKE_LIVE_FINGERPRINT; a
+# rollout question about the app answers FAKE_APP_STATE on the first call and
+# a settled state afterwards, and one about the workers answers
+# FAKE_WORKERS_STATE.
+run_hook_script() {
+  local script="$1" workdir="$2"
+  printf '%s\n' "$script" > "$workdir/hook.sh"
+  cat > "$workdir/kubectl" <<'FAKE'
+#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_DIR/calls"
+case "$*" in
+  *"jsonpath={.metadata.annotations"*) printf '%s' "$FAKE_LIVE_FINGERPRINT" ;;
+  *"jsonpath={.metadata.generation"*)
+    case "$*" in
+      *" lw-app "*)
+        n=$(cat "$FAKE_DIR/app-asks" 2>/dev/null || echo 0)
+        echo $((n + 1)) > "$FAKE_DIR/app-asks"
+        if [ "$n" -eq 0 ]; then printf '%s' "$FAKE_APP_STATE"; else printf '5|5|1|1|1|1|'; fi
+        ;;
+      *) printf '%s' "$FAKE_WORKERS_STATE" ;;
+    esac
+    ;;
+esac
+exit 0
+FAKE
+  chmod +x "$workdir/kubectl"
+  : > "$workdir/calls"
+  PATH="$workdir:$PATH" FAKE_DIR="$workdir" sh "$workdir/hook.sh" >/dev/null 2>&1
+}
+
+# @scenario "A sync that re-applies the running release leaves the workers up"
+test_unchanged_release_leaves_the_workers_up() {
+  local block pre post workers_block fingerprint annotation workdir
+  block=$(hook_block "")
+  pre=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  post=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+  fingerprint=$(fingerprint_of "$pre")
+  if [ -z "$fingerprint" ]; then
+    fail "unchanged sync" "the ${PRE_JOB} Job renders no fingerprint"
+    return
+  fi
+
+  # The workers Deployment carries the same fingerprint the drain Job compares,
+  # on its metadata, so a new value never rolls a pod.
+  workers_block=$(render_component "workers" "")
+  annotation=$(printf '%s\n' "$workers_block" | awk -F'"' '/langwatch.ai\/stored-objects-upgrade-fingerprint:/ { print $2; exit }')
+  if [ "$annotation" != "$fingerprint" ]; then
+    fail "unchanged sync" "the workers Deployment carries '${annotation:-<absent>}', the drain Job compares '${fingerprint}'"
+    return
+  fi
+  local template_annotations
+  template_annotations=$(printf '%s\n' "$workers_block" | awk '/^  template:/ { want=1 } want { print }')
+  expect_absent "unchanged sync" "$template_annotations" "stored-objects-upgrade-fingerprint" || return 0
+
+  # A second render of the same release gives the same fingerprint.
+  if [ "$(fingerprint_of "$(hook_block "" | hook_doc_named "$PRE_JOB")")" != "$fingerprint" ]; then
+    fail "unchanged sync" "two renders of the same release disagree on the fingerprint"
+    return
+  fi
+
+  workdir=$(mktemp -d)
+  FAKE_LIVE_FINGERPRINT="$fingerprint" run_hook_script "$(hook_script "$pre")" "$workdir"
+  if grep -q 'patch' "$workdir/calls"; then
+    fail "unchanged sync" "the drain Job scaled the workers although the release did not change"
+    rm -rf "$workdir"
+    return
+  fi
+  FAKE_APP_STATE='5|5|1|1|1|1|' FAKE_WORKERS_STATE='3|3|1|1|1|1|' \
+    run_hook_script "$(hook_script "$post")" "$workdir"
+  if grep -q 'patch' "$workdir/calls"; then
+    fail "unchanged sync" "the restore Job scaled the workers although both Deployments had settled"
+    rm -rf "$workdir"
+    return
+  fi
+  rm -rf "$workdir"
+  echo "ok   [unchanged sync] matching fingerprint and settled Deployments leave the workers untouched"
+}
+
+# @scenario "A changed release still stands the workers down"
+test_changed_release_still_stands_the_workers_down() {
+  local block pre post changed workdir
+  block=$(hook_block "")
+  pre=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  post=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+
+  changed=$(fingerprint_of "$(hook_block "--set app.resources.requests.cpu=999m" | hook_doc_named "$PRE_JOB")")
+  if [ -z "$changed" ] || [ "$changed" = "$(fingerprint_of "$pre")" ]; then
+    fail "changed release" "changing a value did not change the fingerprint"
+    return
+  fi
+
+  workdir=$(mktemp -d)
+  # A live Deployment from before the fingerprint existed carries none.
+  for live in "$changed" ""; do
+    FAKE_LIVE_FINGERPRINT="$live" run_hook_script "$(hook_script "$pre")" "$workdir"
+    if ! grep -q 'patch deployment lw-workers --subresource=scale --type=merge -p {"spec":{"replicas":0}}' "$workdir/calls"; then
+      fail "changed release" "the drain Job did not scale the workers to 0 for live fingerprint '${live:-<absent>}'"
+      rm -rf "$workdir"
+      return
+    fi
+  done
+
+  # The app is still rolling when the restore Job starts.
+  rm -f "$workdir/app-asks"
+  FAKE_APP_STATE='6|5|1|0|1|1|' FAKE_WORKERS_STATE='3|3|1|1|1|1|' \
+    run_hook_script "$(hook_script "$post")" "$workdir"
+  if ! grep -q '"replicas":0' "$workdir/calls" || ! grep -q '"replicas":1' "$workdir/calls"; then
+    fail "changed release" "the restore Job did not stand the workers down and bring them back while the app rolled"
+    rm -rf "$workdir"
+    return
+  fi
+  rm -rf "$workdir"
+  echo "ok   [changed release] a new fingerprint or a rolling app still orders the rollout"
+}
+
 test_default_install_renders_the_hook
 test_hook_scales_workers_to_zero_and_waits
+test_unchanged_release_leaves_the_workers_up
+test_changed_release_still_stands_the_workers_down
 test_wait_outlasts_the_grace_period
 test_workers_come_back_after_the_app_rollout
 test_rollout_check_waits_for_the_new_pod
