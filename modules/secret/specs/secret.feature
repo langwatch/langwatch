@@ -65,7 +65,7 @@ Feature: Canonical project-secret lifecycle
     Given a stored secret encrypted under one key
     When a process reads it under a different key, or the row has been altered
     Then the read fails and no partial value is returned
-    And a key that is not a 32-byte hex string is refused when the process composes, not when a customer reads
+    And a key that does not decode to 32 bytes is refused when the process composes, not when a customer reads
 
   Scenario: A process with no key composes no secret service
     Given a process configured with no stored-secret key, or no database

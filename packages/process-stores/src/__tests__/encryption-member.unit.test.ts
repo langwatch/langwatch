@@ -41,6 +41,12 @@ function branchDotSeal(text: string, hexKey: string): string {
 const hexKey = (): string => randomBytes(32).toString("hex");
 const CREDENTIAL = JSON.stringify({ OPENAI_API_KEY: "sk-fixture-not-a-real-key" });
 
+/** A stored row fixed against main's platform/app/src/utils/__tests__/encryption.unit.test.ts. */
+const FIXED_KEY = "0f".repeat(32);
+const STORED_ROW =
+  "aabbccddeeff001122334455:72b43a4bc9e43c4de7e3e7ed18f9dbe02327fe68fd:59a8bc427deba94b3e94aa08ce8ab785";
+const STORED_VALUE = "sk-live-fixture-value";
+
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
@@ -110,6 +116,44 @@ describe("given the encryption member", () => {
     });
   });
 
+  describe("when it seals a model provider's keys", () => {
+    /** @scenario "New model provider keys are encrypted on save" */
+    it("stores three colon-separated hex segments that are not JSON and hold no plaintext", () => {
+      const sealed = encryption.encrypt(CREDENTIAL);
+
+      expect(sealed.split(":")).toHaveLength(3);
+      expect(sealed).toMatch(/^[0-9a-f]{24}:[0-9a-f]+:[0-9a-f]{32}$/);
+      expect(() => JSON.parse(sealed)).toThrow(SyntaxError);
+      expect(sealed).not.toContain("sk-fixture-not-a-real-key");
+    });
+  });
+
+  describe("when it opens a fixed row stored before this member existed", () => {
+    /** @scenario "One at-rest format for every process" */
+    it("reads the original plaintext, so the at-rest format has not drifted", () => {
+      expect(aesEncryption(Buffer.from(FIXED_KEY, "hex")).decrypt(STORED_ROW)).toBe(STORED_VALUE);
+    });
+  });
+
+  describe("when it seals the same value twice", () => {
+    it("never writes the same ciphertext twice, so equal secrets do not look equal", () => {
+      const first = encryption.encrypt("same-value");
+      const second = encryption.encrypt("same-value");
+
+      expect(first).not.toBe(second);
+      expect(first.split(":")[0]).not.toBe(second.split(":")[0]);
+    });
+  });
+
+  describe("when another process holds a member under the same key", () => {
+    it("each reads the other's values unchanged", () => {
+      const other = aesEncryption(Buffer.from(key, "hex"));
+
+      expect(other.decrypt(encryption.encrypt(CREDENTIAL))).toBe(CREDENTIAL);
+      expect(encryption.decrypt(other.encrypt(CREDENTIAL))).toBe(CREDENTIAL);
+    });
+  });
+
   describe("when the value was sealed under another key", () => {
     /** @scenario "A value sealed under another key is refused without quoting it" */
     it("throws without quoting the sealed value", () => {
@@ -118,6 +162,40 @@ describe("given the encryption member", () => {
       expect(() => encryption.decrypt(sealed)).toThrow("Failed to decrypt");
       expect(() => encryption.decrypt(sealed)).not.toThrow(sealed);
     });
+
+    /** @scenario "A key that is not the key refuses rather than guesses" */
+    it("refuses the read rather than returning a partial value", () => {
+      const other = aesEncryption(Buffer.from(hexKey(), "hex"));
+
+      expect(() => other.decrypt(encryption.encrypt(CREDENTIAL))).toThrow("Failed to decrypt");
+    });
+  });
+
+  describe("when the stored value has been altered", () => {
+    /** @scenario "A key that is not the key refuses rather than guesses" */
+    it("refuses a body whose authentication tag no longer matches", () => {
+      const [iv, body, tag] = encryption.encrypt(CREDENTIAL).split(":");
+      const flipped = `${body?.slice(0, -2)}${body?.endsWith("00") ? "11" : "00"}`;
+
+      expect(() => encryption.decrypt(`${iv}:${flipped}:${tag}`)).toThrow("Failed to decrypt");
+    });
+
+    it("refuses a tag lifted from another value", () => {
+      const [iv, body] = encryption.encrypt(CREDENTIAL).split(":");
+      const [, , otherTag] = encryption.encrypt("a-different-secret").split(":");
+
+      expect(() => encryption.decrypt(`${iv}:${body}:${otherTag}`)).toThrow("Failed to decrypt");
+    });
+  });
+
+  describe("when the key does not decode to 32 bytes", () => {
+    /** @scenario "A key that is not the key refuses rather than guesses" */
+    it.each(["", "0f".repeat(16), "0f".repeat(64), "not-hex-at-all"])(
+      "refuses %j when the member is built, before any value is read",
+      (badKey) => {
+        expect(() => aesEncryption(Buffer.from(badKey, "hex"))).toThrow(/AES-256 needs 32/);
+      },
+    );
   });
 
   describe("when the value is in no known shape", () => {
