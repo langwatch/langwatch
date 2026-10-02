@@ -106,7 +106,9 @@ describe("buildChildEnvironment", () => {
           telemetry,
         });
 
-        expect(result.LANGWATCH_NLP_INTERNAL_SECRET).toBe("shared-with-the-app");
+        expect(result.LANGWATCH_NLP_INTERNAL_SECRET).toBe(
+          "shared-with-the-app",
+        );
       });
     });
   });

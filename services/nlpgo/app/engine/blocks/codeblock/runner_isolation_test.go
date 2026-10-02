@@ -222,31 +222,32 @@ func TestCodeBlock_DevRunnerOverrideIsReadOnceAndNotReread(t *testing.T) {
 }
 
 // @scenario "each execution gets its own temporary directory, removed afterwards"
-func TestCodeBlock_RunDirectoryIsRemovedEvenWhenUserCodeLocksIt(t *testing.T) {
+func TestCodeBlock_RunDirectoryIsRemovedEvenWhenUserCodeLocksASubdirectory(t *testing.T) {
 	requirePython(t)
 	exe := newExec(t)
 
-	// User code owns its run directory and can chmod it read-only, which makes
-	// unlinking anything inside it fail. The next execution gets a fresh
-	// directory regardless, so isolation holds, but a long-lived engine would
-	// accumulate the abandoned trees until the volume filled.
+	// Unlinking a file needs write permission on the directory holding it, so
+	// user code that leaves a read-only directory behind defeats a plain
+	// RemoveAll. The next execution gets a fresh directory either way, so
+	// isolation holds; what leaks is disk, which on a long-lived engine
+	// accumulates until the volume fills.
 	//
-	// Worth knowing what this does and does not prove: uid 0 bypasses the
-	// permission check, so under a root test runner (and in the shipped image,
-	// which sets no USER) the plain removal succeeds and this passes either
-	// way. The assertion is still the one that matters, and it is load-bearing
-	// for any engine running as a normal user.
+	// Only a NESTED directory is locked. Locking the run directory itself
+	// stops the runner writing its own result file, so that execution simply
+	// fails, which is both acceptable and a different behavior from this one.
+	// Getting that wrong is what made the first version of this test pass as
+	// root and fail as an ordinary user.
 	res, err := exe.Execute(context.Background(), codeblock.Request{
 		Code: `
 import os, fake_dspy
 
 def execute():
     here = os.path.dirname(os.path.abspath(fake_dspy.__file__))
-    os.mkdir(os.path.join(here, "locked"))
-    with open(os.path.join(here, "locked", "file.txt"), "w") as handle:
+    locked = os.path.join(here, "locked")
+    os.mkdir(locked)
+    with open(os.path.join(locked, "file.txt"), "w") as handle:
         handle.write("x")
-    os.chmod(os.path.join(here, "locked"), 0o500)
-    os.chmod(here, 0o500)
+    os.chmod(locked, 0o500)
     return {"dir": here}
 `,
 		DeclaredOutputs: []string{"dir"},
@@ -259,5 +260,5 @@ def execute():
 
 	_, statErr := os.Stat(dir)
 	assert.True(t, os.IsNotExist(statErr),
-		"run directory %s survived because user code made it read-only (stat error: %v)", dir, statErr)
+		"run directory %s survived because user code left a read-only directory in it (stat error: %v)", dir, statErr)
 }
