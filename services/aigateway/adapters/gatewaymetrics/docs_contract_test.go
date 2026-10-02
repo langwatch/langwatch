@@ -110,6 +110,10 @@ var notMetrics = map[string]string{
 	"gateway_trace_project_unknown":       "REST error code",
 	"gateway_spend_group_by_unstable":     "REST error code",
 
+	// Check ids in the self-hosted checkup report, values of its `check`
+	// field rather than series.
+	"gateway_control_plane": "checkup check id",
+
 	// SDK facade names. The python SDK exposes each resource as a
 	// snake_case attribute, so a documented call reads as a
 	// `gateway_`-prefixed token without naming a series.

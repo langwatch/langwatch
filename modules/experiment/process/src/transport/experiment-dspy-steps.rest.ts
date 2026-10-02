@@ -1,10 +1,6 @@
 /** `POST /api/dspy/log_steps`: the DSPy optimizer's progress log; refusals are handled errors. */
 import { PayloadTooLargeError } from "@langwatch/api";
-import {
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import {
   dSPyLogStepsBodySchema,
@@ -15,7 +11,6 @@ import {
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
 
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
 
@@ -54,12 +49,6 @@ function stepsOf(raw: string): DSPyStepRESTParams[] {
 
   return parsed.data;
 }
-
-/** Retired: the project door resolves the caller. Kept while the package index re-exports it. */
-export const dspyStepsCaller = defineRestMiddleware(
-  "dspyStepsCaller",
-  z.object({ projectId: z.string() }),
-);
 
 /** Stores each step in order, stopping at the first failure. */
 const storeDspySteps = async ({

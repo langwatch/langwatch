@@ -41,9 +41,7 @@ export const experimentProcessModule = defineProcessModule("experiment")
   )
   // This family answers behind the project door, so re-resolving the key here
   // would ask a second question that could answer differently from the door
-  // that admitted the request. `experimentInitCaller` and `dspyStepsCaller`
-  // are bound by the host instead: both families are PUBLIC-door, where
-  // `projectCredentialOfRequest` always throws.
+  // that admitted the request.
   .withTransportFacts(() => [
     bindRestMiddleware(experimentRestCredential, (context) =>
       credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),

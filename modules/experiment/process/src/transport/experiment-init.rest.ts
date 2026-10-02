@@ -1,26 +1,14 @@
 /** POST /api/experiment/init: find-or-create by slug; refusals are handled errors. */
 import { PayloadTooLargeError } from "@langwatch/api";
-import {
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  projectRestFacts,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
 import {
   ExperimentApi,
   experimentInitBodySchema,
   experimentInitResponseSchema,
 } from "@langwatch/experiment-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
-
-/** Retired: the project door resolves the caller. Kept while the package index re-exports it. */
-export const experimentInitCaller = defineRestMiddleware(
-  "experimentInitCaller",
-  z.object({ projectId: z.string(), projectSlug: z.string() }),
-);
 
 export const experimentInitRest = defineRestRouter(ExperimentApi)
   .withNamespace("experiment")

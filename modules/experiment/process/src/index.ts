@@ -56,8 +56,5 @@ export {
 export type { ExperimentWorkbenchObserver } from "./services/experiment-workbench-observer.service.ts";
 export { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 export type { ExperimentFindOrCreateInput } from "./services/experiment-find-or-create.service.ts";
-export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";
-export {
-  experimentDspyStepsRest,
-  dspyStepsCaller,
-} from "./transport/experiment-dspy-steps.rest.ts";
+export { experimentInitRest } from "./transport/experiment-init.rest.ts";
+export { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";

@@ -254,9 +254,9 @@ async function harness({
     identities: {
       project: identity,
       organization: identity,
-      apiKey: identity,
-      scimToken: identity,
-      "instance-admin": identity,
+      api_key: identity,
+      scim_token: identity,
+      instance_admin: identity,
       browser: identity,
     },
     bearers: () => identity,
