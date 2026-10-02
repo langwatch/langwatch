@@ -682,14 +682,15 @@ function buildPageQueries({
 
 /**
  * Collapses ts to each trace's latest version, capped at the scroll's snapshot when one is in
- * play so version resolution stays stable for the scroll's duration.
+ * play. Only the updated axis uses it, so versions before the window's start can never be the
+ * latest of a trace the window keeps; bounding them lets the UpdatedAt index skip old granules.
  */
 function buildLatestVersionOnly(scrollStart: number | undefined): string {
   const scrollSnapshotBound =
     scrollStart !== undefined
       ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
       : "";
-  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String}${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
+  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
 }
 
 /** Stored-span rows as the joined read selects them. */
