@@ -627,15 +627,6 @@ async function readKeyOrRefuse({
   }
 }
 
-/** Which step refused the key (the key exchange unless the error names the lookup) and its code. */
-function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | undefined } {
-  const { stage, code } = (error ?? {}) as { stage?: unknown; code?: unknown };
-  return {
-    stage: stage === "lookup" ? "lookup" : "key",
-    code: typeof code === "string" ? code : undefined,
-  };
-}
-
 /**
  * What Langy is told when the developer says no. The frame carries no
  * reason, so it travels in the call result the CLI writes itself.
