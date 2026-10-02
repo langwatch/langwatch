@@ -87,6 +87,19 @@ describe("DashboardService", () => {
       expect(listed?.graphCount).toBe(1);
     });
 
+    /** @scenario "A saved workbench chart is not exposed through the dashboard REST API" */
+    /** @scenario "The list's graphCount matches what the detail response actually returns" */
+    it("returns only the builder graph on the detail, and the REST list counts that many", async () => {
+      const { service } = await dashboardWithBothChartKinds();
+
+      const [listed] = await service.getAll({ projectId: PROJECT, graphCountScope: "builder" });
+      const detail = await service.getById({ projectId: PROJECT, dashboardId: listed?.id ?? "" });
+
+      expect(detail.graphs).toHaveLength(1);
+      expect(JSON.stringify(detail)).not.toContain("SELECT 1");
+      expect(listed?.graphCount).toBe(detail.graphs.length);
+    });
+
     describe("when the project may not place workbench cards", () => {
       it("counts only the builder graphs it can draw", async () => {
         const { service } = await dashboardWithBothChartKinds(false);

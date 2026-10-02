@@ -180,6 +180,7 @@ describe("OnboardingModule", () => {
     expect(state.gatewayUrl).toBe("https://gw.example.com/v1");
   });
 
+  /** @scenario "initializing an organization without a variant leaves the sign-up data unchanged" */
   it("hands the sign-up ceremony to the organization module with its caller", async () => {
     const { app, initializeOrganization } = buildApp();
     const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
@@ -196,6 +197,7 @@ describe("OnboardingModule", () => {
     expect(initialized).toEqual(INITIALIZED);
   });
 
+  /** @scenario "initializing an organization records the onboarding variant" */
   it("records the onboarding variant inside the sign-up data, as main did", async () => {
     const { app, initializeOrganization } = buildApp();
     const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
