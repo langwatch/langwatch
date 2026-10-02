@@ -1,6 +1,7 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
@@ -34,7 +35,6 @@ import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
 import type { FilterDefinition, FilterField } from "../../model/analytics-filter-definition.ts";
 import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { OverflownTextWithTooltip } from "../elements/overflown-text.tsx";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */

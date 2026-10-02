@@ -1,8 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { LuChevronDown } from "react-icons/lu";
-
-import { PropertySectionTitle } from "../../../elements/property-section-title.tsx";
 
 /**
  * Editing mode for the prompt messages field.

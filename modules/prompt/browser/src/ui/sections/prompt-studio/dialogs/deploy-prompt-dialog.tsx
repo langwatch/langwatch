@@ -1,3 +1,4 @@
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -24,7 +25,6 @@ import { useMemo } from "react";
 
 import { useDeployTags } from "../../../../behavior/use-deploy-tags.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { DeleteConfirmationDialog } from "../../../blocks/delete-confirmation-dialog.tsx";
 import { CopyButton } from "../../../elements/copy-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 

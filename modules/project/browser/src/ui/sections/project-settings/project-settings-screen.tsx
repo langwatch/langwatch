@@ -1,6 +1,7 @@
 /** Organization and project settings; personal workspaces cannot be the org's project (ADR-038). */
 
 import { Dialog } from "@langwatch/design-system/dialog";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -39,7 +40,6 @@ import {
   type ProjectHostProject,
 } from "../../../model/project-host.ts";
 import { ProjectTechStackIcon } from "../../../ui/blocks/tech-stack.tsx";
-import { HorizontalFormControl } from "../../../ui/elements/horizontal-form-control.tsx";
 import { TechStackSelector } from "../../blocks/onboarding/tech-stack.tsx";
 
 type OrganizationFormData = {

@@ -2,7 +2,6 @@
  * @vitest-environment jsdom
  */
 
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,7 +31,7 @@ vi.mock("../../../../../behavior/use-prompt-tabs-browser-store.ts", () => ({
   useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
-vi.mock("../../../../blocks/delete-confirmation-dialog.tsx", () => ({
+vi.mock("@langwatch/design-system/delete-confirmation-dialog", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 
@@ -103,9 +102,8 @@ vi.mock("@langwatch/prompt-client", () => ({
   },
 }));
 
-import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
 // Import after mocks
-import { FakePromptHost } from "../../../../../testing.tsx";
+import { FakePromptHost, renderWithPromptHost } from "../../../../../testing.tsx";
 import { PublishedPromptActions } from "../published-prompt-actions.tsx";
 
 /**
@@ -113,9 +111,9 @@ import { PublishedPromptActions } from "../published-prompt-actions.tsx";
  */
 let currentHost: FakePromptHost;
 
-const renderWithChakra = (ui: React.ReactElement, host: FakePromptHost = new FakePromptHost()) => {
+const renderActions = (ui: React.ReactElement, host: FakePromptHost = new FakePromptHost()) => {
   currentHost = host;
-  return renderWithDesignSystem(<PromptHostProvider value={host}>{ui}</PromptHostProvider>);
+  return renderWithPromptHost(ui, host);
 };
 
 /** Opens the row menu and clicks "Duplicate prompt". */
@@ -139,7 +137,7 @@ describe("PublishedPromptActions", () => {
   describe("given a rendered row menu", () => {
     describe("when the menu is closed", () => {
       it("does not enable the resolved-default model query", () => {
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         expect(mockGetResolvedDefault).toHaveBeenCalledWith(
           expect.objectContaining({ projectId: "test-project" }),
@@ -148,7 +146,7 @@ describe("PublishedPromptActions", () => {
       });
 
       it("does not enable the modify-permission query", () => {
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         expect(mockCheckModifyPermission).toHaveBeenCalledWith(
           expect.objectContaining({ idOrHandle: "prompt-1" }),
@@ -160,7 +158,7 @@ describe("PublishedPromptActions", () => {
     describe("when the menu is opened", () => {
       it("enables the resolved-default model query", async () => {
         const user = userEvent.setup();
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         const trigger = screen.getByRole("button");
         await user.click(trigger);
@@ -173,7 +171,7 @@ describe("PublishedPromptActions", () => {
 
       it("enables the modify-permission query", async () => {
         const user = userEvent.setup();
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         const trigger = screen.getByRole("button");
         await user.click(trigger);
@@ -189,7 +187,7 @@ describe("PublishedPromptActions", () => {
         // Query gated on open resolves asynchronously, so on first open the
         // permission is undefined. Delete must NOT be enabled in that window.
         mockCheckModifyPermission.mockReturnValue({ data: undefined });
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         await user.click(screen.getByRole("button"));
 
@@ -202,7 +200,7 @@ describe("PublishedPromptActions", () => {
         mockCheckModifyPermission.mockReturnValue({
           data: { hasPermission: true },
         });
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         await user.click(screen.getByRole("button"));
 
@@ -216,7 +214,7 @@ describe("PublishedPromptActions", () => {
 
       beforeEach(async () => {
         user = userEvent.setup();
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
         await clickDuplicate(user);
       });
 
@@ -244,7 +242,7 @@ describe("PublishedPromptActions", () => {
       it("surfaces the failure to the user", async () => {
         const user = userEvent.setup();
         mockDuplicate.mockRejectedValue(new Error("Prompt not found"));
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
+        renderActions(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
 
         await clickDuplicate(user);
 
@@ -266,7 +264,7 @@ describe("PublishedPromptActions", () => {
         // `markAsHandledByLicenseHandler` stamped a WeakSet the application's
         // mutation interceptors own; the screen asks the host the same question
         // instead, and this host answers yes the way that application would.
-        renderWithChakra(
+        renderActions(
           <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
           new FakePromptHost({ reportedGlobally: true }),
         );
