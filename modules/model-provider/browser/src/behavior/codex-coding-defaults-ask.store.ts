@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import type { ScopeAssignment } from "../model/scope-assignment.ts";
 
@@ -20,10 +20,12 @@ export interface CodexCodingDefaultsAskState {
   clear: () => void;
 }
 
-export const useCodexCodingDefaultsAskStore = create<CodexCodingDefaultsAskState>(
-  (set): CodexCodingDefaultsAskState => ({
+/** The queued post-connect ask, a slice of the global UI store. */
+export const useCodexCodingDefaultsAskStore = defineSlice<CodexCodingDefaultsAskState>({
+  name: "model-provider:codex-coding-defaults-ask",
+  create: (set) => ({
     pending: null,
-    request: (ask: CodexCodingDefaultsAsk) => set({ pending: ask }),
+    request: (ask) => set({ pending: ask }),
     clear: () => set({ pending: null }),
   }),
-);
+});

@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import type { ProviderClients } from "../../../model/provider-registry.ts";
 import { type AutomationDraft, type DraftAction } from "../model/draft-reducer.ts";
@@ -49,44 +49,48 @@ export interface AutomationAuthoringModel<C extends ProviderClients> {
 }
 
 /**
- * Creates the process-local authoring state for one application host. The
+ * Declares the authoring slice (`automation:authoring`) in the global UI store. The
  * package owns transitions and state shape; the host supplies only its named
  * provider registry, whose forms may use its transport client.
  */
 export function createAutomationAuthoringStore<C extends ProviderClients>(
   model: AutomationAuthoringModel<C>,
 ) {
-  return create<AutomationAuthoringStore<C>>((set) => ({
-    draft: model.INITIAL_DRAFT,
-    section: null,
-    step: "watch",
-    furthestStep: "watch",
-    testHistory: [],
-    hasInvalidConditionRows: false,
-    dispatch: (action) => set((state) => ({ draft: model.reducer(state.draft, action) })),
-    setHasInvalidConditionRows: (isInvalid) => set({ hasInvalidConditionRows: isInvalid }),
-    setSection: (section) => set({ section }),
-    setStep: (step) =>
-      set((state) => {
-        if (state.step === "watch" && state.hasInvalidConditionRows) return {};
-        return {
-          step,
-          furthestStep: stepIndex(step) > stepIndex(state.furthestStep) ? step : state.furthestStep,
-        };
-      }),
-    pushTestAttempt: (attempt) =>
-      set((state) => ({
-        testHistory: [attempt, ...state.testHistory].slice(0, MAX_AUTOMATION_TEST_HISTORY),
-      })),
-    hydrate: (draft) => set({ draft }),
-    reset: () =>
-      set({
-        draft: model.INITIAL_DRAFT,
-        section: null,
-        step: "watch",
-        furthestStep: "watch",
-        testHistory: [],
-        hasInvalidConditionRows: false,
-      }),
-  }));
+  return defineSlice<AutomationAuthoringStore<C>>({
+    name: "automation:authoring",
+    create: (set) => ({
+      draft: model.INITIAL_DRAFT,
+      section: null,
+      step: "watch",
+      furthestStep: "watch",
+      testHistory: [],
+      hasInvalidConditionRows: false,
+      dispatch: (action) => set((state) => ({ draft: model.reducer(state.draft, action) })),
+      setHasInvalidConditionRows: (isInvalid) => set({ hasInvalidConditionRows: isInvalid }),
+      setSection: (section) => set({ section }),
+      setStep: (step) =>
+        set((state) => {
+          if (state.step === "watch" && state.hasInvalidConditionRows) return {};
+          return {
+            step,
+            furthestStep:
+              stepIndex(step) > stepIndex(state.furthestStep) ? step : state.furthestStep,
+          };
+        }),
+      pushTestAttempt: (attempt) =>
+        set((state) => ({
+          testHistory: [attempt, ...state.testHistory].slice(0, MAX_AUTOMATION_TEST_HISTORY),
+        })),
+      hydrate: (draft) => set({ draft }),
+      reset: () =>
+        set({
+          draft: model.INITIAL_DRAFT,
+          section: null,
+          step: "watch",
+          furthestStep: "watch",
+          testHistory: [],
+          hasInvalidConditionRows: false,
+        }),
+    }),
+  });
 }

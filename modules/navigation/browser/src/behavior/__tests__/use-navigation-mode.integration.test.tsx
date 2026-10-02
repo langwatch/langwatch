@@ -4,93 +4,69 @@
  * Spec: specs/navigation/navigation-modes.feature
  */
 
+import { clearReaderUiStorage, setUiStorageReader } from "@langwatch/browser-host/storage";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  loadStoredNavigationMode,
-  NAVIGATION_MODE_STORAGE_KEY,
-  useNavigationModeStore,
-} from "../navigation-mode.store.ts";
+import { NAVIGATION_MODE_SLICE, useNavigationModeStore } from "../navigation-mode.store.ts";
 import { useNavigationMode } from "../use-navigation-mode.ts";
 
-const STORAGE_KEY = NAVIGATION_MODE_STORAGE_KEY;
+const READER = "reader-1";
+const STORAGE_KEY = `langwatch:user:${READER}:${NAVIGATION_MODE_SLICE}`;
+
+function signIn() {
+  act(() => setUiStorageReader(READER));
+}
 
 beforeEach(() => {
+  clearReaderUiStorage();
   localStorage.clear();
-  useNavigationModeStore.setState({ storedMode: null });
+  useNavigationModeStore.setState(useNavigationModeStore.getInitialState(), true);
 });
 
 describe("useNavigationMode", () => {
-  describe("when the device picked nothing", () => {
+  describe("when the reader picked nothing", () => {
     /** @scenario A device with no stored preference runs the product switcher */
     it("resolves to the product switcher", () => {
+      signIn();
       const { result } = renderHook(() => useNavigationMode());
       expect(result.current).toBe("product-switcher");
     });
   });
 
-  describe("when the device stored a mode", () => {
+  describe("when the reader stored a mode", () => {
     /** @scenario The stored mode decides the shell */
-    it("resolves to the stored mode after mount", async () => {
-      localStorage.setItem(STORAGE_KEY, "icon-rail");
+    it("resolves to the stored mode", () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { storedMode: "icon-rail" } }));
+      signIn();
 
-      const { result, rerender } = renderHook(() => useNavigationMode());
-
-      await act(async () => {
-        rerender();
-      });
+      const { result } = renderHook(() => useNavigationMode());
       expect(result.current).toBe("icon-rail");
     });
   });
 
-  describe("when localStorage carries a mode before the first render", () => {
-    /**
-     * The first client render must match the server render. The server has
-     * no localStorage, so it renders the default. If the store read
-     * localStorage at module init instead, an icon-rail reader would
-     * hydrate the wrong shell against the server's product-switcher DOM.
-     *
-     * @scenario The first client frame matches the server default and the stored mode applies after mount
-     */
-    it("renders the default on the first frame and the stored mode after mount", async () => {
-      localStorage.setItem(STORAGE_KEY, "icon-rail");
+  describe("when storage holds garbage", () => {
+    /** @scenario Garbage in storage counts as no stored choice */
+    it("resolves to the product switcher", () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { storedMode: "banana" } }));
+      signIn();
 
-      let firstFrame: string | undefined;
-      const { result, rerender } = renderHook(() => {
-        const mode = useNavigationMode();
-        firstFrame ??= mode;
-        return mode;
-      });
-
-      expect(firstFrame).toBe("product-switcher");
-
-      // The mount effect runs after the first paint; a rerender picks up
-      // the applied stored mode.
-      await act(async () => {
-        rerender();
-      });
-      expect(result.current).toBe("icon-rail");
+      const { result } = renderHook(() => useNavigationMode());
+      expect(result.current).toBe("product-switcher");
     });
   });
 });
 
 describe("navigationModeStore", () => {
-  describe("when storage holds garbage", () => {
-    /** @scenario Garbage in storage counts as no stored choice */
-    it("loads as no pick at all", () => {
-      localStorage.setItem(STORAGE_KEY, "banana");
-      expect(loadStoredNavigationMode()).toBeNull();
-    });
-  });
-
   describe("when a mode is picked", () => {
     /** @scenario Picking a mode persists on the device */
-    it("persists the mode for the next visit", () => {
+    it("persists the mode for the reader's next visit", () => {
+      signIn();
       useNavigationModeStore.getState().setStoredMode("icon-rail");
 
-      expect(localStorage.getItem(STORAGE_KEY)).toBe("icon-rail");
-      expect(loadStoredNavigationMode()).toBe("icon-rail");
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+        state: { storedMode: "icon-rail" },
+      });
     });
   });
 });

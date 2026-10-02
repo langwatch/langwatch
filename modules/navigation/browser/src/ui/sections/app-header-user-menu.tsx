@@ -10,10 +10,12 @@ import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
-  DEFAULT_NAVIGATION_MODE,
+  NAVIGATION_MODES,
   type NavigationMode,
+  navigationModeOf,
   useNavigationModeStore,
 } from "../../behavior/navigation-mode.store.ts";
+import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import {
@@ -27,8 +29,6 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
   "product-switcher": "Product switcher",
   "icon-rail": "Icon rail",
 };
-
-const NAVIGATION_MODES = Object.keys(NAVIGATION_MODE_LABELS) as NavigationMode[];
 
 /**
  * The menu's own header line: "Name (email)" where there is a name, else
@@ -57,13 +57,9 @@ export function AppHeaderUserMenu() {
   // reader's own single entry when they belong to none.
   const { entries: personalWorkspaceEntries } = usePersonalWorkspaceEntries(host);
 
-  // The navigation-mode preference lives on the device (see
-  // navigation-mode.store).
-  const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
+  // A reader who never picked runs the default mode; the picker reports that, not an empty choice.
+  const currentNavigationMode = useNavigationMode();
   const setStoredNavigationMode = useNavigationModeStore((s) => s.setStoredMode);
-  // A device that never picked runs the default mode; the picker reports that,
-  // not an empty choice.
-  const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   return (
     <Menu.Root>
@@ -129,7 +125,7 @@ export function AppHeaderUserMenu() {
                 <Menu.Content>
                   <Menu.RadioItemGroup
                     value={currentNavigationMode}
-                    onValueChange={(e) => setStoredNavigationMode(e.value as NavigationMode)}
+                    onValueChange={(e) => setStoredNavigationMode(navigationModeOf(e.value))}
                   >
                     {NAVIGATION_MODES.map((mode) => (
                       <Menu.RadioItem key={mode} value={mode}>
