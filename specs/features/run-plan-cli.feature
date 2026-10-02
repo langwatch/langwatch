@@ -232,6 +232,21 @@ Feature: Run Plan CLI Commands
     And the exit code is nonzero
 
   @unit
+  Scenario: The wait deadline also bounds a stalled status read
+    Given a batch with one completed run and one unfinished run
+    And a later status request, response body or page stops responding
+    When the configured wait expires
+    Then the CLI stops reading and reports a timeout rather than a poll failure
+    And the last complete poll's counts and results are preserved
+    And the exit code is nonzero
+
+  @unit
+  Scenario: A short wait ends before the next poll
+    Given a wait shorter than the polling interval
+    When the configured wait expires
+    Then the CLI reports a timeout without starting a status request
+
+  @unit
   Scenario: Wait with a value that is not a number of minutes
     When I run "langwatch run-plan run --all --target http:agent_abc --wait soon"
     Then the command is refused before anything is scheduled

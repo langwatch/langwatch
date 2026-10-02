@@ -85,10 +85,13 @@ export async function fetchBatchRuns({
 	endpoint,
 	batchRunId,
 	headers,
+	signal,
 }: {
 	endpoint: string;
 	batchRunId: string;
 	headers: Record<string, string>;
+	/** Cancels every page and response body when the caller stops waiting. */
+	signal?: AbortSignal;
 }): Promise<BatchRun[]> {
 	const runs: BatchRun[] = [];
 	let cursor: string | undefined;
@@ -99,7 +102,7 @@ export async function fetchBatchRuns({
 		url.searchParams.set("limit", "100");
 		if (cursor) url.searchParams.set("cursor", cursor);
 
-		const response = await langwatchFetch(url, { method: "GET", headers });
+		const response = await langwatchFetch(url, { method: "GET", headers, signal });
 		if (!response.ok) {
 			throw new Error(`status endpoint answered ${response.status}`);
 		}
