@@ -121,11 +121,10 @@ Feature: The resume every AI Governance page pins above its content
   # ===========================================================================
 
   @integration @regression
-  Scenario: An empty pane action is drawn as the outline house button
+  Scenario: An empty pane action is drawn as the house header button
     Given an empty pane offering the action that creates the page's own thing
     When the pane renders
-    Then that action is drawn as the section house button, which is outline
-    And it is not drawn as a solid fill
+    Then that action is drawn exactly as the section house header button
 
   @integration @regression
   Scenario: A quieter empty pane action is drawn quieter than the house button

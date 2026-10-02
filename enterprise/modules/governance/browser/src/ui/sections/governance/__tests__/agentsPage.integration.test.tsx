@@ -518,7 +518,7 @@ describe("the Agents page with the sample agents on screen", () => {
       ]);
     });
 
-    /** @scenario "A value the list does not have reads as a dash, never a zero" */
+    /** @scenario "A value the list does not have reads as No data with its reason, never a zero" */
     it("draws a never-called agent's figures as explained dashes on a named row", () => {
       renderPage();
 
@@ -595,7 +595,7 @@ describe("the Agents page with the sample agents on screen", () => {
       }
     });
 
-    /** @scenario "A figure the platform does not have reads as a dash, never a zero" */
+    /** @scenario "A figure the platform does not have reads as No data with its reason, never a zero" */
     it("draws a never-called agent's spend and requests as explained dashes", () => {
       renderPage({ query: { view: "grid" } });
 

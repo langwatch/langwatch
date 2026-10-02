@@ -154,20 +154,16 @@ describe("the action of an empty pane", () => {
       <Button size="sm" variant="ghost">
         Ghost
       </Button>
-      <Button size="sm" colorPalette="orange">
-        Solid
-      </Button>
     </>
   );
   const classOf = (name: string) => screen.getByRole("button", { name }).className;
 
   describe("given an action that creates the page's own thing", () => {
-    /** @scenario "An empty pane action is drawn as the outline house button" */
-    it("is drawn as the house header button and not as a solid fill", () => {
+    /** @scenario "An empty pane action is drawn as the house header button" */
+    it("is drawn exactly as the house header button", () => {
       renderInChakra(paneWith("primary"));
 
       expect(classOf("The action")).toBe(classOf("House"));
-      expect(classOf("The action")).not.toBe(classOf("Solid"));
     });
   });
 

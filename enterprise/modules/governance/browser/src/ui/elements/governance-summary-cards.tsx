@@ -57,9 +57,10 @@ export function GovernanceSummaryCard({
       flex="1 1 220px"
       minWidth="200px"
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
+      borderColor="border.muted"
+      borderRadius="xl"
       backgroundColor="bg.panel"
+      boxShadow="md"
       padding={4}
     >
       <VStack align="stretch" gap={2}>
