@@ -61420,7 +61420,9 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
 | Instant Evals are off on this install | The install judges with its own key, or has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
 
-If judging stops partway on a connected install, the popover also names both addresses, so check that they are still reachable.
+On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
+
+With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
