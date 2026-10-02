@@ -50,7 +50,7 @@ export function LineHighlights({
           left={0}
           right={0}
           height={`${positions[draggedParagraph]?.height ?? 0}px`}
-          background="blue.50"
+          background="blue.subtle"
           opacity={0.5}
           pointerEvents="none"
           borderRadius="md"

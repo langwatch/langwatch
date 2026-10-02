@@ -1,10 +1,10 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
-import {
-  API_KEY_PLACEHOLDER,
-  PersonalAccessTokenBanner,
-} from "@langwatch/design-system/personal-access-token-banner";
+import { CopyButton } from "@langwatch/design-system/copy-button";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
+import { Alert, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { KeyRound } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 
@@ -67,20 +67,22 @@ export function GeneratePromptApiSnippetDialog({
   }
 
   const description = (
-    <Link
-      href="https://docs.langwatch.ai/api-reference/prompts/get-prompt"
-      isExternal
-      color="blue.fg"
-      _hover={{ textDecoration: "underline" }}
-      fontSize="xs"
-    >
-      View the API documentation
-    </Link>
+    <>
+      Fetch this prompt from your code, filled with its variables.{" "}
+      <Link
+        href="https://docs.langwatch.ai/api-reference/prompts/get-prompt"
+        isExternal
+        color="fg.info"
+        _hover={{ textDecoration: "underline" }}
+      >
+        API reference
+      </Link>
+    </>
   );
 
   const controls =
     organizationId && project ? (
-      <PersonalAccessTokenBanner
+      <TokenCallout
         token={token}
         isCreating={minting.isMinting}
         scopeNote={minting.scopeNote}
@@ -113,3 +115,56 @@ export function GeneratePromptApiSnippetDialog({
 
 // Re-export the Trigger subcomponent for composability
 GeneratePromptApiSnippetDialog.Trigger = GenerateApiSnippetDialog.Trigger;
+
+/** A quiet info callout: mint a personal access token to fill the snippet, then copy it once. */
+function TokenCallout({
+  token,
+  isCreating,
+  scopeNote,
+  onCreate,
+}: {
+  token: string | null;
+  isCreating: boolean;
+  scopeNote?: string;
+  onCreate: () => void;
+}) {
+  return (
+    <Alert.Root status="info" variant="subtle" size="sm" borderRadius="md" alignItems="center">
+      <Alert.Indicator>
+        <KeyRound size={14} />
+      </Alert.Indicator>
+      <Alert.Content gap={0.5}>
+        <Alert.Description fontSize="sm">
+          {token ? (
+            <HStack gap={1} as="span">
+              <Text as="span" fontWeight="medium">
+                Copy this token now; it won&apos;t be shown again.
+              </Text>
+              <CopyButton
+                value={token}
+                label="Personal access token"
+                aria-label="Copy personal access token"
+              />
+            </HStack>
+          ) : (
+            "Create a personal access token to fill in the snippet."
+          )}
+        </Alert.Description>
+        {scopeNote ? (
+          <Text fontSize="xs" color="fg.muted">
+            {scopeNote}
+          </Text>
+        ) : null}
+      </Alert.Content>
+      <Button
+        size="xs"
+        variant={token ? "ghost" : "outline"}
+        loading={isCreating}
+        onClick={onCreate}
+        aria-label={token ? "Create another" : "Create a personal access token"}
+      >
+        {token ? "Create another" : "Create token"}
+      </Button>
+    </Alert.Root>
+  );
+}

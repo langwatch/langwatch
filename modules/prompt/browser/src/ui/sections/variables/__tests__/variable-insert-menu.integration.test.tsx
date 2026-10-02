@@ -165,7 +165,7 @@ describe("VariableInsertMenu", () => {
   describe("when highlighting", () => {
     it("highlights first item by default (index 0)", () => {
       renderComponent({ highlightedIndex: 0 });
-      // The first field "input" should have blue.50 background
+      // The first field "input" should have the bg.muted highlight
       // Can't easily test CSS in jsdom, but component renders without error
       expect(screen.getByText("input")).toBeInTheDocument();
     });

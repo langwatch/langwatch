@@ -395,7 +395,7 @@ function MenuSourceGroup({
             gap={2}
             cursor="pointer"
             borderRadius="4px"
-            background={optionIndex === highlight.highlightedIndex ? "blue.50" : undefined}
+            background={optionIndex === highlight.highlightedIndex ? "bg.muted" : undefined}
             onMouseMove={() => highlightOnMove({ ...highlight, optionIndex })}
             onClick={() => onSelectIndex(optionIndex)}
           >
@@ -426,7 +426,7 @@ function MenuCreateOption({
       gap={2}
       cursor="pointer"
       borderRadius="4px"
-      background={highlight.highlightedIndex === createOptionIndex ? "blue.50" : undefined}
+      background={highlight.highlightedIndex === createOptionIndex ? "bg.muted" : undefined}
       onMouseMove={() => highlightOnMove({ ...highlight, optionIndex: createOptionIndex })}
       borderTop="1px solid"
       borderColor="border.muted"
@@ -434,7 +434,7 @@ function MenuCreateOption({
       onClick={() => onCreateVariable?.(normalizedQuery)}
     >
       <Plus size={12} color="var(--chakra-colors-blue-500)" />
-      <Text fontSize="13px" color="blue.600">
+      <Text fontSize="13px" color="fg.info">
         Create variable "{`{{${normalizedQuery}}}`}"
       </Text>
     </HStack>

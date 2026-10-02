@@ -189,7 +189,7 @@ export const TemplateLogicMenu = ({
             display="flex"
             alignItems="center"
             gap={1}
-            _hover={{ color: "blue.500" }}
+            _hover={{ color: "fg" }}
           >
             Learn template syntax
             <ExternalLink size={10} />
@@ -218,7 +218,7 @@ function ConstructOption({
       gap={2}
       cursor="pointer"
       borderRadius="4px"
-      background={isHighlighted ? "blue.50" : undefined}
+      background={isHighlighted ? "bg.muted" : undefined}
       onMouseMove={onHover}
       onClick={onSelect}
       data-testid={`logic-construct-${construct.keyword}`}

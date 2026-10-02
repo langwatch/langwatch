@@ -1,6 +1,6 @@
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Box, HStack, type StackProps, Text, VStack } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { inferProvider, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 import { MODEL_ICON_SIZE } from "@langwatch/prompt-contract/llm-config-constants";
@@ -33,11 +33,13 @@ function getModelDisplayState({
     !isLoading &&
     groupedByProvider.length > 0 &&
     !groupedByProvider.some((g) => g.provider === providerKey);
-  const iconNode =
-    modelOption?.icon ??
-    (isProviderMissing
-      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
-      : undefined);
+  // The inferred mark is dark-safe and covers bare ids ("gpt-5-mini") the options miss.
+  const provider = inferProvider(model);
+  const iconNode = provider ? (
+    <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
+  ) : (
+    modelOption?.icon
+  );
 
   return { iconNode, isProviderMissing, providerKey };
 }

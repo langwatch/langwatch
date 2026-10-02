@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, createListCollection, Field, HStack, Input, Text } from "../primitives.ts";
 import { titleCase } from "../string-casing.ts";
 import { InputGroup } from "./input-group.tsx";
-import { modelProviderIcons } from "./provider-icons.tsx";
+import { inferProvider, ProviderIconGlyph } from "./provider-icons.tsx";
 import { Select } from "./select.tsx";
 
 const MODEL_ICON_SIZE = "16px";
@@ -64,6 +64,12 @@ const SELECT_SIZES: Record<SelectorSize, "sm" | "md" | undefined> = {
   md: "md",
 };
 
+/** The dark-safe provider mark for a model id, prefixed (`openai/gpt-5`) or bare (`gpt-5`). */
+function providerIconFor(model: string, size: string = MODEL_ICON_SIZE): React.ReactNode {
+  const provider = inferProvider(model);
+  return provider ? <ProviderIconGlyph provider={provider} size={size} /> : null;
+}
+
 function iconSlotFor(size: SelectorSize): string {
   return size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
 }
@@ -82,7 +88,7 @@ function groupOptionsByProvider(selectOptions: ModelOption[]): GroupedModelOptio
 
   return Object.entries(byProvider).map(([provider, models]) => ({
     provider,
-    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+    icon: providerIconFor(`${provider}/`),
     models,
   }));
 }
@@ -301,9 +307,9 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     () =>
       (query.data ?? []).map((option) => ({
         ...option,
-        icon: modelProviderIcons[option.value.split("/")[0] as keyof typeof modelProviderIcons],
+        icon: providerIconFor(option.value, iconSlotFor(size)),
       })),
-    [query.data],
+    [query.data, size],
   );
 
   const groupedByProvider: GroupedModelOptions = useMemo(
@@ -328,7 +334,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   // opacity so it reads as "this is what you'd get if you don't
   // override" instead of an empty / broken selector.
   const inheritIcon = inheritOption?.model
-    ? modelProviderIcons[inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons]
+    ? providerIconFor(inheritOption.model, iconSlotFor(size))
     : null;
 
   // The inherit option must be in the collection: Chakra's Select uses it
@@ -351,9 +357,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   });
 
   const selectedItem = selectOptions.find((option) => option.value === model);
-  const selectedIcon =
-    selectedItem?.icon ??
-    modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
+  const selectedIcon = selectedItem?.icon ?? providerIconFor(model, iconSlotFor(size));
   const isUnknown = !!model && !selectedItem;
 
   const showInheritPlaceholder = !model && inheritOption;
