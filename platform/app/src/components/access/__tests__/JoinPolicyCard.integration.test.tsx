@@ -212,8 +212,8 @@ describe("given the seat newcomers receive (ADR-143)", () => {
   });
 
   describe("when the door is shut after a seat was picked", () => {
-    /** @scenario Shutting the door keeps the joiner seat an administrator can no longer see */
-    it("saves the seat already in force, not the one it stopped showing", async () => {
+    /** @scenario Shutting the door leaves the joiner seat an administrator can no longer see untouched */
+    it("leaves the seat out of the save instead of sending one it stopped showing", async () => {
       const { onSave } = renderCard({ domainJoin: "request" });
       const user = userEvent.setup();
 
@@ -223,10 +223,10 @@ describe("given the seat newcomers receive (ADR-143)", () => {
 
       await user.click(screen.getByRole("button", { name: "Save" }));
 
-      expect(onSave).toHaveBeenCalledWith({
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave.mock.calls[0]?.[0]).toStrictEqual({
         domainJoin: "off",
         domains: [],
-        joinerRole: "MEMBER",
       });
     });
   });

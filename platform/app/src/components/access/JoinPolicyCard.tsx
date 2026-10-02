@@ -247,7 +247,8 @@ export function JoinPolicyCard({
   onSave: (next: {
     domainJoin: DomainJoinSetting;
     domains: string[];
-    joinerRole: JoinerRole;
+    /** Left out when the seat control is hidden: the seat in force stays. */
+    joinerRole?: JoinerRole;
   }) => void;
   /** A connection is routing sign-ins, so the SSO door has its own answer to
    *  this question — the card points at it rather than letting a reader set
@@ -273,16 +274,18 @@ export function JoinPolicyCard({
    * A live connection admits people whatever the domain door says, and they
    * land on this seat too, so the choice stays offered while the door is shut
    * as long as that other door is open. When neither door is open the seat is
-   * not shown, and a choice the reader can no longer see is never saved: the
-   * seat already in force goes out instead.
+   * not shown, and a choice the reader can no longer see is never sent: the
+   * save carries no seat and the server keeps the one in force. Sending the
+   * seat this card loaded would overwrite what another administrator saved
+   * since, under this reader's name.
    */
   const seatShown = selected !== "off" || ssoLive;
-  const seatToSave = seatShown ? seat : joinerRole;
+  const seatToSave = seatShown ? seat : undefined;
 
   const unchanged =
     selected === domainJoin &&
     parsedDomains.join(",") === joinDomains.join(",") &&
-    seatToSave === joinerRole;
+    (seatToSave === undefined || seatToSave === joinerRole);
 
   return (
     <SettingsCard
@@ -308,7 +311,7 @@ export function JoinPolicyCard({
             onSave({
               domainJoin: selected,
               domains: parsedDomains,
-              joinerRole: seatToSave,
+              ...(seatToSave === undefined ? {} : { joinerRole: seatToSave }),
             })
           }
         >

@@ -218,7 +218,8 @@ function useDomainJoinSetting({
     (next: {
       domainJoin: DomainJoinSetting;
       domains: string[];
-      joinerRole: JoinerRole;
+      /** Left out when the card hid the seat; the server keeps the one in force. */
+      joinerRole?: JoinerRole;
     }) => {
       setJoiningMutation.mutate(
         { organizationId, ...next },

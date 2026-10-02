@@ -47,12 +47,12 @@ Feature: Developer seat
     When an administrator invites a person with the seat "Full"
     Then after the person accepts they are a Full member
 
-  Scenario: Shutting the door keeps the joiner seat an administrator can no longer see
+  Scenario: Shutting the door leaves the joiner seat an administrator can no longer see untouched
     Given the organisation's joiner seat is "Full"
     And no single sign-on connection admits people
     When an administrator picks the seat "Developer" and then shuts the door before saving
     Then the seat choice is no longer shown
-    And saving keeps the joiner seat at "Full"
+    And saving sends no joiner seat at all, so whatever seat is in force stays in force
 
   # ============================================================================
   # What a Developer can and cannot reach
