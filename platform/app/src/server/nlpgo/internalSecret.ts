@@ -15,6 +15,15 @@
 export const NLP_INTERNAL_SECRET_HEADER = "X-LangWatch-NLP-Secret";
 
 /**
+ * The variable both ends read. Named here rather than spelled at each reader
+ * because one of them is the scenario child's environment allowlist, which is
+ * the only route from the operator's environment into that process: a typo
+ * there costs the child the secret and every nlpgo call it makes comes back
+ * 401.
+ */
+export const NLP_INTERNAL_SECRET_ENV = "LANGWATCH_NLP_INTERNAL_SECRET";
+
+/**
  * Headers to merge into every outbound nlpgo request: the secret header when
  * configured, an empty object when not.
  *
@@ -24,7 +33,7 @@ export const NLP_INTERNAL_SECRET_HEADER = "X-LangWatch-NLP-Secret";
  * drive the two branches with `vi.stubEnv`.
  */
 export function nlpgoInternalHeaders(): Record<string, string> {
-  const secret = process.env.LANGWATCH_NLP_INTERNAL_SECRET?.trim();
+  const secret = process.env[NLP_INTERNAL_SECRET_ENV]?.trim();
   if (!secret) return {};
 
   return { [NLP_INTERNAL_SECRET_HEADER]: secret };

@@ -44,7 +44,7 @@ Docker Compose starts the following services:
 | `redis` | `redis:alpine` | - | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
-Services with no host port are reachable only on the compose network. `langwatch_nlp` listens on 5561 there, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at.
+Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
 
 ## Configuration
 

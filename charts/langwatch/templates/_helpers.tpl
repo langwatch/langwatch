@@ -587,6 +587,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      fires only against a real cluster, and only when the Secret is already
      there and demonstrably missing the key — never on a first install where
      it has yet to be created. */}}
+{{/* The NLP service's own key faces the same collision as Langy's, from the
+     other direction: langwatch_nlp.secrets.internalSecretKey names a key the
+     chart writes into the app Secret unconditionally, so pointing it at
+     nextAuthSecret or a gateway key emits that entry twice and the NLP value
+     wins. The app would then authenticate sessions, or the gateway hop, with
+     the NLP credential. Refuse, for the same reason the Langy check does:
+     these credentials have separate blast radii on purpose. */}}
+{{- $nlpKey := include "langwatch.nlpInternalSecretKey" . }}
+{{- $nlpReserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+{{- if (.Values.gateway).chartManaged }}
+  {{- $nlpReserved = concat $nlpReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
+{{- end }}
+{{- if has $nlpKey $nlpReserved }}
+  {{- $errors = append $errors (printf "langwatch_nlp.secrets.internalSecretKey is %q, which is already a key of the app Secret. The NLP credential would overwrite that one. Pick a distinct key name; the default is LANGWATCH_NLP_INTERNAL_SECRET." $nlpKey) }}
+{{- end }}
 {{- $langy := (index .Values "langyagent") | default dict }}
 {{- if $langy.chartManaged }}
   {{- $langySecrets := $langy.secrets | default dict }}

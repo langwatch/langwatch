@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -187,6 +188,36 @@ func (e *Executor) newRunDir() (string, error) {
 	return dir, nil
 }
 
+// removeRunDir disposes of one execution's directory.
+//
+// A plain RemoveAll is not enough: unlinking a file needs write permission on
+// the directory holding it, so user code that chmods its own run directory (or
+// any directory it created inside) read-only makes the removal fail and leaves
+// the tree on disk. The next execution still gets a fresh directory, so the
+// isolation property holds either way, but a long-lived engine process would
+// accumulate them until the volume filled. Restoring owner write permission on
+// the way down costs one walk and removes the only failure mode user code can
+// arrange for itself.
+func removeRunDir(dir string) {
+	if err := os.RemoveAll(dir); err == nil {
+		return
+	}
+	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			// Keep walking: one unreadable entry must not abandon the rest.
+			return nil //nolint:nilerr // best-effort cleanup, see the doc comment
+		}
+		if entry.IsDir() {
+			// G302 does not distinguish a directory from a file: 0700 is already
+			// owner-only, and the execute bit is what makes a directory
+			// traversable at all.
+			_ = os.Chmod(path, 0o700) //nolint:gosec // directory mode, not a file mode
+		}
+		return nil
+	})
+	_ = os.RemoveAll(dir)
+}
+
 // Request is what the engine hands to the executor per node invocation.
 type Request struct {
 	Code            string
@@ -324,7 +355,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = os.RemoveAll(runDir) }()
+	defer removeRunDir(runDir)
 
 	runnerPath := filepath.Join(runDir, "runner.py")
 	resultPath := filepath.Join(runDir, "result.json")

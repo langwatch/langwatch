@@ -89,4 +89,39 @@ describe("buildChildEnvironment", () => {
       });
     });
   });
+
+  describe("given the engine's internal secret is configured on the parent", () => {
+    describe("when a child is started for any target", () => {
+      it("forwards the secret so the adapters inside it can authenticate", () => {
+        // The code and workflow adapters and the model factory run inside this
+        // child and build their own requests to nlpgo. nlpgo refuses a /go
+        // request with no secret once one is configured, so without the
+        // forward a configured install 401s every simulation run against a
+        // workflow or code agent while the engine answers the parent fine.
+        vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", "shared-with-the-app");
+
+        const result = buildChildEnvironment({
+          jobData: jobData("http"),
+          labels: [],
+          telemetry,
+        });
+
+        expect(result.LANGWATCH_NLP_INTERNAL_SECRET).toBe("shared-with-the-app");
+      });
+    });
+  });
+
+  describe("given no internal secret on the parent", () => {
+    describe("when a child is started", () => {
+      it("binds nothing, so the child sends no secret header either", () => {
+        const result = buildChildEnvironment({
+          jobData: jobData("http"),
+          labels: [],
+          telemetry,
+        });
+
+        expect(result.LANGWATCH_NLP_INTERNAL_SECRET).toBeUndefined();
+      });
+    });
+  });
 });
