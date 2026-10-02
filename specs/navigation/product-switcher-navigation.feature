@@ -165,3 +165,10 @@ Feature: Product switcher navigation
     Given my organization holds more than eight projects
     When I open the project menu without typing
     Then each team I can create a project in offers "New Project"
+
+  @integration
+  Scenario: A later navigation keeps the chrome while the workspace re-settles
+    Given the chrome has drawn once
+    When I navigate somewhere that makes my session or permissions read again
+    Then the sidebar and top bar stay on screen
+    And the page area is blank until the read settles, never the full loading splash

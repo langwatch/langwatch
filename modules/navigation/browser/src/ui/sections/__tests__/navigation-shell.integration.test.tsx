@@ -734,3 +734,29 @@ describe("the guided tour's spotlight targets", () => {
     });
   });
 });
+
+describe("a later navigation that makes the workspace read again", () => {
+  afterEach(() => cleanup());
+
+  /** @scenario A later navigation keeps the chrome while the workspace re-settles */
+  it("keeps the chrome and blanks only the page rather than drawing the splash", () => {
+    const shellReading = (isLoading: boolean) => (
+      <WithStubNavigationHost
+        readings={{ ...BASE_READINGS, isLoading, waiting: <div data-testid="waiting" /> }}
+        actions={{ navigate: navigateMock, replace: replaceMock }}
+      >
+        <NavigationShell>
+          <div data-testid="page-body" />
+        </NavigationShell>
+      </WithStubNavigationHost>
+    );
+    const view = renderWithDesignSystem(shellReading(false));
+    expect(screen.getByTestId("page-body")).toBeTruthy();
+
+    view.rerender(shellReading(true));
+
+    expect(screen.queryByTestId("waiting")).toBeNull();
+    expect(screen.queryByTestId("page-body")).toBeNull();
+    expect(screen.getByTestId("product-sidebar")).toBeTruthy();
+  });
+});

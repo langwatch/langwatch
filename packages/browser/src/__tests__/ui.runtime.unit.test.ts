@@ -72,4 +72,21 @@ describe("UiRuntime", () => {
     expect(document.getElementById("root")?.innerHTML).toBe("");
     expect(() => runtime.start()).toThrow("UI runtime is closed.");
   });
+
+  it("re-renders into the root a previous runtime left, as a hot reload re-running the entry does", () => {
+    document.body.innerHTML = '<div id="root"></div>';
+    const errors = vi.spyOn(console, "error").mockImplementation(() => void 0);
+    const reloaded = new TestUiShell();
+    reloaded.render.mockImplementation(() => createElement("main", null, "Reloaded"));
+
+    act(() => UiRuntime.create({ document, shell: new TestUiShell() }).start());
+    const runtime = UiRuntime.create({ document, shell: reloaded });
+    act(() => runtime.start());
+
+    expect(document.getElementById("root")?.textContent).toBe("Reloaded");
+    expect(errors.mock.calls.flat().join(" ")).not.toContain("already been passed to createRoot");
+
+    act(() => runtime.close());
+    errors.mockRestore();
+  });
 });

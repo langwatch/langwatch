@@ -22,12 +22,8 @@ afterEach(async () => {
 describe("given the providers that need router context", () => {
   describe("when the application installs the ones it still owns", () => {
     it("keeps the page inside the command bar, with the toaster beside it and the footer after it", async () => {
-      const navigationWrites: string[] = [];
       const InnerProvider = createUiInnerProvider({
         usePublicAppConfig: () => ({ data: publicAppConfig }),
-        useNavigationTracking: () => {
-          navigationWrites.push("mounted");
-        },
         commandBar: ({ children }: { children: ReactNode }) => (
           <div data-testid="command-bar">{children}</div>
         ),
@@ -67,7 +63,6 @@ describe("given the providers that need router context", () => {
         container.querySelector("[data-testid='command-bar'] [data-testid='footer']"),
       ).toBeNull();
       expect(container.querySelector("[data-testid='footer']")).toBeTruthy();
-      expect(navigationWrites).toEqual(["mounted"]);
 
       router.dispose();
     });

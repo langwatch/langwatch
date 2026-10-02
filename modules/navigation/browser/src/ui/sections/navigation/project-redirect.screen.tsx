@@ -25,5 +25,5 @@ export default function ProjectRedirectScreen() {
     return () => clearTimeout(timeout);
   }, [host, slug, rest]);
 
-  return <>{host.waiting()}</>;
+  return null;
 }

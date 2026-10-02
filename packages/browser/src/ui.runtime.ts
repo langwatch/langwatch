@@ -8,12 +8,15 @@ export type UiRuntimeOptions = {
   rootElementId?: string;
 };
 
+/** One root per container, so a hot reload that re-runs the entry re-renders into it. */
+const mountedRoots = new WeakMap<Element, Root>();
+
 export class UiRuntime {
   static create(options: UiRuntimeOptions): UiRuntime {
     return new UiRuntime(options.document, options.shell, options.rootElementId ?? "root");
   }
 
-  private root: Root | undefined;
+  private container: Element | undefined;
   private closed = false;
 
   private constructor(
@@ -27,7 +30,7 @@ export class UiRuntime {
       throw new Error("UI runtime is closed.");
     }
 
-    if (this.root) {
+    if (this.container) {
       return;
     }
 
@@ -38,11 +41,13 @@ export class UiRuntime {
       throw new Error("Root element not found");
     }
 
-    const root = createRoot(container);
+    const root = mountedRoots.get(container) ?? createRoot(container);
     try {
       root.render(this.shell.render());
-      this.root = root;
+      mountedRoots.set(container, root);
+      this.container = container;
     } catch (error) {
+      mountedRoots.delete(container);
       root.unmount();
       throw error;
     }
@@ -54,7 +59,10 @@ export class UiRuntime {
     }
 
     this.closed = true;
-    this.root?.unmount();
-    this.root = void 0;
+    if (this.container) {
+      mountedRoots.get(this.container)?.unmount();
+      mountedRoots.delete(this.container);
+    }
+    this.container = void 0;
   }
 }

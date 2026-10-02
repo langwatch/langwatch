@@ -4,7 +4,7 @@
  */
 
 import { Box, HStack } from "@langwatch/design-system/primitives";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import {
   useNavigationShellState,
@@ -43,15 +43,21 @@ export function NavigationShell({
   fullScreen = false,
 }: NavigationShellProps) {
   const host = useNavigationHost();
-  const state = useNavigationShellState({
+  const reading = useNavigationShellState({
     isPersonalScope: personalScope,
     isOrgScope: orgScope,
   });
   useProjectAddressRedirect();
+  const lastReady = useRef<NavigationShellReadyState | null>(null);
+  if (reading.status === "ready") lastReady.current = reading;
 
-  if (state.status === "not-found") return <>{host.notFound()}</>;
-  if (state.status === "loading") return <>{host.waiting()}</>;
-  if (state.status === "chromeless" || fullScreen) return <>{children}</>;
+  if (reading.status === "not-found") return <>{host.notFound()}</>;
+  // Only the first load waits on the splash: a scope or permission re-settle on
+  // a later navigation keeps the last chrome and blanks just the page.
+  const state = reading.status === "loading" ? lastReady.current : reading;
+  if (state === null) return <>{host.waiting()}</>;
+  const page = reading.status === "loading" ? null : children;
+  if (state.status === "chromeless" || fullScreen) return <>{page}</>;
 
   const isIconRail = mode === "icon-rail";
 
@@ -62,7 +68,7 @@ export function NavigationShell({
       <Box width="full" minHeight="100vh" background="bg.page">
         <ShellTitle pageTitle={pageTitle} state={state} />
         <MobileShell state={state}>
-          <ShellPageBody personalScope={personalScope}>{children}</ShellPageBody>
+          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
         </MobileShell>
       </Box>
     );
@@ -90,7 +96,7 @@ export function NavigationShell({
         <ShellTopBar state={state} shouldShowProductCluster={!isIconRail} />
 
         <ShellContentRow state={state} isIconRail={isIconRail}>
-          <ShellPageBody personalScope={personalScope}>{children}</ShellPageBody>
+          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
         </ShellContentRow>
       </Box>
     </Box>

@@ -18,8 +18,6 @@ export type UiPublicTelemetry = PostHogPublicConfig &
 
 export type UiInnerProviderInstall = {
   usePublicAppConfig: () => { data: UiPublicTelemetry | undefined };
-  /** Product-memory and settings-return write points, mounted once. */
-  useNavigationTracking: () => void;
   commandBar: UiProviderShell;
   toaster: ComponentType;
   footer: ComponentType;
@@ -33,7 +31,6 @@ export type UiInnerProviderInstall = {
 
 export function createUiInnerProvider({
   usePublicAppConfig,
-  useNavigationTracking,
   commandBar: CommandBar,
   toaster: Toaster,
   footer: Footer,
@@ -49,7 +46,6 @@ export function createUiInnerProvider({
     // Router context is available here — the inner providers render inside
     // RouterProvider — which is what a navigation span needs.
     useNavigationTracing({ enabled: !!publicConfig.data?.telemetry.browserTracing });
-    useNavigationTracking();
 
     return (
       <>
