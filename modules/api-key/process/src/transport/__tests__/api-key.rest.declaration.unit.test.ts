@@ -34,6 +34,7 @@ describe("the api-keys REST declaration", () => {
         ["patch", "/:id", "updateApiKey", "organization:manage"],
         ["delete", "/:id", "revokeApiKey", "organization:manage"],
         ["post", "/ingestion", "createIngestionApiKey", "traces:create"],
+        ["post", "/project", "createProjectApiKey", "project:manage"],
       ]);
     });
 
@@ -50,6 +51,7 @@ describe("the api-keys REST declaration", () => {
         ["updateApiKey", undefined],
         ["revokeApiKey", undefined],
         ["createIngestionApiKey", 201],
+        ["createProjectApiKey", 201],
       ]);
     });
 
@@ -69,6 +71,7 @@ describe("the api-keys REST declaration", () => {
         ["updateApiKey", "organization", ["apiKeyRestCredential"]],
         ["revokeApiKey", "organization", ["apiKeyRestCredential"]],
         ["createIngestionApiKey", "project", ["apiKeyIngestionCaller"]],
+        ["createProjectApiKey", "project", ["apiKeyIngestionCaller"]],
       ]);
     });
 
@@ -80,6 +83,7 @@ describe("the api-keys REST declaration", () => {
         "Update an API key",
         "Revoke an API key",
         "Create an ingestion API key",
+        "Create a project API key",
       ]);
     });
   });

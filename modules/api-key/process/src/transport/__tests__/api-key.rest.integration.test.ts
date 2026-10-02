@@ -1100,11 +1100,15 @@ describe("the api-keys REST family", () => {
       ["a service key", { keyType: "service" }],
       ["another member's key", { assignedToUserId: OTHER_USER_ID }],
       ["another project", { bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "p-2" }] }],
-      ["an organization binding", { bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }] }],
-      ["a second binding", { bindings: [...INGESTION_SHAPE.bindings, ...INGESTION_SHAPE.bindings] }],
+      [
+        "an organization binding",
+        { bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }] },
+      ],
+      [
+        "a second binding",
+        { bindings: [...INGESTION_SHAPE.bindings, ...INGESTION_SHAPE.bindings] },
+      ],
       ["an extra permission", { permissions: ["traces:create", "traces:view"] }],
-      ["unrestricted access", { permissionMode: "all", permissions: undefined }],
-      ["an admin role", { bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }] }],
     ])("refuses %s", async (_shape, change) => {
       const { send, create } = mountIngestion();
 
@@ -1119,6 +1123,26 @@ describe("the api-keys REST family", () => {
       expect(create).not.toHaveBeenCalled();
     });
 
+    /** @scenario The ingestion key route refuses any other shape */
+    it.each([
+      ["unrestricted access", { permissionMode: "all", permissions: undefined }],
+      [
+        "an admin role",
+        { bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+      ],
+    ])("refuses %s at the body's own shape, before any key is minted", async (_shape, change) => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, ...change },
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(422);
+      expect(create).not.toHaveBeenCalled();
+    });
+
     /** @scenario An API key cannot mint an ingestion key */
     it("refuses a caller presenting an API key", async () => {
       const { send, create } = mountIngestion();
@@ -1126,6 +1150,115 @@ describe("the api-keys REST family", () => {
       const response = await send("/api/api-keys/ingestion", {
         method: "POST",
         body: INGESTION_SHAPE,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+  describe("when a project session asks POST /api/api-keys/project for a key", () => {
+    const PROJECT_KEY_SHAPE = {
+      name: "laptop / my-project",
+      keyType: "personal",
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+    };
+
+    function mountProjectKey(options: { granted?: readonly string[] } = {}) {
+      const create = vi.fn(async () => ({
+        token: "sk-lw-project",
+        apiKey: apiKey({ id: "project-key", name: PROJECT_KEY_SHAPE.name }),
+      }));
+      const mounted = mountApiKeyRest({ apiKeys: { create }, granted: options.granted });
+      return { ...mounted, create };
+    }
+
+    /** @scenario A person's project session mints its own project API key */
+    it("mints the person's own key with full access to the session's project", async () => {
+      const { send, create } = mountProjectKey();
+
+      const response = await send("/api/api-keys/project", {
+        method: "POST",
+        body: PROJECT_KEY_SHAPE,
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({ token: "sk-lw-project" });
+      expect(create).toHaveBeenCalledWith({
+        name: PROJECT_KEY_SHAPE.name,
+        description: undefined,
+        userId: CALLER_USER_ID,
+        createdByUserId: CALLER_USER_ID,
+        organizationId: ORGANIZATION_ID,
+        expiresAt: undefined,
+        permissionMode: "all",
+        bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      });
+    });
+
+    /** @scenario The project API key route refuses any other shape */
+    it.each([
+      ["a service key", { keyType: "service" }],
+      ["another member's key", { assignedToUserId: OTHER_USER_ID }],
+      ["another project", { bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: "p-2" }] }],
+      [
+        "an organization binding",
+        { bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }] },
+      ],
+      [
+        "a second binding",
+        { bindings: [...PROJECT_KEY_SHAPE.bindings, ...PROJECT_KEY_SHAPE.bindings] },
+      ],
+      [
+        "restricted permissions",
+        {
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      ],
+      ["read-only access", { permissionMode: "readonly" }],
+      [
+        "a lesser role",
+        { bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+      ],
+    ])("refuses %s", async (_shape, change) => {
+      const { send, create } = mountProjectKey();
+
+      const response = await send("/api/api-keys/project", {
+        method: "POST",
+        body: { ...PROJECT_KEY_SHAPE, ...change },
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A person without project:manage cannot mint a project API key */
+    it("refuses a session that holds traces:create but not project:manage", async () => {
+      const { send, create } = mountProjectKey({ granted: ["traces:create"] });
+
+      const response = await send("/api/api-keys/project", {
+        method: "POST",
+        body: PROJECT_KEY_SHAPE,
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An API key cannot mint a project API key */
+    it("refuses a caller presenting an API key", async () => {
+      const { send, create } = mountProjectKey();
+
+      const response = await send("/api/api-keys/project", {
+        method: "POST",
+        body: PROJECT_KEY_SHAPE,
       });
 
       expect(response.status).toBe(403);
