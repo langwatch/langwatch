@@ -32,6 +32,10 @@ import { shouldStartPasskeyOnArrival } from "../logic/methodRanking";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
+import {
+  rememberSoleConnectionAutoDial,
+  soleConnectionAutoDialAllowed,
+} from "../logic/soleConnectionAutoDial";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
@@ -98,6 +102,8 @@ export function IdentifierFirstSignIn() {
     readonly SignInMethod[]
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  // Read once per mount, before this page dials anything itself.
+  const [soleAutoDialAllowed] = useState(() => soleConnectionAutoDialAllowed());
   /**
    * Whether an expired session of this browser's explains the arrival.
    *
@@ -324,13 +330,26 @@ export function IdentifierFirstSignIn() {
   }
 
   if (decision?.outcome === "redirect_to_connection") {
+    // A typed address always dials. With no address, only the self-hosted
+    // sole connection does, and only if this tab has not just been sent
+    // there: a round trip that came back without a session shows the button
+    // rather than looping.
+    const soleConnection =
+      submittedIdentifier === null &&
+      decision.reasonCode === "sole_active_connection";
     return (
       <RoutedToConnection
         decision={decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
-        autoStart={submittedIdentifier !== null}
+        autoStart={
+          submittedIdentifier !== null ||
+          (soleConnection && soleAutoDialAllowed)
+        }
+        onAutoStart={
+          soleConnection ? () => rememberSoleConnectionAutoDial() : undefined
+        }
       />
     );
   }
@@ -674,10 +693,13 @@ export function RoutedToConnection({
   title = "Log in to LangWatch",
   footer,
   autoStart = true,
+  onAutoStart,
 }: {
   decision: RoutingDecision;
-  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  /** Whether the hand-off starts on its own or waits for the button. */
   autoStart?: boolean;
+  /** Called once, when the hand-off starts on its own. */
+  onAutoStart?: () => void;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
   /** The address that routed here, handed to the provider as the OIDC
@@ -700,8 +722,9 @@ export function RoutedToConnection({
     // presses: without it the people routed by their address, who sign in
     // this way every day, are the ones the landing never badges.
     rememberPendingMethod(method);
+    onAutoStart?.();
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [autoStart, method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);

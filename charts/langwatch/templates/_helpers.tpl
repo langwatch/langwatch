@@ -1532,6 +1532,31 @@ containers:
 {{- end -}}
 
 {{/*
+  The release's stored-objects upgrade fingerprint: a digest of the chart
+  version and every value. The workers Deployment carries it as an annotation,
+  and the pre-upgrade hook compares the live annotation with the release about
+  to be applied. Equal means the sync renders what is already running (Argo CD
+  maps these hooks to PreSync and PostSync and runs them on every sync), so no
+  pod rolls. The hook also requires both rollouts to be finished before it
+  skips, since an equal fingerprint does not prove the last rollout completed.
+
+  Values, not the rendered Deployments: a Deployment cannot hash a manifest
+  that carries the hash. Any value change counts as a change, which keeps the
+  ordering on every real upgrade at the cost of also running it for a change
+  that does not roll a pod.
+*/}}
+{{- define "langwatch.storedObjects.upgradeFingerprint" -}}
+{{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
+{{- end -}}
+
+{{/* Whether the stored-objects upgrade hooks render for this release. */}}
+{{- define "langwatch.storedObjects.serializeUpgradesActive" -}}
+{{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
   Shell functions both stored-objects upgrade hook Jobs use. They read the
   `ns`, `deploy` and `selector` variables the Job's script sets above them.
 */}}
@@ -1592,12 +1617,17 @@ is_number() {
 }
 
 app_rollout_done() {
+  rollout_done "$app"
+}
+
+# Whether the named Deployment has finished rolling out.
+rollout_done() {
   # Pipe-separated, not space-separated. A status field that is absent (which
   # is how the API reports zero) renders as nothing, so on whitespace splitting
   # every later field shifts left and is read as the wrong one. With an
   # explicit separator the empty field keeps its place, and an empty field
   # fails is_number below, which reads as "not done yet" and keeps waiting.
-  state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
+  state=$(kubectl -n "$ns" get deployment "${1}" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
   old_ifs=$IFS
   IFS='|'
   set -- $state
