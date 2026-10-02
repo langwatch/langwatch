@@ -35,8 +35,11 @@ export class MemoryMonitorRepository implements MonitorRepository {
 
   private constructor() {}
 
-  static create(): MemoryMonitorRepository {
-    return new MemoryMonitorRepository();
+  /** `seed` holds the rows a fixture or a contract test needs to already exist. */
+  static create({ seed = [] }: { seed?: readonly StoredMonitor[] } = {}): MemoryMonitorRepository {
+    const repository = new MemoryMonitorRepository();
+    repository.#rows = seed.map((monitor) => structuredClone(monitor));
+    return repository;
   }
 
   async countUsage({
@@ -52,11 +55,6 @@ export class MemoryMonitorRepository implements MonitorRepository {
       monitors: made.filter((at) => since === undefined || at >= since).length,
       ...(made.length === 0 ? {} : { firstMonitorAt: Math.min(...made) }),
     };
-  }
-
-  /** Seeds a row the way a fixture or a contract test needs it to already exist. */
-  seed(monitor: StoredMonitor): void {
-    this.#rows.push(structuredClone(monitor));
   }
 
   async findAll(input: { projectId: string }): Promise<MonitorWithEvaluator[]> {

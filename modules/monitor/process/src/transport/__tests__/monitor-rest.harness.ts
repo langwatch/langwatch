@@ -34,8 +34,7 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 export function mountMonitorRest(
   options: { permits?: boolean; seed?: readonly MonitorWithEvaluator[] } = {},
 ) {
-  const repository = MemoryMonitorRepository.create();
-  for (const monitor of options.seed ?? []) repository.seed(monitor);
+  const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
 
   const app = createMonitorTestApp({
     repositories: createMonitorTestRepositories(repository),

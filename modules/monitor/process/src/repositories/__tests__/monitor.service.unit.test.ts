@@ -43,8 +43,7 @@ const stored: MonitorWithEvaluator = {
 function harness(
   options: { seed?: readonly MonitorWithEvaluator[]; known?: readonly string[]; id?: string } = {},
 ) {
-  const repository = MemoryMonitorRepository.create();
-  for (const monitor of options.seed ?? []) repository.seed(monitor);
+  const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
   const evaluators = new FakeMonitorEvaluators(options.known ?? ["evaluator_1"]);
 
   return {

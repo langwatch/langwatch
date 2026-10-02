@@ -57,8 +57,7 @@ function mount(
     hasProjectPermission?: (input: { permission: string }) => Promise<boolean>;
   } = {},
 ) {
-  const repository = MemoryMonitorRepository.create();
-  for (const monitor of options.seed ?? []) repository.seed(monitor);
+  const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
 
   const performance = options.performance ?? new FakeMonitorPerformance();
   const replication =

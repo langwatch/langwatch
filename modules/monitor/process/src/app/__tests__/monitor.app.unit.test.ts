@@ -46,10 +46,9 @@ const existing: MonitorWithEvaluator = {
 /** The app over a repository already holding {@link existing}. */
 function harness(
   overrides: Parameters<typeof createMonitorTestApp>[0] = {},
-  seeded: MonitorWithEvaluator = existing,
+  seeded: MonitorWithEvaluator[] = [existing],
 ) {
-  const repository = MemoryMonitorRepository.create();
-  repository.seed(seeded);
+  const repository = MemoryMonitorRepository.create({ seed: seeded });
   const app = createMonitorTestApp({
     repositories: createMonitorTestRepositories(repository),
     evaluators: new FakeMonitorEvaluators(["evaluator-1", "evaluator-2"]),
@@ -68,8 +67,10 @@ async function patchWith(changes: MonitorPatchInput["changes"]) {
 describe("MonitorModule", () => {
   describe("when the monitors running one evaluator are asked for", () => {
     it("answers them by id and name, and none that run another evaluator", async () => {
-      const { app, repository } = harness();
-      repository.seed({ ...existing, id: "monitor-2", name: "Tone", evaluatorId: "evaluator-2" });
+      const { app } = harness({}, [
+        existing,
+        { ...existing, id: "monitor-2", name: "Tone", evaluatorId: "evaluator-2" },
+      ]);
 
       await expect(
         app.findByEvaluator({ projectId: "project-1", evaluatorId: "evaluator-1" }),
@@ -128,7 +129,7 @@ describe("MonitorModule", () => {
 
   describe("when the monitor's stored settings no longer parse", () => {
     it("stores an empty settings object rather than failing every later edit", async () => {
-      const { app } = harness({}, { ...existing, parameters: "not-an-object" });
+      const { app } = harness({}, [{ ...existing, parameters: "not-an-object" }]);
 
       const updated = await app.patch({
         id: "monitor-1",

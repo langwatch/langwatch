@@ -37,10 +37,13 @@ const onMessage: MonitorWithEvaluator = {
 };
 
 function seeded() {
-  const repository = MemoryMonitorRepository.create();
-  repository.seed(onMessage);
-  repository.seed({ ...onMessage, id: "monitor-2", name: "Manual", executionMode: "MANUALLY" });
-  repository.seed({ ...onMessage, id: "monitor-3", name: "Other", projectId: "project-2" });
+  const repository = MemoryMonitorRepository.create({
+    seed: [
+      onMessage,
+      { ...onMessage, id: "monitor-2", name: "Manual", executionMode: "MANUALLY" },
+      { ...onMessage, id: "monitor-3", name: "Other", projectId: "project-2" },
+    ],
+  });
 
   return repository;
 }
