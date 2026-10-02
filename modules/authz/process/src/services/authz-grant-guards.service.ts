@@ -108,11 +108,12 @@ export class AuthzGrantGuardsService {
       });
     }
 
-    const unknownPermissions = Array.isArray(customRole.permissions)
-      ? customRole.permissions
-          .filter((value) => typeof value !== "string" || !isRegistryPermission(value))
-          .map((value) => String(value))
-      : [];
+    if (!Array.isArray(customRole.permissions)) {
+      throw new GrantValidationError("Custom role permissions are not a list", { customRoleId });
+    }
+    const unknownPermissions = customRole.permissions
+      .filter((value) => typeof value !== "string" || !isRegistryPermission(value))
+      .map((value) => String(value));
     if (unknownPermissions.length > 0) {
       throw new GrantValidationError("Custom role lists permissions that do not exist", {
         customRoleId,

@@ -74,6 +74,8 @@ function makeService(
         existing.grants.map((binding) => ({ ...binding, apiKeyId: apiKeyIds[0] })),
       hasPermission: async () => true,
       can,
+      findPermissionsBeyondCaller: async (input: { caller: Principal; permissions: string[] }) =>
+        (await can({ principal: input.caller })) ? [] : input.permissions,
       listUserBindings: async () => [],
       listScopeBindings: async () => [],
       listUserCreatedRoles: async () => [{ id: "role_1", permissions: ["langy:view"] }],
@@ -168,7 +170,7 @@ describe("given a create whose grants do not become readable", () => {
       await codeOf(() =>
         service.create({
           name: "Restricted Key",
-          userId: null,
+          userId: USER_ID,
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["langy:view"],
@@ -313,5 +315,29 @@ describe("given a request made with an organization key", () => {
     await service.update({ id: EXISTING_ID, ...CALLER, bindings: [ORG_BINDING] });
 
     expect(asked).toEqual([{ type: "user", id: USER_ID }]);
+  });
+});
+
+describe("given a restricted key with no owner, creator or requesting key", () => {
+  /** @scenario A restricted key nobody answers for is refused */
+  it("refuses the create and writes nothing", async () => {
+    const { service, repository, grantCalls } = makeService(null);
+
+    expect(
+      await codeOf(() =>
+        service.create({
+          name: "Unbounded",
+          userId: null,
+          createdByUserId: null,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [CUSTOM_BINDING],
+        }),
+      ),
+    ).toBe("api_key_scope_violation");
+
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(grantCalls).toEqual([]);
   });
 });

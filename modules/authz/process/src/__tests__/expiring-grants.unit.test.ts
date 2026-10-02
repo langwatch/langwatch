@@ -343,15 +343,15 @@ describe("given a grant that ends next Friday", () => {
 });
 
 describe("given an answer assembled before a grant's end date", () => {
-  /** @scenario "A grant that ends is felt on the next collect, not instantly" */
-  it("may answer from the held snapshot, while a fresh collect denies", async () => {
-    const { authz } = authzFor([projectBinding(THURSDAY + 1000)], { cached: true });
+  /** @scenario "An expired grant stops granting while its answer is cached" */
+  it("collects again at the end date, and the ended grant no longer counts", async () => {
+    const { authz, reader } = authzFor([projectBinding(THURSDAY + 1000)], { cached: true });
     expect(await canView(authz)).toBe(true);
 
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(1000);
 
-    expect(await canView(authz)).toBe(true);
-    expect(await canView(authzFor([projectBinding(THURSDAY + 1000)]).authz)).toBe(false);
+    expect(await canView(authz)).toBe(false);
+    expect(reader.findUserBindings).toHaveBeenCalledTimes(2);
   });
 
   /** @scenario "A stale answer cannot outlive the cache's own ceiling" */

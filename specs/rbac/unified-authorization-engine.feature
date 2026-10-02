@@ -194,6 +194,13 @@ Feature: Unified authorization engine
     # organization controls must never decide access in this one.
 
   @unit
+  Scenario: A custom role whose stored permissions are not a list cannot be granted
+    Given a custom role whose stored permissions are not a list
+    When an administrator grants it
+    Then the grant is refused as invalid
+    And no binding is written
+
+  @unit
   Scenario: Replacing a grant is one atomic swap
     Given user "dave" has role "member" bound at organization "acme"
     When an admin narrows dave's grant to team "client-a"

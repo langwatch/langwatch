@@ -42,7 +42,13 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
   };
 }
 
-function makeService({ children }: { children: { id: string }[] }) {
+function makeService({
+  children,
+  grantsFail = false,
+}: {
+  children: { id: string }[];
+  grantsFail?: boolean;
+}) {
   const rows = new Map<string, StoredApiKey>();
   rows.set(LOGIN_ID, keyRow());
   for (const child of children) {
@@ -67,9 +73,13 @@ function makeService({ children }: { children: { id: string }[] }) {
     },
   );
 
+  const revokeBindingsWhere = vi.fn(async () => {
+    if (grantsFail) throw new Error("ledger unavailable");
+  });
+  const forget = vi.fn(async () => void 0);
   const dependencies = {
     authz: { listApiKeyBindings: async () => [] } as never,
-    grants: { revokeBindingsWhere: vi.fn(), deleteRole: vi.fn() } as never,
+    grants: { revokeBindingsWhere, deleteRole: vi.fn() } as never,
     organizations: {} as never,
     projects: {} as never,
     bindingIds: {} as never,
@@ -78,10 +88,10 @@ function makeService({ children }: { children: { id: string }[] }) {
   };
   const policy = ApiKeyGrantPolicyService.create(dependencies);
   const service = ApiKeyLifecycleService.create({ ...dependencies, repository }, policy, {
-    forget: async () => void 0,
+    forget,
   });
 
-  return { service, repository, revoke, findLiveChildren };
+  return { service, repository, revoke, findLiveChildren, revokeBindingsWhere, forget };
 }
 
 const caller = { callerUserId: USER_ID, callerIsAdmin: false, organizationId: ORG_ID };
@@ -205,5 +215,31 @@ describe("ApiKeyLifecycleService.revokeChildren", () => {
         }),
       ).resolves.toBe(1);
     });
+  });
+});
+
+describe("ApiKeyLifecycleService.revoke ordering", () => {
+  /** @scenario A revoked key is refused before its grants are retracted */
+  it("marks the key revoked and refuses its shared answer before removing its grants", async () => {
+    const { service, revoke, forget, revokeBindingsWhere } = makeService({ children: [] });
+
+    await service.revoke({ id: LOGIN_ID, ...caller, cascadeToChildren: false });
+
+    const [revokedAt] = revoke.mock.invocationCallOrder;
+    const [forgottenAt] = forget.mock.invocationCallOrder;
+    const [retractedAt] = revokeBindingsWhere.mock.invocationCallOrder;
+    expect(revokedAt).toBeLessThan(forgottenAt!);
+    expect(forgottenAt).toBeLessThan(retractedAt!);
+  });
+
+  it("leaves the key refused when its grants cannot be removed", async () => {
+    const { service, revoke, forget } = makeService({ children: [], grantsFail: true });
+
+    await expect(
+      service.revoke({ id: LOGIN_ID, ...caller, cascadeToChildren: false }),
+    ).rejects.toThrow("ledger unavailable");
+
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ id: LOGIN_ID }));
+    expect(forget).toHaveBeenCalledWith(expect.objectContaining({ revoked: true }));
   });
 });

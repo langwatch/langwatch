@@ -39,6 +39,7 @@ import { fromDate, nowInstant } from "@langwatch/time";
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type {
   AuthzManagedGrantRepository,
+  AuthzManagedBindingRow,
   AuthzBindingScopeRow,
 } from "../repositories/authz-managed-grant.repository.ts";
 import {
@@ -55,6 +56,16 @@ export type AuthzGrantWriterPermissions = Pick<
 >;
 
 const WIRE_SCOPE = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
+
+/** Whether a custom role's stored permissions are a list at all. */
+function isPermissionList(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+/** The permission names in a custom role's stored list. */
+function permissionNames(list: unknown[]): string[] {
+  return list.filter((permission): permission is string => typeof permission === "string");
+}
 
 function assertScopeCanGrantRole({
   binding,
@@ -184,6 +195,11 @@ export class AuthzGrantWriterService {
       caller: input.caller,
       bindings: [changed],
       rolesById,
+    });
+    await this.assertHeldWithinCaller({
+      organizationId: input.organizationId,
+      caller: input.caller,
+      binding,
     });
     if (input.role !== "ADMIN") {
       await this.assertNotLastAdmin({
@@ -437,16 +453,11 @@ export class AuthzGrantWriterService {
       organizationId,
       roleIds,
     });
-    const rolesById = new Map(
-      roles.map((role) => [
-        role.id,
-        Array.isArray(role.permissions)
-          ? role.permissions.filter(
-              (permission): permission is string => typeof permission === "string",
-            )
-          : [],
-      ]),
-    );
+    const rolesById = new Map<string, readonly string[]>();
+    for (const role of roles) {
+      if (!isPermissionList(role.permissions)) throw new CustomRoleNotAssignableError(role.id);
+      rolesById.set(role.id, permissionNames(role.permissions));
+    }
     const missingRoleId = roleIds.find((roleId) => !rolesById.has(roleId));
     if (missingRoleId) {
       throw new CustomRoleNotAssignableError(missingRoleId);
@@ -477,7 +488,10 @@ export class AuthzGrantWriterService {
     await this.assertWithinCaller({ organizationId, caller, bindings, rolesById });
   }
 
-  /** The same ceiling for a role change: the new role, at the binding's own scope. */
+  /**
+   * The same ceiling for a role change: the new role and the current one, at the
+   * binding's scope.
+   */
   async assertRoleChangeWithinCaller({
     organizationId,
     caller,
@@ -499,6 +513,35 @@ export class AuthzGrantWriterService {
       caller,
       bindings: [{ role, customRoleId, scopeType: binding.scopeType, scopeId: binding.scopeId }],
     });
+    await this.assertHeldWithinCaller({ organizationId, caller, binding });
+  }
+
+  /**
+   * A caller changes or takes away only a binding that confers nothing beyond their
+   * own standing.
+   */
+  private async assertHeldWithinCaller({
+    organizationId,
+    caller,
+    binding,
+  }: {
+    organizationId: string;
+    caller: AuthzPrincipalRef;
+    binding: AuthzManagedBindingRow;
+  }): Promise<void> {
+    const roles = binding.customRoleId
+      ? await this.options.bindings.findAssignableRoles({
+          organizationId,
+          roleIds: [binding.customRoleId],
+        })
+      : [];
+    const rolesById = new Map(
+      roles.map((role) => [
+        role.id,
+        isPermissionList(role.permissions) ? permissionNames(role.permissions) : [],
+      ]),
+    );
+    await this.assertWithinCaller({ organizationId, caller, bindings: [binding], rolesById });
   }
 
   /** Every door's one escalation check: a binding never confers what the caller lacks there. */

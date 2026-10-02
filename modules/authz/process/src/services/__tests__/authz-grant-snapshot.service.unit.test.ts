@@ -11,6 +11,7 @@ type Options = {
   cacheEnabled?: boolean;
   epoch?: number | null;
   owner?: { userId: string | null } | null;
+  bindings?: { expiresAtMs?: number | null }[];
 };
 
 function snapshotWith(options: Options = {}) {
@@ -26,7 +27,7 @@ function snapshotWith(options: Options = {}) {
       organizationId: string;
     }) => {
       collected.push({ principalId: principal.id, organizationId });
-      return { marker: `${principal.id}@${organizationId}` };
+      return { marker: `${principal.id}@${organizationId}`, bindings: options.bindings ?? [] };
     },
     findApiKeyOwner: async () =>
       options.owner === undefined ? { userId: "user-1" } : options.owner,
@@ -115,6 +116,24 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
     });
   });
 
+  describe("given a cached grant that expires before the cache's age bound", () => {
+    /** @scenario "An expired grant stops granting while its answer is cached" */
+    it("collects again once the grant has ended", async () => {
+      vi.setSystemTime(new Date("2026-10-02T00:00:00.000Z"));
+      const endsAtMs = Date.now() + 1_000;
+      const { service, collected } = snapshotWith({ bindings: [{ expiresAtMs: endsAtMs }] });
+
+      await service.collectCached({ principal: user, organizationId: "org-a" });
+      vi.setSystemTime(endsAtMs - 1);
+      await service.collectCached({ principal: user, organizationId: "org-a" });
+      expect(collected).toHaveLength(1);
+
+      vi.setSystemTime(endsAtMs);
+      await service.collectCached({ principal: user, organizationId: "org-a" });
+      expect(collected).toHaveLength(2);
+    });
+  });
+
   describe("given an entry older than the cache's age bound", () => {
     /** @scenario "A held answer is never served indefinitely" */
     it("collects again, even though the epoch has not moved", async () => {
@@ -197,7 +216,7 @@ describe("AuthzGrantSnapshotService.findOwnerGrantsFor", () => {
         organizationId: "org-a",
       });
 
-      expect(grants).toEqual({ marker: "user-1@org-a" });
+      expect(grants).toEqual({ marker: "user-1@org-a", bindings: [] });
       expect(collected).toEqual([{ principalId: "user-1", organizationId: "org-a" }]);
     });
   });

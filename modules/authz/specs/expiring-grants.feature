@@ -101,12 +101,12 @@ Feature: Expiring grants
   # stop this instant revokes; a revocation bumps the epoch.
 
   @unit
-  Scenario: A grant that ends is felt on the next collect, not instantly
+  Scenario: An expired grant stops granting while its answer is cached
     Given "dana" holds a grant that ends in one second
     And their access was collected a moment before it ended
-    When "dana" is checked again immediately afterwards
-    Then the already-collected answer may still allow the access
-    But an answer collected after the moment denies it
+    When "dana" is checked again at the moment the grant ends
+    Then the answer is collected again rather than reused
+    And the elapsed grant no longer counts
 
   @unit
   Scenario: A stale answer cannot outlive the cache's own ceiling

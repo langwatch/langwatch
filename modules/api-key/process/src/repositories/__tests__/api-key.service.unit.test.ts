@@ -354,6 +354,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
     authz: createApiFixture<AuthzApi>({
       listApiKeyBindings,
       can: vi.fn().mockResolvedValue(true),
+      findPermissionsBeyondCaller: vi.fn().mockResolvedValue([]),
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserBindings: vi.fn().mockResolvedValue([]),
       listScopeBindings: vi.fn().mockResolvedValue([]),
@@ -627,11 +628,12 @@ describe("API-key service", () => {
     ).rejects.toMatchObject({ code: "api_key_not_found" });
   });
 
-  it("validates the owner ceiling at the resolved project team scope", async () => {
-    const can = vi.fn().mockResolvedValue(true);
+  it("validates the owner ceiling at the resolved project scope", async () => {
+    const findPermissionsBeyondCaller = vi.fn().mockResolvedValue([]);
     const authz = createApiFixture<AuthzApi>({
       listApiKeyBindings,
-      can,
+      can: vi.fn().mockResolvedValue(true),
+      findPermissionsBeyondCaller,
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
     });
@@ -654,14 +656,11 @@ describe("API-key service", () => {
       permissionMode: "all",
       bindings: [{ scopeType: "PROJECT", scopeId: "project-1", role: "VIEWER" }],
     });
-    expect(can).toHaveBeenCalledWith(
+    expect(findPermissionsBeyondCaller).toHaveBeenCalledWith(
       expect.objectContaining({
-        scope: {
-          type: "project",
-          id: "project-1",
-          teamId: "team-1",
-          organizationId: "org-1",
-        },
+        organizationId: "org-1",
+        caller: { type: "user", id: "user-1" },
+        scope: { type: "project", id: "project-1" },
       }),
     );
   });

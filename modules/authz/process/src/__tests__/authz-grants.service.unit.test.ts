@@ -193,20 +193,22 @@ describe("AuthzGrantsService.attach", () => {
   });
 
   describe("when the custom role's payload is not a list at all", () => {
-    it("attaches, because a malformed payload grants nothing to validate", async () => {
+    /** @scenario "A custom role whose stored permissions are not a list cannot be granted" */
+    it("refuses, because a malformed payload cannot be validated", async () => {
       const repository = makeRepository({
         findCustomRole: vi.fn().mockResolvedValue({ organizationId: ORG, permissions: null }),
       });
       const { service } = makeService(repository);
 
-      await service.attach({
-        actor,
-        who: { type: "user", id: "alice" },
-        role: { customRoleId: "cr-empty" },
-        where: { type: "team", id: TEAM, organizationId: ORG },
-      });
-
-      expect(repository.createBinding).toHaveBeenCalledTimes(1);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { customRoleId: "cr-empty" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(repository.createBinding).not.toHaveBeenCalled();
     });
   });
 

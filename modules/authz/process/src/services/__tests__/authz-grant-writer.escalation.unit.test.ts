@@ -284,3 +284,80 @@ describe("given the binding writer every door writes through", () => {
     });
   });
 });
+
+describe("given a caller changing a binding that already exists", () => {
+  describe("when the binding's current role confers what the caller lacks", () => {
+    /** @scenario Changing a binding above the caller's own standing is refused */
+    it("refuses to demote it and leaves the binding", async () => {
+      const { writer, changeBindingRole } = setup({
+        lacks: ["project:delete"],
+        existing: { id: "rb-1", scopeType: "TEAM", role: "ADMIN" },
+      });
+
+      await expect(
+        writer.update({
+          organizationId: ORG,
+          bindingId: "rb-1",
+          role: "VIEWER",
+          actor,
+          caller: self,
+        }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+      expect(changeBindingRole).not.toHaveBeenCalled();
+    });
+
+    it("refuses the grants door's role change the same way", async () => {
+      const { writer } = setup({
+        lacks: ["project:delete"],
+        existing: { id: "rb-1", scopeType: "TEAM", role: "ADMIN" },
+      });
+
+      await expect(
+        writer.assertRoleChangeWithinCaller({
+          organizationId: ORG,
+          caller: self,
+          bindingId: "rb-1",
+          role: "VIEWER",
+          customRoleId: null,
+        }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    });
+  });
+
+  describe("when the caller holds everything the current role confers", () => {
+    /** @scenario Demoting a binding within the caller's own standing is allowed */
+    it("demotes it", async () => {
+      const { writer, changeBindingRole } = setup({
+        lacks: ["project:delete"],
+        existing: { id: "rb-1", scopeType: "TEAM", role: "MEMBER" },
+      });
+
+      await writer.update({
+        organizationId: ORG,
+        bindingId: "rb-1",
+        role: "VIEWER",
+        actor,
+        caller: self,
+      });
+
+      expect(changeBindingRole).toHaveBeenCalledOnce();
+    });
+
+    it("lets the grants door's role change through", async () => {
+      const { writer } = setup({
+        lacks: ["project:delete"],
+        existing: { id: "rb-1", scopeType: "TEAM", role: "MEMBER" },
+      });
+
+      await expect(
+        writer.assertRoleChangeWithinCaller({
+          organizationId: ORG,
+          caller: self,
+          bindingId: "rb-1",
+          role: "VIEWER",
+          customRoleId: null,
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});

@@ -72,17 +72,36 @@ export class ApiKeyLifecycleService {
     grants: ApiKeyGrantPolicyService,
     answers: Pick<ApiKeyTokenResolutionService, "forget">,
   ): ApiKeyLifecycleService {
-    return new ApiKeyLifecycleService(options.repository, options, grants, answers);
+    return new ApiKeyLifecycleService({
+      repository: options.repository,
+      options,
+      grants,
+      answers,
+    });
   }
 
   private readonly bindings: ApiKeyGrantsService;
 
-  private constructor(
-    private readonly repository: ApiKeyRepository,
-    private readonly options: ApiKeyDependencies,
-    private readonly grants: ApiKeyGrantPolicyService,
-    private readonly answers: Pick<ApiKeyTokenResolutionService, "forget">,
-  ) {
+  private readonly repository: ApiKeyRepository;
+  private readonly options: ApiKeyDependencies;
+  private readonly grants: ApiKeyGrantPolicyService;
+  private readonly answers: Pick<ApiKeyTokenResolutionService, "forget">;
+
+  private constructor({
+    repository,
+    options,
+    grants,
+    answers,
+  }: {
+    repository: ApiKeyRepository;
+    options: ApiKeyDependencies;
+    grants: ApiKeyGrantPolicyService;
+    answers: Pick<ApiKeyTokenResolutionService, "forget">;
+  }) {
+    this.repository = repository;
+    this.options = options;
+    this.grants = grants;
+    this.answers = answers;
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
@@ -262,6 +281,15 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
 
+    // The row first, then the shared answer, then the grants: a failure part-way leaves a key
+    // that is refused, never one that is live with its grants gone.
+    const cause = input.cause ?? "user";
+    const revoked = publicApiKey({
+      ...(await this.repository.revoke({ id: input.id, cause })),
+      grants: existing.grants,
+    });
+    await this.answers.forget({ lookupId: existing.lookupId, revoked: true });
+
     await this.options.grants.revokeBindingsWhere({
       organizationId: input.organizationId,
       where: { apiKeyId: input.id },
@@ -281,13 +309,6 @@ export class ApiKeyLifecycleService {
         awaitProjection: input.awaitProjection,
       });
     }
-
-    const cause = input.cause ?? "user";
-    const revoked = publicApiKey({
-      ...(await this.repository.revoke({ id: input.id, cause })),
-      grants: existing.grants,
-    });
-    await this.answers.forget({ lookupId: existing.lookupId, revoked: true });
 
     if (input.cascadeToChildren ?? true) {
       await this.revokeChildrenOf({
@@ -410,6 +431,14 @@ export class ApiKeyLifecycleService {
       userId: input.createdByUserId,
       apiKeyId: input.callerApiKeyId,
     });
+    // A key's own role is bounded only here, so nobody to bound it by is a platform
+    // mint or nothing.
+    if (input.permissions?.length && principals.length === 0 && !input.isSystemManaged) {
+      throw new ApiKeyScopeViolationError(
+        "A restricted key needs an owner, a creator or a requesting key to bound its permissions",
+      );
+    }
+
     for (const principal of principals) {
       await this.grants.assertCeiling({
         principal,

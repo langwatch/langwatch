@@ -3,12 +3,12 @@ import {
   apiKeyPermissionFormatSchema,
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authorization";
-import type {
-  AuthzAccessBinding,
-  AuthzAttachOutcome,
-  AuthzGrantCaller,
-  AuthzPrincipalRef,
+import {
+  permissionsConferred,
+  type AuthzAccessBinding,
+  type AuthzAttachOutcome,
+  type AuthzGrantCaller,
+  type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
@@ -18,14 +18,6 @@ type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }
   | { type: "team"; id: string; organizationId: string }
   | { type: "project"; id: string; teamId: string; organizationId: string };
-
-function builtInRolePermission(binding: ApiKeyScope): string {
-  const organizationScoped = binding.scopeType === "ORGANIZATION";
-  if (binding.role === "ADMIN")
-    return organizationScoped ? "organization:manage" : "project:manage";
-  if (binding.role === "MEMBER") return organizationScoped ? "organization:view" : "project:update";
-  return "project:view";
-}
 
 /** A grant past its end moment is listed (the Access page shows it) but confers nothing. */
 function isLive(binding: AuthzAccessBinding): boolean {
@@ -194,7 +186,10 @@ export class ApiKeyGrantPolicyService {
     };
   }
 
-  /** Refuses any binding `principal` does not itself hold; a personal key holds key ∩ owner. */
+  /**
+   * Refuses any binding that confers what `principal` does not itself hold there: the whole set
+   * the role confers, asked through authz's own escalation rule. A personal key holds key ∩ owner.
+   */
   async assertCeiling({
     principal,
     organizationId,
@@ -208,49 +203,33 @@ export class ApiKeyGrantPolicyService {
   }): Promise<void> {
     for (const binding of bindings) {
       const scope = await this.validateScope(binding, organizationId);
-      const checks = await this.permissionsForBinding(binding, organizationId, permissions);
-      for (const permission of checks) {
-        const authzScope = this.authzScope(scope, organizationId);
-        const allowed = await this.options.authz.can({
-          principal,
-          permission: permission as AuthzPermission,
-          scope: authzScope,
-        });
-        if (!allowed) {
-          throw new ApiKeyScopeViolationError(
-            `Cannot grant permission ${permission} beyond what the granting credential holds`,
-          );
-        }
+      const conferred = permissionsConferred({
+        role: binding.role,
+        scopeType: binding.scopeType,
+        customPermissions:
+          binding.role === "CUSTOM"
+            ? await this.customPermissions(binding, organizationId, permissions)
+            : [],
+      });
+      const missing = await this.options.authz.findPermissionsBeyondCaller({
+        organizationId,
+        caller: principal,
+        scope: { type: scope.type, id: scope.id },
+        permissions: [...conferred],
+      });
+      if (missing.length > 0) {
+        throw new ApiKeyScopeViolationError(
+          `Cannot grant permission ${missing.join(", ")} beyond what the granting credential holds`,
+        );
       }
     }
   }
 
-  private authzScope(scope: ResolvedScope, organizationId: string) {
-    if (scope.type === "organization") {
-      return { type: "organization" as const, id: scope.id };
-    }
-
-    if (scope.type === "team") {
-      return { type: "team" as const, id: scope.id, organizationId };
-    }
-
-    return {
-      type: "project" as const,
-      id: scope.id,
-      teamId: scope.teamId,
-      organizationId,
-    };
-  }
-
-  private async permissionsForBinding(
+  private async customPermissions(
     binding: ApiKeyScope,
     organizationId: string,
     rawPermissions: string[],
   ): Promise<string[]> {
-    if (binding.role !== "CUSTOM") {
-      return [builtInRolePermission(binding)];
-    }
-
     if (rawPermissions.length > 0) {
       return [...rawPermissions].toSorted();
     }

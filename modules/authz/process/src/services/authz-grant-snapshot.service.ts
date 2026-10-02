@@ -17,6 +17,8 @@ type CacheEntry = {
   epoch: number;
   grants: CollectedGrants;
   storedAt: number;
+  /** When the earliest expiring binding in `grants` ends. */
+  endsAtMs: number;
 };
 
 export type AuthzGrantSnapshotServiceOptions = {
@@ -66,20 +68,29 @@ export class AuthzGrantSnapshotService {
     const key = `${principal.type}:${principal.id}:${organizationId}`;
     const entry = this.cache.get(key);
     const maxAgeMs = this.options.cacheMaxAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
+    const nowMs = nowInstant().epochMilliseconds;
     const entryIsCurrent =
       entry &&
       entry.epoch === currentEpoch &&
-      nowInstant().epochMilliseconds - entry.storedAt < maxAgeMs;
+      nowMs - entry.storedAt < maxAgeMs &&
+      nowMs < entry.endsAtMs;
     if (entryIsCurrent) {
       return entry.grants;
     }
 
     const grants = await this.collector.collectGrants({ principal, organizationId });
     this.pruneCache();
+    // An expiring grant ends the entry with it: nothing bumps the epoch when a grant lapses.
     this.cache.set(key, {
       epoch: currentEpoch,
       grants,
       storedAt: nowInstant().epochMilliseconds,
+      endsAtMs: Math.min(
+        Infinity,
+        ...grants.bindings.flatMap((binding) =>
+          binding.expiresAtMs != null ? [binding.expiresAtMs] : [],
+        ),
+      ),
     });
 
     return grants;

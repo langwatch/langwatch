@@ -33,6 +33,17 @@ function policyWith(fakes: Fakes = {}) {
         calls.push({ method: "can", permission: input.permission, principal: input.principal });
         return fakes.allow?.(input.permission) ?? fakes.can ?? true;
       },
+      findPermissionsBeyondCaller: async (input: {
+        permissions: string[];
+        caller: unknown;
+        scope: unknown;
+      }) => {
+        calls.push({ method: "beyondCaller", scope: input.scope });
+        return input.permissions.filter((permission) => {
+          calls.push({ method: "can", permission, principal: input.caller });
+          return !(fakes.allow?.(permission) ?? fakes.can ?? true);
+        });
+      },
       listUserBindings: async () => fakes.userBindings ?? [],
       listScopeBindings: async () => fakes.scopeBindings ?? [],
       listUserCreatedRoles: async () => fakes.customRoles ?? [],
@@ -149,7 +160,9 @@ describe("ApiKeyGrantPolicyService", () => {
           permissions: [],
         });
 
-        expect(calls.filter((call) => call.method === "can")).toHaveLength(1);
+        expect(calls.filter((call) => call.method === "beyondCaller")).toEqual([
+          { method: "beyondCaller", scope: { type: "project", id: "project-1" } },
+        ]);
       });
     });
 
@@ -172,9 +185,8 @@ describe("ApiKeyGrantPolicyService", () => {
       });
     });
 
-    // The permission each role stands for IS the ceiling. Map ADMIN to
-    // something weak and a user holding only `project:view` could mint an
-    // admin key, with every check still passing.
+    // Every permission a role confers is the ceiling, not one that stands for it:
+    // a holder of only `organization:view` must not mint an organization Member key.
     describe("given each role", () => {
       const expected: [ApiKeyScope["role"], ApiKeyScope["scopeType"], string][] = [
         ["ADMIN", "ORGANIZATION", "organization:manage"],
@@ -197,9 +209,26 @@ describe("ApiKeyGrantPolicyService", () => {
             permissions: [],
           });
 
-          expect(calls.find((call) => call.method === "can")?.permission).toBe(permission);
+          expect(
+            calls.filter((call) => call.method === "can").map((call) => call.permission),
+          ).toContain(permission);
         });
       }
+
+      it("refuses an organization Member key to someone who holds only organization:view", async () => {
+        const { service } = policyWith({
+          allow: (permission) => permission === "organization:view",
+        });
+
+        await expect(
+          service.assertCeiling({
+            principal: { type: "user", id: "user-1" },
+            organizationId: ORG,
+            bindings: [scope({ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG })],
+            permissions: [],
+          }),
+        ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
+      });
     });
 
     describe("given a CUSTOM binding naming a role", () => {

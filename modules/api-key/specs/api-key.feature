@@ -32,6 +32,23 @@ Feature: API key lifecycle
     Then every requested permission is checked at that resolved scope
     And a permission outside the owner's ceiling is rejected
 
+  @unit
+  Scenario: A built-in role is checked as every permission it confers
+    Given a member who holds organization:view but not the rest of the organization Member role
+    When a key with an organization Member binding is created for them
+    Then the create is refused
+
+  @unit
+  Scenario: A restricted key nobody answers for is refused
+    When a restricted key is created with no owner, no creator and no requesting key
+    And it is not a platform-managed key
+    Then the create is refused and nothing is written
+
+  @unit
+  Scenario: A revoked key is refused before its grants are retracted
+    When a key is revoked
+    Then the key is marked revoked and its shared answer refused before its grants are removed
+
   Scenario: A service key without bindings defaults to organization administration
     When an unowned service key is created without bindings
     Then it receives one organization ADMIN binding
