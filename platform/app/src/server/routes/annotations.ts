@@ -8,7 +8,7 @@
  */
 
 import type { AuthzPermission as Permission } from "@langwatch/authz";
-import { ValidationError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
@@ -203,17 +203,15 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
+    // A refusal the caller can act on (unknown id → 404) goes to the app's
+    // error handler as-is. Anything else is ours: log it, and keep the
+    // database's own message out of the response.
+    if (HandledError.isHandled(e)) throw e;
     logger.error(
       { error: e, projectId: project.id },
       "error deleting annotation",
     );
-    return c.json(
-      {
-        status: "error",
-        message: e instanceof Error ? e.message : "ID not found.",
-      },
-      500,
-    );
+    return c.json({ status: "error", message: "Internal server error." }, 500);
   }
 });
 

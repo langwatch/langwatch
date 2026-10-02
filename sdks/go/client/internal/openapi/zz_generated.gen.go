@@ -826,6 +826,21 @@ func (e GetApiAnnotationsTraceIdParamsAnchor) Valid() bool {
 	}
 }
 
+// Defines values for DeleteApiAnnotationsId404JSONResponseBodyError.
+const (
+	AnnotationNotFound DeleteApiAnnotationsId404JSONResponseBodyError = "annotation_not_found"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiAnnotationsId404JSONResponseBodyError enum.
+func (e DeleteApiAnnotationsId404JSONResponseBodyError) Valid() bool {
+	switch e {
+	case AnnotationNotFound:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateApiKeyJSONBodyBindingsRole.
 const (
 	CreateApiKeyJSONBodyBindingsRoleADMIN  CreateApiKeyJSONBodyBindingsRole = "ADMIN"
@@ -22429,6 +22444,9 @@ type PostApiAnnotationsTraceIdJSONBody struct {
 	Email      *string `json:"email,omitempty"`
 	IsThumbsUp bool    `json:"isThumbsUp"`
 }
+
+// DeleteApiAnnotationsId404JSONResponseBodyError defines parameters for DeleteApiAnnotationsId.
+type DeleteApiAnnotationsId404JSONResponseBodyError string
 
 // PatchApiAnnotationsIdJSONBody defines parameters for PatchApiAnnotationsId.
 type PatchApiAnnotationsIdJSONBody struct {
@@ -103806,6 +103824,10 @@ type DeleteApiAnnotationsIdResponse struct {
 		Status  *string `json:"status,omitempty"`
 	}
 	JSON400 *Error
+	JSON404 *struct {
+		Error   DeleteApiAnnotationsId404JSONResponseBodyError `json:"error"`
+		Message string                                         `json:"message"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -128934,6 +128956,16 @@ func ParseDeleteApiAnnotationsIdResponse(rsp *http.Response) (*DeleteApiAnnotati
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   DeleteApiAnnotationsId404JSONResponseBodyError `json:"error"`
+			Message string                                         `json:"message"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 
