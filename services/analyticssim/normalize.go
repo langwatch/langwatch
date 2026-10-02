@@ -12,10 +12,11 @@ import (
 )
 
 // decodeBody undoes the encodings the PostHog clients use: gzip (posthog-node's
-// Content-Encoding, posthog-js's ?compression=gzip-js) and posthog-js's
+// Content-Encoding, posthog-js's ?compression=gzip-js, or a body that starts
+// with gzip's magic bytes, as posthog-js's batches do) and posthog-js's
 // form-encoded base64 `data=` field. Anything else is taken as JSON.
 func decodeBody(body []byte, contentEncoding, compression, contentType string) ([]byte, error) {
-	if contentEncoding == "gzip" || compression == "gzip-js" {
+	if contentEncoding == "gzip" || compression == "gzip-js" || bytes.HasPrefix(body, []byte{0x1f, 0x8b}) {
 		reader, err := gzip.NewReader(bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("the body is not gzip: %w", err)
