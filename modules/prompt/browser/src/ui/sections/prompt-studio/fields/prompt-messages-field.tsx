@@ -1,4 +1,9 @@
 import {
+  AddMessageButton,
+  MessageRoleLabel,
+  RemoveMessageButton,
+} from "@langwatch/design-system/messages";
+import {
   Box,
   Field,
   HStack,
@@ -26,7 +31,6 @@ import {
   getDefaultEditingMode,
   type PromptEditingMode,
 } from "./editing-mode-title.tsx";
-import { AddMessageButton, MessageRoleLabel, RemoveMessageButton } from "./messages/index.ts";
 
 /**
  * Type for message field errors
@@ -316,19 +320,14 @@ function MessagesModeList({
   messageFields,
   systemField,
   systemIndex,
-  showAddMessage,
 }: {
   shared: MessageRowShared;
   messageFields: MessageFieldArray;
   systemField: MessageField | undefined;
   systemIndex: number;
-  showAddMessage: boolean;
 }) {
   const { borderless } = shared;
   const nonSystemMessages = messageFields.fields.filter((_, idx) => idx !== systemIndex);
-  const handleAdd = (role: "user" | "assistant") => {
-    messageFields.append({ role, content: "" });
-  };
 
   return (
     <>
@@ -342,8 +341,6 @@ function MessagesModeList({
         >
           <HStack width="full" paddingX={borderless ? 2 : 0} paddingBottom={borderless ? 2 : 0}>
             <MessageRoleLabel messageRole="system" />
-            <Spacer />
-            {showAddMessage && <AddMessageButton onAdd={handleAdd} />}
           </HStack>
           <MessageRow
             key="system-message-row"
@@ -431,6 +428,9 @@ export function PromptMessagesField({
       <HStack width="full" flexShrink={0} paddingX={borderless ? 3 : 1}>
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
+        {editingMode === "messages" && (
+          <AddMessageButton onAdd={(role) => messageFields.append({ role, content: "" })} />
+        )}
       </HStack>
 
       <VStack gap={2} align="stretch" width="full" {...fillWhen(borderless)}>
@@ -449,7 +449,6 @@ export function PromptMessagesField({
             messageFields={messageFields}
             systemField={systemField}
             systemIndex={systemIndex}
-            showAddMessage={editingMode === "messages"}
           />
         )}
       </VStack>

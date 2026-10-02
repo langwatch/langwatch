@@ -116,6 +116,9 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
           <ConversationThread
             parts={parts}
             labels={labels}
+            // The person testing the prompt is the subject: their turns sit on
+            // the right with a person icon, the model's replies on the left.
+            roleMode="scenario-human-caller"
             projectId={project?.id ?? ""}
             renderPartActions={renderPartActions}
             shouldRenderStructuredOutput

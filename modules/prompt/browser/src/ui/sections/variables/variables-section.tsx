@@ -355,6 +355,9 @@ const INPUT_TYPE_OPTIONS = [
   { value: "chat_messages", label: TYPE_LABELS.chat_messages ?? "Messages" },
 ];
 
+/** One variable row's height: the type select, name, "=" and value share it. */
+const ROW_HEIGHT = "32px";
+
 type VariableRowProps = {
   variable: Variable;
   mapping?: FieldMapping;
@@ -433,14 +436,18 @@ const VariableRow = ({
   };
 
   return (
-    <HStack gap={2} width="full">
-      <FieldTypeSelect
-        value={variable.type}
-        options={INPUT_TYPE_OPTIONS}
-        onChange={(type) => onUpdate({ type: type as FieldType })}
-        readOnly={readOnly}
-        testId={`variable-type-select-${variable.identifier}`}
-      />
+    // Every cell is one row tall and centred on it, and the type and name
+    // columns hold a fixed minimum width, so read-only and editable rows line up.
+    <HStack gap={2} width="full" align="flex-start">
+      <HStack height={ROW_HEIGHT} width="104px" flexShrink={0}>
+        <FieldTypeSelect
+          value={variable.type}
+          options={INPUT_TYPE_OPTIONS}
+          onChange={(type) => onUpdate({ type: type as FieldType })}
+          readOnly={readOnly}
+          testId={`variable-type-select-${variable.identifier}`}
+        />
+      </HStack>
 
       {/* Variable Name */}
       {isEditing && !readOnly ? (
@@ -450,7 +457,9 @@ const VariableRow = ({
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
           size="sm"
-          width="100px"
+          width="120px"
+          height={ROW_HEIGHT}
+          flexShrink={0}
           fontFamily="mono"
           fontSize="13px"
 
@@ -458,7 +467,7 @@ const VariableRow = ({
           data-testid={`variable-name-input-${variable.identifier}`}
         />
       ) : (
-        <HStack gap={1}>
+        <HStack gap={1} height={ROW_HEIGHT} minWidth="120px" flexShrink={0}>
           <Text
             fontFamily="mono"
             fontSize="13px"
@@ -494,7 +503,13 @@ const VariableRow = ({
       {!isMappingDisabled ? (
         <>
           {/* = sign and value/mapping input */}
-          <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
+          <Text
+            color="fg.subtle"
+            fontFamily="mono"
+            fontSize="13px"
+            lineHeight={ROW_HEIGHT}
+            flexShrink={0}
+          >
             =
           </Text>
 
@@ -514,10 +529,9 @@ const VariableRow = ({
               />
             </Box>
           ) : (
-            // The value typed in the Prompt Playground. It opens two lines
-            // tall and grows with the text up to a limit, then scrolls, so a
-            // long value reads in full without pushing the rows below it
-            // off the panel.
+            // The value typed in the Prompt Playground. It opens two lines tall
+            // (first line centred on the row) and grows with the text up to a
+            // limit, then scrolls, so a long value never pushes rows off the panel.
             <Textarea
               value={defaultValue ?? ""}
               onChange={(e) => onDefaultValueChange?.(e.target.value)}
@@ -526,6 +540,8 @@ const VariableRow = ({
               minWidth={0}
               fontFamily="mono"
               fontSize="13px"
+              lineHeight="20px"
+              paddingY="6px"
               variant="flushed"
               borderColor="border"
               autoresize
@@ -549,6 +565,7 @@ const VariableRow = ({
             size="xs"
             variant="ghost"
             colorPalette="gray"
+            marginTop="4px"
             onClick={onRemove}
             flexShrink={0}
             color="fg.subtle"
