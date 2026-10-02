@@ -200,15 +200,6 @@ export const FEATURE_FLAGS = [
     description:
       "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
-  // Allowlist for born-finalized entrance (ADR-116 §3); couples sign-up to
-  // engine availability, so enable per organization knowingly.
-  {
-    key: "release_identity_born_finalized_signup",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Creates new users directly on the identity branch: their sign-in history is recorded as identity events and their migration state is finalized as part of sign-up, instead of being backfilled afterwards. Off = new users are created exactly as before. Sign-up on a targeted organization fails rather than falling back when the event-sourcing stack is unavailable, so enable it per organization, knowingly.",
-  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",

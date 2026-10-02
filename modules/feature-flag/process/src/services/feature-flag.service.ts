@@ -22,7 +22,6 @@ import {
   type RuleEvaluationContext,
   type FeatureFlagTarget,
   FeatureFlagExperimentUnavailableError,
-  UnknownFeatureFlagError,
   UnknownFeatureFlagExperimentError,
 } from "@langwatch/feature-flag-contract";
 import { toDate } from "@langwatch/time";
@@ -32,6 +31,7 @@ import type {
   FeatureFlagExperimentRepository,
 } from "../repositories/feature-flag-experiment-setting.repository.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import { isExperimentFlag, tenantPolicyOf } from "../rules/feature-flag-registry.rules.ts";
 import type { FeatureFlagRowStore } from "./cached-feature-flag-row.service.ts";
 import type { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
 
@@ -246,11 +246,7 @@ export class FeatureFlagService {
   }
 
   private assertExperiment(flagKey: string): void {
-    try {
-      if (this.registry.getDefinition(flagKey).experiment) return;
-    } catch (error) {
-      if (!(error instanceof UnknownFeatureFlagError)) throw error;
-    }
+    if (isExperimentFlag({ registry: this.registry, flagKey })) return;
     throw new UnknownFeatureFlagExperimentError();
   }
 
@@ -357,14 +353,8 @@ export class FeatureFlagService {
     );
 
     return {
-      policyFor: (subjectType, flagKey) => {
-        const stored = bySubject.get(`${subjectType} ${flagKey}`);
-        if (stored === undefined) {
-          return "inherit";
-        }
-
-        return stored ? "enabled" : "disabled";
-      },
+      policyFor: (subjectType, flagKey) =>
+        tenantPolicyOf({ stored: bySubject.get(`${subjectType} ${flagKey}`) }),
       enrolled: (flagKey) => bySubject.get(`USER ${flagKey}`) === true,
     };
   }
