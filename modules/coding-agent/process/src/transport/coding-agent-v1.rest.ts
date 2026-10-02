@@ -50,6 +50,7 @@ export const codingAgentV1Rest = defineRestRouter(CodingAgentApi)
   .withOutput(pullRequestUsageResponseSchema)
   .withMiddleware(codingAgentV1RestCaller)
   .withDocs({
+    operationId: "getPullRequestUsage",
     summary: "Get pull request coding agent usage",
     description:
       "Assistant usage for one pull request: sessions, tokens and cost, " +

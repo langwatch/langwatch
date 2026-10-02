@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    team_id: str,
     *,
     body: PostApiTeamsByIdMembersBody,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/teams/{id}/members".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/teams/{team_id}/members".format(
+            team_id=quote(str(team_id), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsByIdMembersBody,
@@ -69,7 +69,7 @@ def sync_detailed(
     """Add a member to a team
 
     Args:
-        id (str):
+        team_id (str):
         body (PostApiTeamsByIdMembersBody):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
         body=body,
     )
 
@@ -93,7 +93,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsByIdMembersBody,
@@ -101,7 +101,7 @@ def sync(
     """Add a member to a team
 
     Args:
-        id (str):
+        team_id (str):
         body (PostApiTeamsByIdMembersBody):
 
     Raises:
@@ -113,14 +113,14 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        team_id=team_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsByIdMembersBody,
@@ -128,7 +128,7 @@ async def asyncio_detailed(
     """Add a member to a team
 
     Args:
-        id (str):
+        team_id (str):
         body (PostApiTeamsByIdMembersBody):
 
     Raises:
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
         body=body,
     )
 
@@ -150,7 +150,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsByIdMembersBody,
@@ -158,7 +158,7 @@ async def asyncio(
     """Add a member to a team
 
     Args:
-        id (str):
+        team_id (str):
         body (PostApiTeamsByIdMembersBody):
 
     Raises:
@@ -171,7 +171,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            team_id=team_id,
             client=client,
             body=body,
         )

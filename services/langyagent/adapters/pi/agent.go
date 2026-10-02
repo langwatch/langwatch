@@ -328,7 +328,9 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 	// while it worked. The app's sink absorbs push failures and reconnects on
 	// its own, so an emit "failure" is only a dropped live frame — keep
 	// consuming to the real terminal; the durable fold stays complete.
-	_ = st.apply(ev)
+	if !st.apply(ev) {
+		clog.Get(ctx).Debug("pi worker live frame dropped", zap.String("type", ev.Type))
+	}
 	return false, nil
 }
 

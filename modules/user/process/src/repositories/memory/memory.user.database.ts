@@ -1,4 +1,5 @@
 import type { Instant } from "@langwatch/time";
+import type { UserNotificationChoice } from "@langwatch/user-contract";
 
 /**
  * The rows the two user repositories share — one store rather than two,
@@ -23,6 +24,8 @@ export type MemoryUserRow = {
   /** Two-step verification confirmed on the account, as the plugin records it. */
   twoFactorEnabled: boolean;
   joinOfferDismissedDomains: readonly string[];
+  /** Topic to choice; a topic that is absent was never answered. */
+  notificationPreferences: Readonly<Record<string, UserNotificationChoice>>;
 };
 
 export type MemoryUserAccountRow = {

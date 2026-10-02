@@ -85,8 +85,8 @@ export interface SignInMethodPolicy {
    *  policy-refused. Local by definition — this is the door that must stay
    *  open when the IdP cannot be reached. */
   localMethods: readonly SignInMethod[];
-  /** ADR-027's binary license gate, resolved once per process and handed in
-   *  frozen. Per-request policy over a frozen gate IS startup semantics. */
+  /** ADR-027's binary license gate, read from its per-process memo (a deny is
+   *  re-read within a minute, ADR-027 v9). Policy never re-decides a license. */
   federationLicensed: boolean;
   /** Only a self-hosted deployment auto-redirects on a sole connection; on
    *  cloud, one org's connection must never claim the auth screens. */

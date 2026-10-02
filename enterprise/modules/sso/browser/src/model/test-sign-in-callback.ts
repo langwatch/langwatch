@@ -19,6 +19,20 @@ export interface TestSignInVerdict {
   code: string;
   /** `error_description` as the provider sent it, where there is one. */
   description: string | null;
+  /** On `sso_issuer_mismatch`: the issuer the connection holds and the one the token carried. */
+  expectedIssuer: string | null;
+  receivedIssuer: string | null;
+}
+
+/** An issuer as the callback reported it, kept only when it is a plain https
+ *  address: the query string is caller-controlled. */
+function issuersIn(value: string | undefined): string[] {
+  if (!value || value.length > 2048) return [];
+  try {
+    return new URL(value).protocol === "https:" ? [value] : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -36,6 +50,8 @@ export function testSignInCallbackQuery({
   const next: Record<string, string | undefined> = { ...query };
   delete next.error;
   delete next.error_description;
+  delete next.expected_issuer;
+  delete next.received_issuer;
   next[TEST_SIGN_IN_MARKER] = connectionId;
 
   return next;
@@ -53,5 +69,10 @@ export function testSignInCallbackVerdict({
   if (!code) return null;
   if (query[TEST_SIGN_IN_MARKER] !== connectionId) return null;
 
-  return { code, description: query.error_description ?? null };
+  return {
+    code,
+    description: query.error_description ?? null,
+    expectedIssuer: issuersIn(query.expected_issuer)[0] ?? null,
+    receivedIssuer: issuersIn(query.received_issuer)[0] ?? null,
+  };
 }

@@ -83,6 +83,22 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(({ app, actor }) => app.dismissTraceExplorerTour({ id: callerOf(actor).operatorId }))
 
+  .procedure("getNotificationPreference")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }) =>
+    app.getNotificationPreference({ id: callerOf(actor).operatorId, topic: input.topic }),
+  )
+
+  .procedure("setNotificationPreference")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }) =>
+    app.setNotificationPreference({
+      id: callerOf(actor).operatorId,
+      topic: input.topic,
+      choice: input.choice,
+    }),
+  )
+
   .procedure("isAdmin")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }) => ({

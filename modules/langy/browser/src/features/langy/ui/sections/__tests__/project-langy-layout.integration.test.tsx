@@ -37,14 +37,19 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 // "mount once per project", so the tests need to tell a surviving panel apart
 // from a remounted one.
 const sidecarMounts = { count: 0 };
+vi.mock("../../../behavior/use-langy-web-push.ts", () => ({ useLangyWebPush: () => undefined }));
+
 vi.mock("../langy-panel.tsx", () => ({
   LangySidecar: () => <LangySidecarStub />,
 }));
 
 // The follow-along deep link reads a tRPC query, and this suite renders the layout with no
 // tRPC provider. Its own behaviour is pinned by langy-conversation-deep-link.unit.test.tsx.
+const deepLinkReads = { count: 0 };
 vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
-  useLangyConversationDeepLink: () => undefined,
+  useLangyConversationDeepLink: () => {
+    deepLinkReads.count++;
+  },
 }));
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
@@ -226,6 +231,7 @@ beforeEach(() => {
     dockShifted: false,
   });
   sidecarMounts.count = 0;
+  deepLinkReads.count = 0;
 });
 
 afterEach(() => cleanup());
@@ -238,6 +244,15 @@ describe("ProjectLangyLayout", () => {
 
       expect(screen.getByText("workbench page")).toBeTruthy();
       expect(drawer()).toBeTruthy();
+    });
+  });
+
+  describe("given any project page", () => {
+    /** @scenario "Every project page reads the follow-along link" */
+    it("reads the follow-along link", () => {
+      renderAt("/demo/traces");
+
+      expect(deepLinkReads.count).toBeGreaterThan(0);
     });
   });
 

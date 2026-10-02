@@ -163,7 +163,9 @@ export const prismaTableCatalogue = {
   "ConnectedStatement": "ConnectedStatement",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
-  "SelfHostedInstanceReport": "SelfHostedInstanceReport"
+  "SelfHostedInstanceReport": "SelfHostedInstanceReport",
+  "WebPushSubscription": "WebPushSubscription",
+  "WebPushVapidKey": "WebPushVapidKey"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -249,6 +251,7 @@ export const prismaModelFieldCatalogue = {
     "langyCodeAccessPreference",
     "passkeyNudgeDismissedAt",
     "joinOfferDismissedDomains",
+    "notificationPreferences",
     "Annotation",
     "shareLinks",
     "Workflow",
@@ -2741,6 +2744,22 @@ export const prismaModelFieldCatalogue = {
     "reportSchemaVersion",
     "unknownFields",
     "payload"
+  ],
+  "WebPushSubscription": [
+    "id",
+    "userId",
+    "endpoint",
+    "p256dh",
+    "auth",
+    "userAgent",
+    "createdAt",
+    "lastSuccessAt"
+  ],
+  "WebPushVapidKey": [
+    "id",
+    "publicKey",
+    "privateKeyEncrypted",
+    "createdAt"
   ]
 } as const;
 
@@ -3326,7 +3345,9 @@ export const prismaRelationCatalogue = {
   "ConnectedStatement": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
-  "SelfHostedInstanceReport": {}
+  "SelfHostedInstanceReport": {},
+  "WebPushSubscription": {},
+  "WebPushVapidKey": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

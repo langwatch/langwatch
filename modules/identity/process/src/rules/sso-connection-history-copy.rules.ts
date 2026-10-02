@@ -7,6 +7,7 @@ import {
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
   MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
@@ -55,7 +56,8 @@ function selfProvedMethodWords(method: string | null): string {
 type HistoryCopyFields = Pick<
   SsoConnectionHistoryEntry,
   "domain" | "method" | "route" | "policy" | "note" | "name"
->;
+> &
+  Partial<Pick<SsoConnectionHistoryEntry, "issuer">>;
 
 function forDomain(domain: string | null): string {
   return domain ? ` for ${domain}` : "";
@@ -117,6 +119,10 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
   // line above already says what it was called before.
   [CONNECTION_RENAMED_EVENT_TYPE]: ({ name }) =>
     `The connection was renamed to "${name ?? "a new name"}"`,
+  [CONNECTION_IDP_UPDATED_EVENT_TYPE]: ({ issuer }) =>
+    issuer
+      ? `The identity provider settings were changed, the issuer is now ${issuer}`
+      : "The identity provider settings were changed",
   [REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE]: () =>
     "This connection was registered to replace the one set up before self-serve",
   [MIGRATION_ROUTE_SELECTED_EVENT_TYPE]: ({ route }) =>
@@ -136,7 +142,8 @@ export function ssoConnectionHistoryCopy(
   entry: Pick<
     SsoConnectionHistoryEntry,
     "type" | "domain" | "method" | "route" | "policy" | "note" | "name"
-  >,
+  > &
+    Partial<Pick<SsoConnectionHistoryEntry, "issuer">>,
 ): string {
   const copy = HISTORY_COPY_BY_EVENT_TYPE[entry.type];
   // A fact with no words is still a fact, and dropping it would make the

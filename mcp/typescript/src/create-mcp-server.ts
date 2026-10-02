@@ -3,6 +3,18 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.ts";
+import { fetchDocumentation } from "./documentation-fetch.ts";
+import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
+import {
+  runParametersSchema,
+  runPlanScopeSchema,
+  runPlanTargetSchema,
+} from "./schemas/run-plan.ts";
+import {
+  evaluatorAttachmentsSchema,
+  scenarioFieldValuesSchema,
+  suiteFieldsSchema,
+} from "./schemas/suite-fields.ts";
 import {
   actionParamsSchema,
   alertTypeSchema,
@@ -16,21 +28,6 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
-import { fetchDocumentation } from "./documentation-fetch.ts";
-import {
-  createDatasetSchema,
-  datasetColumnDefinitionSchema,
-} from "./schemas/create-dataset.ts";
-import {
-  runParametersSchema,
-  runPlanScopeSchema,
-  runPlanTargetSchema,
-} from "./schemas/run-plan.ts";
-import {
-  evaluatorAttachmentsSchema,
-  scenarioFieldValuesSchema,
-  suiteFieldsSchema,
-} from "./schemas/suite-fields.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -1555,7 +1552,7 @@ function registerTriggerTools(server: McpServer): void {
       requireApiKey();
       const { handleListTriggers } = await import("./tools/list-triggers.ts");
       return { content: [{ type: "text", text: await handleListTriggers(params) }] };
-    })
+    }),
   );
 
   server.tool(
@@ -1569,7 +1566,7 @@ function registerTriggerTools(server: McpServer): void {
       const { getTrigger } = await import("./langwatch-api-triggers.ts");
       const trigger = await getTrigger(params.id);
       return { content: [{ type: "text", text: JSON.stringify(trigger, null, 2) }] };
-    })
+    }),
   );
 
   server.tool(
@@ -1586,7 +1583,9 @@ function registerTriggerTools(server: McpServer): void {
     {
       name: z.string().describe("Trigger name"),
       action: triggerActionSchema.describe("Which channel it delivers on"),
-      actionParams: actionParamsSchema.optional().describe("The delivery configuration the channel named in `action` reads. Defaults to {}"),
+      actionParams: actionParamsSchema
+        .optional()
+        .describe("The delivery configuration the channel named in `action` reads. Defaults to {}"),
       filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
       filterQuery: z.string().optional().describe(TRIGGER_FILTER_QUERY_DESCRIPTION),
       customGraphId: z.string().optional().describe("Set to make this an alert on that graph"),
@@ -1601,7 +1600,7 @@ function registerTriggerTools(server: McpServer): void {
       requireApiKey();
       const { handleCreateTrigger } = await import("./tools/create-trigger.ts");
       return await handleCreateTrigger(params);
-    })
+    }),
   );
 
   server.tool(
@@ -1616,15 +1615,32 @@ function registerTriggerTools(server: McpServer): void {
       id: z.string().describe("The trigger ID"),
       name: z.string().optional().describe("New name"),
       active: z.boolean().optional().describe("Resume or pause it"),
-      actionParams: actionParamsSchema.optional().describe("The delivery configuration this automation should have from now on"),
+      actionParams: actionParamsSchema
+        .optional()
+        .describe("The delivery configuration this automation should have from now on"),
       filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
-      filterQuery: z.string().nullable().optional().describe(`${TRIGGER_FILTER_QUERY_DESCRIPTION} null clears the saved query.`),
-      graphAlert: graphAlertSchema.optional().describe("Only for an automation that is already a graph alert"),
-      report: reportSchema.optional().describe("Only for an automation that is already a scheduled report"),
+      filterQuery: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(`${TRIGGER_FILTER_QUERY_DESCRIPTION} null clears the saved query.`),
+      graphAlert: graphAlertSchema
+        .optional()
+        .describe("Only for an automation that is already a graph alert"),
+      report: reportSchema
+        .optional()
+        .describe("Only for an automation that is already a scheduled report"),
       templates: templatesSchema.optional(),
       notificationCadence: notificationCadenceSchema.optional(),
-      message: z.string().nullable().optional().describe("New alert message. null removes the custom message"),
-      alertType: alertTypeSchema.nullable().optional().describe("New alert severity. null clears it"),
+      message: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("New alert message. null removes the custom message"),
+      alertType: alertTypeSchema
+        .nullable()
+        .optional()
+        .describe("New alert severity. null clears it"),
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
@@ -1648,8 +1664,12 @@ function registerTriggerTools(server: McpServer): void {
         return toolError("filters must be a JSON object");
       }
       const trigger = await updateTrigger({ ...params, filters });
-      return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
-    })
+      return {
+        content: [
+          { type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` },
+        ],
+      };
+    }),
   );
 
   server.tool(
@@ -1663,7 +1683,7 @@ function registerTriggerTools(server: McpServer): void {
       const { testFireTrigger } = await import("./langwatch-api-triggers.ts");
       const result = await testFireTrigger(params.id);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    })
+    }),
   );
 
   server.tool(
@@ -1678,7 +1698,7 @@ function registerTriggerTools(server: McpServer): void {
       requireApiKey();
       const { handleListTriggerFires } = await import("./tools/list-trigger-fires.ts");
       return { content: [{ type: "text", text: await handleListTriggerFires(params) }] };
-    })
+    }),
   );
 
   server.tool(

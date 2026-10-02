@@ -11,14 +11,17 @@ from ...models.post_api_gateway_v1_budgets_response_401 import PostApiGatewayV1B
 from ...models.post_api_gateway_v1_budgets_response_403 import PostApiGatewayV1BudgetsResponse403
 from ...models.post_api_gateway_v1_budgets_response_409 import PostApiGatewayV1BudgetsResponse409
 from ...models.post_api_gateway_v1_budgets_response_500 import PostApiGatewayV1BudgetsResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
     body: PostApiGatewayV1BudgetsBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -105,6 +108,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsResponse201
     | PostApiGatewayV1BudgetsResponse400
@@ -115,9 +119,12 @@ def sync_detailed(
 ]:
     """Create budget
 
-     Creates an organization-owned budget across all seven scope types.
+     Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
+    the budget is created, so spend earlier in the current window is not included. Requires
+    gatewayBudgets:create at the organization; a project key or an organization key may call it.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1BudgetsBody):
 
     Raises:
@@ -130,6 +137,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = client.get_httpx_client().request(
@@ -143,6 +151,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsResponse201
     | PostApiGatewayV1BudgetsResponse400
@@ -154,9 +163,12 @@ def sync(
 ):
     """Create budget
 
-     Creates an organization-owned budget across all seven scope types.
+     Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
+    the budget is created, so spend earlier in the current window is not included. Requires
+    gatewayBudgets:create at the organization; a project key or an organization key may call it.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1BudgetsBody):
 
     Raises:
@@ -170,6 +182,7 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        idempotency_key=idempotency_key,
     ).parsed
 
 
@@ -177,6 +190,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsResponse201
     | PostApiGatewayV1BudgetsResponse400
@@ -187,9 +201,12 @@ async def asyncio_detailed(
 ]:
     """Create budget
 
-     Creates an organization-owned budget across all seven scope types.
+     Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
+    the budget is created, so spend earlier in the current window is not included. Requires
+    gatewayBudgets:create at the organization; a project key or an organization key may call it.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1BudgetsBody):
 
     Raises:
@@ -202,6 +219,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -213,6 +231,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsResponse201
     | PostApiGatewayV1BudgetsResponse400
@@ -224,9 +243,12 @@ async def asyncio(
 ):
     """Create budget
 
-     Creates an organization-owned budget across all seven scope types.
+     Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
+    the budget is created, so spend earlier in the current window is not included. Requires
+    gatewayBudgets:create at the organization; a project key or an organization key may call it.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1BudgetsBody):
 
     Raises:
@@ -241,5 +263,6 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            idempotency_key=idempotency_key,
         )
     ).parsed

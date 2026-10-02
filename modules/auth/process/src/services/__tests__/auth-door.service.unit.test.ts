@@ -12,6 +12,7 @@ import type * as observabilityModule from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -57,6 +58,8 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     verifyBrowserSession,
     resolveBrowserSession: async () => SIGNED_IN,
     revokeBrowserSession,
+    idTokenIssuerRefusals: IdTokenIssuerRefusalChannel.create(),
+    connectionIssuers: { findIssuersForConnection: async () => [] },
     deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
       `key-for-${sessionId}-${impersonatorId}-${epoch}`,
     // Two epochs and a day in: the server's clock alone names the epoch.
@@ -334,6 +337,103 @@ describe("AuthDoorService", () => {
       const answered = await world.service.betterAuthHandshake(signIn());
 
       expect(answered.status).toBe(500);
+    });
+  });
+});
+
+describe("given a single sign-on callback whose ID token the engine refused for its issuer", () => {
+  const EXPECTED = "https://login.microsoftonline.com/app-tenant/v2.0";
+  const RECEIVED = "https://login.microsoftonline.com/home-tenant/v2.0";
+  const REFUSED_AT =
+    "/settings/sso?ssoTest=c1&error=invalid_provider&error_description=token_not_verified";
+  const callback = () =>
+    new Request(`${BASE_URL}/api/auth/sso/callback/connection_1?code=c&state=s`, {
+      headers: { origin: BASE_URL },
+    });
+  const issRefusal = (iss: string) =>
+    Object.assign(new Error('unexpected "iss" claim value'), {
+      code: "ERR_JWT_CLAIM_VALIDATION_FAILED",
+      claim: "iss",
+      payload: { iss },
+    });
+
+  /** The engine's logger notes the refusal while the handler runs, then redirects. */
+  function doorRefusing({ claim }: { claim: "iss" | "aud" }) {
+    const idTokenIssuerRefusals = IdTokenIssuerRefusalChannel.create();
+    const handler = vi.fn(async () => {
+      idTokenIssuerRefusals.note([
+        "the id token was not verified",
+        Object.assign(issRefusal(RECEIVED), { claim }),
+      ]);
+      return new Response(null, { status: 302, headers: { location: REFUSED_AT } });
+    });
+    const { service } = door({
+      betterAuth: async () => ({ handler }),
+      idTokenIssuerRefusals,
+      connectionIssuers: {
+        findIssuersForConnection: async ({ connectionId }) =>
+          connectionId === "connection_1" ? [EXPECTED] : [],
+      },
+    });
+    return service;
+  }
+
+  describe("when the engine answered its generic token refusal", () => {
+    /** @scenario "An ID token from another issuer is refused with both issuers named" */
+    it("redirects with sso_issuer_mismatch naming both issuers", async () => {
+      const response = await doorRefusing({ claim: "iss" }).betterAuthHandshake(callback());
+      const location = response.headers.get("location") ?? "";
+      const target = new URL(location, BASE_URL);
+
+      expect(location.startsWith("/settings/sso")).toBe(true);
+      expect(target.searchParams.get("error")).toBe("sso_issuer_mismatch");
+      expect(target.searchParams.get("received_issuer")).toBe(RECEIVED);
+      expect(target.searchParams.get("expected_issuer")).toBe(EXPECTED);
+      expect(target.searchParams.get("error_description")).toBeNull();
+      expect(target.searchParams.get("ssoTest")).toBe("c1");
+    });
+  });
+
+  describe("when the refusal was for another claim", () => {
+    it("leaves the redirect as it was", async () => {
+      const response = await doorRefusing({ claim: "aud" }).betterAuthHandshake(callback());
+
+      expect(response.headers.get("location")).toContain("error=invalid_provider");
+    });
+  });
+
+  describe("when the logger notes a refusal outside any request", () => {
+    it("ignores the line", () => {
+      expect(() => IdTokenIssuerRefusalChannel.create().note([issRefusal(RECEIVED)])).not.toThrow();
+    });
+  });
+});
+
+describe("given Microsoft returning to the redirect URI Azure app registrations list", () => {
+  describe("when the callback arrives at /api/auth/callback/azure-ad", () => {
+    /** @scenario "Microsoft sign-in sends the redirect URI registered with Azure" */
+    it("hands it to Better Auth under the Microsoft provider's own path", async () => {
+      const { service, handler } = door();
+
+      await service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/callback/azure-ad?code=c&state=s`),
+      );
+
+      const forwarded = new URL(handler.mock.calls[0]?.[0].url ?? "");
+      expect(forwarded.pathname).toBe("/api/auth/callback/microsoft");
+      expect(forwarded.search).toBe("?code=c&state=s");
+    });
+  });
+
+  describe("when any other callback arrives", () => {
+    it("leaves its path alone", async () => {
+      const { service, handler } = door();
+
+      await service.betterAuthHandshake(new Request(`${BASE_URL}/api/auth/callback/google?code=c`));
+
+      expect(new URL(handler.mock.calls[0]?.[0].url ?? "").pathname).toBe(
+        "/api/auth/callback/google",
+      );
     });
   });
 });

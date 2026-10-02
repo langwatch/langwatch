@@ -210,6 +210,7 @@ describe("the organization's own single sign-on surface", () => {
         "getMigrationProgress",
         "getSetup",
         "grantBreakGlass",
+        "identityProvider",
         "onHistoryActivity",
         "proveDomain",
         "register",
@@ -221,6 +222,7 @@ describe("the organization's own single sign-on surface", () => {
         "selectMigrationRoute",
         "setArrivals",
         "startLegacyMigration",
+        "updateIdentityProvider",
       ]);
     });
   });
@@ -398,6 +400,91 @@ describe("the organization's own single sign-on surface", () => {
         args: { organizationId: "org_acme", providerId: "Okta", protocol: "oidc" },
         targetKind: "ssoConnection",
       });
+    });
+  });
+
+  describe("given an administrator editing their identity provider", () => {
+    const IDP = {
+      protocol: "oidc" as const,
+      issuer: "https://acme.okta.com",
+      clientId: "client",
+      clientSecret: "shhh",
+    };
+
+    it("prefills the form with the settings identity holds, never the secret", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.identityProvider(TARGET)).resolves.toEqual({
+        protocol: "oidc",
+        issuer: "https://acme.okta.com",
+        clientId: "client",
+        hasClientSecret: true,
+      });
+      expect(commands.getIdentityProvider).toHaveBeenCalledWith(TARGET);
+    });
+
+    it("answers no settings for a grandfathered connection", async () => {
+      const { caller, commands } = await harness();
+      commands.getIdentityProvider.mockResolvedValueOnce({ protocol: "grandfathered" });
+
+      await expect(caller.identityProvider(TARGET)).resolves.toBeNull();
+    });
+
+    it("passes the settings on for the same connection, and audits no secret", async () => {
+      const { auditLog, caller, commands } = await harness();
+
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).resolves.toBeUndefined();
+
+      expect(commands.updateIdentityProvider).toHaveBeenCalledWith({
+        ...TARGET,
+        idp: IDP,
+        actor: { userId: "user_ana" },
+      });
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.updateIdentityProvider",
+        args: { ...TARGET, protocol: "oidc" },
+        targetKind: "ssoConnection",
+        targetId: "ssoc_1",
+      });
+      expect(JSON.stringify(auditLog.record.mock.calls)).not.toContain("shhh");
+    });
+
+    it("keeps the stored secret when the field is left blank", async () => {
+      const { caller, commands } = await harness();
+
+      await caller.updateIdentityProvider({
+        ...TARGET,
+        idp: { protocol: "oidc", issuer: "https://acme.okta.com", clientId: "client" },
+      });
+
+      expect(commands.updateIdentityProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ idp: expect.objectContaining({ clientSecret: null }) }),
+      );
+    });
+
+    /** @scenario "Only an administrator who may manage single sign-on can edit" */
+    it("refuses a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.identityProvider(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.getIdentityProvider).not.toHaveBeenCalled();
+      expect(commands.updateIdentityProvider).not.toHaveBeenCalled();
+    });
+
+    it("is gated on the plan like registering", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.updateIdentityProvider({ ...TARGET, idp: IDP })).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required" },
+      });
+      expect(commands.updateIdentityProvider).not.toHaveBeenCalled();
     });
   });
 

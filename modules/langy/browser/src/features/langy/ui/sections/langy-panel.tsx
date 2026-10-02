@@ -101,6 +101,7 @@ import {
   useLangyPanelPeek,
   useLangyPanelPlacement,
 } from "../../behavior/panel/use-langy-panel-layout.ts";
+import { useLangyPanelNotifications } from "../../behavior/panel/use-langy-panel-notifications.ts";
 import {
   useLangyDraftRestore,
   useLangyPanelSend,
@@ -124,6 +125,7 @@ import { LangyMakeDefaultDialog } from "../elements/langy-make-default-dialog.ts
 import { AnimatedConversationTitle } from "./animated-conversation-title.tsx";
 import { Composer } from "./composer.tsx";
 import { LangyDevDrawer } from "./langy-dev-drawer.tsx";
+import { LangyNotificationsMenuGroup } from "./langy-notifications-menu-group.tsx";
 import type { ProposalHandlers } from "./langy-proposal-card.tsx";
 import { LangySendProvider } from "./langy-send-context.tsx";
 import {
@@ -486,7 +488,7 @@ function LangyPanel({
     turnActive,
     durableLastError: history.lastError,
     messages: engine.messages,
-    regenerate: engine.regenerate,
+    retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
   });
   const send = useLangyPanelSend({
@@ -536,6 +538,14 @@ function LangyPanel({
   const reads = useLangyTranscriptReads({
     displayMessages: view.displayMessages,
     questionCards: waits.questionCards,
+  });
+  useLangyPanelNotifications({
+    conversationId: activeConversationId,
+    conversationTitle: facts.title,
+    status: engine.status,
+    messages: engine.messages,
+    waits,
+    liveCodeAccessCallId: reads.liveCodeAccessCallId,
   });
   const selectChoice = useLangyChoiceAnswer({
     projectId,
@@ -1074,6 +1084,8 @@ function LangyOverflowMenu({
             </Menu.Item>
           ))}
         </Menu.ItemGroup>
+        <Menu.Separator />
+        <LangyNotificationsMenuGroup />
         <Menu.Separator />
         <Menu.Item value="dev-mode" onClick={() => setDevMode(!devMode)}>
           <HStack gap={2.5} width="full">

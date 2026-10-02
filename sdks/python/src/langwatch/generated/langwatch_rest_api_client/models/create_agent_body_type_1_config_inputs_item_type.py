@@ -7,6 +7,7 @@ class CreateAgentBodyType1ConfigInputsItemType(str, Enum):
     CODE = "code"
     DATASET = "dataset"
     DICT = "dict"
+    FILE = "file"
     FLOAT = "float"
     IMAGE = "image"
     INT = "int"

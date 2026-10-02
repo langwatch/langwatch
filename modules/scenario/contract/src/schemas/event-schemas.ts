@@ -245,17 +245,19 @@ const scenarioAudioMessageSchema = z.object({
   ),
 });
 
-const agUiToolCallSchema = z.looseObject({
-  id: z.string().optional(),
-  type: z.literal("function").optional(),
-  function: z
-    .looseObject({
-      name: z.string().optional(),
-      arguments: z.string().optional(),
-    })
-    .optional(),
-  encryptedValue: z.string().optional(),
-});
+const agUiToolCallSchema = z
+  .looseObject({
+    id: z.string().optional(),
+    type: z.literal("function").optional(),
+    function: z
+      .looseObject({
+        name: z.string().optional(),
+        arguments: z.string().optional(),
+      })
+      .optional(),
+    encryptedValue: z.string().optional(),
+  })
+  .meta({ id: "AgUiToolCall" });
 
 /**
  * The AG-UI message boundary, loose so its validator stays out of the Zod graph;

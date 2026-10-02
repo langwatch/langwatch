@@ -23,12 +23,12 @@ import {
   OrganizationPermissionError,
   PayloadTooLargeError,
 } from "../../errors.ts";
+import { getRoutePolicy } from "../../route-registry.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
-import { getRoutePolicy } from "../../route-registry.ts";
 
 /**
  * The runtime's loggers are created at module scope, so spying on `createLogger` calls never
@@ -188,8 +188,9 @@ describe("a declared REST router mounted through the runtime", () => {
     /**
      * @scenario "The declarations publish the OpenAPI document"
      * @scenario "The dated and latest aliases are served but never documented"
+     * @scenario "A declared route is published at its canonical v1 address"
      */
-    it("publishes the bare path once and hides the dated and latest aliases", async () => {
+    it("publishes the /api/v1 address once and hides the bare, dated and latest aliases", async () => {
       const refuse = vi.fn(() => {
         throw new Error("OpenAPI generation must not resolve the application");
       });
@@ -209,7 +210,8 @@ describe("a declared REST router mounted through the runtime", () => {
       expect(Object.keys(published.paths ?? {})).not.toContainEqual(
         expect.stringMatching(/\/(latest|preview|\d{4}-\d{2}-\d{2})(\/|$)/),
       );
-      expect(published.paths?.["/api/annotations/{id}"]).toBeDefined();
+      expect(published.paths?.["/api/v1/annotations/{id}"]).toBeDefined();
+      expect(published.paths?.["/api/annotations/{id}"]).toBeUndefined();
     });
   });
 
@@ -335,9 +337,11 @@ describe("the document a declared route publishes", () => {
   it("files the operation under the tags the declaration named", async () => {
     const published = await generateSpecs(secretsApp(), SPEC_OPTIONS);
 
-    const bare = published.paths?.["/api/secrets"] as { get?: { tags?: string[] } } | undefined;
+    const canonical = published.paths?.["/api/v1/secrets"] as
+      | { get?: { tags?: string[] } }
+      | undefined;
 
-    expect(bare?.get?.tags).toEqual(["Secrets"]);
+    expect(canonical?.get?.tags).toEqual(["Secrets"]);
   });
 });
 
@@ -572,7 +576,7 @@ describe("a family the declaration marked superseded", () => {
   it("marks the documented mount of the operation deprecated, with the notice", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
 
-    const item = published.paths?.["/api/legacy-reports/{id}"] as
+    const item = published.paths?.["/api/v1/legacy-reports/{id}"] as
       | { get?: { deprecated?: boolean; description?: string } }
       | undefined;
 
@@ -597,7 +601,7 @@ describe("a family the declaration marked superseded", () => {
   it("publishes the answers the route documented beside its declared success", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
 
-    const item = published.paths?.["/api/legacy-reports/{id}"] as
+    const item = published.paths?.["/api/v1/legacy-reports/{id}"] as
       | { get?: { responses?: Record<string, { description?: string }> } }
       | undefined;
 
@@ -622,11 +626,11 @@ describe("a route declared public", () => {
   it("is published with no security requirement, unlike its scoped siblings", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
 
-    const publicItem = published.paths?.["/api/legacy-reports/health"] as
+    const publicItem = published.paths?.["/api/v1/legacy-reports/health"] as
       | { get?: { security?: unknown[] } }
       | undefined;
 
-    const scopedItem = published.paths?.["/api/legacy-reports/{id}"] as
+    const scopedItem = published.paths?.["/api/v1/legacy-reports/{id}"] as
       | { get?: { security?: unknown[] } }
       | undefined;
 

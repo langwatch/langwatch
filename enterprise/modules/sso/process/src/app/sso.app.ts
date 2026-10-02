@@ -56,7 +56,9 @@ import {
   type SsoSetupRegistered,
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
+  type SsoSetupIdentityProviderView,
   type SsoSetupRenameInput,
+  type SsoSetupUpdateIdentityProviderInput,
   type SsoSelfServeAvailability,
   type SsoSelfServeContext,
   type SsoSetupStartMigrationInput,
@@ -76,7 +78,10 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/sign-in-providers.rules.ts";
-import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
+import {
+  findDeploymentSignIns,
+  ssoServiceProviderAddresses,
+} from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import {
@@ -241,7 +246,7 @@ export class SsoModule implements SsoApiContract {
     this.#selfServeContext = SsoSelfServeContextService.create({
       authority: LicenseDomainClaimAuthority.create({
         isHosted,
-        licensedAtStartup: () => gate.platformAllowed(),
+        licenseGate: () => gate.platformAllowed(),
         licensing: dependencies.licensing,
       }),
       // The same platform-operator grant the back office gates on.
@@ -297,6 +302,8 @@ export class SsoModule implements SsoApiContract {
       finalizeLegacyMigration: (input, actor) =>
         setup().finalizeLegacyMigration({ ...input, actor }),
       rename: (input, actor) => setup().rename({ ...input, actor }),
+      getIdentityProvider: (input) => setup().getIdentityProvider(input),
+      updateIdentityProvider: (input, actor) => setup().updateIdentityProvider({ ...input, actor }),
       setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
       activate: (input, actor) => setup().activate({ ...input, actor }),
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
@@ -350,10 +357,17 @@ export class SsoModule implements SsoApiContract {
     return {
       ...journey,
       availability: await this.#selfServeContext.availability({ ...input, actorId: by.id }),
-      serviceProvider: ssoServiceProviderAddresses({
-        baseUrl: this.#baseUrl,
-        connectionId: journey.connection?.connectionId ?? null,
-      }),
+      serviceProvider: {
+        ...ssoServiceProviderAddresses({
+          baseUrl: this.#baseUrl,
+          connectionId: journey.connection?.connectionId ?? null,
+        }),
+        deploymentSignIn:
+          findDeploymentSignIns({
+            provider: await this.resolveProvider(),
+            baseUrl: this.#baseUrl,
+          })[0] ?? null,
+      },
     };
   }
 
@@ -406,7 +420,7 @@ export class SsoModule implements SsoApiContract {
   }): Promise<SignInProviderMounts> {
     return Promise.resolve({
       socialProviders: buildSocialProviders(
-        this.#configuration,
+        { ...this.#configuration, baseUrl: input.baseUrl },
         input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
       ),
       genericOAuthConfigs:
@@ -774,6 +788,36 @@ export class SsoModule implements SsoApiContract {
       action: "rename",
       args: { ...input },
       ceremony: (actor) => this.#selfServe.rename(input, actor),
+    });
+  }
+
+  async findIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | null> {
+    const view = await this.#selfServe.getIdentityProvider(input);
+    return view.protocol === "grandfathered" ? null : view;
+  }
+
+  /**
+   * Gated like registering, because these settings decide where sign-ins go.
+   * The audit row names the protocol and leaves the settings out: they can
+   * carry a client secret.
+   */
+  async setupUpdateIdentityProvider(
+    input: SsoSetupUpdateIdentityProviderInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
+    await this.#attempted({
+      by,
+      action: "updateIdentityProvider",
+      args: {
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        protocol: input.idp.protocol,
+      },
+      ceremony: (actor) => this.#selfServe.updateIdentityProvider(input, actor),
     });
   }
 

@@ -248,6 +248,57 @@ const isIngestionShape = ({
   );
 };
 
+/**
+ * The one shape a person's project session may mint as its full-access key: personal, their own,
+ * one ADMIN binding to that project, every permission, capped at the person's own access there.
+ */
+const isFullAccessShape = ({
+  input,
+  projectId,
+  callerUserId,
+}: {
+  input: ApiKeyRestCreate;
+  projectId: string;
+  callerUserId: string;
+}): boolean => {
+  const [binding, ...extra] = input.bindings ?? [];
+
+  return (
+    input.keyType === "personal" &&
+    (input.assignedToUserId === undefined || input.assignedToUserId === callerUserId) &&
+    (input.projectIds ?? []).length === 0 &&
+    binding !== undefined &&
+    extra.length === 0 &&
+    binding.role === "ADMIN" &&
+    binding.scopeType === "PROJECT" &&
+    binding.scopeId === projectId &&
+    input.permissionMode === "all" &&
+    (input.permissions ?? []).length === 0
+  );
+};
+
+/** Who a full-access key is minted for, or the refusal: a person's session, the one shape. */
+const fullAccessKeyOwner = ({
+  principal,
+  input,
+  projectId,
+}: {
+  principal: z.infer<(typeof apiKeyIngestionCaller)["schema"]>["principal"];
+  input: ApiKeyRestCreate;
+  projectId: string;
+}): string => {
+  if (principal?.type !== "user") {
+    throw new ApiKeyScopeViolationError("Only a person's sign-in session mints a full-access key");
+  }
+  if (!isFullAccessShape({ input, projectId, callerUserId: principal.id })) {
+    throw new ApiKeyScopeViolationError(
+      "A full-access key is personal, bound to this one project, with every permission there",
+    );
+  }
+
+  return principal.id;
+};
+
 export const apiKeyRest: Readonly<{
   protocol: "rest";
   namespace: string;
@@ -536,6 +587,54 @@ export const apiKeyRest: Readonly<{
       permissionMode: "restricted",
       permissions: [...INGESTION_PERMISSIONS],
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: scope.id }],
+    });
+
+    return {
+      token: result.token,
+      apiKey: {
+        id: result.apiKey.id,
+        name: result.apiKey.name,
+        createdAt: result.apiKey.createdAt,
+      },
+    };
+  })
+
+  // `langwatch login --project` mints the key it writes to .env here: the person's own key with
+  // full access to the project their sign-in is bound to, behind project:manage.
+  .post("/full-access", "createFullAccessApiKey")
+  .withCredential("project")
+  .withInput(apiKeyRestCreateSchema)
+  .withPermission("project:manage")
+  .withOutput(apiKeyRestMintedSchema)
+  .withStatus(201)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Create a full-access API key",
+    description:
+      'Mint the caller\'s own API key for the project their sign-in session is bound to, as `langwatch login --project` does: it can do everything the caller can do in that project (prompts, datasets, evaluations, simulations, traces). Only one shape is accepted: keyType "personal", owned by the caller, one ADMIN binding to that project and permissionMode "all". Name it after the machine; omit expiresAt for a key that never expires. Requires a person\'s project session holding project:manage; an API key cannot mint one.',
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "The caller is not a person's sign-in session, lacks project:manage, or asked for any other shape (api_key_scope_violation)",
+      },
+      { status: 422, description: "Validation error (validation_error)" },
+    ],
+  })
+  .withMiddleware(apiKeyIngestionCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    const userId = fullAccessKeyOwner({ principal: caller.principal, input, projectId: scope.id });
+
+    const result = await app.create({
+      name: input.name,
+      description: input.description,
+      userId,
+      createdByUserId: userId,
+      organizationId: caller.organizationId,
+      expiresAt: input.expiresAt,
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: scope.id }],
     });
 
     return {

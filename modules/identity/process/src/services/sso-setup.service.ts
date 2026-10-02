@@ -143,6 +143,9 @@ export class SsoSetupService {
       this.deps.activity.findLastAuthenticationAtMs({
         organizationId,
         connectionId: connection.connectionId,
+        // A sign-in through an issuer the connection no longer dials is not
+        // evidence for the one it dials now.
+        issuer: connection.idpMetadata.issuer,
       }),
     ]);
     const liveCount = bindings.filter((binding) => breakGlassIsLive({ binding, nowMs })).length;

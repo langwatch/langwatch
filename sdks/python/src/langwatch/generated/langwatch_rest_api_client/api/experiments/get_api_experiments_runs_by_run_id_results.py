@@ -1,10 +1,13 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.get_api_experiments_runs_by_run_id_results_response_200 import (
+    GetApiExperimentsRunsByRunIdResultsResponse200,
+)
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -31,15 +34,21 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     if response.status_code == 200:
-        return None
+        response_200 = GetApiExperimentsRunsByRunIdResultsResponse200.from_dict(response.json())
+
+        return response_200
 
     if response.status_code == 401:
-        return None
+        response_401 = cast(Any, None)
+        return response_401
 
     if response.status_code == 404:
-        return None
+        response_404 = cast(Any, None)
+        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -47,7 +56,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -64,7 +75,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[Any]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -80,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -95,12 +106,12 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     run_id: str,
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[Any]:
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -116,7 +127,38 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
+    """
+
+    return sync_detailed(
+        run_id=run_id,
+        client=client,
+        experiment_slug=experiment_slug,
+    ).parsed
+
+
+async def asyncio_detailed(
+    run_id: str,
+    *,
+    client: AuthenticatedClient,
+    experiment_slug: str | Unset = UNSET,
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
+    """Read run results
+
+     Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
+    Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within
+    its experiment.
+
+    Args:
+        run_id (str):
+        experiment_slug (str | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -127,3 +169,36 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    run_id: str,
+    *,
+    client: AuthenticatedClient,
+    experiment_slug: str | Unset = UNSET,
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
+    """Read run results
+
+     Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
+    Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within
+    its experiment.
+
+    Args:
+        run_id (str):
+        experiment_slug (str | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
+    """
+
+    return (
+        await asyncio_detailed(
+            run_id=run_id,
+            client=client,
+            experiment_slug=experiment_slug,
+        )
+    ).parsed

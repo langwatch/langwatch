@@ -48,6 +48,8 @@ export function useTestSignIn({ connectionId }: { connectionId: string }): TestS
           code: host.normalizeSignInErrorCode(verdict.code),
           description: verdict.description,
           yourAddress: host.currentUserAddress(),
+          expectedIssuer: verdict.expectedIssuer,
+          receivedIssuer: verdict.receivedIssuer,
         })
       : null;
 

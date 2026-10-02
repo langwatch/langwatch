@@ -77,7 +77,7 @@ function printLwql(reference: QueryReferenceResult): void {
   formatTable({
     data: reference.lwql.schema.views.map((view) => ({
       View: view.name,
-      "Time column": view.timeColumn,
+      "Time column": view.timeColumn ?? "",
       Columns: String(view.columns.length),
       Grain: view.grain,
     })),

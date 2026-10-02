@@ -9,6 +9,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
+import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
 import { LangySidecar } from "./langy-panel.tsx";
 
@@ -27,6 +28,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
   });
   useLangyScopeReset();
   useLangyConversationDeepLink();
+  useLangyWebPush();
 
   return (
     <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy}>

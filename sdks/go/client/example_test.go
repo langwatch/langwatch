@@ -159,9 +159,7 @@ func ExampleTracesService_All() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if tr.TraceId != nil {
-			fmt.Println(*tr.TraceId)
-		}
+		fmt.Println(tr.TraceId)
 	}
 }
 

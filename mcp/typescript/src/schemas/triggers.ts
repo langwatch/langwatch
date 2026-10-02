@@ -49,9 +49,7 @@ const slackActionParamsSchema = z
     slackChannelId: z
       .string()
       .optional()
-      .describe(
-        "The channel the bot posts in, for a bot connection or `bot` delivery.",
-      ),
+      .describe("The channel the bot posts in, for a bot connection or `bot` delivery."),
     slackBotToken: z
       .string()
       .optional()
@@ -69,9 +67,7 @@ const slackActionParamsSchema = z
 
 const webhookActionParamsSchema = z
   .object({
-    url: z
-      .string()
-      .describe("Where the request goes. https only, and not a private host."),
+    url: z.string().describe("Where the request goes. https only, and not a private host."),
     method: z.enum(["POST", "PUT", "PATCH"]).optional(),
     headers: z
       .record(z.string(), z.string())
@@ -96,9 +92,7 @@ const webhookActionParamsSchema = z
 
 const datasetActionParamsSchema = z
   .object({
-    datasetId: z
-      .string()
-      .describe("The dataset matched traces are appended to."),
+    datasetId: z.string().describe("The dataset matched traces are appended to."),
     datasetMapping: z
       .object({
         mapping: z.record(z.string(), z.unknown()),
@@ -129,43 +123,35 @@ export const actionParamsSchema = z.union([
  *  destination cannot deliver, so it is refused with the field named. A
  *  connection decides its own kind; without one, the legacy fields need a
  *  webhook URL, or a channel and a token. */
-const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine(
-  (params, ctx) => {
-    const delivery = params.slackDelivery ?? "webhook";
-    if (delivery === "bot" && !params.slackChannelId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["slackChannelId"],
-        message: params.slackIntegrationId
-          ? "a bot connection needs the channel to post in"
-          : "bot delivery needs the channel to post in",
-      });
-    }
-    if (params.slackIntegrationId) return;
-    if (delivery === "webhook" && !params.slackWebhook) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["slackIntegrationId"],
-        message: "name the Slack connection to post through",
-      });
-    }
-    if (
-      delivery === "bot" &&
-      !params.slackBotToken &&
-      params.slackBotTokenSet !== true
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["slackIntegrationId"],
-        message: "bot delivery needs the Slack connection to post through",
-      });
-    }
-  },
-);
+const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine((params, ctx) => {
+  const delivery = params.slackDelivery ?? "webhook";
+  if (delivery === "bot" && !params.slackChannelId) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["slackChannelId"],
+      message: params.slackIntegrationId
+        ? "a bot connection needs the channel to post in"
+        : "bot delivery needs the channel to post in",
+    });
+  }
+  if (params.slackIntegrationId) return;
+  if (delivery === "webhook" && !params.slackWebhook) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["slackIntegrationId"],
+      message: "name the Slack connection to post through",
+    });
+  }
+  if (delivery === "bot" && !params.slackBotToken && params.slackBotTokenSet !== true) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["slackIntegrationId"],
+      message: "bot delivery needs the Slack connection to post through",
+    });
+  }
+});
 
-const ACTION_PARAMS_SCHEMA_BY_ACTION: Partial<
-  Record<string, z.ZodTypeAny>
-> = {
+const ACTION_PARAMS_SCHEMA_BY_ACTION: Partial<Record<string, z.ZodTypeAny>> = {
   SEND_EMAIL: emailActionParamsSchema,
   SEND_SLACK_MESSAGE: slackActionParamsWriteSchema,
   SEND_WEBHOOK: webhookActionParamsSchema,
@@ -188,10 +174,7 @@ export function validateActionParamsForAction({
   const parsed = schema.safeParse(actionParams);
   if (parsed.success) return { ok: true };
   const issues = parsed.error.issues
-    .map(
-      (issue) =>
-        `${issue.path.join(".") || "(actionParams)"}: ${issue.message}`,
-    )
+    .map((issue) => `${issue.path.join(".") || "(actionParams)"}: ${issue.message}`)
     .join("; ");
   return {
     ok: false,
@@ -204,7 +187,7 @@ export function validateActionParamsForAction({
 export const TRIGGER_FILTERS_DESCRIPTION = [
   "Trace conditions as a JSON object string.",
   'Unkeyed fields take a list of values: {"traces.error":["true"]}.',
-  'Keyed fields nest a key above the list. evaluations.* is keyed by the MONITOR id (the `id` from `platform_list_monitors` / GET /api/monitors, not its evaluatorId): {"evaluations.passed":{"<monitorId>":["false"]}}.',
+  'Keyed fields nest a key above the list. evaluations.* is keyed by the MONITOR id (the `id` from `platform_list_monitors` / GET /api/v1/monitors, not its evaluatorId): {"evaluations.passed":{"<monitorId>":["false"]}}.',
   'metadata.value is keyed by the metadata key: {"metadata.value":{"<key>":["true"]}}.',
   "A keyed field sent as a bare list, or keyed by anything but a monitor id, is refused.",
 ].join(" ");
@@ -234,9 +217,7 @@ export const graphAlertSchema = z
       ])
       .describe("The window, in minutes, the series is read over."),
   })
-  .describe(
-    "The rule an alert fires by. Send it with `customGraphId` and `alertType`.",
-  );
+  .describe("The rule an alert fires by. Send it with `customGraphId` and `alertType`.");
 
 /** What a scheduled report renders and when. Structured, not a loose record: an
  *  agent that cannot see the field names guesses them, and a guess is a 422.
@@ -268,9 +249,7 @@ export const reportSchema = z
           .describe(
             'A 5-field cron expression (minute hour day-of-month month day-of-week), for example "0 9 * * 1". It can send at most every 15 minutes.',
           ),
-        timezone: z
-          .string()
-          .describe('An IANA timezone, for example "Europe/Amsterdam" or "UTC".'),
+        timezone: z.string().describe('An IANA timezone, for example "Europe/Amsterdam" or "UTC".'),
       })
       .describe("When it sends."),
     compareToPrevious: z
@@ -346,9 +325,7 @@ const triggerFireSchema = z
 /** A page of fires: `{ fires, nextCursor }`, or the bare array an older
  *  deployment answers with, which has no next page. */
 export const triggerFirePageSchema = z.union([
-  z
-    .array(triggerFireSchema)
-    .transform((fires) => ({ fires, nextCursor: null })),
+  z.array(triggerFireSchema).transform((fires) => ({ fires, nextCursor: null })),
   z
     .object({
       fires: z.array(triggerFireSchema).optional(),

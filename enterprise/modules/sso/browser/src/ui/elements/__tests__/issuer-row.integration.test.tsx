@@ -29,4 +29,23 @@ describe("given a connection with an issuer", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("https://acme.okta.com"));
   });
+
+  describe("when the reader may edit the identity provider settings", () => {
+    it("offers the edit beside the issuer", () => {
+      const onEdit = vi.fn();
+      renderWithSsoHost(<IssuerRow issuer="https://acme.okta.com" onEdit={onEdit} />);
+
+      fireEvent.click(screen.getByTestId("identity-provider-edit"));
+
+      expect(onEdit).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when no edit is offered", () => {
+    it("shows no edit control", () => {
+      renderWithSsoHost(<IssuerRow issuer="https://acme.okta.com" />);
+
+      expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
+    });
+  });
 });

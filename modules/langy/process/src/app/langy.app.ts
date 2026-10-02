@@ -94,6 +94,7 @@ import {
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { NotificationService } from "@langwatch/notification-contract";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -125,6 +126,7 @@ import { readSessionKeyCredential } from "../rules/langy-local-control-connect.r
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 import type { LangyConversationDefinition } from "../services/langy-conversation-pipeline.service.ts";
 import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
+import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
@@ -266,6 +268,8 @@ export class LangyModule implements LangyApiContract {
     scenarios: ScenarioApi,
     /** Whether a failed turn belonged to guided onboarding, and where that failure is tracked. */
     onboarding: OnboardingApi,
+    /** Where Langy's notifications are sent from: notification's Web Push. */
+    notifications: NotificationService,
     /** The platform default retention the analytics grain is written on. */
     retention: DataRetentionApi,
   };
@@ -315,6 +319,7 @@ export class LangyModule implements LangyApiContract {
         gateway: setup.dependencies.gateway,
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
+      github: LangyGithubTurnTokenService.create(setup.dependencies.github),
       skillGates: LangySkillGatesService.create(setup.dependencies.featureFlags),
       navigateFallback: LangyNavigateFallbackService.create({
         projects: setup.dependencies.projects,
@@ -410,6 +415,11 @@ export class LangyModule implements LangyApiContract {
         }),
       },
       guidedOnboarding: { reader: guidedOnboarding, analytics: guidedOnboarding },
+      webPush: {
+        users: setup.dependencies.users,
+        projects: setup.dependencies.projects,
+        notifications: setup.dependencies.notifications,
+      },
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });

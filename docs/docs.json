@@ -984,6 +984,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/first-run",
               "self-hosting/licensing",
               "self-hosting/connect",
               "self-hosting/data-and-telemetry",
@@ -1013,7 +1014,8 @@
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
               "self-hosting/deployment/kubernetes-local",
-              "self-hosting/deployment/argocd"
+              "self-hosting/deployment/argocd",
+              "self-hosting/deployment/routing"
             ]
           },
           {
@@ -1088,6 +1090,7 @@
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-attachments",
               "api-reference/datasets/evaluate-a-dataset",
+              "api-reference/datasets/create-a-dataset-from-an-uploaded-file",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
@@ -1095,6 +1098,7 @@
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
               "api-reference/datasets/post-dataset-entries",
+              "api-reference/datasets/import-an-uploaded-file-into-a-dataset",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
               "api-reference/datasets/delete-dataset",
@@ -1552,7 +1556,14 @@
           },
           {
             "group": "Grants",
-            "pages": ["api-reference/grants/overview"]
+            "pages": [
+              "api-reference/grants/overview",
+              "api-reference/grants/list-grants",
+              "api-reference/grants/grant-a-role",
+              "api-reference/grants/get-a-grant",
+              "api-reference/grants/change-a-grant-s-role",
+              "api-reference/grants/revoke-a-grant"
+            ]
           },
           {
             "group": "Role Bindings",
@@ -1609,6 +1620,7 @@
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/create-an-ingestion-api-key",
               "api-reference/api-keys/get-api-key",
               "api-reference/api-keys/update-api-key",
               "api-reference/api-keys/revoke-api-key"

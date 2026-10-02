@@ -90,8 +90,9 @@ def sync_detailed(
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
 ) -> Response[ListRoleBindingsResponse200]:
-    """List the organization's role bindings, each naming its principal (user, group or API key), role and
-    scope. Filter by principal or scope; totalCount counts the filtered set.
+    """List the organization's role bindings, each naming its principal (user, group or API key), role,
+    scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
+    the filtered set. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         user_id (str | Unset):
@@ -138,8 +139,9 @@ def sync(
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
 ) -> ListRoleBindingsResponse200 | None:
-    """List the organization's role bindings, each naming its principal (user, group or API key), role and
-    scope. Filter by principal or scope; totalCount counts the filtered set.
+    """List the organization's role bindings, each naming its principal (user, group or API key), role,
+    scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
+    the filtered set. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         user_id (str | Unset):
@@ -181,8 +183,9 @@ async def asyncio_detailed(
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
 ) -> Response[ListRoleBindingsResponse200]:
-    """List the organization's role bindings, each naming its principal (user, group or API key), role and
-    scope. Filter by principal or scope; totalCount counts the filtered set.
+    """List the organization's role bindings, each naming its principal (user, group or API key), role,
+    scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
+    the filtered set. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         user_id (str | Unset):
@@ -227,8 +230,9 @@ async def asyncio(
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
 ) -> ListRoleBindingsResponse200 | None:
-    """List the organization's role bindings, each naming its principal (user, group or API key), role and
-    scope. Filter by principal or scope; totalCount counts the filtered set.
+    """List the organization's role bindings, each naming its principal (user, group or API key), role,
+    scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
+    the filtered set. superseded by /api/grants, which answers the same rows as grants
 
     Args:
         user_id (str | Unset):

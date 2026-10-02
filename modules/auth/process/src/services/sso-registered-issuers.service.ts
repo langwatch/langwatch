@@ -13,6 +13,7 @@ import {
 export interface SsoIssuerDirectory {
   findIssuersForConnection(args: { connectionId: string }): Promise<string[]>;
   findIssuersForDomain(args: { domain: string }): Promise<string[]>;
+  findEndpointOrigins(args: { issuers: readonly string[] }): Promise<string[]>;
 }
 
 export interface SsoRegisteredIssuersServiceDeps {
@@ -41,6 +42,15 @@ export class SsoRegisteredIssuersService {
     const [named] = findConnectionIdsInPath(request.url);
     const connectionId = named ?? target?.providerId;
     return connectionId ? this.issuersFor({ connectionId }) : this.issuersForDomainIn(target);
+  }
+
+  /** The origins these issuers' endpoints live on, when that is not their
+   *  own (Google's `*.googleapis.com`). An unreadable answer trusts nothing new. */
+  async endpointOriginsFor(issuers: readonly string[]): Promise<string[]> {
+    if (issuers.length === 0) return [];
+    return this.read(() => this.deps.issuers.findEndpointOrigins({ issuers }), {
+      issuers: issuers.join(" "),
+    });
   }
 
   /** Parsed off a clone, so the handler still reads its own body. */

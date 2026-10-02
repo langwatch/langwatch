@@ -218,9 +218,33 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
  * is: one remediation, one sentence.
  */
-const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_unauthorized",
   "upstream_forbidden",
+  // The providers' own codes for the same two statuses, which the proxy files
+  // instead of the status when the body carries one: Bedrock through the
+  // gateway ("access_denied" / "permission_denied_error"), Anthropic
+  // ("authentication_error" / "permission_error"), OpenAI ("invalid_api_key"),
+  // and the AWS SDK exception name.
+  "access_denied",
+  "permission_denied_error",
+  "authentication_error",
+  "permission_error",
+  "invalid_api_key",
+  "AccessDeniedException",
+]);
+
+/**
+ * The provider does not serve the model to this key: a 404 status, or the
+ * provider's own code for it (OpenAI "model_not_found", Anthropic
+ * "not_found_error", the AWS SDK exception name). Deterministic, like a
+ * refused credential: the fix is the model, not a retry.
+ */
+export const PROVIDER_MODEL_MISSING_REASONS: ReadonlySet<string> = new Set([
+  "upstream_not_found",
+  "model_not_found",
+  "not_found_error",
+  "ResourceNotFoundException",
 ]);
 
 /*
@@ -239,6 +263,20 @@ const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
   "upstream_timeout",
+  // The gateway's own codes for a provider it could not get an answer from.
+  "provider_timeout",
+  "provider_connection_failed",
+]);
+
+/**
+ * The provider refused the request itself as malformed: Bedrock's
+ * "ValidationException", or a 422 status. Deterministic, so the fix is another
+ * model, not a retry. The broad "invalid_request_error" and bare 400 are left
+ * out: Anthropic files a spent balance under them, and that one can pass.
+ */
+export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unprocessable_entity",
+  "ValidationException",
 ]);
 
 /**
@@ -2975,7 +3013,7 @@ const presentations = {
   sso_domain_not_verified: {
     title: "This domain is not verified yet",
     describe: () =>
-      "Single sign-on only admits people from a domain your organization has proven it owns. Finish the domain verification, then try again.",
+      "Single sign-on only admits people from a domain your organization has proven it owns. If you are setting up single sign-on, verify the domain in Settings > Authentication > Identity provider and try again. Otherwise, ask whoever manages single sign-on to verify it.",
   },
   sso_domain_proof_lapsed: {
     title: "This domain's proof has lapsed",
@@ -2986,6 +3024,17 @@ const presentations = {
     title: "The connection needs its credentials",
     describe: () =>
       "Add the client ID and secret for OpenID Connect, or the signing certificate for SAML, before this connection can be registered.",
+  },
+  sso_issuer_mismatch: {
+    // Names both addresses: they are public, and the fix is to make them equal.
+    title: "The identity provider names a different issuer",
+    describe: (error) =>
+      `This connection expects ${str(error, "expected", "its issuer")}, and the identity provider sent ${str(error, "received", "a different one")}. Use the issuer the identity provider names. For Microsoft Entra ID that is https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration, not a user's home tenant and not common or organizations.`,
+  },
+  sso_issuer_multi_tenant: {
+    title: "Use your tenant's own issuer",
+    describe: (error) =>
+      `${str(error, "issuer", "That address")} is a Microsoft Entra ID multi-tenant endpoint, and no sign-in token carries it as the issuer. Use https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration.`,
   },
   sso_issuer_unreachable: {
     title: "The identity provider could not be reached",
@@ -3048,7 +3097,7 @@ const presentations = {
   sso_license_required: {
     title: "Single sign-on needs an active licence",
     describe: () =>
-      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+      "Activate an enterprise licence on this installation, and you can set single sign-on up here. A licence activated a moment ago reaches every server within a minute.",
   },
   sso_self_serve_unavailable: {
     title: "Setting single sign-on up yourself isn't switched on yet",
@@ -3120,7 +3169,7 @@ const presentations = {
   sso_existing_account_unconfirmed: {
     title: "An account with this address already exists",
     describe: () =>
-      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain and your identity provider marks the address as verified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
+      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
@@ -5290,13 +5339,19 @@ const presentations = {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
-        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+        return "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)) {
+        return "The model provider does not serve this model to this key. Check the model name, or pick a different model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
         return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_INVALID_REQUEST_REASONS)) {
+        return "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.";
       }
       return "Try again, or pick a different model.";
     },

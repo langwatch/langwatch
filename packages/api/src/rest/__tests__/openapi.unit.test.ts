@@ -4,6 +4,8 @@
  *
  * @see specs/api-reference/exclusive-bounds-3-1.feature
  * @see ../../../specs/endpoint-capabilities.feature
+ * @see specs/api-reference/recursive-schema-defs.feature
+ * @see specs/api-reference/openapi-document-generation.feature
  */
 import { Hono } from "hono";
 import { generateSpecs, validator } from "hono-openapi";
@@ -15,6 +17,7 @@ import type { RestTransportDocs } from "../openapi.ts";
 import {
   documentedResponses,
   documentRoute,
+  dropHeadTwins,
   hoistStraySchemaDefs,
   normalizeExclusiveBounds,
   publishEnumRecordKeys,
@@ -313,6 +316,112 @@ describe("hoistStraySchemaDefs", () => {
     });
   });
 
+  describe("given a $defs entry the schema named with .meta({ id })", () => {
+    /** @scenario "A definition the schema named keeps its name" */
+    it("publishes it under that name, not a generated one", () => {
+      const document = documentWith({
+        $ref: "#/components/schemas/Trace",
+        $defs: { Trace: { type: "object", properties: { id: { type: "string" } } } },
+      });
+
+      hoistStraySchemaDefs(document);
+
+      expect(Object.keys(document.components.schemas)).toEqual(["Trace"]);
+      expect(document.paths["/a"].get.responses[200].content["application/json"].schema).toEqual({
+        $ref: "#/components/schemas/Trace",
+      });
+    });
+  });
+
+  describe("given two routes that each carry an anonymous JSON value definition", () => {
+    /** @scenario "Every anonymous JSON value is one JsonValue component" */
+    it("publishes one JsonValue component both routes refer to", () => {
+      const jsonValue = (name: string) => ({
+        anyOf: [
+          { type: "string" },
+          { type: "number" },
+          { type: "boolean" },
+          { type: "null" },
+          { type: "array", items: { $ref: `#/$defs/${name}` } },
+          {
+            type: "object",
+            propertyNames: { type: "string" },
+            additionalProperties: { $ref: `#/$defs/${name}` },
+          },
+        ],
+      });
+      const document = {
+        components: { schemas: {} as Record<string, unknown> },
+        paths: {
+          "/a": {
+            get: {
+              schema: { $ref: "#/$defs/__schema0", $defs: { __schema0: jsonValue("__schema0") } },
+            },
+          },
+          "/b": {
+            get: {
+              schema: { $ref: "#/$defs/__schema3", $defs: { __schema3: jsonValue("__schema3") } },
+            },
+          },
+        },
+      };
+
+      hoistStraySchemaDefs(document);
+
+      expect(Object.keys(document.components.schemas)).toEqual(["JsonValue"]);
+      expect(document.paths["/a"].get.schema.$ref).toBe("#/components/schemas/JsonValue");
+      expect(document.paths["/b"].get.schema.$ref).toBe("#/components/schemas/JsonValue");
+    });
+  });
+
+  describe("given two different definitions the schemas named alike", () => {
+    /** @scenario "Two different schemas cannot claim one component name" */
+    it("fails the document naming the component", () => {
+      const document = {
+        components: { schemas: {} as Record<string, unknown> },
+        paths: {
+          "/a": {
+            get: { schema: { $ref: "#/$defs/Widget", $defs: { Widget: { type: "string" } } } },
+          },
+          "/b": {
+            get: { schema: { $ref: "#/$defs/Widget", $defs: { Widget: { type: "number" } } } },
+          },
+        },
+      };
+
+      expect(() => hoistStraySchemaDefs(document)).toThrow(/components\.schemas\.Widget/);
+    });
+  });
+
+  describe("given a schema that names its definition like a generated one", () => {
+    /** @scenario "A generated name never takes a name a schema chose" */
+    it("publishes the anonymous definition under another name", () => {
+      const document = {
+        components: { schemas: {} as Record<string, unknown> },
+        paths: {
+          "/a": {
+            get: {
+              schema: { $ref: "#/$defs/__schema0", $defs: { __schema0: { type: "number" } } },
+            },
+          },
+          "/b": {
+            get: {
+              schema: { $ref: "#/$defs/__hoisted0", $defs: { __hoisted0: { type: "string" } } },
+            },
+          },
+        },
+      };
+
+      hoistStraySchemaDefs(document);
+
+      expect(document.components.schemas).toEqual({
+        __hoisted0: { type: "string" },
+        __hoisted1: { type: "number" },
+      });
+      expect(document.paths["/a"].get.schema).toEqual({ $ref: "#/components/schemas/__hoisted1" });
+    });
+  });
+
   describe("given a response schema with no $defs entry", () => {
     /** @scenario "A schema with no $defs is left exactly as it was" */
     it("leaves the schema exactly as it was", () => {
@@ -368,6 +477,72 @@ describe("the security requirement an operation publishes", () => {
   });
 });
 
+describe("dropHeadTwins", () => {
+  /** @scenario "Every published operation id is unique" */
+  it("drops the HEAD operation that repeats its GET's id, and keeps a HEAD of its own", () => {
+    const document = {
+      paths: {
+        "/files/{id}": { get: { operationId: "readFile" }, head: { operationId: "readFile" } },
+        "/probe": { head: { operationId: "probe" } },
+      },
+    };
+
+    dropHeadTwins(document);
+
+    expect(document.paths).toEqual({
+      "/files/{id}": { get: { operationId: "readFile" } },
+      "/probe": { head: { operationId: "probe" } },
+    });
+  });
+});
+
+describe("the operation id an operation publishes", () => {
+  describe("given a route whose docs name a published id", () => {
+    /** @scenario "A published operation id outlives a renamed declaration" */
+    it("publishes the docs' id rather than the declared operation name", () => {
+      const published = restRouteDocumentation({
+        route: rawBodyRoute({ operationId: "postApiIntake" }),
+        credential: "project",
+      });
+
+      expect(published.operationId).toBe("postApiIntake");
+    });
+  });
+
+  describe("given a route whose docs name no id", () => {
+    it("publishes the declared operation name", () => {
+      const published = restRouteDocumentation({ route: rawBodyRoute(), credential: "project" });
+
+      expect(published.operationId).toBe("intake");
+    });
+  });
+});
+
+describe("the access policy an operation publishes", () => {
+  /** @scenario "An operation requiring a permission publishes the permission" */
+  it("publishes the credential class and the permission the route declared", () => {
+    const published = restRouteDocumentation({
+      route: { ...rawBodyRoute(), permission: "traces:view" } as RestTransportRoute<unknown>,
+      credential: "organization",
+    });
+
+    expect(published["x-access-policy"]).toEqual({
+      kind: "handlerManaged",
+      credential: ["organization_api_key"],
+      permissions: ["traces:view"],
+    });
+  });
+
+  it("publishes a public route as reachable with no credential", () => {
+    const published = restRouteDocumentation({
+      route: { ...rawBodyRoute(), access: { kind: "public", reason: "discovery" } } as never,
+      credential: "project",
+    });
+
+    expect(published["x-access-policy"]).toEqual({ kind: "public", credential: ["none"] });
+  });
+});
+
 type PublishedOperation = Readonly<{
   parameters?: readonly Readonly<{ name: string; in: string; required?: boolean }>[];
   requestBody?: Readonly<{ required?: boolean; content: Record<string, { schema?: unknown }> }>;
@@ -388,6 +563,28 @@ async function publishedOperation(route: RestTransportRoute<unknown>): Promise<P
 
   return operation;
 }
+
+describe("documents generated more than once from one declaration", () => {
+  /** @scenario "The api serves the generated document" */
+  it("publish the named component the declaration's documented answer names, every time", async () => {
+    const route = declaredOutputRoute({
+      responses: documentedResponses({ 200: z.object({ id: z.string() }).meta({ id: "Widget" }) }),
+    });
+    const generate = async () => {
+      const app = new Hono().get(route.path, documentRoute({ route }), (c) => c.body(null, 204));
+
+      return JSON.parse(JSON.stringify(await generateSpecs(app))) as {
+        components?: { schemas?: Record<string, unknown> };
+      };
+    };
+
+    const first = await generate();
+    const second = await generate();
+
+    expect(Object.keys(first.components?.schemas ?? {})).toEqual(["Widget"]);
+    expect(second).toEqual(first);
+  });
+});
 
 /** A create a caller may retry under its own key. */
 function idempotentCreateRoute(): RestTransportRoute<unknown> {

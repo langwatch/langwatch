@@ -19,6 +19,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -80,6 +81,7 @@ async function relayRoute() {
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
       onboarding: createApiFixture<OnboardingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     members: {

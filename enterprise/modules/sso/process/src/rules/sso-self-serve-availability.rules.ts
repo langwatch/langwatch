@@ -5,8 +5,8 @@ import type {
 } from "@langwatch/enterprise-sso-contract";
 
 /**
- * Self-hosted: the licence held at startup decides; one activated since
- * startup asks for a restart. Hosted: the organization's opt-in decides.
+ * Self-hosted: the licence gate decides; a licence the gate has not read yet
+ * says it is on its way. Hosted: the organization's opt-in decides.
  * Self-hosted is read first, because the opt-in is a hosted concept.
  */
 export function ssoSelfServeAvailability(context: SsoSelfServeContext): SsoSelfServeAvailability {
@@ -20,7 +20,7 @@ export function ssoSelfServeAvailability(context: SsoSelfServeContext): SsoSelfS
     }
     return {
       available: false,
-      refusal: context.licenseActivatedSinceStart ? "license_restart_required" : "license_required",
+      refusal: context.licenseActivationPending ? "license_activation_pending" : "license_required",
     };
   }
   if (!context.optedIn) return { available: false, refusal: "not_opted_in" };

@@ -13,7 +13,10 @@ import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.lan
 import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
-import type { LangyVirtualKeyService } from "../services/langy-credential.service.ts";
+import type {
+  LangyGithubService,
+  LangyVirtualKeyService,
+} from "../services/langy-credential.service.ts";
 import {
   LangyGithubPrQuotaService,
   LANGY_GITHUB_PRS_PER_DAY,
@@ -82,6 +85,8 @@ export function buildLangyInfrastructure(input: {
   skillGates?: LangySkillGates;
   /** Where a navigate the conversation remembered no link for opens. */
   navigateFallback: LangyNavigateFallbackService;
+  /** A turn's GitHub token; absent where no GitHub peer is composed. */
+  github?: LangyGithubService;
 }): LangyBuiltInfrastructure {
   const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
   const tokenBuffer = redis ? LangyTokenBufferRedisRepository.create({ redis }) : null;
@@ -117,7 +122,7 @@ export function buildLangyInfrastructure(input: {
   const credentials: LangyCredentialComposition = {
     sessionKeys,
     virtualKeys,
-    github: { enabled: false, findTurnTokens: () => Promise.resolve([]) },
+    github: input.github ?? { enabled: false, findTurnTokens: () => Promise.resolve([]) },
     runtime: langyWorkerRuntimeOf({ config: input.config, publicBaseUrl: input.publicBaseUrl }),
   };
 

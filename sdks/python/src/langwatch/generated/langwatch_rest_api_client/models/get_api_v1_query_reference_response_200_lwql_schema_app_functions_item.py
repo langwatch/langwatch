@@ -4,16 +4,12 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_encoding import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemEncoding,
+from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_gates_item_type_0 import (
+    GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0,
 )
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_gates_item import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItem,
-)
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_key_kind import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKeyKind,
+from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_gates_item_type_1 import (
+    GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1,
 )
 from ..models.get_api_v1_query_reference_response_200_lwql_schema_app_functions_item_kind import (
     GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind,
@@ -29,12 +25,13 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
         name (str):
         signature (str):
         description (str):
-        kind (GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind):
         returns (str):
-        encoding (GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemEncoding):
-        key_kind (GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKeyKind):
+        encoding (str):
+        key_kind (str):
+        kind (GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind):
         cap (int):
-        gates (list[GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItem]):
+        gates (list[GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0 |
+            GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1]):
         available (bool):
         example_sql (str):
     """
@@ -42,15 +39,17 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
     name: str
     signature: str
     description: str
-    kind: GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind
     returns: str
-    encoding: GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemEncoding
-    key_kind: GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKeyKind
+    encoding: str
+    key_kind: str
+    kind: GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind
     cap: int
-    gates: list[GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItem]
+    gates: list[
+        GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0
+        | GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1
+    ]
     available: bool
     example_sql: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -59,19 +58,24 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
 
         description = self.description
 
-        kind = self.kind.value
-
         returns = self.returns
 
-        encoding = self.encoding.value
+        encoding = self.encoding
 
-        key_kind = self.key_kind.value
+        key_kind = self.key_kind
+
+        kind = self.kind.value
 
         cap = self.cap
 
         gates = []
         for gates_item_data in self.gates:
-            gates_item = gates_item_data.value
+            gates_item: str
+            if isinstance(gates_item_data, GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0):
+                gates_item = gates_item_data.value
+            else:
+                gates_item = gates_item_data.value
+
             gates.append(gates_item)
 
         available = self.available
@@ -79,16 +83,16 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
         example_sql = self.example_sql
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
                 "signature": signature,
                 "description": description,
-                "kind": kind,
                 "returns": returns,
                 "encoding": encoding,
                 "keyKind": key_kind,
+                "kind": kind,
                 "cap": cap,
                 "gates": gates,
                 "available": available,
@@ -107,20 +111,41 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
 
         description = d.pop("description")
 
-        kind = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind(d.pop("kind"))
-
         returns = d.pop("returns")
 
-        encoding = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemEncoding(d.pop("encoding"))
+        encoding = d.pop("encoding")
 
-        key_kind = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKeyKind(d.pop("keyKind"))
+        key_kind = d.pop("keyKind")
+
+        kind = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemKind(d.pop("kind"))
 
         cap = d.pop("cap")
 
         gates = []
         _gates = d.pop("gates")
         for gates_item_data in _gates:
-            gates_item = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItem(gates_item_data)
+
+            def _parse_gates_item(
+                data: object,
+            ) -> (
+                GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0
+                | GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1
+            ):
+                try:
+                    if not isinstance(data, str):
+                        raise TypeError()
+                    gates_item_type_0 = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType0(data)
+
+                    return gates_item_type_0
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                if not isinstance(data, str):
+                    raise TypeError()
+                gates_item_type_1 = GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1(data)
+
+                return gates_item_type_1
+
+            gates_item = _parse_gates_item(gates_item_data)
 
             gates.append(gates_item)
 
@@ -132,31 +157,14 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItem:
             name=name,
             signature=signature,
             description=description,
-            kind=kind,
             returns=returns,
             encoding=encoding,
             key_kind=key_kind,
+            kind=kind,
             cap=cap,
             gates=gates,
             available=available,
             example_sql=example_sql,
         )
 
-        get_api_v1_query_reference_response_200_lwql_schema_app_functions_item.additional_properties = d
         return get_api_v1_query_reference_response_200_lwql_schema_app_functions_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -24,13 +24,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    ingestion_template_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v1/governance/ingestion-templates/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/governance/ingestion-templates/{ingestion_template_id}".format(
+            ingestion_template_id=quote(str(ingestion_template_id), safe=""),
         ),
     }
 
@@ -99,7 +99,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[
@@ -115,7 +115,7 @@ def sync_detailed(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,7 +126,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
     )
 
     response = client.get_httpx_client().request(
@@ -137,7 +137,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> (
@@ -154,7 +154,7 @@ def sync(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -165,13 +165,13 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[
@@ -187,7 +187,7 @@ async def asyncio_detailed(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -198,7 +198,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -207,7 +207,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> (
@@ -224,7 +224,7 @@ async def asyncio(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -236,7 +236,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            ingestion_template_id=ingestion_template_id,
             client=client,
         )
     ).parsed

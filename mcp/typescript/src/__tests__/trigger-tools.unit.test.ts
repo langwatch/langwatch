@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../langwatch-api.js", () => ({ makeRequest: vi.fn() }));
 
-import { makeRequest } from "../langwatch-api.ts";
 import {
   createTrigger,
   getTrigger,
@@ -10,6 +9,7 @@ import {
   testFireTrigger,
   updateTrigger,
 } from "../langwatch-api-triggers.ts";
+import { makeRequest } from "../langwatch-api.ts";
 import {
   actionParamsSchema,
   reportSchema,
@@ -112,9 +112,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       };
 
       expect(reportSchema.parse(report)).toMatchObject(report);
-      expect(
-        reportSchema.safeParse({ schedule: report.schedule }).success,
-      ).toBe(false);
+      expect(reportSchema.safeParse({ schedule: report.schedule }).success).toBe(false);
     });
   });
 
@@ -330,10 +328,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(await testFireTrigger("trigger-1")).toMatchObject({
         channel: "slack",
       });
-      expect(request).toHaveBeenCalledWith(
-        "POST",
-        "/api/v1/triggers/trigger-1/test-fire",
-      );
+      expect(request).toHaveBeenCalledWith("POST", "/api/v1/triggers/trigger-1/test-fire");
     });
 
     it("reads its fires newest first", async () => {
@@ -347,13 +342,8 @@ describe("Feature: an agent configures an automation over MCP", () => {
         },
       ]);
 
-      expect(
-        (await listTriggerFires({ id: "trigger-1", limit: 5 })).fires,
-      ).toHaveLength(1);
-      expect(request).toHaveBeenCalledWith(
-        "GET",
-        "/api/v1/triggers/trigger-1/fires?limit=5",
-      );
+      expect((await listTriggerFires({ id: "trigger-1", limit: 5 })).fires).toHaveLength(1);
+      expect(request).toHaveBeenCalledWith("GET", "/api/v1/triggers/trigger-1/fires?limit=5");
     });
   });
 
@@ -457,9 +447,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
         '{"evaluations.passed":{"<monitorId>":["false"]}}',
       );
-      expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
-        '{"metadata.value":{"<key>":["true"]}}',
-      );
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain('{"metadata.value":{"<key>":["true"]}}');
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain('{"traces.error":["true"]}');
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain("not its evaluatorId");
       expect(TRIGGER_FILTER_QUERY_DESCRIPTION).toContain("evaluatorVerdict:fail");

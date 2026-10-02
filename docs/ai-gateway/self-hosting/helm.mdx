@@ -4,12 +4,12 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment and Service next to `langwatch-app`. The gateway gets no Ingress of its own: publish it with `ingress.gateway.host` on the app Ingress. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
 ## Prerequisites
 
 - A Kubernetes cluster and `helm` 3.
-- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- An ingress controller or a Gateway API implementation. [Routing and ingress controllers](/self-hosting/deployment/routing) lists what to expose on each.
 - A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 - The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
@@ -39,14 +39,25 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 </Step>
 <Step title="Write the gateway values">
 
-Add a `gateway` block to your umbrella `values.yaml`:
+Add a `gateway` block to your umbrella `values.yaml`, and the gateway host to the app `ingress` block:
 
 ```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com        # publishes /v1 and /health on this host
+    tls:
+      secretName: gateway-tls
+  # className nginx adds the streaming, timeout and body-size annotations
+  # to the gateway Ingress only.
+
 gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.host> from the ingress below.
+  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
   publicUrl: ""
 
   # Where the gateway reaches the control plane. Empty resolves to
@@ -59,25 +70,6 @@ gateway:
     internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
     jwtSecretKey: LW_GATEWAY_JWT_SECRET
     jwtSecretPreviousKey: "" # set only during a JWT secret rotation
-
-  ingress:
-    enabled: true
-    className: nginx
-    host: gateway.acme.com # your hostname, never the chart placeholder
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true # publishes GET /health for uptime monitors
-      path: /health
-    tls:
-      enabled: true
-      secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
   security:
     maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth

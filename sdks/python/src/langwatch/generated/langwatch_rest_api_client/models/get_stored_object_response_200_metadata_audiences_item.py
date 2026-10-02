@@ -33,6 +33,7 @@ class GetStoredObjectResponse200MetadataAudiencesItem(str, Enum):
     ROUTINGPOLICIESVIEW = "routingPolicies:view"
     SCENARIOSVIEW = "scenarios:view"
     SECRETSVIEW = "secrets:view"
+    SSOVIEW = "sso:view"
     TEAMVIEW = "team:view"
     TRACESVIEW = "traces:view"
     TRIGGERSVIEW = "triggers:view"

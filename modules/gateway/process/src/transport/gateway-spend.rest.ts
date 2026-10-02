@@ -98,6 +98,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withOutput(gatewaySpendSummariesPageSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
+    operationId: "getApiGatewayV1SpendSummaries",
     tags: ["Gateway Spend"],
     summary: "List spend summaries",
     description: SPEND_SUMMARIES_DESCRIPTION,
@@ -113,6 +114,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withOutput(gatewaySpendEventsPageSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
+    operationId: "getApiGatewayV1SpendEvents",
     tags: ["Gateway Spend"],
     summary: "List spend events",
     description: SPEND_EVENTS_PULL_DESCRIPTION,
@@ -129,6 +131,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withOutput(gatewayEndUserSpendResponseSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
+    operationId: "getApiGatewayV1EndUsersByIdSpend",
     tags: ["Gateway Spend"],
     summary: "Read one end user's spend",
     description: END_USER_SPEND_DESCRIPTION,
@@ -144,6 +147,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withOutput(gatewaySpendReplayResponseSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
+    operationId: "postApiGatewayV1SpendEventsReplay",
     tags: ["Gateway Spend"],
     summary: "Replay spend events to an endpoint",
     description: REPLAY_DESCRIPTION,

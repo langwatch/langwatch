@@ -2271,6 +2271,11 @@ connection that is not active does not route sign-ins yet. An active connection
 routes people who match its verified domains; the local way back in remains
 available to the person you named.
 
+On a self-hosted installation where this is the only active connection, the
+sign-in page sends people straight to the identity provider without showing a
+LangWatch sign-in form. To reach the local sign-in, open
+`/auth/signin?local=1`.
+
 <Frame>
   <img src="/images/access/sso-active-light.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="block dark:hidden" />
   <img src="/images/access/sso-active-dark.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="hidden dark:block" />
@@ -7925,39 +7930,39 @@ A dropped parameter is reported in three places:
 
 {/* param-table:begin generated from paramPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
 
-| Parameter                | anthropic | bedrock | gemini / vertex | Notes                                                                                                                                                                                                                                                                                                       |
-| ------------------------ | --------- | ------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `audio`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `frequency_penalty`      | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `function_call`          | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                             |
-| `functions`              | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                             |
-| `logit_bias`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `logprobs`               | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `metadata`               | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `modalities`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `n`                      | dropped   | dropped | dropped         | n: 1 passes; n > 1 is reduced to one completion and signaled                                                                                                                                                                                                                                                |
-| `parallel_tool_calls`    | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `prediction`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `presence_penalty`       | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `prompt_cache_key`       | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `prompt_cache_retention` | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `reasoning_effort`       | mapped    | mapped  | mapped          | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only                                                                                                                                                                                  |
-| `response_format`        | mapped    | mapped  | mapped          | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced             |
-| `safety_identifier`      | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `seed`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `service_tier`           | dropped   | dropped | dropped         | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped                                                                                                                                                                                 |
-| `stop`                   | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `store`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `stream_options`         | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `temperature`            | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `tool_choice`            | mapped    | mapped  | mapped          | anthropic: none/auto/required/named mapped; named must exist in tools; allowed_tools refused; bedrock: none maps by removing tools (Converse has no none mode); named must exist in tools; allowed_tools refused; gemini: none/auto/required/named mapped; named must exist in tools; allowed_tools refused |
-| `tools`                  | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `top_logprobs`           | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                             |
-| `top_p`                  | mapped    | mapped  | mapped          | anthropic: dropped with a signal when temperature is also set (Anthropic models reject the pair); bedrock: dropped with a signal when temperature is also set on Anthropic models (they reject the pair); other families take both                                                                          |
-| `user`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `verbosity`              | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| `web_search_options`     | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
-| any other key            | dropped   | dropped | dropped         | vendor params with no mapping on translated lanes                                                                                                                                                                                                                                                           |
+| Parameter                | anthropic | bedrock | gemini / vertex | Notes                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------ | --------- | ------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `audio`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `frequency_penalty`      | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `function_call`          | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `functions`              | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `logit_bias`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `logprobs`               | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `metadata`               | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `modalities`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `n`                      | dropped   | dropped | dropped         | n: 1 passes; n > 1 is reduced to one completion and signaled                                                                                                                                                                                                                                                                                                         |
+| `parallel_tool_calls`    | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `prediction`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `presence_penalty`       | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `prompt_cache_key`       | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `prompt_cache_retention` | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `reasoning_effort`       | mapped    | mapped  | mapped          | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only                                                                                                                                                                                                                                           |
+| `response_format`        | mapped    | mapped  | mapped          | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); the Converse lane (customer VPC endpoints, OpenAI models) enforces json_schema for Anthropic models and OpenAI GPT-5 and later, not gpt-oss; gemini: json_object and json_schema both enforced |
+| `safety_identifier`      | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `seed`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `service_tier`           | dropped   | dropped | dropped         | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped                                                                                                                                                                                                                                          |
+| `stop`                   | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `store`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `stream_options`         | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `temperature`            | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `tool_choice`            | mapped    | mapped  | mapped          | anthropic: none/auto/required/named mapped; named must exist in tools; allowed_tools refused; bedrock: none maps by removing tools (Converse has no none mode); named must exist in tools; allowed_tools refused; gemini: none/auto/required/named mapped; named must exist in tools; allowed_tools refused                                                          |
+| `tools`                  | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `top_logprobs`           | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                                                                                      |
+| `top_p`                  | mapped    | mapped  | mapped          | anthropic: dropped with a signal when temperature is also set (Anthropic models reject the pair); bedrock: dropped with a signal when temperature is also set on Anthropic models (they reject the pair); other families take both                                                                                                                                   |
+| `user`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `verbosity`              | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| `web_search_options`     | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                                                                                      |
+| any other key            | dropped   | dropped | dropped         | vendor params with no mapping on translated lanes                                                                                                                                                                                                                                                                                                                    |
 
 {/* param-table:end */}
 
@@ -10082,7 +10087,7 @@ description: Point a public hostname at the LangWatch AI Gateway and terminate T
 sidebarTitle: DNS & TLS
 ---
 
-Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the nginx ingress the chart renders, a cloud load balancer in front of the Service, and the checks that prove the endpoint works.
+Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the chart Ingress on ingress-nginx, a cloud load balancer in front of the Service, and the checks that prove the endpoint works. For Envoy Gateway and other Gateway API implementations, see [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Prerequisites
 
@@ -10093,33 +10098,33 @@ Give the gateway its own hostname, separate from the app. LLM clients and coding
 <Steps>
 <Step title="Set the ingress values">
 
-The chart renders one Ingress from these values:
+The gateway is published from the app Ingress settings. Set `ingress.gateway.host` next to the app hosts:
 
 ```yaml
-gateway:
-  ingress:
-    enabled: true
-    className: nginx
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
     host: gateway.acme.com
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true
-      path: /health
     tls:
-      enabled: true
       secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
-Replace `host`. The chart placeholder `gateway.langwatch.ai` is skipped when the control plane derives the public URL, so an install that keeps it hands CLI users no gateway URL.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
-The four `nginx.ingress.kubernetes.io/proxy-*` annotations keep streamed responses unbuffered and let a stream run for an hour. Keep them.
+With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 
 </Step>
 <Step title="Issue the certificate">
@@ -10186,22 +10191,20 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 
 ## What the ingress publishes
 
-| Path      | Match                                                 | Routes                                                                                                                                                     |
-| --------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/v1`     | `Prefix`                                              | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
-| `/health` | `Exact`, only with `ingress.healthPath.enabled: true` | The public status endpoint for uptime monitors                                                                                                             |
+| Path | Match | Routes |
+|---|---|---|
+| `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
+| `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the default ingress; `ingress.path: /` publishes every route, including the probes and `/metrics`.
+`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
-To terminate TLS on a cloud load balancer instead of the ingress, disable the ingress and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
+To terminate TLS on a cloud load balancer instead of the ingress, leave `ingress.gateway.host` empty and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
 
 ```yaml
 gateway:
-  ingress:
-    enabled: false
-  publicUrl: https://gateway.acme.com # no ingress host to derive it from
+  publicUrl: https://gateway.acme.com   # no ingress host to derive it from
   service:
     type: LoadBalancer
     port: 443
@@ -10216,8 +10219,9 @@ gateway:
 
 <Warning>
   Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the
-  `Authorization` header that carries the virtual key crosses that last hop without encryption. The
-  ingress terminates at the ingress controller and the network load balancer terminates at the load
+  `Authorization` header that carries the virtual key crosses that last hop without encryption.
+
+  The ingress terminates at the ingress controller and the network load balancer terminates at the load
   balancer, which puts the plaintext hop inside the cluster network in the first case and between
   the load balancer and the pods in the second. Both assume that network is trusted. Where it is
   not, run a service mesh with mutual TLS between the terminator and the gateway pods.
@@ -10242,20 +10246,27 @@ A Service of type `LoadBalancer` publishes every route, including `/metrics`, th
 
 ## Other ingress controllers
 
-Set `ingress.className` and replace the nginx annotations with the controller's equivalents. Two settings matter for every controller: response buffering off, and an idle or read timeout above the longest stream you allow. The gateway lets a provider call run up to 14 minutes.
+Set `ingress.className` for your controller. The ingress-nginx annotations are added only when `className` is `nginx`. Put the controller's equivalents in `ingress.gateway.annotations` so they apply to the gateway host only.
 
-AWS ALB example:
+Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
+
+AWS ALB example. The certificate comes from ACM rather than `ingress.gateway.tls.secretName`, so `gateway.publicUrl` states the https URL the CLI should use:
 
 ```yaml
-gateway:
-  ingress:
-    className: alb
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
+  gateway:
+    host: gateway.acme.com
     annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
       alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+gateway:
+  publicUrl: https://gateway.acme.com
 ```
 
 ## Outbound endpoint policy
@@ -10272,13 +10283,13 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 
 ## Common failures
 
-| Symptom                                                         | Cause                                                     | Fix                                                                                 |
-| --------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `curl` reports an unknown certificate                           | cert-manager has not issued `gateway-tls` yet             | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
-| Streamed responses arrive all at once                           | Buffering is on at the proxy                              | Add the `proxy-buffering: "off"` annotation, or its equivalent on your controller   |
-| A long stream stops at 60 seconds                               | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout                                         |
-| CLI users get `http://localhost:5563` as the gateway URL        | The control plane has no `LW_GATEWAY_PUBLIC_URL`          | Set `gateway.ingress.host` to your hostname, or `gateway.publicUrl`                 |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on                            | Add the hostname to `ALLOWED_PROXY_HOSTS`                                           |
+| Symptom | Cause | Fix |
+|---|---|---|
+| `curl` reports an unknown certificate | cert-manager has not issued `gateway-tls` yet | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
+| Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
+| A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
+| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -10305,7 +10316,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics`             | Prometheus                           | Always. See [Observability](/ai-gateway/observability#metrics-prometheus)                                                                               |
 | `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
-None of these endpoints requires a key. With the chart's default ClusterIP Service and ingress, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 
@@ -10385,15 +10396,7 @@ The verdict flips to 503 after 60 seconds without a successful probe, and a new 
 
 The probe failure itself is logged on the gateway pod as `statusprobe_control_plane_unreachable`, with the underlying error.
 
-```yaml
-gateway:
-  ingress:
-    healthPath:
-      enabled: true # default
-      path: /health
-```
-
-Set `enabled: false` to keep the endpoint in-cluster.
+The chart Ingress for `ingress.gateway.host` publishes `/health` as an `Exact` path next to `/v1`. To keep the endpoint in-cluster, route the gateway with your own route and leave `/health` out.
 
 ## Graceful shutdown
 
@@ -10437,12 +10440,12 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment and Service next to `langwatch-app`. The gateway gets no Ingress of its own: publish it with `ingress.gateway.host` on the app Ingress. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
 ## Prerequisites
 
 - A Kubernetes cluster and `helm` 3.
-- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- An ingress controller or a Gateway API implementation. [Routing and ingress controllers](/self-hosting/deployment/routing) lists what to expose on each.
 - A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 - The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
@@ -10472,14 +10475,25 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 </Step>
 <Step title="Write the gateway values">
 
-Add a `gateway` block to your umbrella `values.yaml`:
+Add a `gateway` block to your umbrella `values.yaml`, and the gateway host to the app `ingress` block:
 
 ```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com        # publishes /v1 and /health on this host
+    tls:
+      secretName: gateway-tls
+  # className nginx adds the streaming, timeout and body-size annotations
+  # to the gateway Ingress only.
+
 gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.host> from the ingress below.
+  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
   publicUrl: ""
 
   # Where the gateway reaches the control plane. Empty resolves to
@@ -10492,25 +10506,6 @@ gateway:
     internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
     jwtSecretKey: LW_GATEWAY_JWT_SECRET
     jwtSecretPreviousKey: "" # set only during a JWT secret rotation
-
-  ingress:
-    enabled: true
-    className: nginx
-    host: gateway.acme.com # your hostname, never the chart placeholder
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true # publishes GET /health for uptime monitors
-      path: /health
-    tls:
-      enabled: true
-      secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
   security:
     maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth
@@ -10720,7 +10715,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
+The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## 3. The gateway reaches the control plane
 
@@ -10807,14 +10802,14 @@ Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_
 
 ## 8. The control plane knows the public URL
 
-The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host`.
+The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `ingress.gateway.host` when the app Ingress is enabled.
 
 ```bash
 kubectl -n langwatch get deploy langwatch-app \
   -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
 ```
 
-Expected: `https://gateway.acme.com`. An empty result means the ingress host is still the chart placeholder; set `gateway.ingress.host` or `gateway.publicUrl` and upgrade.
+Expected: `https://gateway.acme.com`. An empty result means the install has neither `ingress.gateway.host` nor `gateway.publicUrl`. Set one and upgrade.
 
 Members can then sign in from the CLI and get a [personal key](/ai-gateway/governance/personal-keys) bound to this gateway.
 
@@ -11843,19 +11838,14 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json`. Three routes serve it and the SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The OpenAPI document is generated from the route declarations and is not committed. The api builds it at boot and serves it at `/api/openapi.json`. The SDK clients and the copy published alongside these docs, `docs/api-reference/openapiLangWatch.json`, are generated from it and committed, and CI fails when they no longer match the routes.
 
 ```bash
-# from the repo root: check that every operation the document lists is still
-# served by a route. It never writes the checked-in artifact, which is edited
-# deliberately, with a diff in front of a person.
-pnpm --filter @langwatch/platform-api run openapi:check
+# from the repo root: write the document to specs/api-reference/openapi-document.json (gitignored)
+pnpm --filter @langwatch/platform-api run openapi:generate
 
-# from sdks/typescript/
-pnpm generate:openapi-types         # regenerate the TS generated client from that spec
-
-# from sdks/python/
-make generate/api-client            # regenerate the Python generated client
+# from the repo root: regenerate the TypeScript, Python and Go clients and the docs copy
+make sync-all-openapi
 ```
 
 The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
@@ -61748,61 +61738,19 @@ LangWatch is configured through environment variables. How you set them depends 
   Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
 </Warning>
 
+## License
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_LICENSE_KEY` | An activation code (`LW-XXXX-XXXX-XXXX-XXXX`, redeemed once at startup over outbound HTTPS to `connect.langwatch.ai`) or a signed license key (works offline), told apart by shape. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license). | - |
+
 ## Authentication
 
-| Variable            | Description                                                                                                                                                          | Default |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
+| Variable | Description | Default |
+|----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
-### SSO Provider Variables
-
-Each SSO provider requires specific variables. See [SSO Configuration](/self-hosting/configuration/sso) for detailed setup guides.
-
-**Auth0:**
-
-| Variable              | Description                                             |
-| --------------------- | ------------------------------------------------------- |
-| `AUTH0_CLIENT_ID`     | Auth0 application client ID                             |
-| `AUTH0_CLIENT_SECRET` | Auth0 application client secret                         |
-| `AUTH0_ISSUER`        | Auth0 issuer URL (e.g. `https://your-tenant.auth0.com`) |
-
-**Azure AD:**
-
-| Variable                 | Description                        |
-| ------------------------ | ---------------------------------- |
-| `AZURE_AD_CLIENT_ID`     | Azure AD application client ID     |
-| `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
-| `AZURE_AD_TENANT_ID`     | Azure AD tenant ID                 |
-
-**GitHub:**
-
-| Variable               | Description                    |
-| ---------------------- | ------------------------------ |
-| `GITHUB_CLIENT_ID`     | GitHub OAuth app client ID     |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
-
-**GitLab:**
-
-| Variable               | Description                    |
-| ---------------------- | ------------------------------ |
-| `GITLAB_CLIENT_ID`     | GitLab OAuth app client ID     |
-| `GITLAB_CLIENT_SECRET` | GitLab OAuth app client secret |
-
-**Google:**
-
-| Variable               | Description                |
-| ---------------------- | -------------------------- |
-| `GOOGLE_CLIENT_ID`     | Google OAuth client ID     |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-
-**Okta:**
-
-| Variable             | Description                    |
-| -------------------- | ------------------------------ |
-| `OKTA_CLIENT_ID`     | Okta application client ID     |
-| `OKTA_CLIENT_SECRET` | Okta application client secret |
-| `OKTA_ISSUER`        | Okta issuer URL                |
+A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
 
 ## Services
 
@@ -62072,6 +62020,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
@@ -62534,385 +62483,144 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-Configure an organization's identity provider in **Settings > Authentication >
-Identity provider**. The setup walks you through provider details, domain
-verification, a test sign-in and a recovery administrator. See the
-[SSO setup guide](/platform/sso) for the full journey and screenshots.
+## Setting up a connection
 
-This page also covers the deployment-wide provider configured through
-`NEXTAUTH_PROVIDER`. Keep the existing provider settings when upgrading an
-installation that already uses them. Changing an organization's connection
-and changing the deployment's default provider are separate actions.
+A connection is an organization's link to its identity provider, over OpenID
+Connect or SAML. To set one up, open **Settings > Authentication > Identity
+provider** as an organization administrator and give:
+
+- the provider's issuer, client id and client secret, or its SAML metadata
+- the email domain the connection signs in
+- a test sign-in through the provider
+- an administrator who can still sign in if the provider is unavailable
+
+See the [SSO setup guide](/platform/sso) for the full journey and screenshots,
+and [First run](/self-hosting/first-run) for the steps on a fresh install.
 
 On a licensed installation, a domain added in the setup page is verified right
 away, with no DNS record or file to publish. A domain belongs to one
 organization per installation. When the installation has more than one
 organization, only a platform operator listed in `ADMIN_EMAILS` adds a domain
-without proof; other organization administrators still complete the DNS or
-file check.
+without proof. Other organization administrators complete the DNS or file
+check.
+
+## Before you start
+
+- Activate an [Enterprise license](/self-hosting/licensing). Single sign-on
+  turns on without a restart once the license is active.
+- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
+  open LangWatch. The redirect URI the identity provider calls uses that
+  address.
+- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It
+  encrypts the stored client secrets, and a new value cannot decrypt the
+  existing ones.
+
+## Redirect URI
+
+Every connection has its own redirect URI, shown on the setup page:
+
+```
+https://<your LangWatch host>/api/auth/sso/callback/<connection id>
+```
+
+A SAML connection posts to its assertion consumer service instead, also shown
+on the setup page:
+
+```
+https://<your LangWatch host>/api/auth/sso/saml2/sp/acs/<connection id>
+```
+
+The connection id stays the same for the life of the connection, so the
+address registered in the identity provider does not change.
+
+To fix a wrong issuer, client id or client secret, or to replace SAML metadata,
+edit the connection with the pencil button next to its issuer on the setup
+page. Editing keeps the connection id, so the redirect URI, the domains and who
+the connection admits stay the same. A blank client secret keeps the current
+one.
+
+The new settings are checked the same way as at registration. If they are
+refused, the connection keeps its current settings. The protocol of a
+connection cannot be changed.
+
+## Issuer
+
+Enter the issuer exactly as it appears in the `iss` claim of the provider's
+ID tokens. When you register the connection, LangWatch fetches
+`<issuer>/.well-known/openid-configuration` and saves the `issuer` value from
+that response, so a trailing slash you typed or left out is corrected. If the
+response gives a different issuer, you get an error and the connection is not saved.
+
+| Provider | Issuer |
+|----------|--------|
+| Microsoft Entra ID | `https://login.microsoftonline.com/<tenant id>/v2.0` |
+| Okta | `https://<your org>.okta.com`, or `https://<your org>.okta.com/oauth2/<server id>` for a custom authorization server |
+| Auth0 | `https://<your tenant>.auth0.com/` |
+| Google Workspace | `https://accounts.google.com` |
+| AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<user pool id>` |
+| Keycloak | `https://<your host>/realms/<realm>` |
+| OneLogin | `https://<your subdomain>.onelogin.com/oidc/2` |
+| GitLab | `https://gitlab.com`, or your GitLab host |
+| Any other OpenID Connect provider | The address its discovery document is published under |
+
+Check an issuer by fetching its discovery document:
+
+```bash
+ISSUER="https://login.microsoftonline.com/<tenant id>/v2.0"
+curl "$ISSUER/.well-known/openid-configuration"
+```
+
+Register the client with the authorization code flow and the `openid`,
+`email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
+so it cannot be a connection.
+
+### Microsoft Entra ID
+
+- Register LangWatch as an app in Entra ID and add the redirect URI under the
+  **Web** platform.
+- Use the issuer of the tenant that holds the app registration,
+  `https://login.microsoftonline.com/<tenant id>/v2.0`. You cannot register
+  the `common`, `organizations` or `consumers` endpoints: an ID token from them
+  has the user's own tenant in `iss`.
+- LangWatch reads the address from the `email` claim, so each user needs a
+  mail address in Entra ID. In **Token configuration**, add the optional
+  `email` and `xms_edov` claims to the ID token.
+
+If you see "Your identity provider names a different issuer" on the test
+sign-in, compare the two issuers it lists. A guest user's token can carry
+their home tenant. Set the issuer on the connection to the app's tenant
+issuer.
+
+## Existing email and password accounts
+
+On a self-hosted installation, a sign-in through a connection links to an
+existing email and password account with the same address once the connection
+has verified the address's domain. This includes accounts whose address was
+never confirmed, which is every account on an installation without
+[outbound email](/self-hosting/configuration/email).
+
+The identity provider does not have to send `email_verified`. Microsoft Entra
+ID never sends it, and SAML has no such attribute. A sign-in where the provider
+reports the address as unverified, with `email_verified: false` or with Entra
+ID's `xms_edov: false`, is refused with "An account with this address already
+exists".
+
+On LangWatch Cloud, a sign-in links to an existing account only when the
+address is confirmed and the provider sends `email_verified: true`.
 
 ## Upgrading an existing installation
 
 Identity and access migrations run automatically as the app starts, one
-organization at a time. An organization that migrates cleanly is switched
-over immediately; one whose historical data needs attention is held on its
-existing sign-in path without blocking the deployment. Keep the current
-provider configuration and credentials during the upgrade. See the
+organization at a time. Each organization switches over as soon as it migrates
+cleanly. When an organization's historical data needs attention, it stays on
+its existing sign-in path and the deployment starts anyway. See the
 [upgrade guide](/self-hosting/upgrade#automatic-identity-and-access-migration)
 for what still blocks startup and how to check and retry a held organization.
 
-## Before you start
-
-- Activate an [Enterprise license](/self-hosting/licensing).
-- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
-  open LangWatch. Your provider's callback must use that address too.
-- Configure [outbound email](/self-hosting/configuration/email) and verify a
-  recovery administrator can receive a password-reset email.
-- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It protects
-  stored provider credentials; replacing it prevents existing values from
-  being decrypted.
-
-For organization-managed connections, follow the callback and SAML service
-provider details shown in the setup page. They identify that connection. The
-callback pattern below applies to the deployment-wide providers in this guide.
-
-<Warning>
-SSO requires an Enterprise license. A configured deployment-wide provider does
-not grant a license by itself. If the license gate refuses federation,
-LangWatch falls back to email sign-in. Existing users need working outbound
-email to recover through **Forgot password**.
-
-The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. Before upgrading an installation where everyone uses SSO, activate the license or verify email recovery works. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
-
-</Warning>
-
-## Supported Providers
-
-| Provider                          | `NEXTAUTH_PROVIDER` value | Requires                            |
-| --------------------------------- | ------------------------- | ----------------------------------- |
-| Email/Password                    | `email` (default)         | Nothing extra                       |
-| Auth0                             | `auth0`                   | Client ID, Client Secret, Issuer    |
-| AWS Cognito                       | `cognito`                 | Client ID, Client Secret, Issuer    |
-| Azure AD                          | `azure-ad`                | Client ID, Client Secret, Tenant ID |
-| GitHub                            | `github`                  | Client ID, Client Secret            |
-| GitLab                            | `gitlab`                  | Client ID, Client Secret            |
-| Google                            | `google`                  | Client ID, Client Secret            |
-| Okta                              | `okta`                    | Client ID, Client Secret, Issuer    |
-| OneLogin                          | `onelogin`                | Client ID, Client Secret, Issuer    |
-| Any other OpenID Connect provider | `oidc`                    | Client ID, Client Secret, Issuer    |
-
-## OAuth Redirect URL
-
-When configuring your identity provider, set the redirect/callback URL to:
-
-```
-https://your-langwatch-domain.com/api/auth/callback/{provider}
-```
-
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
-
-<Note>
-  A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are
-  missing, starts the deployment in email mode and logs which provider it could not mount. That
-  keeps a licensed deployment signable-in while you correct the value, rather than pointing the
-  sign-in page at an identity provider that was never wired up.
-</Note>
-
-## Provider Setup
-
-### Email/Password
-
-The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
-
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive.
-
-With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
-
-A licensed deployment-wide provider normally owns sign-in, so local password
-sign-in and reset are unavailable. Set `LOCAL_PASSWORDS_ENABLED=on` only when
-you intend the deployment to offer local passwords alongside that provider.
-This does not bypass an organization's SSO policy: an address routed through
-an active connection still needs that connection, unless it has a valid
-recovery-administrator binding.
-
-When federation is unavailable because the deployment is unlicensed, email
-sign-in and password reset remain available. Test recovery before relying on
-it during an outage.
-
-### Auth0
-
-1. Create an application in the [Auth0 Dashboard](https://manage.auth0.com/)
-2. Set **Allowed Callback URLs** to `https://your-domain.com/api/auth/callback/auth0`
-3. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: auth0
-    providers:
-      auth0:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: auth0ClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: auth0ClientSecret }
-        issuer:
-          value: "https://your-tenant.auth0.com"
-```
-
-Or via environment variables:
-
-| Variable              | Value                           |
-| --------------------- | ------------------------------- |
-| `NEXTAUTH_PROVIDER`   | `auth0`                         |
-| `AUTH0_CLIENT_ID`     | Your Auth0 client ID            |
-| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret        |
-| `AUTH0_ISSUER`        | `https://your-tenant.auth0.com` |
-
-### AWS Cognito
-
-1. In the [Cognito console](https://console.aws.amazon.com/cognito/), open your user pool and give it a hosted-UI domain if it does not have one yet (**App integration > Domain**)
-2. Create an app client with a client secret, and set its **Allowed callback URL** to `https://your-domain.com/api/auth/callback/cognito`
-3. Under the app client's login pages, enable the **Authorization code grant** flow and the `openid`, `email` and `profile` scopes
-4. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: cognito
-    providers:
-      cognito:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
-        issuer:
-          value: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123"
-```
-
-Or via environment variables:
-
-| Variable                | Value                                                     |
-| ----------------------- | --------------------------------------------------------- |
-| `NEXTAUTH_PROVIDER`     | `cognito`                                                 |
-| `COGNITO_CLIENT_ID`     | Your app client ID                                        |
-| `COGNITO_CLIENT_SECRET` | Your app client secret                                    |
-| `COGNITO_ISSUER`        | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
-
-<Note>
-The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
-
-```bash
-curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
-```
-
-</Note>
-
-### Azure AD
-
-1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
-2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
-3. Create a client secret under **Certificates & secrets**
-4. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: azure-ad
-    providers:
-      azureAd:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: azureClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
-        tenantId:
-          value: "your-tenant-id"
-```
-
-<Note>
-  The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the
-  value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
-</Note>
-
-| Variable                 | Value                   |
-| ------------------------ | ----------------------- |
-| `NEXTAUTH_PROVIDER`      | `azure-ad`              |
-| `AZURE_AD_CLIENT_ID`     | Application (client) ID |
-| `AZURE_AD_CLIENT_SECRET` | Client secret value     |
-| `AZURE_AD_TENANT_ID`     | Directory (tenant) ID   |
-
-### GitHub
-
-1. Create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers)
-2. Set **Authorization callback URL** to `https://your-domain.com/api/auth/callback/github`
-3. Configure:
-
-```yaml
-app:
-  nextAuth:
-    provider: github
-    providers:
-      github:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: githubClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: githubClientSecret }
-```
-
-| Variable               | Value                   |
-| ---------------------- | ----------------------- |
-| `NEXTAUTH_PROVIDER`    | `github`                |
-| `GITHUB_CLIENT_ID`     | OAuth app client ID     |
-| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
-
-### GitLab
-
-1. Create an application in [GitLab > Applications](https://gitlab.com/-/profile/applications)
-2. Set **Redirect URI** to `https://your-domain.com/api/auth/callback/gitlab`
-3. Select scopes: `read_user`, `openid`, `profile`, `email`
-
-| Variable               | Value              |
-| ---------------------- | ------------------ |
-| `NEXTAUTH_PROVIDER`    | `gitlab`           |
-| `GITLAB_CLIENT_ID`     | Application ID     |
-| `GITLAB_CLIENT_SECRET` | Application secret |
-
-### Google
-
-1. Create credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Add an **Authorized redirect URI**: `https://your-domain.com/api/auth/callback/google`
-
-| Variable               | Value               |
-| ---------------------- | ------------------- |
-| `NEXTAUTH_PROVIDER`    | `google`            |
-| `GOOGLE_CLIENT_ID`     | OAuth client ID     |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-
-### Okta
-
-1. Create an application in [Okta Admin Console](https://developer.okta.com/)
-2. Set **Sign-in redirect URI** to `https://your-domain.com/api/auth/callback/okta`
-
-```yaml
-app:
-  nextAuth:
-    provider: okta
-    providers:
-      okta:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oktaClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oktaClientSecret }
-        issuer:
-          value: "https://your-org.okta.com"
-```
-
-| Variable             | Value                       |
-| -------------------- | --------------------------- |
-| `NEXTAUTH_PROVIDER`  | `okta`                      |
-| `OKTA_CLIENT_ID`     | Client ID                   |
-| `OKTA_CLIENT_SECRET` | Client secret               |
-| `OKTA_ISSUER`        | `https://your-org.okta.com` |
-
-### OneLogin
-
-1. In the [OneLogin Admin portal](https://www.onelogin.com/), add an **OpenID Connect (OIDC)** application
-2. Set the **Redirect URI** to `https://your-domain.com/api/auth/callback/onelogin`
-3. Under **SSO**, set the application type to **Web** so it is issued a client secret, and note the Client ID and Client Secret
-
-```yaml
-app:
-  nextAuth:
-    provider: onelogin
-    providers:
-      onelogin:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oneloginClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oneloginClientSecret }
-        issuer:
-          value: "https://your-subdomain.onelogin.com/oidc/2"
-```
-
-| Variable                 | Value                                        |
-| ------------------------ | -------------------------------------------- |
-| `NEXTAUTH_PROVIDER`      | `onelogin`                                   |
-| `ONELOGIN_CLIENT_ID`     | Client ID                                    |
-| `ONELOGIN_CLIENT_SECRET` | Client secret                                |
-| `ONELOGIN_ISSUER`        | `https://your-subdomain.onelogin.com/oidc/2` |
-
-<Note>
-  If OneLogin sits behind another identity provider, for example a Cognito user pool that federates
-  to it, point LangWatch at whichever one it talks to directly and let that one handle the hop.
-  LangWatch only needs one OIDC issuer.
-</Note>
-
-### Any other OpenID Connect provider
-
-Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
-
-1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
-2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
-
-```yaml
-app:
-  nextAuth:
-    provider: oidc
-    providers:
-      oidc:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
-        issuer:
-          value: "https://idp.example.com"
-```
-
-| Variable             | Value                                                                     |
-| -------------------- | ------------------------------------------------------------------------- |
-| `NEXTAUTH_PROVIDER`  | `oidc`                                                                    |
-| `OIDC_CLIENT_ID`     | Client ID                                                                 |
-| `OIDC_CLIENT_SECRET` | Client secret                                                             |
-| `OIDC_ISSUER`        | Whatever your provider publishes `.well-known/openid-configuration` under |
-
-<Note>
-Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
-
-```bash
-curl https://idp.example.com/.well-known/openid-configuration
-```
-
-JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
-
-</Note>
-
-## Domain-to-Organization Mapping
-
-For on-premises deployments with SSO, map email domains to organizations:
-
-```sql
--- Connect to PostgreSQL and run:
-UPDATE "Organization"
-SET "ssoProvider" = 'okta',
-    "ssoDomain" = 'yourcompany.com'
-WHERE "id" = 'your-org-id';
-```
-
-This ensures users with `@yourcompany.com` emails are automatically associated with the correct organization.
-
-## Migrating from Email/Password to SSO
-
-An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
-
-1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
-2. Enable SSO by setting the provider configuration above.
-3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
-
-Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
-
-<Note>
-  Users keep their existing data, projects, and permissions after the SSO migration. The migration
-  only changes their authentication method.
-</Note>
+Installations that configure a sign-in provider in the deployment settings
+keep working after an upgrade, with the same redirect URI. To move to a
+connection set up in **Settings**, follow
+[Move to your own identity provider](/platform/sso-update).
 
 ---
 
@@ -63037,7 +62745,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: a license token derived from the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -63050,19 +62758,26 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
-A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+A fresh install starts on the open source baseline with no account and no license. LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+- An **activation code**, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default. The install redeems it over outbound HTTPS to `connect.langwatch.ai`, so it needs outbound access to that host.
+- A **signed license key**, a long base64 string also delivered as a `.langwatch-license` file. It works offline.
+
+Both go in the same `LANGWATCH_LICENSE_KEY` variable or `app.license.key` Helm value. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for the full comparison.
 
 1. Open **Settings, License**.
-2. Choose **Enter activation code**, paste the code, and confirm.
+2. Choose **Enter activation code**, paste the code, and choose **Activate License**.
 3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
 
-The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems it once at startup. See [An activation code in the variable](/self-hosting/licensing#an-activation-code-in-the-variable).
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch and never opens a connection.
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection. The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
 
 ## Endpoints and variables
 
@@ -63130,7 +62845,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: a license token derived from its signed license key (a hash, not the key itself), its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 
@@ -63171,7 +62886,7 @@ Your own providers are untouched: a model spelled without the prefix goes to you
 
 An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 
-The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+The signed license key is where you check it: decode it and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
 For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
 
@@ -63230,7 +62945,7 @@ You can read the exact report your install sends on **Settings, Checkup**, copy 
 | Channel | Who sends it | Where it goes | What it carries | How to stop it |
 |---|---|---|---|---|
 | Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
 
@@ -63311,25 +63026,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
-Create the namespace and the Secrets:
-
-```bash
-kubectl create namespace langwatch
-
-kubectl -n langwatch create secret generic langwatch-app-secrets \
-  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
-  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
-  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
-
-kubectl -n langwatch create secret generic langwatch-clickhouse-creds \
-  --from-literal=password="$(openssl rand -hex 32)" \
-  --from-literal=clusterSecret="$(openssl rand -hex 24)"
-```
-
-If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
+Create both Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
 
 Then apply the Application manifest:
 
@@ -63385,7 +63082,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 # Open http://localhost:5560
 ```
 
-The preflight Job (mapped from Helm's `pre-install` + `pre-upgrade` hooks to ArgoCD's `PreSync` phase) validates that every required key is present on the Secret before pods roll, so a missing or misspelled key fails the sync with a clear list of what is missing rather than crashlooping pods opaquely.
+A missing or misspelled key leaves the pods that read it in `CreateContainerConfigError`, naming the key. `kubectl -n langwatch describe pod` shows which.
 
 ## Production overrides
 
@@ -63412,21 +63109,28 @@ Topic-specific configuration pages:
 
 - [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
 - [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
-- [SSO](/self-hosting/configuration/sso) for OIDC / SAML wiring
+- [SSO](/self-hosting/configuration/sso) for OIDC and SAML connections
+- [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for `app.license.key`, which takes an activation code (needs outbound access to `connect.langwatch.ai`) or a signed license key (works offline)
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
 - [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
 
 ## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
 
-Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
+You can use an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
 
-The preflight Job runs as an ArgoCD `PreSync` hook, mapped automatically from Helm's `pre-install` and `pre-upgrade` hooks (see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)). A Secret that has not landed in time fails the sync with a clear missing-keys error.
+The Secret can land in the same sync as the chart. The chart ships no `PreSync` hook that reads it, so pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
 
-The preflight Job runs during ArgoCD's `PreSync` phase, which Argo completes in full before any `Sync` phase manifest is applied. A regular `ExternalSecret` / `SealedSecret` / `vaultauth` resource is a `Sync`-phase manifest by default, so a `sync-wave` annotation on it cannot pull it ahead of the preflight, even at wave `-1000`. Pick one of:
+<Note>
+**Azure Key Vault:** secret names allow only letters, digits and `-`, so keys like `LW_GATEWAY_INTERNAL_SECRET` cannot be stored under that name. Map them in the `ExternalSecret`:
 
-- Materialise the Secret from a **separate ArgoCD Application** that you sync first (app-of-apps or explicit ordering between Applications). This is the cleanest path for `ExternalSecret`-based stacks.
-- Annotate the operator-rendered Secret as a `PreSync` hook on this Application (`argocd.argoproj.io/hook: PreSync` plus a `sync-wave` lower than `-5`, since the preflight's Helm `pre-upgrade` hook lands at wave `-5`). Works if the operator supports being a hook resource.
-- Pre-create the Secret with `kubectl` before the first sync (or before the operator's first reconcile). This is the one-shot path the quick-start uses.
+```yaml
+data:
+  - secretKey: LW_GATEWAY_INTERNAL_SECRET
+    remoteRef: { key: lw-gateway-internal-secret }
+```
+
+Prefer External Secrets Operator over the Secrets Store CSI driver: the CSI driver only syncs a Kubernetes Secret while a pod mounts its volume.
+</Note>
 
 ## Reinstall and ownership
 
@@ -63453,6 +63157,8 @@ RV2=$(kubectl -n langwatch get secret langwatch-app-secrets -o jsonpath='{.metad
 
 The two `resourceVersion` values should be identical because the chart no longer renders the Secret on the operator-managed path.
 
+Then follow [First run](/self-hosting/first-run) to create the first account, add the license and connect your identity provider.
+
 ## Legacy: autogen.enabled=true under ArgoCD
 
 If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim.
@@ -63475,12 +63181,12 @@ spec:
         - /data
 ```
 
-The recommended path is to flip `autogen.enabled` to `false`, pre-create the Secret per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
+The recommended path is to flip `autogen.enabled` to `false`, provide the Secrets per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
 
 ## Reference
 
 - Chart template comment: `charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
-- Chart values: `charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
+- Chart values: `charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`.
 - Helper that enforces app+gateway Secret-name consistency: `charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
 - Postmortem driving the original chart change: [PR #4423](https://github.com/langwatch/langwatch/pull/4423).
 - Single-secret collapse (this page's current shape): [PR #4440](https://github.com/langwatch/langwatch/pull/4440).
@@ -63542,9 +63248,14 @@ Edit `.env` to customize your deployment. Key variables:
 API_TOKEN_JWT_SECRET=your-jwt-secret
 CREDENTIALS_SECRET=your-encryption-key
 NEXTAUTH_SECRET=your-session-secret
+
+# Optional: an Enterprise license, either an activation code
+# (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
+# or a signed license key (works offline)
+LANGWATCH_LICENSE_KEY=
 ```
 
-See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -63643,6 +63354,7 @@ For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/
 
 ## Next Steps
 
+- [First run](/self-hosting/first-run): Create the first account, add the license and connect your identity provider
 - [Docker Images](/self-hosting/deployment/docker-images): Learn about each container image
 - [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm): Production deployment
 - [Environment Variables](/self-hosting/configuration/environment-variables): Full configuration reference
@@ -63844,7 +63556,8 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 <Warning>
   `autogen.enabled=true` generates random secrets on each install. This is fine for testing but not
-  for production, secrets change on reinstall and invalidate sessions. See [Production
+  for production, secrets change on reinstall and invalidate sessions. Under Argo CD it is worse:
+  Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production
   Deployment](#production-deployment) below.
 </Warning>
 
@@ -63862,6 +63575,21 @@ workers:
 ```
 
 Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+
+### License
+
+An Enterprise license goes in `app.license.key`, inline or from a Secret. It takes either an activation code (`LW-XXXX-XXXX-XXXX-XXXX`), which needs outbound HTTPS to `connect.langwatch.ai`, or a signed license key, which works offline:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for what happens at startup with each form.
 
 ## Low-Resources Deployment
 
@@ -63886,38 +63614,61 @@ This configures smaller resource limits, single replicas, and disables evaluator
 For production, you should:
 
 1. Use external managed databases (PostgreSQL, Redis)
-2. Create Kubernetes Secrets manually
+2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
 4. Disable auto-generation
 
-### 1. Create the app Secret
+### 1. Provide the Secrets
 
-One Secret holds every chart-required value (app keys + AI Gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
+With `autogen.enabled: false` the chart creates no Secrets; it reads them from Secrets you provide. Source them from your secret manager (External Secrets Operator, Sealed Secrets, Vault, Azure Key Vault, …) so values stay stable across syncs and can be rotated. Every value is an opaque random string, e.g. `openssl rand -hex 32`. Which keys you need depends on what you run:
 
-```bash
-kubectl create namespace langwatch
+**App Secret**: referenced by `secrets.existingSecret` (default name `langwatch-app-secrets`). The app, workers, gateway and Langy pods all read it.
 
-kubectl -n langwatch create secret generic langwatch-app-secrets \
-  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
-  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
-  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+| Key | Needed when |
+|-----|-------------|
+| `credentialsEncryptionKey` | Always |
+| `cronApiKey` | Always |
+| `nextAuthSecret` | Always |
+| `virtualKeyPepper` | Always |
+| `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` | `gateway.chartManaged: true` (default) |
+| `LANGY_INTERNAL_SECRET` | `langyagent.chartManaged: true` (default) |
+| `LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD` | Optional, see LangWatchQL below |
+
+Every key name can be changed to match your secret store, for example the dashed names Azure Key Vault produces through `dataFrom`: `secrets.secretKeys.*` for the app and LangWatchQL keys, `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey` for the gateway keys (the app and the gateway pod both read them), and `langyagent.secrets.internalSecretKey` for Langy.
+
+**ClickHouse Secret**: chart-managed ClickHouse only (skip it with `clickhouse.chartManaged: false`). Referenced by `clickhouse.auth.existingSecret`, and the name must differ from the default `<release>-clickhouse`, since the deployment composes `CLICKHOUSE_URL` from the password key at runtime.
+
+| Key | Needed when |
+|-----|-------------|
+| `password` | Always |
+| `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
+
+**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords. With `autogen.enabled=false` the render fails without them, because a generated password would change on every Argo CD sync.
+
+A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead. Argo CD renders without cluster access, so under Argo CD only the pod error shows it.
+
+<Note>
+`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse, PostgreSQL and Redis credentials. Use it with plain `helm` only: it reads existing values back from the cluster, which Argo CD cannot do, so under Argo CD the generated values change on every sync. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
+</Note>
+
+<Note>
+**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
+
+To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again. Once it is `Complete`, restart the ClickHouse StatefulSet and the app and workers Deployments, which read the passwords at startup.
+
+With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
+</Note>
+
+<Note>
+**Clusters that forbid root pods** (Kyverno/Gatekeeper `runAsNonRoot` policies): the Langy assistant pod runs as UID 0 with a small set of added capabilities, which it needs to isolate each session under its own UID. If your policy blocks that, turn Langy off. Every other LangWatch pod already runs as non-root:
+
+```yaml
+langyagent:
+  chartManaged: false
 ```
 
-If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines.
-
-For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart does not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
-
-```bash
-kubectl create secret generic langwatch-clickhouse-creds \
-  --namespace langwatch \
-  --from-literal=password="$(openssl rand -hex 32)" \
-  --from-literal=clusterSecret="$(openssl rand -hex 24)"
-```
-
-The `clusterSecret` key is only used when `clickhouse.replicas > 1` (Keeper inter-node auth), but creating it upfront keeps a future `--set clickhouse.replicas=3` a one-line change. If you run external ClickHouse (`clickhouse.chartManaged: false`), skip this Secret entirely.
+This removes the pod and every reference to it, and `LANGY_INTERNAL_SECRET` is no longer needed. A sandboxed runtime (see [Langy](/self-hosting/langy/overview)) hardens Langy where root pods are allowed; it does not satisfy a `runAsNonRoot` policy. For Pod Security Admission `restricted`, which also rejects the bundled Prometheus, apply the [`strict-admission` overlay](/self-hosting/security#strict-admission-control) instead.
+</Note>
 
 For external databases, create additional secrets:
 
@@ -63997,7 +63748,8 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS.
+# Ingress with TLS, on ingress-nginx. For Envoy Gateway, Gateway API or
+# another controller, see /self-hosting/deployment/routing.
 #
 # `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
 # so the private control plane is never internet-reachable. Blocked requests
@@ -64019,6 +63771,12 @@ ingress:
     - secretName: langwatch-tls
       hosts:
         - langwatch.example.com
+  # AI Gateway host. Renders a second Ingress with the settings above, plus
+  # the nginx streaming settings the gateway needs.
+  gateway:
+    host: gateway.langwatch.example.com
+    tls:
+      secretName: langwatch-gateway-tls
 
 # Prometheus monitoring
 prometheus:
@@ -64050,6 +63808,8 @@ kubectl -n langwatch get ingress
 # Check logs
 kubectl -n langwatch logs deploy/langwatch-app --tail=50
 ```
+
+Then follow [First run](/self-hosting/first-run) to create the first account, add the license and connect your identity provider.
 
 ## High-Availability Deployment
 
@@ -64232,14 +63992,14 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
-   The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -64296,7 +64056,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
+If both installs enable an Ingress, give each its own `ingress.hosts` and `ingress.gateway.host`. Overlapping host and path rules conflict in the ingress controller.
 
 ### Custom StorageClass
 
@@ -64323,6 +64083,7 @@ For clusters without internet access:
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
 3. Set `imagePullSecrets` if your registry requires authentication
+4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`
 
 ---
 
@@ -64486,6 +64247,182 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 ---
 
+# FILE: ./self-hosting/deployment/routing.mdx
+
+---
+title: Routing and ingress controllers
+description: "The hosts, paths, Services, timeouts and body sizes to expose for LangWatch on any ingress controller or Gateway API implementation"
+sidebarTitle: Routing
+---
+
+A Helm install creates no Ingress by default. Turn on the chart Ingress, which can carry the AI Gateway host too, or write your own routes with Envoy Gateway, another Gateway API implementation, Traefik or a cloud load balancer. This page lists what those routes must expose.
+
+## What to expose
+
+LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and coding agents reach the LangWatch AI Gateway.
+
+| Host | Path | Match | Backend Service | Port |
+|---|---|---|---|---|
+| App, for example `langwatch.acme.com` | `/` | Prefix | `<release>-app` | `5560` |
+| App | `/api/internal` | Prefix | Do not route. Block it. | |
+| Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
+| Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+
+`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+
+`/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
+
+## Proxy settings
+
+| Setting | App | Gateway |
+|---|---|---|
+| Response buffering | Off, for Server-Sent Events under `/api/sse` and streamed runs | Off, for streamed completions |
+| Request buffering | Default | Off |
+| Idle or read timeout | Above 30 seconds. Streams send a keep-alive every 25 seconds and long polls wait up to 25 seconds. `120` is a good value. | At least 60 seconds. Non-streaming calls send a heartbeat every 45 seconds. The chart nginx default is `3600`. |
+| Total request timeout | Disabled, or longer than your longest stream | Disabled, or above 15 minutes. A provider call can run up to 14 minutes. |
+| Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
+| WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
+
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+
+## Chart Ingress
+
+The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress. It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
+
+On ingress-nginx:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
+
+The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+
+On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
+
+## Gateway API (Envoy Gateway)
+
+Leave the chart Ingress off and attach HTTPRoutes to your Gateway. Set `gateway.publicUrl`, because the control plane cannot derive the gateway URL without `ingress.gateway.host`.
+
+```yaml
+# values.yaml
+ingress:
+  enabled: false
+gateway:
+  publicUrl: https://gateway.acme.com
+```
+
+These routes are for release `langwatch` in namespace `langwatch`, on a Gateway named `public` in namespace `envoy-gateway-system`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-app
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - langwatch.acme.com
+  rules:
+    # No backendRefs: requests to the private control plane get a 5xx.
+    - matches:
+        - path: { type: PathPrefix, value: /api/internal }
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: langwatch-app
+          port: 5560
+      timeouts:
+        request: 0s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-gateway
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - gateway.acme.com
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /v1 }
+        - path: { type: Exact, value: /health }
+      backendRefs:
+        - name: langwatch-gateway
+          port: 80
+      timeouts:
+        request: 0s
+```
+
+`request: 0s` turns off the total request timeout, so streams are not cut. You do not need to order the two app rules: Gateway API matches the longest prefix first, so `/api/internal` takes precedence over `/`. Check that your implementation answers that rule with a 5xx before you rely on it.
+
+If your Gateway is in a different namespace from the routes, set `allowedRoutes.namespaces` on its listener to admit the `langwatch` namespace. If you set idle timeouts in an Envoy Gateway `ClientTrafficPolicy` or `BackendTrafficPolicy`, keep them above the values in the table.
+
+## Network policies
+
+`gateway.networkPolicy.enabled` is off by default. When you turn it on, the default `gateway.networkPolicy.ingressFrom` admits only the `ingress-nginx` namespace and Prometheus. Change it to the namespace where your proxy pods run, for example `envoy-gateway-system`, or the gateway refuses that traffic.
+
+---
+
+# FILE: ./self-hosting/first-run.mdx
+
+---
+title: First run
+description: "From a fresh install to single sign-on: the first account, the license and the identity provider connection."
+sidebarTitle: First run
+keywords: first run, setup, first account, license, activation code, sso, single sign-on, identity provider, self-hosted
+---
+
+## Steps
+
+These steps take a fresh install to single sign-on through your own identity provider. They apply to [Helm](/self-hosting/deployment/kubernetes-helm), [ArgoCD](/self-hosting/deployment/argocd) and [Docker Compose](/self-hosting/deployment/docker-compose) installs alike.
+
+1. **Install LangWatch.** No email provider is needed for these steps.
+2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey, since step 5 links single sign-on to the password account. The first account is an ordinary organization administrator. It has no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it.
+3. **Add the license.** Open **Settings > License**. Enter the activation code LangWatch sent you, which needs outbound HTTPS to `connect.langwatch.ai` (see [Connect](/self-hosting/connect)). On an install without that access, paste or upload the license key instead (see [Editions and licensing](/self-hosting/licensing)). Single sign-on turns on once the license is active, with no restart.
+4. **Connect your identity provider.** Open **Settings > Authentication > Identity provider** and follow the setup:
+   1. Register the connection with the issuer, client id and client secret from your identity provider, or with its SAML metadata.
+   2. Copy the redirect URI the page shows into your identity provider. It has the form `https://<your LangWatch host>/api/auth/sso/callback/<connection id>`. In Microsoft Entra ID, add it under the **Web** platform.
+   3. Add your domain.
+   4. Run the test sign-in.
+   5. Name an administrator who can still get in if the identity provider is unavailable.
+   6. Choose who the connection lets in.
+   7. Select **Go live**.
+5. **Sign in through single sign-on.** The administrator's password account links to the identity provider on its first single sign-on sign-in, which is the test sign-in in step 4. You keep the same account, organization and projects.
+
+See [SSO configuration](/self-hosting/configuration/sso) for the redirect URIs, the issuer each provider uses and how existing accounts link.
+
+---
+
 # FILE: ./self-hosting/infrastructure/architecture.mdx
 
 ---
@@ -64583,8 +64520,8 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 The API process (`apps/api`, built on Hono), the single external entry point
 for all traffic. It serves REST, tRPC and SSE, and also serves the prebuilt
-browser bundle (a Vite/React single-page app, `apps/ui`) as static assets —
-one container is the whole interactive tier:
+browser bundle (a Vite/React single-page app, `apps/ui`) as static assets.
+One container is the whole interactive tier:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -64596,7 +64533,7 @@ one container is the whole interactive tier:
 ### LangWatch Workers
 
 Same `langwatch/langwatch` image, started from `apps/worker` instead of
-`apps/api` (there is no in-process worker mode — the app and the workers are
+`apps/api` (there is no in-process worker mode: the app and the workers are
 always separate processes). Consumes jobs from a BullMQ queue in Redis and
 runs the event sourcing pipeline (see below).
 
@@ -64622,6 +64559,22 @@ Built-in evaluator library (Python):
 - Format (exact match, BLEU, ROUGE, semantic similarity)
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
+
+### AI Gateway (port 5563)
+
+A Go service (image `langwatch/ai-gateway`, subchart `gateway`) that terminates virtual-key traffic and forwards it to the model providers configured in LangWatch. It reads each key's configuration (providers, budgets, guardrails, routing) from the App over the cluster network and reports usage back to it.
+
+- Your LLM clients, coding agents and the Langy agent call it with a virtual key
+- It needs its own externally reachable hostname (`ingress.gateway.host`, or `gateway.publicUrl` behind your own route) when clients outside the cluster use it
+- `gateway.chartManaged: false` removes it
+
+### Langy Agent (port 8080, Service port 80)
+
+The worker manager behind the in-product assistant (image `langwatch/langyagent`, subchart `langyagent`). The App and Workers reach it over cluster DNS; it has no ingress. Each conversation runs in a worker with its own UID and credentials, and its model calls go through the AI Gateway.
+
+- On by default (`langyagent.chartManaged: true`); `false` removes the pod and every reference to it
+- Runs on the node's normal container runtime by default; a sandboxed RuntimeClass (gVisor, Kata) is opt-in, see [Langy setup](/self-hosting/langy/setup)
+- Its NetworkPolicy denies internet egress unless you turn it on, see [Langy networking and egress](/self-hosting/langy/networking-and-egress)
 
 ### PostgreSQL: Control Plane
 
@@ -64767,17 +64720,19 @@ Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
 
 ## Network Topology
 
-Only the App is exposed externally. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
-| Component  | Service Type             | External |
-| ---------- | ------------------------ | -------- |
-| App        | Ingress, LoadBalancer    | Yes      |
-| Workers    | None (no Service needed) | No       |
-| NLP        | ClusterIP                | No       |
-| LangEvals  | ClusterIP                | No       |
-| PostgreSQL | ClusterIP                | No       |
-| ClickHouse | ClusterIP                | No       |
-| Redis      | ClusterIP                | No       |
+| Component | Service Type | External |
+|-----------|-------------|----------|
+| App | Ingress, LoadBalancer | Yes |
+| Workers | None (no Service needed) | No |
+| NLP | ClusterIP | No |
+| LangEvals | ClusterIP | No |
+| AI Gateway | ClusterIP, plus an Ingress when `ingress.gateway.host` is set | Optional, for clients outside the cluster |
+| Langy Agent | ClusterIP | No |
+| PostgreSQL | ClusterIP | No |
+| ClickHouse | ClusterIP | No |
+| Redis | ClusterIP | No |
 
 <Note>
   LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure
@@ -65251,6 +65206,21 @@ It is optional. An instance GitHub cannot reach still connects and works, and re
 An ingress that does not pass WebSocket upgrades still works: the CLI falls back to long-polling on its own. Each poll holds for up to 20 seconds, so keep the ingress read timeout at 30 seconds or more. The same timeout already applies to [connected agents](/agent-testing/connect-your-agent).
 
 The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
+
+## Push notifications
+
+Langy's browser notifications are Web Push messages. The LangWatch app and workers send them over HTTPS (`:443`) straight to the push service of each subscribed browser. The agent pod is not involved, and push needs no configuration: the install generates its own VAPID key pair on first use and stores it encrypted in the database.
+
+| Browser | Push service host |
+|---|---|
+| Chrome, Edge on Android, Opera, Samsung Internet and other Chromium browsers | `fcm.googleapis.com` |
+| Firefox | `updates.push.services.mozilla.com` |
+| Safari on macOS and iOS | `web.push.apple.com` (Apple documents `*.push.apple.com`) |
+| Edge on Windows and macOS | `*.notify.windows.com` |
+
+The app refuses a subscription whose endpoint is on any other host. Allow the hosts for the browsers your team uses. When the app cannot reach a push service, the send is retried with backoff for about ten minutes, and then dropped.
+
+A browser that cannot subscribe at all, because it has no Push API or subscribing failed, gets its notifications from the open LangWatch tab instead. A browser that did subscribe never falls back to the tab, so blocking these hosts after people subscribed means their notifications stop.
 
 ## Enable outbound egress
 
@@ -65830,20 +65800,31 @@ Those accounts have no password, so the door back in is **Forgot password**, and
 If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
+## Two forms of license
+
+LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+| Form | Looks like | Network |
+|---|---|---|
+| **Activation code** | `LW-XXXX-XXXX-XXXX-XXXX` | The install redeems it over outbound HTTPS to `connect.langwatch.ai` for a signed license and stores that on the organization. It works only with outbound access to that host. |
+| **Signed license key** | A long base64 string, also delivered as a `.langwatch-license` file | Verified locally. It works offline. |
+
+In configuration, one setting takes both: the `LANGWATCH_LICENSE_KEY` variable or the Helm value `app.license.key`. There is no separate variable for activation codes. On **Settings → License**, choose **Enter activation code** for a code, and **Enter license key** or **Upload license file** for a signed license key. The page detects the form, so a value pasted under the other option is still accepted. See [Connect](/self-hosting/connect#activate-with-a-code) for what redemption sends.
+
 ## Activating a license
 
 <Steps>
 <Step title="Get a license">
-Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key.
 </Step>
 
 <Step title="Activate it">
-In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+In the platform, go to **Settings → License**, choose **Enter activation code** and paste the code, or choose **Enter license key** or **Upload license file** for a signed license key, then choose **Activate License**.
 
-Prefer configuration over a UI step? Set the key as an environment variable instead:
+Prefer configuration over a UI step? Set the code or key as an environment variable instead:
 
 ```bash
-LANGWATCH_LICENSE_KEY=<your signed license key>
+LANGWATCH_LICENSE_KEY=<your activation code or signed license key>
 ```
 
 On Helm, the chart takes it inline or from a Secret you already manage:
@@ -65857,14 +65838,25 @@ app:
         key: license
 ```
 
-Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
-
+A signed license key set through configuration entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
-<Step title="Restart the deployment">
-The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+<Step title="SSO turns on">
+Plan entitlements apply immediately. SSO turns on at once on the server that stored the license, and within a minute on every other replica, with no restart. The activation confirmation in the UI says so too.
+
+`LANGWATCH_LICENSE_KEY` and `app.license.key` are read at startup, so a change to the variable takes a restart.
 </Step>
 </Steps>
+
+## An activation code in the variable
+
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code and an organization exists, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+
+- If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
+- On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.
+- If redemption is refused, the app logs the reason and still starts. Causes: an unknown, expired or already used code, a code bound to another install, no outbound access to `connect.langwatch.ai`, or `LANGWATCH_CONNECT_DISABLED` set.
+
+The startup log names the form it found in the variable and what it did with it.
 
 ## Expiry
 
@@ -67241,8 +67233,8 @@ langevals:
     limits: { cpu: 500m, memory: 4Gi }
 ```
 
-The limit is a ceiling, not a reservation, so a generous one costs nothing until
-an evaluator actually loads a model.
+The limit is a ceiling, not a reservation, so a generous one uses no extra
+memory until an evaluator actually loads a model.
 
 To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
 
@@ -67324,17 +67316,21 @@ kubectl -n langwatch exec deploy/langwatch-app -- \
 
 ### SSO callback URL mismatch
 
-The callback URL configured in your identity provider must exactly match:
+The redirect URI registered in your identity provider must exactly match the one shown on the connection's setup page:
 
 ```
-https://your-langwatch-domain.com/api/auth/callback/{provider}
+https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
 Check that `app.http.publicUrl` matches your actual domain (including `https://`).
 
-### "Email already exists" during SSO migration
+### Issuer mismatch on the test sign-in
 
-This happens when a user already has an email/password account. Follow the [SSO migration steps](/self-hosting/configuration/sso#migrating-from-emailpassword-to-sso) to link existing accounts.
+If you see "Your identity provider names a different issuer" on the test sign-in, compare the two issuers it lists: the connection's, and the one in the `iss` claim of the ID token. See [Issuer](/self-hosting/configuration/sso#issuer).
+
+### Existing account refused during SSO sign-in
+
+When SSO sign-in says "An account with this address already exists", the identity provider reported the address as unverified, or the connection has not verified the address's domain. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts).
 
 ### Sessions expire too quickly
 
@@ -68236,6 +68232,41 @@ docker compose up -d
 
 ## Breaking Changes
 
+### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
+
+The gateway sub-chart used to create its own Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now renders no Ingress. The `gateway.ingress.*` values are gone.
+
+To keep publishing the gateway through an Ingress, set its host on the app Ingress. The chart renders a second Ingress, `<release>-gateway-ingress`, with the app Ingress `className`, `labels` and `annotations`:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your existing app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+
+A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
+
+The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
+
+### Helm installs with autogen off and Argo CD
+
+With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis.auth.existingSecret` and `postgresql.auth.existingSecret` (or a password value). The chart used to generate these passwords, and under Argo CD a generated password changed on every sync. A plain `helm upgrade` of a release that already has the chart's own `<release>-redis` and `<release>-postgresql` Secrets keeps them.
+
+Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
+
+The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
+
+Keep Argo CD pruning on, so a new spec replaces the old Job; without it, delete old render Jobs before a rollback, or the rollback finds its Job already complete and does not render again.
+
+The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
+
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 
 The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
@@ -68250,7 +68281,7 @@ The first start runs a migration preflight before the app reports ready. `--time
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
-**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts) for how linking works in the current release.
 
 **Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
 
@@ -68958,6 +68989,15 @@ openapi: "PATCH /api/v1/annotations/{id}"
 
 ---
 
+# FILE: ./api-reference/api-keys/create-an-ingestion-api-key.mdx
+
+---
+title: "Create an ingestion API key"
+openapi: "POST /api/v1/api-keys/ingestion"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/create-api-key.mdx
 
 ---
@@ -69250,11 +69290,20 @@ openapi: "POST /api/v1/dataset/{slugOrId}/upload"
 
 ---
 
+# FILE: ./api-reference/datasets/create-a-dataset-from-an-uploaded-file.mdx
+
+---
+title: "Create a dataset from an uploaded file"
+openapi: "POST /api/v1/dataset/imports"
+---
+
+---
+
 # FILE: ./api-reference/datasets/create-attachments.mdx
 
 ---
 title: "Create Attachments"
-openapi: "POST /api/dataset/attachments"
+openapi: "POST /api/v1/dataset/attachments"
 ---
 
 ---
@@ -69317,7 +69366,7 @@ openapi: "GET /api/v1/dataset/{slugOrId}"
 
 ---
 title: "List entries of a dataset"
-openapi: "GET /api/dataset/{slug}/entries"
+openapi: "GET /api/v1/dataset/{datasetSlug}/entries"
 ---
 
 ---
@@ -69327,6 +69376,15 @@ openapi: "GET /api/dataset/{slug}/entries"
 ---
 title: "List records for a dataset"
 openapi: "GET /api/v1/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/import-an-uploaded-file-into-a-dataset.mdx
+
+---
+title: "Import an uploaded file into a dataset"
+openapi: "POST /api/v1/dataset/{slugOrId}/imports"
 ---
 
 ---
@@ -69357,7 +69415,7 @@ Manage datasets for evaluations, experiments, and fine-tuning. Create, update, u
 
 ---
 title: "Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation."
-openapi: "POST /api/v1/dataset/{slug}/entries"
+openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 ---
 
 ---
@@ -70407,6 +70465,42 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/grants/change-a-grant-s-role.mdx
+
+---
+title: "Change a grant's role"
+openapi: "PATCH /api/v1/grants/{grantId}"
+---
+
+---
+
+# FILE: ./api-reference/grants/get-a-grant.mdx
+
+---
+title: "Get a grant"
+openapi: "GET /api/v1/grants/{grantId}"
+---
+
+---
+
+# FILE: ./api-reference/grants/grant-a-role.mdx
+
+---
+title: "Grant a role"
+openapi: "POST /api/v1/grants"
+---
+
+---
+
+# FILE: ./api-reference/grants/list-grants.mdx
+
+---
+title: "List grants"
+openapi: "GET /api/v1/grants"
+---
+
+---
+
 # FILE: ./api-reference/grants/overview.mdx
 
 ---
@@ -70550,6 +70644,15 @@ langwatch grants revoke <grant_id>
 
 ---
 
+# FILE: ./api-reference/grants/revoke-a-grant.mdx
+
+---
+title: "Revoke a grant"
+openapi: "DELETE /api/v1/grants/{grantId}"
+---
+
+---
+
 # FILE: ./api-reference/graphs/create-graphs.mdx
 
 ---
@@ -70612,7 +70715,7 @@ openapi: "PATCH /api/v1/graphs/{id}"
 
 ---
 title: "Add group binding"
-openapi: "POST /api/v1/groups/{id}/bindings"
+openapi: "POST /api/v1/groups/{groupId}/bindings"
 ---
 
 ---
@@ -70621,7 +70724,7 @@ openapi: "POST /api/v1/groups/{id}/bindings"
 
 ---
 title: "Add group member"
-openapi: "POST /api/v1/groups/{id}/members"
+openapi: "POST /api/v1/groups/{groupId}/members"
 ---
 
 ---
@@ -70639,7 +70742,7 @@ openapi: "POST /api/v1/groups"
 
 ---
 title: "Delete group"
-openapi: "DELETE /api/v1/groups/{id}"
+openapi: "DELETE /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -70648,7 +70751,7 @@ openapi: "DELETE /api/v1/groups/{id}"
 
 ---
 title: "Get group"
-openapi: "GET /api/v1/groups/{id}"
+openapi: "GET /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -70657,7 +70760,7 @@ openapi: "GET /api/v1/groups/{id}"
 
 ---
 title: "List group bindings"
-openapi: "GET /api/v1/groups/{id}/bindings"
+openapi: "GET /api/v1/groups/{groupId}/bindings"
 ---
 
 ---
@@ -70675,7 +70778,7 @@ openapi: "GET /api/v1/groups"
 
 ---
 title: "List group members"
-openapi: "GET /api/v1/groups/{id}/members"
+openapi: "GET /api/v1/groups/{groupId}/members"
 ---
 
 ---
@@ -70800,7 +70903,7 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 
 ---
 title: "Remove group binding"
-openapi: "DELETE /api/v1/groups/{id}/bindings/{bindingId}"
+openapi: "DELETE /api/v1/groups/{groupId}/bindings/{bindingId}"
 ---
 
 ---
@@ -70809,7 +70912,7 @@ openapi: "DELETE /api/v1/groups/{id}/bindings/{bindingId}"
 
 ---
 title: "Remove group member"
-openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
+openapi: "DELETE /api/v1/groups/{groupId}/members/{userId}"
 ---
 
 ---
@@ -70818,7 +70921,7 @@ openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
 
 ---
 title: "Rename group"
-openapi: "PATCH /api/v1/groups/{id}"
+openapi: "PATCH /api/v1/groups/{groupId}"
 ---
 
 ---
@@ -71137,7 +71240,7 @@ curl -X DELETE https://app.langwatch.ai/api/v1/organization/invites/<invite_id> 
 
 ---
 title: "Revoke invite"
-openapi: "DELETE /api/v1/organization/invites/{id}"
+openapi: "DELETE /api/v1/organization/invites/{inviteId}"
 ---
 
 ---
@@ -71467,7 +71570,7 @@ openapi: "POST /api/v1/organizations"
 
 ---
 title: "Get an organization"
-openapi: "GET /api/v1/organizations/{id}"
+openapi: "GET /api/v1/organizations/{organizationId}"
 ---
 
 ---
@@ -73424,7 +73527,7 @@ openapi: "PATCH /api/v1/suites/{id}"
 
 ---
 title: "Add team member"
-openapi: "POST /api/v1/teams/{id}/members"
+openapi: "POST /api/v1/teams/{teamId}/members"
 ---
 
 ---
@@ -73433,7 +73536,7 @@ openapi: "POST /api/v1/teams/{id}/members"
 
 ---
 title: "Archive team"
-openapi: "DELETE /api/v1/teams/{id}"
+openapi: "DELETE /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73451,7 +73554,7 @@ openapi: "POST /api/v1/teams"
 
 ---
 title: "Get team"
-openapi: "GET /api/v1/teams/{id}"
+openapi: "GET /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73460,7 +73563,7 @@ openapi: "GET /api/v1/teams/{id}"
 
 ---
 title: "List team members"
-openapi: "GET /api/v1/teams/{id}/members"
+openapi: "GET /api/v1/teams/{teamId}/members"
 ---
 
 ---
@@ -73469,7 +73572,7 @@ openapi: "GET /api/v1/teams/{id}/members"
 
 ---
 title: "List team projects"
-openapi: "GET /api/v1/teams/{id}/projects"
+openapi: "GET /api/v1/teams/{teamId}/projects"
 ---
 
 ---
@@ -73563,7 +73666,7 @@ curl -X POST https://app.langwatch.ai/api/projects \
 
 ---
 title: "Remove team member"
-openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
+openapi: "DELETE /api/v1/teams/{teamId}/members/{userId}"
 ---
 
 ---
@@ -73572,7 +73675,7 @@ openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
 
 ---
 title: "Update team"
-openapi: "PATCH /api/v1/teams/{id}"
+openapi: "PATCH /api/v1/teams/{teamId}"
 ---
 
 ---
@@ -73666,7 +73769,7 @@ openapi: "POST /api/trace/{id}/unshare"
 
 ---
 title: "Discover what the trace filter fields hold"
-openapi: "GET /api/traces/facets"
+openapi: "GET /api/v1/traces/facets"
 ---
 
 ---
@@ -73987,7 +74090,7 @@ openapi: "PATCH /api/v1/traces/{traceId}/metadata"
 
 ---
 title: "Pause an automation"
-openapi: "POST /api/triggers/{id}/disable"
+openapi: "POST /api/v1/triggers/{triggerId}/disable"
 ---
 
 ---
@@ -73996,7 +74099,7 @@ openapi: "POST /api/triggers/{id}/disable"
 
 ---
 title: "Resume an automation"
-openapi: "POST /api/triggers/{id}/enable"
+openapi: "POST /api/v1/triggers/{triggerId}/enable"
 ---
 
 ---
@@ -74005,7 +74108,7 @@ openapi: "POST /api/triggers/{id}/enable"
 
 ---
 title: "Send a test fire"
-openapi: "POST /api/triggers/{id}/test-fire"
+openapi: "POST /api/v1/triggers/{triggerId}/test-fire"
 ---
 
 ---
@@ -74032,7 +74135,7 @@ openapi: "POST /api/v1/triggers"
 
 ---
 title: "Delete a trigger"
-openapi: "DELETE /api/v1/triggers/{id}"
+openapi: "DELETE /api/v1/triggers/{triggerId}"
 ---
 
 ---
@@ -74041,7 +74144,7 @@ openapi: "DELETE /api/v1/triggers/{id}"
 
 ---
 title: "List an automation's fires"
-openapi: "GET /api/triggers/{id}/fires"
+openapi: "GET /api/v1/triggers/{triggerId}/fires"
 ---
 
 ---
@@ -74050,7 +74153,7 @@ openapi: "GET /api/triggers/{id}/fires"
 
 ---
 title: "Get a trigger by its ID"
-openapi: "GET /api/v1/triggers/{id}"
+openapi: "GET /api/v1/triggers/{triggerId}"
 ---
 
 ---
@@ -74059,7 +74162,7 @@ openapi: "GET /api/v1/triggers/{id}"
 
 ---
 title: "List Slack Connections"
-openapi: "GET /api/slack-connections"
+openapi: "GET /api/v1/slack-connections"
 ---
 
 ---
@@ -74271,7 +74374,7 @@ In the CLI, `--action-params` takes the channel's configuration as JSON, and `--
 
 ---
 title: "Update a trigger"
-openapi: "PATCH /api/v1/triggers/{id}"
+openapi: "PATCH /api/v1/triggers/{triggerId}"
 ---
 
 ---

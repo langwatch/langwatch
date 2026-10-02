@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, TypeVar
+
+from attrs import define as _attrs_define
+
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="PostApiTriggersByIdTestFireResponse404")
+
+
+@_attrs_define
+class PostApiTriggersByIdTestFireResponse404:
+    """
+    Attributes:
+        error (str):
+        message (str | Unset):
+    """
+
+    error: str
+    message: str | Unset = UNSET
+
+    def to_dict(self) -> dict[str, Any]:
+        error = self.error
+
+        message = self.message
+
+        field_dict: dict[str, Any] = {}
+
+        field_dict.update(
+            {
+                "error": error,
+            }
+        )
+        if message is not UNSET:
+            field_dict["message"] = message
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
+
+        post_api_triggers_by_id_test_fire_response_404 = cls(
+            error=error,
+            message=message,
+        )
+
+        return post_api_triggers_by_id_test_fire_response_404

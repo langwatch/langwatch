@@ -87,6 +87,15 @@ Feature: The local development process topology
     When a lane is started with a port the launcher derived
     Then the lane binds the derived port
 
+  # A worktree's `.env` is often copied from another checkout, so its
+  # LANGWATCH_API_URL names that checkout's api. The ui then serves this stack
+  # while every /api call lands on the other one.
+  @unit
+  Scenario: The browser application's api proxy follows the derived api port
+    Given the workspace env file names another stack's api address
+    When the launcher starts on a non-default PORT
+    Then the browser application's lane is told the api address on PORT + 1000
+
   @unit
   Scenario: A port the developer set themselves is left alone
     Given a developer who set the api port explicitly

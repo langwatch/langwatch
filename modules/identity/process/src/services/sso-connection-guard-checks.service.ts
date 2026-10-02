@@ -26,6 +26,8 @@ import {
   REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   RENAME_CONNECTION_COMMAND_TYPE,
+  SSO_IDP_EDITABLE_STATES,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
   FINALIZE_MIGRATION_COMMAND_TYPE,
@@ -151,6 +153,9 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
     "SUSPENDED",
     "TEARDOWN_PENDING",
   ],
+  // Shared with the setup surface, so the edit control and this guard
+  // cannot disagree about where it works.
+  [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: SSO_IDP_EDITABLE_STATES,
 };
 
 export interface SsoConnectionGuardsDeps {

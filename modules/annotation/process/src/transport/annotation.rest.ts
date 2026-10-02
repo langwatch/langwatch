@@ -25,7 +25,10 @@ export const annotationRest: Readonly<{
   .withQuery(annotationRestQuerySchema)
   .withPermission("annotations:view")
   .withOutput(annotationRestListResponseSchema)
-  .withDocs({ summary: "List annotations in the caller’s project" })
+  .withDocs({
+    operationId: "getApiAnnotations",
+    summary: "List annotations in the caller’s project",
+  })
   .handle(async ({ app, input, scope }) => {
     const annotations = await app.list({
       projectId: scope.id,
@@ -39,7 +42,10 @@ export const annotationRest: Readonly<{
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:view")
   .withOutput(annotationRestResponseSchema)
-  .withDocs({ summary: "Get an annotation in the caller’s project" })
+  .withDocs({
+    operationId: "getApiAnnotationsId",
+    summary: "Get an annotation in the caller’s project",
+  })
   .handle(async ({ app, input, scope }) => {
     const annotation = await app.getById({
       id: input.id,
@@ -54,7 +60,10 @@ export const annotationRest: Readonly<{
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:manage")
   .withOutput(annotationRestResponseSchema)
-  .withDocs({ summary: "Update an annotation in the caller’s project" })
+  .withDocs({
+    operationId: "patchApiAnnotationsId",
+    summary: "Update an annotation in the caller’s project",
+  })
   .handle(async ({ app, input, scope }) => {
     const annotation = await app.update({
       ...input,
@@ -68,7 +77,10 @@ export const annotationRest: Readonly<{
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
   .withOutput(annotationRestDeletedSchema)
-  .withDocs({ summary: "Delete an annotation in the caller’s project" })
+  .withDocs({
+    operationId: "deleteApiAnnotationsId",
+    summary: "Delete an annotation in the caller’s project",
+  })
   .handle(async ({ app, input, scope }) => {
     await app.delete({ id: input.id, projectId: scope.id });
 
@@ -80,7 +92,10 @@ export const annotationRest: Readonly<{
   .withQuery(annotationRestQuerySchema)
   .withPermission("annotations:view")
   .withOutput(annotationRestListResponseSchema)
-  .withDocs({ summary: "List annotations on a trace in the caller’s project" })
+  .withDocs({
+    operationId: "getApiAnnotationsTraceId",
+    summary: "List annotations on a trace in the caller’s project",
+  })
   .handle(async ({ app, input, scope }) => {
     const annotations = await app.list({
       projectId: scope.id,
@@ -96,7 +111,10 @@ export const annotationRest: Readonly<{
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:create")
   .withOutput(annotationRestResponseSchema)
-  .withDocs({ summary: "Create an unattributed annotation on a trace" })
+  .withDocs({
+    operationId: "postApiAnnotationsTraceId",
+    summary: "Create an unattributed annotation on a trace",
+  })
   .handle(async ({ app, input, scope }) => {
     const annotation = await app.createUnattributed({
       projectId: scope.id,

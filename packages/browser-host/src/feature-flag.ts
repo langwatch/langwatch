@@ -6,6 +6,8 @@ import {
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
 
+import { useFeatureFlagOverrides } from "./feature-flag-overrides.ts";
+
 const api = createModuleApi<ContractApiMap<typeof featureFlagTrpc>>();
 
 // The service caches operator rows for five seconds. Refetching every mounted
@@ -55,7 +57,8 @@ export function useFeatureFlag(
   flag: FrontendFeatureFlag,
   options: UseFeatureFlagOptions,
 ): UseFeatureFlagResult {
-  const queryEnabled = options.enabled ?? true;
+  const override = useFeatureFlagOverrides()[flag];
+  const queryEnabled = (options.enabled ?? true) && override === undefined;
 
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
@@ -70,6 +73,7 @@ export function useFeatureFlag(
     },
   );
 
+  if (override !== undefined) return { enabled: override, isLoading: false };
   return {
     enabled: data?.enabled ?? false,
     isLoading: queryEnabled ? isLoading : false,

@@ -11,14 +11,17 @@ from ...models.post_api_gateway_v1_virtual_keys_response_401 import PostApiGatew
 from ...models.post_api_gateway_v1_virtual_keys_response_403 import PostApiGatewayV1VirtualKeysResponse403
 from ...models.post_api_gateway_v1_virtual_keys_response_409 import PostApiGatewayV1VirtualKeysResponse409
 from ...models.post_api_gateway_v1_virtual_keys_response_500 import PostApiGatewayV1VirtualKeysResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
     body: PostApiGatewayV1VirtualKeysBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -105,6 +108,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1VirtualKeysBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysResponse201
     | PostApiGatewayV1VirtualKeysResponse400
@@ -115,10 +119,13 @@ def sync_detailed(
 ]:
     """Create virtual key
 
-     Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's
-    project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+     Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
+    withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
+    hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
+    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1VirtualKeysBody):
 
     Raises:
@@ -131,6 +138,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = client.get_httpx_client().request(
@@ -144,6 +152,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1VirtualKeysBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysResponse201
     | PostApiGatewayV1VirtualKeysResponse400
@@ -155,10 +164,13 @@ def sync(
 ):
     """Create virtual key
 
-     Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's
-    project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+     Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
+    withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
+    hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
+    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1VirtualKeysBody):
 
     Raises:
@@ -172,6 +184,7 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        idempotency_key=idempotency_key,
     ).parsed
 
 
@@ -179,6 +192,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1VirtualKeysBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysResponse201
     | PostApiGatewayV1VirtualKeysResponse400
@@ -189,10 +203,13 @@ async def asyncio_detailed(
 ]:
     """Create virtual key
 
-     Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's
-    project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+     Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
+    withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
+    hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
+    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1VirtualKeysBody):
 
     Raises:
@@ -205,6 +222,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -216,6 +234,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiGatewayV1VirtualKeysBody,
+    idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysResponse201
     | PostApiGatewayV1VirtualKeysResponse400
@@ -227,10 +246,13 @@ async def asyncio(
 ):
     """Create virtual key
 
-     Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's
-    project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+     Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
+    withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
+    hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
+    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
+        idempotency_key (str | Unset):
         body (PostApiGatewayV1VirtualKeysBody):
 
     Raises:
@@ -245,5 +267,6 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            idempotency_key=idempotency_key,
         )
     ).parsed

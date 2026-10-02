@@ -27,6 +27,7 @@ function entry(
     route: null,
     policy: null,
     name: null,
+    issuer: null,
     note: null,
     replacesConnectionId: null,
     ...overrides,

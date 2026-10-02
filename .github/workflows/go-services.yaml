@@ -50,7 +50,6 @@ on:
       - "modules/trace/contract/src/trace-format.schemas.ts"
       - "modules/evaluator/contract/src/evaluators.native.ts"
       - "modules/model-provider/contract/src/catalog/model-catalog.json"
-      - "specs/api-reference/openapi-document.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -128,7 +127,6 @@ jobs:
               - 'modules/trace/contract/src/trace-format.schemas.ts'
               - 'modules/evaluator/contract/src/evaluators.native.ts'
               - 'modules/model-provider/contract/src/catalog/model-catalog.json'
-              - 'specs/api-reference/openapi-document.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
@@ -255,6 +253,12 @@ jobs:
       # resolve against; inline YAML steps bind nothing.
       - name: Assert shutdown values render as the pod needs them
         run: ./charts/gateway/tests/shutdown-values.sh
+
+      # A plain install creates no gateway Ingress and no ingress-nginx
+      # annotations, an enabled one carries the class the operator picked,
+      # and the PDB never blocks a node drain at any replica count.
+      - name: Assert the gateway Ingress is opt-in and the PDB allows drains
+        run: ./charts/gateway/tests/ingress-and-pdb.sh
 
       # The chart's graceful window has to stay above the gateway's 45s
       # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),

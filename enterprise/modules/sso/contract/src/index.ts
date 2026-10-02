@@ -23,6 +23,8 @@ export {
   ssoSetupArrivalsSchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
+  ssoSetupIdentityProviderUpdateSchema,
+  ssoSetupIdentityProviderViewSchema,
   ssoSetupMigrationProgressSchema,
   ssoSetupMigrationRouteSchema,
   ssoSetupMigrationSchema,
@@ -34,6 +36,7 @@ export {
   ssoSetupRemovalSchema,
   ssoSetupRenameSchema,
   ssoSetupStartMigrationSchema,
+  ssoSetupUpdateIdentityProviderSchema,
   type SsoBreakGlassBinding,
   type SsoBreakGlassBindingInput,
   type SsoBreakGlassCandidate,
@@ -50,6 +53,8 @@ export {
   type SsoSetupArrivalsInput,
   type SsoSetupConnectionInput,
   type SsoSetupDomainInput,
+  type SsoSetupIdentityProviderUpdate,
+  type SsoSetupIdentityProviderView,
   type SsoSetupMigration,
   type SsoSetupMigrationProgressInput,
   type SsoSetupMigrationRouteInput,
@@ -61,6 +66,7 @@ export {
   type SsoSetupRemovalInput,
   type SsoSetupRenameInput,
   type SsoSetupStartMigrationInput,
+  type SsoSetupUpdateIdentityProviderInput,
 } from "./sso-setup.contract.ts";
 export {
   SSO_SELF_SERVE_DEPLOYMENTS,

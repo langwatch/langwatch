@@ -6,6 +6,8 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="DeleteApiSecretsByIdBody")
 
 
@@ -13,10 +15,10 @@ T = TypeVar("T", bound="DeleteApiSecretsByIdBody")
 class DeleteApiSecretsByIdBody:
     """
     Attributes:
-        project_id (str):
+        project_id (str | Unset):
     """
 
-    project_id: str
+    project_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -24,18 +26,16 @@ class DeleteApiSecretsByIdBody:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "projectId": project_id,
-            }
-        )
+        field_dict.update({})
+        if project_id is not UNSET:
+            field_dict["projectId"] = project_id
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        project_id = d.pop("projectId")
+        project_id = d.pop("projectId", UNSET)
 
         delete_api_secrets_by_id_body = cls(
             project_id=project_id,

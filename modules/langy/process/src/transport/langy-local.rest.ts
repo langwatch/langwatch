@@ -5,6 +5,7 @@
  */
 
 import { PayloadTooLargeError } from "@langwatch/api";
+import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   cancelCallResponseSchema,
@@ -30,11 +31,14 @@ import type { z } from "zod";
 const MAX_BODY_BYTES = 256 * 1024;
 
 /**
- * The permission this door declares AND the one it enforces. One constant, so
- * the declaration the OpenAPI surface publishes and the check the framework
- * runs cannot drift into disagreeing about what a caller needs.
+ * The caller is the worker, carrying its conversation's Langy session key, which never holds
+ * `langy:create` (Langy may not start Langy). The service bridges the key to its owner, checks
+ * their Langy access and refuses any conversation that is not theirs, as main's route does.
+ * @see specs/langy/langy-local-control.feature
  */
-const LOCAL_PERMISSION = "langy:create" as const;
+const LOCAL_ACCESS = anyAuthenticated({
+  reason: "the service bridges the session key to its owner and proves the conversation is theirs",
+});
 
 /** Parses and validates a JSON body a composed schema can't declare via `.withInput()`. */
 function parseJsonBody<T extends z.ZodType>(raw: string, schema: T): z.infer<T> {
@@ -58,7 +62,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── what `code_access` reads ──────────────────────────────────────────────
 
   .get("/api/langy/local/workspace", "langyLocalWorkspace")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withQuery(langyLocalWorkspaceQuerySchema)
   .withOutput(workspaceStatusSchema)
   .withDocs({
@@ -75,7 +79,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the control request the card renders ──────────────────────────────────
 
   .post("/api/langy/local/requests", "langyLocalCreateRequest")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalCreateRequestBodySchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withOutput(createControlRequestResponseSchema)
@@ -91,7 +95,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── one local tool call ───────────────────────────────────────────────────
 
   .post("/api/langy/local/calls", "langyLocalStartCall")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   // `langyLocalStartCallRequestSchema` intersects a discriminated union, which
   // `.withInput()`'s `SourceSchema` does not admit; parsed by hand instead,
   // exactly as this route always has.
@@ -108,7 +112,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   )
 
   .get("/api/langy/local/calls/:callId", "langyLocalReadCall")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withParams(langyLocalCallIdParamsSchema)
   .withOutput(pollCallResponseSchema)
   .withDocs({ description: "The call's answer, or not found while it is still running." })
@@ -122,7 +126,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   )
 
   .post("/api/langy/local/calls/:callId/cancel", "langyLocalCancelCall")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withParams(langyLocalCallIdParamsSchema)
   .withInput(controlActionBodySchema)
   .withOutput(cancelCallResponseSchema)
@@ -138,7 +142,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the question the worker asks ──────────────────────────────────────────
 
   .post("/api/langy/waits", "langyLocalStartWait")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalStartWaitRequestSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withOutput(startWaitResponseSchema)
@@ -148,7 +152,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   )
 
   .get("/api/langy/waits/:waitId", "langyLocalReadWait")
-  .withPermission(LOCAL_PERMISSION)
+  .withAccess(LOCAL_ACCESS)
   .withParams(langyLocalWaitIdParamsSchema)
   .withOutput(pollWaitResponseSchema)
   .withDocs({ description: "The answered question, or not found while it is still waiting." })

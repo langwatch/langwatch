@@ -5,7 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.project import Project
+from ...models.get_project_response_200 import GetProjectResponse200
 from ...types import Response, safe_http_status
 
 
@@ -23,9 +23,11 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | Project | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | GetProjectResponse200 | None:
     if response.status_code == 200:
-        response_200 = Project.from_dict(response.json())
+        response_200 = GetProjectResponse200.from_dict(response.json())
 
         return response_200
 
@@ -47,7 +49,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any | Project]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | GetProjectResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -63,7 +67,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | Project]:
+) -> Response[Any | GetProjectResponse200]:
     """Get a project
 
      Get a project by ID, including its API key. Requires project:view permission.
@@ -76,7 +80,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | Project]
+        Response[Any | GetProjectResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -94,7 +98,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | Project | None:
+) -> Any | GetProjectResponse200 | None:
     """Get a project
 
      Get a project by ID, including its API key. Requires project:view permission.
@@ -107,7 +111,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | Project
+        Any | GetProjectResponse200
     """
 
     return sync_detailed(
@@ -120,7 +124,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | Project]:
+) -> Response[Any | GetProjectResponse200]:
     """Get a project
 
      Get a project by ID, including its API key. Requires project:view permission.
@@ -133,7 +137,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | Project]
+        Response[Any | GetProjectResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -149,7 +153,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | Project | None:
+) -> Any | GetProjectResponse200 | None:
     """Get a project
 
      Get a project by ID, including its API key. Requires project:view permission.
@@ -162,7 +166,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | Project
+        Any | GetProjectResponse200
     """
 
     return (

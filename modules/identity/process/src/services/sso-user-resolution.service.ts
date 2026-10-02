@@ -5,6 +5,7 @@ import {
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
+  SsoDomainNotVerifiedError,
   SsoExistingAccountUnconfirmedError,
   type SsoUserResolution,
   type SsoUserResolutionInput,
@@ -59,12 +60,12 @@ export class SsoUserResolutionService {
     const user = candidates[0];
     if (!user) return CONTINUE;
 
-    // SAML supplies a signed email attribute, without an OIDC verification flag.
-    // The caller has already admitted that assertion through the domain gate.
-    if (input.protocol === "oidc" && !input.emailVerified) {
-      return this.resolveUnvouchedAddress({ connection, input, user });
+    if (this.isUnvouched(input)) return this.resolveUnvouchedAddress({ connection, input, user });
+    if (user.emailVerified) {
+      return input.protocol === "saml"
+        ? this.resolveVerifiedSamlUser({ input, user, email })
+        : this.resolveConfirmedOidcUser({ connection, input, user, email });
     }
-    if (user.emailVerified) return this.resolveVerifiedSamlUser({ input, user, email });
     if (!(await this.directoryOwns({ connection, input, userId: user.id }))) {
       return this.resolveUnconfirmedUser({ connection, input, user, email });
     }
@@ -72,6 +73,16 @@ export class SsoUserResolutionService {
       return REFUSE;
     }
     return this.resolveOwnedUser({ input, userId: user.id, email });
+  }
+
+  /**
+   * An OIDC sign-in with no word from the provider that the address is real.
+   * SAML carries no flag and was admitted by the domain gate. Cloud takes only
+   * `email_verified: true`; self-hosted refuses only an explicit "unverified".
+   */
+  private isUnvouched(input: SsoUserResolutionInput): boolean {
+    if (input.protocol !== "oidc") return false;
+    return this.deps.isHosted ? !input.emailVerified : input.emailVerification === "unverified";
   }
 
   /** An existing subject binding still names an inactive member after the
@@ -121,9 +132,44 @@ export class SsoUserResolutionService {
     return { action: "link", userId: user.id, profile: "preserve" };
   }
 
-  /** An OIDC provider that does not say the address is verified: the library
-   *  refuses the link either way, and an unconfirmed account this connection's
-   *  directory does not own gets the named refusal instead. */
+  /**
+   * A confirmed account an OIDC provider signs in on self-hosted without
+   * `email_verified: true`: linked on the connection's domain proof or Entra ID's
+   * `xms_edov: true`, otherwise refused with the missing domain proof named.
+   */
+  private async resolveConfirmedOidcUser({
+    connection,
+    input,
+    user,
+    email,
+  }: {
+    connection: SsoConnectionState;
+    input: SsoUserResolutionInput;
+    user: SsoResolutionCandidate;
+    email: string;
+  }): Promise<SsoUserResolution> {
+    if (this.deps.isHosted || input.emailVerified) return CONTINUE;
+    if (user.deactivated) return REFUSE;
+    if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
+    if (
+      input.emailVerification !== "verified" &&
+      !connectionProvesDomainOf({ connection, email: input.email })
+    ) {
+      return refuseUnprovedDomain({ providerId: input.providerId });
+    }
+    const contested = await this.deps.people.isAddressOrSubjectHeldByAnother({
+      userId: user.id,
+      email,
+      accountKey: input.accountKey,
+    });
+    if (contested) return REFUSE;
+    return { action: "link", userId: user.id, profile: "preserve" };
+  }
+
+  /** An OIDC provider that does not vouch for the address (said "unverified",
+   *  or said nothing on Cloud): the library refuses the link either way, and an
+   *  unconfirmed account this connection's directory does not own gets the
+   *  named refusal instead. */
   private async resolveUnvouchedAddress({
     connection,
     input,
@@ -140,14 +186,14 @@ export class SsoUserResolutionService {
     return refuseUnconfirmed({
       providerId: input.providerId,
       detail:
-        "the provider did not assert the address is verified and the account's address is unconfirmed",
+        "the provider asserted the address is not verified and the account's address is unconfirmed",
     });
   }
 
   /**
-   * An unconfirmed account, asserted by an OIDC provider that says the address
-   * is verified, on a self-hosted installation: the connection's qualified
-   * domain proof may vouch for it (sso-link-unconfirmed-local-account.feature).
+   * An unconfirmed account on a self-hosted installation, asserted by SAML or
+   * by an OIDC provider that did not say "unverified": the connection's
+   * qualified domain proof may vouch for it (sso-link-unconfirmed-local-account.feature).
    */
   private async resolveUnconfirmedUser({
     connection,
@@ -160,7 +206,7 @@ export class SsoUserResolutionService {
     user: SsoResolutionCandidate;
     email: string;
   }): Promise<SsoUserResolution> {
-    if (this.deps.isHosted || input.protocol !== "oidc") return CONTINUE;
+    if (this.deps.isHosted) return CONTINUE;
     if (user.deactivated) return REFUSE;
     if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
     if (!connectionProvesDomainOf({ connection, email: input.email })) {
@@ -280,6 +326,18 @@ function connectionProvesDomainOf({
   }
   const domain = normalizeDomain(email.slice(at + 1));
   return qualifySsoDomainOwnership({ state: connection, domain }).status === "QUALIFIED";
+}
+
+/** A confirmed account the provider did not vouch for, on a domain the
+ *  connection has no proof for: named, so the screen can say which proof is
+ *  missing instead of "account already exists". The person signing in is often
+ *  the administrator testing the connection, and verifying the domain is theirs. */
+function refuseUnprovedDomain({ providerId }: { providerId: string }): SsoUserResolution {
+  const detail =
+    "the provider sent no email verification claim and the connection has no qualified proof for the address's domain";
+  const error = new SsoDomainNotVerifiedError(detail);
+  logger.info({ code: error.code, providerId }, `single sign-on link refused: ${detail}`);
+  return { action: "reject", code: "sso_domain_not_verified" };
 }
 
 /** Logged with its cause because the library carries only the code onward. */

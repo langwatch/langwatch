@@ -1,3 +1,4 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -14,7 +15,6 @@ import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { licensingProcessModule } from "../../licensing.module.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 const SIGNED = "signed-with-the-gateway-secret";
 

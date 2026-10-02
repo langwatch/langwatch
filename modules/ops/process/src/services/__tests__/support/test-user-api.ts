@@ -50,6 +50,14 @@ export class TestUserApi implements UserApi {
     this.overrides.dismissTraceExplorerTour?.(input) ??
     this.unimplemented("dismissTraceExplorerTour");
 
+  getNotificationPreference: UserApi["getNotificationPreference"] = (input) =>
+    this.overrides.getNotificationPreference?.(input) ??
+    this.unimplemented("getNotificationPreference");
+
+  setNotificationPreference: UserApi["setNotificationPreference"] = (input) =>
+    this.overrides.setNotificationPreference?.(input) ??
+    this.unimplemented("setNotificationPreference");
+
   getLangyCodeAccessPreference: UserApi["getLangyCodeAccessPreference"] = (input) =>
     this.overrides.getLangyCodeAccessPreference?.(input) ??
     this.unimplemented("getLangyCodeAccessPreference");

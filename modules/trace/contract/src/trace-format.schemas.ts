@@ -249,20 +249,23 @@ export type SpanInputOutput =
       value: SpanInputOutput[];
     };
 
-export const spanInputOutputSchema: z.ZodType<SpanInputOutput> = z.lazy(() =>
-  z.union([
-    typedValueTextSchema,
-    typedValueChatMessagesSchema,
-    typedValueGuardrailResultSchema,
-    typedValueEvaluationResultSchema,
-    typedValueJsonSchema,
-    typedValueRawSchema,
-    z.object({
-      type: z.literal("list"),
-      value: z.array(spanInputOutputSchema),
-    }),
-  ]),
-);
+/** Published as the `SpanInputOutput` component, which the list arm refers back to. */
+export const spanInputOutputSchema: z.ZodType<SpanInputOutput> = z
+  .lazy(() =>
+    z.union([
+      typedValueTextSchema,
+      typedValueChatMessagesSchema,
+      typedValueGuardrailResultSchema,
+      typedValueEvaluationResultSchema,
+      typedValueJsonSchema,
+      typedValueRawSchema,
+      z.object({
+        type: z.literal("list"),
+        value: z.array(spanInputOutputSchema),
+      }),
+    ]),
+  )
+  .meta({ id: "SpanInputOutput" });
 
 export const errorCaptureSchema = z.object({
   has_error: z.literal(true),

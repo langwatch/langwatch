@@ -101,6 +101,9 @@ def sync_detailed(
 ]:
     """Get budget
 
+     Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
+    the organization for a key that names no project.
+
     Args:
         id (str):
 
@@ -137,6 +140,9 @@ def sync(
 ):
     """Get budget
 
+     Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
+    the organization for a key that names no project.
+
     Args:
         id (str):
 
@@ -166,6 +172,9 @@ async def asyncio_detailed(
     | GetApiGatewayV1BudgetsByIdResponse500
 ]:
     """Get budget
+
+     Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
+    the organization for a key that names no project.
 
     Args:
         id (str):
@@ -200,6 +209,9 @@ async def asyncio(
     | None
 ):
     """Get budget
+
+     Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
+    the organization for a key that names no project.
 
     Args:
         id (str):

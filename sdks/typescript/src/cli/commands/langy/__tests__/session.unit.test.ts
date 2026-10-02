@@ -734,6 +734,24 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(printed).not.toContain("sk-lw-proj");
     });
 
+    it("names no missing endpoint when only the key reader is absent", async () => {
+      start({});
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the refusal to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { message: string };
+      expect(error.message).toContain(".env was not changed");
+      expect(error.message).not.toContain("endpoint");
+    });
+
     it("replaces the values a second call finds", async () => {
       fs.writeFileSync(
         path.join(root, ".env"),

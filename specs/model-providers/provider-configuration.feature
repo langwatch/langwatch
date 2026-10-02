@@ -83,6 +83,14 @@ Feature: Model Provider Configuration
     And the plaintext API key does not appear anywhere in the response
     And non-secret values like the base URL remain visible
 
+  @integration
+  Scenario: Saving a provider answers with its credentials masked
+    Given I save an "azure" provider with an API key, an endpoint and an extra header
+    When the save answers with the stored provider
+    Then the API key and the header value are masked in the answer
+    And the plaintext API key does not appear anywhere in the answer
+    And the endpoint remains visible
+
   @unit
   Scenario: Preserve original extra header values when saving with masked placeholders
     Given I have "custom" provider configured with extra headers

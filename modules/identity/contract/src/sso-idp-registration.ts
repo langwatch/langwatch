@@ -30,6 +30,45 @@ export const ssoIdpRegistrationSchema = z.discriminatedUnion("protocol", [
   ssoSamlRegistrationSchema,
 ]);
 
+/**
+ * A registration's fields, to change an existing connection's identity provider
+ * settings. A blank OpenID Connect client secret keeps the stored one: a secret
+ * is never shown back, so every issuer fix would otherwise need it again.
+ */
+export const ssoOidcUpdateSchema = z.object({
+  ...ssoOidcRegistrationSchema.shape,
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+
+export const ssoIdpUpdateSchema = z.discriminatedUnion("protocol", [
+  ssoOidcUpdateSchema,
+  ssoSamlRegistrationSchema,
+]);
+
+export type SsoIdpUpdate = z.infer<typeof ssoIdpUpdateSchema>;
+
+/**
+ * A connection's current identity provider settings, as the edit form is
+ * prefilled with them. Never the OpenID Connect client secret: the form says
+ * whether one is stored, and a blank secret keeps it.
+ */
+export type SsoIdentityProviderView =
+  | {
+      protocol: "oidc";
+      issuer: string | null;
+      clientId: string | null;
+      hasClientSecret: boolean;
+    }
+  | {
+      protocol: "saml";
+      entryPoint: string | null;
+      entityId: string | null;
+      metadataXml: string | null;
+      certificate: string | null;
+    }
+  /** A grandfathered connection dials the legacy provider: no settings of its own. */
+  | { protocol: "grandfathered" };
+
 export type SsoOidcRegistration = z.infer<typeof ssoOidcRegistrationSchema>;
 export type SsoSamlRegistration = z.infer<typeof ssoSamlRegistrationSchema>;
 export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;

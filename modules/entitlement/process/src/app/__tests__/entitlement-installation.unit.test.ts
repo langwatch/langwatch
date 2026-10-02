@@ -393,7 +393,7 @@ describe("entitlement app installation", () => {
     it("answers the rollups recorded for that caller and none for anybody else", async () => {
       const database = MemoryEntitlementDatabase.create();
       const rollup: ProjectSpendRollup = {
-        project: { id: "project-1" },
+        project: { id: "project-1", name: "Chat", slug: "chat", teamId: "team-1" },
         costs: [
           {
             projectId: "project-1",

@@ -11,7 +11,8 @@ Feature: A recursive response schema publishes a document that resolves
   # Two different routes can each produce a `$defs` entry named the same
   # generic `__schema0` — z.record(z.string(), z.json()) is one real shape
   # that triggers it — so hoisting has to rename per occurrence, never assume
-  # the anonymous name is unique across the whole document.
+  # the anonymous name is unique across the whole document. Hoisting names an
+  # anonymous definition by its content, so the same shape is one component.
 
   Scenario: A schema with a local $defs block is hoisted into components
     Given a response schema carrying a local "$defs" entry
@@ -35,3 +36,27 @@ Feature: A recursive response schema publishes a document that resolves
     Given a response schema with no "$defs" entry
     When the document is written
     Then the schema is unchanged
+
+  Scenario: A definition the schema named keeps its name
+    Given a response schema whose "$defs" entry was named with .meta({ id: "Trace" })
+    When the document is written
+    Then the entry is published as "components.schemas.Trace"
+    And the schema's $ref points at that name
+
+  Scenario: Every anonymous JSON value is one JsonValue component
+    Given two routes whose schemas each carry an anonymous "any JSON value" definition
+    When the document is written
+    Then "components.schemas" holds one "JsonValue" definition
+    And both routes refer to it
+
+  Scenario: Two different schemas cannot claim one component name
+    Given two routes whose schemas name different definitions "Widget"
+    When the document is written
+    Then the run fails naming "components.schemas.Widget"
+
+  Scenario: A generated name never takes a name a schema chose
+    Given one route whose schema names its definition "__hoisted0"
+    And another route whose schema carries an anonymous definition
+    When the document is written
+    Then the named definition keeps "__hoisted0"
+    And the anonymous definition is published under another name

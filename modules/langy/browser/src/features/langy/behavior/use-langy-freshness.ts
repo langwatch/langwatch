@@ -31,6 +31,12 @@ export function useLangyFreshness(activeConversationId: string | null): void {
             projectId,
             conversationId: signal.conversationId,
           });
+          // The code access card reads the folder off this query; a tab not attached to the
+          // turn's stream never hears the connect any other way.
+          void trpcUtils.langy.getLocalWorkspace.invalidate({
+            projectId,
+            conversationId: signal.conversationId,
+          });
           // The open conversation's live path (ADR-059): `catchUpConversationFold` compares the
           // signal's cursor with the local fold's and, when behind, folds in the event tail.
           catchUpConversationFold({

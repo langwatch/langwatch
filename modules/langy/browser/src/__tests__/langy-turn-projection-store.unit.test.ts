@@ -117,6 +117,39 @@ describe("the turn projection in the store", () => {
     });
   });
 
+  describe("when a snapshot names a new turn after this tab settled its own", () => {
+    /** @scenario "A snapshot naming a new turn is adopted by a tab that settled its own" */
+    it("adopts the new turn", () => {
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 100, eventId: "e1" },
+        currentTurnId: "turn-1",
+      });
+      useLangyStore.getState().settleTurn("turn-1");
+
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 300, eventId: "e3" },
+        currentTurnId: "turn-2",
+      });
+
+      const state = useLangyStore.getState();
+      expect(state.turnPhase).toBe("active");
+      expect(state.activeTurnId).toBe("turn-2");
+    });
+
+    it("never re-adopts the turn it settled", () => {
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore.getState().settleTurn("turn-1");
+
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 300, eventId: "e3" },
+        currentTurnId: "turn-1",
+      });
+
+      expect(useLangyStore.getState().turnPhase).toBe("idle");
+    });
+  });
+
   describe("when a new chat starts", () => {
     it("drops the projection with the rest of the conversation state", () => {
       useLangyStore.getState().applyTurnEvents([accepted({ id: "e1", createdAt: 100 })]);

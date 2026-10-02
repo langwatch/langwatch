@@ -18,6 +18,7 @@ import {
   langyQuestionCards,
   langyQuestionWaitsByToolCall,
   routeLangyChoiceAnswer,
+  routeLangyQuestionRefusal,
 } from "../../../../model/langy-local-waits.ts";
 import { parseLangyLocalWorkspace } from "../../../../model/langy-local-workspace.ts";
 import { toEngineParts } from "../../model/langy-engine-parts.ts";
@@ -106,6 +107,10 @@ export function useLangyLocalWaits({
     questionCardsByToolCall,
     awaitingAnswer,
     workspace: localWorkspace.data,
+    /** The folder read has answered once, so the waits above are a baseline, not a guess. */
+    workspaceFetched: localWorkspace.isFetched,
+    /** The conversation record has answered once, the other source the waiting cards read. */
+    recordFetched: localRecord.isFetched,
     // The ask holding the turn is open in the sharing terminal too, so both places are named.
     terminalConnected: localWorkspace.data?.connected === true,
   };
@@ -120,6 +125,32 @@ function selectedLabels({ selection, card }: ChoiceAnswer): string[] {
     const label = labelById.get(id);
     return label ? [label] : [];
   });
+}
+
+/** A refused wait answer: a real failure is shown, a settled wait never answers twice. */
+function settleRefusedAnswer({
+  error,
+  settle,
+  retry,
+  sendAsMessage,
+}: {
+  error: unknown;
+  settle: (status: "answered" | "expired") => void;
+  retry: () => void;
+  sendAsMessage: () => void;
+}) {
+  const refusal = routeLangyQuestionRefusal(readHandledError(error));
+  if (refusal.kind === "failed") {
+    retry();
+    showErrorToast({ error, fallbackTitle: "Could not send your answer" });
+    return;
+  }
+  if (refusal.kind === "answered") {
+    settle("answered");
+    return;
+  }
+  settle("expired");
+  sendAsMessage();
 }
 
 /**
@@ -142,6 +173,7 @@ export function useLangyChoiceAnswer({
 }) {
   const answerQuestion = api.langy.answerQuestion.useMutation();
   const implementationRef = useRef<(answer: ChoiceAnswer) => void>(() => undefined);
+  const answeringWaits = useRef(new Set<string>());
 
   const sendAsMessage = ({ selection, card }: ChoiceAnswer) => {
     if (isBusy) return;
@@ -174,6 +206,9 @@ export function useLangyChoiceAnswer({
     answer: ChoiceAnswer;
   }) => {
     if (!projectId) return;
+    // The card stays open until the answer lands, so a second click must not answer twice.
+    if (answeringWaits.current.has(waitId)) return;
+    answeringWaits.current.add(waitId);
     const settle = (status: "answered" | "expired") =>
       useLangyLocalControlStore.getState().settleWait({ waitId, kind: "question", status });
     const { selection, card } = answer;
@@ -187,15 +222,13 @@ export function useLangyChoiceAnswer({
       },
       {
         onSuccess: () => settle("answered"),
-        onError: (error) => {
-          // Only an expired wait falls back to a message; anything else is a real failure.
-          if (readHandledError(error)?.code !== "langy_wait_expired") {
-            showErrorToast({ error, fallbackTitle: "Could not send your answer" });
-            return;
-          }
-          settle("expired");
-          implementationRef.current(answer);
-        },
+        onError: (error) =>
+          settleRefusedAnswer({
+            error,
+            settle,
+            retry: () => answeringWaits.current.delete(waitId),
+            sendAsMessage: () => implementationRef.current(answer),
+          }),
       },
     );
   };

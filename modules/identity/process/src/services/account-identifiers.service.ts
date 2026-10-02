@@ -1,5 +1,5 @@
 import type { AuthApi } from "@langwatch/auth-contract";
-import { FrontDoorRateLimitedError } from "@langwatch/auth-contract";
+import { EmailSendingUnavailableError, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   type AccountIdentifier,
@@ -33,6 +33,16 @@ export interface AccountIdentifiersServiceDeps {
   mail: AddressConfirmationMailChannel;
   rateLimiter: RateLimiter;
   sessions: Pick<AuthApi, "listBrowserSessions">;
+  /**
+   * The account's own address and whether `User.emailVerified` holds it as
+   * confirmed. Sign-in linking reads that column, so the row says confirmed
+   * whenever it does, also when an operator set it by hand on an install with no mail.
+   */
+  accountAddress: (args: {
+    userId: string;
+  }) => Promise<{ email: string; confirmed: boolean } | null>;
+  /** Whether this installation can send mail at all. */
+  hasMailDelivery: () => Promise<boolean>;
   now?: () => number;
 }
 
@@ -56,7 +66,13 @@ export class AccountIdentifiersService {
 
   /** The guard read out loud before the click; `removeIdentifier` still asks it. */
   async listIdentifiers({ userId }: { userId: string }): Promise<AccountIdentifier[]> {
-    const heads = await this.deps.heads.findHeads({ userId });
+    const [heads, accountAddress] = await Promise.all([
+      this.deps.heads.findHeads({ userId }),
+      this.deps.accountAddress({ userId }),
+    ]);
+    const confirmedAccountAddress = accountAddress?.confirmed
+      ? normalizeIdentifierValue(accountAddress.email)
+      : null;
 
     return Object.values(heads.identifiers)
       .filter((head) => head.state !== "DETACHED")
@@ -67,14 +83,22 @@ export class AccountIdentifiersService {
         const verdict: DetachVerdict = isActive
           ? detachVerdict({ heads, identifierId: head.identifierId })
           : { removable: true };
+        const confirmed =
+          isActive ||
+          (head.provider === "email" &&
+            head.value !== null &&
+            confirmedAccountAddress !== null &&
+            normalizeIdentifierValue(head.value) === confirmedAccountAddress);
         return {
           identifierId: head.identifierId,
           accountId: head.accountId,
           provider: head.provider,
           value: head.value,
           isPrimary: head.state === "PRIMARY",
-          confirmed: isActive,
-          resendable: head.provider === "email" && !isActive,
+          confirmed,
+          // Only an email can be confirmed by an emailed link, and only one
+          // that has not been.
+          resendable: head.provider === "email" && !confirmed,
           removable: verdict.removable,
           refusalCode: verdict.removable ? null : verdict.refusalCode,
           demotesFirst: head.state === "PRIMARY",
@@ -95,6 +119,9 @@ export class AccountIdentifiersService {
     email: string;
     codeChallenge: string;
   }): Promise<EmailIdentifierAdded> {
+    // Adding an address IS sending it a link: without a way to send one the
+    // address could only ever sit there unconfirmed.
+    await this.requireMailDelivery();
     await this.meter({ key: `identity.addEmailIdentifier:${userId}` });
 
     const normalizedValue = normalizeIdentifierValue(email);
@@ -147,6 +174,7 @@ export class AccountIdentifiersService {
     identifierId: string;
     codeChallenge: string;
   }): Promise<void> {
+    await this.requireMailDelivery();
     await this.meter({ key: `identity.resendIdentifierConfirmation:${userId}` });
     await this.sendConfirmationFor({ userId, identifierId, codeChallenge });
   }
@@ -183,6 +211,10 @@ export class AccountIdentifiersService {
 
     await this.sendConfirmationFor({ userId, identifierId: attached.identifierId, codeChallenge });
     return { identifierId: attached.identifierId };
+  }
+
+  private async requireMailDelivery(): Promise<void> {
+    if (!(await this.deps.hasMailDelivery())) throw new EmailSendingUnavailableError();
   }
 
   /** A primary demotes before it detaches (D01); with no successor the detach guard refuses. */

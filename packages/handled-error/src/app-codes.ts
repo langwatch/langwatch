@@ -712,6 +712,8 @@ export const APP_ERROR_CODES = [
   "sso_domain_proof_lapsed",
   "sso_domain_proof_not_found",
   "sso_existing_account_unconfirmed",
+  "sso_issuer_mismatch",
+  "sso_issuer_multi_tenant",
   "sso_issuer_unreachable",
   "sso_license_required",
   "sso_migration_finalization_blocked",

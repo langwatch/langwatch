@@ -47,6 +47,14 @@ export class PrismaConnectOrganizationRepository implements ConnectOrganizationR
     return rows.map((row) => row.id);
   }
 
+  async findAllOldestFirst(): Promise<{ organizationId: string; license: string | null }[]> {
+    const rows = await this.prisma.organization.findMany({
+      select: { id: true, license: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row) => ({ organizationId: row.id, license: row.license }));
+  }
+
   async setServicesDisabled({
     organizationId,
     servicesDisabled,

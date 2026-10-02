@@ -781,6 +781,15 @@
           "documentation": "The domains this person has said \"no thanks\" to being offered their\ncolleagues on (D12). Per domain rather than one flag: somebody who\nchanges jobs and verifies a second address should be offered their new\nemployer's organization, not silenced forever by a decision they made\nabout the old one. Empty means never dismissed anything."
         },
         {
+          "name": "notificationPreferences",
+          "columnName": "notificationPreferences",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "This person's answer about browser notifications, one entry per topic:\n{ \"langy\": \"enabled\" | \"declined\" }. A topic that is absent was never\nanswered. The browser's own permission is not stored here.\nSpec: specs/langy/langy-notifications.feature"
+        },
+        {
           "name": "Annotation",
           "columnName": "Annotation",
           "type": "Annotation",
@@ -24147,6 +24156,134 @@
           "isList": false,
           "isOptional": false,
           "documentation": "The validated report, with every unknown field already dropped."
+        }
+      ]
+    },
+    {
+      "name": "WebPushSubscription",
+      "tableName": "WebPushSubscription",
+      "documentation": "One browser a person subscribed to Web Push, owned by notification. A\nperson holds one row per device; the endpoint names the browser, so a\nbrowser that subscribes again replaces its own row.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The person the pushes are for. A plain column: the row leaves with the\nperson through notification's own subscriber on the user lifecycle."
+        },
+        {
+          "name": "endpoint",
+          "columnName": "endpoint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The push service URL the browser handed out. Unique per browser."
+        },
+        {
+          "name": "p256dh",
+          "columnName": "p256dh",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The browser's P-256 public key and auth secret, base64url, as the\nbrowser reports them. Payloads are encrypted to these."
+        },
+        {
+          "name": "auth",
+          "columnName": "auth",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userAgent",
+          "columnName": "userAgent",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastSuccessAt",
+          "columnName": "lastSuccessAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the push service last accepted a push for this browser."
+        }
+      ]
+    },
+    {
+      "name": "WebPushVapidKey",
+      "tableName": "WebPushVapidKey",
+      "documentation": "This installation's VAPID key pair, generated on first use so Web Push works\nwithout configuration. Fixed id, so the table holds one row: a second\ninsert loses the race on the primary key and reads the winner's pair.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "publicKey",
+          "columnName": "publicKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The uncompressed P-256 public key, base64url. The browser subscribes with it."
+        },
+        {
+          "name": "privateKeyEncrypted",
+          "columnName": "privateKeyEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The private key, base64url, encrypted with the process encryption key."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     }

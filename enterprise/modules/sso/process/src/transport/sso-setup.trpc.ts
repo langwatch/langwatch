@@ -117,6 +117,20 @@ export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetu
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
 
+    /** `sso:manage`, not `sso:view`: it carries the client id, which only the
+     *  person who may change it needs. Not plan-gated, it is a read. */
+    .procedure("identityProvider")
+    .withPermission("sso:manage")
+    .handle(({ app, input }) => app.findIdentityProvider(input))
+
+    /** Gated like `register`: these settings decide where sign-ins go. */
+    .procedure("updateIdentityProvider")
+    .withEntitlement("enterprise", SSO_PLAN)
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) =>
+      app.setupUpdateIdentityProvider(input, administratorOf(actor)),
+    )
+
     .procedure("setArrivals")
     .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")

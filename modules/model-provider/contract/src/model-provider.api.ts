@@ -238,11 +238,12 @@ export interface ModelProviderApi {
   runPlaygroundCompletion(
     input: ModelProviderPlaygroundRequest,
   ): Promise<ModelProviderPlaygroundCompletion>;
+  /** Stores or replaces a provider row and answers it with its credentials masked. */
   upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider>;
   /**
    * The write a project credential makes, which names no person to attribute
    * it to and no person to authorize it against: the key's own project
-   * permission is the whole gate, as this door has always worked.
+   * permission is the whole gate. Answers the row with its credentials masked.
    */
   upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider>;
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void>;

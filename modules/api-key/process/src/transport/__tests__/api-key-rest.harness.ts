@@ -4,6 +4,7 @@
  * error envelope the host answers with.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestAuditRow, RestIdentity } from "@langwatch/api/hosting";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -15,13 +16,15 @@ import type { PrincipalRef } from "@langwatch/authorization";
 
 import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import type { RestAuditRow, RestIdentity } from "@langwatch/api/hosting";
 
 export const ORGANIZATION_ID = "organization-1";
 export const CALLER_USER_ID = "user-caller";
 export const OTHER_USER_ID = "user-other";
 export const API_KEY_ID = "api-key-credential";
 export const PROJECT_ID = "project-1";
+
+/** The permissions the two project-session mint routes ask of the project door. */
+const PROJECT_TIER_PERMISSIONS = new Set(["traces:create", "project:manage"]);
 
 /**
  * Which credential the request arrives with. A service credential acts as
@@ -52,14 +55,19 @@ export function mountApiKeyRest(
 ) {
   const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
   const granted = new Set(
-    options.granted ?? ["organization:view", "organization:manage", "traces:create"],
+    options.granted ?? [
+      "organization:view",
+      "organization:manage",
+      "traces:create",
+      "project:manage",
+    ],
   );
   // The trail the two addressed management routes declare. The runtime refuses
   // to mount a declared action with nowhere to write it, so a family that
   // stopped auditing would fail here rather than go quiet in production.
   const audit: RestAuditRow[] = [];
 
-  // One identity answers both the organization door and the ingestion route's project door.
+  // One identity answers the organization door and the project-session mint routes' project door.
   const door: RestIdentity = {
     authenticate: ({ request, permission }) => {
       const userId = callerOf(request);
@@ -68,10 +76,9 @@ export function mountApiKeyRest(
 
       return {
         actor: userId ? { type: "user", id: userId } : { type: "api_key", id: API_KEY_ID },
-        scope:
-          permission === "traces:create"
-            ? { tier: "project", id: PROJECT_ID }
-            : { tier: "organization", id: ORGANIZATION_ID },
+        scope: PROJECT_TIER_PERMISSIONS.has(permission)
+          ? { tier: "project", id: PROJECT_ID }
+          : { tier: "organization", id: ORGANIZATION_ID },
       };
     },
   };

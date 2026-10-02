@@ -8,6 +8,7 @@ import type {
   UiSessionCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/feature-flag-overrides";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
@@ -215,6 +216,8 @@ class BrowserUiShell extends UiShell {
   }
 
   prepare(): void {
+    // Before the first render, so a `?ff_` link opens straight onto the screen it names.
+    applyFeatureFlagOverridesFromSearch(window.location.search);
     registerChunkReloadListener();
   }
 

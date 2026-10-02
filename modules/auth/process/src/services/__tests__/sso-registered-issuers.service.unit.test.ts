@@ -21,6 +21,7 @@ function serviceOver(directory: Partial<SsoIssuerDirectory>) {
     issuers: {
       findIssuersForConnection: async () => [],
       findIssuersForDomain: async () => [],
+      findEndpointOrigins: async () => [],
       ...directory,
     },
     logger,
@@ -134,10 +135,46 @@ describe("given the connection directory cannot be read", () => {
           throw new Error("directory unreachable");
         },
         findIssuersForDomain: async () => [],
+        findEndpointOrigins: async () => [],
       },
       logger,
     });
 
     expect(await service.issuersForRequest(signInRequest({ providerId: "ssoc_acme" }))).toEqual([]);
+  });
+});
+
+describe("given the issuers a request may reach", () => {
+  it("asks identity which endpoint origins their discovery documents name", async () => {
+    const service = serviceOver({
+      findEndpointOrigins: async ({ issuers }) =>
+        issuers.includes("https://accounts.google.com") ? ["https://oauth2.googleapis.com"] : [],
+    });
+
+    expect(await service.endpointOriginsFor(["https://accounts.google.com"])).toEqual([
+      "https://oauth2.googleapis.com",
+    ]);
+  });
+
+  it("asks nothing when there are no issuers", async () => {
+    const service = serviceOver({
+      findEndpointOrigins: async () => {
+        throw new Error("asked for nothing");
+      },
+    });
+
+    expect(await service.endpointOriginsFor([])).toEqual([]);
+  });
+
+  describe("when identity cannot answer", () => {
+    it("trusts no extra origin rather than refusing the sign-in", async () => {
+      const service = serviceOver({
+        findEndpointOrigins: async () => {
+          throw new Error("discovery unreachable");
+        },
+      });
+
+      expect(await service.endpointOriginsFor([ACME_ISSUER])).toEqual([]);
+    });
   });
 });

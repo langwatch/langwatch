@@ -88,7 +88,7 @@ describe("registering an OpenID Connect provider", () => {
         clientId: "client",
         clientSecret: "secret",
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ issuer: "https://login.acme.okta.com" });
   });
 
   it("appends the well-known path to whatever path the issuer already carries", () => {
@@ -201,5 +201,83 @@ describe("registering a SAML provider", () => {
         ),
       ),
     ).toBe("sso_credentials_required");
+  });
+});
+
+describe("given the issuer a registration stores", () => {
+  const TENANT = "8f3c2a8e-1b7d-4c0f-9a51-3e6f2d7b9c10";
+  const ENTRA = `https://login.microsoftonline.com/${TENANT}/v2.0`;
+  const discoveryNaming = (issuer?: string): SsoIssuerDiscoveryChannel => ({
+    discover: async () =>
+      issuer === undefined ? { reachable: true } : { reachable: true, issuer },
+  });
+  const register = (issuer: string, discovery: SsoIssuerDiscoveryChannel) =>
+    serviceOver(discovery).validateOidcRegistration({
+      protocol: "oidc",
+      issuer,
+      clientId: "client",
+      clientSecret: "secret",
+    });
+  const refusalOf = (promise: Promise<unknown>) =>
+    promise
+      .then(() => ({ code: "no refusal", meta: {} }))
+      .catch((error: unknown) => error as { code: string; meta: Record<string, unknown> });
+
+  describe("when an Entra ID issuer is typed with a trailing slash", () => {
+    /** @scenario "Registration stores the issuer the discovery document names" */
+    it("stores the discovery document's issuer, without the slash", async () => {
+      await expect(register(`${ENTRA}/`, discoveryNaming(ENTRA))).resolves.toEqual({
+        issuer: ENTRA,
+      });
+    });
+
+    it("stores the canonical Entra ID issuer when the document names none", async () => {
+      await expect(register(`${ENTRA}//`, discoveryNaming())).resolves.toEqual({ issuer: ENTRA });
+    });
+  });
+
+  describe("when a provider's issuer ends in a slash", () => {
+    it("keeps the slash the discovery document names", async () => {
+      const issuer = "https://acme.eu.auth0.com/";
+      await expect(register("https://acme.eu.auth0.com", discoveryNaming(issuer))).resolves.toEqual(
+        { issuer },
+      );
+    });
+  });
+
+  describe("when the issuer is an Entra ID multi-tenant endpoint", () => {
+    /** @scenario "Registration refuses a Microsoft Entra ID multi-tenant issuer" */
+    it.each(["common", "organizations", "consumers"])(
+      "refuses %s with sso_issuer_multi_tenant",
+      async (segment) => {
+        const issuer = `https://login.microsoftonline.com/${segment}/v2.0`;
+        const refusal = await refusalOf(
+          register(issuer, discoveryNaming("https://login.microsoftonline.com/{tenantid}/v2.0")),
+        );
+        expect(refusal.code).toBe("sso_issuer_multi_tenant");
+        expect(refusal.meta).toEqual({ issuer });
+      },
+    );
+
+    it("refuses a discovery document that names the {tenantid} template", async () => {
+      const refusal = await refusalOf(
+        register(
+          "https://login.microsoftonline.com/acme.example/v2.0",
+          discoveryNaming("https://login.microsoftonline.com/{tenantid}/v2.0"),
+        ),
+      );
+      expect(refusal.code).toBe("sso_issuer_multi_tenant");
+    });
+  });
+
+  describe("when the discovery document names a different issuer", () => {
+    /** @scenario "Registration refuses a discovery document that names another issuer" */
+    it("refuses with sso_issuer_mismatch naming both issuers", async () => {
+      const typed = "https://idp.acme.example/realms/staff";
+      const named = "https://idp.acme.example/realms/other";
+      const refusal = await refusalOf(register(typed, discoveryNaming(named)));
+      expect(refusal.code).toBe("sso_issuer_mismatch");
+      expect(refusal.meta).toEqual({ expected: typed, received: named });
+    });
   });
 });

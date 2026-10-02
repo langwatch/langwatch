@@ -82,6 +82,8 @@ export interface LicensingApi {
   getDomainClaimAuthority(): Promise<DomainClaimLicenseAuthority>;
   /** Validates a pasted key and stores it, answering the plan it grants. */
   uploadLicense(input: StoreLicenseInput): Promise<PlanInfo>;
+  /** Changes on every license this process stores or removes, so a gate can re-read at once. */
+  licenseRevision(): Promise<number>;
   /**
    * Redeems an activation code with LangWatch and stores the license it
    * minted, through the same validation as a pasted key.

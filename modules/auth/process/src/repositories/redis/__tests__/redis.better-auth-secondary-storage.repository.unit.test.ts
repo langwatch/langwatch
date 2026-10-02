@@ -15,11 +15,14 @@ import { RedisBetterAuthSecondaryStorageRepository } from "../redis.better-auth-
 /** The script's contract over the double's own keyspace: count, then expire one without. */
 function storageOver(store: MemoryRedisStore) {
   const keyspace = memoryRedisDouble({ store });
-  const evaluate = vi.fn(async (_script: unknown, _keys: unknown, key: unknown, seconds: unknown) => {
-    const count = await keyspace.incr(String(key));
-    if ((await keyspace.ttl(String(key))) < 0) await keyspace.expire(String(key), Number(seconds));
-    return count;
-  });
+  const evaluate = vi.fn(
+    async (_script: unknown, _keys: unknown, key: unknown, seconds: unknown) => {
+      const count = await keyspace.incr(String(key));
+      if ((await keyspace.ttl(String(key))) < 0)
+        await keyspace.expire(String(key), Number(seconds));
+      return count;
+    },
+  );
   const redis = memoryRedisDouble({ store, script: { eval: evaluate } });
 
   return { storage: RedisBetterAuthSecondaryStorageRepository.create(redis), redis, evaluate };

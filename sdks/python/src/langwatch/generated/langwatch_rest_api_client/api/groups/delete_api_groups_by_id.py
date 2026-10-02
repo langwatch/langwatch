@@ -10,13 +10,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    group_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v1/groups/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/groups/{group_id}".format(
+            group_id=quote(str(group_id), safe=""),
         ),
     }
 
@@ -52,14 +52,14 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteApiGroupsByIdResponse200]:
     """Delete a group
 
     Args:
-        id (str):
+        group_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -70,7 +70,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
     )
 
     response = client.get_httpx_client().request(
@@ -81,14 +81,14 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
 ) -> DeleteApiGroupsByIdResponse200 | None:
     """Delete a group
 
     Args:
-        id (str):
+        group_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -99,20 +99,20 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        group_id=group_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteApiGroupsByIdResponse200]:
     """Delete a group
 
     Args:
-        id (str):
+        group_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,7 +123,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -132,14 +132,14 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
 ) -> DeleteApiGroupsByIdResponse200 | None:
     """Delete a group
 
     Args:
-        id (str):
+        group_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,7 +151,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            group_id=group_id,
             client=client,
         )
     ).parsed

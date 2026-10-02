@@ -1,4 +1,5 @@
 import type { Ora } from "ora";
+
 import { commandValidationError } from "../../utils/errorOutput.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
 
@@ -31,12 +32,8 @@ export function parseJsonFlags({
   try {
     return {
       filters: options.filters ? parseJsonObject(options.filters) : undefined,
-      actionParams: options.actionParams
-        ? parseJsonObject(options.actionParams)
-        : undefined,
-      graphAlert: options.graphAlert
-        ? parseJsonObject(options.graphAlert)
-        : undefined,
+      actionParams: options.actionParams ? parseJsonObject(options.actionParams) : undefined,
+      graphAlert: options.graphAlert ? parseJsonObject(options.graphAlert) : undefined,
       report: options.report ? parseJsonObject(options.report) : undefined,
     };
   } catch {

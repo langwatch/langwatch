@@ -53,7 +53,8 @@ export interface LangyMessagesResult {
 }
 
 /**
- * HEAVY, on-demand message history for one conversation (`langy.messages`).
+ * HEAVY, on-demand message history for one conversation (`langy.messages`), refreshed by the
+ * turn's read hints (`langy.trpc.ts`). Notifications never depend on it: the server sends them.
  */
 export function useLangyMessages(conversationId: string | null): LangyMessagesResult {
   const { project } = useOrganizationTeamProject();

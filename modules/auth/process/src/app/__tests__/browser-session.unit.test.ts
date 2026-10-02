@@ -369,36 +369,39 @@ describe("BrowserSessionService", () => {
     ];
 
     /** @scenario "Every browser session revocation deletes rows before clearing the cached sessions" */
-    it.each(revocations)("deletes the rows for %s before clearing the cache", async (_name, revoke) => {
-      const order: string[] = [];
-      const cache = new Cache();
-      cache.deleted.mockImplementation(() => order.push("cache"));
-      const sessions = new Sessions();
-      sessions.records = [
-        {
-          id: "session-2",
-          identifierId: "identifier-1",
-          amr: ["pwd"],
-          ipAddress: "203.0.113.4",
-          userAgent: "Mozilla/5.0",
-          createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
-          updatedAt: Temporal.Instant.from("2026-01-02T00:00:00Z"),
-          expires: Temporal.Instant.from("2026-02-01T00:00:00Z"),
-        },
-      ];
-      for (const deleted of [sessions.deletedAll, sessions.deletedById, sessions.deletedOthers]) {
-        deleted.mockImplementation(async () => {
-          order.push("rows");
-          return 1;
-        });
-      }
+    it.each(revocations)(
+      "deletes the rows for %s before clearing the cache",
+      async (_name, revoke) => {
+        const order: string[] = [];
+        const cache = new Cache();
+        cache.deleted.mockImplementation(() => order.push("cache"));
+        const sessions = new Sessions();
+        sessions.records = [
+          {
+            id: "session-2",
+            identifierId: "identifier-1",
+            amr: ["pwd"],
+            ipAddress: "203.0.113.4",
+            userAgent: "Mozilla/5.0",
+            createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+            updatedAt: Temporal.Instant.from("2026-01-02T00:00:00Z"),
+            expires: Temporal.Instant.from("2026-02-01T00:00:00Z"),
+          },
+        ];
+        for (const deleted of [sessions.deletedAll, sessions.deletedById, sessions.deletedOthers]) {
+          deleted.mockImplementation(async () => {
+            order.push("rows");
+            return 1;
+          });
+        }
 
-      await revoke(service({ sessions, cache }).service);
+        await revoke(service({ sessions, cache }).service);
 
-      expect(order[0]).toBe("rows");
-      expect(order).toContain("cache");
-      expect(order.lastIndexOf("rows")).toBeLessThan(order.indexOf("cache"));
-    });
+        expect(order[0]).toBe("rows");
+        expect(order).toContain("cache");
+        expect(order.lastIndexOf("rows")).toBeLessThan(order.indexOf("cache"));
+      },
+    );
   });
 
   describe("when somebody reads the browsers they are signed in on", () => {

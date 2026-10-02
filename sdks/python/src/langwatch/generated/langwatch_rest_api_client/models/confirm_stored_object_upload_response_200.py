@@ -18,7 +18,7 @@ class ConfirmStoredObjectUploadResponse200:
         id (str):
         sha256 (str):
         byte_length (int):
-        filename (str):
+        filename (Any):
         media_type (str):
         audience (ConfirmStoredObjectUploadResponse200Audience):
     """
@@ -27,7 +27,7 @@ class ConfirmStoredObjectUploadResponse200:
     id: str
     sha256: str
     byte_length: int
-    filename: str
+    filename: Any
     media_type: str
     audience: ConfirmStoredObjectUploadResponse200Audience
 

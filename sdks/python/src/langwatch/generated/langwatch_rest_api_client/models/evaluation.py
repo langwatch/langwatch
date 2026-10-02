@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,14 +21,16 @@ T = TypeVar("T", bound="Evaluation")
 class Evaluation:
     """
     Attributes:
-        evaluation_id (str | Unset):
-        evaluator_id (str | Unset):
+        evaluation_id (str):
+        evaluator_id (str):
+        name (str):
+        status (Literal['error'] | Literal['in_progress'] | Literal['processed'] | Literal['scheduled'] |
+            Literal['skipped']):
+        timestamps (EvaluationTimestamps):
         span_id (None | str | Unset):
-        name (str | Unset):
         type_ (None | str | Unset):
         is_guardrail (bool | None | Unset):
         evaluation_thread_id (None | str | Unset):
-        status (str | Unset):
         passed (bool | None | Unset):
         score (float | None | Unset):
         label (None | str | Unset):
@@ -36,17 +38,17 @@ class Evaluation:
         inputs (EvaluationInputsType0 | None | Unset):
         error (EvaluationErrorType0 | None | Unset):
         retries (float | None | Unset):
-        timestamps (EvaluationTimestamps | Unset):
     """
 
-    evaluation_id: str | Unset = UNSET
-    evaluator_id: str | Unset = UNSET
+    evaluation_id: str
+    evaluator_id: str
+    name: str
+    status: Literal["error"] | Literal["in_progress"] | Literal["processed"] | Literal["scheduled"] | Literal["skipped"]
+    timestamps: EvaluationTimestamps
     span_id: None | str | Unset = UNSET
-    name: str | Unset = UNSET
     type_: None | str | Unset = UNSET
     is_guardrail: bool | None | Unset = UNSET
     evaluation_thread_id: None | str | Unset = UNSET
-    status: str | Unset = UNSET
     passed: bool | None | Unset = UNSET
     score: float | None | Unset = UNSET
     label: None | str | Unset = UNSET
@@ -54,7 +56,6 @@ class Evaluation:
     inputs: EvaluationInputsType0 | None | Unset = UNSET
     error: EvaluationErrorType0 | None | Unset = UNSET
     retries: float | None | Unset = UNSET
-    timestamps: EvaluationTimestamps | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -65,13 +66,20 @@ class Evaluation:
 
         evaluator_id = self.evaluator_id
 
+        name = self.name
+
+        status: (
+            Literal["error"] | Literal["in_progress"] | Literal["processed"] | Literal["scheduled"] | Literal["skipped"]
+        )
+        status = self.status
+
+        timestamps = self.timestamps.to_dict()
+
         span_id: None | str | Unset
         if isinstance(self.span_id, Unset):
             span_id = UNSET
         else:
             span_id = self.span_id
-
-        name = self.name
 
         type_: None | str | Unset
         if isinstance(self.type_, Unset):
@@ -90,8 +98,6 @@ class Evaluation:
             evaluation_thread_id = UNSET
         else:
             evaluation_thread_id = self.evaluation_thread_id
-
-        status = self.status
 
         passed: bool | None | Unset
         if isinstance(self.passed, Unset):
@@ -139,29 +145,25 @@ class Evaluation:
         else:
             retries = self.retries
 
-        timestamps: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.timestamps, Unset):
-            timestamps = self.timestamps.to_dict()
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if evaluation_id is not UNSET:
-            field_dict["evaluation_id"] = evaluation_id
-        if evaluator_id is not UNSET:
-            field_dict["evaluator_id"] = evaluator_id
+        field_dict.update(
+            {
+                "evaluation_id": evaluation_id,
+                "evaluator_id": evaluator_id,
+                "name": name,
+                "status": status,
+                "timestamps": timestamps,
+            }
+        )
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
-        if name is not UNSET:
-            field_dict["name"] = name
         if type_ is not UNSET:
             field_dict["type"] = type_
         if is_guardrail is not UNSET:
             field_dict["is_guardrail"] = is_guardrail
         if evaluation_thread_id is not UNSET:
             field_dict["evaluation_thread_id"] = evaluation_thread_id
-        if status is not UNSET:
-            field_dict["status"] = status
         if passed is not UNSET:
             field_dict["passed"] = passed
         if score is not UNSET:
@@ -176,8 +178,6 @@ class Evaluation:
             field_dict["error"] = error
         if retries is not UNSET:
             field_dict["retries"] = retries
-        if timestamps is not UNSET:
-            field_dict["timestamps"] = timestamps
 
         return field_dict
 
@@ -188,9 +188,41 @@ class Evaluation:
         from ..models.evaluation_timestamps import EvaluationTimestamps
 
         d = dict(src_dict)
-        evaluation_id = d.pop("evaluation_id", UNSET)
+        evaluation_id = d.pop("evaluation_id")
 
-        evaluator_id = d.pop("evaluator_id", UNSET)
+        evaluator_id = d.pop("evaluator_id")
+
+        name = d.pop("name")
+
+        def _parse_status(
+            data: object,
+        ) -> (
+            Literal["error"] | Literal["in_progress"] | Literal["processed"] | Literal["scheduled"] | Literal["skipped"]
+        ):
+            status_type_0 = cast(Literal["scheduled"], data)
+            if status_type_0 != "scheduled":
+                raise ValueError(f"status_type_0 must match const 'scheduled', got '{status_type_0}'")
+            return status_type_0
+            status_type_1 = cast(Literal["in_progress"], data)
+            if status_type_1 != "in_progress":
+                raise ValueError(f"status_type_1 must match const 'in_progress', got '{status_type_1}'")
+            return status_type_1
+            status_type_2 = cast(Literal["error"], data)
+            if status_type_2 != "error":
+                raise ValueError(f"status_type_2 must match const 'error', got '{status_type_2}'")
+            return status_type_2
+            status_type_3 = cast(Literal["skipped"], data)
+            if status_type_3 != "skipped":
+                raise ValueError(f"status_type_3 must match const 'skipped', got '{status_type_3}'")
+            return status_type_3
+            status_type_4 = cast(Literal["processed"], data)
+            if status_type_4 != "processed":
+                raise ValueError(f"status_type_4 must match const 'processed', got '{status_type_4}'")
+            return status_type_4
+
+        status = _parse_status(d.pop("status"))
+
+        timestamps = EvaluationTimestamps.from_dict(d.pop("timestamps"))
 
         def _parse_span_id(data: object) -> None | str | Unset:
             if data is None:
@@ -200,8 +232,6 @@ class Evaluation:
             return cast(None | str | Unset, data)
 
         span_id = _parse_span_id(d.pop("span_id", UNSET))
-
-        name = d.pop("name", UNSET)
 
         def _parse_type_(data: object) -> None | str | Unset:
             if data is None:
@@ -229,8 +259,6 @@ class Evaluation:
             return cast(None | str | Unset, data)
 
         evaluation_thread_id = _parse_evaluation_thread_id(d.pop("evaluation_thread_id", UNSET))
-
-        status = d.pop("status", UNSET)
 
         def _parse_passed(data: object) -> bool | None | Unset:
             if data is None:
@@ -311,22 +339,16 @@ class Evaluation:
 
         retries = _parse_retries(d.pop("retries", UNSET))
 
-        _timestamps = d.pop("timestamps", UNSET)
-        timestamps: EvaluationTimestamps | Unset
-        if isinstance(_timestamps, Unset):
-            timestamps = UNSET
-        else:
-            timestamps = EvaluationTimestamps.from_dict(_timestamps)
-
         evaluation = cls(
             evaluation_id=evaluation_id,
             evaluator_id=evaluator_id,
-            span_id=span_id,
             name=name,
+            status=status,
+            timestamps=timestamps,
+            span_id=span_id,
             type_=type_,
             is_guardrail=is_guardrail,
             evaluation_thread_id=evaluation_thread_id,
-            status=status,
             passed=passed,
             score=score,
             label=label,
@@ -334,7 +356,6 @@ class Evaluation:
             inputs=inputs,
             error=error,
             retries=retries,
-            timestamps=timestamps,
         )
 
         evaluation.additional_properties = d

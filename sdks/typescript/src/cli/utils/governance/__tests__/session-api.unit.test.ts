@@ -12,7 +12,11 @@ vi.mock("../config", () => ({
 
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
-import { fetchPersonalProject, mintProjectIngestionKey } from "../session-api";
+import {
+  fetchPersonalProject,
+  mintProjectFullAccessKey,
+  mintProjectIngestionKey,
+} from "../session-api";
 
 const liveSession = (): GovernanceConfig =>
   ({
@@ -194,5 +198,85 @@ describe("session-api request bounds", () => {
       expect(cfg.refresh_token).toBe("lw_rt_rotated");
       expect(saveConfig).toHaveBeenCalled();
     });
+  });
+});
+
+describe("mintProjectFullAccessKey", () => {
+  const CHILD = {
+    access_token: "lw_at_child",
+    refresh_token: "lw_rt_child",
+    expires_in: 3600,
+    project: { id: "p1", slug: "demo", name: "Demo" },
+  };
+
+  function controlPlane({ fullAccessStatus }: { fullAccessStatus: number }) {
+    const calls: { path: string; body: Record<string, unknown>; auth: string | null }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const path = new URL(requestUrl(input)).pathname;
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<
+        string,
+        unknown
+      >;
+      calls.push({ path, body, auth: new Headers(init?.headers).get("authorization") });
+      if (path === "/api/auth/cli/refresh") return jsonResponse(200, CHILD);
+      if (path === "/api/v1/api-keys/full-access") {
+        return fullAccessStatus === 201
+          ? jsonResponse(201, { token: "sk-lw-project", apiKey: { id: "k1", name: "n" } })
+          : jsonResponse(fullAccessStatus, { error: "forbidden" });
+      }
+      if (path === "/api/v1/api-keys/ingestion") {
+        return jsonResponse(201, { token: "sk-lw-ingest", apiKey: { id: "k2", name: "n" } });
+      }
+      return jsonResponse(200, { ok: true });
+    };
+    return { calls, fetchImpl };
+  }
+
+  /** @scenario `langwatch login --project <slug>` writes a full-access key */
+  it("mints the person's own key with every permission on the project, then ends the child", async () => {
+    const { calls, fetchImpl } = controlPlane({ fullAccessStatus: 201 });
+    const cfg = liveSession();
+
+    const minted = await mintProjectFullAccessKey(cfg, "demo", { fetchImpl });
+
+    expect(minted).toEqual({
+      api_key: "sk-lw-project",
+      kind: "full-access",
+      project: { id: "p1", slug: "demo", name: "Demo" },
+    });
+    expect(calls.map((call) => call.path)).toEqual([
+      "/api/auth/cli/refresh",
+      "/api/v1/api-keys/full-access",
+      "/api/auth/cli/logout",
+    ]);
+    expect(calls[1]?.auth).toBe("Bearer lw_at_child");
+    expect(calls[1]?.body).toMatchObject({
+      keyType: "personal",
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: "p1" }],
+    });
+    expect(calls[1]?.body).not.toHaveProperty("permissions");
+    expect(calls[2]?.body).toEqual({ refresh_token: "lw_rt_child", access_token: "lw_at_child" });
+    expect(cfg.refresh_token).toBe("lw_rt_test");
+  });
+
+  /** @scenario A person who cannot manage the project gets an ingestion key and is told so */
+  it("falls back to the ingestion key when the full key is refused", async () => {
+    const { calls, fetchImpl } = controlPlane({ fullAccessStatus: 403 });
+
+    const minted = await mintProjectFullAccessKey(liveSession(), "demo", { fetchImpl });
+
+    expect(minted).toEqual({
+      api_key: "sk-lw-ingest",
+      kind: "ingestion",
+      project: { id: "p1", slug: "demo", name: "Demo" },
+    });
+    expect(calls.map((call) => call.path)).toEqual([
+      "/api/auth/cli/refresh",
+      "/api/v1/api-keys/full-access",
+      "/api/v1/api-keys/ingestion",
+      "/api/auth/cli/logout",
+    ]);
+    expect(calls[2]?.auth).toBe("Bearer lw_at_child");
   });
 });

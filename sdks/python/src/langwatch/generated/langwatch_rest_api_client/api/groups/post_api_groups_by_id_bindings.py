@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    group_id: str,
     *,
     body: PostApiGroupsByIdBindingsBody,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/groups/{id}/bindings".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/groups/{group_id}/bindings".format(
+            group_id=quote(str(group_id), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdBindingsBody,
@@ -69,7 +69,7 @@ def sync_detailed(
     """Add a role binding to a group
 
     Args:
-        id (str):
+        group_id (str):
         body (PostApiGroupsByIdBindingsBody):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
         body=body,
     )
 
@@ -93,7 +93,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdBindingsBody,
@@ -101,7 +101,7 @@ def sync(
     """Add a role binding to a group
 
     Args:
-        id (str):
+        group_id (str):
         body (PostApiGroupsByIdBindingsBody):
 
     Raises:
@@ -113,14 +113,14 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        group_id=group_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdBindingsBody,
@@ -128,7 +128,7 @@ async def asyncio_detailed(
     """Add a role binding to a group
 
     Args:
-        id (str):
+        group_id (str):
         body (PostApiGroupsByIdBindingsBody):
 
     Raises:
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
         body=body,
     )
 
@@ -150,7 +150,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    group_id: str,
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdBindingsBody,
@@ -158,7 +158,7 @@ async def asyncio(
     """Add a role binding to a group
 
     Args:
-        id (str):
+        group_id (str):
         body (PostApiGroupsByIdBindingsBody):
 
     Raises:
@@ -171,7 +171,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            group_id=group_id,
             client=client,
             body=body,
         )

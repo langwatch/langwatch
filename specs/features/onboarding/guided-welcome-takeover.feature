@@ -184,6 +184,14 @@ Feature: Guided welcome flow and takeover screens
     And the default chat model pills show the recommended model first, marked "recommended"
     And Connect is disabled until a key is typed
 
+  @integration
+  Scenario: The picked chat model pill is the model the connection uses
+    When I select OpenAI
+    Then the default chat model pills show the recommended model first, marked "recommended"
+    When I pick another pill and connect with a key
+    Then the connection saves the model I picked and Langy runs on it
+    And the pills can no longer be changed once connected
+
   @unit
   Scenario: The recommended model is the newest main-tier model in the catalog
     Given the committed model catalog

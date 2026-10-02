@@ -10,11 +10,13 @@ import type { experimentsTrpc } from "@langwatch/experiment-contract";
 import type { githubTrpc } from "@langwatch/github-contract";
 import type { langyTrpc } from "@langwatch/langy-contract";
 import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
+import type { notificationTrpc } from "@langwatch/notification-contract";
 import type { integrationsChecksTrpc } from "@langwatch/onboarding-contract";
 import type { organizationTrpc } from "@langwatch/organization-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
 import type { tracesTrpc } from "@langwatch/trace-contract";
+import type { userTrpc } from "@langwatch/user-contract";
 
 export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof modelProviderTrpc> &
@@ -29,6 +31,8 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof promptTrpc> &
   ContractApiMap<typeof experimentsTrpc> &
   ContractApiMap<typeof secretTrpc> &
+  ContractApiMap<typeof userTrpc> &
+  ContractApiMap<typeof notificationTrpc> &
   ContractApiMap<typeof automationTrpc>;
 
 /** What each procedure in the map answers, as the browser receives it. */

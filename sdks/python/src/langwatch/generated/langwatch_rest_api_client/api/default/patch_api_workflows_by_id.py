@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -7,14 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_workflows_by_id_body import PatchApiWorkflowsByIdBody
 from ...models.patch_api_workflows_by_id_response_200 import PatchApiWorkflowsByIdResponse200
-from ...models.patch_api_workflows_by_id_response_404 import PatchApiWorkflowsByIdResponse404
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiWorkflowsByIdBody,
+    body: PatchApiWorkflowsByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -35,15 +35,14 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404 | None:
+) -> Any | PatchApiWorkflowsByIdResponse200 | None:
     if response.status_code == 200:
         response_200 = PatchApiWorkflowsByIdResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 404:
-        response_404 = PatchApiWorkflowsByIdResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -54,7 +53,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404]:
+) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -70,20 +69,20 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWorkflowsByIdBody,
-) -> Response[PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404]:
+    body: PatchApiWorkflowsByIdBody | Unset = UNSET,
+) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
         id (str):
-        body (PatchApiWorkflowsByIdBody):
+        body (PatchApiWorkflowsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404]
+        Response[Any | PatchApiWorkflowsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -102,20 +101,20 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWorkflowsByIdBody,
-) -> PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404 | None:
+    body: PatchApiWorkflowsByIdBody | Unset = UNSET,
+) -> Any | PatchApiWorkflowsByIdResponse200 | None:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
         id (str):
-        body (PatchApiWorkflowsByIdBody):
+        body (PatchApiWorkflowsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404
+        Any | PatchApiWorkflowsByIdResponse200
     """
 
     return sync_detailed(
@@ -129,20 +128,20 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWorkflowsByIdBody,
-) -> Response[PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404]:
+    body: PatchApiWorkflowsByIdBody | Unset = UNSET,
+) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
         id (str):
-        body (PatchApiWorkflowsByIdBody):
+        body (PatchApiWorkflowsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404]
+        Response[Any | PatchApiWorkflowsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -159,20 +158,20 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiWorkflowsByIdBody,
-) -> PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404 | None:
+    body: PatchApiWorkflowsByIdBody | Unset = UNSET,
+) -> Any | PatchApiWorkflowsByIdResponse200 | None:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
         id (str):
-        body (PatchApiWorkflowsByIdBody):
+        body (PatchApiWorkflowsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse404
+        Any | PatchApiWorkflowsByIdResponse200
     """
 
     return (

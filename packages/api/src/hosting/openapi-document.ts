@@ -2,13 +2,14 @@ import { createHash } from "node:crypto";
 
 import type { Hono, MiddlewareHandler } from "hono";
 /**
- * The live OpenAPI document: generated from the mounted REST families' own
- * describeRoute()/validator() metadata, so it changes with the routes on restart and cannot go
- * stale like the frozen file.
+ * The OpenAPI document: generated from the mounted REST families' own describeRoute()/validator()
+ * metadata. Nothing commits it; the api serves it and the SDK and docs builds generate it from the
+ * same declarations (dev/docs/ARCHITECTURE.md).
  */
 import { generateSpecs } from "hono-openapi";
 
 import {
+  dropHeadTwins,
   hoistStraySchemaDefs,
   normalizeExclusiveBounds,
   publishEnumRecordKeys,
@@ -75,19 +76,24 @@ const CACHE_CONTROL = "public, max-age=60, must-revalidate";
 type PublishedDocument = Readonly<{ bytes: Uint8Array<ArrayBuffer>; etag: string }>;
 
 /**
- * The OpenAPI document over RestHost.app, generated once, with the 3.1 exclusive bounds and
- * hoisted recursive `$defs` schema builders cannot produce. Every location sharing this
- * handler serves one document under one entity tag (packages/api/specs/api-discovery.feature).
+ * The OpenAPI document over RestHost.app, generated once when the route is mounted. Every
+ * location sharing this handler serves one document under one entity tag
+ * (packages/api/specs/api-discovery.feature).
  */
 export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
   let published: Promise<PublishedDocument> | undefined;
-
-  return async (context) => {
-    published ??= publish(restApp).catch((failure: unknown) => {
+  const generate = () =>
+    (published ??= publish(restApp).catch((failure: unknown) => {
       published = undefined;
       throw failure;
-    });
-    const { bytes, etag } = await published;
+    }));
+
+  // Started at mount so the first caller does not pay for it; a failure is retried by the next
+  // request rather than left as an unhandled rejection.
+  generate().catch(() => void 0);
+
+  return async (context) => {
+    const { bytes, etag } = await generate();
     const headers = { ETag: etag, "Cache-Control": CACHE_CONTROL };
 
     if (alreadyHeld({ ifNoneMatch: context.req.header("if-none-match"), etag })) {
@@ -98,7 +104,11 @@ export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
   };
 }
 
-async function publish(restApp: Hono): Promise<PublishedDocument> {
+/**
+ * The whole document a REST application describes: what the route serves, and what the SDK and
+ * docs builds write to disk before they read it.
+ */
+export async function buildOpenApiDocument(restApp: Hono): Promise<Record<string, unknown>> {
   const generated = await generateSpecs(restApp, { documentation: documentation() });
   // The corrections rewrite in place, and hono-openapi hands every call the SAME
   // resolved schema objects, so they run over a copy.
@@ -106,8 +116,13 @@ async function publish(restApp: Hono): Promise<PublishedDocument> {
 
   hoistStraySchemaDefs(document);
   publishEnumRecordKeys(document);
+  dropHeadTwins(document);
 
-  const bytes = Buffer.from(JSON.stringify(normalizeExclusiveBounds(document)), "utf8");
+  return normalizeExclusiveBounds(document) as Record<string, unknown>;
+}
+
+async function publish(restApp: Hono): Promise<PublishedDocument> {
+  const bytes = Buffer.from(JSON.stringify(await buildOpenApiDocument(restApp)), "utf8");
   const digest = createHash("sha256").update(bytes).digest("base64url").slice(0, 27);
 
   return { bytes, etag: `"${digest}"` };

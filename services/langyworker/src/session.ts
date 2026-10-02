@@ -28,6 +28,12 @@ import {
   LOCAL_TOOL_NAMES,
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
+import {
+  NOTIFY_TOOL_NAME,
+  OFFER_NOTIFICATIONS_TOOL_NAME,
+  createNotifyExtension,
+  notifyLedgerFromEntries,
+} from "./tools/notify.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
 import { SECRET_SNIPPET_TOOL_NAME, createSecretSnippetExtension } from "./tools/secret-snippet.js";
@@ -49,6 +55,8 @@ export const ENABLED_TOOLS = [
   SAY_TOOL_NAME,
   SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
+  NOTIFY_TOOL_NAME,
+  OFFER_NOTIFICATIONS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
 
@@ -161,6 +169,7 @@ export async function createLangySession({
           repeatedLineRefusal({ text, calls: turnContext.calls }),
       }),
       createSecretSnippetExtension(),
+      createNotifyExtension({ ledger: notifyLedgerFromEntries(sessionManager.getEntries()) }),
       // Registers `bash` in place of pi's built-in: the extension's tool wins
       // the name in the session's registry.
       createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
@@ -179,6 +188,8 @@ export async function createLangySession({
     settingsManager,
     tools: [...ENABLED_TOOLS],
   });
+  installModelRetry({ session });
+
   installModelRetry({ session });
 
   return { session, resumed };

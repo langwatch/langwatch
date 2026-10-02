@@ -208,6 +208,22 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then the panel re-reads the transcript once, which lands the new turn's own message
     And it then reattaches to that turn's stream and navigates where the turn says
 
+  # A process that only sends commands has no event log, so the tail it serves
+  # is empty. The transcript snapshot still names the cursor and the turn in
+  # flight, so a fold the tail cannot move is moved by the snapshot instead.
+  @unit
+  Scenario: An event tail that stops short of the signal re-reads the snapshot
+    Given the open tab's fold is behind the cursor a freshness signal names
+    When the event tail it reads comes back without reaching that cursor
+    Then the tab re-reads the transcript snapshot
+    And a snapshot ahead of the fold seeds it, adopting the turn it names in flight
+
+  @unit
+  Scenario: A snapshot naming a new turn is adopted by a tab that settled its own
+    Given this tab's own turn ended, so it tracks no live turn
+    When the transcript snapshot names a different turn in flight
+    Then the tab adopts that turn, so it can resume its stream and stop it
+
   # ---------------------------------------------------------------------------
   # Domain-error rendering (ADR-045)
   # ---------------------------------------------------------------------------

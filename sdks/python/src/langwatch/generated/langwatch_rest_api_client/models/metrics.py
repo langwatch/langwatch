@@ -15,10 +15,10 @@ T = TypeVar("T", bound="Metrics")
 class Metrics:
     """
     Attributes:
-        first_token_ms (int | None | Unset):
-        total_time_ms (int | None | Unset):
-        prompt_tokens (int | None | Unset):
-        completion_tokens (int | None | Unset):
+        first_token_ms (float | None | Unset):
+        total_time_ms (float | None | Unset):
+        prompt_tokens (float | None | Unset):
+        completion_tokens (float | None | Unset):
         reasoning_tokens (float | None | Unset):
         cache_read_input_tokens (float | None | Unset):
         cache_creation_input_tokens (float | None | Unset):
@@ -29,10 +29,10 @@ class Metrics:
         tokens_estimated (bool | None | Unset):
     """
 
-    first_token_ms: int | None | Unset = UNSET
-    total_time_ms: int | None | Unset = UNSET
-    prompt_tokens: int | None | Unset = UNSET
-    completion_tokens: int | None | Unset = UNSET
+    first_token_ms: float | None | Unset = UNSET
+    total_time_ms: float | None | Unset = UNSET
+    prompt_tokens: float | None | Unset = UNSET
+    completion_tokens: float | None | Unset = UNSET
     reasoning_tokens: float | None | Unset = UNSET
     cache_read_input_tokens: float | None | Unset = UNSET
     cache_creation_input_tokens: float | None | Unset = UNSET
@@ -44,25 +44,25 @@ class Metrics:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        first_token_ms: int | None | Unset
+        first_token_ms: float | None | Unset
         if isinstance(self.first_token_ms, Unset):
             first_token_ms = UNSET
         else:
             first_token_ms = self.first_token_ms
 
-        total_time_ms: int | None | Unset
+        total_time_ms: float | None | Unset
         if isinstance(self.total_time_ms, Unset):
             total_time_ms = UNSET
         else:
             total_time_ms = self.total_time_ms
 
-        prompt_tokens: int | None | Unset
+        prompt_tokens: float | None | Unset
         if isinstance(self.prompt_tokens, Unset):
             prompt_tokens = UNSET
         else:
             prompt_tokens = self.prompt_tokens
 
-        completion_tokens: int | None | Unset
+        completion_tokens: float | None | Unset
         if isinstance(self.completion_tokens, Unset):
             completion_tokens = UNSET
         else:
@@ -150,39 +150,39 @@ class Metrics:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
 
-        def _parse_first_token_ms(data: object) -> int | None | Unset:
+        def _parse_first_token_ms(data: object) -> float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(int | None | Unset, data)
+            return cast(float | None | Unset, data)
 
         first_token_ms = _parse_first_token_ms(d.pop("first_token_ms", UNSET))
 
-        def _parse_total_time_ms(data: object) -> int | None | Unset:
+        def _parse_total_time_ms(data: object) -> float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(int | None | Unset, data)
+            return cast(float | None | Unset, data)
 
         total_time_ms = _parse_total_time_ms(d.pop("total_time_ms", UNSET))
 
-        def _parse_prompt_tokens(data: object) -> int | None | Unset:
+        def _parse_prompt_tokens(data: object) -> float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(int | None | Unset, data)
+            return cast(float | None | Unset, data)
 
         prompt_tokens = _parse_prompt_tokens(d.pop("prompt_tokens", UNSET))
 
-        def _parse_completion_tokens(data: object) -> int | None | Unset:
+        def _parse_completion_tokens(data: object) -> float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(int | None | Unset, data)
+            return cast(float | None | Unset, data)
 
         completion_tokens = _parse_completion_tokens(d.pop("completion_tokens", UNSET))
 

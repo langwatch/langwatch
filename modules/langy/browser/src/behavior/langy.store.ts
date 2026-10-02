@@ -601,9 +601,14 @@ function seededTurnProjection(
 ): Partial<LangyState> {
   const turnProjection = seedLangyTurnProjection(s.turnProjection, snapshot);
   // Refresh-resume: the durable record names a turn in flight and this tab
-  // tracks none — adopt it so Stop targets it and live signals route to it.
+  // tracks none live (nothing, or only its own settled turn) — adopt it so
+  // Stop targets it and live signals route to it.
+  const tracksNoLiveTurn = s.activeTurnId === null || s.activeTurnId === s.settledTurnId;
   const adoptTurnId =
-    snapshot.currentTurnId && s.activeTurnId === null && turnProjection !== s.turnProjection
+    snapshot.currentTurnId &&
+    snapshot.currentTurnId !== s.settledTurnId &&
+    tracksNoLiveTurn &&
+    turnProjection !== s.turnProjection
       ? snapshot.currentTurnId
       : null;
   // The phase reducers return the WHOLE state (`{...state, ...}`), so
@@ -612,7 +617,7 @@ function seededTurnProjection(
   return {
     ...(adoptTurnId
       ? {
-          ...reduceObserveBackendTurn(s, true),
+          ...reduceObserveBackendTurn({ ...s, settledTurnId: null }, true),
           activeTurnId: adoptTurnId,
         }
       : {}),

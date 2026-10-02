@@ -4,12 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_webhooks_v1_endpoints_response_200_item_type_0 import (
-    GetApiWebhooksV1EndpointsResponse200ItemType0,
-)
-from ...models.get_api_webhooks_v1_endpoints_response_200_item_type_1 import (
-    GetApiWebhooksV1EndpointsResponse200ItemType1,
-)
+from ...models.get_api_webhooks_v1_endpoints_response_200 import GetApiWebhooksV1EndpointsResponse200
 from ...types import Response, safe_http_status
 
 
@@ -25,32 +20,9 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1] | None:
+) -> GetApiWebhooksV1EndpointsResponse200 | None:
     if response.status_code == 200:
-        response_200 = []
-        _response_200 = response.json()
-        for response_200_item_data in _response_200:
-
-            def _parse_response_200_item(
-                data: object,
-            ) -> GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1:
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    response_200_item_type_0 = GetApiWebhooksV1EndpointsResponse200ItemType0.from_dict(data)
-
-                    return response_200_item_type_0
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_200_item_type_1 = GetApiWebhooksV1EndpointsResponse200ItemType1.from_dict(data)
-
-                return response_200_item_type_1
-
-            response_200_item = _parse_response_200_item(response_200_item_data)
-
-            response_200.append(response_200_item)
+        response_200 = GetApiWebhooksV1EndpointsResponse200.from_dict(response.json())
 
         return response_200
 
@@ -62,7 +34,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]]:
+) -> Response[GetApiWebhooksV1EndpointsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -77,7 +49,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]]:
+) -> Response[GetApiWebhooksV1EndpointsResponse200]:
     """List webhook endpoints
 
      List the organization's webhook endpoints
@@ -87,7 +59,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]]
+        Response[GetApiWebhooksV1EndpointsResponse200]
     """
 
     kwargs = _get_kwargs()
@@ -102,7 +74,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1] | None:
+) -> GetApiWebhooksV1EndpointsResponse200 | None:
     """List webhook endpoints
 
      List the organization's webhook endpoints
@@ -112,7 +84,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]
+        GetApiWebhooksV1EndpointsResponse200
     """
 
     return sync_detailed(
@@ -123,7 +95,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]]:
+) -> Response[GetApiWebhooksV1EndpointsResponse200]:
     """List webhook endpoints
 
      List the organization's webhook endpoints
@@ -133,7 +105,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]]
+        Response[GetApiWebhooksV1EndpointsResponse200]
     """
 
     kwargs = _get_kwargs()
@@ -146,7 +118,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1] | None:
+) -> GetApiWebhooksV1EndpointsResponse200 | None:
     """List webhook endpoints
 
      List the organization's webhook endpoints
@@ -156,7 +128,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        list[GetApiWebhooksV1EndpointsResponse200ItemType0 | GetApiWebhooksV1EndpointsResponse200ItemType1]
+        GetApiWebhooksV1EndpointsResponse200
     """
 
     return (

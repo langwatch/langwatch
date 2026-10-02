@@ -19,7 +19,7 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // Org-scoped at /settings/members, kept rather than `/settings/directory` on purpose:
   // `members.tsx` now redirects, so arriving by the old address covers the redirect too.
   await page.goto(`/settings/members`);
-  await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Directory", level: 1 })).toBeVisible({
     timeout: 15000,
   });
 }
@@ -136,19 +136,16 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   // Use page.request (not page.evaluate(fetch(...))): the Playwright request
   // context resolves this relative URL against baseURL and carries the auth
   // cookies, whereas an in-page fetch on a blank/unnavigated page throws
-  // "Failed to parse URL". Mirrors getProjectSlug and the batched tRPC shape.
+  // "Failed to parse URL". Mirrors getProjectSlug.
   const response = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": {} })),
+    "/api/trpc/organization.getAll?input=" + encodeURIComponent(JSON.stringify({})),
   );
   const json = (await response.json().catch(() => null)) as {
-    "0"?: {
-      result?: {
-        data?: { id: string; teams?: { id: string }[] }[];
-      };
+    result?: {
+      data?: { id: string; teams?: { id: string }[] }[];
     };
   } | null;
-  const org = (json?.["0"]?.result?.data ?? [])[0];
+  const org = (json?.result?.data ?? [])[0];
   if (!org?.id || !org.teams?.[0]?.id) {
     throw new Error(
       `Could not extract org/team IDs (status ${response.status()}): ${JSON.stringify(json).slice(
@@ -180,13 +177,11 @@ export function generateUniqueEmail(prefix: string): string {
  */
 export async function activateEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
-  const response = await page.request.post("/api/trpc/license.upload?batch=1", {
-    data: {
-      "0": { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY },
-    },
+  const response = await page.request.post("/api/trpc/license.upload", {
+    data: { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY },
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok() || result?.["0"]?.error) {
+  if (!response.ok() || result?.error) {
     throw new Error(
       `license.upload failed: ${response.status()} ${JSON.stringify(result).slice(0, 500)}`,
     );
@@ -200,11 +195,11 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
  */
 export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
-  const response = await page.request.post("/api/trpc/license.remove?batch=1", {
-    data: { "0": { organizationId } },
+  const response = await page.request.post("/api/trpc/license.remove", {
+    data: { organizationId },
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok() || result?.["0"]?.error) {
+  if (!response.ok() || result?.error) {
     throw new Error(
       `license.remove failed: ${response.status()} ${JSON.stringify(result).slice(0, 500)}`,
     );

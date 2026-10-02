@@ -8,13 +8,13 @@ from ...client import AuthenticatedClient, Client
 from ...models.put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from ...models.put_api_scenarios_by_id_response_200 import PutApiScenariosByIdResponse200
 from ...models.put_api_scenarios_by_id_response_404 import PutApiScenariosByIdResponse404
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PutApiScenariosByIdBody,
+    body: PutApiScenariosByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,7 +25,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -70,13 +71,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PutApiScenariosByIdBody,
+    body: PutApiScenariosByIdBody | Unset = UNSET,
 ) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]:
     """Update an existing scenario
 
     Args:
         id (str):
-        body (PutApiScenariosByIdBody):
+        body (PutApiScenariosByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -102,13 +103,13 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PutApiScenariosByIdBody,
+    body: PutApiScenariosByIdBody | Unset = UNSET,
 ) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404 | None:
     """Update an existing scenario
 
     Args:
         id (str):
-        body (PutApiScenariosByIdBody):
+        body (PutApiScenariosByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -129,13 +130,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PutApiScenariosByIdBody,
+    body: PutApiScenariosByIdBody | Unset = UNSET,
 ) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]:
     """Update an existing scenario
 
     Args:
         id (str):
-        body (PutApiScenariosByIdBody):
+        body (PutApiScenariosByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,13 +160,13 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PutApiScenariosByIdBody,
+    body: PutApiScenariosByIdBody | Unset = UNSET,
 ) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404 | None:
     """Update an existing scenario
 
     Args:
         id (str):
-        body (PutApiScenariosByIdBody):
+        body (PutApiScenariosByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -10,13 +10,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    team_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v1/teams/{id}/projects".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/teams/{team_id}/projects".format(
+            team_id=quote(str(team_id), safe=""),
         ),
     }
 
@@ -52,14 +52,14 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiTeamsByIdProjectsResponse200]:
     """List projects in a team
 
     Args:
-        id (str):
+        team_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -70,7 +70,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
     )
 
     response = client.get_httpx_client().request(
@@ -81,14 +81,14 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetApiTeamsByIdProjectsResponse200 | None:
     """List projects in a team
 
     Args:
-        id (str):
+        team_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -99,20 +99,20 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        team_id=team_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiTeamsByIdProjectsResponse200]:
     """List projects in a team
 
     Args:
-        id (str):
+        team_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,7 +123,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -132,14 +132,14 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetApiTeamsByIdProjectsResponse200 | None:
     """List projects in a team
 
     Args:
-        id (str):
+        team_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,7 +151,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            team_id=team_id,
             client=client,
         )
     ).parsed

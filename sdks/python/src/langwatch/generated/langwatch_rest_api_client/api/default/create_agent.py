@@ -9,6 +9,7 @@ from ...models.create_agent_body_type_1 import CreateAgentBodyType1
 from ...models.create_agent_body_type_2 import CreateAgentBodyType2
 from ...models.create_agent_body_type_3 import CreateAgentBodyType3
 from ...models.create_agent_body_type_4 import CreateAgentBodyType4
+from ...models.create_agent_body_type_5 import CreateAgentBodyType5
 from ...models.create_agent_response_201 import CreateAgentResponse201
 from ...types import Response, safe_http_status
 
@@ -19,7 +20,8 @@ def _get_kwargs(
     | CreateAgentBodyType1
     | CreateAgentBodyType2
     | CreateAgentBodyType3
-    | CreateAgentBodyType4,
+    | CreateAgentBodyType4
+    | CreateAgentBodyType5,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -35,6 +37,8 @@ def _get_kwargs(
     elif isinstance(body, CreateAgentBodyType2):
         _kwargs["json"] = body.to_dict()
     elif isinstance(body, CreateAgentBodyType3):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, CreateAgentBodyType4):
         _kwargs["json"] = body.to_dict()
     else:
         _kwargs["json"] = body.to_dict()
@@ -78,13 +82,14 @@ def sync_detailed(
     | CreateAgentBodyType1
     | CreateAgentBodyType2
     | CreateAgentBodyType3
-    | CreateAgentBodyType4,
+    | CreateAgentBodyType4
+    | CreateAgentBodyType5,
 ) -> Response[CreateAgentResponse201]:
     """Create an authored agent; connected agents register through the SDK
 
     Args:
         body (CreateAgentBodyType0 | CreateAgentBodyType1 | CreateAgentBodyType2 |
-            CreateAgentBodyType3 | CreateAgentBodyType4):
+            CreateAgentBodyType3 | CreateAgentBodyType4 | CreateAgentBodyType5):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -112,13 +117,14 @@ def sync(
     | CreateAgentBodyType1
     | CreateAgentBodyType2
     | CreateAgentBodyType3
-    | CreateAgentBodyType4,
+    | CreateAgentBodyType4
+    | CreateAgentBodyType5,
 ) -> CreateAgentResponse201 | None:
     """Create an authored agent; connected agents register through the SDK
 
     Args:
         body (CreateAgentBodyType0 | CreateAgentBodyType1 | CreateAgentBodyType2 |
-            CreateAgentBodyType3 | CreateAgentBodyType4):
+            CreateAgentBodyType3 | CreateAgentBodyType4 | CreateAgentBodyType5):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -141,13 +147,14 @@ async def asyncio_detailed(
     | CreateAgentBodyType1
     | CreateAgentBodyType2
     | CreateAgentBodyType3
-    | CreateAgentBodyType4,
+    | CreateAgentBodyType4
+    | CreateAgentBodyType5,
 ) -> Response[CreateAgentResponse201]:
     """Create an authored agent; connected agents register through the SDK
 
     Args:
         body (CreateAgentBodyType0 | CreateAgentBodyType1 | CreateAgentBodyType2 |
-            CreateAgentBodyType3 | CreateAgentBodyType4):
+            CreateAgentBodyType3 | CreateAgentBodyType4 | CreateAgentBodyType5):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,13 +180,14 @@ async def asyncio(
     | CreateAgentBodyType1
     | CreateAgentBodyType2
     | CreateAgentBodyType3
-    | CreateAgentBodyType4,
+    | CreateAgentBodyType4
+    | CreateAgentBodyType5,
 ) -> CreateAgentResponse201 | None:
     """Create an authored agent; connected agents register through the SDK
 
     Args:
         body (CreateAgentBodyType0 | CreateAgentBodyType1 | CreateAgentBodyType2 |
-            CreateAgentBodyType3 | CreateAgentBodyType4):
+            CreateAgentBodyType3 | CreateAgentBodyType4 | CreateAgentBodyType5):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

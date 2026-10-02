@@ -63,7 +63,7 @@ const OUR_REFUSALS: Record<
   sso_existing_account_unconfirmed: {
     title: "Your LangWatch account's address isn't confirmed",
     advice: () =>
-      "A LangWatch account already exists at that address and its address was never confirmed. This connection can link it once it has verified the address's domain and your identity provider marks the address as verified. Verify the domain on this connection, check that the provider sends email_verified as true, then run this again.",
+      "A LangWatch account already exists at that address and its address was never confirmed. This connection links it once it has verified the address's domain, unless your identity provider reports the address as unverified (email_verified false, or xms_edov false on Microsoft Entra ID). Verify the domain on this connection, check how the provider reports the address, then run this again.",
   },
   sso_sign_in_refused: {
     title: "LangWatch refused that sign-in",
@@ -85,12 +85,18 @@ export function testSignInFailureFor({
   code,
   description,
   yourAddress,
+  expectedIssuer,
+  receivedIssuer,
 }: {
   code: string;
   /** `error_description` as the provider sent it, where there is one. */
   description?: string | null;
   yourAddress?: string | null;
+  expectedIssuer?: string | null;
+  receivedIssuer?: string | null;
 }): TestSignInFailure {
+  if (code === "sso_issuer_mismatch")
+    return issuerMismatchFailure({ expectedIssuer, receivedIssuer });
   const ours = OUR_REFUSALS[code];
   if (ours) {
     return { title: ours.title, detail: null, advice: ours.advice(yourAddress ?? null) };
@@ -104,9 +110,33 @@ export function testSignInFailureFor({
   };
 }
 
+/** The ID token named a different issuer from the connection's. Both are
+ *  quoted, since the fix is to make them equal. */
+function issuerMismatchFailure({
+  expectedIssuer,
+  receivedIssuer,
+}: {
+  expectedIssuer?: string | null;
+  receivedIssuer?: string | null;
+}): TestSignInFailure {
+  const detail = [
+    expectedIssuer ? `This connection expects: ${expectedIssuer}` : null,
+    receivedIssuer ? `Your identity provider sent: ${receivedIssuer}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    title: "Your identity provider names a different issuer",
+    detail: detail === "" ? null : detail,
+    advice:
+      "The issuer on this connection has to be exactly the one in the provider's sign-in tokens. Change it on this connection to the one your provider sent. For Microsoft Entra ID it is https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration, not a user's home tenant and not common or organizations.",
+  };
+}
+
 /** Whether the words are ours, which is the same as saying who to go and ask. */
 export function testSignInFailureIsOurs(code: string): boolean {
-  return code in OUR_REFUSALS;
+  return code === "sso_issuer_mismatch" || code in OUR_REFUSALS;
 }
 
 /**

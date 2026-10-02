@@ -12,14 +12,14 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    group_id: str,
     binding_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v1/groups/{id}/bindings/{binding_id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/groups/{group_id}/bindings/{binding_id}".format(
+            group_id=quote(str(group_id), safe=""),
             binding_id=quote(str(binding_id), safe=""),
         ),
     }
@@ -56,7 +56,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    group_id: str,
     binding_id: str,
     *,
     client: AuthenticatedClient,
@@ -64,7 +64,7 @@ def sync_detailed(
     """Remove a role binding from a group
 
     Args:
-        id (str):
+        group_id (str):
         binding_id (str):
 
     Raises:
@@ -76,7 +76,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
         binding_id=binding_id,
     )
 
@@ -88,7 +88,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    group_id: str,
     binding_id: str,
     *,
     client: AuthenticatedClient,
@@ -96,7 +96,7 @@ def sync(
     """Remove a role binding from a group
 
     Args:
-        id (str):
+        group_id (str):
         binding_id (str):
 
     Raises:
@@ -108,14 +108,14 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        group_id=group_id,
         binding_id=binding_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    group_id: str,
     binding_id: str,
     *,
     client: AuthenticatedClient,
@@ -123,7 +123,7 @@ async def asyncio_detailed(
     """Remove a role binding from a group
 
     Args:
-        id (str):
+        group_id (str):
         binding_id (str):
 
     Raises:
@@ -135,7 +135,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        group_id=group_id,
         binding_id=binding_id,
     )
 
@@ -145,7 +145,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    group_id: str,
     binding_id: str,
     *,
     client: AuthenticatedClient,
@@ -153,7 +153,7 @@ async def asyncio(
     """Remove a role binding from a group
 
     Args:
-        id (str):
+        group_id (str):
         binding_id (str):
 
     Raises:
@@ -166,7 +166,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            group_id=group_id,
             binding_id=binding_id,
             client=client,
         )

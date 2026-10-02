@@ -23,6 +23,7 @@ import type {
 } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -295,6 +296,7 @@ async function createApp(): Promise<LangyModule> {
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org_1" }),
       plans: createApiFixture<EntitlementApi>(),
       onboarding: createApiFixture<OnboardingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     members: {

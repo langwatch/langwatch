@@ -23,6 +23,8 @@ export interface LangyLocalRecordResult {
   isError: boolean;
   /** The failure, for the shared error copy to name it. */
   error: unknown;
+  /** The record has answered at least once for this conversation. */
+  isFetched: boolean;
   /** Read the record again, which is what the panel's retry does. */
   refetch: () => void;
 }
@@ -74,6 +76,7 @@ export function useLangyLocalRecord({
     workspaceConnected: data?.workspaceConnected ?? false,
     isError: !!conversationId && query.isError,
     error: conversationId ? query.error : null,
+    isFetched: !!conversationId && query.isFetched,
     refetch: () => void refetch(),
   };
 }

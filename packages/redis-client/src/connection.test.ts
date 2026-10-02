@@ -1,20 +1,15 @@
+import { EventEmitter } from "node:events";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const standaloneCalls: [string, Record<string, unknown>][] = [];
 const clusterCalls: [unknown, Record<string, unknown>][] = [];
 const connectionsMade: FakeConnection[] = [];
 
-class FakeConnection {
-  readonly handlers = new Map<string, (...args: unknown[]) => void>();
+class FakeConnection extends EventEmitter {
   constructor() {
+    super();
     connectionsMade.push(this);
-  }
-  on(event: string, handler: (...args: unknown[]) => void) {
-    this.handlers.set(event, handler);
-    return this;
-  }
-  emit(event: string, ...args: unknown[]) {
-    this.handlers.get(event)?.(...args);
   }
 }
 
@@ -38,6 +33,12 @@ vi.mock("ioredis", () => {
 });
 
 const { RedisConnectionService } = await import("./connection.ts");
+
+function lastConnection(): FakeConnection {
+  const connection = connectionsMade.at(-1);
+  if (!connection) throw new Error("no connection was constructed");
+  return connection;
+}
 
 function createLoggerSpy() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -198,6 +199,124 @@ describe("RedisConnectionService", () => {
       });
 
       expect(logger.warn).toHaveBeenCalledWith({}, "heads up");
+    });
+  });
+
+  describe("when the server rejects the password", () => {
+    /** The error ioredis emits, and rejects every queued command with. */
+    function wrongPassError() {
+      return Object.assign(new Error("WRONGPASS invalid username-password pair"), {
+        command: { name: "auth", args: ["s3cret-redis-password"] },
+      });
+    }
+
+    /** @scenario "the Redis password never reaches the logs" */
+    it("redacts the password on the error before it is logged", () => {
+      const logger = createLoggerSpy();
+      new RedisConnectionService({ logger }).connect({
+        url: "redis://localhost:6379",
+      });
+      const connection = lastConnection();
+      const error = wrongPassError();
+
+      connection.emit("error", error);
+
+      expect(error.command.args).toEqual(["[redacted]"]);
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain("s3cret-redis-password");
+    });
+
+    it("redacts it before a listener added later sees it", () => {
+      new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      });
+      const connection = lastConnection();
+      const seen: unknown[] = [];
+      connection.on("error", (error: { command: { args: unknown } }) =>
+        seen.push(error.command.args),
+      );
+
+      connection.emit("error", wrongPassError());
+
+      expect(seen).toEqual([["[redacted]"]]);
+    });
+
+    it("redacts a password the server echoes in the message", () => {
+      new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      });
+      const connection = lastConnection();
+      const error = Object.assign(
+        new Error("ERR unknown command 'AUTH', with args beginning with: 's3cret-redis-password' "),
+        { command: { name: "auth", args: ["s3cret-redis-password"] } },
+      );
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).not.toContain("s3cret-redis-password");
+      expect(error.stack).not.toContain("s3cret-redis-password");
+    });
+
+    it("removes a truncated echo of a long password", () => {
+      new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      });
+      const connection = lastConnection();
+      const password = `p${"x".repeat(200)}`;
+      const error = Object.assign(
+        new Error(
+          `ERR unknown command 'AUTH', with args beginning with: 'default' '${password.slice(0, 110)}' `,
+        ),
+        { command: { name: "auth", args: ["default", password] } },
+      );
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).toBe(
+        "ERR unknown command 'AUTH', with args beginning with: [redacted]",
+      );
+      expect(error.stack).not.toContain("x".repeat(20));
+    });
+
+    it("keeps the username elsewhere in the message", () => {
+      new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      });
+      const connection = lastConnection();
+      const error = Object.assign(new Error("WRONGPASS for the default user"), {
+        command: { name: "auth", args: ["default", "s3cret-redis-password"] },
+      });
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).toBe("WRONGPASS for the default user");
+    });
+    it("redacts node errors on a cluster", () => {
+      new RedisConnectionService().connect({
+        clusterEndpoints: "one:6379",
+      });
+      const connection = lastConnection();
+      const error = wrongPassError();
+
+      connection.emit("node error", error, "one:6379");
+
+      expect(error.command.args).toEqual(["[redacted]"]);
+    });
+
+    it("keeps the arguments of other failed commands", () => {
+      new RedisConnectionService({
+        logger: createLoggerSpy(),
+      }).connect({ url: "redis://localhost:6379" });
+      const connection = lastConnection();
+      const error = Object.assign(new Error("WRONGTYPE"), {
+        command: { name: "get", args: ["some-key"] },
+      });
+
+      connection.emit("error", error);
+
+      expect(error.command.args).toEqual(["some-key"]);
     });
   });
 

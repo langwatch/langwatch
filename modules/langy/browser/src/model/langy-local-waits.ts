@@ -465,6 +465,19 @@ export function routeLangyChoiceAnswer({
 }
 
 /**
+ * What a refused question answer means. `langy_wait_expired` refuses every settled wait: one
+ * that ended unanswered falls back to the next user message, one already answered (a second
+ * click, or the terminal first) only settles the card, so no extra turn starts.
+ */
+export function routeLangyQuestionRefusal(
+  refusal: { code?: string; meta?: unknown } | null | undefined,
+): { kind: "message" } | { kind: "answered" } | { kind: "failed" } {
+  if (refusal?.code !== "langy_wait_expired") return { kind: "failed" };
+  const outcome = (refusal.meta as { outcome?: unknown } | undefined)?.outcome;
+  return outcome === "answered" ? { kind: "answered" } : { kind: "message" };
+}
+
+/**
  * The tool call a choices card's block id names. The question bridge mints
  * `question:<toolCallId>:<index>`, and the tool call id is the only part of it
  * the wait knows, so the split is here rather than at every call site.

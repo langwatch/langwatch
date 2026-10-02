@@ -8,6 +8,7 @@ import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
+import { readFeatureFlagOverride } from "@langwatch/browser-host/feature-flag-overrides";
 import { uiLeaveTo } from "@langwatch/browser-host/navigation";
 import type {
   UiActiveScopeReading,
@@ -149,6 +150,9 @@ export class BrowserUiSession extends UiSession {
   }
 
   featureFlag(flag: string): boolean | undefined {
+    // This browser's own `?ff_` answer wins and is never asked of the server.
+    const override = readFeatureFlagOverride(flag);
+    if (override !== void 0) return override;
     const answer = this.state.flags.get(flag);
     if (answer === void 0) {
       this.state.askFlag(flag);

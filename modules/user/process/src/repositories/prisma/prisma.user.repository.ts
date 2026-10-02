@@ -12,6 +12,7 @@ import {
   userCredentialAccountRowSchema,
   userCredentialAccountSchema,
   userPasskeyNudgeStatusSchema,
+  userNotificationChoiceSchema,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
@@ -20,6 +21,8 @@ import {
   type UserProfile,
   type UserTourPreference,
   type UserCodeAccessPreference,
+  type UserNotificationChoice,
+  type UserNotificationTopic,
   type CreatedUser,
   type SetFirstUserPasswordResult,
   type UserUsageCount,
@@ -32,6 +35,26 @@ import type {
   UserDeactivationOutcome,
   UserRepository,
 } from "../user.repository.ts";
+
+/**
+ * The stored map, read leniently: a choice this release does not know (one a
+ * newer release wrote) is dropped rather than failing the read.
+ */
+function readNotificationPreferences(value: unknown): Record<string, UserNotificationChoice> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const known: Record<string, UserNotificationChoice> = {};
+  for (const [topic, choice] of Object.entries(value)) {
+    const parsed = userNotificationChoiceSchema.safeParse(choice);
+    if (parsed.success) known[topic] = parsed.data;
+  }
+  return known;
+}
+
+/** The stored map as it is, every key kept; anything that is not an object reads as empty. */
+function storedPreferenceMap(value: Prisma.JsonValue): Prisma.JsonObject {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  return value;
+}
 
 /** The three models, the transaction runner, and the raw read of the database's clock. */
 export type UserDatabase = Pick<
@@ -335,6 +358,41 @@ export class PrismaUserRepository
     return userTourPreferenceSchema.parse({
       dismissed: true,
       dismissedAt: userTourPreferenceRowSchema.parse(row).tracesExplorerTourDismissedAt,
+    });
+  }
+
+  async findNotificationPreferences(id: string): Promise<Record<string, UserNotificationChoice>> {
+    const row = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      select: { notificationPreferences: true },
+    });
+
+    return readNotificationPreferences(row.notificationPreferences);
+  }
+
+  /**
+   * One topic is merged into the stored map as it is stored, so a value this release does not
+   * read is kept. Serializable, so two answers to different topics cannot drop each other.
+   */
+  async setNotificationPreference(input: {
+    id: string;
+    topic: UserNotificationTopic;
+    choice: UserNotificationChoice;
+  }): Promise<void> {
+    await this.serializableTransaction(async (transaction) => {
+      const row = await transaction.user.findUniqueOrThrow({
+        where: { id: input.id },
+        select: { notificationPreferences: true },
+      });
+      await transaction.user.update({
+        where: { id: input.id },
+        data: {
+          notificationPreferences: {
+            ...storedPreferenceMap(row.notificationPreferences),
+            [input.topic]: input.choice,
+          },
+        },
+      });
     });
   }
 

@@ -1,12 +1,10 @@
 import { type Page } from "@playwright/test";
 
 type GetAllResponse = {
-  "0"?: {
-    result?: {
-      data?: {
-        teams?: { projects?: { slug?: string }[] }[];
-      }[];
-    };
+  result?: {
+    data?: {
+      teams?: { projects?: { slug?: string }[] }[];
+    }[];
   };
 };
 
@@ -20,11 +18,10 @@ export async function getProjectSlug(page: Page): Promise<string> {
   if (pinned) return pinned;
 
   const response = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": {} })),
+    "/api/trpc/organization.getAll?input=" + encodeURIComponent(JSON.stringify({})),
   );
   const data = (await response.json().catch(() => null)) as GetAllResponse | null;
-  const orgs = data?.["0"]?.result?.data ?? [];
+  const orgs = data?.result?.data ?? [];
   for (const org of orgs) {
     for (const team of org.teams ?? []) {
       const slug = (team.projects ?? [])[0]?.slug;

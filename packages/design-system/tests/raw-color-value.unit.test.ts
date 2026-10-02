@@ -29,9 +29,9 @@ describe("expandCssVars", () => {
   });
 
   it("throws on a variable that refers to itself", () => {
-    expect(() =>
-      expandCssVars({ value: "var(--loop)", read: () => "var(--loop)" }),
-    ).toThrow("deeper than");
+    expect(() => expandCssVars({ value: "var(--loop)", read: () => "var(--loop)" })).toThrow(
+      "deeper than",
+    );
   });
 });
 

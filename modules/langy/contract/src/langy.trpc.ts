@@ -68,8 +68,14 @@ export const langyTrpc = defineTrpcContract("langy")
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyConversationDetailSchema.nullable())
 
+  // The panel's thread follows the turn's durable steps through read hints, so a tab
+  // that was asleep or offline catches up without polling.
   .query("messages", {
     invalidatedBy: [
+      LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+      LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+      LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+      LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
       LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
       LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
     ],
@@ -133,11 +139,23 @@ export const langyTrpc = defineTrpcContract("langy")
   .withInput(langyProjectInputSchema)
   .withOutput(langyCodeAccessPreferenceSchema)
 
-  .query("localRecord")
+  .query("localRecord", {
+    invalidatedBy: [
+      LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+      LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+      LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED,
+      LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED,
+    ],
+  })
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyLocalRecordSchema)
 
-  .query("getLocalWorkspace")
+  .query("getLocalWorkspace", {
+    invalidatedBy: [
+      LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED,
+      LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED,
+    ],
+  })
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyLocalWorkspaceStatusSchema)
 

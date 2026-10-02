@@ -156,7 +156,7 @@ function SsoConfiguredButNotInUseNotice() {
             {unlicensed ? (
               <>
                 so everyone is signing in by email until a license is activated. Activate one and
-                restart the server to switch single sign-on on.
+                single sign-on turns on within a minute, no restart needed.
               </>
             ) : (
               <>

@@ -171,6 +171,42 @@ export const userTourPreferenceSchema = z
   .strict();
 export type UserTourPreference = z.infer<typeof userTourPreferenceSchema>;
 
+/**
+ * The topics a person can turn browser notifications on or off for. Each
+ * feature that notifies names its own topic, so one choice never silences another.
+ */
+export const userNotificationTopicSchema = z.enum(["langy"]);
+export type UserNotificationTopic = z.infer<typeof userNotificationTopicSchema>;
+
+/** What a person answered about one topic's notifications. */
+export const userNotificationChoiceSchema = z.enum(["enabled", "declined"]);
+export type UserNotificationChoice = z.infer<typeof userNotificationChoiceSchema>;
+
+/** One topic's stored choice; `choice` is null while the person never answered. */
+export const userNotificationPreferenceSchema = z
+  .object({
+    topic: userNotificationTopicSchema,
+    choice: userNotificationChoiceSchema.nullable(),
+  })
+  .strict();
+export type UserNotificationPreference = z.infer<typeof userNotificationPreferenceSchema>;
+
+export const userNotificationTopicInputSchema = z
+  .object({ id: z.string().min(1), topic: userNotificationTopicSchema })
+  .strict();
+export type UserNotificationTopicInput = z.infer<typeof userNotificationTopicInputSchema>;
+
+export const setUserNotificationPreferenceInputSchema = z
+  .object({
+    id: z.string().min(1),
+    topic: userNotificationTopicSchema,
+    choice: userNotificationChoiceSchema,
+  })
+  .strict();
+export type SetUserNotificationPreferenceInput = z.infer<
+  typeof setUserNotificationPreferenceInputSchema
+>;
+
 export const userTourPreferenceRowSchema = z
   .object({ tracesExplorerTourDismissedAt: z.date().nullable() })
   .strict();

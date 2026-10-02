@@ -86,10 +86,9 @@ COPY sdks/typescript ./sdks/typescript
 # is already in the image at this point: the trace, evaluator and
 # model-provider contracts and packages/redaction arrive with `COPY packages`
 # above, the langevals catalogue and feature-map.json with their own lines, and
-# the skills bundle with `COPY skills`. Its one remaining application input —
-# specs/api-reference/openapi-document.json, from which
-# `generate:openapi-types` derives the REST client — arrives with its own COPY
-# below, ahead of the build that runs the generator.
+# the skills bundle with `COPY skills`. The REST client is committed source
+# (src/internal/generated/openapi/api-client.ts), so the build reads no OpenAPI
+# document.
 #
 # The four monolith source files that used to be copied here are gone from the
 # tree, and so are the two generators that read them — their output was imported
@@ -107,10 +106,9 @@ COPY sdks/typescript ./sdks/typescript
 # (https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci):
 # the install layer must not be invalidated by a source edit.
 COPY apps/worker/package.json ./apps/worker/package.json
-# The interactive API process. It also owns the two openapi document tasks
-# that still live in apps/api; the goose runner and TTL reconciler moved to
-# packages/clickhouse-migrations, and the rest (Prisma, LangWatchQL) moved to
-# apps/tasks.
+# The interactive API process. It also owns the OpenAPI document generator; the
+# goose runner and TTL reconciler moved to packages/clickhouse-migrations, and
+# the rest (Prisma, LangWatchQL) moved to apps/tasks.
 COPY apps/api/package.json ./apps/api/package.json
 # The browser bundle. `@langwatch/ui` is a Vite build rather than a process:
 # it emits dist/client, which the API process serves.
@@ -129,14 +127,12 @@ COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
 COPY apps/scenario-child ./apps/scenario-child
 # What `start:prepare:files` and `ensure:built` read: the generator scripts (and
-# their Go binary, below), the
-# OpenAPI document the SDK derives its REST client from, and the web declarations
-# project the browser packages reference.
+# their Go binary, below) and the web declarations project the browser packages
+# reference.
 COPY dev/scripts ./dev/scripts
 # dev/scripts/devscripts.sh runs this binary when Go is not on PATH.
 COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
 COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
-COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-document.json
 # The trailing `...` on each filter makes pnpm build each application's
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
@@ -175,10 +171,9 @@ RUN pnpm start:prepare:files && pnpm ensure:built \
 # (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Losing this silently would
 # leave a dev-dependency-laden production image; losing it loudly fails the
 # build here where the cause is obvious.
-# --ignore-scripts: this pass exists only to drop devDependencies. Without it
-# the SDK's `prepare` re-runs here and dies — it regenerates types with
-# openapi-typescript, a devDependency this very command is removing. Nothing
-# needs regenerating at this point; the dist was built in the step above, and
+# --ignore-scripts: this pass exists only to drop devDependencies, and a
+# lifecycle script that ran here could need a devDependency this very command
+# is removing. Nothing needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
 RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 

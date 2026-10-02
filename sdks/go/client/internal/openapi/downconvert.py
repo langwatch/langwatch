@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Down-convert the canonical OpenAPI 3.1 document to a 3.0.3-compatible one.
 
-The LangWatch API spec (langwatch/src/app/api/openapiLangWatch.json) is authored
-as OpenAPI 3.1.0. The Go code generator (oapi-codegen, via kin-openapi) only
+The LangWatch API spec (specs/api-reference/openapi-document.json, generated from
+the api's route declarations) is OpenAPI 3.1.0. The Go code generator (oapi-codegen, via kin-openapi) only
 understands OpenAPI 3.0, so this script performs a small, deterministic,
 loss-free-for-our-purposes down-conversion of the handful of 3.1-only JSON Schema
-constructs the spec actually uses. The canonical 3.1 spec is never modified; the
-3.0 output is committed alongside the generated Go so `go build` works without
-re-running anything.
+constructs the spec actually uses. The 3.1 spec is never modified; the 3.0
+output is a temporary file, and the generated Go is committed so `go build`
+works without re-running anything.
 
 Transforms applied (and why each is safe for codegen):
 
@@ -38,6 +38,18 @@ Transforms applied (and why each is safe for codegen):
 
   7. discriminator over inline oneOf/anyOf members -> dropped
      oapi-codegen maps a discriminator only onto $ref members; the union stays.
+
+  8. two properties whose Go field names collide -> x-go-name on the later one
+     An object accepting both `toolCalls` and `tool_calls` would otherwise get
+     two `ToolCalls` fields. The later property is renamed with a `Snake`
+     suffix; its JSON name is unchanged.
+
+  9. response media type "application/<x>+json" -> "application/json"
+     oapi-codegen leaves the nested types of a structured-suffix JSON response
+     undeclared, so the Go file does not compile. The generated parser reads
+     any Content-Type containing "json" as JSON, so a SCIM answer still
+     decodes. Request bodies keep their media type, which the client sends as
+     Content-Type.
 
 Usage:
     python3 downconvert.py <source-3.1.json> <dest-3.0.json>
@@ -111,7 +123,38 @@ def convert(node):
         if any(isinstance(m, dict) and "$ref" not in m for m in members):
             node.pop("discriminator")
 
+    # (8) property names that oapi-codegen would turn into one Go field name.
+    properties = node.get("properties")
+    if isinstance(properties, dict) and node.get("type") == "object":
+        seen = set()
+        for name in sorted(properties, key=lambda key: ("_" in key, key)):
+            field = go_field_name(name)
+            if field in seen and isinstance(properties[name], dict):
+                properties[name]["x-go-name"] = field + "Snake"
+            seen.add(field)
+
     return {k: convert(v) for k, v in node.items()}
+
+
+def go_field_name(name):
+    """The Go field name oapi-codegen derives from a JSON property name."""
+    parts = [part for part in name.replace("-", "_").split("_") if part]
+    return "".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def json_responses(spec):
+    """Rule (9): give every structured-suffix JSON response the plain JSON media type."""
+    for item in spec.get("paths", {}).values():
+        for operation in item.values():
+            if not isinstance(operation, dict):
+                continue
+            for response in operation.get("responses", {}).values():
+                content = response.get("content") if isinstance(response, dict) else None
+                if not isinstance(content, dict):
+                    continue
+                for media_type in [key for key in content if key.endswith("+json")]:
+                    entry = content.pop(media_type)
+                    content.setdefault("application/json", entry)
 
 
 def main():
@@ -123,6 +166,7 @@ def main():
         spec = json.load(handle)
     spec["openapi"] = "3.0.3"
     spec = convert(spec)
+    json_responses(spec)
     with open(dest, "w") as handle:
         json.dump(spec, handle, indent=2)
         handle.write("\n")

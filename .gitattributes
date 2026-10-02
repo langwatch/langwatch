@@ -21,7 +21,6 @@ modules/analytics/contract/src/visualization/vega-lite-schema-validator.generate
 modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts linguist-generated=true
 modules/langy/browser/src/model/shared/langy/feature-map.generated.json linguist-generated=true
 skills/_compiled/native/**              linguist-generated=true
-apps/api/src/features/discovery/openapi-document.json linguist-generated=true
 **/*.generated.*                        linguist-generated=true
 sdks/typescript/src/internal/generated/**/*.ts linguist-generated=true
 docs/self-hosting/usage-report-dictionary.mdx linguist-generated=true

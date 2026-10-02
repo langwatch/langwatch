@@ -4,15 +4,30 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.list_roles_built_in import ListRolesBuiltIn
 from ...models.list_roles_response_200 import ListRolesResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    built_in: ListRolesBuiltIn | Unset = UNSET,
+) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    json_built_in: str | Unset = UNSET
+    if not isinstance(built_in, Unset):
+        json_built_in = built_in.value
+
+    params["builtIn"] = json_built_in
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/v1/roles",
+        "params": params,
     }
 
     return _kwargs
@@ -47,8 +62,14 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> Response[ListRolesResponse200]:
-    """List the organization's custom roles with their permission sets.
+    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
+    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
+    roles, `?builtIn=false` only the custom ones.
+
+    Args:
+        built_in (ListRolesBuiltIn | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -58,7 +79,9 @@ def sync_detailed(
         Response[ListRolesResponse200]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        built_in=built_in,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -70,8 +93,14 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> ListRolesResponse200 | None:
-    """List the organization's custom roles with their permission sets.
+    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
+    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
+    roles, `?builtIn=false` only the custom ones.
+
+    Args:
+        built_in (ListRolesBuiltIn | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -83,14 +112,21 @@ def sync(
 
     return sync_detailed(
         client=client,
+        built_in=built_in,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> Response[ListRolesResponse200]:
-    """List the organization's custom roles with their permission sets.
+    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
+    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
+    roles, `?builtIn=false` only the custom ones.
+
+    Args:
+        built_in (ListRolesBuiltIn | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -100,7 +136,9 @@ async def asyncio_detailed(
         Response[ListRolesResponse200]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        built_in=built_in,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -110,8 +148,14 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> ListRolesResponse200 | None:
-    """List the organization's custom roles with their permission sets.
+    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
+    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
+    roles, `?builtIn=false` only the custom ones.
+
+    Args:
+        built_in (ListRolesBuiltIn | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,5 +168,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            built_in=built_in,
         )
     ).parsed

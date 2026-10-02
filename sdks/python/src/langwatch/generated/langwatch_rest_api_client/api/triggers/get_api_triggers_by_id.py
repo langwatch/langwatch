@@ -11,13 +11,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    trigger_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v1/triggers/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/triggers/{trigger_id}".format(
+            trigger_id=quote(str(trigger_id), safe=""),
         ),
     }
 
@@ -58,14 +58,14 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiTriggersByIdResponse200 | GetApiTriggersByIdResponse404]:
     """Get a trigger by its ID
 
     Args:
-        id (str):
+        trigger_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -76,7 +76,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        trigger_id=trigger_id,
     )
 
     response = client.get_httpx_client().request(
@@ -87,14 +87,14 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetApiTriggersByIdResponse200 | GetApiTriggersByIdResponse404 | None:
     """Get a trigger by its ID
 
     Args:
-        id (str):
+        trigger_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -105,20 +105,20 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        trigger_id=trigger_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiTriggersByIdResponse200 | GetApiTriggersByIdResponse404]:
     """Get a trigger by its ID
 
     Args:
-        id (str):
+        trigger_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -129,7 +129,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        trigger_id=trigger_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -138,14 +138,14 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    trigger_id: str,
     *,
     client: AuthenticatedClient,
 ) -> GetApiTriggersByIdResponse200 | GetApiTriggersByIdResponse404 | None:
     """Get a trigger by its ID
 
     Args:
-        id (str):
+        trigger_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,7 +157,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            trigger_id=trigger_id,
             client=client,
         )
     ).parsed

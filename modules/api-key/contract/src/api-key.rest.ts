@@ -32,7 +32,9 @@ export const apiKeyRestListItemSchema = z.object({
 });
 export type ApiKeyRestListItem = z.infer<typeof apiKeyRestListItemSchema>;
 
-export const apiKeyRestListSchema = z.object({ data: z.array(apiKeyRestListItemSchema) });
+export const apiKeyRestListSchema = z.object({
+  data: z.array(apiKeyRestListItemSchema.meta({ id: "ApiKeyInfo" })),
+});
 
 export const apiKeyRestDetailSchema = z.object({
   ...apiKeyRestListItemSchema.shape,

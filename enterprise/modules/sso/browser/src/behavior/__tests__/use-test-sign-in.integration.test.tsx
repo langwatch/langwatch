@@ -112,6 +112,45 @@ describe("when the provider sends the browser back", () => {
     },
   );
 
+  describe("when the ID token named another issuer and both come back on the page", () => {
+    /** @scenario "An ID token from another issuer is refused with both issuers named" */
+    it("quotes the issuer the connection expects and the one the provider sent", () => {
+      const expected = "https://login.microsoftonline.com/app-tenant/v2.0";
+      const received = "https://login.microsoftonline.com/home-tenant/v2.0";
+      const host = new FakeSsoHost({
+        query: {
+          error: "sso_issuer_mismatch",
+          ssoTest: "conn-1",
+          expected_issuer: expected,
+          received_issuer: received,
+        },
+      });
+      const { result } = renderTestSignIn(host);
+
+      expect(result.current.failure?.title).toMatch(/names a different issuer/i);
+      expect(result.current.failure?.detail).toContain(`This connection expects: ${expected}`);
+      expect(result.current.failure?.detail).toContain(`Your identity provider sent: ${received}`);
+      expect(result.current.failure?.advice).toMatch(/not common or organizations/);
+    });
+  });
+
+  describe("when the issuers on the page are not https addresses", () => {
+    it("leaves them out instead of quoting the query string", () => {
+      const host = new FakeSsoHost({
+        query: {
+          error: "sso_issuer_mismatch",
+          ssoTest: "conn-1",
+          expected_issuer: "javascript:alert(1)",
+          received_issuer: "http://login.example/v2.0",
+        },
+      });
+      const { result } = renderTestSignIn(host);
+
+      expect(result.current.failure?.title).toMatch(/names a different issuer/i);
+      expect(result.current.failure?.detail).toBeNull();
+    });
+  });
+
   it("leaves an error belonging to another flow alone", () => {
     const someoneElses = new FakeSsoHost({ query: { error: "access_denied", ssoTest: "conn-9" } });
     const unmarked = new FakeSsoHost({ query: { error: "access_denied" } });

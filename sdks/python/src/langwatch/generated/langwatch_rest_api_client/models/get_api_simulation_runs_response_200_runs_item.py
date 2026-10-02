@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -14,6 +13,12 @@ if TYPE_CHECKING:
     )
     from ..models.get_api_simulation_runs_response_200_runs_item_results_type_0 import (
         GetApiSimulationRunsResponse200RunsItemResultsType0,
+    )
+    from ..models.get_api_simulation_runs_response_200_runs_item_role_costs import (
+        GetApiSimulationRunsResponse200RunsItemRoleCosts,
+    )
+    from ..models.get_api_simulation_runs_response_200_runs_item_role_latencies import (
+        GetApiSimulationRunsResponse200RunsItemRoleLatencies,
     )
 
 
@@ -36,7 +41,12 @@ class GetApiSimulationRunsResponse200RunsItem:
         updated_at (float):
         duration_in_ms (float):
         platform_url (str):
+        scenario_set_id (str | Unset):
+        messages_truncated (bool | Unset): True when `messages` holds only the first few messages of a longer
+            conversation. Pass `include=messages` to read them all.
         total_cost (float | Unset):
+        role_costs (GetApiSimulationRunsResponse200RunsItemRoleCosts | Unset):
+        role_latencies (GetApiSimulationRunsResponse200RunsItemRoleLatencies | Unset):
         note (None | str | Unset): One short line saying why the run was started, as given when it was queued. Null on a
             run started without one.
         scenario_version (int | None | Unset): The version of the scenario at the moment the run was queued. Null on
@@ -55,10 +65,13 @@ class GetApiSimulationRunsResponse200RunsItem:
     updated_at: float
     duration_in_ms: float
     platform_url: str
+    scenario_set_id: str | Unset = UNSET
+    messages_truncated: bool | Unset = UNSET
     total_cost: float | Unset = UNSET
+    role_costs: GetApiSimulationRunsResponse200RunsItemRoleCosts | Unset = UNSET
+    role_latencies: GetApiSimulationRunsResponse200RunsItemRoleLatencies | Unset = UNSET
     note: None | str | Unset = UNSET
     scenario_version: int | None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_simulation_runs_response_200_runs_item_results_type_0 import (
@@ -98,7 +111,19 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         platform_url = self.platform_url
 
+        scenario_set_id = self.scenario_set_id
+
+        messages_truncated = self.messages_truncated
+
         total_cost = self.total_cost
+
+        role_costs: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.role_costs, Unset):
+            role_costs = self.role_costs.to_dict()
+
+        role_latencies: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.role_latencies, Unset):
+            role_latencies = self.role_latencies.to_dict()
 
         note: None | str | Unset
         if isinstance(self.note, Unset):
@@ -113,7 +138,7 @@ class GetApiSimulationRunsResponse200RunsItem:
             scenario_version = self.scenario_version
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "scenarioId": scenario_id,
@@ -130,8 +155,16 @@ class GetApiSimulationRunsResponse200RunsItem:
                 "platformUrl": platform_url,
             }
         )
+        if scenario_set_id is not UNSET:
+            field_dict["scenarioSetId"] = scenario_set_id
+        if messages_truncated is not UNSET:
+            field_dict["messagesTruncated"] = messages_truncated
         if total_cost is not UNSET:
             field_dict["totalCost"] = total_cost
+        if role_costs is not UNSET:
+            field_dict["roleCosts"] = role_costs
+        if role_latencies is not UNSET:
+            field_dict["roleLatencies"] = role_latencies
         if note is not UNSET:
             field_dict["note"] = note
         if scenario_version is not UNSET:
@@ -146,6 +179,12 @@ class GetApiSimulationRunsResponse200RunsItem:
         )
         from ..models.get_api_simulation_runs_response_200_runs_item_results_type_0 import (
             GetApiSimulationRunsResponse200RunsItemResultsType0,
+        )
+        from ..models.get_api_simulation_runs_response_200_runs_item_role_costs import (
+            GetApiSimulationRunsResponse200RunsItemRoleCosts,
+        )
+        from ..models.get_api_simulation_runs_response_200_runs_item_role_latencies import (
+            GetApiSimulationRunsResponse200RunsItemRoleLatencies,
         )
 
         d = dict(src_dict)
@@ -201,7 +240,25 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         platform_url = d.pop("platformUrl")
 
+        scenario_set_id = d.pop("scenarioSetId", UNSET)
+
+        messages_truncated = d.pop("messagesTruncated", UNSET)
+
         total_cost = d.pop("totalCost", UNSET)
+
+        _role_costs = d.pop("roleCosts", UNSET)
+        role_costs: GetApiSimulationRunsResponse200RunsItemRoleCosts | Unset
+        if isinstance(_role_costs, Unset):
+            role_costs = UNSET
+        else:
+            role_costs = GetApiSimulationRunsResponse200RunsItemRoleCosts.from_dict(_role_costs)
+
+        _role_latencies = d.pop("roleLatencies", UNSET)
+        role_latencies: GetApiSimulationRunsResponse200RunsItemRoleLatencies | Unset
+        if isinstance(_role_latencies, Unset):
+            role_latencies = UNSET
+        else:
+            role_latencies = GetApiSimulationRunsResponse200RunsItemRoleLatencies.from_dict(_role_latencies)
 
         def _parse_note(data: object) -> None | str | Unset:
             if data is None:
@@ -234,26 +291,13 @@ class GetApiSimulationRunsResponse200RunsItem:
             updated_at=updated_at,
             duration_in_ms=duration_in_ms,
             platform_url=platform_url,
+            scenario_set_id=scenario_set_id,
+            messages_truncated=messages_truncated,
             total_cost=total_cost,
+            role_costs=role_costs,
+            role_latencies=role_latencies,
             note=note,
             scenario_version=scenario_version,
         )
 
-        get_api_simulation_runs_response_200_runs_item.additional_properties = d
         return get_api_simulation_runs_response_200_runs_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

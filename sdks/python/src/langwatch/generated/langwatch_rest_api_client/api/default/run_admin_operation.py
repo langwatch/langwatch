@@ -5,12 +5,17 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.run_admin_operation_body import RunAdminOperationBody
+from ...models.run_admin_operation_response_200 import RunAdminOperationResponse200
 from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     resource: str,
+    *,
+    body: RunAdminOperationBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -19,12 +24,21 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> RunAdminOperationResponse200 | None:
     if response.status_code == 200:
-        return None
+        response_200 = RunAdminOperationResponse200.from_dict(response.json())
+
+        return response_200
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -32,7 +46,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[RunAdminOperationResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -48,21 +64,24 @@ def sync_detailed(
     resource: str,
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Any]:
+    body: RunAdminOperationBody,
+) -> Response[RunAdminOperationResponse200]:
     """
     Args:
         resource (str):
+        body (RunAdminOperationBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[RunAdminOperationResponse200]
     """
 
     kwargs = _get_kwargs(
         resource=resource,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -72,27 +91,84 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     resource: str,
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Any]:
+    body: RunAdminOperationBody,
+) -> RunAdminOperationResponse200 | None:
     """
     Args:
         resource (str):
+        body (RunAdminOperationBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        RunAdminOperationResponse200
+    """
+
+    return sync_detailed(
+        resource=resource,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    resource: str,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunAdminOperationBody,
+) -> Response[RunAdminOperationResponse200]:
+    """
+    Args:
+        resource (str):
+        body (RunAdminOperationBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[RunAdminOperationResponse200]
     """
 
     kwargs = _get_kwargs(
         resource=resource,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    resource: str,
+    *,
+    client: AuthenticatedClient | Client,
+    body: RunAdminOperationBody,
+) -> RunAdminOperationResponse200 | None:
+    """
+    Args:
+        resource (str):
+        body (RunAdminOperationBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        RunAdminOperationResponse200
+    """
+
+    return (
+        await asyncio_detailed(
+            resource=resource,
+            client=client,
+            body=body,
+        )
+    ).parsed

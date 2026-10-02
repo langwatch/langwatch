@@ -4,9 +4,13 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_scenarios_by_id_versions_by_version_response_200_snapshot_fields import (
+        GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields,
+    )
     from ..models.get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item import (
         GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem,
     )
@@ -29,6 +33,8 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
         judge_model (None | str):
         max_turns (float | None):
         min_turns (float | None):
+        fields (GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields | Unset): The field values as this version
+            saved them. Absent on servers that predate suite fields.
     """
 
     name: str
@@ -40,7 +46,7 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
     judge_model: None | str
     max_turns: float | None
     min_turns: float | None
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    fields: GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -68,8 +74,12 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
         min_turns: float | None
         min_turns = self.min_turns
 
+        fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = self.fields.to_dict()
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
@@ -83,11 +93,16 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
                 "minTurns": min_turns,
             }
         )
+        if fields is not UNSET:
+            field_dict["fields"] = fields
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_scenarios_by_id_versions_by_version_response_200_snapshot_fields import (
+            GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields,
+        )
         from ..models.get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item import (
             GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem,
         )
@@ -138,6 +153,13 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
 
         min_turns = _parse_min_turns(d.pop("minTurns"))
 
+        _fields = d.pop("fields", UNSET)
+        fields: GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields | Unset
+        if isinstance(_fields, Unset):
+            fields = UNSET
+        else:
+            fields = GetApiScenariosByIdVersionsByVersionResponse200SnapshotFields.from_dict(_fields)
+
         get_api_scenarios_by_id_versions_by_version_response_200_snapshot = cls(
             name=name,
             situation=situation,
@@ -148,23 +170,7 @@ class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
             judge_model=judge_model,
             max_turns=max_turns,
             min_turns=min_turns,
+            fields=fields,
         )
 
-        get_api_scenarios_by_id_versions_by_version_response_200_snapshot.additional_properties = d
         return get_api_scenarios_by_id_versions_by_version_response_200_snapshot
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

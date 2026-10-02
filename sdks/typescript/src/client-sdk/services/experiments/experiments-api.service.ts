@@ -545,11 +545,9 @@ export class ExperimentsApiService {
       {
         params: {
           path: { slug },
-          // Both are described as string query parameters; the serialised
-          // query string is the same either way.
           query: {
-            ...(limit !== undefined ? { limit: String(limit) } : {}),
-            ...(cursor !== undefined ? { cursor: String(cursor) } : {}),
+            ...(limit !== undefined ? { limit } : {}),
+            ...(cursor !== undefined ? { cursor } : {}),
           },
         },
       },
@@ -577,7 +575,7 @@ export class ExperimentsApiService {
   }): Promise<ExperimentRestoreVersionResponse> {
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/experiments/{slug}/versions/{version}/restore",
-      { params: { path: { slug, version: String(version) } } },
+      { params: { path: { slug, version } } },
     );
     // Declared `withRawResponse`; see getWorkbenchState above.
     return unwrapApiResult<ExperimentRestoreVersionResponse>({

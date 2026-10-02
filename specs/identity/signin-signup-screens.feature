@@ -638,13 +638,17 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And finishing lands me on the same "check your email" the sign-up door shows
     And I can go back to the address step for a mistyped address
 
+  # The log-in door turns an unknown address into a sign-up by mailing it a
+  # confirmation link. An installation with no email provider cannot send one,
+  # so the screen does not offer it and says what is missing instead.
   @integration
-  Scenario: An address with no account on an installation that cannot send email goes to the password step
+  Scenario: An address with no account on an installation that cannot send email is told what is missing
     Given the installation has no email provider configured
-    When I enter an email address no account holds on the log-in screen
-    And I continue with the sign-up it offers
-    Then no confirmation link is sent and I am not told to check my email
-    And the sign-up door opens on the password step for that address, marked unconfirmed
+    When I enter an email address no account holds
+    Then the screen says there is no account for that address yet
+    And it says an administrator needs to set up email, or that I can sign in with single sign-on once it is set up
+    And no confirmation link is offered
+    And I can go back to the address step for a mistyped address
 
   @integration
   Scenario: A late instance-methods answer does not undo the carried address routing
@@ -1015,13 +1019,34 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then no sign-in routing or provider handoff starts
     And I can explicitly choose to log in again
 
+  # A self-hosted deployment with one live connection is an SSO deployment:
+  # colleagues go straight to their identity provider and never see a
+  # LangWatch log-in page. `?local=1` is the way to the local sign-in.
   @integration @regression
-  Scenario: A sole SSO provider waits for a sign-in gesture
-    Given the self-hosted installation has one active SSO connection
+  Scenario: A self-hosted sign-in page goes straight to the sole live connection
+    Given the self-hosted installation has one live SSO connection
     When I open the sign-in page without submitting an address
-    Then I see a button for that provider without an automatic redirect
+    Then the provider sign-in starts without me pressing anything
+
+  @integration @regression
+  Scenario: The sole connection is not dialed twice in a row
+    Given the sign-in page sent me to the sole connection moments ago
+    When I land on the sign-in page again without a session
+    Then I see a button for that provider instead of another automatic redirect
     When I choose to continue with that provider
     Then the provider sign-in starts
+
+  @integration @regression
+  Scenario: A failed sign-in return never redirects to the sole connection
+    Given the self-hosted installation has one live SSO connection
+    When I open the sign-in page with an error from the identity provider
+    Then I see the error and no provider sign-in starts
+
+  @integration @regression
+  Scenario: The break-glass sign-in page never redirects to the sole connection
+    Given the self-hosted installation has one live SSO connection
+    When I open the sign-in page with the break-glass parameter
+    Then I see the local sign-in and no provider sign-in starts
 
   @unit @regression
   Scenario: Logout reports a revocation failure instead of confirming success

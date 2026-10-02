@@ -50,13 +50,18 @@ export const listOrganizationSpendInputSchema = z.object({
 });
 export type ListOrganizationSpendInput = z.infer<typeof listOrganizationSpendInputSchema>;
 
-/**
- * One project's spend, as the billing screen groups it. Loose on purpose: the
- * project row and the grouped cost rows travel as the operational database
- * shaped them, and narrowing them here would drop columns the screen reads.
- */
+/** The project a spend rollup is for: its identity only, never its credentials. */
+export const projectSpendRollupProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  teamId: z.string(),
+});
+export type ProjectSpendRollupProject = z.infer<typeof projectSpendRollupProjectSchema>;
+
+/** One project's spend, as the billing screen groups it; cost rows keep the grouped shape. */
 export const projectSpendRollupSchema = z.object({
-  project: z.looseObject({ id: z.string() }),
+  project: projectSpendRollupProjectSchema,
   costs: z.array(
     z.looseObject({
       projectId: z.string(),

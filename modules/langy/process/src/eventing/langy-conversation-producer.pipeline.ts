@@ -139,6 +139,11 @@ function buildLangyConversationProducerPipeline(input: {
     sessionKeys,
     localConnectTurn,
     guidedOnboarding,
+    webPush: {
+      users: { getNotificationPreference: refuse("read a notification preference") },
+      projects: { findSummaryById: refuse("read a project for a notification") },
+      notifications: { requestWebPushDelivery: refuse("request a Web Push delivery") },
+    },
   }).buildProcessing();
 }
 
