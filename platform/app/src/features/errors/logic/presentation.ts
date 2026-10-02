@@ -286,6 +286,23 @@ const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
   "upstream_timeout",
+  // The gateway's own codes for a provider it could not get an answer from.
+  "provider_timeout",
+  "provider_connection_failed",
+]);
+
+/**
+ * The provider refused the request itself as malformed: a 400 or 422 status,
+ * or the provider's own code for it (Bedrock's "ValidationException", the
+ * OpenAI and Anthropic "invalid_request_error"). Deterministic: the same
+ * request is refused the same way on every try, so the fix is another model,
+ * not a retry.
+ */
+export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_bad_request",
+  "upstream_unprocessable_entity",
+  "ValidationException",
+  "invalid_request_error",
 ]);
 
 /**
@@ -4689,6 +4706,9 @@ const presentations = {
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_INVALID_REQUEST_REASONS)) {
+        return "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.";
       }
       return "Try again, or pick a different model.";
     },

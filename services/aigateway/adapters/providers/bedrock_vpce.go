@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	brdocument "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	brtypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/bytedance/sonic"
@@ -502,56 +503,66 @@ func responseFormatJSONSchema(rf *interface{}) (map[string]interface{}, bool) {
 }
 
 // mapBedrockMessages splits the neutral Bifrost message list into Bedrock's
-// system prompt blocks and conversation messages. Bedrock Converse only allows
-// user/assistant roles, so a tool-role message is mapped to a user message
-// carrying a ToolResultBlock.
+// system prompt blocks and conversation messages.
+//
+// Converse only allows user and assistant roles, and it requires them to
+// alternate. A tool-role message becomes a ToolResultBlock on the user side,
+// and every block that lands on the same side as the message before it joins
+// that message: the results of parallel tool calls answer one assistant turn,
+// so they must sit in one user message (Converse rejects the turn otherwise,
+// "Expected toolResult blocks at messages.N.content"), and user text sent
+// right after them joins that message too. System and developer messages are
+// hoisted to the system prompt wherever they appear, and a message with no
+// content is dropped, which can leave two same-side messages adjacent; they
+// merge the same way.
 func mapBedrockMessages(in []bfschemas.ChatMessage) ([]brtypes.SystemContentBlock, []brtypes.Message, error) {
 	var system []brtypes.SystemContentBlock
 	var messages []brtypes.Message
 
 	for _, m := range in {
-		switch m.Role {
-		case bfschemas.ChatMessageRoleSystem, bfschemas.ChatMessageRoleDeveloper:
+		if m.Role == bfschemas.ChatMessageRoleSystem || m.Role == bfschemas.ChatMessageRoleDeveloper {
 			for _, text := range messageTexts(m) {
 				system = append(system, &brtypes.SystemContentBlockMemberText{Value: text})
 			}
-
-		case bfschemas.ChatMessageRoleTool:
-			blocks := toolResultBlocks(m)
-			if len(blocks) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleUser,
-				Content: blocks,
-			})
-
-		case bfschemas.ChatMessageRoleUser:
-			content := userContentBlocks(m)
-			if len(content) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleUser,
-				Content: content,
-			})
-
-		case bfschemas.ChatMessageRoleAssistant:
-			content := assistantContentBlocks(m)
-			if len(content) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleAssistant,
-				Content: content,
-			})
-
-		default:
-			return nil, nil, fmt.Errorf("unsupported chat message role %q", m.Role)
+			continue
 		}
+		role, content, err := converseTurn(m)
+		if err != nil {
+			return nil, nil, err
+		}
+		messages = appendConverseTurn(messages, role, content)
 	}
 
 	return system, messages, nil
+}
+
+// converseTurn maps one non-system message to the Converse side it lands on
+// and the content blocks it carries there.
+func converseTurn(m bfschemas.ChatMessage) (brtypes.ConversationRole, []brtypes.ContentBlock, error) {
+	switch m.Role {
+	case bfschemas.ChatMessageRoleTool:
+		return brtypes.ConversationRoleUser, toolResultBlocks(m), nil
+	case bfschemas.ChatMessageRoleUser:
+		return brtypes.ConversationRoleUser, userContentBlocks(m), nil
+	case bfschemas.ChatMessageRoleAssistant:
+		return brtypes.ConversationRoleAssistant, assistantContentBlocks(m), nil
+	default:
+		return "", nil, fmt.Errorf("unsupported chat message role %q", m.Role)
+	}
+}
+
+// appendConverseTurn adds content to the conversation, joining the last
+// message when it is on the same side so the roles keep alternating. Empty
+// content adds nothing.
+func appendConverseTurn(messages []brtypes.Message, role brtypes.ConversationRole, content []brtypes.ContentBlock) []brtypes.Message {
+	if len(content) == 0 {
+		return messages
+	}
+	if last := len(messages) - 1; last >= 0 && messages[last].Role == role {
+		messages[last].Content = append(messages[last].Content, content...)
+		return messages
+	}
+	return append(messages, brtypes.Message{Role: role, Content: content})
 }
 
 // messageTexts returns the plain-text fragments of a message content
@@ -625,6 +636,9 @@ func toolResultBlocks(m bfschemas.ChatMessage) []brtypes.ContentBlock {
 	}
 	if len(resultContent) == 0 && toolUseID == "" {
 		return nil
+	}
+	if len(resultContent) == 0 {
+		resultContent = []brtypes.ToolResultContentBlock{&brtypes.ToolResultContentBlockMemberText{Value: ""}}
 	}
 	return []brtypes.ContentBlock{
 		&brtypes.ContentBlockMemberToolResult{
@@ -856,19 +870,76 @@ func bedrockLLMUsage(usage *brtypes.TokenUsage) *bfschemas.BifrostLLMUsage {
 	}
 }
 
-// wrapBedrockError surfaces a Bedrock SDK error with the upstream HTTP status
-// when available so the gateway's error envelope mirrors the provider response.
+// wrapBedrockError turns a Bedrock SDK error into the error the gateway
+// surfaces. An error Bedrock answered is forwarded as an UpstreamError under
+// Bedrock's own status and exception name, so a terminal 400
+// (ValidationException) reaches the client as a 400 and is neither retried nor
+// failed over, while a 429 or 5xx stays retryable. A request the SDK refused
+// to send (a required field missing) is a deterministic bad request. Anything
+// else never got an answer and stays a retryable provider_error.
 func wrapBedrockError(ctx context.Context, err error) error {
 	var respErr *smithyhttp.ResponseError
-	if errors.As(err, &respErr) && respErr.Response != nil {
-		return herr.New(ctx, domain.ErrProviderError, herr.M{
-			"status":  respErr.Response.StatusCode,
+	if errors.As(err, &respErr) && respErr.Response != nil && respErr.Response.StatusCode > 0 {
+		ue := &domain.UpstreamError{
+			StatusCode: respErr.Response.StatusCode,
+			Message:    err.Error(),
+			Provider:   string(domain.ProviderBedrock),
+			Headers:    forwardableUpstreamHeaders(bedrockResponseHeaders(respErr)),
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			ue.ErrorType = apiErr.ErrorCode()
+			ue.ErrorCode = apiErr.ErrorCode()
+			if msg := apiErr.ErrorMessage(); msg != "" {
+				ue.Message = msg
+			}
+		}
+		return ue
+	}
+	var invalid *smithy.InvalidParamsError
+	if errors.As(err, &invalid) {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
 			"message": err.Error(),
 		})
 	}
 	return herr.New(ctx, domain.ErrProviderError, herr.M{
 		"message": err.Error(),
 	})
+}
+
+// bedrockStreamError is the error a ConverseStream ends with mid-stream.
+// Bedrock reports these as typed exception events (ThrottlingException,
+// ValidationException, ModelStreamErrorException) on a stream already answered
+// 200, so there is no status to forward; the exception name rides as the error
+// type so the SSE error frame names it.
+func bedrockStreamError(err error) error {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return fmt.Errorf("bedrock stream error: %w", err)
+	}
+	msg := apiErr.ErrorMessage()
+	if msg == "" {
+		msg = err.Error()
+	}
+	return &domain.UpstreamError{
+		Message:   msg,
+		ErrorType: apiErr.ErrorCode(),
+		ErrorCode: apiErr.ErrorCode(),
+		Provider:  string(domain.ProviderBedrock),
+	}
+}
+
+// bedrockResponseHeaders flattens the HTTP response headers of a Bedrock SDK
+// error for forwardableUpstreamHeaders.
+func bedrockResponseHeaders(respErr *smithyhttp.ResponseError) map[string]string {
+	if respErr.Response == nil || respErr.Response.Response == nil {
+		return nil
+	}
+	out := make(map[string]string, len(respErr.Response.Header))
+	for k := range respErr.Response.Header {
+		out[k] = respErr.Response.Header.Get(k)
+	}
+	return out
 }
 
 // --- stream iterator ---
@@ -927,7 +998,7 @@ func (it *bedrockStreamIterator) nextTyped(ctx context.Context) (*bfschemas.Bifr
 		case event, ok := <-it.stream.Events():
 			if !ok {
 				if err := it.stream.Err(); err != nil {
-					it.err = fmt.Errorf("bedrock stream error: %w", err)
+					it.err = bedrockStreamError(err)
 				}
 				it.done = true
 				return nil, false
