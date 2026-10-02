@@ -109,8 +109,7 @@ describe("the licence limit answers", () => {
         limits.reportBlocked({ organizationId: ORGANIZATION, limitType: "members" }, ANA),
       ).resolves.toBeUndefined();
 
-      await new Promise((resolve) => setImmediate(resolve));
-      expect(reportError).toHaveBeenCalledWith(failure);
+      await vi.waitFor(() => expect(reportError).toHaveBeenCalledWith(failure));
     });
   });
 });
