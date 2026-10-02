@@ -23,6 +23,7 @@ import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { ATTR_KEYS as ATTR } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { SpendUsage } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { epochMsToOtlpNanos } from "~/server/traces/collectorSpan.utils";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 
 const logger = createLogger("langwatch:gateway:realtime-session-span");
@@ -119,8 +120,8 @@ export async function recordRealtimeSessionSpan(params: {
         spanId: settlementSpanId(session.id),
         name: SPAN_NAME,
         kind: 3,
-        startTimeUnixNano: String(startMs * 1_000_000),
-        endTimeUnixNano: String(endMs * 1_000_000),
+        startTimeUnixNano: epochMsToOtlpNanos(startMs),
+        endTimeUnixNano: epochMsToOtlpNanos(endMs),
         attributes,
         events: [],
         links: [],
