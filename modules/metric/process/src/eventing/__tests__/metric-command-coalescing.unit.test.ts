@@ -13,10 +13,8 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 
 import { point } from "../../app/__tests__/metric.fixture.ts";
-import {
-  RecordMetricDataPointCommand,
-  createMetricProcessingPipeline,
-} from "../metric-processing.service.ts";
+import { RecordMetricDataPointCommand } from "../metric.commands.ts";
+import { createMetricProcessingPipeline } from "../metric.pipeline.ts";
 
 const TENANT_ID = "project_metric_coalescing";
 

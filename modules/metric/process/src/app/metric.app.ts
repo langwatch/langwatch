@@ -19,13 +19,13 @@ import type { OtlpDoorRequest } from "@langwatch/otlp";
 import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  buildMetricProcessingPipeline,
+  type MetricProcessingPipeline,
+} from "../eventing/metric.pipeline.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
-import {
-  MetricProcessingService,
-  type MetricProcessingPipeline,
-} from "../services/metric-processing.service.ts";
 import { MetricRequestCollectionService } from "../services/metric-request-collection.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 import { OtlpMetricReceiverService } from "../services/otlp-metric-receiver.service.ts";
@@ -75,7 +75,7 @@ export class MetricModule implements MetricApiContract {
 
   static create({ dependencies, members, config }: MetricSetup): MetricModule {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
-    const pipeline = MetricProcessingService.create({
+    const pipeline = buildMetricProcessingPipeline({
       repository: ClickHouseMetricDataPointAppendRepository.create({
         resolveClient: ClickHouseMetricDataPointAppendRepository.resolverOver(members.clickhouse),
         defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
@@ -86,7 +86,7 @@ export class MetricModule implements MetricApiContract {
         resolve: (tenantId) =>
           dependencies.retention.getResolvedForProject({ projectId: tenantId }),
       },
-    }).build();
+    });
     const service = MetricService.create({ preparation });
     const collection = MetricRequestCollectionService.create({
       traces: dependencies.traces,

@@ -53,7 +53,7 @@ export type {
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
 } from "./channels/langy-worker.channel.ts";
-export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
+export type { LangyConversationProcessingPipelineDeps } from "./eventing/langy-conversation.pipeline.ts";
 export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,

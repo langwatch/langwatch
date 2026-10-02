@@ -4,7 +4,7 @@ import { point } from "../../app/__tests__/metric.fixture.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
-import { MetricProcessingService } from "../metric-processing.service.ts";
+import { buildMetricProcessingPipeline } from "../metric.pipeline.ts";
 
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
   return {
@@ -20,14 +20,14 @@ describe("ClickHouseMetricProcessingAdapter", () => {
     it("builds the metric-processing pipeline from that client alone", () => {
       const resolveClient = vi.fn(async () => client());
 
-      const pipeline = MetricProcessingService.create({
+      const pipeline = buildMetricProcessingPipeline({
         repository: ClickHouseMetricDataPointAppendRepository.create({
           resolveClient,
           defaultRetentionDays: 49,
         }),
         defaultRetentionDays: 49,
         metricCommandShardCount: 8,
-      }).build();
+      });
 
       expect(pipeline.metadata.name).toBe("metric_processing");
       expect(pipeline.commands.map((command) => command.definition.name)).toEqual([

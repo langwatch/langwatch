@@ -113,6 +113,7 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
+import type { LangyConversationDefinition } from "../eventing/langy-conversation.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
@@ -124,7 +125,6 @@ import type {
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
-import type { LangyConversationDefinition } from "../services/langy-conversation-pipeline.service.ts";
 import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
 import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";

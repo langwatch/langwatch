@@ -20,9 +20,12 @@ import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-ef
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
-import { LangyConversationPipelineService } from "../services/langy-conversation-pipeline.service.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
+import {
+  buildLangyConversationPipeline,
+  type LangyConversationDefinition,
+} from "./langy-conversation.pipeline.ts";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
@@ -124,7 +127,7 @@ export class EventingLangyConversationAdapter {
 
   private constructor(private readonly options: EventingLangyConversationAdapterOptions) {}
 
-  buildProcessing(): ReturnType<LangyConversationPipelineService["build"]> {
+  buildProcessing(): LangyConversationDefinition {
     const options = this.options;
     const conversationStore = options.langyConversationProjectionStore;
 
@@ -204,7 +207,7 @@ export class EventingLangyConversationAdapter {
       ...options.webPush,
     });
 
-    return LangyConversationPipelineService.create({
+    return buildLangyConversationPipeline({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
@@ -219,7 +222,7 @@ export class EventingLangyConversationAdapter {
         localConnectTurnSubscriber,
         webPushSubscriber,
       ],
-    }).build();
+    });
   }
 
   connectCommands(commands: RedisLangyConversationRuntimeRepository): void {

@@ -12,18 +12,14 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../langy-analytics-event.projection.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import {
-  agentRespondedEvent,
-  CONVERSATION_ID,
-  PROJECT_ID,
-} from "../../eventing/__tests__/langyEventFixtures.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
-import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
-import {
-  LangyConversationPipelineService,
+  buildLangyConversationPipeline,
   type LangyConversationProcessingPipelineDeps,
-} from "../langy-conversation-pipeline.service.ts";
+} from "../langy-conversation.pipeline.ts";
+import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "./langyEventFixtures.ts";
 
 /**
  * Proves the FINAL Langy pipeline shape from the public static definition (conversation + turn)
@@ -69,7 +65,7 @@ function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDep
     ...overrides,
   };
   return {
-    pipeline: LangyConversationPipelineService.create(deps).build(),
+    pipeline: buildLangyConversationPipeline(deps),
     analyticsAppend,
     subscribers,
   };

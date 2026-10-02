@@ -7,7 +7,7 @@ import {
 } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
 
-import { RecordMetricDataPointCommand } from "../metric-processing.service.ts";
+import { RecordMetricDataPointCommand } from "../metric.commands.ts";
 
 describe("RecordMetricDataPointCommand", () => {
   /** @scenario "Valid OTLP points become canonical durable events" */
