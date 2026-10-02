@@ -13,7 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { findProjectByApiKey } from "~/server/api-key/project-api-key";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { sessionRevocation } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
@@ -45,13 +45,18 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
     return c.json({ message: "X-Auth-Token header is required." }, 401);
   }
 
-  const project = await findProjectByApiKey({ prisma, token: authToken });
+  // The same resolution every SDK route uses: a project API key, or an API
+  // key bound to exactly one project (the key /authorize mints for the SDK
+  // login). A key that does not name one project is refused like a wrong one.
+  const resolved = await TokenResolver.create(prisma).resolve({
+    token: authToken,
+  });
 
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
 
-  return c.json({ projectSlug: project.slug });
+  return c.json({ projectSlug: resolved.project.slug });
 });
 
 // ---------- GET /api/auth/session ----------

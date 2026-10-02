@@ -220,7 +220,8 @@ The project API key is now stored as an HMAC-SHA256 hash, like every other API k
 - The plaintext stays in PostgreSQL for 7 days after a key is hashed, so the previous release can still authenticate it during the rollout and a rollback. After that, the plaintext is removed.
 - **Settings > API Keys** shows only the last four characters of the project API key. The full key is shown once, when you rotate it. To get a working key again, rotate the project API key or create a new API key.
 - Keep `CREDENTIALS_SECRET` stable. The hash is keyed by `CREDENTIALS_SECRET`, or by `NEXTAUTH_SECRET` when `CREDENTIALS_SECRET` is not set. Changing that value, including setting `CREDENTIALS_SECRET` for the first time on an install that only had `NEXTAUTH_SECRET`, invalidates every project API key and every other API key.
-- Rolling back to an earlier release more than 7 days after the upgrade leaves that release unable to authenticate project API keys, since it reads only the plaintext. Rotate the project API keys after such a rollback.
+- The earlier release reads only the plaintext. A project created or a key rotated on the new release has no plaintext, so the earlier release cannot authenticate that key, during the rollout or after a rollback. Rolling back more than 7 days after the upgrade has the same effect on every project API key. Rotate the affected keys on the release you end up running.
+- After a rollback, the earlier release's workflows, scenario runs and gateway trace export also fail for those projects until their key is rotated.
 
 To hash every key now, or to remove the plaintext without waiting 7 days, run the sweep from an app container:
 

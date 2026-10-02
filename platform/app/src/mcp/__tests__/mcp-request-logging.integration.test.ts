@@ -43,7 +43,9 @@ const { mockPrisma, logLines, loggerStub } = vi.hoisted(() => {
     loggerStub: stub,
     mockPrisma: {
       project: {
-        findUnique: vi.fn(({ where }: { where: { apiKey: string } }) =>
+        // A key still stored in plaintext: the hash lookup misses, the
+        // plaintext lookup finds it.
+        findUnique: vi.fn(({ where }: { where: { apiKey?: string } }) =>
           Promise.resolve(
             where.apiKey === "lw_logging_key"
               ? {
@@ -55,6 +57,10 @@ const { mockPrisma, logLines, loggerStub } = vi.hoisted(() => {
               : null,
           ),
         ),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      projectInternalKey: {
+        findUnique: vi.fn().mockResolvedValue(null),
       },
     },
   };

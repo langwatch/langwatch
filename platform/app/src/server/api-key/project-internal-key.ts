@@ -48,34 +48,52 @@ export async function getProjectInternalKey({
       return decrypt(existing.tokenEncrypted);
     } catch (error) {
       // The instance's encryption key changed since the token was stored.
-      // Replace it: nothing outside the server holds this token.
+      // Replace it: nothing outside the server holds this token. The update
+      // only applies to the unreadable row, so when two callers replace it at
+      // once, one write wins and both return the token the row ends up with.
       logger.warn(
         { projectId, error },
         "the project internal key could not be read; replacing it",
       );
       const replacement = newInternalKey();
-      await prisma.projectInternalKey.update({
-        where: { projectId },
+      await prisma.projectInternalKey.updateMany({
+        where: { projectId, tokenHash: existing.tokenHash },
         data: {
           tokenHash: replacement.tokenHash,
           tokenEncrypted: replacement.tokenEncrypted,
         },
       });
-      return replacement.token;
+      return readWinner({ prisma, projectId, minted: replacement });
     }
   }
 
+  // Two callers can mint at once. The insert skips a row that already
+  // exists, and every caller returns the token of the row that landed first.
   const minted = newInternalKey();
-  // Two callers can mint at once. The upsert keeps whichever row landed
-  // first, and every caller returns the token of that row.
-  const row = await prisma.projectInternalKey.upsert({
+  await prisma.projectInternalKey.createMany({
+    data: [
+      {
+        projectId,
+        tokenHash: minted.tokenHash,
+        tokenEncrypted: minted.tokenEncrypted,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return readWinner({ prisma, projectId, minted });
+}
+
+async function readWinner({
+  prisma,
+  projectId,
+  minted,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  minted: { token: string; tokenHash: string };
+}): Promise<string> {
+  const row = await prisma.projectInternalKey.findUniqueOrThrow({
     where: { projectId },
-    create: {
-      projectId,
-      tokenHash: minted.tokenHash,
-      tokenEncrypted: minted.tokenEncrypted,
-    },
-    update: {},
   });
   return row.tokenHash === minted.tokenHash
     ? minted.token

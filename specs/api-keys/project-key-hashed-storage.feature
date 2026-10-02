@@ -100,6 +100,13 @@ Feature: Project API keys are stored as hashes
     When two LangWatch services ask for the project internal key at once
     Then both receive the same key
 
+  @integration
+  Scenario: The Python SDK login accepts the key a person mints for one project
+    Given a member mints an API key bound to one project from the authorize page
+    When the SDK validates that key
+    Then it is accepted
+    And the response names that project
+
   # Display
 
   @integration

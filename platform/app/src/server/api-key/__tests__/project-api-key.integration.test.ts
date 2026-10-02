@@ -15,10 +15,18 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+import { ApiKeyService } from "../api-key.service";
 
 import {
   findProjectByApiKey,
@@ -94,6 +102,18 @@ describe("Feature: Project API keys are stored as hashes", () => {
   });
 
   afterAll(async () => {
+    await prisma.apiKey
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.user
+      .deleteMany({ where: { email: { startsWith: `${ns}-` } } })
+      .catch(() => {});
     await prisma.project
       .deleteMany({ where: { slug: { startsWith: `--test-project-${ns}` } } })
       .catch(() => {});
@@ -218,6 +238,53 @@ describe("Feature: Project API keys are stored as hashes", () => {
         expect(stored.apiKey).toBe(newToken);
         expect(stored.apiKeyHash).toBe(hashProjectApiKey(newToken));
       });
+    });
+  });
+
+  describe("given an API key a person minted for one project", () => {
+    /** @scenario "The Python SDK login accepts the key a person mints for one project" */
+    it("validates over HTTP for the SDK login and names that project", async () => {
+      const { projectId } = await createPlaintextProject();
+      const user = await prisma.user.create({
+        data: { name: "SDK Login", email: `${ns}-sdk-login@example.com` },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          organizationId,
+          userId: user.id,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+      await seedRoleBinding(prisma, {
+        organizationId,
+        userId: user.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: projectId,
+      });
+      const { token } = await ApiKeyService.create(prisma).create({
+        name: "SDK login",
+        userId: user.id,
+        createdByUserId: user.id,
+        organizationId,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeId: projectId,
+          },
+        ],
+      });
+
+      const res = await validateOverHttp(token);
+
+      expect(res.status).toBe(200);
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { slug: true },
+      });
+      expect(await res.json()).toEqual({ projectSlug: project.slug });
     });
   });
 
