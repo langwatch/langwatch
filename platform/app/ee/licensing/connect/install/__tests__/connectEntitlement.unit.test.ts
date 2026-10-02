@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   connectServiceEnabled,
+  connectServiceState,
   installIsEntitled,
   licenseConnectServices,
   organizationEnabledConnectServices,
@@ -235,6 +236,60 @@ describe("given a service switched off on a license that never named it", () => 
         }),
       ).resolves.toEqual([]);
     });
+  });
+});
+
+describe("given a refused Instant Eval asking which half of the answer said no", () => {
+  /** @scenario "A self-hosted install is told why from its judge and its license, and the plan is not read" */
+  it.each([
+    {
+      when: "the license names it and nobody switched it off",
+      connectServices: ["instant_evals"],
+      disabled: [],
+      state: { entitled: true, switchedOn: true },
+    },
+    {
+      when: "the license names it and an admin switched it off",
+      connectServices: ["instant_evals"],
+      disabled: ["instant_evals"],
+      state: { entitled: true, switchedOn: false },
+    },
+    {
+      when: "the license does not name it",
+      connectServices: ["managed_models"],
+      disabled: [],
+      state: { entitled: false, switchedOn: false },
+    },
+  ])("reads the state when $when", async ({
+    connectServices,
+    disabled,
+    state,
+  }) => {
+    const { licenseKey } = mintLicense({ connectServices });
+
+    await expect(
+      connectServiceState({
+        prisma: prismaWith([
+          { license: licenseKey, connectServicesDisabled: disabled },
+        ]),
+        organizationId: ORGANIZATION_ID,
+        service: "instant_evals",
+        publicKey: PUBLIC_KEY,
+        now: NOW,
+      }),
+    ).resolves.toEqual(state);
+  });
+
+  it("reads neither half as yes for an organization with no license", async () => {
+    await expect(
+      connectServiceState({
+        prisma: prismaWith([{ license: null, connectServicesDisabled: [] }]),
+        organizationId: ORGANIZATION_ID,
+        service: "instant_evals",
+        publicKey: PUBLIC_KEY,
+        now: NOW,
+      }),
+    ).resolves.toEqual({ entitled: false, switchedOn: false });
   });
 });
 

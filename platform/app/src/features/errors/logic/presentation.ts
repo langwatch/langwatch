@@ -529,8 +529,10 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: () =>
-      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+    describe: (error) =>
+      error.meta.deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, not from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",

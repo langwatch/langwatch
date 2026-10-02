@@ -1,7 +1,10 @@
 import { type MutableRefObject, useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { explainAnyError, readHandledError } from "~/features/errors";
-import type { InstantEvalOptInOffer } from "~/server/app-layer/instant-evals/opt-in";
+import type {
+  InstantEvalOptInOffer,
+  SelfHostedInstantEvalOffer,
+} from "~/server/app-layer/instant-evals/opt-in";
 import type { InstantEvalSearchTarget } from "~/server/app-layer/traces/ai-query";
 import {
   instantEvalChipText,
@@ -333,7 +336,8 @@ function useInstantEvalStarter({
  * rather than applying a fallback query.
  *
  * A member who may manage a self-serve organization gets the switch; one who
- * may not is told to ask an admin; anyone else gets a word with us. The
+ * may not is told to ask an admin; a self-hosted install is told why in its
+ * own terms; anyone else gets a word with us. The
  * payload is held aside for the switch only, so a thrown switch can go on to
  * the estimate the reader asked for.
  */
@@ -363,7 +367,26 @@ function bailUnreleased({
     outcome.setRefusal({ kind: "ask_admin" });
     return;
   }
+  if (isSelfHostedOffer(optInOffer)) {
+    outcome.setRefusal({ kind: optInOffer });
+    return;
+  }
   outcome.setRefusal({ kind: "unreleased" });
+}
+
+/** The offers a self-hosted install is refused with, each its own popover. */
+const SELF_HOSTED_OFFERS: ReadonlySet<string> =
+  new Set<SelfHostedInstantEvalOffer>([
+    "not_in_license",
+    "switched_off",
+    "not_connected",
+    "ask_operator",
+  ]);
+
+function isSelfHostedOffer(
+  offer: InstantEvalOptInOffer | undefined,
+): offer is SelfHostedInstantEvalOffer {
+  return offer !== undefined && SELF_HOSTED_OFFERS.has(offer);
 }
 
 /** Confirms or abandons the run sitting in the dialog. */

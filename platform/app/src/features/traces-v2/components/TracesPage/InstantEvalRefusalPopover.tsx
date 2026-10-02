@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverRoot,
 } from "~/components/ui/popover";
+import type { SelfHostedInstantEvalOffer } from "~/server/app-layer/instant-evals/opt-in";
 import NextLink from "~/utils/compat/next-link";
 import {
   isSupportChatAvailable,
@@ -22,15 +23,21 @@ import { docsUrl } from "~/utils/docsUrl";
  * organization Instant Evals are not on for, told to three readers: a member
  * who may manage a self-serve organization is offered the switch, a member
  * who may not is told where the text would go and to ask an organization
- * admin, and an enterprise organization or a self-hosted install is offered a
- * word with us.
+ * admin, and an enterprise organization is offered a word with us.
+ *
+ * A self-hosted install is told why in its own terms instead, one kind per
+ * reason, because each has its own remedy: a license that does not include
+ * Instant Evals, an admin who switched them off, an install that cannot
+ * reach LangWatch, or an operator who decides for an install with its own
+ * judge key.
  */
 export type InstantEvalRefusal =
   | { kind: "budget" }
   | { kind: "model" }
   | { kind: "opt_in" }
   | { kind: "ask_admin" }
-  | { kind: "unreleased" };
+  | { kind: "unreleased" }
+  | { kind: SelfHostedInstantEvalOffer };
 
 /** Where a paid plan is picked, which is what lifts the free budget. */
 export const UPGRADE_HREF = "/settings/subscription";
@@ -50,6 +57,17 @@ export const WHERE_THE_TEXT_GOES_HREF = docsUrl(
   "/features/instant-evals/limits-and-cost#where-the-judged-text-goes",
 );
 
+/** The docs section on how a self-hosted install judges through LangWatch. */
+export const SELF_HOSTED_INSTANT_EVALS_HREF = docsUrl(
+  "/self-hosting/connect#instant-evals-through-connect",
+);
+
+/** Where an organization admin switches hosted judging back on. */
+export const CONNECT_SETTINGS_HREF = "/settings/connect";
+
+/** The two addresses a self-hosted install judges through. */
+const CONNECT_HOSTS = "connect.langwatch.ai and gateway.langwatch.ai";
+
 interface InstantEvalRefusalPopoverProps {
   refusal: InstantEvalRefusal | null;
   /**
@@ -66,7 +84,73 @@ interface InstantEvalRefusalPopoverProps {
    */
   onEnable: () => void;
   isEnabling: boolean;
+  /**
+   * The install judges through LangWatch: the "can't run right now" popover
+   * then names the two addresses it needs.
+   */
+  viaConnect?: boolean;
   children: React.ReactElement;
+}
+
+interface InstantEvalRefusalCopy {
+  title: string;
+  body: string;
+  /** A phrase set in bold where it first appears in the body. */
+  emphasis?: string;
+  action?: { label: string; href?: string };
+  /** A second, quieter link beside the action, when the copy has one. */
+  more?: { label: string; href: string };
+  dismiss: string;
+}
+
+/**
+ * A self-hosted install's refusal, worded for the reason it was refused.
+ * Null for every other kind.
+ *
+ * Only a license that does not include Instant Evals offers a word with us:
+ * the other three are fixed on the install, by an admin, its network or its
+ * operator, and a "Contact us" there would send the reader to someone who
+ * can't change any of them.
+ */
+function selfHostedRefusalCopy(
+  kind: InstantEvalRefusal["kind"],
+): InstantEvalRefusalCopy | null {
+  const readMore = { label: "Read more", href: SELF_HOSTED_INSTANT_EVALS_HREF };
+  if (kind === "not_in_license") {
+    return {
+      title: "Your license doesn't include Instant Evals",
+      body: "Instant Evals turn plain language questions into native filters. On a self-hosted install they come with a license that includes them. Contact us to add them.",
+      emphasis: "Instant Evals",
+      action: { label: "Contact us", href: CONTACT_US_HREF },
+      more: readMore,
+      dismiss: "Not now",
+    };
+  }
+  if (kind === "switched_off") {
+    return {
+      title: "Instant Evals are switched off for your organization",
+      body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
+      action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
+      dismiss: "Not now",
+    };
+  }
+  if (kind === "not_connected") {
+    return {
+      title: "This install can't reach LangWatch",
+      body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
+      more: readMore,
+      dismiss: "Not now",
+    };
+  }
+  if (kind === "ask_operator") {
+    return {
+      title: "Instant Evals are off on this install",
+      body: "This install judges with its own key, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
+      more: readMore,
+      dismiss: "Not now",
+    };
+  }
+  return null;
 }
 
 /**
@@ -76,16 +160,18 @@ interface InstantEvalRefusalPopoverProps {
  * for the reader who may do nothing here but read. The render branches on
  * that rather than on the refusal kind.
  */
-export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
-  title: string;
-  body: string;
-  /** A phrase set in bold where it first appears in the body. */
-  emphasis?: string;
-  action?: { label: string; href?: string };
-  /** A second, quieter link beside the action, when the copy has one. */
-  more?: { label: string; href: string };
-  dismiss: string;
-} {
+export function instantEvalRefusalCopy(
+  refusal: InstantEvalRefusal,
+  {
+    viaConnect = false,
+  }: {
+    /**
+     * The install judges through LangWatch, so a judge that can't be reached
+     * may be the network between the two.
+     */
+    viaConnect?: boolean;
+  } = {},
+): InstantEvalRefusalCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
   const meanwhile = "The words are searched as a phrase in the meantime.";
@@ -99,14 +185,21 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   }
   if (refusal.kind === "model") {
     // The deployment has no judge, or its judge is down. The reader's own
-    // model settings cannot fix either, so the way out is a word with us.
+    // model settings cannot fix either, so the way out is a word with us. An
+    // install that judges through LangWatch may just not be reaching it, and
+    // that one its operator can check first.
+    const network = viaConnect
+      ? ` This install judges through LangWatch, so check that it can reach ${CONNECT_HOSTS}.`
+      : "";
     return {
       title: "Instant Evals can't run right now",
-      body: `${meanwhile} If it keeps happening, contact us.`,
+      body: `${meanwhile}${network} If it keeps happening, contact us.`,
       action: { label: "Contact us", href: CONTACT_US_HREF },
       dismiss: "Skip",
     };
   }
+  const selfHosted = selfHostedRefusalCopy(refusal.kind);
+  if (selfHosted) return selfHosted;
   const whereItGoes =
     "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model.";
   if (refusal.kind === "opt_in") {
@@ -181,8 +274,8 @@ function EmphasizedBody({
  */
 export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
-> = ({ refusal, onClose, onEnable, isEnabling, children }) => {
-  const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
+> = ({ refusal, onClose, onEnable, isEnabling, viaConnect, children }) => {
+  const copy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
   const action = copy?.action;
   const useSupportChat =
     action?.href === CONTACT_US_HREF && isSupportChatAvailable();

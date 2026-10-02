@@ -164,7 +164,11 @@ describe("tracesV2.instantEval opt-in procedures", () => {
       const result = await callerFor(MEMBER_ID).tracesV2.instantEval.access({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: false, offer: "ask_admin" });
+      expect(result).toEqual({
+        released: false,
+        offer: "ask_admin",
+        viaConnect: false,
+      });
     });
 
     it("is refused the switch, and nothing is recorded", async () => {
@@ -185,14 +189,24 @@ describe("tracesV2.instantEval opt-in procedures", () => {
       const result = await callerFor(ADMIN_ID).tracesV2.instantEval.access({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: false, offer: "enable" });
+      expect(result).toEqual({
+        released: false,
+        offer: "enable",
+        viaConnect: false,
+      });
     });
 
     it("switches on the project's own organization and no other", async () => {
       const result = await callerFor(ADMIN_ID).tracesV2.instantEval.enable({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: true, offer: "enable" });
+      // The access read's own shape, since the popover writes it into that
+      // cache; the hosted switch never judges through Connect.
+      expect(result).toEqual({
+        released: true,
+        offer: "enable",
+        viaConnect: false,
+      });
 
       const own = await optInOf(ORG_ID);
       expect(own.instantEvalsEnabledAt).toBeInstanceOf(Date);

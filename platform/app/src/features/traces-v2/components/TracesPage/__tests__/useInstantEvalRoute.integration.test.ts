@@ -490,6 +490,28 @@ describe("given Instant Evals are off for an enterprise organization", () => {
       expect(mutations.enable.mutate).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it.each([
+      "not_in_license",
+      "switched_off",
+      "not_connected",
+      "ask_operator",
+    ] as const)("opens the %s popover on a self-hosted install, with no estimate and no switch", (offer) => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: offer,
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: offer });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("opens the contact-us popover while the offer is still unknown", () => {
       const { result } = renderHook(() =>

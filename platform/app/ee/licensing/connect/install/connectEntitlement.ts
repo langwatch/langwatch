@@ -121,6 +121,37 @@ export async function organizationEnabledConnectServices({
   return entitled.filter((service) => !disabled.has(service));
 }
 
+/**
+ * Both halves of one service's answer apart: whether the license names it,
+ * and whether it is still switched on. What a refusal reads to say which half
+ * said no, since each has its own remedy.
+ */
+export async function connectServiceState({
+  prisma,
+  organizationId,
+  service,
+  publicKey,
+  now,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  service: ConnectService;
+  publicKey?: string;
+  now?: Date;
+}): Promise<{ entitled: boolean; switchedOn: boolean }> {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { license: true, connectServicesDisabled: true },
+  });
+  const entitled = licenseConnectServices({
+    licenseKey: organization?.license ?? configuredSignedLicenseKey(),
+    ...(publicKey ? { publicKey } : {}),
+    ...(now ? { now } : {}),
+  }).includes(service);
+  const disabled = organization?.connectServicesDisabled ?? [];
+  return { entitled, switchedOn: entitled && !disabled.includes(service) };
+}
+
 /** Whether one hosted service is both entitled and switched on. */
 export async function connectServiceEnabled({
   prisma,

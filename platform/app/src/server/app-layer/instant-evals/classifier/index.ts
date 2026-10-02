@@ -61,14 +61,52 @@ const BUCKET_BURST_SECONDS = 2;
 
 let cached: InstantEvalClassifier | undefined;
 
+/**
+ * Where this deployment's judge runs, in the order the classifier is chosen.
+ *
+ * - `off`: the operator turned judging off with `INSTANT_EVAL_CLASSIFIER=null`.
+ * - `own_key`: the install judges with its own `JEV_API_KEY`.
+ * - `connect`: the install judges through LangWatch, as its license allows.
+ * - `disconnected`: no key of its own and Connect switched off, so nothing
+ *   can judge until one of the two changes.
+ */
+export type InstantEvalJudgeRoute =
+  | "off"
+  | "own_key"
+  | "connect"
+  | "disconnected";
+
+export function instantEvalJudgeRoute(): InstantEvalJudgeRoute {
+  if (env.INSTANT_EVAL_CLASSIFIER === "null") return "off";
+  if (env.JEV_API_KEY) return "own_key";
+  return readConnectConfig().permitted ? "connect" : "disconnected";
+}
+
 /** Whether this deployment can judge anything at all. */
 export function isInstantEvalClassifierConfigured(): boolean {
-  if (env.INSTANT_EVAL_CLASSIFIER === "null") return false;
-  if (env.JEV_API_KEY) return true;
   // The Connect classifier answers per organization, and an organization
   // whose license names no hosted judging skips every question. Whether it can
   // judge for anyone is decided there, not here.
-  return readConnectConfig().permitted;
+  const route = instantEvalJudgeRoute();
+  return route === "own_key" || route === "connect";
+}
+
+/**
+ * Whether the organization's license is what releases Instant Evals to it:
+ * the install judges through LangWatch, and the organization's license names
+ * hosted judging that no admin switched off.
+ *
+ * The license is signed by the customer, which makes it the organization's
+ * agreement to the data flow in the same way the hosted service's own switch
+ * is, so no release flag is asked on top of it. An install that judges with
+ * its own key is never released here: the operator's flag still decides for
+ * it, because nothing the customer signed names that judge.
+ */
+export async function isInstantEvalLicensedForOrganization(
+  organizationId: string,
+): Promise<boolean> {
+  if (instantEvalJudgeRoute() !== "connect") return false;
+  return await isInstantEvalClassifierAvailableForOrganization(organizationId);
 }
 
 /**

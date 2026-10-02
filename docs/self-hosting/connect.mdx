@@ -143,7 +143,20 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
 
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+
+An install with its own judge key still turns Instant Evals on with `RELEASE_INSTANT_EVALS=1`, because no license names that judge.
+
+When a sentence typed in trace search can't be judged, the popover under the search bar says why:
+
+| The popover says | What to do |
+| --- | --- |
+| Your license doesn't include Instant Evals | Contact us to add them to your license. |
+| Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
+| This install can't reach LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
+| Instant Evals are off on this install | The install judges with its own key. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`. |
+
+If judging stops partway on a connected install, the popover also names both addresses, so check that they are still reachable.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 

@@ -19,10 +19,12 @@ const crispPolicy = vi.hoisted(() => ({
 vi.mock("~/utils/crispBubblePolicy", () => crispPolicy);
 
 import {
+  CONNECT_SETTINGS_HREF,
   CONTACT_US_HREF,
   InstantEvalRefusalPopover,
   instantEvalRefusalCopy,
   MODEL_PROVIDERS_HREF,
+  SELF_HOSTED_INSTANT_EVALS_HREF,
   UPGRADE_HREF,
   WHERE_THE_TEXT_GOES_HREF,
 } from "../InstantEvalRefusalPopover";
@@ -314,6 +316,116 @@ describe("given Instant Evals are off for an enterprise organization", () => {
       expect(
         screen.queryByRole("link", { name: "Contact us" }),
       ).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a self-hosted install that judges through LangWatch", () => {
+  describe("when the judge can't be reached for an eval chip", () => {
+    /** @scenario "A judgement that fails on an install judging through LangWatch names the addresses it needs" */
+    it("names both addresses and still offers to contact us", () => {
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "model" }}
+          onClose={() => {}}
+          onEnable={() => {}}
+          isEnabling={false}
+          viaConnect
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      expect(
+        screen.getByText(
+          "The words are searched as a phrase in the meantime. This install judges through LangWatch, so check that it can reach connect.langwatch.ai and gateway.langwatch.ai. If it keeps happening, contact us.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+        "href",
+        CONTACT_US_HREF,
+      );
+    });
+  });
+});
+
+describe("given an eval chip refused on a self-hosted install", () => {
+  function renderRefusal(
+    kind: "not_in_license" | "switched_off" | "not_connected" | "ask_operator",
+  ) {
+    render(
+      <InstantEvalRefusalPopover
+        refusal={{ kind }}
+        onClose={() => {}}
+        onEnable={() => {}}
+        isEnabling={false}
+      >
+        <span>anchor</span>
+      </InstantEvalRefusalPopover>,
+      { wrapper },
+    );
+  }
+
+  describe("when its license does not include Instant Evals", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it("says so, offers to contact us to add them, and links Read more", () => {
+      renderRefusal("not_in_license");
+      expect(
+        screen.getByText("Your license doesn't include Instant Evals"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+        "href",
+        CONTACT_US_HREF,
+      );
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        SELF_HOSTED_INSTANT_EVALS_HREF,
+      );
+      expect(screen.queryByRole("button", { name: "Enable" })).toBeNull();
+    });
+  });
+
+  describe("when an organization admin switched them off", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it("names Settings, Connect, links there, and offers no Contact us", () => {
+      renderRefusal("switched_off");
+      expect(
+        screen.getByText(/switch them back on in Settings, Connect/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Open Connect settings" }),
+      ).toHaveAttribute("href", CONNECT_SETTINGS_HREF);
+      expect(screen.queryByText("Contact us")).toBeNull();
+    });
+  });
+
+  describe("when the install can't reach LangWatch", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it("names both addresses and links Read more, with no Contact us", () => {
+      renderRefusal("not_connected");
+      expect(
+        screen.getByText("This install can't reach LangWatch"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/connect\.langwatch\.ai and gateway\.langwatch\.ai/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        SELF_HOSTED_INSTANT_EVALS_HREF,
+      );
+      expect(screen.queryByText("Contact us")).toBeNull();
+    });
+  });
+
+  describe("when the install judges with its own key", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it("sends the reader to whoever runs the install, with no Contact us", () => {
+      renderRefusal("ask_operator");
+      expect(
+        screen.getByText("Instant Evals are off on this install"),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/whoever runs it decides/)).toBeInTheDocument();
+      expect(screen.queryByText("Contact us")).toBeNull();
     });
   });
 });

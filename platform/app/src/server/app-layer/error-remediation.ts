@@ -263,7 +263,8 @@ const registry = {
   },
   instant_eval_opt_in_not_offered: {
     tips: [
-      "An enterprise organization, or a self-hosted install, is switched on by LangWatch rather than from the search bar; contact support@langwatch.ai",
+      "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them",
+      "Contact support@langwatch.ai to switch them on, or to add them to the license",
     ],
     docsPath: "/features/instant-evals/limits-and-cost",
   },
