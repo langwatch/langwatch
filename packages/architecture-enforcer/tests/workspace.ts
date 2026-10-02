@@ -46,7 +46,7 @@ export function parsedSource(name: string, text: string): ts.SourceFile {
 export const POLICY_ANCHORS: Readonly<Record<string, string>> = {
   "packages/prisma-client/prisma/schema.prisma": "",
   "packages/clickhouse-migrations/migrations/.keep": "",
-  "packages/installed-server-modules/src/server-modules.generated.ts":
+  "apps/api/src/process-modules.generated.ts":
     "export const processModules = [\n] as const;\n",
   "dev/tsconfig.declarations.json": '{ "files": [], "references": [] }\n',
   "apps/api/src/main.ts": "",

@@ -22,6 +22,7 @@ import { governanceWeb } from "@langwatch/enterprise-governance-browser/declarat
 import { integrationWeb } from "@langwatch/integration-browser/declaration";
 import { langyWeb } from "@langwatch/langy-browser/declaration";
 import { licensingWeb } from "@langwatch/enterprise-licensing-browser/declaration";
+import { managedProviderWeb } from "@langwatch/enterprise-managed-provider-browser/declaration";
 import { modelProviderWeb } from "@langwatch/model-provider-browser/declaration";
 import { monitorWeb } from "@langwatch/monitor-browser/declaration";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
@@ -32,6 +33,7 @@ import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { presenceWeb } from "@langwatch/presence-browser/declaration";
 import { projectWeb } from "@langwatch/project-browser/declaration";
 import { promptWeb } from "@langwatch/prompt-browser/declaration";
+import { saasWeb } from "@langwatch/enterprise-saas-browser/declaration";
 import { scenarioWeb } from "@langwatch/scenario-browser/declaration";
 import { scimWeb } from "@langwatch/enterprise-scim-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
@@ -67,6 +69,7 @@ export const browserModules = [
   integrationWeb satisfies { readonly name: "integration" },
   langyWeb satisfies { readonly name: "langy" },
   licensingWeb satisfies { readonly name: "licensing" },
+  managedProviderWeb satisfies { readonly name: "managed-provider" },
   modelProviderWeb satisfies { readonly name: "model-provider" },
   monitorWeb satisfies { readonly name: "monitor" },
   navigationWeb satisfies { readonly name: "navigation" },
@@ -77,6 +80,7 @@ export const browserModules = [
   presenceWeb satisfies { readonly name: "presence" },
   projectWeb satisfies { readonly name: "project" },
   promptWeb satisfies { readonly name: "prompt" },
+  saasWeb satisfies { readonly name: "saas" },
   scenarioWeb satisfies { readonly name: "scenario" },
   scimWeb satisfies { readonly name: "scim" },
   secretWeb satisfies { readonly name: "secret" },
@@ -89,8 +93,8 @@ export const browserModules = [
   userWeb satisfies { readonly name: "user" },
   workflowWeb satisfies { readonly name: "workflow" },
 ] as const;
-type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "slack" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim" | "sso";
-type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "audit-log" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "demo-data" | "enterprise-gateway" | "enterprise-ops" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "nurturing" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "rum" | "saas" | "sample-agents" | "scenario" | "scim" | "secret" | "share" | "slack" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
+type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "slack" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "managed-provider" | "saas" | "scim" | "sso";
+type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "audit-log" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "demo-data" | "enterprise-gateway" | "enterprise-ops" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "nurturing" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "rum" | "saas" | "sample-agents" | "scenario" | "scim" | "secret" | "share" | "slack" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "usage" | "user" | "webhook" | "workflow";
 type MissingWeb = Exclude<PairedOnDisk, (typeof browserModules)[number]["name"]>;
 type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;
 export const webModulePairing = {} satisfies {

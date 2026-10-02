@@ -391,12 +391,6 @@
       "path": "apps/idpsim-web/tsconfig.json"
     },
     {
-      "path": "packages/installed-server-modules/tsconfig.json"
-    },
-    {
-      "path": "packages/installed-web-modules/tsconfig.json"
-    },
-    {
       "path": "modules/instant-eval/contract/tsconfig.json"
     },
     {
@@ -701,6 +695,12 @@
     },
     {
       "path": "apps/ui/tsconfig.test.json"
+    },
+    {
+      "path": "modules/usage/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/usage/process/tsconfig.json"
     },
     {
       "path": "modules/user/browser/tsconfig.json"

@@ -1,11 +1,11 @@
+import { describe, expect, it } from "vitest";
+
 /**
  * `checkHostMounts` asks whether a host is mounted ANYWHERE. A host the shell
  * mounts as a layout is only mounted above the routes under that layout, and
  * nothing checked that. Spec: specs/ui/module-host-mounting.feature
  */
-import { browserModules } from "@langwatch/installed-web-modules";
-import { describe, expect, it } from "vitest";
-
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteTable } from "../ui-route-table";
 import type { UiRouteDescriptor, UiShellLayout } from "../ui-route-table";
 

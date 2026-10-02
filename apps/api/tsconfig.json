@@ -48,6 +48,9 @@
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/audit-log/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/auth/contract/tsconfig.build.json"
     },
     {
@@ -117,6 +120,12 @@
       "path": "../../enterprise/modules/billing/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/demo-data/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/enterprise-gateway/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
@@ -135,6 +144,12 @@
       "path": "../../enterprise/modules/managed-provider/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/nurturing/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/enterprise-ops/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
     },
     {
@@ -142,6 +157,12 @@
     },
     {
       "path": "../../enterprise/modules/scim/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/scim/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/sso/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/entitlement/contract/tsconfig.build.json"
@@ -204,6 +225,9 @@
       "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/instant-eval/process/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -213,7 +237,13 @@
       "path": "../../modules/langy/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/log/process/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../modules/metric/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
@@ -238,6 +268,9 @@
     },
     {
       "path": "../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/onboarding/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/ops/contract/tsconfig.build.json"
@@ -303,6 +336,12 @@
       "path": "../../modules/role/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/rum/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/sample-agents/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/scenario/contract/tsconfig.build.json"
     },
     {
@@ -322,6 +361,9 @@
     },
     {
       "path": "../../modules/share/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/slack/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/stored-object/contract/tsconfig.build.json"
@@ -352,6 +394,9 @@
     },
     {
       "path": "../../modules/trace/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/usage/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/user/contract/tsconfig.build.json"

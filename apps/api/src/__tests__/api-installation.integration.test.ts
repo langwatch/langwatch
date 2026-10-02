@@ -9,13 +9,13 @@ import { AuthApi } from "@langwatch/auth-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { processModules } from "@langwatch/installed-server-modules";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModuleApiToken } from "@langwatch/module";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
 
+import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const OTLP_FAMILIES: ReadonlySet<string> = new Set(["otel", "otel-logs", "otel-metrics"]);

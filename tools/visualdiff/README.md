@@ -665,7 +665,7 @@ Every finished run records, in `.visualdiff/works.json`, each route with no
 finding and each flow judged `works`, at the candidate commit; a section that
 fails again is forgotten. A later run skips a recorded section while
 `git diff --name-only <commit> <candidate> --` is empty over what it touches:
-the module whose `defineWebModule` screens declare its path (its `browser`,
+the module whose `defineBrowserModule` screens declare its path (its `browser`,
 `process` and `contract`), `packages/browser-host`,
 `packages/design-system`, `apps/ui` and the runner's source. A flow touches the
 modules of its `go` steps' paths, and its steps and expects must hash as

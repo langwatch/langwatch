@@ -7,7 +7,6 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { processModules } from "@langwatch/installed-server-modules";
 import { ModuleApiToken } from "@langwatch/module";
 import {
   bootInstalledProcess,
@@ -37,6 +36,8 @@ import { createTestLogger } from "@langwatch/test-harness";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const ROLE = "worker";
 /** Every value is harmless and invented: nothing here is read from `.env`. */
@@ -308,15 +309,15 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "A SaaS worker registers the billable-events meter" */
-  it("declares the billable-events meter on the roll-up pipeline of a SaaS worker", async () => {
+  it("declares the billable-events meter on the usage pipeline of a SaaS worker", async () => {
     const { runtime, eventing } = await bootWorker({ saas: true });
 
     try {
-      const rollUp = eventing.definitions.find(
-        (definition) => definition.metadata.name === "billing_reporting",
+      const usage = eventing.definitions.find(
+        (definition) => definition.metadata.name === "usage",
       );
       expect(
-        rollUp?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+        usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(["orgBillableEventsMeter"]);
     } finally {
       await runtime.stop();

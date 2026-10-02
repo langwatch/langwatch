@@ -7,7 +7,6 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { processModules } from "@langwatch/installed-server-modules";
 import { LangyApi } from "@langwatch/langy-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -40,6 +39,8 @@ import { createTestLogger } from "@langwatch/test-harness";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

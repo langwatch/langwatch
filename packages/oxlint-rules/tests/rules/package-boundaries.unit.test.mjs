@@ -273,7 +273,7 @@ describe("given package-boundaries", () => {
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["compositionRoot"]);
-      expect(found[0].message).toContain("`@langwatch/installed-server-modules`");
+      expect(found[0].message).toContain("`process-modules.generated.ts`");
       expect(
         ids("apps/tasks/src/database.ts", 'import { Task } from "@langwatch/agent-process";'),
       ).toEqual(["compositionRoot"]);

@@ -1,14 +1,14 @@
-/**
- * The crash this covers: the table named two layout keys whose files were
- * deleted with the features tree, and `createUiRouteObjects` resolves EVERY
- * key when the router is BUILT, so the first gap took the browser down at boot.
- */
-import { browserModules } from "@langwatch/installed-web-modules";
 import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/browser/feature-install";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { describe, expect, it } from "vitest";
 
+/**
+ * The crash this covers: the table named two layout keys whose files were
+ * deleted with the features tree, and `createUiRouteObjects` resolves EVERY
+ * key when the router is BUILT, so the first gap took the browser down at boot.
+ */
+import { browserModules } from "../../browser-modules.generated.ts";
 import { loadUiRootCapabilities } from "../ui-root-capabilities";
 import { uiRouteTable } from "../ui-route-table";
 import { uiShellLayouts } from "../ui-shell-layouts";

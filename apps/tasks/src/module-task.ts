@@ -1,9 +1,9 @@
-import { processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
 import { processConfig, Server } from "@langwatch/process";
 import { Task, TaskCatalogue } from "@langwatch/task";
 
 import { processEnvironment } from "./config.ts";
+import { processModules } from "./process-modules.generated.ts";
 
 const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
 

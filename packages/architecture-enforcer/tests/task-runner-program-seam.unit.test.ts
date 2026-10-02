@@ -14,13 +14,7 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /** The generated list every process boots (record section 4); the runner pays for it by design. */
-const INSTALLED_MODULES = join(
-  REPO_ROOT,
-  "packages",
-  "installed-server-modules",
-  "src",
-  "server-modules.generated.ts",
-);
+const INSTALLED_MODULES = join(REPO_ROOT, "apps", "tasks", "src", "process-modules.generated.ts");
 
 /**
  * Measured at 73 when the runner started booting the installed list in the tasks role (the

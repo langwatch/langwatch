@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-import { browserModules } from "@langwatch/installed-web-modules";
 import { createUi } from "@langwatch/browser";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { createUiRouteObjects, UiRouteOutlet } from "@langwatch/browser/route-objects";
@@ -8,6 +7,7 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
+import { browserModules } from "../../browser-modules.generated.ts";
 import type { UiRouteDescriptor } from "../ui-route-table";
 
 // The screen has its own suites; here it only has to report the view its

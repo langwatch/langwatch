@@ -1,13 +1,13 @@
+import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/browser/feature-install";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import { describe, expect, it } from "vitest";
+
 /**
  * A page key with no declared loader throws when the router is BUILT, so one
  * missing declaration takes the whole browser down. Nothing else composes the
  * real table against the real modules, so the gap read green until this test.
  */
-import { browserModules } from "@langwatch/installed-web-modules";
-import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/browser/feature-install";
-import { installedModuleScreens } from "@langwatch/browser/module-screens";
-import { describe, expect, it } from "vitest";
-
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteTable } from "../ui-route-table";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 

@@ -47,6 +47,9 @@
       "path": "../../packages/browser-host/tsconfig.build.json"
     },
     {
+      "path": "../../modules/coding-agent/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/config/tsconfig.build.json"
     },
     {
@@ -74,16 +77,25 @@
       "path": "../../enterprise/modules/managed-provider/browser/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/saas/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/scim/browser/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/sso/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/browser/tsconfig.build.json"
     },
     {
       "path": "../../modules/gateway/browser/tsconfig.build.json"
@@ -96,6 +108,9 @@
     },
     {
       "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/integration/browser/tsconfig.build.json"
     },
     {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
@@ -128,6 +143,9 @@
       "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/presence/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/react-rum/tsconfig.build.json"
     },
     {
@@ -138,6 +156,15 @@
     },
     {
       "path": "../../modules/secret/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/share/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/slack/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/suite/browser/tsconfig.build.json"
     },
     {
       "path": "../../packages/time/tsconfig.build.json"

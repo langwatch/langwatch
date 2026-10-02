@@ -1,7 +1,6 @@
 import { type TransportPeers } from "@langwatch/api";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type ExposedSurface,
@@ -26,6 +25,8 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 /** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const ROLE = "api";
 /** Every value is harmless and invented: nothing here is read from `.env`. */

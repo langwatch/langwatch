@@ -169,7 +169,7 @@ func TestServedOnlyRoutesCountAndRenderInPackets(t *testing.T) {
 
 func TestRouteInventoryPicksTheLayoutRunsAndRemovesTheScript(t *testing.T) {
 	cases := map[string]struct{ marker, subdir, command string }{
-		"branch": {"packages/installed-server-modules/src/server-modules.generated.ts", "packages/api", "node"},
+		"branch": {"apps/api/src/process-modules.generated.ts", "packages/api", "node"},
 		"main":   {"platform/app/src/server/api-router.ts", "platform/app", "pnpm"},
 	}
 	for side, layout := range cases {

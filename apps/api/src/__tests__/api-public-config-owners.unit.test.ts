@@ -1,6 +1,7 @@
-import { processModules } from "@langwatch/installed-server-modules";
 import { isProcessModule, processConfig } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
 
 describe("the modules a container takes from the server's config", () => {
   it("keeps every installed module that projects browser config", () => {

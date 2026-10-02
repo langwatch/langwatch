@@ -12,7 +12,6 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { processModules } from "@langwatch/installed-server-modules";
 import { generate } from "@langwatch/ksuid";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -52,6 +51,8 @@ import {
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

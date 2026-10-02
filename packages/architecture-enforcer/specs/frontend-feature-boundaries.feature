@@ -36,10 +36,10 @@ Feature: A module's browser package is closed
     Then nothing is reported, because apps/ui installs browser halves
 
   @unit @architecture
-  Scenario: The installed web modules package may import a browser package
-    Given the installed-web-modules package imports a module's browser declaration
+  Scenario: The generated browser module list may import a browser package
+    Given apps/ui's generated browser-modules list imports a module's browser declaration
     When the browser package closure is checked
-    Then nothing is reported, because that package is the generated installer list
+    Then nothing is reported, because that file is the generated installer list
 
   @unit @architecture
   Scenario: A browser package's own files may import themselves

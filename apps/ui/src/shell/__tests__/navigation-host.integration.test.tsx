@@ -36,7 +36,6 @@ vi.mock("@langwatch/navigation-browser/chrome", () => ({
   NavigationShell: ({ children }: { children: ReactNode }) => (
     <div data-testid="navigation-shell">{children}</div>
   ),
-  useNavigationTracking: () => {},
 }));
 
 const ORGANIZATION_ID = "org_1";

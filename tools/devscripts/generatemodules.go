@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -16,16 +15,16 @@ import (
 )
 
 const (
-	serverRoot    = "packages/installed-server-modules"
-	webRoot       = "packages/installed-web-modules"
-	serverList    = serverRoot + "/src/server-modules.generated.ts"
-	webList       = webRoot + "/src/web-modules.generated.ts"
-	serverMembers = serverRoot + "/src/server-module-members.generated.ts"
-	serverPackage = serverRoot + "/package.json"
-	webPackage    = webRoot + "/package.json"
+	processList   = "src/process-modules.generated.ts"
+	browserList   = "src/browser-modules.generated.ts"
 	generatedHead = "/** Generated from modules/catalogue.json. Do not edit by hand. */\n" +
 		"/** Run `pnpm generate:modules` to rewrite it. */\n"
 )
+
+// Apps that boot the process half each carry their own copy of the list.
+var processApps = []string{"apps/api", "apps/worker", "apps/tasks"}
+
+const browserApp = "apps/ui"
 
 // Output is one generated file: a repository-relative path and its text.
 type Output struct{ Path, Source string }
@@ -40,12 +39,6 @@ type packageJSON struct {
 	Name    string `json:"name"`
 	Exports any    `json:"exports"`
 }
-
-var (
-	readsPattern = regexp.MustCompile(`static\s+readonly\s+reads\s*=\s*(?:reads\()?\[?([^);\]]*)`)
-	quotedName   = regexp.MustCompile("[\"'`]([A-Za-z]\\w*)[\"'`]")
-	plainKey     = regexp.MustCompile(`^[a-z][a-zA-Z0-9]*$`)
-)
 
 // containsWord is regexp `\bneedle\b` (or `needle\b` when leading is false) without
 // compiling a pattern per module.
@@ -156,114 +149,6 @@ func declarationsFor(root string, cat catalogue, half, suffix string) ([]declara
 	return out, nil
 }
 
-func membersFor(root, entryRoot string) ([]string, error) {
-	appDir := filepath.Join(root, entryRoot, "process", "src", "app")
-	if !exists(appDir) {
-		return nil, nil
-	}
-	names, err := os.ReadDir(appDir)
-	if err != nil {
-		return nil, err
-	}
-	declared := map[string]bool{}
-	for _, name := range names {
-		if !strings.HasSuffix(name.Name(), ".app.ts") {
-			continue
-		}
-		text, err := os.ReadFile(filepath.Join(appDir, name.Name()))
-		if err != nil {
-			return nil, err
-		}
-		match := readsPattern.FindSubmatch(text)
-		if match == nil || len(match[1]) == 0 {
-			continue
-		}
-		for _, quoted := range quotedName.FindAllSubmatch(match[1], -1) {
-			declared[string(quoted[1])] = true
-		}
-	}
-	members := make([]string, 0, len(declared))
-	for name := range declared {
-		members = append(members, name)
-	}
-	sort.Strings(members)
-	return members, nil
-}
-
-// memberSource keeps catalogue order: the JS sort there is never assigned.
-func memberSource(root string, cat catalogue) (string, error) {
-	var rows []string
-	for _, entry := range cat.Features {
-		if !exists(filepath.Join(root, entry.Root, "process", "package.json")) {
-			continue
-		}
-		members, err := membersFor(root, entry.Root)
-		if err != nil {
-			return "", err
-		}
-		key := entry.ID
-		if !plainKey.MatchString(key) {
-			key = jsQuote(key)
-		}
-		quoted := make([]string, len(members))
-		for i, member := range members {
-			quoted[i] = jsQuote(member)
-		}
-		rows = append(rows, fmt.Sprintf("  %s: [%s],", key, strings.Join(quoted, ", ")))
-	}
-	lines := []string{
-		"/** Generated from modules/catalogue.json. Do not edit by hand. */",
-		"/** Run `pnpm generate:modules` to rewrite it. */",
-		"",
-		"/**",
-		" * What each installed module's App declared it reads, in name order.",
-		" *",
-		" * Boot builds exactly this union, plus whatever each module's chosen",
-		" * repository tier requires, and refuses by module and member when this",
-		" * process cannot supply one.",
-		" */",
-		"export const processModuleMembers = {",
-	}
-	lines = append(lines, rows...)
-	lines = append(lines, "} as const;", "")
-	return strings.Join(lines, "\n"), nil
-}
-
-func moduleConfigsFor(root string, cat catalogue) ([]declaration, error) {
-	var out []declaration
-	for _, entry := range cat.Features {
-		base := filepath.Join(root, entry.Root, "contract")
-		packagePath := filepath.Join(base, "package.json")
-		configPath := filepath.Join(base, "src", entry.ID+".config.ts")
-		indexPath := filepath.Join(base, "src", "index.ts")
-		if !exists(packagePath) || !exists(configPath) || !exists(indexPath) {
-			continue
-		}
-		symbol := camelCase(entry.ID) + "ServerConfigSchema"
-		config, err := os.ReadFile(configPath)
-		if err != nil {
-			return nil, err
-		}
-		if !containsWord(config, "export const "+symbol, false) {
-			continue
-		}
-		index, err := os.ReadFile(indexPath)
-		if err != nil {
-			return nil, err
-		}
-		if !strings.Contains(string(index), "./"+entry.ID+".config") {
-			continue
-		}
-		manifest, err := readManifest(packagePath)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, declaration{id: entry.ID, symbol: symbol, specifier: manifest.Name})
-	}
-	sort.SliceStable(out, func(i, j int) bool { return collate.Compare(out[i].id, out[j].id) < 0 })
-	return out, nil
-}
-
 func listSource(declarations []declaration, constant, half string) string {
 	body := fmt.Sprintf("/** No module declares a %s half yet. */\nexport const %s = [] as const;\n", half, constant)
 	if len(declarations) > 0 {
@@ -318,6 +203,8 @@ func pairingSource(root string, cat catalogue, serverNames []string) string {
 	}, "\n")
 }
 
+// packageSource declares each package the app's generated list imports. It adds
+// what is missing and never reorders or removes: an app owns the rest of its manifest.
 func packageSource(root, manifestPath string, packages []string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(root, manifestPath))
 	if err != nil {
@@ -331,10 +218,23 @@ func packageSource(root, manifestPath string, packages []string) (string, error)
 	if !ok {
 		return "", fmt.Errorf("%s: not a JSON object", manifestPath)
 	}
-	names := slices.Compact(slices.Sorted(slices.Values(packages)))
 	dependencies := Object{}
-	for _, name := range names {
-		dependencies = append(dependencies, Member{name, "workspace:*"})
+	for _, member := range manifest {
+		if member.Key == "dependencies" {
+			if existing, ok := member.Value.(Object); ok {
+				dependencies = existing
+			}
+		}
+	}
+	for _, name := range slices.Compact(slices.Sorted(slices.Values(packages))) {
+		if slices.ContainsFunc(dependencies, func(m Member) bool { return m.Key == name }) {
+			continue
+		}
+		at := slices.IndexFunc(dependencies, func(m Member) bool { return m.Key > name })
+		if at < 0 {
+			at = len(dependencies)
+		}
+		dependencies = slices.Insert(dependencies, at, Member{name, "workspace:*"})
 	}
 	return stringifyJS(manifest.Set("dependencies", dependencies)) + "\n", nil
 }
@@ -349,10 +249,6 @@ func GenerateModules(root string) ([]Output, error) {
 	if err := json.Unmarshal(data, &cat); err != nil {
 		return nil, err
 	}
-	configs, err := moduleConfigsFor(root, cat)
-	if err != nil {
-		return nil, err
-	}
 	servers, err := declarationsFor(root, cat, "module", "ProcessModule")
 	if err != nil {
 		return nil, err
@@ -361,39 +257,33 @@ func GenerateModules(root string) ([]Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	members, err := memberSource(root, cat)
-	if err != nil {
-		return nil, err
-	}
-	serverPackages := []string{"@langwatch/process"}
+	serverPackages := []string{}
 	serverNames := []string{}
 	for _, d := range servers {
 		serverPackages = append(serverPackages, d.pkg)
 		serverNames = append(serverNames, d.id)
 	}
-	for _, c := range configs {
-		serverPackages = append(serverPackages, c.specifier)
-	}
 	webPackages := []string{}
 	for _, d := range webs {
 		webPackages = append(webPackages, d.pkg)
 	}
-	serverPackageText, err := packageSource(root, serverPackage, serverPackages)
+	outputs := []Output{}
+	for _, app := range processApps {
+		manifest, err := packageSource(root, app+"/package.json", serverPackages)
+		if err != nil {
+			return nil, err
+		}
+		outputs = append(outputs,
+			Output{app + "/" + processList, listSource(servers, "processModules", "server")},
+			Output{app + "/package.json", manifest})
+	}
+	manifest, err := packageSource(root, browserApp+"/package.json", webPackages)
 	if err != nil {
 		return nil, err
 	}
-	webPackageText, err := packageSource(root, webPackage, webPackages)
-	if err != nil {
-		return nil, err
-	}
-	outputs := []Output{
-		{serverList, listSource(servers, "processModules", "server")},
-		{webList, listSource(webs, "browserModules", "web") + pairingSource(root, cat, serverNames)},
-		{serverMembers, members},
-		{serverPackage, serverPackageText},
-		{webPackage, webPackageText},
-	}
-	return outputs, nil
+	return append(outputs,
+		Output{browserApp + "/" + browserList, listSource(webs, "browserModules", "web") + pairingSource(root, cat, serverNames)},
+		Output{browserApp + "/package.json", manifest}), nil
 }
 
 func runGenerateModules(root string, args []string, stdout, stderr io.Writer) int {

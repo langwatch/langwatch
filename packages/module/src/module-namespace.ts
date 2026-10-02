@@ -16,6 +16,7 @@ const NAMESPACE_EXCEPTIONS = {
   licensing: "licensing",
   nurturing: "nurturing",
   ops: "ops",
+  usage: "usage",
   "enterprise-gateway": "enterprise-gateway",
   "enterprise-ops": "enterprise-ops",
   presence: "presence",

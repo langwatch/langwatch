@@ -159,10 +159,9 @@ const SHARED_THING_HOME =
 
 /** Workspace-relative roots that install browser halves, with why each may reach them. */
 const BROWSER_INSTALLERS = [
-  { root: "apps/ui", reason: "the application installs browser halves" },
   {
-    root: "packages/installed-web-modules",
-    reason: "the generated installer list imports each module's ./declaration",
+    root: "apps/ui",
+    reason: "the application installs browser halves through its generated browser-modules list",
   },
 ] as const;
 
@@ -184,7 +183,7 @@ function closureViolation({
     file,
     line,
     specifier,
-    message: `${JSON.stringify(target.name)} is a closed browser package (ARCHITECTURE.md §3.4); only the installers (apps/ui, installed-web-modules) may reach it.`,
+    message: `${JSON.stringify(target.name)} is a closed browser package (ARCHITECTURE.md §3.4); only the installers (apps/ui) may reach it.`,
     allowed: SHARED_THING_HOME,
   };
 }

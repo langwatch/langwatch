@@ -1,7 +1,6 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type InstallableServerFeature,
@@ -29,6 +28,8 @@ import { createTestLogger } from "@langwatch/test-harness";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const ROLE = "api";
 /** Every value is harmless and invented: nothing here is read from `.env`. */

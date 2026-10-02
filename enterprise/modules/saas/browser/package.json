@@ -8,14 +8,19 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
-  "exports": {},
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/saas.web.ts",
+      "types": "./dist/saas.web.d.ts",
+      "default": "./src/saas.web.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "posthog-js": "catalog:"
   },

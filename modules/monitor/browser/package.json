@@ -7,7 +7,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/online-evaluations.ts",
   "types": "./dist/online-evaluations.d.ts",
   "exports": {
     "./declaration": {

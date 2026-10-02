@@ -149,6 +149,9 @@
       "path": "modules/trace/contract/tsconfig.build.json"
     },
     {
+      "path": "modules/usage/contract/tsconfig.build.json"
+    },
+    {
       "path": "modules/user/contract/tsconfig.build.json"
     },
     {

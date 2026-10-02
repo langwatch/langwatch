@@ -70,7 +70,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>Module implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
-    "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate packages/installed-server-modules/src/server-modules.generated.ts from modules/catalogue.json, and check in the result.",
+    "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate apps/api/src/process-modules.generated.ts (and the worker and tasks copies) from modules/catalogue.json, and check in the result.",
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":
@@ -79,8 +79,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
 
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
 /** What `pnpm generate:modules` writes from modules/catalogue.json (ARCHITECTURE.md §6). */
-const GENERATED_SERVER_MODULE_LIST =
-  "packages/installed-server-modules/src/server-modules.generated.ts";
+const GENERATED_SERVER_MODULE_LIST = "apps/api/src/process-modules.generated.ts";
 const GENERATED_MODULE_LIST_BLOCK = /export const \w+Modules = \[([\s\S]*?)\] as const/;
 const GENERATED_MODULE_LIST_ENTRY = /([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;

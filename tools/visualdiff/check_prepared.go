@@ -22,8 +22,8 @@ type checkoutPrepare struct {
 var checkoutPrepares = []checkoutPrepare{
 	{output: "node_modules/.modules.yaml", inputs: []string{"pnpm-lock.yaml"}, command: "pnpm install"},
 	{output: "packages/prisma-client/src/generated", inputs: []string{"packages/prisma-client/prisma/schema.prisma"}, command: "pnpm start:prepare:files"},
-	{output: "packages/installed-server-modules/src/server-modules.generated.ts", inputs: []string{"modules/catalogue.json"}, command: "pnpm generate:modules"},
-	{output: "packages/installed-web-modules/src/web-modules.generated.ts", inputs: []string{"modules/catalogue.json"}, command: "pnpm generate:modules"},
+	{output: "apps/api/src/process-modules.generated.ts", inputs: []string{"modules/catalogue.json"}, command: "pnpm generate:modules"},
+	{output: "apps/ui/src/browser-modules.generated.ts", inputs: []string{"modules/catalogue.json"}, command: "pnpm generate:modules"},
 	{output: "sdks/typescript/dist/index.mjs", inputs: []string{"sdks/typescript/src"}, command: "pnpm ensure:built"},
 	{output: "mcp/typescript/dist/index.js", inputs: []string{"mcp/typescript/src"}, command: "pnpm ensure:built"},
 	{output: "packages/ksuid/dist/index.d.ts", inputs: []string{"packages/ksuid/src"}, command: "pnpm ensure:built"},

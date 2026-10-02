@@ -1,11 +1,11 @@
+import { describe, expect, it } from "vitest";
+
 /**
  * Navigation's screens read the navigation host, and only the chrome layout
  * mounts it. The 404 and the `@project` forward sat at the top level, so
  * `/{slug}/not-found` threw "No NavigationHost in context".
  */
-import { browserModules } from "@langwatch/installed-web-modules";
-import { describe, expect, it } from "vitest";
-
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteTable } from "../ui-route-table";
 import type { UiRouteDescriptor } from "../ui-route-table";
 

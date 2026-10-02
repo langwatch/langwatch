@@ -125,12 +125,12 @@ describe("when a module's browser package is imported from outside its own direc
     expect(violations).toHaveLength(0);
   });
 
-  /** @scenario "The installed web modules package may import a browser package" */
-  it("does not report the installer package's generated declaration imports", () => {
+  /** @scenario "The generated browser module list may import a browser package" */
+  it("does not report the app's generated declaration imports", () => {
     writePackage("modules/trace/browser", "@langwatch/trace-browser");
-    writePackage("packages/installed-web-modules", "@langwatch/installed-web-modules");
+    writePackage("apps/ui", "@langwatch/ui");
     write(
-      "packages/installed-web-modules/src/web-modules.generated.ts",
+      "apps/ui/src/browser-modules.generated.ts",
       'import { traceWeb } from "@langwatch/trace-browser/declaration";\nexport const x = traceWeb;\n',
     );
 

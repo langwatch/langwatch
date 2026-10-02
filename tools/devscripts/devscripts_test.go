@@ -80,8 +80,10 @@ func TestGenerateModulesMatchesTheNodeScript(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, generateModulesFixture)
 	writeTree(t, root, map[string]string{
-		"packages/installed-server-modules/src/.keep": "",
-		"packages/installed-web-modules/src/.keep":    "",
+		"apps/api/src/.keep":    "",
+		"apps/worker/src/.keep": "",
+		"apps/tasks/src/.keep":  "",
+		"apps/ui/src/.keep":     "",
 	})
 	code, stdout, stderr := run(t, "generate-modules", "--root", root)
 	if code != 0 || stdout != generateModulesStdout {
@@ -99,10 +101,10 @@ func TestGenerateModulesDryRunWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, generateModulesFixture)
 	code, stdout, _ := run(t, "generate-modules", "--dry-run", "--root", root)
-	if code != 0 || !strings.HasPrefix(stdout, "Would generate packages/installed-server-modules/src/server-modules.generated.ts (") {
+	if code != 0 || !strings.HasPrefix(stdout, "Would generate apps/api/src/process-modules.generated.ts (") {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
-	if exists(filepath.Join(root, "packages/installed-server-modules/src")) {
+	if exists(filepath.Join(root, "apps/api/src")) {
 		t.Error("dry run wrote a file")
 	}
 }

@@ -17,6 +17,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

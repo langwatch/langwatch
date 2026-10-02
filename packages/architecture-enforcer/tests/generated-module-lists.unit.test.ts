@@ -1,60 +1,28 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const DEVSCRIPTS = join(REPOSITORY_ROOT, "dev/scripts/devscripts.sh");
-const SERVER_MODULES = "packages/installed-server-modules/src/server-modules.generated.ts";
-const scratch: string[] = [];
-
-afterAll(() => {
-  for (const directory of scratch) rmSync(directory, { recursive: true, force: true });
-});
+const PROCESS_APPS = ["api", "worker", "tasks"] as const;
+const processList = (app: string) => `apps/${app}/src/process-modules.generated.ts`;
+const SERVER_MODULES = processList("api");
+const BROWSER_MODULES = "apps/ui/src/browser-modules.generated.ts";
 
 function generateModules({ args }: { args: string[] }): void {
   execFileSync("bash", [DEVSCRIPTS, "generate-modules", ...args], { stdio: "pipe" });
 }
 
-/** One module on disk, as the generator reads it: a catalogue and an App. */
-function moduleTree(app: string): string {
-  const root = mkdtempSync(join(tmpdir(), "installed-modules-"));
-  scratch.push(root);
-  const server = join(root, "modules/annotation/process/src/app");
-  mkdirSync(server, { recursive: true });
-  writeFileSync(
-    join(root, "modules/catalogue.json"),
-    JSON.stringify({
-      version: 0,
-      features: [{ id: "annotation", root: "modules/annotation" }],
-    }),
-  );
-  // The generator rewrites these packages' dependencies, so they have to exist.
-  for (const half of ["server", "web"]) {
-    mkdirSync(join(root, `packages/installed-${half}-modules/src`), { recursive: true });
-    writeFileSync(
-      join(root, `packages/installed-${half}-modules/package.json`),
-      `{"name":"@langwatch/installed-${half}-modules","dependencies":{}}`,
-    );
-  }
-  writeFileSync(join(root, "modules/annotation/process/package.json"), '{"name":"x"}');
-  writeFileSync(join(server, "annotation.app.ts"), app);
-  return root;
-}
-
-/** What the generator wrote for the one module in that tree. */
-function membersIn(root: string): string {
-  generateModules({ args: ["--root", root] });
-  return readFileSync(
-    join(root, "packages/installed-server-modules/src/server-module-members.generated.ts"),
-    "utf8",
-  );
-}
-
 function checkedIn(path: string): string {
   return readFileSync(resolve(REPOSITORY_ROOT, path), "utf8");
+}
+
+function importedPackages(path: string): string[] {
+  return [...checkedIn(path).matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
+    (match) => match[1] ?? "",
+  );
 }
 
 describe("given the checked-in module lists", () => {
@@ -77,51 +45,37 @@ describe("given the checked-in module lists", () => {
       }
     });
 
-    it("reads each module's members off the `reads` its App declared", () => {
-      const root = moduleTree(`
-        export class AnnotationModule {
-          static readonly contract = AnnotationApi;
-          static readonly reads = ["clock", "logger"] as const;
-        }
-      `);
-
-      expect(membersIn(root)).toContain('annotation: ["clock", "logger"],');
-    });
-
-    it("records an empty list for a module whose App names no member", () => {
-      const root = moduleTree(`
-        export class AnnotationModule {
-          static readonly contract = AnnotationApi;
-        }
-      `);
-
-      expect(membersIn(root)).toContain("annotation: [],");
-    });
-
     it("names each installed module exactly once", () => {
-      const imported = [...checkedIn(SERVER_MODULES).matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
-        (match) => match[1],
-      );
+      const imported = importedPackages(SERVER_MODULES);
 
       expect(imported.length).toBeGreaterThan(0);
       expect(imported.length).toBe(new Set(imported).size);
     });
+
+    it("gives api, worker and tasks the same process list", () => {
+      for (const app of PROCESS_APPS) {
+        expect(importedPackages(processList(app))).toEqual(importedPackages(SERVER_MODULES));
+      }
+    });
   });
 
-  describe("when the package that owns the lists is read", () => {
-    /** @scenario "The generated module lists have a home that type-checks" */
-    it("depends on exactly the packages the server list imports, and the kernel", () => {
-      const imported = [...checkedIn(SERVER_MODULES).matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
-        (match) => match[1] ?? "",
-      );
-      const owner = JSON.parse(checkedIn("packages/installed-server-modules/package.json")) as {
-        dependencies: Record<string, string>;
-      };
+  describe("when each app's manifest is read", () => {
+    it("declares every package its generated list imports", () => {
+      const lists = [
+        ...PROCESS_APPS.map((app) => ({ app, list: processList(app) })),
+        { app: "ui", list: BROWSER_MODULES },
+      ];
 
-      // The generator keeps the kernel declared on the server half (generatemodules.go).
-      expect(Object.keys(owner.dependencies).toSorted((a, b) => a.localeCompare(b))).toEqual(
-        [...imported, "@langwatch/process"].toSorted((a, b) => a.localeCompare(b)),
-      );
+      for (const { app, list } of lists) {
+        const owner = JSON.parse(checkedIn(`apps/${app}/package.json`)) as {
+          dependencies: Record<string, string>;
+        };
+        const imported = new Set(
+          importedPackages(list).map((name) => name.split("/").slice(0, 2).join("/")),
+        );
+
+        for (const name of imported) expect(owner.dependencies).toHaveProperty([name]);
+      }
     });
   });
 });

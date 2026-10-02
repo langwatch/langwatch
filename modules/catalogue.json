@@ -310,6 +310,12 @@
       "subjects": ["trace", "trace-ingestion"]
     },
     {
+      "id": "usage",
+      "root": "modules/usage",
+      "classification": "core",
+      "subjects": ["usage"]
+    },
+    {
       "id": "user",
       "root": "modules/user",
       "classification": "core",
@@ -338,6 +344,12 @@
       "root": "enterprise/modules/demo-data",
       "classification": "enterprise",
       "subjects": ["demo-data"]
+    },
+    {
+      "id": "digest",
+      "root": "enterprise/modules/digest",
+      "classification": "enterprise",
+      "subjects": ["digest"]
     },
     {
       "id": "enterprise-gateway",

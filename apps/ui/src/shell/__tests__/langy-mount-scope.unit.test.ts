@@ -1,11 +1,11 @@
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import { describe, expect, it } from "vitest";
+
 /**
  * Langy mounts once per layout route; every route below a layout gets the panel.
  * Spec: specs/langy/langy-mount-scope.feature
  */
-import { browserModules } from "@langwatch/installed-web-modules";
-import { installedModuleScreens } from "@langwatch/browser/module-screens";
-import { describe, expect, it } from "vitest";
-
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteTable, type UiRouteDescriptor } from "../ui-route-table";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 

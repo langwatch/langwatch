@@ -52,7 +52,7 @@ function pkg(kind: "contract" | "process" | "browser", feature = "widget"): Clas
 /** The generated module list a process installs from (tools/devscripts/generatemodules.go). */
 function generatedModuleList(identifiers: readonly string[] = []): void {
   write(
-    "packages/installed-server-modules/src/server-modules.generated.ts",
+    "apps/api/src/process-modules.generated.ts",
     `export const processModules = [${identifiers.join(", ")}] as const;\n`,
   );
 }
@@ -371,10 +371,10 @@ describe("feature shape", () => {
     /** @scenario "A policy whose anchor file is gone refuses the run by name" */
     it("throws naming the policy and the list instead of reading every installer as booted", () => {
       referenceFeature();
-      rmSync(join(root, "packages/installed-server-modules/src/server-modules.generated.ts"));
+      rmSync(join(root, "apps/api/src/process-modules.generated.ts"));
 
       expect(() => findings()).toThrow(
-        "feature-shape: its anchor packages/installed-server-modules/src/server-modules.generated.ts does not exist",
+        "feature-shape: its anchor apps/api/src/process-modules.generated.ts does not exist",
       );
     });
   });

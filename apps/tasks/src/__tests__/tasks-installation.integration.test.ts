@@ -6,7 +6,6 @@ import {
   type BlobCleanupDeps,
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
-import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type InstallableServerFeature,
@@ -36,6 +35,8 @@ import { createTestLogger } from "@langwatch/test-harness";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const ROLE = "tasks";
 /** Every value is harmless and invented: nothing here is read from `.env`. */

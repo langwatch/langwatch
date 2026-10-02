@@ -2,7 +2,6 @@
  * The application a composing host actually gets from `@langwatch/ui`.
  */
 
-import { browserModules } from "@langwatch/installed-web-modules";
 import { createUiApplication } from "@langwatch/browser/application";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
 import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
@@ -10,6 +9,7 @@ import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteTable } from "../ui-route-table";
 
 const publicAppConfig: UiPublicTelemetry = {
@@ -46,7 +46,6 @@ function applicationFromPackageEntry() {
       toaster: () => null,
       footer: () => null,
       usePublicAppConfig: () => ({ data: publicAppConfig }),
-      useNavigationTracking: () => void 0,
       isDevelopment: false,
     },
     pages: {

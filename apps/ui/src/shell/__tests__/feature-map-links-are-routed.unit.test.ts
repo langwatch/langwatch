@@ -6,11 +6,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { browserModules } from "@langwatch/installed-web-modules";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const CATCH_ALL = "*";

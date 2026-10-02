@@ -1,9 +1,9 @@
-import { browserModules } from "@langwatch/installed-web-modules";
 import { uiRoutePageKeys } from "@langwatch/browser/feature-install";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { browserModules } from "../../browser-modules.generated.ts";
 import {
   uiLegacyRedirectRoutes,
   uiRouteDescriptors,

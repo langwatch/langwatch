@@ -107,7 +107,7 @@ Feature: The package-boundaries lint rule
     Given an application's main.ts, or any other file of an application, that imports a module's process package
     When the package-boundaries rule runs over it
     Then it reports compositionRoot
-    And the fix names the generated installed-server-modules list
+    And the fix names the app's generated process-modules list
 
   @unit
   Scenario: Code outside a module importing its process package is reported as processOutsideModule

@@ -29,7 +29,7 @@ const routeScriptName = ".apidiff-routes-inventory.mjs"
 // routeLayouts read the monolith's built Hono router, or a modular checkout's
 // installed server modules and the API application's own lanes.
 var routeLayouts = []inventoryCandidate{
-	{"packages/installed-server-modules/src/server-modules.generated.ts", inventoryLayout{script: "inventory/branch-routes.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}},
+	{"apps/api/src/process-modules.generated.ts", inventoryLayout{script: "inventory/branch-routes.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}},
 	{"platform/app/src/server/api-router.ts", inventoryLayout{script: "inventory/main-routes.mjs", subdir: "platform/app", command: []string{"pnpm", "exec", "tsx"}}},
 }
 

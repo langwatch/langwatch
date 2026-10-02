@@ -8,12 +8,19 @@
     "src"
   ],
   "type": "module",
-  "exports": {},
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/managed-provider.web.ts",
+      "types": "./dist/managed-provider.web.d.ts",
+      "default": "./src/managed-provider.web.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*"
   },

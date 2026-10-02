@@ -34,7 +34,6 @@ const providers: UiApplicationInstall["providers"] = {
   toaster: () => null,
   footer: () => null,
   usePublicAppConfig: () => ({ data: publicAppConfig }),
-  useNavigationTracking: () => void 0,
   isDevelopment: false,
 };
 

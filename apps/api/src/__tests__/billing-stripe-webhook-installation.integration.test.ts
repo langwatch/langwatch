@@ -5,10 +5,10 @@
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { RestHost } from "@langwatch/api/rest";
-import { processModules } from "@langwatch/installed-server-modules";
 import { ModuleApiToken } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
+import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const closed = {

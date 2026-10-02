@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
@@ -8,8 +10,7 @@ import {
   UiSession,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/browser-host/capabilities";
-import { describe, expect, it } from "vitest";
+} from "../capabilities.ts";
 
 class RecordingNavigation extends UiNavigation {
   readonly moves: string[] = [];

@@ -1,12 +1,12 @@
 import "@langwatch/time/polyfill";
 import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-frame-document";
 import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process";
 
 import { apiHealthRoute } from "./api-health-route.ts";
 import { processEnvironment } from "./config.ts";
+import { processModules } from "./process-modules.generated.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
