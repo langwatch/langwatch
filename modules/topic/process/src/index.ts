@@ -6,8 +6,6 @@ export type {
 export type { TopicClusteringRunStatusData } from "./eventing/topic-clustering-run-status.projection.ts";
 export type { ProjectedTopic, TopicModelData } from "./eventing/topic-model.projection.ts";
 export { topicProcessModule, createTopicClusteringMetrics } from "./topic.module.ts";
-export type { TopicRepositories } from "./repositories/topic.repositories.ts";
-export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
 export {
   classifyClusteringError,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
