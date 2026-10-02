@@ -27,3 +27,9 @@ Feature: Setting two-step verification up speaks main's rules and our codes
     Given a two-factor endpoint that refused with better-auth's lockout
     When the refusal is answered
     Then it is the handled error "identity_mfa_locked_out" at its own status
+
+  @unit
+  Scenario: With the flag off, passkeys do not exist
+    Given a deployment whose passkey flag is off
+    When the authentication plugins are mounted
+    Then no passkey plugin is mounted

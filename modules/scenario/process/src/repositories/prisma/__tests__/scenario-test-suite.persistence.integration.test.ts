@@ -274,7 +274,6 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     ).resolves.toMatchObject({ name: "Foreign" });
   });
 
-  /** @scenario "Test suite with colliding name keeps both names readable with distinct slug" */
   /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
   it("keeps a colliding name readable under a distinct slug", async () => {
     const testSuites = service();

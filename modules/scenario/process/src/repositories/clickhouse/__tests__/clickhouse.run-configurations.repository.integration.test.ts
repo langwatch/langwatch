@@ -425,7 +425,7 @@ describe.skipIf(databaseUrl === null)("the previous configurations of a scope", 
   });
 
   describe("given a batch whose scenarios resolved different parameter values", () => {
-    /** @scenario "Batch: different parameters per scenario takes first scenario's values" */
+    /** @scenario "Two scenarios of one batch that resolved different parameters take the first scenario's" */
     it("takes the first scenario's values", async () => {
       const suiteId = `suite-${nanoid()}`;
       const first = `scenario-a-${nanoid()}`;

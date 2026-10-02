@@ -140,3 +140,10 @@ Feature: Isolated Scenario execution
     When a run is cancelled or its worker drains
     Then its child is stopped with the signal its runtime row declares
     And a runtime that declares nothing else is stopped with SIGTERM
+
+  @unit
+  Scenario: A voice worker runs only voice jobs
+    Given an execution pool on a voice worker
+    When a non-voice job is submitted to it
+    Then the job is refused so another pod runs it
+    And a voice job submitted to the same pool starts

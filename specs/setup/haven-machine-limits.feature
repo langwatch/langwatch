@@ -42,3 +42,18 @@ Feature: Machine resource limits are settable from the CLI and the hub
     Then its overlay sets INSTANT_EVAL_CLASSIFIER to "memory"
     And a monolith checkout's stack gets nothing, because its parse does not know the value
     And the setting is 0 by default, which emits nothing
+
+  @unit
+  Scenario: The observability stack fits inside an undersized colima VM
+    Given the colima VM reports its own CPU count and memory
+    When the observability stack's limits ask for more than the VM has
+    Then each limit is shrunk to the VM's own ceiling
+    And limits that already fit are left untouched
+    And a reading haven cannot make sense of leaves the configured limits as they are
+
+  @unit
+  Scenario: haven surfaces docker's own error on a failed run
+    Given a docker command that fails with its reason on stderr
+    When haven runs it
+    Then the error haven reports carries docker's own message
+    And a command that succeeds reports nothing

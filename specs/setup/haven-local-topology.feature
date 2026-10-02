@@ -202,3 +202,10 @@ Feature: The local development topology
     And "haven status" lists api.<slug>.langwatch.localhost as the backend URL
     And tools/havenrun's layout-aware readiness is unaffected, because it reads
       lanes, not the routed services list
+
+  @unit
+  Scenario: One observability graph is set up and shared by both applications
+    Given the backend process hosts the worker and the API together
+    When it starts them
+    Then the worker is told it owns telemetry and the API is told it does not
+    And so the telemetry SDK is set up exactly once for the process

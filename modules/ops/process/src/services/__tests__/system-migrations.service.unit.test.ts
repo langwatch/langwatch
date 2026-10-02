@@ -815,7 +815,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
   });
 
   describe("given a step that only waited on its prerequisites", () => {
-    /** @scenario "A targeted run that waited says so, not held organization" */
+    /** @scenario "A targeted run that only waited says so, rather than reporting a held organization" */
     it("answers that it is waiting, not that it is held for review", async () => {
       const { service } = serviceWith({
         // The state machine has no waiting status: a waiting step records

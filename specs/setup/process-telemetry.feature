@@ -90,3 +90,10 @@ Feature: One OpenTelemetry setup every process uses
       Given a resolver answering the OTLP headers handle
       When telemetry is composed
       Then the header value is read through the handle rather than the environment
+
+    @unit
+    Scenario: A shared observability handle is returned as-is, without a second SDK setup
+      Given one application has already set up the process's observability
+      When a second application in the same process composes its observability with that handle
+      Then it is handed the same handle
+      And the telemetry SDK is not set up a second time

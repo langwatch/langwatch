@@ -246,3 +246,33 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     And the same path from a literal family that declared no root is refused
     And a family answering at the root that does not disclaim the /api/v1 twin is refused
     And a family that hangs its routes off a namespace may not declare a root at all
+
+  @integration
+  Scenario: A route-declared rate-limit window reaches the limiter
+    Given a route declaring a window of two requests in sixty seconds
+    When a caller reaches it
+    Then the limiter is asked to count against exactly that window, under the framework's key
+
+  @integration
+  Scenario: A caller past its declared window is refused until it reopens
+    Given a route declaring a window of two requests
+    When one principal calls it a third time inside the window
+    Then the third call is answered 429 with the wait the limiter named as Retry-After
+    And the handler ran only for the two calls inside the window
+
+  @integration
+  Scenario: One caller's exhaustion refuses nobody else
+    Given one principal has used up a route's declared window
+    When a different principal calls the same route
+    Then that call is answered as normal, because each principal is counted apart
+
+  @integration
+  Scenario: A route declaring no rate limit is never counted
+    Given a route beside a metered one that declares no rate limit
+    When it is called more often than its sibling's window allows
+    Then every call is answered and the limiter is never asked
+
+  @unit
+  Scenario: A rate-limit window is declared whole or not at all
+    When a route declares a request count with no window length, or a length with no count
+    Then the declaration is refused where it is written, saying requests and seconds travel together

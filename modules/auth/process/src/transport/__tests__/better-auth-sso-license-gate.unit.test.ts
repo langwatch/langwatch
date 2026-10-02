@@ -192,7 +192,6 @@ describe("the SSO license-gate request hook", () => {
   });
 
   describe("given a request to better-auth's own raw sign-up route", () => {
-    /** @scenario "Raw password sign-up is closed on every deployment, licensed or not" */
     /** @scenario "Raw password sign-up cannot bypass confirmed registration" */
     it("refuses with 404 before any license or gate state is read, even in plain email mode", async () => {
       const federation = new StubFederation();

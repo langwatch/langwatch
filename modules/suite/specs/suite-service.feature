@@ -91,3 +91,15 @@ Feature: Suite service
     When the scenario owner queues one of its runs
     Then the run's reserved namespace records the target key and the target's overrides
     And it records the models the plan was configured with
+
+  @unit
+  Scenario: The list surface renders a deep link when a public base URL is configured
+    Given a deployment that configured a public base URL
+    When the suite module builds a platform link
+    Then it answers a link on that base URL
+
+  @unit
+  Scenario: The list surface refuses a deep link by name when no public base URL is configured
+    Given a deployment that named no public base URL
+    When the suite module builds a platform link
+    Then it is refused by name

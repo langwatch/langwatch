@@ -355,7 +355,7 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-# @scenario "no 'boxd exec ... -- \"...\"' sends 'set -o pipefail' to dash"
+# @scenario "No boxd exec recipe hands set -o pipefail to dash"
 @test "boxd-fork.sh: 'set -o pipefail' inside a boxd-exec recipe must be preceded by 'bash -c'" {
   # Regression guard for the dash-vs-bash mismatch: 'boxd exec' runs the
   # remote command under /bin/sh (dash), which can't parse pipefail.

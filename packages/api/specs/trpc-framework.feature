@@ -175,3 +175,9 @@ Feature: tRPC framework boundary
     When the client calls that procedure
     Then the tRPC error's data.cause is that body
     And the process names no module error to put it there
+
+  @unit
+  Scenario: A no-permission check on a procedure with no .input() runs instead of crashing
+    Given a procedure that declares no permission and no .input()
+    When it is called, so tRPC hands its check an undefined input rather than an object
+    Then the check passes the call on to the handler instead of throwing

@@ -139,3 +139,9 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given a webhook cancelling, linking or recording a payment failure
     When it writes through the subscription port
     Then each call reaches the repository with exactly what it was given
+
+  @unit
+  Scenario: A signed delivery is acknowledged
+    Given a hosted deployment with Stripe and its webhook signing secret
+    When a delivery signed with that secret arrives
+    Then the delivery is acknowledged

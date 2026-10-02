@@ -151,3 +151,22 @@ Feature: Visual diff between two refs
     Given a run asking for a 390x844 viewport
     When the runner opens its browser contexts
     Then both sides use that viewport
+
+  @unit
+  Scenario: Each stack seeds a lived-in catalogue: named dashboards, icon workflows, agents and a department
+    When a run seeds a stack's catalogue through its API
+    Then it creates the named dashboards and workflows that each carry an icon
+    And it registers agents and puts the seeded admin in a department
+    And a seed call the stack refuses is reported as a warning
+
+  @unit
+  Scenario: Each stack offers the Langy echo model and one annotation score metric
+    When a run seeds a stack's catalogue
+    Then the OpenAI provider offers the Langy echo model without replacing the process's own credentials
+    And one annotation score metric exists under its seeded name
+
+  @unit
+  Scenario: The coding-assistant seed posts sessions the way the ingest CLI does
+    When a run seeds coding-assistant sessions
+    Then its logs and spans carry each session's identity and branch
+    And they use the same event names and hook scope the ingest CLI sends

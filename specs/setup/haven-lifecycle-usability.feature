@@ -172,3 +172,10 @@ Feature: haven lifecycle usability
     Then the shell changes directory to that worktree
     And a prefix matching several worktrees names them all rather than picking one
     And a name matching none lists what there is
+
+  @unit
+  Scenario: Status masks this worktree's overlay credentials by default
+    Given the caller's own worktree has a running stack
+    When "haven status --json" runs without --reveal
+    Then the overlay's credentials are masked and its plain deployment facts, like the slug, are not
+    And with --reveal the credentials print in clear

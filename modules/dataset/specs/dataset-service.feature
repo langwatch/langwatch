@@ -172,3 +172,10 @@ Feature: Shared Dataset service
       Then the reader is shown why it failed
       And they are offered a retry
       And the record grid is not mounted
+
+  @unit
+  Scenario: A file over the size limit is refused with a clear error
+    Given a dataset attachment larger than the upload limit
+    When its size is checked
+    Then it is refused as dataset_attachment_too_large
+    And the refusal names the largest size accepted

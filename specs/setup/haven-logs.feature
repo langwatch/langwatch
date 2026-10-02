@@ -180,3 +180,10 @@ Feature: haven logs
     When a developer presses slash anywhere on the dashboard
     Then the log filter takes focus, and escape clears it
     And the shortcut stands down while something else is being typed into
+
+  @unit
+  Scenario: A tool banner renders as one line or not at all
+    Given a service logs a multi-line startup banner as one record, as Vite does
+    When the line is rendered
+    Then the ready line and everything around it collapse to one record naming the tool, its version and its start time
+    And a banner holding nothing but addresses and the help hint is dropped entirely
