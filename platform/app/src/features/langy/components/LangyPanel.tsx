@@ -3043,7 +3043,7 @@ function LangyPanel({
     //
     // `retryTurn` goes through `regenerate()`, NOT `sendMessage()`: it re-runs
     // the last turn without re-posting the user's message, so connecting can't
-    // duplicate it in the transcript (pinned by langy-chat-retry.unit.test.ts).
+    // duplicate it in the transcript (pinned by useLangyChatEngine.retry.unit.test.tsx).
     retryTurn();
   }, [utils, organizationId, retryTurn]);
 
