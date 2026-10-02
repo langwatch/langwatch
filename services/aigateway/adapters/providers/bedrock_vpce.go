@@ -939,7 +939,7 @@ var bedrockExceptionStatus = map[string]int{
 	"ValidationException":         http.StatusBadRequest,
 	"ThrottlingException":         http.StatusTooManyRequests,
 	"ServiceUnavailableException": http.StatusServiceUnavailable,
-	"ModelStreamErrorException":   http.StatusServiceUnavailable,
+	"ModelStreamErrorException":   http.StatusFailedDependency,
 	"InternalServerException":     http.StatusInternalServerError,
 }
 
