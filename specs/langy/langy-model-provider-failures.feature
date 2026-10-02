@@ -66,6 +66,36 @@ Feature: A turn that the model provider refused says so
       Then it is the provider card, not "Langy's reply failed"
       And it offers to try again
 
+    # Bedrock refuses a request it cannot parse with a 400 ValidationException
+    # ("Expected toolResult blocks at messages.2.content"). The same request
+    # is refused the same way on every try, so the card offers another model
+    # rather than another try. The provider's sentence stays off the card for
+    # the reason above; the trace carries it.
+    @unit
+    Scenario: A request the provider refuses as invalid reads as the provider's, with another model as the way out
+      Given a turn that failed with the proxy's upstream code carrying the provider's own "ValidationException" code
+      When the customer reads the card
+      Then it is the provider card saying the provider refused the request as invalid
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    # A failure the gateway names in its own envelope rather than forwarding
+    # the provider's body: "provider_error" when the provider answered with
+    # something unusable, "provider_timeout" and
+    # "provider_connection_failed" when it never answered at all.
+    @unit
+    Scenario: A failure the gateway files as the provider's reads as the provider card
+      Given a turn that failed with the gateway's "provider_error" code
+      When the customer reads the card
+      Then it is the provider card, not "Langy's reply failed"
+      And it offers to try again
+
+    @unit
+    Scenario: A provider the gateway could not reach reads as the provider being down
+      Given a turn that failed with the gateway's "provider_timeout" code
+      When the customer reads the card
+      Then it says the provider is temporarily unavailable
+
   Rule: A model this project cannot serve says so, and offers the settings
 
     Being refused by a provider and having no provider at all are different

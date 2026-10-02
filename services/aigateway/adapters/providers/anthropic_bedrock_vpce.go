@@ -245,10 +245,15 @@ func pumpBedrockChunksAsResponsesEvents(
 	}
 
 	if err := bedrock.Err(); err != nil && !errors.Is(err, context.Canceled) {
+		message := err.Error()
+		var ue *domain.UpstreamError
+		if errors.As(err, &ue) && ue.Message != "" {
+			message = ue.Message
+		}
 		select {
 		case ch <- &bfschemas.BifrostStreamChunk{BifrostError: &bfschemas.BifrostError{
 			IsBifrostError: false,
-			Error:          &bfschemas.ErrorField{Message: err.Error()},
+			Error:          &bfschemas.ErrorField{Message: message},
 		}}:
 		case <-ctx.Done():
 		}
