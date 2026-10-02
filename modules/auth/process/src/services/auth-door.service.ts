@@ -25,10 +25,7 @@ const logger = createLogger("langwatch:auth");
 /** What the sign-in door reads through: the one Better Auth instance and the session reads. */
 export interface AuthDoorDeps {
   betterAuth(): Promise<Readonly<{ handler(request: Request): Promise<Response> }>>;
-  /** Whether this request may create its user on the identity branch (ADR-116 §3). */
-  isBornFinalizedSignUp(request: Request): Promise<boolean>;
   baseUrl(): string;
-  runWithIdentityBirth<T>(run: () => Promise<T>): Promise<T>;
   verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerification>;
   resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
@@ -98,7 +95,7 @@ export class AuthDoorService {
     throw new InvalidAuthOriginError();
   }
 
-  /** Better Auth's own fetch handler, behind the origin gate and the born-finalized entrance. */
+  /** Better Auth's own fetch handler, behind the origin gate. */
   async betterAuthHandshake(request: Request): Promise<Response> {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
@@ -128,16 +125,11 @@ export class AuthDoorService {
       return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
     }
 
-    // ADR-116 §3: the born-finalized marker is set HERE and only here, once the
-    // backend allowlist check has passed. Nothing below re-decides it.
-    const bornFinalized = await this.deps.isBornFinalizedSignUp(request);
     const betterAuth = await this.deps.betterAuth();
     // Better Auth counts the caller the platform resolved, never one a header claims.
     const stated = requestStatingCaller({ request, caller: ClientAddress.resolvedFor(request) });
 
-    const answered = await (bornFinalized
-      ? this.deps.runWithIdentityBirth(() => betterAuth.handler(stated))
-      : betterAuth.handler(stated));
+    const answered = await betterAuth.handler(stated);
     // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
     const errorPageUrl = `${baseUrl}/auth/error`;
     const traceId = getActiveTraceId();

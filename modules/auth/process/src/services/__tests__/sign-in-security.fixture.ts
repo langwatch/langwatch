@@ -19,7 +19,12 @@ export type RecordedEvidence = {
  */
 export function signInSecurityFixture({ now }: { now: () => Instant }) {
   const locks = MemorySignInAttemptLockRepository.create({ now });
-  const settings = MemorySignInSecuritySettingsRepository.create();
+  const memberships = new Map<string, Set<string>>();
+  const settings = MemorySignInSecuritySettingsRepository.create({ memberships });
+  /** Puts a person in an organization, as the Postgres twin's membership row does. */
+  const join = ({ userId, organizationId }: { userId: string; organizationId: string }) => {
+    memberships.set(userId, new Set([...(memberships.get(userId) ?? []), organizationId]));
+  };
   const accounts = new Map<string, string>();
   const touched: { sessionId: string; at: Instant }[] = [];
   const recorded: RecordedEvidence = { locked: [], escalated: [] };
@@ -38,6 +43,7 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
     settings,
     recorded,
     touched,
+    join,
     /** Puts an organization's rule in place and joins whoever belongs to it. */
     organization: async ({
       id,
@@ -51,7 +57,7 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
       members?: string[];
     }) => {
       await settings.save({ organizationId: id, rule: { lockout, sessionBound } });
-      for (const userId of members) settings.join({ userId, organizationId: id });
+      for (const userId of members) join({ userId, organizationId: id });
     },
     /** Gives an address an account, which an unknown address never gets. */
     account: ({ identifier, userId }: { identifier: string; userId: string }) => {

@@ -73,7 +73,6 @@ import { UserApi } from "@langwatch/user-contract";
 import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
 import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
-import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -220,7 +219,7 @@ export class AuthModule implements AuthApiContract {
     users: UserApi,
     /** The credential ledger the legacy `X-Auth-Token` check resolves through. */
     apiKeys: ApiKeyApi,
-    /** This deployment's flag store, for the born-finalized entrance. */
+    /** This deployment's flag store. */
     featureFlags: FeatureFlagApi,
     /** Whose connections decide what a federated sign-in arrives into. */
     identity: IdentityApi,
@@ -397,14 +396,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#door = AuthDoorService.create({
       betterAuth: () => this.betterAuth(),
-      isBornFinalizedSignUp: (request) =>
-        isBornFinalizedSignUp({
-          featureFlags: dependencies.featureFlags,
-          directory: PrismaAuthDirectoryRepository.create(members.prisma),
-          request,
-        }),
       baseUrl: () => this.baseUrl(),
-      runWithIdentityBirth: (run) => this.runWithIdentityBirth(run),
       verifyBrowserSession: (input) => this.verifyBrowserSession(input),
       resolveBrowserSession: (input) => this.resolveBrowserSession(input),
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
@@ -772,20 +764,6 @@ export class AuthModule implements AuthApiContract {
    * needs its end-session endpoint, and this module reads none.
    */
   readonly federatedLogout: AuthRestFederatedLogout = () => Promise.resolve(null);
-
-  /**
-   * ADR-116 §3's birth context. Identity doesn't export the adapter, so this
-   * refuses to avoid finalized/legacy row mixing.
-   */
-  runWithIdentityBirth<T>(_run: () => Promise<T>): Promise<T> {
-    return Promise.reject(
-      new AuthUnavailableError({
-        capability:
-          "identity birth context (@langwatch/identity-process publishes no BetterAuthIdentityBirthService), so it cannot run a born-finalized sign-up",
-        processName: this.#members.processName,
-      }),
-    );
-  }
 
   resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;

@@ -53,9 +53,7 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
   const verifyBrowserSession = vi.fn<AuthDoorDeps["verifyBrowserSession"]>(async () => VERIFIED);
   const service = AuthDoorService.create({
     betterAuth: async () => ({ handler }),
-    isBornFinalizedSignUp: async () => false,
     baseUrl: () => BASE_URL,
-    runWithIdentityBirth: (run) => run(),
     verifyBrowserSession,
     resolveBrowserSession: async () => SIGNED_IN,
     revokeBrowserSession,

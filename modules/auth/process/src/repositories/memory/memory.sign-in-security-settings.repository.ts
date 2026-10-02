@@ -22,19 +22,14 @@ const asksNothing = (rule: OrganizationSignInSecurityRule): boolean =>
  */
 export class MemorySignInSecuritySettingsRepository implements SignInSecuritySettingsRepository {
   readonly rules = new Map<string, OrganizationSignInSecurityRule>();
-  readonly memberships = new Map<string, Set<string>>();
 
-  private constructor() {}
+  private constructor(readonly memberships: Map<string, Set<string>>) {}
 
-  static create(): MemorySignInSecuritySettingsRepository {
-    return new MemorySignInSecuritySettingsRepository();
-  }
-
-  /** Puts a person in an organization, as the Postgres twin's join does. */
-  join({ userId, organizationId }: { userId: string; organizationId: string }): void {
-    const joined = this.memberships.get(userId) ?? new Set<string>();
-    joined.add(organizationId);
-    this.memberships.set(userId, joined);
+  /** `memberships` (user id -> organization ids) is the table a test seeds. */
+  static create({
+    memberships = new Map<string, Set<string>>(),
+  }: { memberships?: Map<string, Set<string>> } = {}): MemorySignInSecuritySettingsRepository {
+    return new MemorySignInSecuritySettingsRepository(memberships);
   }
 
   async findForUser({

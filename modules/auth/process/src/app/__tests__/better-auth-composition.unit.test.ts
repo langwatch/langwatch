@@ -203,16 +203,6 @@ describe("when Better Auth deletes a user", () => {
   });
 });
 
-describe("when the born-finalized entrance is reached", () => {
-  it("refuses by name rather than signing somebody up outside the birth context", async () => {
-    const app = await appFor(true);
-
-    await expect(app.runWithIdentityBirth(async () => "unreached")).rejects.toThrowError(
-      /identity birth context/,
-    );
-  });
-});
-
 const genericOAuthOptionsSchema = z.object({
   config: z.array(z.object({ providerId: z.string() })),
 });

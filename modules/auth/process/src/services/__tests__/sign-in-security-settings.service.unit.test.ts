@@ -51,7 +51,7 @@ function harness({
     ),
   };
   const released = vi.fn(async () => undefined);
-  for (const userId of members) fixture.settings.join({ userId, organizationId: "acme" });
+  for (const userId of members) fixture.join({ userId, organizationId: "acme" });
 
   return {
     fixture,
