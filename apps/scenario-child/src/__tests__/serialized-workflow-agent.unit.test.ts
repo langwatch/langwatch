@@ -4,7 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpNlpFetchChannel } from "../channels/http/http.nlp-fetch.channel.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
@@ -148,10 +148,6 @@ describe("SerializedWorkflowAgentAdapter", () => {
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   describe("given its basic contract", () => {
     it("has AGENT role", () => {
       const adapter = new HttpSerializedWorkflowAgentChannel({
@@ -169,6 +165,37 @@ describe("SerializedWorkflowAgentAdapter", () => {
         projectApiKey: apiKey,
       });
       expect(adapter.name).toBe("SerializedWorkflowAgentAdapter");
+    });
+  });
+
+  describe("given the parent stated the engine's internal secret for this child", () => {
+    /** @scenario "the shared helper carries the secret when one is configured" */
+    it("sends it as X-LangWatch-NLP-Secret", async () => {
+      const adapter = new HttpSerializedWorkflowAgentChannel({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        nlpInternalSecret: "s3cr3t",
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(mockFetch.mock.calls[0]![1].headers).toMatchObject({
+        "X-LangWatch-NLP-Secret": "s3cr3t",
+      });
+    });
+
+    /** @scenario "the shared helper carries nothing when none is configured" */
+    it("sends no secret header when the parent stated none", async () => {
+      const adapter = new HttpSerializedWorkflowAgentChannel({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(mockFetch.mock.calls[0]![1].headers).not.toHaveProperty("X-LangWatch-NLP-Secret");
     });
   });
 

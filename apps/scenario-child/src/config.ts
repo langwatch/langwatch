@@ -1,4 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import {
   SCENARIO_LOG_CONTEXT_ENV,
   scenarioLogContextSchema,
@@ -14,6 +15,8 @@ export type ScenarioChildEnvironment = Readonly<{
   verbose: boolean;
   egressPolicy: string | undefined;
   rejectUnauthorized: boolean;
+  /** The engine hop's shared credential, as the parent stated it for this child. */
+  nlpInternalSecret: string | undefined;
 }>;
 
 export function readScenarioChildEnvironment({
@@ -29,6 +32,7 @@ export function readScenarioChildEnvironment({
     verbose: source.SCENARIO_VERBOSE === "true",
     egressPolicy: source[egressPolicyKey],
     rejectUnauthorized: source.NODE_TLS_REJECT_UNAUTHORIZED !== "0",
+    nlpInternalSecret: source[NLP_INTERNAL_SECRET_ENV],
   };
 }
 

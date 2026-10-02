@@ -2,6 +2,7 @@
  * Engine's streaming studio route on project's own Lambda; uses object storage for large payloads.
  */
 import { createLogger } from "@langwatch/observability";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
 
 import {
@@ -40,6 +41,8 @@ export type LambdaWorkflowStudioStreamOptions = Readonly<{
   staging?: NlpPayloadStaging | undefined;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;
+  /** The engine hop's shared credential, as the process resolved it. */
+  internalSecret?: string | undefined;
 }>;
 
 export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
@@ -54,6 +57,7 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": input.origin,
+      ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
     };
     const body = JSON.stringify(input.body);
     const parked = await this.stageIfOversized({

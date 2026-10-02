@@ -1180,6 +1180,22 @@ langwatch_nlp:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
 
+  # Shared credential the app, the workers and this service authenticate the
+  # app -> NLP hop with. All three read the key below from the app Secret
+  # (secrets.existingSecret when you supply one, the chart-generated Secret
+  # otherwise), so they always hold the same value. With autogen on, the chart
+  # generates it and keeps it stable across upgrades.
+  #
+  # The env var name is fixed at LANGWATCH_NLP_INTERNAL_SECRET on all three.
+  # Only the Secret key is configurable, for installs whose app Secret is
+  # written by external-secrets or terraform under another name. A Secret with
+  # no such key leaves the variable unset, the NLP service then accepts
+  # unauthenticated requests, and the install keeps working.
+  ## @extra langwatch_nlp.secrets Where the app <-> NLP service credential comes from.
+  ## @param langwatch_nlp.secrets.internalSecretKey [string, default: LANGWATCH_NLP_INTERNAL_SECRET] Key of the app Secret holding the shared value the app, the workers and the NLP service authenticate with. Rename it only when you supply the app Secret yourself and it stores the value under another key.
+  secrets:
+    internalSecretKey: LANGWATCH_NLP_INTERNAL_SECRET
+
   # Ceiling on how long a workflow code block may run inside the sandboxed
   # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
   # 710 is the engine's stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS,

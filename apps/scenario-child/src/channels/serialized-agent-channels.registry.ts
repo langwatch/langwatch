@@ -38,6 +38,8 @@ export type AgentAdapterBuildInput = {
   adapterData: TargetAdapterData;
   modelParams?: LiteLLMParams;
   nlpServiceUrl: string;
+  /** The engine hop's shared credential, as the parent stated it for this child. */
+  nlpInternalSecret?: string | undefined;
   projectApiKey?: string;
   parameters?: RunParameterValues;
   httpPort?: ScenarioHttp;
@@ -101,6 +103,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         config: data,
         litellmParams: input.modelParams,
         nlpServiceUrl: input.nlpServiceUrl,
+        nlpInternalSecret: input.nlpInternalSecret,
         parameters: input.parameters,
         logger: input.logger,
       });
@@ -129,6 +132,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
       return HttpSerializedCodeAgentChannel.create({
         config: data,
         nlpServiceUrl: input.nlpServiceUrl,
+        nlpInternalSecret: input.nlpInternalSecret,
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
         timeouts: nlpTimeouts,
@@ -146,6 +150,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
       return HttpSerializedWorkflowAgentChannel.create({
         config: data,
         nlpServiceUrl: input.nlpServiceUrl,
+        nlpInternalSecret: input.nlpInternalSecret,
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
         timeouts: nlpTimeouts,

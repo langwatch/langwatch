@@ -1,4 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import type { LanguageModel } from "ai";
 
 /**
@@ -11,10 +12,15 @@ export function handleForParameters(input: {
   model: string;
   parameters: Record<string, string>;
   executionProxyBaseUrl: string;
+  /** The engine hop's shared credential, as the process resolved it. */
+  internalSecret?: string | undefined;
 }): LanguageModel {
-  const headers = Object.fromEntries(
-    Object.entries(input.parameters).map(([key, value]) => [`x-litellm-${key}`, value]),
-  );
+  const headers = {
+    ...Object.fromEntries(
+      Object.entries(input.parameters).map(([key, value]) => [`x-litellm-${key}`, value]),
+    ),
+    ...nlpInternalSecretHeaders({ secret: input.internalSecret }),
+  };
   const vercelProvider = createOpenAICompatible({
     name: input.providerKey,
     apiKey: input.parameters.api_key,

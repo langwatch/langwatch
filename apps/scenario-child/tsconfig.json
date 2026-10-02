@@ -30,6 +30,9 @@
       "path": "../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../packages/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/scenario/contract/tsconfig.build.json"
     },
     {

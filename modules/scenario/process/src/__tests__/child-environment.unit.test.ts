@@ -2,6 +2,7 @@
  * Child's env allowlist: voice-only forward of VOICE_PUBLIC_BASE_URL/
  * BASE_HOST/VOICE_WS_PORT is the only gate between operator and child.
  */
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildChildEnvironment } from "../services/node-scenario-child.service.ts";
@@ -82,6 +83,41 @@ describe("buildChildEnvironment", () => {
         expect(result.VOICE_PUBLIC_BASE_URL).toBeUndefined();
         expect(result.BASE_HOST).toBeUndefined();
         expect(result.VOICE_WS_PORT).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given the process resolved the engine's internal secret", () => {
+    describe("when a child is started for any target", () => {
+      it("forwards the secret so the adapters inside it can authenticate", () => {
+        // The code and workflow adapters and the model factory run inside this
+        // child and build their own requests to the engine, which refuses a
+        // /go request carrying no secret once one is configured. Without the
+        // forward a configured install 401s every simulation run against a
+        // workflow or code agent while answering the parent fine.
+        const result = buildChildEnvironment({
+          config: { ...config, nlpInternalSecret: "shared-with-the-app" },
+          jobData: jobData("http"),
+          labels: [],
+          telemetry,
+        });
+
+        expect(result[NLP_INTERNAL_SECRET_ENV]).toBe("shared-with-the-app");
+      });
+    });
+  });
+
+  describe("given the process resolved no internal secret", () => {
+    describe("when a child is started", () => {
+      it("binds nothing, so the child sends no secret header either", () => {
+        const result = buildChildEnvironment({
+          config,
+          jobData: jobData("http"),
+          labels: [],
+          telemetry,
+        });
+
+        expect(result[NLP_INTERNAL_SECRET_ENV]).toBeUndefined();
       });
     });
   });

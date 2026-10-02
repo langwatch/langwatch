@@ -12,16 +12,22 @@ const PING_PROMPT = "ping";
 
 /** One token down the execution proxy the product generates through at runtime. */
 export class HttpModelProviderConnectionPingChannel extends ModelProviderConnectionPing {
-  private constructor(private readonly executionProxyBaseUrl: string) {
+  private constructor(
+    private readonly executionProxyBaseUrl: string,
+    private readonly internalSecret: string | undefined,
+  ) {
     super();
   }
 
   static create({
     executionProxyBaseUrl,
+    nlpInternalSecret,
   }: {
     executionProxyBaseUrl: string;
+    /** The engine hop's shared credential, as the process resolved it. */
+    nlpInternalSecret?: string | undefined;
   }): HttpModelProviderConnectionPingChannel {
-    return new HttpModelProviderConnectionPingChannel(executionProxyBaseUrl);
+    return new HttpModelProviderConnectionPingChannel(executionProxyBaseUrl, nlpInternalSecret);
   }
 
   async ping({
@@ -36,6 +42,7 @@ export class HttpModelProviderConnectionPingChannel extends ModelProviderConnect
           model,
           parameters,
           executionProxyBaseUrl: this.executionProxyBaseUrl,
+          internalSecret: this.internalSecret,
         }),
         prompt: PING_PROMPT,
         maxOutputTokens: 1,

@@ -303,6 +303,8 @@ type ScenarioProcessMembers = Readonly<{
   rawSocketPort: number;
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
+  /** The engine hop's shared credential, resolved by the process (ADR-132). */
+  nlpInternalSecret: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
 }>;
@@ -331,6 +333,7 @@ export class ScenarioModule implements ScenarioApi {
     "rawSocketPort",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
+    "nlpInternalSecret",
     "isSaas",
     "nodeEnvironment",
   ] as const;
@@ -432,6 +435,7 @@ export class ScenarioModule implements ScenarioApi {
     const childHost = {
       voicePublicUrl: voice.publicUrl,
       nlpServiceUrl: setup.members.nlpServiceUrl,
+      nlpInternalSecret: setup.members.nlpInternalSecret,
       isSaas: setup.members.isSaas,
       nodeEnvironment: setup.members.nodeEnvironment,
       publicBaseUrl: setup.members.publicBaseUrl,

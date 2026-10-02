@@ -3,6 +3,7 @@
  * their framework owner, with the same primitive a module uses.
  */
 import { Config, isSaas } from "@langwatch/config";
+import { Secret } from "@langwatch/secrets";
 import { z } from "zod";
 
 export const processOwner = {
@@ -84,4 +85,12 @@ export const processOwner = {
       no_proxy: c.env("no_proxy", z.string().optional()),
     },
   })),
+  secrets: {
+    /**
+     * The engine hop's shared credential, resolved here and handed to every
+     * module that calls the engine as the `nlpInternalSecret` member. One
+     * owner, because the engine checks one value for all of them.
+     */
+    nlpInternal: Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true }),
+  },
 } as const;

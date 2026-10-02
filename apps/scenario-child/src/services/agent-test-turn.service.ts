@@ -82,6 +82,7 @@ async function runAgentTestTurnValue({
   }).build({
     adapterData: job.adapterData,
     nlpServiceUrl: job.nlpServiceUrl,
+    nlpInternalSecret: runtime.nlpInternalSecret,
     projectApiKey: runtime.langwatchApiKey,
     parameters: job.parameters,
     httpPort: runtime.httpPort,

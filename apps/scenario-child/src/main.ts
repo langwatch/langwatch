@@ -114,6 +114,7 @@ function readRuntime(): ScenarioChildRuntime {
     httpPort: new WorkerScenarioChildHttp(environment),
     logger,
     nlpTimeouts: HttpNlpFetchChannel.timeoutsFromEnvironment(source),
+    nlpInternalSecret: environment.nlpInternalSecret,
     voiceAgents: (data) => createSerializedVoiceAgentAdapter({ data, registry: voiceTransports }),
     endVoiceCall: ({ data, adapter }) =>
       voiceTransports[data.voiceTarget.transport].endCall(adapter),

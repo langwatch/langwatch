@@ -24,6 +24,9 @@ const PERSISTENT_SECRET_KEYS = [
   // The app and the Langy agent authenticate to each other with this; a
   // regenerated value on one side and not the other makes every turn 401.
   "LANGY_INTERNAL_SECRET",
+  // Same deal for the app -> NLP engine hop: both processes read this one file,
+  // so a rotation that only reaches one of them makes every studio run 401.
+  "LANGWATCH_NLP_INTERNAL_SECRET",
 ] as const;
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
@@ -121,6 +124,10 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
 
   sectionBreak("LANGWATCH INTERNAL SERVICES");
   set("LANGWATCH_NLP_SERVICE", portBound.LANGWATCH_NLP_SERVICE.expected);
+  // The app sends this as X-LangWatch-NLP-Secret and the engine requires it on
+  // every /go/* route. Both read this same file (services/nlpgo.ts passes it
+  // through), so one generated value covers both ends.
+  set("LANGWATCH_NLP_INTERNAL_SECRET", hex(32));
   set("LANGEVALS_ENDPOINT", portBound.LANGEVALS_ENDPOINT.expected);
   // LANGWATCH_ENDPOINT is where the engine POSTs evaluator runs and dataset
   // uploads; the default is the cloud app, which 401s for self-host. Pin it

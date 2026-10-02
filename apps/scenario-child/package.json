@@ -27,6 +27,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",

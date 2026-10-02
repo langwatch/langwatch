@@ -90,6 +90,7 @@ export function buildModelProviderInfrastructure(input: {
     }),
     connectionPing: modelProviderConnectionPingChannels.live.create({
       executionProxyBaseUrl: config.executionProxyBaseUrl,
+      nlpInternalSecret: config.nlpInternalSecret,
     }),
     ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),

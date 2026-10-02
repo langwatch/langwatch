@@ -161,9 +161,9 @@ export interface ModelProviderCodexDeviceFlow {
   ): Promise<ModelProviderCodexDeviceApproval>;
 }
 
-/** The engine address is the process's fact, not this module's env spelling. */
+/** The engine address and its credential are the process's facts, not this module's spellings. */
 type ModelProviderMembers = MembersRead<readonly ["redis", "encryption"]> &
-  Readonly<{ nlpServiceUrl: string | undefined }>;
+  Readonly<{ nlpServiceUrl: string | undefined; nlpInternalSecret: string | undefined }>;
 
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
@@ -190,6 +190,8 @@ export type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
+  /** The engine hop's shared credential, as the process resolved it. */
+  nlpInternalSecret: string | undefined;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -244,7 +246,7 @@ export class ModelProviderModule implements ModelProviderApi {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
   } as const;
-  static readonly reads = ["redis", "encryption", "nlpServiceUrl"] as const;
+  static readonly reads = ["redis", "encryption", "nlpServiceUrl", "nlpInternalSecret"] as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     return ModelProviderModule.withPlatformChain(
@@ -282,6 +284,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
+      nlpInternalSecret: members.nlpInternalSecret,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
@@ -296,6 +299,7 @@ export class ModelProviderModule implements ModelProviderApi {
       dependencies,
       members: infrastructure,
       executionProxyBaseUrl,
+      nlpInternalSecret: members.nlpInternalSecret,
       platformChain,
     });
   }
@@ -318,6 +322,7 @@ export class ModelProviderModule implements ModelProviderApi {
       members: setup.members,
       executionProxyBaseUrl:
         setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
+      nlpInternalSecret: void 0,
       platformChain: setup.platformChain ?? PlatformProviderChainService.create(),
     });
   }
@@ -359,12 +364,14 @@ export class ModelProviderModule implements ModelProviderApi {
     dependencies,
     members,
     executionProxyBaseUrl,
+    nlpInternalSecret,
     platformChain,
   }: {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
     members: ModelProviderInfrastructure;
     executionProxyBaseUrl: string;
+    nlpInternalSecret: string | undefined;
     platformChain: PlatformProviderChainService;
   }) {
     this.platformChain = platformChain;
@@ -398,11 +405,13 @@ export class ModelProviderModule implements ModelProviderApi {
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
       executionProxyBaseUrl,
+      nlpInternalSecret,
     });
     const execution = ModelProviderExecutionHandleService.create({
       modelProviders: this.#modelProviders,
       projects: dependencies.projects,
       executionProxyBaseUrl,
+      nlpInternalSecret,
     });
     this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
       execution,

@@ -45,6 +45,8 @@ export type ModelProviderExecutionHandleOptions = {
    * Where the execution proxy answers, fully formed: nlpgo's `/go/proxy/v1`.
    */
   executionProxyBaseUrl: string;
+  /** The engine hop's shared credential, as the process resolved it. */
+  nlpInternalSecret?: string | undefined;
   /**
    * Codex's own road, where the process composed one. Absent means codex
    * models refuse by name — see {@link ModelProviderCodexHandle}.
@@ -224,6 +226,7 @@ export class ModelProviderExecutionHandleService {
       model: model_,
       parameters: litellmParams,
       executionProxyBaseUrl: input.executionProxyBaseUrl,
+      internalSecret: input.nlpInternalSecret,
     });
   }
 

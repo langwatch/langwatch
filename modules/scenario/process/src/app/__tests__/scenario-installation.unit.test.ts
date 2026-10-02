@@ -69,6 +69,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("nlpServiceUrl", undefined)
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
+    .withMember("nlpInternalSecret", undefined)
     .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)

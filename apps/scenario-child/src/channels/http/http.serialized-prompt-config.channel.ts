@@ -34,6 +34,8 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;
     nlpServiceUrl: string;
+    /** The engine hop's shared credential, as the parent stated it for this child. */
+    nlpInternalSecret?: string | undefined;
     logger?: Logger;
     parameters?: RunParameterValues;
   }): HttpSerializedPromptConfigChannel {
@@ -47,12 +49,15 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
   private readonly config: PromptConfigData;
   private readonly litellmParams: LiteLLMParams;
   private readonly nlpServiceUrl: string;
+  private readonly nlpInternalSecret: string | undefined;
   private readonly parameters: RunParameterValues;
 
   constructor(options: {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;
     nlpServiceUrl: string;
+    /** The engine hop's shared credential, as the parent stated it for this child. */
+    nlpInternalSecret?: string | undefined;
     logger?: Logger;
     /** The run's resolved values, read from the template as `params.NAME`. */
     parameters?: RunParameterValues;
@@ -62,6 +67,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     this.config = options.config;
     this.litellmParams = options.litellmParams;
     this.nlpServiceUrl = options.nlpServiceUrl;
+    this.nlpInternalSecret = options.nlpInternalSecret;
     this.parameters = options.parameters ?? {};
     this.logger = options.logger ?? createLogger("langwatch:scenarios:prompt-adapter");
   }
@@ -103,6 +109,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     const model = HttpLitellmModelChannel.create().model({
       litellmParams: this.litellmParams,
       nlpServiceUrl: this.nlpServiceUrl,
+      nlpInternalSecret: this.nlpInternalSecret,
     });
 
     const result = await generateText({

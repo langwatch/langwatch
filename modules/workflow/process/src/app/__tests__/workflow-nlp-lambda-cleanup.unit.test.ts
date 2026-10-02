@@ -39,6 +39,7 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowModule> {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       nlpCodeBlockTimeoutSeconds: void 0,
+      nlpInternalSecret: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,
     },

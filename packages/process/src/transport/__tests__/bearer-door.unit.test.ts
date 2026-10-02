@@ -8,14 +8,20 @@ import { timingSafeEqual } from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
-import { bearerDoor } from "../api-surface.ts";
-
 vi.mock("node:crypto", async (importOriginal) => {
   const actual = await importOriginal<typeof NodeCrypto>();
   return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) };
 });
 
 const SECRET = "cron-secret-value";
+
+// Loaded fresh, under this file's node:crypto mock. Test files share one
+// module registry, so a static import can return an api-surface instance
+// another file already evaluated, bound to the real timingSafeEqual: the door
+// still admits the caller and the spy below sees no calls. Resetting first
+// makes the assertion depend on the door, not on what ran before it.
+vi.resetModules();
+const { bearerDoor } = await import("../api-surface.ts");
 const door = bearerDoor({ name: "cron", token: SECRET });
 
 function presenting(authorization: string) {

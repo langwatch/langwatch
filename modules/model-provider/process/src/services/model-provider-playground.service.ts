@@ -5,6 +5,7 @@ import type {
   ModelProviderPlaygroundRequest,
   ModelProviderPlaygroundStatus,
 } from "@langwatch/model-provider-contract";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { streamText, type ModelMessage } from "ai";
 
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
@@ -20,19 +21,28 @@ export class ModelProviderPlaygroundService {
   #credentialRefusals = new Map<string, { error: string }>();
   readonly #modelProviders: ModelProviderApi;
   readonly #executionProxyBaseUrl: string;
+  readonly #nlpInternalSecret: string | undefined;
 
-  private constructor(modelProviders: ModelProviderApi, executionProxyBaseUrl: string) {
+  private constructor(
+    modelProviders: ModelProviderApi,
+    executionProxyBaseUrl: string,
+    nlpInternalSecret: string | undefined,
+  ) {
     this.#modelProviders = modelProviders;
     this.#executionProxyBaseUrl = executionProxyBaseUrl;
+    this.#nlpInternalSecret = nlpInternalSecret;
   }
 
   static create(options: {
     modelProviders: ModelProviderApi;
     executionProxyBaseUrl: string;
+    /** The engine hop's shared credential, as the process resolved it. */
+    nlpInternalSecret?: string | undefined;
   }): ModelProviderPlaygroundService {
     return new ModelProviderPlaygroundService(
       options.modelProviders,
       options.executionProxyBaseUrl,
+      options.nlpInternalSecret,
     );
   }
 
@@ -52,9 +62,12 @@ export class ModelProviderPlaygroundService {
       model: input.model,
       projectId: input.projectId,
     });
-    const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
-    );
+    const headers = {
+      ...Object.fromEntries(
+        Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
+      ),
+      ...nlpInternalSecretHeaders({ secret: this.#nlpInternalSecret }),
+    };
     const vercelProvider = createOpenAI({
       apiKey: litellmParams.api_key,
       baseURL: this.#executionProxyBaseUrl,

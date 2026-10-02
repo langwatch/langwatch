@@ -603,6 +603,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      fires only against a real cluster, and only when the Secret is already
      there and demonstrably missing the key — never on a first install where
      it has yet to be created. */}}
+{{/* The NLP service's own key faces the same collision as Langy's, from the
+     other direction: langwatch_nlp.secrets.internalSecretKey names a key the
+     chart writes into the app Secret unconditionally, so pointing it at
+     nextAuthSecret or a gateway key emits that entry twice and the NLP value
+     wins. The app would then authenticate sessions, or the gateway hop, with
+     the NLP credential. Refuse, for the same reason the Langy check does:
+     these credentials have separate blast radii on purpose. */}}
+{{- $nlpKey := include "langwatch.nlpInternalSecretKey" . }}
+{{- $nlpReserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+{{- if (.Values.gateway).chartManaged }}
+  {{- $nlpReserved = concat $nlpReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
+{{- end }}
+{{- if has $nlpKey $nlpReserved }}
+  {{- $errors = append $errors (printf "langwatch_nlp.secrets.internalSecretKey is %q, which is already a key of the app Secret. The NLP credential would overwrite that one. Pick a distinct key name; the default is LANGWATCH_NLP_INTERNAL_SECRET." $nlpKey) }}
+{{- end }}
 {{- $langy := (index .Values "langyagent") | default dict }}
 {{- if $langy.chartManaged }}
   {{- $langySecrets := $langy.secrets | default dict }}
@@ -629,6 +644,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     {{- if (.Values.gateway).chartManaged }}
       {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
+    {{- $reserved = append $reserved (include "langwatch.nlpInternalSecretKey" .) }}
     {{- if has $langyKey $reserved }}
       {{- $errors = append $errors (printf "langyagent.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. Langy would overwrite that credential with its own value. Pick a distinct key name (the default is LANGY_INTERNAL_SECRET), or point langyagent.secrets.existingSecretName at a separate Secret." $langyKey $langySecretName) }}
     {{- end }}
@@ -816,6 +832,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 - name: LANGWATCH_NLP_SERVICE
   value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
+
+{{/* Shared credential for the app -> NLP service hop. The app sends it on every
+     NLP request and the NLP service refuses requests that do not carry it, so
+     both ends read the same key of the same Secret and can never disagree.
+
+     `optional: true` is deliberate, and is what makes an upgrade safe: an
+     install that brings its own Secret (autogen off, or a Secret written by
+     external-secrets / terraform) has no such key yet. Absent, the variable is
+     simply unset on both ends, the NLP service keeps accepting unauthenticated
+     requests, and the install carries on working, instead of three pods dying
+     in CreateContainerConfigError over a key nothing told the operator to add.
+     Adding the key to that Secret and rolling the Deployments turns it on. */}}
+- name: LANGWATCH_NLP_INTERNAL_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: {{ include "langwatch.nlpInternalSecretKey" . }}
+      optional: true
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 
@@ -1341,6 +1375,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "langwatch.gatewayJwtSecretKey" -}}
 {{- ((.Values.gateway).secrets).jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" -}}
+{{- end -}}
+
+{{/* Key of the app Secret holding the app <-> NLP service shared credential.
+     The env var name is fixed (both sides read LANGWATCH_NLP_INTERNAL_SECRET);
+     only the key inside the Secret is configurable, for operators whose Secret
+     is written by external-secrets or terraform under another name. */}}
+{{- define "langwatch.nlpInternalSecretKey" -}}
+{{- ((.Values.langwatch_nlp).secrets).internalSecretKey | default "LANGWATCH_NLP_INTERNAL_SECRET" -}}
 {{- end -}}
 
 {{/* Whether the LangWatchQL passwords come from the chart-owned passwords

@@ -89,6 +89,7 @@ function appWith({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       nlpCodeBlockTimeoutSeconds: void 0,
+      nlpInternalSecret: void 0,
       nlpServiceUrl: "http://engine.test:5561",
       publicBaseUrl: "https://app.test",
     },

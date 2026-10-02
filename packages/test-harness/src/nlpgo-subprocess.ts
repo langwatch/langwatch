@@ -125,7 +125,8 @@ async function waitForNlpgoHealth(port: number, timeoutMs: number): Promise<void
 
 /**
  * Start nlpgo subprocess: builds (cached), spawns, health-checks. Caller must
- * stop() in afterAll.
+ * stop() in afterAll. `env` merges over the defaults below, which leave /go
+ * unguarded; pass LANGWATCH_NLP_INTERNAL_SECRET to exercise the guard.
  */
 export async function startNlpgoSubprocess(opts: {
   port: number;
@@ -145,6 +146,12 @@ export async function startNlpgoSubprocess(opts: {
       ...opts.environment,
       NLPGO_CHILD_BYPASS: "true",
       SERVER_ADDR: `:${opts.port}`,
+      // Blank unless a caller asks otherwise: with a secret the engine
+      // requires X-LangWatch-NLP-Secret on every /go route, and the suites
+      // here post to /go directly rather than through a composed channel.
+      // Inheriting the developer's own value would 401 them while CI, which
+      // has none, stayed green.
+      LANGWATCH_NLP_INTERNAL_SECRET: "",
       ...opts.env,
     },
     stdio: ["ignore", "pipe", "pipe"],

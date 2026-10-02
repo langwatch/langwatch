@@ -53,6 +53,7 @@ export const scenarioHostMembers = {
   voicePublicUrl: { unavailable: "no media door in a test process" },
   nlpServiceUrl: void 0,
   nlpCodeBlockTimeoutSeconds: void 0,
+  nlpInternalSecret: void 0,
   isSaas: false,
   nodeEnvironment: "test",
 };

@@ -10,7 +10,8 @@
 #   acme-app         credentials-encryption-key, cron-api-key, nextauth-secret,
 #                    virtual-key-pepper, gateway-internal-secret,
 #                    gateway-jwt-secret, langy-internal-secret,
-#                    lwql-clickhouse-password, lwql-postgres-reader-password
+#                    nlp-internal-secret, lwql-clickhouse-password,
+#                    lwql-postgres-reader-password
 #   acme-clickhouse  clickhouse-password, clickhouse-cluster-secret
 #   acme-redis       redis-password
 #   acme-postgresql  postgres-admin-password, postgres-password
@@ -60,3 +61,7 @@ langyagent:
   secrets:
     existingSecretName: acme-app
     internalSecretKey: langy-internal-secret
+
+langwatch_nlp:
+  secrets:
+    internalSecretKey: nlp-internal-secret

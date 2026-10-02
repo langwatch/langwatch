@@ -1,6 +1,7 @@
 /**
  * The NLP engine, reached over HTTP.
  */
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 import {
@@ -82,12 +83,14 @@ type NlpRuntimeOptions = {
   lambda?: NlpLambdaInvoke | undefined;
   staging?: NlpPayloadStaging | undefined;
   stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
+  /** The engine hop's shared credential, as the process resolved it. */
+  internalSecret?: string | undefined;
 };
 
 /**
  * Dispatches Studio events to the NLP engine at a single configured address. The engine serves
  * the Go implementation under the `/go` prefix, so a caller's `path` (`/studio/execute_sync`)
- * is rewritten to `/go/studio/execute_sync`.
+ * is rewritten to `/go/studio/execute_sync`, carrying the shared internal secret when one is set.
  */
 export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
   /** {@link formatTraceparent}, as the adapter's own surface. */
@@ -116,6 +119,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     /** Where an oversized ARN invoke is parked; absent, such an invoke refuses by name. */
     staging?: NlpPayloadStaging | undefined;
     stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
+    /** The engine hop's shared credential, as the process resolved it. */
+    internalSecret?: string | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
     const { serviceUrl, ...rest } = options;
 
@@ -131,6 +136,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     lambda: NlpLambdaInvoke;
     staging?: NlpPayloadStaging | undefined;
     stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
+    /** The engine hop's shared credential, as the process resolved it. */
+    internalSecret?: string | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
     const { functions, ...rest } = options;
 
@@ -171,6 +178,7 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": request.origin,
+      ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
     };
 
     // Causality depth is forwarded ONLY when the caller is part of an

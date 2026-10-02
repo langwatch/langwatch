@@ -40,6 +40,7 @@ async function appAt({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       nlpCodeBlockTimeoutSeconds: void 0,
+      nlpInternalSecret: void 0,
       nlpServiceUrl,
       publicBaseUrl: void 0,
     },

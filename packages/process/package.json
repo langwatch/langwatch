@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./nlp-internal-secret": {
+      "types": "./dist/nlp-internal-secret.d.ts",
+      "default": "./src/nlp-internal-secret.ts"
     }
   },
   "scripts": {

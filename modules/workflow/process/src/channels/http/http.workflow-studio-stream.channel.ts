@@ -1,6 +1,8 @@
 /**
  * Engine's streaming studio route; HTTP POST with SSE stream, no per-project Lambda routing.
  */
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+
 import {
   type WorkflowStudioStream,
   type WorkflowStudioStreamInput,
@@ -13,11 +15,19 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
     serviceUrl: string;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
+    /** The engine hop's shared credential, as the process resolved it. */
+    internalSecret?: string | undefined;
   }): HttpWorkflowStudioStreamAdapter {
     return new HttpWorkflowStudioStreamAdapter(options);
   }
 
-  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {}
+  private constructor(
+    private readonly options: {
+      serviceUrl: string;
+      fetch?: typeof fetch;
+      internalSecret?: string | undefined;
+    },
+  ) {}
 
   async open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     const call = this.options.fetch ?? fetch;
@@ -26,6 +36,7 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
       headers: {
         "Content-Type": "application/json",
         "X-LangWatch-Origin": input.origin,
+        ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
       },
       body: JSON.stringify(input.body),
     });

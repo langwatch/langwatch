@@ -374,6 +374,8 @@ export type WorkflowHostMembers = Omit<
 type WorkflowProcessFacts = Readonly<{
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
+  /** The engine hop's shared credential, resolved by the process (ADR-132). */
+  nlpInternalSecret: string | undefined;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -427,9 +429,11 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
     };
   }
 
+  const internalSecret = setup.members.nlpInternalSecret;
+
   return {
-    stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl }),
-    runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl }),
+    stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
+    runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl, internalSecret }),
   };
 }
 
@@ -480,6 +484,7 @@ function lambdaEngine({
   };
   const staging = setup.repositories.payloadStaging;
   const { stagingThresholdBytes, stagingTtlSeconds } = config;
+  const internalSecret = setup.members.nlpInternalSecret;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
@@ -488,12 +493,14 @@ function lambdaEngine({
       staging,
       stagingThresholdBytes,
       stagingTtlSeconds,
+      internalSecret,
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
       functions,
       lambda: AwsNlpLambdaInvokeChannel.create({ lambda }),
       staging,
       stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
+      internalSecret,
     }),
     fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
   };
@@ -630,6 +637,7 @@ export class WorkflowModule implements WorkflowApi {
     "prisma",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
+    "nlpInternalSecret",
     "publicBaseUrl",
   ] as const;
   static readonly repositories = workflowRepositories;

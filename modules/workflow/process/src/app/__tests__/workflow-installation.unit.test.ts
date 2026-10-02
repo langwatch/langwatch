@@ -54,6 +54,7 @@ function process_() {
     })
     .withMember("nlpServiceUrl", undefined)
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
+    .withMember("nlpInternalSecret", undefined)
     .withMember("publicBaseUrl", undefined)
     .provide({
       authz: createApiFixture({}, "AuthzApi"),

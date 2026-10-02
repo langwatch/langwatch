@@ -50,6 +50,8 @@ export interface ScenarioChildRuntime {
   logger: Logger;
   /** The operator's nlpgo deadlines, read by the process that started this. */
   nlpTimeouts?: NlpFetchTimeouts;
+  /** The engine hop's shared credential, as the parent stated it for this child. */
+  nlpInternalSecret?: string | undefined;
   /** Builds a voice target's adapter over the transports, with this child's environment. */
   voiceAgents: VoiceAgentBuilder;
   /** Hangs up a voice target's live call when the whole-call limit elapses. */
@@ -115,9 +117,11 @@ function buildVoiceRunSetup({
 function buildRunCast({
   jobData,
   adapter,
+  nlpInternalSecret,
 }: {
   jobData: ChildProcessJobData;
   adapter: ScenarioRunner.AgentAdapter;
+  nlpInternalSecret: string | undefined;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script?: ScenarioRunner.ScriptStep[];
@@ -141,10 +145,12 @@ function buildRunCast({
   const simulatorModel = models.model({
     litellmParams: roleModelParams.simulator,
     nlpServiceUrl,
+    nlpInternalSecret,
   });
   const judgeModel = models.judgeModel({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
+    nlpInternalSecret,
   });
   // An inbound phone agent that greets on connect opens the run with its own
   // turn (so the greeting is captured first), then hands over to the
@@ -205,12 +211,17 @@ async function executeScenarioChildValue({
     adapterData,
     modelParams,
     nlpServiceUrl,
+    nlpInternalSecret: runtime.nlpInternalSecret,
     projectApiKey: langwatchApiKey,
     parameters,
     httpPort: runtime.httpPort,
     logger,
   });
-  const cast = buildRunCast({ jobData, adapter });
+  const cast = buildRunCast({
+    jobData,
+    adapter,
+    nlpInternalSecret: runtime.nlpInternalSecret,
+  });
   const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({ jobData, adapter, runtime });
 
   // The timer clears on a rejected run too, or it could fire after the failure is reported.

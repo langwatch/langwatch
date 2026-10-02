@@ -132,6 +132,7 @@ function createRealModelProviderApp(
       redis: fakeRedis(),
       nlpServiceUrl: undefined,
       encryption: new ReversingCipher(),
+      nlpInternalSecret: undefined,
     },
     config: {
       blockLocalHttpCalls: true,

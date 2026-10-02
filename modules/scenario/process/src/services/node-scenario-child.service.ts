@@ -4,6 +4,7 @@ import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 
 import { createLogger } from "@langwatch/observability";
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import {
   CHILD_PROCESS,
   encodeScenarioEgressPolicy,
@@ -66,6 +67,12 @@ export interface ScenarioChildProcessConfig {
    * here is how that refusal would turn back into a silently permissive default.
    */
   egress: ScenarioEgressPolicy;
+  /**
+   * The engine hop's shared credential, as the process resolved it. The child's
+   * environment is an allow-list, so a value this process holds and does not
+   * state here is a child whose every workflow and code turn is refused 401.
+   */
+  nlpInternalSecret?: string | undefined;
   parentEnvironment: ScenarioChildParentEnvironment;
 }
 
@@ -397,6 +404,12 @@ function buildChildProcessEnvironment(
     SKIP_ENV_VALIDATION: "1",
     NODE_COMPILE_CACHE: parent.nodeCompileCache ?? compileCache,
     COREPACK_ENABLE_DOWNLOAD_PROMPT: parent.corepackEnableDownloadPrompt,
+    // The code and workflow adapters and the model factory all run INSIDE this
+    // child and build their own engine requests, and this allow-list is the
+    // only route into it. Without the forward, an install that configures the
+    // credential answers from the parent fine and 401s on every simulation run
+    // against a workflow or code agent.
+    [NLP_INTERNAL_SECRET_ENV]: config.nlpInternalSecret,
     ...scenario,
   };
   const environment: NodeJS.ProcessEnv = {};

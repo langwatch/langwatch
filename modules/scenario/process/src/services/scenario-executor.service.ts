@@ -58,6 +58,8 @@ const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 export type ScenarioExecutorHost = Readonly<{
   voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;
+  /** The engine hop's shared credential, as the process resolved it. */
+  nlpInternalSecret: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
   publicBaseUrl: string | undefined;
@@ -197,6 +199,7 @@ export class ScenarioExecutorService {
         blockLocal: config.blockLocalHttpCalls,
         allowedHosts: [...config.allowedProxyHosts],
       },
+      nlpInternalSecret: host.nlpInternalSecret,
       parentEnvironment: config.childParentEnvironment,
     };
   }

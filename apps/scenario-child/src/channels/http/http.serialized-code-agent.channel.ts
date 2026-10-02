@@ -6,6 +6,7 @@
 import { randomBytes } from "crypto";
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-contract";
@@ -91,6 +92,8 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     projectApiKey: string;
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
+    /** The engine hop's shared credential, as the parent stated it for this child. */
+    nlpInternalSecret?: string | undefined;
   }): HttpSerializedCodeAgentChannel {
     return new HttpSerializedCodeAgentChannel(options);
   }
@@ -117,6 +120,8 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
   private readonly parameters: RunParameterValues;
   /** The operator's deadlines, as the process that composed this read them. */
   private readonly timeouts: NlpFetchTimeouts;
+  /** The engine hop's shared credential, as the parent stated it for this child. */
+  private readonly nlpInternalSecret: string | undefined;
 
   constructor({
     config,
@@ -124,12 +129,14 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     projectApiKey,
     parameters,
     timeouts,
+    nlpInternalSecret,
   }: {
     config: CodeAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
+    nlpInternalSecret?: string | undefined;
   }) {
     super();
     this.config = config;
@@ -137,6 +144,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
     this.timeouts = timeouts ?? {};
+    this.nlpInternalSecret = nlpInternalSecret;
     this.name = "SerializedCodeAgentAdapter";
   }
 
@@ -410,7 +418,10 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
           try {
             const fetchInit: FetchInitWithDispatcher = {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...nlpInternalSecretHeaders({ secret: this.nlpInternalSecret }),
+              },
               body: JSON.stringify(event),
               signal: controller.signal,
               dispatcher: HttpNlpFetchChannel.create().dispatcher({
