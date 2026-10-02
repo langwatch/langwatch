@@ -4,6 +4,7 @@
  * ARCHITECTURE.md §10.1.
  */
 
+import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import {
   useUiCapabilities,
   useUiDeclarations,
@@ -13,6 +14,7 @@ import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declaration
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
+import { getUserPermissionsAtScope } from "../model/api-key-permissions.ts";
 import {
   AuthorizeHostApi,
   AuthorizeHostProvider,
@@ -24,7 +26,7 @@ import {
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "../model/authorize-host.ts";
-import { projectTokenInput } from "../model/project-token-input.ts";
+import { cappedDeviceFlowPermissions, projectTokenInput } from "../model/project-token-input.ts";
 import { apiKeyApi } from "./api-key-api.ts";
 import { useApiKeyOrganizationGraph } from "./api-key-organization-graph.ts";
 import { writeToClipboard } from "./browser-clipboard.ts";
@@ -126,6 +128,12 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
+  // The person's own bindings: the ceiling the minted token never exceeds.
+  const myBindings = apiKeyApi.apiKey.myBindings.useQuery(
+    { organizationId: activeScope.organizationId ?? "" },
+    { enabled: !!activeScope.organizationId },
+  );
+  const { refetch: refetchBindings } = myBindings;
   // As `useMintPersonalToken`: the token is never kept in the mutation cache.
   const { mutateAsync: mintToken, reset: resetMint } = apiKeyApi.apiKey.create.useMutation({
     gcTime: 0,
@@ -153,8 +161,26 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         mintProjectToken: async () => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
+          const bindings = myBindings.data ?? (await refetchBindings()).data ?? [];
+          const held = getUserPermissionsAtScope({
+            myBindings: bindings,
+            scopeType: "PROJECT",
+            scopeId: projectId,
+            organizationId,
+            orgProjects: (graph.organization?.teams ?? []).flatMap((team) =>
+              team.projects.map((project) => ({ id: project.id, teamId: team.id })),
+            ),
+            isServiceKey: false,
+          });
+          const permissions = cappedDeviceFlowPermissions({ held });
+          if (permissions.length === 0) {
+            throw new ApiKeyScopeViolationError(
+              "You hold none of the permissions a token needs on this project.",
+            );
+          }
           try {
-            return (await mintToken(projectTokenInput({ organizationId, projectId }))).token;
+            return (await mintToken(projectTokenInput({ organizationId, projectId, permissions })))
+              .token;
           } finally {
             resetMint();
           }
@@ -166,6 +192,8 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     [
       activeScope,
       graph,
+      myBindings.data,
+      refetchBindings,
       sessionActor,
       session,
       location,

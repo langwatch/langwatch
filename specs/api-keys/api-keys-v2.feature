@@ -323,7 +323,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then a token for that skill alone is minted holding only the create permission it calls
       And the skill is handed no other setup token
 
-    @unimplemented
+    @unit
     Scenario: The authorize page mints the device-flow default set, capped at what the person holds
       Given "max" holds only some of the device-flow default permissions on project "alpha"
       When "max" opens "/authorize" and creates a personal access token
