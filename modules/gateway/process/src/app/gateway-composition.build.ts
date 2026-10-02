@@ -49,7 +49,7 @@ import {
   type GatewayPlatformProviders,
 } from "../services/gateway-scope-resolution.service.ts";
 import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
-import { GatewayUsageService } from "../services/gateway-usage.service.ts";
+import { GatewayUsageService } from "../services/gateway-spend-summary.service.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { GatewayService, type GatewayBudgetOrganizations } from "../services/gateway.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";

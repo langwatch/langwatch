@@ -11,7 +11,7 @@ import {
   GatewayUsageService,
   type GatewayUsageProjects,
   type GatewayUsageVirtualKeys,
-} from "../services/gateway-usage.service.ts";
+} from "../services/gateway-spend-summary.service.ts";
 
 type TraceStub = {
   virtualKeyId: string;

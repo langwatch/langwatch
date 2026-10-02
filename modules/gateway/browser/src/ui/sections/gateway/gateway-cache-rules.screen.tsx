@@ -16,7 +16,7 @@ import {
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
-import { api } from "../../../behavior/gateway-api.ts";
+import { api, type GatewayCacheRuleView } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
@@ -25,20 +25,7 @@ import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx"
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
-type CacheRuleListRow = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  priority: number;
-  enabled: boolean;
-  matchers: unknown;
-  action: unknown;
-  modeEnum: "RESPECT" | "FORCE" | "DISABLE";
-  archivedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+type CacheRuleListRow = GatewayCacheRuleView;
 
 function CacheRulesPage() {
   const showErrorToast = useShowErrorToast();

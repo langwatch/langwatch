@@ -12,11 +12,16 @@ import type {
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
   GatewayCacheRuleAction,
+  GatewayCacheRuleDto,
   GatewayCacheRuleMatchers,
   GatewayGuardrailResource,
+  GatewayUsageSummary,
   GatewayVirtualKeyDirectBudget,
+  GatewayVirtualKeyUsageSummary,
   VirtualKeyApiScopeAssignment,
+  VirtualKeyCamelDtoResponse,
   VirtualKeyConfig,
+  VirtualKeyMinted,
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -29,35 +34,10 @@ export type GatewayScopeAssignment = VirtualKeyApiScopeAssignment;
 /**
  * A VirtualKey as the wire carries it, which is not the row the server holds.
  */
-export type VirtualKeyView = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  status: "active" | "disabled" | "revoked";
-  purpose: "user" | "langy";
-  displayPrefix: string;
-  principalUserId: string | null;
-  traceProjectId: string | null;
-  traceProjectArchived: boolean;
-  principalUser: { name: string | null; email: string | null } | null;
-  externalId: string | null;
-  metadata: Record<string, string>;
-  scopes: GatewayScopeAssignment[];
-  routingPolicyId: string | null;
-  routingMode: "NONE" | "FALLBACK_ALL" | "POLICY";
-  config: unknown;
-  /** The row's optimistic-concurrency counter, a BigInt stringified. */
-  revision: string;
-  createdAt: string;
-  updatedAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-  expiresAt: string | null;
-};
+export type VirtualKeyView = VirtualKeyCamelDtoResponse;
 
 /** A key together with its secret, which the two mutations that mint one return exactly once. */
-export type VirtualKeyMinted = { virtualKey: VirtualKeyView; secret: string };
+export type { VirtualKeyMinted };
 
 /**
  * The budget a key carries on itself, as the create and edit drawers send it. Not the
@@ -168,20 +148,7 @@ export type GatewayBudgetScopeInput =
  * A cache rule as the wire carries it. `mode` is renamed `modeEnum` by the DTO — the stored
  * column and the `action` both carry a mode, and the two are spelled differently on purpose.
  */
-export type GatewayCacheRuleView = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  priority: number;
-  enabled: boolean;
-  matchers: GatewayCacheRuleMatchers;
-  action: GatewayCacheRuleAction;
-  modeEnum: "RESPECT" | "FORCE" | "DISABLE";
-  archivedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type GatewayCacheRuleView = GatewayCacheRuleDto;
 
 /** One gateway request, as the billing feed records it. `occurredAt` is a Date. */
 export type GatewaySpendEventRow = {
@@ -241,42 +208,9 @@ export type GatewaySpendEventPage = {
   clickHouseDisabled: boolean;
 };
 
-export type GatewayUsageSummary = {
-  totalUsd: string;
-  totalRequests: number;
-  blockedRequests: number;
-  avgUsdPerRequest: string;
-  byVirtualKey: {
-    virtualKeyId: string;
-    name: string;
-    displayPrefix: string;
-    totalUsd: string;
-    requests: number;
-  }[];
-  byModel: { model: string; totalUsd: string; requests: number }[];
-  byDay: { day: string; totalUsd: string; requests: number }[];
-};
+export type { GatewayUsageSummary };
 
-export type GatewayVirtualKeyUsageSummary = {
-  totalUsd: string;
-  totalRequests: number;
-  blockedRequests: number;
-  avgUsdPerRequest: string;
-  byModel: { model: string; totalUsd: string; requests: number }[];
-  byDay: { day: string; totalUsd: string; requests: number }[];
-  /** The most recent twenty, which is what the detail page shows. */
-  recentDebits: {
-    id: string;
-    occurredAt: string;
-    model: string;
-    providerSlot: string | null;
-    amountUsd: string;
-    tokensInput: number;
-    tokensOutput: number;
-    durationMs: number | null;
-    status: string;
-  }[];
-};
+export type { GatewayVirtualKeyUsageSummary };
 
 /**
  * A configured SQS destination as the endpoint list renders it. `region`, `accountId` and

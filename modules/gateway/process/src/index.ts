@@ -35,7 +35,7 @@ export type {
   UsageSummary,
   UsageWindow,
   VirtualKeyUsageSummary,
-} from "./services/gateway-usage.service.ts";
+} from "./services/gateway-spend-summary.service.ts";
 export type {
   GatewayBudgetSpendRecord,
   BudgetBucketBoundary,

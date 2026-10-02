@@ -1,7 +1,8 @@
 import {
+  type GatewayVirtualKeySnakeDto,
+  type VirtualKeyCamelDtoResponse,
   type VirtualKeyWithScopes,
   metadataFromRow,
-  type ResourceMetadata,
   toWireEnum,
 } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -21,86 +22,11 @@ export type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
 };
 
-export type VirtualKeyScopeEntry = {
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-  scopeId: string;
-};
+export type VirtualKeyScopeEntry = VirtualKeyCamelDtoResponse["scopes"][number];
 
-export type VirtualKeyCamelDto = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  status: "active" | "disabled" | "revoked";
-  purpose: "user" | "langy";
-  displayPrefix: string;
-  principalUserId: string | null;
-  /**
-   * Where this key's traces and costs land; grants no access to the key.
-   * Null only for a key written before the destination was stored, in an
-   * organization that had no governance project to fall back to.
-   */
-  traceProjectId: string | null;
-  /**
-   * True when the customer has deleted the project the key traces into. The
-   * key keeps sending its traces there, so nothing else on the row says so.
-   */
-  traceProjectArchived: boolean;
-  principalUser: { name: string | null; email: string | null } | null;
-  /** The caller's own id for this key, unique per organization. */
-  externalId: string | null;
-  /** Customer-owned bookkeeping, echoed back verbatim. */
-  metadata: ResourceMetadata;
-  scopes: VirtualKeyScopeEntry[];
-  routingPolicyId: string | null;
-  routingMode: "NONE" | "FALLBACK_ALL" | "POLICY";
-  config: unknown;
-  revision: string;
-  createdAt: string;
-  updatedAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-  /**
-   * `status` stays "active" past the expiry date on purpose: the three
-   * status values are what clients switch on; "expired" is derivable from
-   * this date — keeping the key editable is the point of a date over a status.
-   */
-  expiresAt: string | null;
-};
+export type VirtualKeyCamelDto = VirtualKeyCamelDtoResponse;
 
-export type VirtualKeySnakeDto = {
-  id: string;
-  organization_id: string;
-  name: string;
-  description: string | null;
-  status: "active" | "disabled" | "revoked";
-  purpose: "user" | "langy";
-  display_prefix: string;
-  principal_user_id: string | null;
-  trace_project_id: string | null;
-  trace_project_archived: boolean;
-  external_id: string | null;
-  metadata: ResourceMetadata;
-  /**
-   * Wire casing, lower_snake_case, unlike the camel DTO next to it: this is
-   * the shape the public REST surface publishes, and every enum it carries is
-   * lowercase there.
-   */
-  scopes: {
-    scope_type: "organization" | "team" | "project";
-    scope_id: string;
-  }[];
-  routing_policy_id: string | null;
-  routing_mode: "none" | "fallback_all" | "policy";
-  config: unknown;
-  revision: string;
-  created_at: string;
-  updated_at: string;
-  last_used_at: string | null;
-  revoked_at: string | null;
-  /** When the key stops serving; null for a key that never expires. */
-  expires_at: string | null;
-};
+export type VirtualKeySnakeDto = GatewayVirtualKeySnakeDto;
 
 type BaseVk = Omit<VirtualKeyCamelDto, never>;
 

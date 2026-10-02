@@ -1,4 +1,9 @@
-import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
+import {
+  type GatewayUsageSummary,
+  type GatewayVirtualKeyUsageSummary,
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "@langwatch/gateway-contract";
 /**
  * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries, not
  * the budget ledger, which writes once per applicable budget and never for an uncapped key. Every
@@ -39,51 +44,11 @@ export type GatewayUsageVirtualKeys = {
 
 export type UsageWindow = { fromDate: Instant; toDate: Instant };
 
-export type UsageSummary = {
-  totalUsd: string;
-  totalRequests: number;
-  blockedRequests: number;
-  avgUsdPerRequest: string;
-  byVirtualKey: {
-    virtualKeyId: string;
-    name: string;
-    displayPrefix: string;
-    totalUsd: string;
-    requests: number;
-  }[];
-  byModel: {
-    model: string;
-    totalUsd: string;
-    requests: number;
-  }[];
-  byDay: { day: string; totalUsd: string; requests: number }[];
-};
+export type UsageSummary = GatewayUsageSummary;
 
 // Scoped-to-one-VK version for the detail page. Omits the per-VK
 // rollup (there's only one) and exposes the 20 most recent debits.
-export type VirtualKeyUsageSummary = {
-  totalUsd: string;
-  totalRequests: number;
-  blockedRequests: number;
-  avgUsdPerRequest: string;
-  byModel: {
-    model: string;
-    totalUsd: string;
-    requests: number;
-  }[];
-  byDay: { day: string; totalUsd: string; requests: number }[];
-  recentDebits: {
-    id: string;
-    occurredAt: string;
-    model: string;
-    providerSlot: string | null;
-    amountUsd: string;
-    tokensInput: number;
-    tokensOutput: number;
-    durationMs: number | null;
-    status: string;
-  }[];
-};
+export type VirtualKeyUsageSummary = GatewayVirtualKeyUsageSummary;
 
 const RECENT_DEBITS_LIMIT = 20;
 

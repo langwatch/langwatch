@@ -19,7 +19,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { formatBudgetUsd, type GatewayBudgetDetailResponse } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
 import { Archive, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
@@ -438,16 +438,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-// Mirrors the wire shape of `BudgetScopeTargetInfo` (the shared
-// scope-target resolver): flat, with the kind-specific extras optional.
-type ScopeTarget = {
-  kind: string;
-  id: string;
-  name: string;
-  secondary: string | null;
-  projectSlug?: string | null;
-  memberCount?: number;
-};
+type ScopeTarget = NonNullable<GatewayBudgetDetailResponse["scopeTarget"]>;
 
 function ScopeBadge({
   target,

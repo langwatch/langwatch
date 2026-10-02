@@ -229,7 +229,7 @@ import {
 } from "../services/gateway-spend-reconciliation.service.ts";
 import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
 import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
-import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
+import type { GatewayUsageService, UsageWindow } from "../services/gateway-spend-summary.service.ts";
 import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,

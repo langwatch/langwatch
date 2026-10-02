@@ -4,6 +4,7 @@ import {
   scopeTargetKey,
   type GatewayBudgetResolutionTarget,
   type GatewayResolvedBudget,
+  type VirtualKeyApplicableBudgets,
 } from "@langwatch/gateway-contract";
 /**
  * The budgets that will constrain a key, answered for a key that may not exist yet. Resolution is
@@ -26,35 +27,7 @@ export type DraftVirtualKey = {
   principalUserId: string | null;
 };
 
-export type ApplicableBudget = {
-  id: string;
-  name: string;
-  scopeType: string;
-  scopeId: string;
-  /** Human label for the target, e.g. the team or group name. */
-  scopeLabel: string;
-  window: string;
-  limitUsd: string;
-  spentUsd: string;
-  onBreach: string;
-  /** Null means resets are computed in the default timezone (UTC). */
-  timezone: string | null;
-  /** Null when the budget counts every provider. */
-  providerKey: string | null;
-  /** Display name for `providerKey`, so the list can say "OpenAI only". */
-  providerLabel: string | null;
-  /**
-   * True when the budget is per member of a group rather than a
-   * shared pot, which changes what its limit means to the person reading.
-   */
-  isPerMember: boolean;
-  /**
-   * Set when this row is the budget a key's drawer field manages. The edit drawer seeds its field
-   * from this row and hides it from the inherited list; independently created key-targeted budgets
-   * show as inherited constraints like any other.
-   */
-  managedByVirtualKeyId: string | null;
-};
+export type ApplicableBudget = VirtualKeyApplicableBudgets[number];
 
 /**
  * The budgets that already apply to a key, drafted or saved.
