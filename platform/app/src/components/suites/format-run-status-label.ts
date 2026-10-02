@@ -41,7 +41,8 @@ const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([
 /**
  * Formats a scenario run status into a display label with optional criteria count.
  *
- * Terminal statuses (success, failed, error) show "Passed" or "Failed" with
+ * Completed runs without evaluation results show "Not evaluated".
+ * Terminal statuses with results show "Passed" or "Failed" with
  * criteria count in parentheses when criteria exist, e.g. "Passed (4/5)".
  * Non-terminal statuses return their label as-is: "Running", "Pending", etc.
  */
@@ -49,6 +50,10 @@ export function formatRunStatusLabel({
   status,
   results,
 }: FormatRunStatusLabelInput): string {
+  // Completion alone is not a passing evaluation (for example, a human voice call).
+  if (status === ScenarioRunStatus.SUCCESS && !results) {
+    return "Not evaluated";
+  }
   const label = STATUS_LABELS[status];
 
   if (!TERMINAL_WITH_CRITERIA.has(status) || !results) {
