@@ -426,42 +426,111 @@ export async function forkProjectSession(
   return (await res.json()) as RefreshResult;
 }
 
-/** The ingestion key a project session mints for this machine's app: personal, that project only. */
+/**
+ * The ingestion key a project session mints for this machine's app: personal, that project only.
+ */
 export async function createIngestionKey(
   opts: DeviceFlowOptions,
   { accessToken, project }: { accessToken: string; project: ExchangeProject },
 ): Promise<string> {
-  const res = await (opts.fetchImpl ?? fetch)(
-    `${normalizeEndpoint(opts.baseUrl)}/api/v1/api-keys/ingestion`,
-    {
-      method: "POST",
-      headers: {
-        ...buildSdkIdentityHeaders({ surface: "cli" }),
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
-        keyType: "personal",
-        permissionMode: "restricted",
-        permissions: ["traces:create"],
-        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: project.id }],
-      }),
+  return mintProjectSessionKey(opts, {
+    accessToken,
+    path: "/api/v1/api-keys/ingestion",
+    body: {
+      name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
+      keyType: "personal",
+      permissionMode: "restricted",
+      permissions: ["traces:create"],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: project.id }],
     },
-  );
+    refused: `cannot send traces to project "${project.slug}"`,
+    failed: "ingestion key failed",
+  });
+}
+
+/**
+ * The project key a project session mints for this machine: personal, every permission in that
+ * one project, capped at what the person holds there. Refused (403) to a person without
+ * project:manage, and missing (404) on a server older than the route: both read as "denied".
+ */
+export async function createProjectApiKey(
+  opts: DeviceFlowOptions,
+  { accessToken, project }: { accessToken: string; project: ExchangeProject },
+): Promise<string> {
+  return mintProjectSessionKey(opts, {
+    accessToken,
+    path: "/api/v1/api-keys/project",
+    body: {
+      name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
+      keyType: "personal",
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: project.id }],
+    },
+    refused: `cannot get a project key for "${project.slug}"`,
+    failed: "project key failed",
+    missingIsRefusal: true,
+  });
+}
+
+/** Which key a project login wrote to .env. */
+export type ProjectLoginKeyKind = "project" | "ingestion";
+
+/**
+ * The key `langwatch login --project` writes: the full project key, or the ingestion key when the
+ * person cannot get the full one (no project:manage there, or a server without the route).
+ */
+export async function createProjectLoginKey(
+  opts: DeviceFlowOptions,
+  session: { accessToken: string; project: ExchangeProject },
+): Promise<{ token: string; kind: ProjectLoginKeyKind }> {
+  try {
+    return { token: await createProjectApiKey(opts, session), kind: "project" };
+  } catch (error) {
+    if (!(error instanceof DeviceFlowError) || error.kind !== "denied") throw error;
+    return { token: await createIngestionKey(opts, session), kind: "ingestion" };
+  }
+}
+
+async function mintProjectSessionKey(
+  opts: DeviceFlowOptions,
+  {
+    accessToken,
+    path,
+    body,
+    refused,
+    failed,
+    missingIsRefusal = false,
+  }: {
+    accessToken: string;
+    path: string;
+    body: Record<string, unknown>;
+    refused: string;
+    failed: string;
+    missingIsRefusal?: boolean;
+  },
+): Promise<string> {
+  const res = await (opts.fetchImpl ?? fetch)(`${normalizeEndpoint(opts.baseUrl)}${path}`, {
+    method: "POST",
+    headers: {
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
   if (res.status === 401) {
     throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
   }
-  if (res.status === 403) {
-    throw new DeviceFlowError("denied", `cannot send traces to project "${project.slug}"`);
+  if (res.status === 403 || (missingIsRefusal && res.status === 404)) {
+    throw new DeviceFlowError("denied", refused);
   }
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new DeviceFlowError("other", `ingestion key failed (${res.status}): ${body.slice(0, 256)}`);
+    const text = await res.text().catch(() => "");
+    throw new DeviceFlowError("other", `${failed} (${res.status}): ${text.slice(0, 256)}`);
   }
   const minted = (await res.json()) as { token?: string };
-  if (!minted.token) throw new DeviceFlowError("other", "ingestion key answer carried no token");
+  if (!minted.token) throw new DeviceFlowError("other", `${failed}: the answer carried no token`);
   return minted.token;
 }
 

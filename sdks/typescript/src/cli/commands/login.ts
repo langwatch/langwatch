@@ -10,9 +10,10 @@ import {
   globalConfigIsolationWarning,
   rewritesGlobalConfigForLocalInstance,
 } from "@/cli/utils/governance/global-config-isolation";
+import { printIngestionKeyNotice } from "@/cli/utils/governance/ingestion-key-notice";
 import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
-import { mintProjectIngestionKey, SessionApiError } from "@/cli/utils/governance/session-api";
+import { mintProjectApiKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -127,8 +128,8 @@ const failFastHeadlessProjectLogin = (): never => {
 };
 
 /**
- * Non-interactive project login: mints this machine's ingestion key for the named project
- * from the device session and writes it to $CWD/.env. No browser, no prompts, works headless.
+ * Non-interactive project login: mints this machine's project key for the named project from
+ * the device session and writes it to $CWD/.env. No browser, no prompts, works headless.
  */
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
@@ -143,11 +144,12 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     process.exit(1);
   }
   try {
-    const result = await mintProjectIngestionKey(cfg, slug);
+    const result = await mintProjectApiKey(cfg, slug);
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
+    const written = result.kind === "project" ? "API key" : "Ingestion key";
     console.log(
-      chalk.green(`✓ Ingestion key for project ${chalk.bold(result.project.name)} saved to .env`),
+      chalk.green(`✓ ${written} for project ${chalk.bold(result.project.name)} saved to .env`),
     );
     if (envResult.created) {
       console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
@@ -158,6 +160,7 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     }
     console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
     console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+    if (result.kind === "ingestion") printIngestionKeyNotice(result.project);
   } catch (error) {
     if (error instanceof SessionApiError) {
       console.error(chalk.red(`Error: ${error.message}`));

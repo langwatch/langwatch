@@ -7,7 +7,14 @@ import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
-import { createIngestionKey, DeviceFlowError, forkProjectSession, logout } from "./device-flow";
+import {
+  createIngestionKey,
+  createProjectLoginKey,
+  DeviceFlowError,
+  forkProjectSession,
+  logout,
+  type ProjectLoginKeyKind,
+} from "./device-flow";
 import { refreshSession as sharedRefreshSession } from "./session-refresh";
 
 export interface SessionApiOptions {
@@ -173,6 +180,38 @@ export async function mintProjectIngestionKey(
   slug: string,
   opts: SessionApiOptions = {},
 ): Promise<SessionProjectKey> {
+  return withProjectSession(cfg, slug, opts, async (flow, session) => ({
+    api_key: await createIngestionKey(flow, session),
+    project: session.project,
+  }));
+}
+
+/**
+ * `langwatch login --project <slug>`: forks a child session capped at the project from the device
+ * session, mints this machine's full project key with it (the ingestion key for a person who
+ * cannot manage the project), then ends the child. The device session itself is left as it was.
+ */
+export async function mintProjectApiKey(
+  cfg: GovernanceConfig,
+  slug: string,
+  opts: SessionApiOptions = {},
+): Promise<SessionProjectKey & { kind: ProjectLoginKeyKind }> {
+  return withProjectSession(cfg, slug, opts, async (flow, session) => {
+    const { token, kind } = await createProjectLoginKey(flow, session);
+    return { api_key: token, kind, project: session.project };
+  });
+}
+
+/** Runs `mint` with a child session forked onto the project, and ends the child after. */
+async function withProjectSession<T>(
+  cfg: GovernanceConfig,
+  slug: string,
+  opts: SessionApiOptions,
+  mint: (
+    flow: { baseUrl: string; fetchImpl: typeof fetch },
+    session: { accessToken: string; project: SessionProjectKey["project"] },
+  ) => Promise<T>,
+): Promise<T> {
   if (!cfg.refresh_token) {
     throw new SessionApiError(401, "not_logged_in", "Not logged in");
   }
@@ -199,8 +238,7 @@ export async function mintProjectIngestionKey(
       );
     }
     try {
-      const apiKey = await createIngestionKey(flow, { accessToken: child.access_token, project });
-      return { api_key: apiKey, project };
+      return await mint(flow, { accessToken: child.access_token, project });
     } finally {
       await logout(flow, child.refresh_token, child.access_token).catch(() => undefined);
     }

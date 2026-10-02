@@ -23,15 +23,17 @@ import {
 } from "./cli-api";
 import { type GovernanceConfig, displayConfigPath, loadConfig, saveConfig } from "./config";
 import {
-  createIngestionKey,
+  createProjectLoginKey,
   type CredentialType,
   DeviceFlowError,
   type ExchangeApiKeyResult,
   type ExchangeDeviceSessionResult,
   logout,
   pollUntilDone,
+  type ProjectLoginKeyKind,
   startDeviceCode,
 } from "./device-flow";
+import { printIngestionKeyNotice } from "./ingestion-key-notice";
 import { formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
 import { keptWiringLines, refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
@@ -257,7 +259,8 @@ async function completeDeviceSession({
 
 /**
  * The key a project login writes: an older server's `api_key` verbatim, or this machine's
- * ingestion key minted with the project session, which then ends (only the key is kept).
+ * project key minted with the project session (the ingestion key for a person who cannot
+ * manage the project), which then ends (only the key is kept).
  */
 async function projectKeyOf({
   baseUrl,
@@ -265,10 +268,10 @@ async function projectKeyOf({
 }: {
   baseUrl: string;
   result: ProjectKeyResult;
-}): Promise<string> {
-  if (result.kind === "api_key") return result.api_key;
+}): Promise<{ token: string; kind: ProjectLoginKeyKind }> {
+  if (result.kind === "api_key") return { token: result.api_key, kind: "project" };
   try {
-    return await createIngestionKey(
+    return await createProjectLoginKey(
       { baseUrl },
       { accessToken: result.access_token, project: result.project },
     );
@@ -287,7 +290,10 @@ async function completeProjectKey({
   spinner: Ora;
 }): Promise<GovernanceConfig> {
   // Written to the project-local .env (NO copy-paste).
-  const apiKey = await projectKeyOf({ baseUrl: cfg.control_plane_url, result });
+  const { token: apiKey, kind: keyKind } = await projectKeyOf({
+    baseUrl: cfg.control_plane_url,
+    result,
+  });
   spinner.succeed(`Connected to project ${chalk.bold(result.project.name)}`);
   // Seed the identity notice's credential-to-project-name cache while the
   // server is telling us the name anyway, so the first api-key notice
@@ -306,6 +312,7 @@ async function completeProjectKey({
   console.log();
   console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
   console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+  if (keyKind === "ingestion") printIngestionKeyNotice(result.project);
   return cfg;
 }
 
