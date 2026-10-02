@@ -81,25 +81,17 @@ const UNDOCUMENTED_CHECKUP =
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
 
-/**
- * The dated (`2026-08-07`) or literal-`latest` address of an operation this
- * generator already skips or documents at its default address — the version
- * segment lands BEFORE the family's path segment, a shape no `pathPrefixes` entry can match.
- */
-const UNDOCUMENTED_DATED_VERSION_PIN =
-  "Not yet documented in the API reference: this is the dated or 'latest'-pinned address of an operation already covered above; per-version reference pages are not generated.";
-
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
-
-const RETIRED_LEGACY_SECRET_SINGULAR =
-  "Retired surface, intentionally undocumented: superseded by /api/secrets (see the Secrets family below); this singular-named alias is the same family under its original path.";
 
 const UNDOCUMENTED_APP_INTERNAL =
   "Not part of the public API: the LangWatch app, its operators or a vendor webhook call this route, not API key holders.";
 
 const UNDOCUMENTED_STORED_OBJECTS =
   "Not yet documented in the API reference: the stored object upload routes back signed-URL attachments and have no reference pages yet.";
+
+const UNDOCUMENTED_CLI_AUTH =
+  "Not yet documented in the API reference: the langwatch CLI calls the device login routes and the routes behind its login session, and the CLI documentation covers that flow.";
 
 const UNDOCUMENTED_LANGY_CONVERSATIONS =
   "Not yet documented in the API reference: the Langy conversation routes have no reference pages yet.";
@@ -121,46 +113,22 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/agents": RETIRED_LEGACY_AGENTS,
   "/api/agents/{id}": RETIRED_LEGACY_AGENTS,
-  "/api/secret": RETIRED_LEGACY_SECRET_SINGULAR,
-  "/api/secret/{id}": RETIRED_LEGACY_SECRET_SINGULAR,
-  "/api/v1/secret": RETIRED_LEGACY_SECRET_SINGULAR,
-  "/api/v1/secret/{id}": RETIRED_LEGACY_SECRET_SINGULAR,
-  "/api/v1/2026-08-07/trigger/slack": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/latest/trigger/slack": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/v1/governance/2026-08-07/ingestion-templates": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/2026-08-07/ingestion-templates/admin": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/2026-08-07/ingestion-templates/clone": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/2026-08-07/ingestion-templates/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/2026-08-07/ingestion-templates/{id}/ottl-rules":
-    UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/latest/ingestion-templates": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/latest/ingestion-templates/admin": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/latest/ingestion-templates/clone": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/latest/ingestion-templates/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/governance/latest/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/governance/ingestion-templates/{ingestionTemplateId}": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{ingestionTemplateId}/ottl-rules":
+    UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
-  "/api/v1/me/2026-08-07/project": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/me/2026-08-07/usage": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/me/latest/project": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/me/latest/usage": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/model-defaults/2026-08-07/": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/model-defaults/2026-08-07/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/model-defaults/latest/": UNDOCUMENTED_DATED_VERSION_PIN,
-  "/api/v1/model-defaults/latest/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/v1/langy/control/connect/frames": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/connect/poll": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/connect/register": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/v1/langy/control/requests/{id}/approve": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/v1/langy/control/requests/{id}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests/{requestId}/approve": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests/{requestId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/projects/{projectId}/analytics/charts": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
@@ -181,12 +149,52 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/ops/clickhouse/explain": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/platform-health": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/platform-health/{check}": UNDOCUMENTED_APP_INTERNAL,
-  "/api/v1/playground": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/unsubscribe": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/auth/cli/approve": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/bootstrap": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/budget-overview": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/budget/status": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/deny": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/device-approval": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/device-code": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/exchange": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources/{sourceId}/events": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources/{sourceId}/health": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-key": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-keys": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-keys/{lookup_id}": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-templates": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/status": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/logout": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/lookup": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/personal-project": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/project-key": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/refresh": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/virtual-key": UNDOCUMENTED_CLI_AUTH,
   "/api/v1/langy/conversations": UNDOCUMENTED_LANGY_CONVERSATIONS,
   "/api/v1/langy/conversations/{conversationId}/messages": UNDOCUMENTED_LANGY_CONVERSATIONS,
-  "/api/v1/stored-objects/{id}": UNDOCUMENTED_STORED_OBJECTS,
-  "/api/v1/stored-objects/{uploadToken}/confirmation": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/uploads": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/uploads/{storedObjectId}/confirmation": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{projectId}/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{projectId}/{storedObjectId}/{filename}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/langy/local/calls": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/calls/{callId}": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/calls/{callId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/workspace": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/ui/actions": UNDOCUMENTED_APP_INTERNAL,
+  "/api/langy/waits": UNDOCUMENTED_APP_INTERNAL,
+  "/api/langy/waits/{waitId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/credentials/revoke": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/relay/frames": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/turn/{turnId}/result": UNDOCUMENTED_APP_INTERNAL,
+  "/api/rum/v1/traces": UNDOCUMENTED_APP_INTERNAL,
+  "/api/user-avatar/{projectId}/{userAvatarId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/webhooks/stripe": UNDOCUMENTED_APP_INTERNAL,
+  "/api/webhooks/auth0-scim": UNDOCUMENTED_APP_INTERNAL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -485,7 +493,6 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/grants"],
     overviewDescription:
       "Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings.",
-    extraPages: ["api-reference/grants/overview"],
   },
   {
     name: "Role Bindings",

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_checkup_run_body_checks_item import PostApiCheckupRunBodyChecksItem
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiCheckupRunBody")
@@ -15,18 +16,21 @@ T = TypeVar("T", bound="PostApiCheckupRunBody")
 class PostApiCheckupRunBody:
     """
     Attributes:
-        checks (list[str] | Unset): The check ids to run. Omit to run every explicit check.
-        scenario_run_plan_id (str | Unset): The run plan the scenario canary launches.
+        checks (list[PostApiCheckupRunBodyChecksItem] | Unset):
+        scenario_run_plan_id (str | Unset):
     """
 
-    checks: list[str] | Unset = UNSET
+    checks: list[PostApiCheckupRunBodyChecksItem] | Unset = UNSET
     scenario_run_plan_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         checks: list[str] | Unset = UNSET
         if not isinstance(self.checks, Unset):
-            checks = self.checks
+            checks = []
+            for checks_item_data in self.checks:
+                checks_item = checks_item_data.value
+                checks.append(checks_item)
 
         scenario_run_plan_id = self.scenario_run_plan_id
 
@@ -43,7 +47,14 @@ class PostApiCheckupRunBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        checks = cast(list[str], d.pop("checks", UNSET))
+        _checks = d.pop("checks", UNSET)
+        checks: list[PostApiCheckupRunBodyChecksItem] | Unset = UNSET
+        if _checks is not UNSET:
+            checks = []
+            for checks_item_data in _checks:
+                checks_item = PostApiCheckupRunBodyChecksItem(checks_item_data)
+
+                checks.append(checks_item)
 
         scenario_run_plan_id = d.pop("scenarioRunPlanId", UNSET)
 

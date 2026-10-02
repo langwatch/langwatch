@@ -71,6 +71,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     })
     .withDocs(
       langyControlDocs(mount, {
+        operationId: "registerLangyControlSession",
         description:
           "The registered frame with its instance token, or the refused frame with its reason.",
         responses: documentedResponses({ 200: langyControlRegisterAnswerSchema }),
@@ -102,6 +103,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     })
     .withDocs(
       langyControlDocs(mount, {
+        operationId: "pollLangyControlSession",
         description:
           "The frames waiting for the folder, or 410 when the instance token is not known.",
         responses: documentedResponses({ 200: langyControlPollAnswerSchema }),
@@ -132,6 +134,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     })
     .withDocs(
       langyControlDocs(mount, {
+        operationId: "postLangyControlFrames",
         description: "How many frames were taken, or 410 when the instance token is not known.",
         responses: documentedResponses({ 200: langyControlFramesAnswerSchema }),
       }),

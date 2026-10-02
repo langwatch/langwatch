@@ -103,8 +103,8 @@ Feature: Explicit compatibility version namespaces
   @unimplemented
   Scenario: One logical route reaches the document once
     When the OpenAPI document is generated
-    Then the bare path carries the declared operation id
-    And no dated, latest or /api/v1 address appears as a second operation
+    Then the /api/v1 address carries the declared operation id
+    And no dated, latest or bare address appears as a second operation
 
   @integration
   Scenario: A family serves one static generation instead of dated namespaces

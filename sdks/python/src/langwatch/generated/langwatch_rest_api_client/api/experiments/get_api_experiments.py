@@ -10,8 +10,8 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    page: str | Unset = UNSET,
-    page_size: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -62,16 +62,16 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: str | Unset = UNSET,
-    page_size: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> Response[GetApiExperimentsResponse200]:
     """List experiments for the project
 
      List experiments for the project. Includes a runs count and last-run timestamp per experiment.
 
     Args:
-        page (str | Unset):
-        page_size (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -96,16 +96,16 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: str | Unset = UNSET,
-    page_size: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> GetApiExperimentsResponse200 | None:
     """List experiments for the project
 
      List experiments for the project. Includes a runs count and last-run timestamp per experiment.
 
     Args:
-        page (str | Unset):
-        page_size (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -125,16 +125,16 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: str | Unset = UNSET,
-    page_size: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> Response[GetApiExperimentsResponse200]:
     """List experiments for the project
 
      List experiments for the project. Includes a runs count and last-run timestamp per experiment.
 
     Args:
-        page (str | Unset):
-        page_size (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,16 +157,16 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: str | Unset = UNSET,
-    page_size: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> GetApiExperimentsResponse200 | None:
     """List experiments for the project
 
      List experiments for the project. Includes a runs count and last-run timestamp per experiment.
 
     Args:
-        page (str | Unset):
-        page_size (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

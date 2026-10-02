@@ -17,16 +17,20 @@ class CreateAgentBodyType3ConfigDevTunnel:
     Attributes:
         previous_url (str | Unset):
         connected_at (str | Unset):
+        heartbeat_at (str | Unset):
     """
 
     previous_url: str | Unset = UNSET
     connected_at: str | Unset = UNSET
+    heartbeat_at: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         previous_url = self.previous_url
 
         connected_at = self.connected_at
+
+        heartbeat_at = self.heartbeat_at
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -35,6 +39,8 @@ class CreateAgentBodyType3ConfigDevTunnel:
             field_dict["previousUrl"] = previous_url
         if connected_at is not UNSET:
             field_dict["connectedAt"] = connected_at
+        if heartbeat_at is not UNSET:
+            field_dict["heartbeatAt"] = heartbeat_at
 
         return field_dict
 
@@ -45,9 +51,12 @@ class CreateAgentBodyType3ConfigDevTunnel:
 
         connected_at = d.pop("connectedAt", UNSET)
 
+        heartbeat_at = d.pop("heartbeatAt", UNSET)
+
         create_agent_body_type_3_config_dev_tunnel = cls(
             previous_url=previous_url,
             connected_at=connected_at,
+            heartbeat_at=heartbeat_at,
         )
 
         create_agent_body_type_3_config_dev_tunnel.additional_properties = d

@@ -17,7 +17,9 @@ if TYPE_CHECKING:
     from ..models.span_input_output_type_5 import SpanInputOutputType5
     from ..models.span_input_output_type_6 import SpanInputOutputType6
     from ..models.trace_spans_item_type_0_error_type_0 import TraceSpansItemType0ErrorType0
+    from ..models.trace_spans_item_type_0_input_type_0_type_1 import TraceSpansItemType0InputType0Type1
     from ..models.trace_spans_item_type_0_metrics_type_0 import TraceSpansItemType0MetricsType0
+    from ..models.trace_spans_item_type_0_output_type_0_type_1 import TraceSpansItemType0OutputType0Type1
     from ..models.trace_spans_item_type_0_params_type_0 import TraceSpansItemType0ParamsType0
     from ..models.trace_spans_item_type_0_timestamps import TraceSpansItemType0Timestamps
 
@@ -36,9 +38,11 @@ class TraceSpansItemType0:
         parent_id (None | str | Unset):
         name (None | str | Unset):
         input_ (None | SpanInputOutputType0 | SpanInputOutputType1 | SpanInputOutputType2 | SpanInputOutputType3 |
-            SpanInputOutputType4 | SpanInputOutputType5 | SpanInputOutputType6 | Unset):
+            SpanInputOutputType4 | SpanInputOutputType5 | SpanInputOutputType6 | TraceSpansItemType0InputType0Type1 |
+            Unset):
         output (None | SpanInputOutputType0 | SpanInputOutputType1 | SpanInputOutputType2 | SpanInputOutputType3 |
-            SpanInputOutputType4 | SpanInputOutputType5 | SpanInputOutputType6 | Unset):
+            SpanInputOutputType4 | SpanInputOutputType5 | SpanInputOutputType6 | TraceSpansItemType0OutputType0Type1 |
+            Unset):
         error (None | TraceSpansItemType0ErrorType0 | Unset):
         metrics (None | TraceSpansItemType0MetricsType0 | Unset):
         params (None | TraceSpansItemType0ParamsType0 | Unset):
@@ -61,6 +65,7 @@ class TraceSpansItemType0:
         | SpanInputOutputType4
         | SpanInputOutputType5
         | SpanInputOutputType6
+        | TraceSpansItemType0InputType0Type1
         | Unset
     ) = UNSET
     output: (
@@ -72,6 +77,7 @@ class TraceSpansItemType0:
         | SpanInputOutputType4
         | SpanInputOutputType5
         | SpanInputOutputType6
+        | TraceSpansItemType0OutputType0Type1
         | Unset
     ) = UNSET
     error: None | TraceSpansItemType0ErrorType0 | Unset = UNSET
@@ -90,7 +96,9 @@ class TraceSpansItemType0:
         from ..models.span_input_output_type_5 import SpanInputOutputType5
         from ..models.span_input_output_type_6 import SpanInputOutputType6
         from ..models.trace_spans_item_type_0_error_type_0 import TraceSpansItemType0ErrorType0
+        from ..models.trace_spans_item_type_0_input_type_0_type_1 import TraceSpansItemType0InputType0Type1
         from ..models.trace_spans_item_type_0_metrics_type_0 import TraceSpansItemType0MetricsType0
+        from ..models.trace_spans_item_type_0_output_type_0_type_1 import TraceSpansItemType0OutputType0Type1
         from ..models.trace_spans_item_type_0_params_type_0 import TraceSpansItemType0ParamsType0
 
         span_id = self.span_id
@@ -130,6 +138,8 @@ class TraceSpansItemType0:
             input_ = self.input_.to_dict()
         elif isinstance(self.input_, SpanInputOutputType6):
             input_ = self.input_.to_dict()
+        elif isinstance(self.input_, TraceSpansItemType0InputType0Type1):
+            input_ = self.input_.to_dict()
         else:
             input_ = self.input_
 
@@ -149,6 +159,8 @@ class TraceSpansItemType0:
         elif isinstance(self.output, SpanInputOutputType5):
             output = self.output.to_dict()
         elif isinstance(self.output, SpanInputOutputType6):
+            output = self.output.to_dict()
+        elif isinstance(self.output, TraceSpansItemType0OutputType0Type1):
             output = self.output.to_dict()
         else:
             output = self.output
@@ -230,7 +242,9 @@ class TraceSpansItemType0:
         from ..models.span_input_output_type_5 import SpanInputOutputType5
         from ..models.span_input_output_type_6 import SpanInputOutputType6
         from ..models.trace_spans_item_type_0_error_type_0 import TraceSpansItemType0ErrorType0
+        from ..models.trace_spans_item_type_0_input_type_0_type_1 import TraceSpansItemType0InputType0Type1
         from ..models.trace_spans_item_type_0_metrics_type_0 import TraceSpansItemType0MetricsType0
+        from ..models.trace_spans_item_type_0_output_type_0_type_1 import TraceSpansItemType0OutputType0Type1
         from ..models.trace_spans_item_type_0_params_type_0 import TraceSpansItemType0ParamsType0
         from ..models.trace_spans_item_type_0_timestamps import TraceSpansItemType0Timestamps
 
@@ -274,6 +288,7 @@ class TraceSpansItemType0:
             | SpanInputOutputType4
             | SpanInputOutputType5
             | SpanInputOutputType6
+            | TraceSpansItemType0InputType0Type1
             | Unset
         ):
             if data is None:
@@ -336,6 +351,14 @@ class TraceSpansItemType0:
                 return componentsschemas_span_input_output_type_6
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                input_type_0_type_1 = TraceSpansItemType0InputType0Type1.from_dict(data)
+
+                return input_type_0_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             return cast(
                 None
                 | SpanInputOutputType0
@@ -345,6 +368,7 @@ class TraceSpansItemType0:
                 | SpanInputOutputType4
                 | SpanInputOutputType5
                 | SpanInputOutputType6
+                | TraceSpansItemType0InputType0Type1
                 | Unset,
                 data,
             )
@@ -362,6 +386,7 @@ class TraceSpansItemType0:
             | SpanInputOutputType4
             | SpanInputOutputType5
             | SpanInputOutputType6
+            | TraceSpansItemType0OutputType0Type1
             | Unset
         ):
             if data is None:
@@ -424,6 +449,14 @@ class TraceSpansItemType0:
                 return componentsschemas_span_input_output_type_6
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                output_type_0_type_1 = TraceSpansItemType0OutputType0Type1.from_dict(data)
+
+                return output_type_0_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             return cast(
                 None
                 | SpanInputOutputType0
@@ -433,6 +466,7 @@ class TraceSpansItemType0:
                 | SpanInputOutputType4
                 | SpanInputOutputType5
                 | SpanInputOutputType6
+                | TraceSpansItemType0OutputType0Type1
                 | Unset,
                 data,
             )

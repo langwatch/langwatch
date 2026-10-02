@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_connected_agent_frames_body import PostConnectedAgentFramesBody
 from ...models.post_connected_agent_frames_response_200 import PostConnectedAgentFramesResponse200
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostConnectedAgentFramesBody | Unset = UNSET,
+    body: PostConnectedAgentFramesBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,8 +20,7 @@ def _get_kwargs(
         "url": "/api/v1/agents/connect/frames",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -60,12 +59,12 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
-    body: PostConnectedAgentFramesBody | Unset = UNSET,
+    body: PostConnectedAgentFramesBody,
 ) -> Response[PostConnectedAgentFramesResponse200]:
     """Accept this instance's acknowledgements, results and deregistration
 
     Args:
-        body (PostConnectedAgentFramesBody | Unset):
+        body (PostConnectedAgentFramesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -89,12 +88,12 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient | Client,
-    body: PostConnectedAgentFramesBody | Unset = UNSET,
+    body: PostConnectedAgentFramesBody,
 ) -> PostConnectedAgentFramesResponse200 | None:
     """Accept this instance's acknowledgements, results and deregistration
 
     Args:
-        body (PostConnectedAgentFramesBody | Unset):
+        body (PostConnectedAgentFramesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -113,12 +112,12 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
-    body: PostConnectedAgentFramesBody | Unset = UNSET,
+    body: PostConnectedAgentFramesBody,
 ) -> Response[PostConnectedAgentFramesResponse200]:
     """Accept this instance's acknowledgements, results and deregistration
 
     Args:
-        body (PostConnectedAgentFramesBody | Unset):
+        body (PostConnectedAgentFramesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -140,12 +139,12 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient | Client,
-    body: PostConnectedAgentFramesBody | Unset = UNSET,
+    body: PostConnectedAgentFramesBody,
 ) -> PostConnectedAgentFramesResponse200 | None:
     """Accept this instance's acknowledgements, results and deregistration
 
     Args:
-        body (PostConnectedAgentFramesBody | Unset):
+        body (PostConnectedAgentFramesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

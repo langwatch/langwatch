@@ -76,7 +76,7 @@ async def test_direct_evaluator_requests_identify_the_sdk(monkeypatch) -> None:
         assert result.score == async_result.score == 1
         assert len(requests) == 2
         for request in requests:
-            assert request.url.path == "/api/evaluations/langevals/exact_match/evaluate"
+            assert request.url.path == "/api/v1/evaluations/langevals/exact_match/evaluate"
             assert request.headers["X-Auth-Token"] == "test-key"
             assert request.headers["Authorization"] == "Bearer test-key"
             assert (
@@ -121,8 +121,8 @@ def test_direct_experiment_requests_identify_the_sdk(monkeypatch) -> None:
         experiment._log_results("pat-lw-test", {"run_id": experiment.run_id})
 
         assert [request.url.path for request in requests] == [
-            "/api/experiment/init",
-            "/api/evaluations/batch/log_results",
+            "/api/v1/experiment/init",
+            "/api/v1/evaluations/batch/log_results",
         ]
         credential = base64.b64encode(b"project-test:pat-lw-test").decode()
         for request in requests:

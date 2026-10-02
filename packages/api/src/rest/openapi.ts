@@ -26,6 +26,12 @@ export type DocumentedRouteResponse = Omit<RouteResponse, "content"> &
   Partial<Pick<RouteResponse, "content">>;
 
 export type RestTransportDocs = Readonly<{
+  /**
+   * The id the published document names the operation by, where it is not the declared operation
+   * name: generated clients name their methods and types after it, so a published id stays put
+   * when the declaration's own name changes.
+   */
+  readonly operationId?: string;
   readonly summary?: string;
   readonly description?: string;
   /** The groups the operation is filed under in the published reference. */
@@ -55,6 +61,18 @@ export type RestTransportDocs = Readonly<{
   }>;
 }>;
 
+/** What the credential an operation is reached by has to hold, as the document states it. */
+export type AccessPolicyExtension = Readonly<{
+  kind: "public" | "handlerManaged";
+  credential: readonly CredentialClass[];
+  permissions?: readonly string[];
+}>;
+
+/** The describeRoute block plus the `x-access-policy` extension hono-openapi passes through. */
+export type PublishedRouteDocumentation = DescribeRouteOptions & {
+  "x-access-policy"?: AccessPolicyExtension;
+};
+
 /** The OpenAPI block one declared route publishes at one of its mounts. */
 export function restRouteDocumentation({
   route,
@@ -65,10 +83,10 @@ export function restRouteDocumentation({
   deprecated?: RestDeprecation | undefined;
   /** The family's door, for the scheme an optional credential publishes. */
   credential?: RestDoorCredential | undefined;
-}): DescribeRouteOptions {
-  const options: DescribeRouteOptions = {
+}): PublishedRouteDocumentation {
+  const options: PublishedRouteDocumentation = {
     responses: documentedAnswers(route),
-    operationId: route.operation,
+    operationId: route.docs?.operationId ?? route.operation,
   };
 
   if (route.docs?.description !== undefined) options.description = route.docs.description;
@@ -104,6 +122,10 @@ export function restRouteDocumentation({
   // so it keeps the family's own.
   else if (reaches && reaches !== "browser") options.security = [...securityRequirement(reaches)];
 
+  const policy = accessPolicyExtension({ route, reaches });
+
+  if (policy) options["x-access-policy"] = policy;
+
   if (deprecated) {
     options.deprecated = true;
 
@@ -113,6 +135,29 @@ export function restRouteDocumentation({
   }
 
   return options;
+}
+
+/**
+ * What the credential an operation is reached by has to hold: `public` for a route that takes
+ * none, else the credential class and the RBAC permission the route declared (none where the
+ * door alone gates it). It carries no prose reason, which describes how a handler is built.
+ */
+function accessPolicyExtension({
+  route,
+  reaches,
+}: {
+  route: RestTransportRoute<unknown>;
+  reaches: RestDoorCredential | undefined;
+}): AccessPolicyExtension | undefined {
+  if (route.access?.kind === "public") return { kind: "public", credential: ["none"] };
+
+  if (!reaches) return undefined;
+
+  return {
+    kind: "handlerManaged",
+    credential: [CREDENTIAL_CLASS_BY_DOOR[reaches]],
+    permissions: route.access || !route.permission ? [] : [route.permission],
+  };
 }
 
 /** The same block, as the middleware that attaches it to a mounted route. */
@@ -223,10 +268,24 @@ function documentedAnswers(route: RestTransportRoute<unknown>): Record<string, R
   }
 
   for (const [status, stated] of Object.entries(route.docs?.responses ?? {})) {
-    published[status] = { ...stated, content: stated.content ?? declared[status]?.content ?? {} };
+    published[status] = {
+      ...stated,
+      content: ownMediaTypes(stated.content ?? declared[status]?.content ?? {}),
+    };
   }
 
   return published;
+}
+
+/**
+ * A copy of each media type entry. hono-openapi replaces a resolver with the schema it resolved
+ * IN the entry it was handed, and an entry shared with the declaration would leave the next
+ * document generated from it with a bare `$ref` and no component behind it.
+ */
+function ownMediaTypes(content: RouteResponse["content"]): RouteResponse["content"] {
+  return Object.fromEntries(
+    Object.entries(content).map(([mediaType, entry]) => [mediaType, { ...entry }]),
+  );
 }
 
 /**
@@ -471,6 +530,22 @@ function normalizeBound({
 }
 
 /**
+ * Drops, in place, the HEAD operation of a path whose GET carries the same operation id. One
+ * declaration answering both methods is published twice under one id, which client generators
+ * refuse; HEAD is GET without the body, so the GET describes both.
+ */
+export function dropHeadTwins(document: unknown): void {
+  if (!isRecord(document) || !isRecord(document.paths)) return;
+
+  for (const item of Object.values(document.paths)) {
+    if (!isRecord(item)) continue;
+
+    const { get, head } = item;
+    if (isRecord(head) && isRecord(get) && head.operationId === get.operationId) delete item.head;
+  }
+}
+
+/**
  * Spells out every key an enum-keyed record accepts, in place: `z.partialRecord(z.enum(keys), v)`
  * publishes `propertyNames` and `additionalProperties` alone, which names no key a reader can
  * see. Each key becomes an optional property of the value's schema; the two constraints stay.
@@ -496,26 +571,80 @@ export function publishEnumRecordKeys(document: unknown): void {
   document.properties = Object.fromEntries(keys.map((key) => [key, value]));
 }
 
-// zod's OpenAPI adapter rewrites a recursive schema's self-reference to
-// `#/components/schemas/<name>` but leaves the definition itself sitting in
-// that response's own local `$defs`, never hoisted — so the ref dangles the
-// moment two routes' schemas share one document. `__schema0`-style anonymous
-// names are not unique across routes, so hoisting renames per occurrence.
+// zod's OpenAPI adapter points a recursive schema's self-reference at
+// `#/components/schemas/<name>` but leaves the definition in that response's
+// local `$defs`. Anonymous `__schema0` names repeat across routes, so each one
+// is named by its content; a `.meta({ id })` name is kept
+// (specs/api-reference/recursive-schema-defs.feature).
+
+/** zod's name for a definition the schema itself did not name. */
+const ANONYMOUS_DEFINITION = /^_*schema\d+$/;
+
+/** The anonymous recursive shapes the document names, by what zod emits for them. */
+const NAMED_SHAPES: readonly Readonly<{ name: string; schema: ZodType }>[] = [
+  { name: "JsonValue", schema: z.json() },
+];
 
 /**
- * Moves every schema's local `$defs` into `components.schemas` in place, renaming entries to stay
- * unique and rewriting every `$ref` (self-references included) to match.
+ * Moves every schema's local `$defs` into `components.schemas` in place, naming each entry and
+ * rewriting every `$ref` (self-references included) to match. A definition the schema named
+ * keeps that name, and two different definitions claiming one name fail the document.
  */
 export function hoistStraySchemaDefs(document: unknown): void {
   const schemas = componentSchemasOf(document);
 
   if (!schemas) return;
 
+  const byShape = new Map(NAMED_SHAPES.map(({ name, schema }) => [shapeOf(schema), name]));
   let nextId = 0;
-  walkForDefs(document, schemas, () => `__hoisted${nextId++}`);
+
+  walkForDefs(document, schemas, (name, definition) => {
+    if (!ANONYMOUS_DEFINITION.test(name)) return name;
+
+    const shape = canonicalShape(definition, name);
+    const named = byShape.get(shape) ?? `__hoisted${nextId++}`;
+
+    byShape.set(shape, named);
+
+    return named;
+  });
 }
 
-/** The document's own `components.schemas`, created when the generator wrote none. */
+/** The one definition zod emits for a recursive schema, as a canonical shape key. */
+function shapeOf(schema: ZodType): string {
+  const { $defs } = z.toJSONSchema(z.object({ value: schema }), {
+    io: "output",
+    unrepresentable: "any",
+  }) as { $defs?: Record<string, unknown> };
+  const [[name, definition] = []] = Object.entries($defs ?? {});
+
+  return name === undefined ? "" : canonicalShape(definition, name);
+}
+
+/** A definition's JSON with keys sorted and its references to itself spelled as one marker. */
+function canonicalShape(definition: unknown, name: string): string {
+  const self = (ref: string) => ref.split("/").pop() === name;
+  const canonical = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(canonical);
+
+    if (!isRecord(node)) return node;
+
+    return Object.fromEntries(
+      Object.keys(node)
+        .toSorted()
+        .map((key) => {
+          const value = node[key];
+
+          return key === "$ref" && typeof value === "string" && self(value)
+            ? [key, "#self"]
+            : [key, canonical(value)];
+        }),
+    );
+  };
+
+  return JSON.stringify(canonical(definition));
+}
+
 function componentSchemasOf(document: unknown): Record<string, unknown> | undefined {
   if (!isRecord(document)) return void 0;
 
@@ -531,10 +660,10 @@ function componentSchemasOf(document: unknown): Record<string, unknown> | undefi
 function walkForDefs(
   node: unknown,
   schemas: Record<string, unknown>,
-  nameGenerator: () => string,
+  nameFor: (name: string, definition: unknown) => string,
 ): void {
   if (Array.isArray(node)) {
-    for (const child of node) walkForDefs(child, schemas, nameGenerator);
+    for (const child of node) walkForDefs(child, schemas, nameFor);
 
     return;
   }
@@ -546,17 +675,30 @@ function walkForDefs(
   if (isRecord(defs)) {
     delete node.$defs;
 
-    const renamed = new Map(Object.keys(defs).map((name) => [name, nameGenerator()]));
+    const renamed = new Map(
+      Object.entries(defs).map(([name, definition]) => [name, nameFor(name, definition)]),
+    );
 
     rewriteRefs(node, renamed);
 
     for (const [name, definition] of Object.entries(defs)) {
       rewriteRefs(definition, renamed);
-      schemas[renamed.get(name) ?? name] = definition;
+
+      const published = renamed.get(name) ?? name;
+      const held = schemas[published];
+
+      if (held !== void 0 && JSON.stringify(held) !== JSON.stringify(definition)) {
+        throw new Error(
+          `Two different schemas are published as components.schemas.${published}; ` +
+            "give one of them another .meta({ id })",
+        );
+      }
+
+      schemas[published] = definition;
     }
   }
 
-  for (const child of Object.values(node)) walkForDefs(child, schemas, nameGenerator);
+  for (const child of Object.values(node)) walkForDefs(child, schemas, nameFor);
 }
 
 /** Rewrites every `$ref` naming an entry in `renamed` to its new component path. */

@@ -15,13 +15,15 @@
 //
 //	go generate ./...
 //
-// The directive below performs two steps:
+// The directive below performs three steps:
 //
-//  1. Down-convert the canonical OpenAPI 3.1 document
-//     (docs/api-reference/openapiLangWatch.json) to a 3.0.3-compatible
-//     temporary file via downconvert.py, because oapi-codegen (kin-openapi)
-//     does not parse 3.1. The canonical spec is never modified.
-//  2. Run oapi-codegen with oapi-codegen.yaml to emit zz_generated.gen.go.
+//  1. Generate the OpenAPI 3.1 document from the api's route declarations
+//     (pnpm --filter @langwatch/platform-api openapi:generate writes
+//     specs/api-reference/openapi-document.json, which git ignores).
+//  2. Down-convert it to a 3.0.3-compatible temporary file via downconvert.py,
+//     because oapi-codegen (kin-openapi) does not parse 3.1.
+//  3. Run oapi-codegen with oapi-codegen.yaml to emit zz_generated.gen.go.
 package openapi
 
-//go:generate sh -c "python3 downconvert.py ../../../../../docs/api-reference/openapiLangWatch.json ./openapi-3.0.json && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 -config oapi-codegen.yaml ./openapi-3.0.json && rm -f ./openapi-3.0.json"
+//go:generate sh -c "cd ../../../../.. && pnpm --filter @langwatch/platform-api run openapi:generate"
+//go:generate sh -c "python3 downconvert.py ../../../../../specs/api-reference/openapi-document.json ./openapi-3.0.json && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 -config oapi-codegen.yaml ./openapi-3.0.json && rm -f ./openapi-3.0.json"

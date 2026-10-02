@@ -425,26 +425,23 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
-# Check that every operation the frozen document lists is still served.
+# Regenerate everything the OpenAPI document feeds.
 #
-# The DOCUMENT IS FROZEN. `specs/api-reference/openapi-document.json` is served
-# by three routes and the SDKs generate clients from it, so nothing here
-# writes it; the check only reads it.
+# The document is generated from the api's route declarations and never
+# committed (specs/api-reference/openapi-document.json is gitignored). What is
+# generated from it IS committed: the three SDK clients and the docs site copy
+# with its api-reference pages. Each step below writes the document first, and
+# CI runs this same target and fails on a diff (the `openapi-clients` job).
 #
-# All THREE clients are generated and committed. Go is named explicitly because
-# it was once missing from this target and drifted eight spec commits behind
-# while TypeScript and Python stayed current. GOWORK=off because sdks/go/client
-# is its own module and is deliberately absent from the repo-root go.work.
-#
-# To regenerate the CLIENTS from the document as it stands, run the three
-# commands the output names.
+# Go is named explicitly because it was once missing from this target and
+# drifted eight spec commits behind while TypeScript and Python stayed current.
+# GOWORK=off because sdks/go/client is its own module and is deliberately
+# absent from the repo-root go.work.
 sync-all-openapi:
-	@pnpm --filter @langwatch/platform-api run openapi:check
-	@echo ""
-	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
-	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
-	@echo "    cd sdks/python && make generate/api-client"
-	@echo "    cd sdks/go/client && GOWORK=off go generate ./..."
+	@cd sdks/typescript && pnpm run generate:openapi-types
+	@cd sdks/python && make generate/api-client
+	@cd sdks/go/client && GOWORK=off go generate ./...
+	@cd docs && make sync-api-spec && make generate-api-reference
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

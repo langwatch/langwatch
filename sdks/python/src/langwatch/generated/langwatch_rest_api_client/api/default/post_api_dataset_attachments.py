@@ -1,18 +1,11 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.dataset_attachment import DatasetAttachment
 from ...models.post_api_dataset_attachments_body import PostApiDatasetAttachmentsBody
-from ...models.post_api_dataset_attachments_response_200 import PostApiDatasetAttachmentsResponse200
-from ...models.post_api_dataset_attachments_response_400 import PostApiDatasetAttachmentsResponse400
-from ...models.post_api_dataset_attachments_response_401 import PostApiDatasetAttachmentsResponse401
-from ...models.post_api_dataset_attachments_response_413 import PostApiDatasetAttachmentsResponse413
-from ...models.post_api_dataset_attachments_response_415 import PostApiDatasetAttachmentsResponse415
-from ...models.post_api_dataset_attachments_response_422 import PostApiDatasetAttachmentsResponse422
-from ...models.post_api_dataset_attachments_response_429 import PostApiDatasetAttachmentsResponse429
-from ...models.post_api_dataset_attachments_response_500 import PostApiDatasetAttachmentsResponse500
 from ...types import UNSET, Response, safe_http_status
 
 
@@ -43,56 +36,23 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-    | None
-):
+) -> Any | DatasetAttachment | None:
     if response.status_code == 200:
-        response_200 = PostApiDatasetAttachmentsResponse200.from_dict(response.json())
+        response_200 = DatasetAttachment.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = PostApiDatasetAttachmentsResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PostApiDatasetAttachmentsResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 413:
-        response_413 = PostApiDatasetAttachmentsResponse413.from_dict(response.json())
-
+        response_413 = cast(Any, None)
         return response_413
 
     if response.status_code == 415:
-        response_415 = PostApiDatasetAttachmentsResponse415.from_dict(response.json())
-
+        response_415 = cast(Any, None)
         return response_415
 
-    if response.status_code == 422:
-        response_422 = PostApiDatasetAttachmentsResponse422.from_dict(response.json())
-
-        return response_422
-
     if response.status_code == 429:
-        response_429 = PostApiDatasetAttachmentsResponse429.from_dict(response.json())
-
+        response_429 = cast(Any, None)
         return response_429
-
-    if response.status_code == 500:
-        response_500 = PostApiDatasetAttachmentsResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -102,16 +62,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-]:
+) -> Response[Any | DatasetAttachment]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -128,19 +79,10 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsBody,
     project_id: str,
-) -> Response[
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-]:
+) -> Response[Any | DatasetAttachment]:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field.
+    `datasetId` field. upload the file as a stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -151,7 +93,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetAttachmentsResponse200 | PostApiDatasetAttachmentsResponse400 | PostApiDatasetAttachmentsResponse401 | PostApiDatasetAttachmentsResponse413 | PostApiDatasetAttachmentsResponse415 | PostApiDatasetAttachmentsResponse422 | PostApiDatasetAttachmentsResponse429 | PostApiDatasetAttachmentsResponse500]
+        Response[Any | DatasetAttachment]
     """
 
     kwargs = _get_kwargs(
@@ -171,20 +113,10 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsBody,
     project_id: str,
-) -> (
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-    | None
-):
+) -> Any | DatasetAttachment | None:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field.
+    `datasetId` field. upload the file as a stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -195,7 +127,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetAttachmentsResponse200 | PostApiDatasetAttachmentsResponse400 | PostApiDatasetAttachmentsResponse401 | PostApiDatasetAttachmentsResponse413 | PostApiDatasetAttachmentsResponse415 | PostApiDatasetAttachmentsResponse422 | PostApiDatasetAttachmentsResponse429 | PostApiDatasetAttachmentsResponse500
+        Any | DatasetAttachment
     """
 
     return sync_detailed(
@@ -210,19 +142,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsBody,
     project_id: str,
-) -> Response[
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-]:
+) -> Response[Any | DatasetAttachment]:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field.
+    `datasetId` field. upload the file as a stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -233,7 +156,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetAttachmentsResponse200 | PostApiDatasetAttachmentsResponse400 | PostApiDatasetAttachmentsResponse401 | PostApiDatasetAttachmentsResponse413 | PostApiDatasetAttachmentsResponse415 | PostApiDatasetAttachmentsResponse422 | PostApiDatasetAttachmentsResponse429 | PostApiDatasetAttachmentsResponse500]
+        Response[Any | DatasetAttachment]
     """
 
     kwargs = _get_kwargs(
@@ -251,20 +174,10 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsBody,
     project_id: str,
-) -> (
-    PostApiDatasetAttachmentsResponse200
-    | PostApiDatasetAttachmentsResponse400
-    | PostApiDatasetAttachmentsResponse401
-    | PostApiDatasetAttachmentsResponse413
-    | PostApiDatasetAttachmentsResponse415
-    | PostApiDatasetAttachmentsResponse422
-    | PostApiDatasetAttachmentsResponse429
-    | PostApiDatasetAttachmentsResponse500
-    | None
-):
+) -> Any | DatasetAttachment | None:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field.
+    `datasetId` field. upload the file as a stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -275,7 +188,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetAttachmentsResponse200 | PostApiDatasetAttachmentsResponse400 | PostApiDatasetAttachmentsResponse401 | PostApiDatasetAttachmentsResponse413 | PostApiDatasetAttachmentsResponse415 | PostApiDatasetAttachmentsResponse422 | PostApiDatasetAttachmentsResponse429 | PostApiDatasetAttachmentsResponse500
+        Any | DatasetAttachment
     """
 
     return (

@@ -11,7 +11,7 @@ from ...types import UNSET, Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    stored_object_id: str,
     *,
     project_id: str,
     audience: GetStoredObjectAudience,
@@ -28,8 +28,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v1/stored-objects/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/stored-objects/{stored_object_id}".format(
+            stored_object_id=quote(str(stored_object_id), safe=""),
         ),
         "params": params,
     }
@@ -66,7 +66,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     project_id: str,
@@ -75,7 +75,7 @@ def sync_detailed(
     """Resolve a fresh stored-object capability
 
     Args:
-        id (str):
+        stored_object_id (str):
         project_id (str):
         audience (GetStoredObjectAudience):
 
@@ -88,7 +88,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        stored_object_id=stored_object_id,
         project_id=project_id,
         audience=audience,
     )
@@ -101,7 +101,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     project_id: str,
@@ -110,7 +110,7 @@ def sync(
     """Resolve a fresh stored-object capability
 
     Args:
-        id (str):
+        stored_object_id (str):
         project_id (str):
         audience (GetStoredObjectAudience):
 
@@ -123,7 +123,7 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        stored_object_id=stored_object_id,
         client=client,
         project_id=project_id,
         audience=audience,
@@ -131,7 +131,7 @@ def sync(
 
 
 async def asyncio_detailed(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     project_id: str,
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """Resolve a fresh stored-object capability
 
     Args:
-        id (str):
+        stored_object_id (str):
         project_id (str):
         audience (GetStoredObjectAudience):
 
@@ -153,7 +153,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        stored_object_id=stored_object_id,
         project_id=project_id,
         audience=audience,
     )
@@ -164,7 +164,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     project_id: str,
@@ -173,7 +173,7 @@ async def asyncio(
     """Resolve a fresh stored-object capability
 
     Args:
-        id (str):
+        stored_object_id (str):
         project_id (str):
         audience (GetStoredObjectAudience):
 
@@ -187,7 +187,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            stored_object_id=stored_object_id,
             client=client,
             project_id=project_id,
             audience=audience,

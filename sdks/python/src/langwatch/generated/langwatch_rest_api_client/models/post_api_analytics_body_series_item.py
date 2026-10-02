@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..models.post_api_analytics_body_series_item_aggregation import PostApiAnalyticsBodySeriesItemAggregation
-from ..models.post_api_analytics_body_series_item_metric import PostApiAnalyticsBodySeriesItemMetric
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ T = TypeVar("T", bound="PostApiAnalyticsBodySeriesItem")
 class PostApiAnalyticsBodySeriesItem:
     """
     Attributes:
-        metric (PostApiAnalyticsBodySeriesItemMetric):
+        metric (str):
         aggregation (PostApiAnalyticsBodySeriesItemAggregation):
         key (str | Unset):
         subkey (str | Unset):
@@ -30,16 +30,17 @@ class PostApiAnalyticsBodySeriesItem:
         as_percent (bool | Unset):
     """
 
-    metric: PostApiAnalyticsBodySeriesItemMetric
+    metric: str
     aggregation: PostApiAnalyticsBodySeriesItemAggregation
     key: str | Unset = UNSET
     subkey: str | Unset = UNSET
     pipeline: PostApiAnalyticsBodySeriesItemPipeline | Unset = UNSET
     filters: PostApiAnalyticsBodySeriesItemFilters | Unset = UNSET
     as_percent: bool | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        metric = self.metric.value
+        metric = self.metric
 
         aggregation = self.aggregation.value
 
@@ -58,7 +59,7 @@ class PostApiAnalyticsBodySeriesItem:
         as_percent = self.as_percent
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "metric": metric,
@@ -84,7 +85,7 @@ class PostApiAnalyticsBodySeriesItem:
         from ..models.post_api_analytics_body_series_item_pipeline import PostApiAnalyticsBodySeriesItemPipeline
 
         d = dict(src_dict)
-        metric = PostApiAnalyticsBodySeriesItemMetric(d.pop("metric"))
+        metric = d.pop("metric")
 
         aggregation = PostApiAnalyticsBodySeriesItemAggregation(d.pop("aggregation"))
 
@@ -118,4 +119,21 @@ class PostApiAnalyticsBodySeriesItem:
             as_percent=as_percent,
         )
 
+        post_api_analytics_body_series_item.additional_properties = d
         return post_api_analytics_body_series_item
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

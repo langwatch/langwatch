@@ -17,7 +17,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiGatewayV1BudgetsByIdResetBody,
+    body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -36,7 +36,8 @@ def _get_kwargs(
         "params": params,
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -109,7 +110,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1BudgetsByIdResetBody,
+    body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsByIdResetResponse200
@@ -120,12 +121,13 @@ def sync_detailed(
 ]:
     """Reset budget period
 
-     Moves the budget's period boundary to now; recorded spend is never mutated.
+     Moves the budget's period boundary to now; recorded spend is never mutated. Requires
+    gatewayBudgets:update at the organization.
 
     Args:
         id (str):
         end_user_id (str | Unset):
-        body (PostApiGatewayV1BudgetsByIdResetBody):
+        body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -152,7 +154,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1BudgetsByIdResetBody,
+    body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsByIdResetResponse200
@@ -164,12 +166,13 @@ def sync(
 ):
     """Reset budget period
 
-     Moves the budget's period boundary to now; recorded spend is never mutated.
+     Moves the budget's period boundary to now; recorded spend is never mutated. Requires
+    gatewayBudgets:update at the organization.
 
     Args:
         id (str):
         end_user_id (str | Unset):
-        body (PostApiGatewayV1BudgetsByIdResetBody):
+        body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -191,7 +194,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1BudgetsByIdResetBody,
+    body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsByIdResetResponse200
@@ -202,12 +205,13 @@ async def asyncio_detailed(
 ]:
     """Reset budget period
 
-     Moves the budget's period boundary to now; recorded spend is never mutated.
+     Moves the budget's period boundary to now; recorded spend is never mutated. Requires
+    gatewayBudgets:update at the organization.
 
     Args:
         id (str):
         end_user_id (str | Unset):
-        body (PostApiGatewayV1BudgetsByIdResetBody):
+        body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -232,7 +236,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiGatewayV1BudgetsByIdResetBody,
+    body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsByIdResetResponse200
@@ -244,12 +248,13 @@ async def asyncio(
 ):
     """Reset budget period
 
-     Moves the budget's period boundary to now; recorded spend is never mutated.
+     Moves the budget's period boundary to now; recorded spend is never mutated. Requires
+    gatewayBudgets:update at the organization.
 
     Args:
         id (str):
         end_user_id (str | Unset):
-        body (PostApiGatewayV1BudgetsByIdResetBody):
+        body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

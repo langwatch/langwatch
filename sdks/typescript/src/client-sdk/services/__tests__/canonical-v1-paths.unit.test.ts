@@ -36,6 +36,8 @@ const VERSION_SEGMENT = /^v\d+$/;
 const BARE_ONLY = [
   /^\/api\/traces\/[^/]+\/transcript$/,
   /^\/api\/trace\/(search|[^/]+(\/share|\/unshare)?)$/,
+  // Langy's in-process worker families, declared literal.
+  /^\/api\/langy\/(local|waits|ui)(\/|$)/,
 ];
 
 function sourceFiles(directory: string): string[] {

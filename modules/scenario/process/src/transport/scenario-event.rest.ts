@@ -28,6 +28,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withStatus(201)
   .withBodyLimit({ maxBytes: SCENARIO_EVENT_MAX_BYTES })
   .withDocs({
+    operationId: "postApiScenarioEvents",
     description: "Create a new scenario event",
     responses: {
       ...baseResponses,
@@ -50,6 +51,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withPermission("scenarios:create")
   .withOutput(responseSchemas.browserTabHandoff)
   .withDocs({
+    operationId: "postApiScenarioEventsBrowserTab",
     description:
       "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
     responses: baseResponses,
@@ -67,6 +69,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withPermission("scenarios:manage")
   .withOutput(scenarioEventArchiveOutputSchema)
   .withDocs({
+    operationId: "deleteApiScenarioEvents",
     description:
       "Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set; scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).",
     responses: {

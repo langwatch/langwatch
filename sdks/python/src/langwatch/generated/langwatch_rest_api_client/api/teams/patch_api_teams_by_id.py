@@ -7,24 +7,25 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_teams_by_id_body import PatchApiTeamsByIdBody
 from ...models.patch_api_teams_by_id_response_200 import PatchApiTeamsByIdResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    team_id: str,
     *,
-    body: PatchApiTeamsByIdBody,
+    body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/v1/teams/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/teams/{team_id}".format(
+            team_id=quote(str(team_id), safe=""),
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -61,16 +62,16 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTeamsByIdBody,
+    body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTeamsByIdResponse200]:
     """Update a team by its id
 
     Args:
-        id (str):
-        body (PatchApiTeamsByIdBody):
+        team_id (str):
+        body (PatchApiTeamsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -81,7 +82,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
         body=body,
     )
 
@@ -93,16 +94,16 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTeamsByIdBody,
+    body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> PatchApiTeamsByIdResponse200 | None:
     """Update a team by its id
 
     Args:
-        id (str):
-        body (PatchApiTeamsByIdBody):
+        team_id (str):
+        body (PatchApiTeamsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -113,23 +114,23 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        team_id=team_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTeamsByIdBody,
+    body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTeamsByIdResponse200]:
     """Update a team by its id
 
     Args:
-        id (str):
-        body (PatchApiTeamsByIdBody):
+        team_id (str):
+        body (PatchApiTeamsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -140,7 +141,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        team_id=team_id,
         body=body,
     )
 
@@ -150,16 +151,16 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    team_id: str,
     *,
     client: AuthenticatedClient,
-    body: PatchApiTeamsByIdBody,
+    body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> PatchApiTeamsByIdResponse200 | None:
     """Update a team by its id
 
     Args:
-        id (str):
-        body (PatchApiTeamsByIdBody):
+        team_id (str):
+        body (PatchApiTeamsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -171,7 +172,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            team_id=team_id,
             client=client,
             body=body,
         )

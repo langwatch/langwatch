@@ -1,10 +1,12 @@
-from typing import Any, cast
+from typing import Any
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.scim_list_groups_response_200 import ScimListGroupsResponse200
+from ...models.scim_list_groups_response_401 import ScimListGroupsResponse401
+from ...models.scim_list_groups_response_403 import ScimListGroupsResponse403
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -39,18 +41,20 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | ScimListGroupsResponse200 | None:
+) -> ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403 | None:
     if response.status_code == 200:
         response_200 = ScimListGroupsResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 401:
-        response_401 = cast(Any, None)
+        response_401 = ScimListGroupsResponse401.from_dict(response.json())
+
         return response_401
 
     if response.status_code == 403:
-        response_403 = cast(Any, None)
+        response_403 = ScimListGroupsResponse403.from_dict(response.json())
+
         return response_403
 
     if client.raise_on_unexpected_status:
@@ -61,7 +65,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | ScimListGroupsResponse200]:
+) -> Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -80,7 +84,7 @@ def sync_detailed(
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
-) -> Response[Any | ScimListGroupsResponse200]:
+) -> Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]:
     r"""List provisioned groups
 
      The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not
@@ -98,7 +102,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ScimListGroupsResponse200]
+        Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -122,7 +126,7 @@ def sync(
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
-) -> Any | ScimListGroupsResponse200 | None:
+) -> ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403 | None:
     r"""List provisioned groups
 
      The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not
@@ -140,7 +144,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ScimListGroupsResponse200
+        ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403
     """
 
     return sync_detailed(
@@ -159,7 +163,7 @@ async def asyncio_detailed(
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
-) -> Response[Any | ScimListGroupsResponse200]:
+) -> Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]:
     r"""List provisioned groups
 
      The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not
@@ -177,7 +181,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ScimListGroupsResponse200]
+        Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -199,7 +203,7 @@ async def asyncio(
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
-) -> Any | ScimListGroupsResponse200 | None:
+) -> ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403 | None:
     r"""List provisioned groups
 
      The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not
@@ -217,7 +221,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ScimListGroupsResponse200
+        ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403
     """
 
     return (

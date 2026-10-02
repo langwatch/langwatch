@@ -30,7 +30,9 @@ import {
   type Entitlements,
 } from "../access/access.ts";
 import { RateLimitedError, SurfaceUnverifiedError } from "../errors.ts";
+import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
+import { registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
   basePathOf,
@@ -95,8 +97,6 @@ import {
   REQUEST_FAMILY,
   withRetryAfter,
 } from "./response.ts";
-import { registerRoutePolicy } from "../route-registry.ts";
-import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -2261,8 +2261,8 @@ function decodeSegment(value: string): string {
 
 /**
  * One logical route at two addresses: its own, and the canonical `/api/v1`
- * twin, whose stack carries no document metadata so the operation is published
- * once.
+ * twin. The document names the operation once, at the twin, the URL an
+ * integrator is told to call; the bare address answers undescribed.
  */
 function mountRoute({
   app,
@@ -2295,9 +2295,9 @@ function mountRoute({
   const methods = route.methods ?? [route.method];
   const addresses = alias ? [absolute, alias] : [absolute];
 
-  register({ app, route, methods, path: absolute, stack });
+  register({ app, route, methods, path: absolute, stack: alias ? undescribedStack(stack) : stack });
 
-  if (alias) register({ app, route, methods, path: alias, stack: undescribedStack(stack) });
+  if (alias) register({ app, route, methods, path: alias, stack });
 
   for (const method of route.anyMethod ? ["all"] : methods) {
     registerRoutePolicy({

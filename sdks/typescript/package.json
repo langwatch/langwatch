@@ -56,7 +56,7 @@
     }
   },
   "scripts": {
-    "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
+    "generate": "pnpm run generate:server-types",
     "cli": "node dist/cli/index.js",
     "prelint": "pnpm run generate",
     "lint": "eslint .",

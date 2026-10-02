@@ -214,7 +214,10 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withPermission("datasets:create")
       .withStatus(201)
       .withOutput(datasetImportStartedSchema)
-      .withDocs({ description: "Create a dataset from an uploaded and confirmed file" })
+      .withDocs({
+        summary: "Create a dataset from an uploaded file",
+        description: "Create a dataset from an uploaded and confirmed file",
+      })
       .handle(({ app, input, scope }) =>
         app.createDatasetFromStoredObject({ ...input, projectId: scope.id }),
       )
@@ -224,7 +227,10 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withInput(datasetRestAppendImportSchema)
       .withPermission("datasets:update")
       .withOutput(datasetImportAppendedSchema)
-      .withDocs({ description: "Add an uploaded and confirmed file's rows to a dataset" })
+      .withDocs({
+        summary: "Import an uploaded file into a dataset",
+        description: "Add an uploaded and confirmed file's rows to a dataset",
+      })
       .handle(({ app, input, scope }) =>
         app.appendStoredObjectToDataset({ ...input, projectId: scope.id }),
       )
@@ -292,6 +298,11 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withDocs({
         description:
           "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
+        errors: [
+          { status: 413, description: "The file is larger than the upload limit." },
+          { status: 415, description: "The media type is not accepted." },
+          { status: 429, description: "Too many uploads for this project in one minute." },
+        ],
       })
       .handle(({ app, input, files, scope }) =>
         app.storeAttachmentUpload({

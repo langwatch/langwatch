@@ -278,3 +278,7 @@ dev/docs/plans/handover-*.md
 *.pprof
 *.prof
 **/tmp-probe*
+
+# The OpenAPI document is generated from the route declarations and never
+# committed: `pnpm --filter @langwatch/platform-api openapi:generate` writes it.
+/specs/api-reference/openapi-document.json

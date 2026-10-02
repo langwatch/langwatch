@@ -28,9 +28,13 @@ import {
 } from "@langwatch/api/rest";
 import {
   ScimApi,
+  scimCreateGroupRequestSchema,
+  scimCreateUserRequestSchema,
   scimErrorSchema,
   scimGroupSchema,
   scimListResponseSchema,
+  scimPatchRequestSchema,
+  scimReplaceGroupRequestSchema,
   scimResourceTypeSchema,
   scimSchemaDefinitionSchema,
   scimServiceProviderConfigSchema,
@@ -521,6 +525,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withStatus(201)
   .withDocs({
+    requestBody: { schema: scimCreateUserRequestSchema },
     summary: "Provision a user",
     description:
       "Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.",
@@ -576,6 +581,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
+    requestBody: { schema: scimCreateUserRequestSchema },
     summary: "Replace a provisioned user",
     description:
       "Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.",
@@ -604,6 +610,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
+    requestBody: { schema: scimPatchRequestSchema },
     summary: "Update a provisioned user",
     description:
       "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.",
@@ -688,6 +695,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withStatus(201)
   .withDocs({
+    requestBody: { schema: scimCreateGroupRequestSchema },
     summary: "Provision a group",
     description:
       "Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.",
@@ -757,6 +765,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
+    requestBody: { schema: scimReplaceGroupRequestSchema },
     summary: "Replace a provisioned group",
     description:
       "Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.",
@@ -785,6 +794,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
+    requestBody: { schema: scimPatchRequestSchema },
     summary: "Update a provisioned group",
     description:
       "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.",

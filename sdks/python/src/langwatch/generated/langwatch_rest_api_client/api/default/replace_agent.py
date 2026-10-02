@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.replace_agent_body import ReplaceAgentBody
 from ...models.replace_agent_response_200 import ReplaceAgentResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: ReplaceAgentBody,
+    body: ReplaceAgentBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -64,13 +65,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: ReplaceAgentBody,
+    body: ReplaceAgentBody | Unset = UNSET,
 ) -> Response[ReplaceAgentResponse200]:
     """Update an authored agent; PUT retains partial update semantics
 
     Args:
         id (str):
-        body (ReplaceAgentBody):
+        body (ReplaceAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -96,13 +97,13 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: ReplaceAgentBody,
+    body: ReplaceAgentBody | Unset = UNSET,
 ) -> ReplaceAgentResponse200 | None:
     """Update an authored agent; PUT retains partial update semantics
 
     Args:
         id (str):
-        body (ReplaceAgentBody):
+        body (ReplaceAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,13 +124,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: ReplaceAgentBody,
+    body: ReplaceAgentBody | Unset = UNSET,
 ) -> Response[ReplaceAgentResponse200]:
     """Update an authored agent; PUT retains partial update semantics
 
     Args:
         id (str):
-        body (ReplaceAgentBody):
+        body (ReplaceAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,13 +154,13 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: ReplaceAgentBody,
+    body: ReplaceAgentBody | Unset = UNSET,
 ) -> ReplaceAgentResponse200 | None:
     """Update an authored agent; PUT retains partial update semantics
 
     Args:
         id (str):
-        body (ReplaceAgentBody):
+        body (ReplaceAgentBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

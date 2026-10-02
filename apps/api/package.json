@@ -25,7 +25,7 @@
     "test": "vitest run",
     "pretest:unit": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
-    "openapi:check": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail && vitest run src/__tests__/openapi-document-drift.integration.test.ts"
+    "openapi:generate": "node --experimental-transform-types --no-warnings src/openapi-document.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:",

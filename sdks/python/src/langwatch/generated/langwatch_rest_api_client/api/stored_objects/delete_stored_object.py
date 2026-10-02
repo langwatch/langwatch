@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    stored_object_id: str,
     *,
     body: DeleteStoredObjectBody,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v1/stored-objects/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/stored-objects/{stored_object_id}".format(
+            stored_object_id=quote(str(stored_object_id), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: DeleteStoredObjectBody,
@@ -69,7 +69,7 @@ def sync_detailed(
     """Delete a stored object
 
     Args:
-        id (str):
+        stored_object_id (str):
         body (DeleteStoredObjectBody):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        stored_object_id=stored_object_id,
         body=body,
     )
 
@@ -93,7 +93,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: DeleteStoredObjectBody,
@@ -101,7 +101,7 @@ def sync(
     """Delete a stored object
 
     Args:
-        id (str):
+        stored_object_id (str):
         body (DeleteStoredObjectBody):
 
     Raises:
@@ -113,14 +113,14 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        stored_object_id=stored_object_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: DeleteStoredObjectBody,
@@ -128,7 +128,7 @@ async def asyncio_detailed(
     """Delete a stored object
 
     Args:
-        id (str):
+        stored_object_id (str):
         body (DeleteStoredObjectBody):
 
     Raises:
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        stored_object_id=stored_object_id,
         body=body,
     )
 
@@ -150,7 +150,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: DeleteStoredObjectBody,
@@ -158,7 +158,7 @@ async def asyncio(
     """Delete a stored object
 
     Args:
-        id (str):
+        stored_object_id (str):
         body (DeleteStoredObjectBody):
 
     Raises:
@@ -171,7 +171,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            stored_object_id=stored_object_id,
             client=client,
             body=body,
         )

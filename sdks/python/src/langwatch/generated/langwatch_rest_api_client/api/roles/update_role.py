@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.update_role_body import UpdateRoleBody
 from ...models.update_role_response_200 import UpdateRoleResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateRoleBody,
+    body: UpdateRoleBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -62,14 +63,15 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateRoleBody,
+    body: UpdateRoleBody | Unset = UNSET,
 ) -> Response[UpdateRoleResponse200]:
     """Update a custom role. Partial: only the fields present are written; a permissions list replaces the
-    set outright.
+    set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not
+    hold on the organization answers 403 role_exceeds_caller_permissions.
 
     Args:
         id (str):
-        body (UpdateRoleBody):
+        body (UpdateRoleBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -95,14 +97,15 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateRoleBody,
+    body: UpdateRoleBody | Unset = UNSET,
 ) -> UpdateRoleResponse200 | None:
     """Update a custom role. Partial: only the fields present are written; a permissions list replaces the
-    set outright.
+    set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not
+    hold on the organization answers 403 role_exceeds_caller_permissions.
 
     Args:
         id (str):
-        body (UpdateRoleBody):
+        body (UpdateRoleBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,14 +126,15 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateRoleBody,
+    body: UpdateRoleBody | Unset = UNSET,
 ) -> Response[UpdateRoleResponse200]:
     """Update a custom role. Partial: only the fields present are written; a permissions list replaces the
-    set outright.
+    set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not
+    hold on the organization answers 403 role_exceeds_caller_permissions.
 
     Args:
         id (str):
-        body (UpdateRoleBody):
+        body (UpdateRoleBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,14 +158,15 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateRoleBody,
+    body: UpdateRoleBody | Unset = UNSET,
 ) -> UpdateRoleResponse200 | None:
     """Update a custom role. Partial: only the fields present are written; a permissions list replaces the
-    set outright.
+    set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not
+    hold on the organization answers 403 role_exceeds_caller_permissions.
 
     Args:
         id (str):
-        body (UpdateRoleBody):
+        body (UpdateRoleBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

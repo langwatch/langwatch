@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 T = TypeVar("T", bound="GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem")
 
@@ -53,6 +52,10 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
         tool_result_bytes (float):
         prompt_chars (float):
         total_tokens (float):
+        repository_host (str):
+        repository_owner (str):
+        repository_name (str):
+        branch (str):
     """
 
     session_id: str
@@ -95,7 +98,10 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
     tool_result_bytes: float
     prompt_chars: float
     total_tokens: float
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    repository_host: str
+    repository_owner: str
+    repository_name: str
+    branch: str
 
     def to_dict(self) -> dict[str, Any]:
         session_id = self.session_id
@@ -178,8 +184,16 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
 
         total_tokens = self.total_tokens
 
+        repository_host = self.repository_host
+
+        repository_owner = self.repository_owner
+
+        repository_name = self.repository_name
+
+        branch = self.branch
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "sessionId": session_id,
@@ -222,6 +236,10 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
                 "toolResultBytes": tool_result_bytes,
                 "promptChars": prompt_chars,
                 "totalTokens": total_tokens,
+                "repositoryHost": repository_host,
+                "repositoryOwner": repository_owner,
+                "repositoryName": repository_name,
+                "branch": branch,
             }
         )
 
@@ -310,6 +328,14 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
 
         total_tokens = d.pop("totalTokens")
 
+        repository_host = d.pop("repositoryHost")
+
+        repository_owner = d.pop("repositoryOwner")
+
+        repository_name = d.pop("repositoryName")
+
+        branch = d.pop("branch")
+
         get_api_coding_agent_sessions_by_session_id_events_response_200_events_item = cls(
             session_id=session_id,
             time_unix_ms=time_unix_ms,
@@ -351,23 +377,10 @@ class GetApiCodingAgentSessionsBySessionIdEventsResponse200EventsItem:
             tool_result_bytes=tool_result_bytes,
             prompt_chars=prompt_chars,
             total_tokens=total_tokens,
+            repository_host=repository_host,
+            repository_owner=repository_owner,
+            repository_name=repository_name,
+            branch=branch,
         )
 
-        get_api_coding_agent_sessions_by_session_id_events_response_200_events_item.additional_properties = d
         return get_api_coding_agent_sessions_by_session_id_events_response_200_events_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

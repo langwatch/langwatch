@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    upload_token: str,
+    stored_object_id: str,
     *,
     body: ConfirmStoredObjectUploadBody,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/stored-objects/{upload_token}/confirmation".format(
-            upload_token=quote(str(upload_token), safe=""),
+        "url": "/api/v1/stored-objects/uploads/{stored_object_id}/confirmation".format(
+            stored_object_id=quote(str(stored_object_id), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    upload_token: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: ConfirmStoredObjectUploadBody,
@@ -69,7 +69,7 @@ def sync_detailed(
     """Confirm a stored-object upload
 
     Args:
-        upload_token (str):
+        stored_object_id (str):
         body (ConfirmStoredObjectUploadBody):
 
     Raises:
@@ -81,7 +81,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        upload_token=upload_token,
+        stored_object_id=stored_object_id,
         body=body,
     )
 
@@ -93,7 +93,7 @@ def sync_detailed(
 
 
 def sync(
-    upload_token: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: ConfirmStoredObjectUploadBody,
@@ -101,7 +101,7 @@ def sync(
     """Confirm a stored-object upload
 
     Args:
-        upload_token (str):
+        stored_object_id (str):
         body (ConfirmStoredObjectUploadBody):
 
     Raises:
@@ -113,14 +113,14 @@ def sync(
     """
 
     return sync_detailed(
-        upload_token=upload_token,
+        stored_object_id=stored_object_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    upload_token: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: ConfirmStoredObjectUploadBody,
@@ -128,7 +128,7 @@ async def asyncio_detailed(
     """Confirm a stored-object upload
 
     Args:
-        upload_token (str):
+        stored_object_id (str):
         body (ConfirmStoredObjectUploadBody):
 
     Raises:
@@ -140,7 +140,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        upload_token=upload_token,
+        stored_object_id=stored_object_id,
         body=body,
     )
 
@@ -150,7 +150,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    upload_token: str,
+    stored_object_id: str,
     *,
     client: AuthenticatedClient,
     body: ConfirmStoredObjectUploadBody,
@@ -158,7 +158,7 @@ async def asyncio(
     """Confirm a stored-object upload
 
     Args:
-        upload_token (str):
+        stored_object_id (str):
         body (ConfirmStoredObjectUploadBody):
 
     Raises:
@@ -171,7 +171,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            upload_token=upload_token,
+            stored_object_id=stored_object_id,
             client=client,
             body=body,
         )

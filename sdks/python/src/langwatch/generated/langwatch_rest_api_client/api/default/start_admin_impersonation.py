@@ -4,22 +4,37 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.start_admin_impersonation_body import StartAdminImpersonationBody
+from ...models.start_admin_impersonation_response_200 import StartAdminImpersonationResponse200
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: StartAdminImpersonationBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/v1/admin/impersonate",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> StartAdminImpersonationResponse200 | None:
     if response.status_code == 200:
-        return None
+        response_200 = StartAdminImpersonationResponse200.from_dict(response.json())
+
+        return response_200
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -27,7 +42,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[StartAdminImpersonationResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -42,17 +59,23 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Any]:
+    body: StartAdminImpersonationBody,
+) -> Response[StartAdminImpersonationResponse200]:
     """
+    Args:
+        body (StartAdminImpersonationBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[StartAdminImpersonationResponse200]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -61,21 +84,75 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     *,
     client: AuthenticatedClient | Client,
-) -> Response[Any]:
+    body: StartAdminImpersonationBody,
+) -> StartAdminImpersonationResponse200 | None:
     """
+    Args:
+        body (StartAdminImpersonationBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        StartAdminImpersonationResponse200
     """
 
-    kwargs = _get_kwargs()
+    return sync_detailed(
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient | Client,
+    body: StartAdminImpersonationBody,
+) -> Response[StartAdminImpersonationResponse200]:
+    """
+    Args:
+        body (StartAdminImpersonationBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[StartAdminImpersonationResponse200]
+    """
+
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    *,
+    client: AuthenticatedClient | Client,
+    body: StartAdminImpersonationBody,
+) -> StartAdminImpersonationResponse200 | None:
+    """
+    Args:
+        body (StartAdminImpersonationBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        StartAdminImpersonationResponse200
+    """
+
+    return (
+        await asyncio_detailed(
+            client=client,
+            body=body,
+        )
+    ).parsed

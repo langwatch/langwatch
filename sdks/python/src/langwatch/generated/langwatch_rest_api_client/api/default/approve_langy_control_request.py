@@ -11,7 +11,7 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    request_id: str,
     *,
     body: ApproveLangyControlRequestBody,
 ) -> dict[str, Any]:
@@ -19,8 +19,8 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/langy/control/requests/{id}/approve".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/langy/control/requests/{request_id}/approve".format(
+            request_id=quote(str(request_id), safe=""),
         ),
     }
 
@@ -61,7 +61,7 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
     body: ApproveLangyControlRequestBody,
@@ -71,7 +71,7 @@ def sync_detailed(
     a second approval is refused.
 
     Args:
-        id (str):
+        request_id (str):
         body (ApproveLangyControlRequestBody):
 
     Raises:
@@ -83,7 +83,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        request_id=request_id,
         body=body,
     )
 
@@ -95,7 +95,7 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
     body: ApproveLangyControlRequestBody,
@@ -105,7 +105,7 @@ def sync(
     a second approval is refused.
 
     Args:
-        id (str):
+        request_id (str):
         body (ApproveLangyControlRequestBody):
 
     Raises:
@@ -117,14 +117,14 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        request_id=request_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
     body: ApproveLangyControlRequestBody,
@@ -134,7 +134,7 @@ async def asyncio_detailed(
     a second approval is refused.
 
     Args:
-        id (str):
+        request_id (str):
         body (ApproveLangyControlRequestBody):
 
     Raises:
@@ -146,7 +146,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        request_id=request_id,
         body=body,
     )
 
@@ -156,7 +156,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    request_id: str,
     *,
     client: AuthenticatedClient,
     body: ApproveLangyControlRequestBody,
@@ -166,7 +166,7 @@ async def asyncio(
     a second approval is refused.
 
     Args:
-        id (str):
+        request_id (str):
         body (ApproveLangyControlRequestBody):
 
     Raises:
@@ -179,7 +179,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            request_id=request_id,
             client=client,
             body=body,
         )

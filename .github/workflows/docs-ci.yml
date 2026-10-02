@@ -51,10 +51,6 @@ jobs:
               - 'docs/**'
               - 'skills/**'
               - '.github/workflows/docs-ci.yml'
-              # The docs site ships a copy of the canonical OpenAPI document and
-              # generates its api-reference pages from it, so a spec change has
-              # to re-run this job or the copy silently falls behind.
-              - 'specs/api-reference/openapi-document.json'
               # The structure checker and the rules it applies.
               - 'pkg/docsscan/**'
               - 'tools/docscheck/**'
@@ -216,10 +212,11 @@ jobs:
         run: cd docs && node llms.txt.cjs
 
       # The api-reference pages and their nav are generated from the docs site's
-      # copy of the canonical OpenAPI document. Both the copy and the pages used
-      # to drift silently, because nothing regenerated them and nothing checked.
-      - name: Re-sync the API spec copy and regenerate api-reference pages
-        run: cd docs && make sync-api-spec && make generate-api-reference
+      # copy of the OpenAPI document. The copy itself is regenerated from the
+      # routes and checked by the openapi-clients job in langwatch-app-ci.yml;
+      # this step checks the pages against the committed copy.
+      - name: Regenerate api-reference pages
+        run: cd docs && make generate-api-reference
 
       - name: Check for stale generated files
         run: |
@@ -249,7 +246,7 @@ jobs:
             echo "  bash docs/scripts/sync-prompts.sh"
             echo "  bash docs/scripts/generate-usage-report-dictionary.sh"
             echo "  cd docs && node llms.txt.cjs"
-            echo "  cd docs && make sync-api-spec && make generate-api-reference"
+            echo "  cd docs && make generate-api-reference"
             echo "Then commit the updated files."
             exit 1
           fi

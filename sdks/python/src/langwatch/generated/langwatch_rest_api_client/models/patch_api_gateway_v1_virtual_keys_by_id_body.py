@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-from dateutil.parser import isoparse
 
 from ..models.patch_api_gateway_v1_virtual_keys_by_id_body_routing_mode import (
     PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode,
@@ -39,7 +37,7 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         trace_project_id (None | str | Unset):
         routing_policy_id (None | str | Unset):
         routing_mode (PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode | Unset):
-        expires_at (datetime.datetime | None | Unset):
+        expires_at (Any | None | Unset):
         budget (None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset):
         config (PatchApiGatewayV1VirtualKeysByIdBodyConfig | Unset):
         external_id (None | str | Unset):
@@ -52,7 +50,7 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
     trace_project_id: None | str | Unset = UNSET
     routing_policy_id: None | str | Unset = UNSET
     routing_mode: PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode | Unset = UNSET
-    expires_at: datetime.datetime | None | Unset = UNSET
+    expires_at: Any | None | Unset = UNSET
     budget: None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset = UNSET
     config: PatchApiGatewayV1VirtualKeysByIdBodyConfig | Unset = UNSET
     external_id: None | str | Unset = UNSET
@@ -95,11 +93,9 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         if not isinstance(self.routing_mode, Unset):
             routing_mode = self.routing_mode.value
 
-        expires_at: None | str | Unset
+        expires_at: Any | None | Unset
         if isinstance(self.expires_at, Unset):
             expires_at = UNSET
-        elif isinstance(self.expires_at, datetime.datetime):
-            expires_at = self.expires_at.isoformat()
         else:
             expires_at = self.expires_at
 
@@ -214,20 +210,12 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         else:
             routing_mode = PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode(_routing_mode)
 
-        def _parse_expires_at(data: object) -> datetime.datetime | None | Unset:
+        def _parse_expires_at(data: object) -> Any | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                expires_at_type_0 = isoparse(data)
-
-                return expires_at_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(datetime.datetime | None | Unset, data)
+            return cast(Any | None | Unset, data)
 
         expires_at = _parse_expires_at(d.pop("expires_at", UNSET))
 

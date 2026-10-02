@@ -1574,6 +1574,16 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
   file did exactly that — the schema and the route drifted, one `$ref`
   pointed at a component that had never existed, and the discovery route
   crashed presenting the document rather than at the split.
+- **The OpenAPI document is generated, never committed** (Rogerio, 2026-10-02). The api builds it
+  once at boot from the routes it mounts and serves it at `/api/openapi.json`; `pnpm --filter
+  @langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
+  refuse and writes it to `specs/api-reference/openapi-document.json`, which git ignores. The
+  document names each route once, at its `/api/v1` address. A published name the declaration no
+  longer spells (an `operationId`, a component) is kept with `.withDocs({ operationId })` and
+  `.meta({ id })` on the route's own schemas, never by editing output. What is committed is what
+  is generated from it: the TypeScript, Python and Go clients and the docs site copy
+  (`docs/api-reference/openapiLangWatch.json`, which Mintlify needs in the repository). `make
+  sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
 
 ---
 

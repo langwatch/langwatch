@@ -90,7 +90,7 @@ func TestTraces(t *testing.T) {
 			defer mu.Unlock()
 			assert.Equal(t, "timeout", gotBody["query"])
 			require.Len(t, res.Traces, 1)
-			assert.Equal(t, "trace_1", *res.Traces[0].TraceId)
+			assert.Equal(t, "trace_1", res.Traces[0].TraceId)
 			assert.Equal(t, "c1", res.Pagination.ScrollID,
 				"the cursor reaches the caller, which is what makes a manual scroll drivable")
 			assert.Equal(t, 1, res.Pagination.TotalHits)
@@ -114,7 +114,7 @@ func TestTraces(t *testing.T) {
 			defer mu.Unlock()
 			assert.Contains(t, gotQuery, "format=json")
 			require.NotNil(t, tr.TraceId)
-			assert.Equal(t, "trace_1", *tr.TraceId)
+			assert.Equal(t, "trace_1", tr.TraceId)
 		})
 	})
 }
@@ -302,7 +302,7 @@ func TestTriggersService(t *testing.T) {
 	t.Run("given Slack connections exist", func(t *testing.T) {
 		t.Run("when listing", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/slack-connections", r.URL.Path)
+				assert.Equal(t, "/api/v1/slack-connections", r.URL.Path)
 				_, _ = w.Write([]byte(`[{"id":"si_1","name":"Alerts bot","kind":"bot","scopeType":"ORGANIZATION","scopeId":"org_1","scopeName":"Acme","slackTeamName":"Acme Workspace","createdAt":""}]`))
 			})
 			connections, err := c.SlackConnections.List(context.Background())
@@ -322,7 +322,7 @@ func TestTriggersService(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/triggers", r.URL.Path)
+				assert.Equal(t, "/api/v1/triggers", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -356,7 +356,7 @@ func TestTriggersService(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPatch, r.Method)
-				assert.Equal(t, "/api/triggers/trig_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/triggers/trig_1", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -387,13 +387,13 @@ func TestTriggersService(t *testing.T) {
 			require.NoError(t, err)
 			mu.Lock()
 			defer mu.Unlock()
-			assert.Equal(t, []string{"/api/triggers/trig_1/enable", "/api/triggers/trig_1/disable"}, paths)
+			assert.Equal(t, []string{"/api/v1/triggers/trig_1/enable", "/api/v1/triggers/trig_1/disable"}, paths)
 		})
 
 		t.Run("when test-firing", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/triggers/trig_1/test-fire", r.URL.Path)
+				assert.Equal(t, "/api/v1/triggers/trig_1/test-fire", r.URL.Path)
 				_, _ = w.Write([]byte(`{"channel":"webhook","recipientCount":1,"usedDefault":true,"missingVariables":[],"errors":["timeout"],"httpStatus":504}`))
 			})
 			res, err := c.Triggers.TestFire(context.Background(), "trig_1")
@@ -408,7 +408,7 @@ func TestTriggersService(t *testing.T) {
 			var mu sync.Mutex
 			var queries []string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/triggers/trig_1/fires", r.URL.Path)
+				assert.Equal(t, "/api/v1/triggers/trig_1/fires", r.URL.Path)
 				mu.Lock()
 				queries = append(queries, r.URL.Query().Encode())
 				mu.Unlock()
@@ -513,7 +513,7 @@ func TestProjectsService(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, projects, 1)
 			require.NotNil(t, projects[0].Id)
-			assert.Equal(t, "project_1", *projects[0].Id)
+			assert.Equal(t, "project_1", projects[0].Id)
 			assert.Equal(t, 1, pg.Total)
 		})
 	})

@@ -16,7 +16,6 @@
   "mcp/typescript/",
   "dev/scripts/",
   "dev/tsconfig.web-declarations.json",
-  "specs/api-reference/openapi-document.json",
   "infra/docker/Dockerfile.langyagent",
   "skills/",
   "feature-map.json",

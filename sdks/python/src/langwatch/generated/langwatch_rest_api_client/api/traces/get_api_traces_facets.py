@@ -157,19 +157,8 @@ def sync_detailed(
 ]:
     """Discover what the trace filter fields hold
 
-     What the trace filter fields actually hold in THIS project, which the filter language's own
-    reference deliberately does not carry: values are tenant data, they move under you, and reading them
-    all costs about thirty aggregate queries.
-
-    Two answers from one door. Without `field` you get the discovery payload: every facet this project
-    has, each with its top values and counts, plus the range bounds for the numeric ones. With `field`
-    you get one field's values, paged, filtered by `prefix`.
-
-    The values are cached and refreshed in the background, so a cold project answers `pending: true`
-    with the payload it has; call again shortly for the computed one.
-
-    Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the
-    fields and their fixed vocabularies; only this endpoint knows the open ones.
+     Discover what the trace filter fields hold in this project. Without `field`, every facet with its
+    top values. With `field`, that field's values, paged.
 
     Args:
         field (str | Unset):
@@ -224,19 +213,8 @@ def sync(
 ):
     """Discover what the trace filter fields hold
 
-     What the trace filter fields actually hold in THIS project, which the filter language's own
-    reference deliberately does not carry: values are tenant data, they move under you, and reading them
-    all costs about thirty aggregate queries.
-
-    Two answers from one door. Without `field` you get the discovery payload: every facet this project
-    has, each with its top values and counts, plus the range bounds for the numeric ones. With `field`
-    you get one field's values, paged, filtered by `prefix`.
-
-    The values are cached and refreshed in the background, so a cold project answers `pending: true`
-    with the payload it has; call again shortly for the computed one.
-
-    Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the
-    fields and their fixed vocabularies; only this endpoint knows the open ones.
+     Discover what the trace filter fields hold in this project. Without `field`, every facet with its
+    top values. With `field`, that field's values, paged.
 
     Args:
         field (str | Unset):
@@ -285,19 +263,8 @@ async def asyncio_detailed(
 ]:
     """Discover what the trace filter fields hold
 
-     What the trace filter fields actually hold in THIS project, which the filter language's own
-    reference deliberately does not carry: values are tenant data, they move under you, and reading them
-    all costs about thirty aggregate queries.
-
-    Two answers from one door. Without `field` you get the discovery payload: every facet this project
-    has, each with its top values and counts, plus the range bounds for the numeric ones. With `field`
-    you get one field's values, paged, filtered by `prefix`.
-
-    The values are cached and refreshed in the background, so a cold project answers `pending: true`
-    with the payload it has; call again shortly for the computed one.
-
-    Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the
-    fields and their fixed vocabularies; only this endpoint knows the open ones.
+     Discover what the trace filter fields hold in this project. Without `field`, every facet with its
+    top values. With `field`, that field's values, paged.
 
     Args:
         field (str | Unset):
@@ -350,19 +317,8 @@ async def asyncio(
 ):
     """Discover what the trace filter fields hold
 
-     What the trace filter fields actually hold in THIS project, which the filter language's own
-    reference deliberately does not carry: values are tenant data, they move under you, and reading them
-    all costs about thirty aggregate queries.
-
-    Two answers from one door. Without `field` you get the discovery payload: every facet this project
-    has, each with its top values and counts, plus the range bounds for the numeric ones. With `field`
-    you get one field's values, paged, filtered by `prefix`.
-
-    The values are cached and refreshed in the background, so a cold project answers `pending: true`
-    with the payload it has; call again shortly for the computed one.
-
-    Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the
-    fields and their fixed vocabularies; only this endpoint knows the open ones.
+     Discover what the trace filter fields hold in this project. Without `field`, every facet with its
+    top values. With `field`, that field's values, paged.
 
     Args:
         field (str | Unset):

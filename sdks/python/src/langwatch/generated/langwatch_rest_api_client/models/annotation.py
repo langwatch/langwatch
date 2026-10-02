@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
     from ..models.annotation_score_options import AnnotationScoreOptions
@@ -29,8 +31,8 @@ class Annotation:
         anchor_kind (None | str):
         anchor_id (None | str):
         anchor_path (None | str):
-        created_at (str):
-        updated_at (str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
     """
 
     id: str
@@ -45,8 +47,8 @@ class Annotation:
     anchor_kind: None | str
     anchor_id: None | str
     anchor_path: None | str
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -82,9 +84,9 @@ class Annotation:
         anchor_path: None | str
         anchor_path = self.anchor_path
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -178,9 +180,9 @@ class Annotation:
 
         anchor_path = _parse_anchor_path(d.pop("anchorPath"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         annotation = cls(
             id=id,

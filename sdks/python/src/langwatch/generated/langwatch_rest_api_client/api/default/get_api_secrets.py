@@ -5,12 +5,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_secrets_response_200_item import GetApiSecretsResponse200Item
-from ...types import UNSET, Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -64,7 +64,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> Response[list[GetApiSecretsResponse200Item]]:
     """List project secrets
 
@@ -72,7 +72,7 @@ def sync_detailed(
     enforces the 50-secret cap. Responses are not cached.
 
     Args:
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -96,7 +96,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> list[GetApiSecretsResponse200Item] | None:
     """List project secrets
 
@@ -104,7 +104,7 @@ def sync(
     enforces the 50-secret cap. Responses are not cached.
 
     Args:
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,7 +123,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> Response[list[GetApiSecretsResponse200Item]]:
     """List project secrets
 
@@ -131,7 +131,7 @@ async def asyncio_detailed(
     enforces the 50-secret cap. Responses are not cached.
 
     Args:
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,7 +153,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    project_id: str,
+    project_id: str | Unset = UNSET,
 ) -> list[GetApiSecretsResponse200Item] | None:
     """List project secrets
 
@@ -161,7 +161,7 @@ async def asyncio(
     enforces the 50-secret cap. Responses are not cached.
 
     Args:
-        project_id (str):
+        project_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

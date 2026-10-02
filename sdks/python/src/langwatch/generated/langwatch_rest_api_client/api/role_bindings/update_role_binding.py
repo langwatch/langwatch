@@ -67,7 +67,8 @@ def sync_detailed(
     body: UpdateRoleBindingBody,
 ) -> Response[UpdateRoleBindingResponse200]:
     """Change a binding's role (and custom role). The principal and scope are the binding's identity and do
-    not change; create a new binding instead.
+    not change; create a new binding instead. superseded by /api/grants, which answers the same rows as
+    grants
 
     Args:
         id (str):
@@ -100,7 +101,8 @@ def sync(
     body: UpdateRoleBindingBody,
 ) -> UpdateRoleBindingResponse200 | None:
     """Change a binding's role (and custom role). The principal and scope are the binding's identity and do
-    not change; create a new binding instead.
+    not change; create a new binding instead. superseded by /api/grants, which answers the same rows as
+    grants
 
     Args:
         id (str):
@@ -128,7 +130,8 @@ async def asyncio_detailed(
     body: UpdateRoleBindingBody,
 ) -> Response[UpdateRoleBindingResponse200]:
     """Change a binding's role (and custom role). The principal and scope are the binding's identity and do
-    not change; create a new binding instead.
+    not change; create a new binding instead. superseded by /api/grants, which answers the same rows as
+    grants
 
     Args:
         id (str):
@@ -159,7 +162,8 @@ async def asyncio(
     body: UpdateRoleBindingBody,
 ) -> UpdateRoleBindingResponse200 | None:
     """Change a binding's role (and custom role). The principal and scope are the binding's identity and do
-    not change; create a new binding instead.
+    not change; create a new binding instead. superseded by /api/grants, which answers the same rows as
+    grants
 
     Args:
         id (str):
