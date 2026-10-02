@@ -142,16 +142,33 @@ func TestPostHogNodeGzipBatchIsListed(t *testing.T) {
 	}
 }
 
-func TestPostHogJSEncodingsAreListed(t *testing.T) {
-	_, srv, c := newTestServer(t)
+func TestPostHogBodyEncodingsAreListed(t *testing.T) {
 	event := `[{"event":"$pageview","properties":{"distinct_id":"anon-1"}}]`
-	send(t, http.MethodPost, srv.URL+"/e/?compression=gzip-js", http.Header{"Content-Type": {"text/plain"}}, gzipped(t, event))
-	form := url.Values{"data": {base64.StdEncoding.EncodeToString([]byte(event))}}.Encode()
-	send(t, http.MethodPost, srv.URL+"/i/v0/e/?compression=base64", http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}, []byte(form))
-	// posthog-js's batch flush gzips without naming a compression.
-	send(t, http.MethodPost, srv.URL+"/e/", http.Header{"Content-Type": {"text/plain"}}, gzipped(t, event))
-	if got := records(t, c, Filter{ID: "anon-1", Kind: KindEvent}); len(got) != 3 {
-		t.Fatalf("got %d records, want 3", len(got))
+	form := []byte(url.Values{"data": {base64.StdEncoding.EncodeToString([]byte(event))}}.Encode())
+	formType := http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}
+	textType := http.Header{"Content-Type": {"text/plain"}}
+	for _, tc := range []struct {
+		name, path string
+		header     http.Header
+		body       []byte
+	}{
+		{"plain JSON", "/e/", http.Header{"Content-Type": {"application/json"}}, []byte(event)},
+		{"gzip by header", "/batch/", http.Header{"Content-Encoding": {"gzip"}, "Content-Type": {"application/json"}}, gzipped(t, event)},
+		{"gzip by query", "/e/?compression=gzip-js", textType, gzipped(t, event)},
+		{"gzip by magic bytes", "/capture/", textType, gzipped(t, event)},
+		{"base64 form", "/i/v0/e/?compression=base64", formType, form},
+		{"base64 form by query alone", "/e/?compression=base64", textType, form},
+		{"base64 form by prefix alone", "/e/", nil, form},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, srv, c := newTestServer(t)
+			if resp := send(t, http.MethodPost, srv.URL+tc.path, tc.header, tc.body); resp.StatusCode != http.StatusOK {
+				t.Fatalf("status %d", resp.StatusCode)
+			}
+			if got := records(t, c, Filter{ID: "anon-1", Kind: KindEvent}); len(got) != 1 {
+				t.Fatalf("got %d records, want 1", len(got))
+			}
+		})
 	}
 }
 

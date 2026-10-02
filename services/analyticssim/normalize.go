@@ -14,9 +14,10 @@ import (
 // decodeBody undoes the encodings the PostHog clients use: gzip (posthog-node's
 // Content-Encoding, posthog-js's ?compression=gzip-js, or a body that starts
 // with gzip's magic bytes, as posthog-js's batches do) and posthog-js's
-// form-encoded base64 `data=` field. Anything else is taken as JSON.
+// form-encoded base64 `data=` field (by content type, ?compression=base64 or the
+// body's own prefix). Anything else is taken as JSON.
 func decodeBody(body []byte, contentEncoding, compression, contentType string) ([]byte, error) {
-	if contentEncoding == "gzip" || compression == "gzip-js" || bytes.HasPrefix(body, []byte{0x1f, 0x8b}) {
+	if strings.EqualFold(strings.TrimSpace(contentEncoding), "gzip") || compression == "gzip-js" || bytes.HasPrefix(body, []byte{0x1f, 0x8b}) {
 		reader, err := gzip.NewReader(bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("the body is not gzip: %w", err)
@@ -25,7 +26,7 @@ func decodeBody(body []byte, contentEncoding, compression, contentType string) (
 			return nil, fmt.Errorf("the body is not gzip: %w", err)
 		}
 	}
-	if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+	if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") || compression == "base64" || bytes.HasPrefix(body, []byte("data=")) {
 		form, err := url.ParseQuery(string(body))
 		if err != nil {
 			return nil, fmt.Errorf("the form body does not parse: %w", err)
