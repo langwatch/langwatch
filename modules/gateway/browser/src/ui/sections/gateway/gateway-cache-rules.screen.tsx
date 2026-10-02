@@ -16,7 +16,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
-import { api, type GatewayCacheRuleView } from "../../../behavior/gateway-api.ts";
+import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
@@ -25,7 +25,7 @@ import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx"
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
-type CacheRuleListRow = GatewayCacheRuleView;
+type CacheRuleListRow = RouterOutputs["gatewayCacheRules"]["list"][number];
 
 function CacheRulesPage() {
   const showErrorToast = useShowErrorToast();

@@ -308,7 +308,11 @@ function BudgetDetailPage() {
                   </DetailRow>
                 )}
                 <DetailRow label="Scope">
-                  <ScopeBadge target={budget.scopeTarget} projectSlug={project?.slug ?? null} />
+                  {budget.scopeTarget ? (
+                    <ScopeBadge target={budget.scopeTarget} projectSlug={project?.slug ?? null} />
+                  ) : (
+                    <Code fontSize="xs">{budget.scopeId}</Code>
+                  )}
                 </DetailRow>
                 <DetailRow label="Created">
                   <Tooltip content={readableDate(budget.createdAt).toLocaleString()}>
@@ -464,6 +468,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 type ScopeTarget = NonNullable<GatewayBudgetDetailResponse["scopeTarget"]>;
+type LedgerStatus = GatewayBudgetDetailResponse["recentLedger"][number]["status"];
 
 function ScopeBadge({
   target,
@@ -584,20 +589,14 @@ function usagePalette(pct: number): "red" | "orange" | "green" {
   return "green";
 }
 
-function statusPalette(
-  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED",
-): "green" | "red" | "orange" | "gray" {
+function statusPalette(status: LedgerStatus): "green" | "red" | "orange" | "gray" {
   if (status === "SUCCESS") return "green";
   if (status === "BLOCKED_BY_GUARDRAIL") return "red";
   if (status === "PROVIDER_ERROR") return "orange";
   return "gray";
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
-}) {
+function StatusBadge({ status }: { status: LedgerStatus }) {
   return <Badge colorPalette={statusPalette(status)}>{status.toLowerCase()}</Badge>;
 }
 

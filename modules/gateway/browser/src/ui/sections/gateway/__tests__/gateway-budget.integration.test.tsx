@@ -145,4 +145,35 @@ describe("budget detail page", () => {
       expect(screen.getByTestId("budget-unreachable-alert")).toBeInTheDocument();
     });
   });
+  describe("when the scope target cannot be named", () => {
+    it("shows the raw scope id in its place", () => {
+      state.budget = budget({ scopeId: "org-gone", scopeTarget: null });
+      renderPage(MANAGE);
+
+      expect(screen.getByText("org-gone")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a ledger line carries an unrecognised status", () => {
+    it("still lists the debit with its status as written", () => {
+      state.budget = budget({
+        recentLedger: [
+          {
+            id: "led-1",
+            virtualKeyId: "vk-1",
+            virtualKeyName: "ci key",
+            virtualKeyPrefix: "lw_vk_",
+            amountUsd: "0.01",
+            model: "gpt-5-mini",
+            status: "QUEUED",
+            occurredAt: "2026-03-02T00:00:00.000Z",
+          },
+        ],
+      });
+      renderPage(MANAGE);
+
+      expect(screen.getByText("ci key")).toBeInTheDocument();
+      expect(screen.getByText("queued")).toBeInTheDocument();
+    });
+  });
 });

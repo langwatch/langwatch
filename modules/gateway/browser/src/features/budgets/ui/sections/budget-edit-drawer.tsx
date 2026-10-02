@@ -11,29 +11,46 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { GatewayBudgetBreachAction, GatewayBudgetList } from "@langwatch/gateway-contract";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 
-type BudgetRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  scopeType: string;
-  scopeTarget?: { name: string } | null;
-  providerLabel?: string | null;
-  window: string;
-  limitUsd: string;
-  onBreach: "BLOCK" | "WARN";
-};
+type BudgetRow = Pick<
+  GatewayBudgetList["budgets"][number],
+  | "id"
+  | "name"
+  | "description"
+  | "scopeType"
+  | "scopeTarget"
+  | "providerLabel"
+  | "window"
+  | "limitUsd"
+  | "onBreach"
+>;
 
 type BudgetEditDrawerProps = {
   budget: BudgetRow | null;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 };
+
+/** Why the limit is refused, or null when it is a positive amount. */
+function limitRefusal(limitUsd: string): string | null {
+  const parsed = Number.parseFloat(limitUsd);
+  return Number.isFinite(parsed) && parsed > 0 ? null : "Enter a positive amount, like 1000.00.";
+}
+
+function scopeSummary(budget: BudgetRow | null): string {
+  if (!budget) return "";
+  const scope =
+    budget.scopeType === "GROUP" ? "group" : budget.scopeType.toLowerCase().replace("_", " ");
+  const target = budget.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : "";
+  const provider = budget.providerLabel ? `, ${budget.providerLabel} only` : "";
+  return `${scope}${target}${provider}`;
+}
 
 export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDrawerProps) {
   const toaster = useGatewayToaster();
@@ -42,7 +59,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [limitUsd, setLimitUsd] = useState("");
-  const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
+  const [onBreach, setOnBreach] = useState<GatewayBudgetBreachAction>("BLOCK");
   // Names one input, so it lives on that input. See BudgetCreateDrawer.
   const [limitError, setLimitError] = useState<string | null>(null);
 
@@ -51,7 +68,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
       setName(budget.name);
       setDescription(budget.description ?? "");
       setLimitUsd(budget.limitUsd);
-      setOnBreach(budget.onBreach);
+      setOnBreach(budget.onBreach === "WARN" ? "WARN" : "BLOCK");
       setLimitError(null);
     }
   }, [budget]);
@@ -78,12 +95,9 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
       toaster.create({ title: "Name and limit are required", type: "error" });
       return;
     }
-    setLimitError(null);
-    const parsed = Number.parseFloat(limitUsd);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setLimitError("Enter a positive amount, like 1000.00.");
-      return;
-    }
+    const refusal = limitRefusal(limitUsd);
+    setLimitError(refusal);
+    if (refusal) return;
     try {
       await updateMutation.mutateAsync({
         organizationId: organization.id,
@@ -130,12 +144,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
             <Field.Root>
               <Field.Label>Applies to</Field.Label>
               <Text fontSize="sm" color="fg.muted">
-                {budget?.scopeType === "GROUP"
-                  ? "group"
-                  : budget?.scopeType.toLowerCase().replace("_", " ")}
-                {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
-                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""} (immutable after
-                create)
+                {scopeSummary(budget)} (immutable after create)
               </Text>
               {budget?.scopeType === "GROUP" && (
                 <Field.HelperText>
@@ -184,7 +193,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
                 <NativeSelect.Field
                   data-testid="gateway-budget-edit-on-breach"
                   value={onBreach}
-                  onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
+                  onChange={(e) => setOnBreach(e.target.value === "WARN" ? "WARN" : "BLOCK")}
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
                   <option value="WARN">Warn: tag responses, keep serving</option>

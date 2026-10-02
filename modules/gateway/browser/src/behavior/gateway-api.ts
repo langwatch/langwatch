@@ -6,211 +6,14 @@
 import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { routingPolicyTrpc } from "@langwatch/enterprise-gateway-contract";
 import type {
-  GatewayApplicableBudget,
-  GatewayBudgetLedgerStatus,
-  GatewayBudgetScopeTarget,
-  GatewayBudgetScopeType,
-  GatewayBudgetWindow,
-  GatewayCacheRuleAction,
-  GatewayCacheRuleDto,
-  GatewayCacheRuleMatchers,
-  GatewayGuardrailResource,
-  GatewayUsageSummary,
-  GatewayVirtualKeyDirectBudget,
-  GatewayVirtualKeyUsageSummary,
+  gatewayBudgetTrpc,
+  gatewayCacheRuleTrpc,
+  gatewayGuardrailTrpc,
+  gatewaySpendEventTrpc,
+  gatewayUsageTrpc,
   VirtualKeyApiScopeAssignment,
-  VirtualKeyCamelDtoResponse,
-  VirtualKeyConfig,
-  VirtualKeyMinted,
+  virtualKeyTrpc,
 } from "@langwatch/gateway-contract";
-import type { Instant } from "@langwatch/time";
-
-/** An acknowledgement, for the writes whose only answer is that they happened. */
-export type GatewayAcknowledgement = { ok: boolean };
-
-/** The scope triad a gateway resource is reachable from. */
-export type GatewayScopeAssignment = VirtualKeyApiScopeAssignment;
-
-/**
- * A VirtualKey as the wire carries it, which is not the row the server holds.
- */
-export type VirtualKeyView = VirtualKeyCamelDtoResponse;
-
-/** A key together with its secret, which the two mutations that mint one return exactly once. */
-export type { VirtualKeyMinted };
-
-/**
- * The budget a key carries on itself, as the create and edit drawers send it. Not the
- * contract's `GatewayBudgetResource`: this is the nested input the virtual-key writes accept,
- * which the service turns into a budget row.
- */
-export type VirtualKeyBudgetInput = {
-  /** A decimal string, greater than zero. */
-  limitUsd: string;
-  window: "DAY" | "WEEK" | "MONTH";
-  onBreach?: "BLOCK" | "WARN";
-  name?: string;
-};
-
-/**
- * The writable half of a key's config. Every field of `virtualKeyConfigSchema` carries a
- * default, so the parsed output has them all and the INPUT has none of them — which is why this
- * is spelled out rather than being `Partial<VirtualKeyConfig>`.
- */
-export type VirtualKeyConfigInput = {
-  modelsAllowed?: string[] | null;
-  providersAllowed?: string[] | null;
-  cache?: { mode?: "respect" | "force" | "disable"; ttlS?: number };
-  fallback?: { maxAttempts?: number };
-  guardrailAttachments?: {
-    direction: "pre" | "post" | "stream_chunk";
-    guardrailIds?: string[];
-  }[];
-  rateLimits?: { rpm?: number | null; tpm?: number | null; rpd?: number | null };
-  realtime?: { maxOpenSessions?: number | null };
-  metadata?: { label?: string; tags?: string[] };
-};
-
-/** The parsed config, for the surfaces that read a key back. */
-export type VirtualKeyConfigView = VirtualKeyConfig;
-
-/**
- * A GatewayBudget as the wire carries it.
- */
-export type GatewayBudgetView = {
-  id: string;
-  organizationId: string;
-  scopeType: GatewayBudgetScopeType;
-  scopeId: string;
-  name: string;
-  description: string | null;
-  window: GatewayBudgetWindow;
-  onBreach: "BLOCK" | "WARN";
-  limitUsd: string;
-  spentUsd: string;
-  timezone: string | null;
-  providerKey: string | null;
-  currentPeriodStartedAt: string;
-  resetsAt: string;
-  cycleAnchorAt: string | null;
-  lastResetAt: string | null;
-  archivedAt: string | null;
-  createdAt: string;
-  endUsersSeen: number | null;
-  endUsersOver: number | null;
-};
-
-/**
- * A budget in a list, with the two facts a list has to state and a detail page
- * does not: whether spend could be totalled at all, and whether any key can
- * actually reach the scope it targets.
- */
-export type GatewayBudgetListRow = GatewayBudgetView & {
-  spendAvailable: boolean;
-  unreachableByAnyKey: boolean;
-  scopeTarget: GatewayBudgetScopeTarget | null;
-  providerLabel: string | null;
-};
-
-export type GatewayBudgetList = {
-  /** False when the spend source is not configured: unknown, not zero. */
-  spendAvailable: boolean;
-  budgets: GatewayBudgetListRow[];
-};
-
-export type GatewayBudgetDetail = GatewayBudgetView & {
-  spendAvailable: boolean;
-  unreachableByAnyKey: boolean;
-  scopeTarget: GatewayBudgetScopeTarget;
-  providerLabel: string | null;
-  recentLedger: {
-    id: string;
-    virtualKeyId: string;
-    virtualKeyName: string;
-    virtualKeyPrefix: string;
-    amountUsd: string;
-    model: string;
-    status: GatewayBudgetLedgerStatus;
-    occurredAt: string;
-  }[];
-};
-
-/** What a new budget is pointed at. `ATTRIBUTED_USER` is not offered on the wire. */
-export type GatewayBudgetScopeInput =
-  | { kind: "ORGANIZATION"; organizationId: string }
-  | { kind: "TEAM"; teamId: string }
-  | { kind: "PROJECT"; projectId: string }
-  | { kind: "VIRTUAL_KEY"; virtualKeyId: string }
-  | { kind: "PRINCIPAL"; principalUserId: string }
-  | { kind: "GROUP"; groupId: string };
-
-/**
- * A cache rule as the wire carries it. `mode` is renamed `modeEnum` by the DTO — the stored
- * column and the `action` both carry a mode, and the two are spelled differently on purpose.
- */
-export type GatewayCacheRuleView = GatewayCacheRuleDto;
-
-/** One gateway request, as the billing feed records it. `occurredAt` is a Date. */
-export type GatewaySpendEventRow = {
-  tenantId: string;
-  gatewayRequestId: string;
-  organizationId: string;
-  /** Always empty; kept so the row shape is stable across the two readers. */
-  teamId: string;
-  virtualKeyId: string;
-  principalUserId: string;
-  endUserId: string;
-  traceId: string;
-  model: string;
-  providerKey: string;
-  requestType: string;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  tokensReasoning: number;
-  costNanoUsd: number;
-  costUsd: string;
-  rateVersion: string;
-  status: "admitted" | "confirmed" | "failed" | "settled";
-  errorClass: string;
-  httpStatus: number;
-  needsReconciliation: boolean;
-  settleReason: string;
-  labels: string[];
-  metadata: string;
-  durationMs: number;
-  occurredAt: string;
-};
-
-export type GatewaySpendEventCursor = { occurredAtMs: number; gatewayRequestId: string };
-
-export type GatewaySpendEventFilters = {
-  virtualKeyIds?: string[];
-  endUserIds?: string[];
-  principalUserIds?: string[];
-  models?: string[];
-  providerKeys?: string[];
-  requestTypes?: string[];
-  labels?: string[];
-  metadata?: { key: string; values: string[] }[];
-  status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
-};
-
-/**
- * A page of spend events. `clickHouseDisabled` rather than a thrown error: a deployment with no
- * spend source has no events rather than a broken page, and the page says so.
- */
-export type GatewaySpendEventPage = {
-  rows: GatewaySpendEventRow[];
-  nextCursor: GatewaySpendEventCursor | null;
-  virtualKeyNames: Record<string, string>;
-  clickHouseDisabled: boolean;
-};
-
-export type { GatewayUsageSummary };
-
-export type { GatewayVirtualKeyUsageSummary };
 
 /**
  * A configured SQS destination as the endpoint list renders it. `region`, `accountId` and
@@ -317,7 +120,7 @@ export type OrganizationModelProviderView = {
   customKeys: Record<string, unknown> | null;
   /** Always null on this projection. */
   deploymentMapping: null;
-  scopes: GatewayScopeAssignment[];
+  scopes: VirtualKeyApiScopeAssignment[];
   models: string[] | null;
   embeddingsModels: string[] | null;
   customModels: { modelId: string; displayName: string; mode: "chat" }[];
@@ -379,422 +182,148 @@ export type PersonalWorkspaceContext = {
   routingPolicy: { id: string; name: string } | null;
 };
 
-export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> & {
-  virtualKeys: {
-    list: {
-      query: { input: { organizationId: string }; output: VirtualKeyView[] };
-    };
-    get: {
-      query: { input: { organizationId: string; id: string }; output: VirtualKeyView };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          description?: string;
-          principalUserId?: string | null;
-          scopes: GatewayScopeAssignment[];
-          traceProjectId?: string | null;
-          routingPolicyId?: string | null;
-          routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
-          /** Coerced server-side, so a form may send either. */
-          expiresAt?: Instant | string;
-          budget?: VirtualKeyBudgetInput | null;
-          config?: VirtualKeyConfigInput;
+export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> &
+  ContractApiMap<typeof virtualKeyTrpc> &
+  ContractApiMap<typeof gatewayBudgetTrpc> &
+  ContractApiMap<typeof gatewayCacheRuleTrpc> &
+  ContractApiMap<typeof gatewayGuardrailTrpc> &
+  ContractApiMap<typeof gatewaySpendEventTrpc> &
+  ContractApiMap<typeof gatewayUsageTrpc> & {
+    webhookEndpoints: {
+      list: {
+        query: { input: { organizationId: string }; output: WebhookEndpointView[] };
+      };
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            destinationKind?: "http" | "sqs";
+            url?: string;
+            sqs?: WebhookSqsInput;
+            enabledEvents: string[];
+            maxBatchSize?: number;
+            maxBatchDelayMs?: number;
+            maxInFlight?: number;
+          };
+          output: { endpoint: WebhookEndpointView; secret: string };
         };
-        output: VirtualKeyMinted;
       };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          scopes?: GatewayScopeAssignment[];
-          traceProjectId?: string | null;
-          routingPolicyId?: string | null;
-          routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
-          expiresAt?: Instant | string | null;
-          budget?: VirtualKeyBudgetInput | null;
-          config?: VirtualKeyConfigInput;
+      update: {
+        mutation: {
+          input: {
+            organizationId: string;
+            endpointId: string;
+            destinationKind?: "http" | "sqs";
+            url?: string;
+            /** A null field clears the stored credential; an absent one keeps it. */
+            sqs?: Partial<WebhookSqsInput>;
+            enabledEvents?: string[];
+            maxBatchSize?: number;
+            maxBatchDelayMs?: number;
+            maxInFlight?: number;
+          };
+          output: WebhookEndpointView;
         };
-        output: VirtualKeyView;
       };
-    };
-    disable: {
-      mutation: {
-        input: { organizationId: string; id: string; reason?: string };
-        output: VirtualKeyView;
-      };
-    };
-    enable: {
-      mutation: { input: { organizationId: string; id: string }; output: VirtualKeyView };
-    };
-    revoke: {
-      mutation: { input: { organizationId: string; id: string }; output: VirtualKeyView };
-    };
-    rotate: {
-      mutation: { input: { organizationId: string; id: string }; output: VirtualKeyMinted };
-    };
-    applicableBudgets: {
-      query: {
-        input: {
-          organizationId: string;
-          virtualKeyId?: string | null;
-          scopes: GatewayScopeAssignment[];
-          traceProjectId?: string | null;
-          principalUserId?: string | null;
+      archive: {
+        mutation: {
+          input: { organizationId: string; endpointId: string };
+          output: undefined;
         };
-        output: GatewayApplicableBudget[];
+      };
+      enable: {
+        mutation: {
+          input: { organizationId: string; endpointId: string };
+          output: WebhookEndpointView;
+        };
+      };
+      disable: {
+        mutation: {
+          input: { organizationId: string; endpointId: string };
+          output: WebhookEndpointView;
+        };
+      };
+      rollSecret: {
+        mutation: {
+          input: { organizationId: string; endpointId: string };
+          output: { endpoint: WebhookEndpointView; secret: string };
+        };
+      };
+      deliveries: {
+        query: {
+          input: {
+            organizationId: string;
+            endpointId: string;
+            limit?: number;
+            cursor?: WebhookDeliveryCursor;
+          };
+          output: WebhookDeliveryPage;
+        };
+      };
+      eventTypes: {
+        query: {
+          input: { organizationId: string };
+          output: readonly WebhookEventType[];
+        };
+      };
+      health: {
+        query: {
+          input: { organizationId: string; endpointId: string };
+          output: WebhookEndpointHealth;
+        };
       };
     };
-    spendThisMonth: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          virtualKeyId: string;
-          spentUsd: string;
-          requests: number;
-          budget: GatewayVirtualKeyDirectBudget | null;
-        }[];
-      };
-    };
-  };
 
-  gatewayBudgets: {
-    list: {
-      query: { input: { organizationId: string }; output: GatewayBudgetList };
-    };
-    /**
-     * Declared because a mutation invalidates it, not because this package
-     * reads it: the personal-workspace budget list is `platform/app`'s, and an
-     * invalidation only reaches it while both halves name the same path.
-     */
-    listForProject: {
-      query: { input: { projectId: string }; output: GatewayBudgetList };
-    };
-    get: {
-      query: {
-        input: { organizationId: string; id: string };
-        output: GatewayBudgetDetail;
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          scope: GatewayBudgetScopeInput;
-          name: string;
-          description?: string;
-          window: GatewayBudgetWindow;
-          limitUsd: number | string;
-          onBreach?: "BLOCK" | "WARN";
-          timezone?: string | null;
-          providerKey?: string | null;
-          /** An ISO string here must carry an offset. */
-          cycleAnchorAt?: Instant | string | null;
-          /** Saves a budget no key can reach, once the reader has been told. */
-          allowUnreachable?: boolean;
+    modelProvider: {
+      listAllForOrganizationForFrontend: {
+        query: {
+          input: { organizationId: string };
+          output: OrganizationModelProviderView[];
         };
-        output: GatewayBudgetView;
       };
     };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          limitUsd?: number | string;
-          onBreach?: "BLOCK" | "WARN";
-          timezone?: string | null;
-        };
-        output: GatewayBudgetView;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GatewayBudgetView;
-      };
-    };
-    reset: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          endUserId?: string;
-          reason?: string;
-        };
-        output: GatewayBudgetView;
-      };
-    };
-    groupTargets: {
-      query: {
-        input: { organizationId: string };
-        output: readonly { id: string; name: string; memberCount: number }[];
-      };
-    };
-  };
 
-  gatewayCacheRules: {
-    list: {
-      query: { input: { organizationId: string }; output: GatewayCacheRuleView[] };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          description?: string | null;
-          priority?: number;
-          enabled?: boolean;
-          matchers: GatewayCacheRuleMatchers;
-          action: GatewayCacheRuleAction;
-        };
-        output: GatewayCacheRuleView;
+    monitors: {
+      getAllForProject: {
+        query: { input: { projectId: string }; output: GuardrailEligibleMonitor[] };
       };
     };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          priority?: number;
-          enabled?: boolean;
-          matchers?: GatewayCacheRuleMatchers;
-          action?: GatewayCacheRuleAction;
-        };
-        output: GatewayCacheRuleView;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GatewayCacheRuleView;
-      };
-    };
-  };
 
-  /** Guardrails are PROJECT-scoped; every other gateway resource is not. */
-  gatewayGuardrails: {
-    list: {
-      query: { input: { projectId: string }; output: GatewayGuardrailResource[] };
-    };
-    create: {
-      mutation: {
-        input: {
-          projectId: string;
-          name: string;
-          description?: string | null;
-          evaluatorId: string;
-          direction: "PRE" | "POST" | "STREAM_CHUNK";
-          failureMode?: "FAIL_OPEN" | "FAIL_CLOSED";
+    organization: {
+      getAllOrganizationMembers: {
+        query: { input: { organizationId: string }; output: OrganizationMemberView[] };
+      };
+      /**
+       * The organization graph the section's scope is resolved out of.
+       */
+      getScopeGraph: {
+        query: {
+          input: Record<string, never>;
+          output: GatewayOrganizationGraph[];
         };
-        output: GatewayGuardrailResource;
       };
     };
-    update: {
-      mutation: {
-        input: {
-          projectId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          evaluatorId?: string;
-          direction?: "PRE" | "POST" | "STREAM_CHUNK";
-          failureMode?: "FAIL_OPEN" | "FAIL_CLOSED";
-        };
-        output: GatewayGuardrailResource;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { projectId: string; id: string };
-        output: GatewayAcknowledgement;
-      };
-    };
-  };
 
-  gatewaySpendEvents: {
-    list: {
-      query: {
-        input: {
-          projectId: string;
-          fromMs: number;
-          toMs: number;
-          filters?: GatewaySpendEventFilters;
-          cursor?: GatewaySpendEventCursor;
-          limit?: number;
-        };
-        output: GatewaySpendEventPage;
+    user: {
+      personalContext: {
+        query: { input: { organizationId: string }; output: PersonalWorkspaceContext };
       };
     };
-  };
 
-  gatewayUsage: {
-    summary: {
-      query: {
-        /** Both bounds are ISO strings, not Dates. */
-        input: { organizationId: string; fromDate: string; toDate: string };
-        output: GatewayUsageSummary;
-      };
-    };
-    summaryForVirtualKey: {
-      query: {
-        input: {
-          organizationId: string;
-          virtualKeyId: string;
-          fromDate: string;
-          toDate: string;
-          model?: string;
-        };
-        output: GatewayVirtualKeyUsageSummary;
-      };
-    };
-  };
-
-  webhookEndpoints: {
-    list: {
-      query: { input: { organizationId: string }; output: WebhookEndpointView[] };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          destinationKind?: "http" | "sqs";
-          url?: string;
-          sqs?: WebhookSqsInput;
-          enabledEvents: string[];
-          maxBatchSize?: number;
-          maxBatchDelayMs?: number;
-          maxInFlight?: number;
-        };
-        output: { endpoint: WebhookEndpointView; secret: string };
-      };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          endpointId: string;
-          destinationKind?: "http" | "sqs";
-          url?: string;
-          /** A null field clears the stored credential; an absent one keeps it. */
-          sqs?: Partial<WebhookSqsInput>;
-          enabledEvents?: string[];
-          maxBatchSize?: number;
-          maxBatchDelayMs?: number;
-          maxInFlight?: number;
-        };
-        output: WebhookEndpointView;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; endpointId: string };
-        output: undefined;
-      };
-    };
-    enable: {
-      mutation: {
-        input: { organizationId: string; endpointId: string };
-        output: WebhookEndpointView;
-      };
-    };
-    disable: {
-      mutation: {
-        input: { organizationId: string; endpointId: string };
-        output: WebhookEndpointView;
-      };
-    };
-    rollSecret: {
-      mutation: {
-        input: { organizationId: string; endpointId: string };
-        output: { endpoint: WebhookEndpointView; secret: string };
-      };
-    };
-    deliveries: {
-      query: {
-        input: {
-          organizationId: string;
-          endpointId: string;
-          limit?: number;
-          cursor?: WebhookDeliveryCursor;
-        };
-        output: WebhookDeliveryPage;
-      };
-    };
-    eventTypes: {
-      query: {
-        input: { organizationId: string };
-        output: readonly WebhookEventType[];
-      };
-    };
-    health: {
-      query: {
-        input: { organizationId: string; endpointId: string };
-        output: WebhookEndpointHealth;
-      };
-    };
-  };
-
-  modelProvider: {
-    listAllForOrganizationForFrontend: {
-      query: {
-        input: { organizationId: string };
-        output: OrganizationModelProviderView[];
-      };
-    };
-  };
-
-  monitors: {
-    getAllForProject: {
-      query: { input: { projectId: string }; output: GuardrailEligibleMonitor[] };
-    };
-  };
-
-  organization: {
-    getAllOrganizationMembers: {
-      query: { input: { organizationId: string }; output: OrganizationMemberView[] };
-    };
-    /**
-     * The organization graph the section's scope is resolved out of.
-     */
-    getScopeGraph: {
-      query: {
-        input: Record<string, never>;
-        output: GatewayOrganizationGraph[];
-      };
-    };
-  };
-
-  user: {
-    personalContext: {
-      query: { input: { organizationId: string }; output: PersonalWorkspaceContext };
-    };
-  };
-
-  plan: {
-    /** The organization's plan, narrowed to the two facts a gateway surface asks of it. */
-    getActivePlan: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          type: string;
-          /** Absent on a legacy plan row, which is not the same as false. */
-          webhookEndpointsEnabled?: boolean;
+    plan: {
+      /** The organization's plan, narrowed to the two facts a gateway surface asks of it. */
+      getActivePlan: {
+        query: {
+          input: { organizationId: string };
+          output: {
+            type: string;
+            /** Absent on a legacy plan row, which is not the same as false. */
+            webhookEndpointsEnabled?: boolean;
+          };
         };
       };
     };
   };
-};
 
 /**
  * The gateway's typed tRPC hooks. Same machinery, same transport and same React Query cache as
