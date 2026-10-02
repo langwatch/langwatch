@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
-    "@langwatch/analytics-process": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
@@ -43,6 +42,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/analytics-process": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

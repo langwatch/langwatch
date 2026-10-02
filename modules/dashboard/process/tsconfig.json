@@ -18,9 +18,6 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -52,6 +49,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../analytics/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/authorization/tsconfig.build.json"

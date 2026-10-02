@@ -13,7 +13,8 @@ import {
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -48,27 +49,6 @@ const DEFINITION = {
   vegaLiteSpec: SPECIFICATION,
 };
 
-/** A handled refusal reaches the caller at its own status with its own code and meta. */
-const boundaryErrorHandler: RestErrorHandler = (error) => {
-  if (error instanceof Error && "httpStatus" in error && typeof error.httpStatus === "number") {
-    return Response.json(
-      {
-        code: "code" in error ? error.code : undefined,
-        meta: "meta" in error ? error.meta : undefined,
-      },
-      { status: error.httpStatus },
-    );
-  }
-
-  return Response.json({ code: "unhandled", error: String(error) }, { status: 500 });
-};
-
-/** What the production door throws when a key lacks the permission a route names. */
-class PermissionDeniedTestError extends Error {
-  readonly httpStatus = 403;
-  readonly code = "api_key_permission_denied";
-}
-
 /** One project's key over the shared repositories, holding exactly the permissions named. */
 function mountKey({
   repositories,
@@ -101,7 +81,13 @@ function mountKey({
     identity: {
       // A project-tier route asks its permission of the door itself.
       authenticate: ({ permission }) => {
-        if (!held.includes(permission)) throw new PermissionDeniedTestError();
+        if (!held.includes(permission)) {
+          throw new PermissionDeniedError({
+            permission,
+            scope: { type: "project", id: projectId },
+            denialReason: "no-binding",
+          });
+        }
         return caller;
       },
       identify: () => caller,
@@ -113,7 +99,7 @@ function mountKey({
       bindRestMiddleware(langWatchQLCallerProtections, () => protections),
       bindRestMiddleware(savedWorkbenchChartUrl, () => PLATFORM_URL),
     ],
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
   const base = `/api/v1/projects/${projectId}/analytics/charts`;
 
