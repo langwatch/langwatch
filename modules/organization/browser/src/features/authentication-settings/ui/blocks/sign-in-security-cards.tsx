@@ -1,4 +1,3 @@
-import { RadioGroup } from "@chakra-ui/react";
 import type { SignInSecuritySettings } from "@langwatch/auth-contract";
 /**
  * The two sign-in security cards (GAC-09, GAC-10). Presentational: each is
@@ -14,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { LockKeyhole, Timer } from "lucide-react";
 import { useState, type ReactNode } from "react";
 

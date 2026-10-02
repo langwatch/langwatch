@@ -4,27 +4,10 @@ import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
 import { Info } from "lucide-react";
 
+import type { BudgetOverviewItemView } from "../../../model/budget-overview-item.ts";
 import { readableDate } from "../../../model/display-formatters.ts";
 
-/**
- * The /me rendering of budgetOverview API: one row per budget binding
- * the user, most binding first. Details in tooltip.
- */
-export type BudgetOverviewItemView = {
-  id: string;
-  name: string;
-  scopeClass: string;
-  scopePhrase: string;
-  scopeLabel: string;
-  window: string;
-  limitUsd: string;
-  spentUsd: string;
-  onBreach: string;
-  providerLabel: string | null;
-  isPerMember: boolean;
-  resetsAt: string | null;
-  topModels?: { model: string; spentUsd: number }[];
-};
+export type { BudgetOverviewItemView };
 
 const WINDOW_PHRASE: Record<string, string> = {
   MINUTE: "this minute",

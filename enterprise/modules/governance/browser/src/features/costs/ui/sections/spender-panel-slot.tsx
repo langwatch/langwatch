@@ -2,26 +2,12 @@
 
 import { ADD_A_SOURCE, PROVIDER_REPORTED_BY_USER } from "../../model/cost-panel-copy.ts";
 import { sampleSpenderRows } from "../../model/sample-lanes.ts";
-import { type SpenderRow } from "../../model/spender-row.ts";
+import type { SpenderReadState, SpenderRow } from "../../model/spender-row.ts";
 import { CostSpenderError, CostSpenderList } from "../blocks/cost-spender-panel.tsx";
 import { CostPanelEmpty } from "../elements/cost-panel-empty.tsx";
 import { CostPanel } from "../elements/cost-panel.tsx";
 
-/**
- * The pulled lane's spender read. `rows` is null while unanswered — the read
- * is refused without the People screen's permission — and a failure is carried
- * separately, because hiding the panel on an outage would claim nobody spent
- * anything.
- */
-export interface SpenderReadState {
-  rows: SpenderRow[] | null;
-  isError: boolean;
-  /** Declined by the plan gate or a missing grant, rather than broken. */
-  refused: boolean;
-  /** Whether it is in flight, for the refresh control. Same reason as the rest. */
-  isFetching: boolean;
-  retry: () => void;
-}
+export type { SpenderReadState };
 
 export function SpenderPanelSlot({
   spenders,

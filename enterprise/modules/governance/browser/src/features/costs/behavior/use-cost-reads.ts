@@ -3,7 +3,7 @@
 import { api } from "../../../behavior/governance-api.ts";
 import { type Breakdowns } from "../model/breakdowns.ts";
 import { isRefusedRead } from "../model/cost-sample-mode.ts";
-import { type SpenderReadState } from "../ui/sections/spender-panel-slot.tsx";
+import { type SpenderReadState } from "../model/spender-row.ts";
 import { useBreakdownQueries } from "./use-breakdown-queries.ts";
 
 /**

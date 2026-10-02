@@ -10,3 +10,19 @@ export interface SpenderRow {
   amountUsd: number | null;
   cellsWithoutAmount: number;
 }
+
+/**
+ * The pulled lane's spender read. `rows` is null while unanswered — the read
+ * is refused without the People screen's permission — and a failure is carried
+ * separately, because hiding the panel on an outage would claim nobody spent
+ * anything.
+ */
+export interface SpenderReadState {
+  rows: SpenderRow[] | null;
+  isError: boolean;
+  /** Declined by the plan gate or a missing grant, rather than broken. */
+  refused: boolean;
+  /** Whether it is in flight, for the refresh control. Same reason as the rest. */
+  isFetching: boolean;
+  retry: () => void;
+}

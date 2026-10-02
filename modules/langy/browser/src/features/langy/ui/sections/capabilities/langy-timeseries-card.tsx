@@ -3,9 +3,9 @@
  */
 
 import { useChart } from "@chakra-ui/charts";
-import { Menu } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { RawMenu as Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { ArrowUpRight, LayoutDashboard, TrendingDown, TrendingUp } from "lucide-react";

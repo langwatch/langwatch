@@ -14,9 +14,9 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import type { Instant } from "@langwatch/time";
 import { useState } from "react";
 
+import type { GrantScope, GrantDraft } from "../../../model/grants/grant-draft.ts";
 import {
   expiryFromDay,
   grantPrincipalText,
@@ -27,17 +27,9 @@ import {
   rolePermissionsAt,
 } from "../../../model/grants/grants.ts";
 
+export type { GrantScope, GrantDraft };
+
 const SCOPE_OF_TIER = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
-
-export type GrantScope = { type: GrantScopeType; id: string };
-
-/** A new grant, as the dialog collects it. */
-export type GrantDraft = {
-  principal: { type: "user" | "group"; id: string };
-  roleId: string;
-  scope: GrantScope;
-  expiresAt?: Instant;
-};
 
 export type GrantDialogProps = {
   organizationId: string;

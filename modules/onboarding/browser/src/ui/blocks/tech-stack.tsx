@@ -4,8 +4,8 @@
  * its one caller and this is the caller's own module.
  */
 
-import { RadioGroup } from "@chakra-ui/react";
 import { Box, Field, HStack, VStack } from "@langwatch/design-system/primitives";
+import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { Code } from "lucide-react";
 
 import { Azure } from "../elements/icons/azure.tsx";

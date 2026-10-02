@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { z } from "zod";
 
-import type { AnnotationColumnChoices } from "../ui/elements/annotation-columns.ts";
+import type { AnnotationColumnChoices } from "../model/annotation-column-choices.ts";
 
 const storageKey = (projectId: string) => `annotations:columns:${projectId}`;
 

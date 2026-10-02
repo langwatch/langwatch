@@ -3,7 +3,7 @@
  * reads it rather than the tool part, and a reload shows what was chosen.
  * Spec: specs/langy/langy-notifications.feature
  */
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Bell, BellOff, Check } from "lucide-react";
 import type { ReactNode } from "react";
 

@@ -3,7 +3,7 @@
 import { toDate } from "@langwatch/time";
 
 import { useAuthzHost } from "../model/authz-host.ts";
-import type { GrantDraft } from "../ui/sections/grants/grant-dialog.tsx";
+import type { GrantDraft } from "../model/grants/grant-draft.ts";
 import { authzApi } from "./authz-api.ts";
 
 export function useGrantSave({

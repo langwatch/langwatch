@@ -1,8 +1,8 @@
 import type { UserPersonalBudget } from "@langwatch/user-contract";
 import { useMemo } from "react";
 
+import type { BudgetOverviewItemView } from "../model/budget-overview-item.ts";
 import { readableDate } from "../model/display-formatters.ts";
-import type { BudgetOverviewItemView } from "../ui/sections/budget-overview/index.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 

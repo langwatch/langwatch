@@ -2,6 +2,10 @@
  * Annotation list columns: score types are folded into one with per-type matrix available.
  */
 
+import type { AnnotationColumnChoices } from "../../model/annotation-column-choices.ts";
+
+export type { AnnotationColumnChoices };
+
 /** One column the list can show, as the column picker names it. */
 export interface AnnotationColumnOption {
   id: string;
@@ -23,9 +27,6 @@ export const FIXED_COLUMN_IDS = ["select", "actions"] as const;
 export const SCORE_COLUMN_PREFIX = "score-";
 
 export const scoreColumnId = (scoreTypeId: string) => `${SCORE_COLUMN_PREFIX}${scoreTypeId}`;
-
-/** What the reviewer has chosen to show or hide, by column id. */
-export type AnnotationColumnChoices = Record<string, boolean>;
 
 const STANDARD = "Standard";
 const SCORE_TYPES = "Score types";

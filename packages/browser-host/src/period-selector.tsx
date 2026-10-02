@@ -1,4 +1,4 @@
-import type { PopoverRootProps } from "@chakra-ui/react";
+import type { PopoverRootProps } from "@langwatch/design-system/popover";
 import { Popover } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import {

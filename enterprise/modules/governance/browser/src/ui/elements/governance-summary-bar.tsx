@@ -1,7 +1,10 @@
 /** Summary strip showing pre-formatted figures; holds no queries or sums. */
 
 import { Box, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+
+import type { GovernanceSummaryBarItem } from "../../model/governance-summary-bar-item.ts";
+
+export type { GovernanceSummaryBarItem };
 
 /**
  * What a figure reads as when nothing measured it: an em dash, never a
@@ -9,25 +12,6 @@ import type { ReactNode } from "react";
  * done, it just has no answer).
  */
 export const GOVERNANCE_SUMMARY_UNMEASURED = "—";
-
-export interface GovernanceSummaryBarItem {
-  /** Stable across renders. The React key, and nothing else reads it. */
-  key: string;
-  /**
-   * The figure, formatted by the caller. Null or undefined when the read held
-   * nothing, which draws the em dash above.
-   */
-  value: ReactNode;
-  /**
-   * What the figure counts, in the reader's own words and never abbreviated:
-   * "requests", not "req"; "tokens", not "tok".
-   */
-  label: string;
-  /** One shorter line beneath the pair. Omitted rather than padded. */
-  hint?: ReactNode;
-  /** A small glyph above the figure, saying what kind of thing it counts. */
-  icon?: ReactNode;
-}
 
 /** Row of raised tiles, one per figure, that wraps to columns rather than scroll. */
 export function GovernanceSummaryBar({

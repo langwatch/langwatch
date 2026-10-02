@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceSummaryBarItem } from "../../../ui/elements/governance-summary-bar.tsx";
+import type { GovernanceSummaryBarItem } from "../../../model/governance-summary-bar-item.ts";
 import type { ToolCard } from "../toolCatalog/tool-cards.ts";
 
 /**

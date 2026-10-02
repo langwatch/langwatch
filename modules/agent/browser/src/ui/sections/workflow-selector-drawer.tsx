@@ -16,11 +16,9 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
-export interface CreateWorkflowAgentInput {
-  name: string;
-  icon: string;
-  description: string;
-}
+import type { CreateWorkflowAgentInput } from "../../model/workflow/create-workflow-agent-input.ts";
+
+export type { CreateWorkflowAgentInput };
 
 export interface WorkflowSelectorDrawerProps {
   open: boolean;

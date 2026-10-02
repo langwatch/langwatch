@@ -1,6 +1,6 @@
 // What the grant dialog offers: roles, members, groups and the reader's standing.
 
-import type { GrantScope } from "../ui/sections/grants/grant-dialog.tsx";
+import type { GrantScope } from "../model/grants/grant-draft.ts";
 import { authzApi } from "./authz-api.ts";
 
 export function useGrantDialogData({

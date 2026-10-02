@@ -3,8 +3,8 @@
  * component-importing-page dependency.
  */
 
-import { RadioGroup } from "@chakra-ui/react";
 import { Box } from "@langwatch/design-system/primitives";
+import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { forwardRef, type ReactNode } from "react";
 
 type RadioCardProps = {

@@ -1,10 +1,10 @@
+import { Menu } from "@langwatch/design-system/menu";
 /**
  * The Notifications section of Langy's menu: turn Langy's browser
  * notifications on or off, and see when the browser has blocked them.
  * Spec: specs/langy/langy-notifications.feature
  */
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Bell, BellOff, Check } from "lucide-react";
 
 import { useLangyNotificationPreference } from "../../behavior/use-langy-notifications.ts";
