@@ -7,7 +7,7 @@ import type {
   ListOrganizationSpendInput,
   ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import type { PrismaClient, Project } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 
 import type { OrganizationSpendRepository } from "../organization-spend.repository.ts";
@@ -37,6 +37,7 @@ export class PrismaOrganizationSpendRepository implements OrganizationSpendRepos
           },
         ],
       },
+      select: { id: true, name: true, slug: true, teamId: true },
     });
     const projectsById = new Map(projects.map((project) => [project.id, project]));
     const projectIds = [...projectsById.keys()];
@@ -60,7 +61,7 @@ export class PrismaOrganizationSpendRepository implements OrganizationSpendRepos
       }),
     ]);
 
-    const rollups = new Map<string, { project: Project; costs: ProjectSpendRollup["costs"] }>();
+    const rollups = new Map<string, ProjectSpendRollup>();
     for (const cost of [...traceCheckCosts, ...otherCosts]) {
       const project = projectsById.get(cost.projectId);
       if (!project) continue;

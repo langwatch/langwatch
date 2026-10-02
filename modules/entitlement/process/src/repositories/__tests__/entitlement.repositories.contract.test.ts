@@ -44,7 +44,7 @@ const backends: readonly Backend[] = [memoryBackend];
 
 function rollup(projectId: string, amount: number): ProjectSpendRollup {
   return {
-    project: { id: projectId },
+    project: { id: projectId, name: projectId, slug: projectId, teamId: "team_1" },
     costs: [
       {
         projectId,
