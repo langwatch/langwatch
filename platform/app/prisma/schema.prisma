@@ -1227,6 +1227,15 @@ model Organization {
   /// (ADR-139, section 2). A license that names no service reaches nothing,
   /// whatever this column holds.
   connectServicesDisabled String[]                      @default([])
+  /// When a member of this organization switched Instant Evals on from the
+  /// search bar, which is the organization's consent to have judged text sent
+  /// to the judge's provider. Null until then: a self-serve organization is
+  /// never opted in on its behalf, and an enterprise one is switched on by an
+  /// operator through the release flag after asking, never here.
+  instantEvalsEnabledAt  DateTime?
+  /// The member who switched them on, so the audit trail names a person and
+  /// not just a moment.
+  instantEvalsEnabledByUserId String?
   /// When the last license sync succeeded.
   connectLastSyncAt      DateTime?
   /// The code of the failure the last sync ended on, cleared on the next

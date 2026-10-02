@@ -110,7 +110,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instant Evals questions](https://langwatch.ai/docs/features/instant-evals/questions.md): The three kinds of question a run can ask, how to sharpen a yes or no with criteria and a threshold, and how to ask up to ten questions of the same text in one run.
 - [Instant Evals targets and statements](https://langwatch.ai/docs/features/instant-evals/targets.md): What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
 - [Reading Instant Eval results](https://langwatch.ai/docs/features/instant-evals/results.md): Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.
-- [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+- [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
 - [Instant Evals CLI reference](https://langwatch.ai/docs/features/instant-evals/cli.md): Every langwatch instant-eval subcommand and flag, what each prints, and the exit codes a script can read.
 
 ### Guardrails

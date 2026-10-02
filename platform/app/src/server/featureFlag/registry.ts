@@ -191,7 +191,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Gates the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects, while they are experimental. Off by default; enable per project or organization via a targeting rule. A deployment with no classifier configured keeps them unavailable whatever this says.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
     key: "release_lwql_workbench",
