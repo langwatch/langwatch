@@ -91,8 +91,15 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     }
 
     const llmConfigs = this.llmConfigs(event, studioWorkflow.nodes);
+    const withStored = await this.withStoredAgentSecrets({
+      nodes: studioWorkflow.nodes,
+      projectId: input.projectId,
+    });
     const [environment, resolutions] = await Promise.all([
-      this.options.projectEnvironment.get({ projectId: input.projectId, workflow: studioWorkflow }),
+      this.options.projectEnvironment.get({
+        projectId: input.projectId,
+        workflow: { ...studioWorkflow, nodes: withStored },
+      }),
       this.options.llmParameters.resolve({
         projectId: input.projectId,
         models: llmConfigs.map((config) => config.llm.model),
@@ -123,13 +130,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
         api_key: apiKey,
         project_id: input.projectId,
         secrets: environment.secrets,
-        nodes: await this.enrichNodes({
-          nodes: await this.withStoredAgentSecrets({
-            nodes: studioWorkflow.nodes,
-            projectId: input.projectId,
-          }),
-          resolutions,
-        }),
+        nodes: await this.enrichNodes({ nodes: withStored, resolutions }),
       },
     };
   }

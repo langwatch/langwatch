@@ -1,14 +1,26 @@
 /** A Studio run's project secrets, read through the secret module's contract. */
-import {
-  SecretUnreadableError,
-  referencedSecretNames,
-  type SecretApi,
-} from "@langwatch/secret-contract";
+import { SecretUnreadableError, type SecretApi } from "@langwatch/secret-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 
 import type { WorkflowProjectEnvironment, WorkflowRunEnvironment } from "../app/workflow.app.ts";
 
 type RunSecretReader = Pick<SecretApi, "list" | "getValuesByName">;
+
+/** A code node's `secrets.NAME` read; a `{{ secrets.NAME }}` template holds the same spelling. */
+const CODE_SECRET_REFERENCE = /(?<![\w.])secrets\.([A-Za-z_][A-Za-z0-9_]*)/g;
+
+// ponytail: scans every string in the graph, so prose naming secrets.X also counts.
+function codeSecretNames(value: unknown): string[] {
+  if (typeof value === "string") {
+    return Array.from(value.matchAll(CODE_SECRET_REFERENCE), ([, name = ""]) => name);
+  }
+  if (Array.isArray(value)) return value.flatMap(codeSecretNames);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).flatMap(codeSecretNames);
+  }
+
+  return [];
+}
 
 /**
  * Code nodes may build a secret's name at runtime, so every listed secret travels;
@@ -35,7 +47,7 @@ export class WorkflowProjectEnvironmentService implements WorkflowProjectEnviron
       secrets: await this.readable({
         projectId,
         names: listed.map(({ name }) => name),
-        referenced: new Set(referencedSecretNames(workflow)),
+        referenced: new Set(codeSecretNames(workflow)),
       }),
     };
   }

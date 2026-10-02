@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAX_SECRET_VALUE_LENGTH,
+  referencedSecretNames,
   secretNameSchema,
   secretPublicSchema,
   secretValueSchema,
@@ -29,5 +30,14 @@ describe("Secret contract", () => {
     });
     expect(parsed).not.toHaveProperty("value");
     expect(parsed).not.toHaveProperty("encryptedValue");
+  });
+
+  it("finds each secret reference once, including one written across a line break", () => {
+    expect(
+      referencedSecretNames({
+        headers: [{ value: "Bearer {{ secrets.API_TOKEN }}" }],
+        body: "{{\n  secrets.OTHER }} and {{secrets.API_TOKEN}}",
+      }),
+    ).toEqual(["API_TOKEN", "OTHER"]);
   });
 });

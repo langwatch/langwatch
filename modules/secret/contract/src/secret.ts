@@ -67,9 +67,20 @@ export const SECRET_REFERENCE = /\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}
 
 /** Every secret name the `{{ secrets.NAME }}` references anywhere in `referencing` name. */
 export function referencedSecretNames(referencing: unknown): string[] {
-  const text = JSON.stringify(referencing) ?? "";
+  const names = stringsIn(referencing).flatMap((text) =>
+    Array.from(text.matchAll(SECRET_REFERENCE), ([, name = ""]) => name),
+  );
 
-  return [...new Set(Array.from(text.matchAll(SECRET_REFERENCE), ([, name = ""]) => name))];
+  return [...new Set(names)];
+}
+
+/** Each string leaf as written, so a reference spanning a newline still matches. */
+function stringsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(stringsIn);
+  if (value !== null && typeof value === "object") return Object.values(value).flatMap(stringsIn);
+
+  return [];
 }
 
 export const getSecretInputSchema = z

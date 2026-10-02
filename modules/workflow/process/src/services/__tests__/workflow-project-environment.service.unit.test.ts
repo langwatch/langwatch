@@ -52,7 +52,7 @@ class ContractSecrets implements Pick<SecretApi, "list" | "getValuesByName"> {
   }
 }
 
-const workflowNaming = (secretName: string) =>
+const workflowNaming = (secretName: string, value = `{{ secrets.${secretName} }}`) =>
   parseStudioWorkflow({
     spec_version: "1.5",
     workflow_id: "workflow-1",
@@ -67,9 +67,7 @@ const workflowNaming = (secretName: string) =>
         position: { x: 0, y: 0 },
         data: {
           name: "LLM Call",
-          parameters: [
-            { identifier: "instructions", type: "str", value: `{{ secrets.${secretName} }}` },
-          ],
+          parameters: [{ identifier: "instructions", type: "str", value }],
         },
       },
     ],
@@ -126,6 +124,21 @@ describe("WorkflowProjectEnvironmentService", () => {
         WorkflowProjectEnvironmentService.create({ secrets }).get({
           projectId,
           workflow: workflowNaming("BROKEN_KEY"),
+        }),
+      ).rejects.toMatchObject({ code: "secret_unreadable", meta: { name: "BROKEN_KEY" } });
+    });
+  });
+
+  describe("given code that reads a secret that cannot be read", () => {
+    it("refuses with the handled code secret_unreadable", async () => {
+      const secrets = new ContractSecrets({ OPENAI_API_KEY: "sk-openai", BROKEN_KEY: "corrupt" }, [
+        "BROKEN_KEY",
+      ]);
+
+      await expect(
+        WorkflowProjectEnvironmentService.create({ secrets }).get({
+          projectId,
+          workflow: workflowNaming("BROKEN_KEY", "token = secrets.BROKEN_KEY\nprint(token)"),
         }),
       ).rejects.toMatchObject({ code: "secret_unreadable", meta: { name: "BROKEN_KEY" } });
     });
