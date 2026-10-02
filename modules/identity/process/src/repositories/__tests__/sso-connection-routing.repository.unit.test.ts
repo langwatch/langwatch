@@ -2,7 +2,10 @@ import type { SsoConnection } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
 import { ssoMethodDialWith } from "../../rules/sso-method-dial.rules.ts";
-import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
+import {
+  type SignInDomainRouting,
+  SignInRouterService,
+} from "../../services/signin-router.service.ts";
 import { SsoConnectionRoutingService } from "../../services/sso-connection-routing.service.ts";
 import { MemoryIdentityStore } from "../memory/memory.identity.store.ts";
 import { MemorySsoConnectionRoutingRepository } from "../memory/memory.sso-connection-routing.repository.ts";
@@ -18,7 +21,7 @@ import {
  * through the same translation production uses.
  */
 
-// Spec: specs/identity/sso-idp-termination.feature
+// Spec: specs/identity/sso-idp-termination.feature, specs/identity/signin-router.feature
 
 const ORG = "org_acme";
 const DOMAIN = "acme.example";
@@ -355,6 +358,47 @@ describe.each(tiers)("SSO connection routing ($name)", ({ build }) => {
       const offered = await routing.findActiveConnections();
 
       expect(offered[0]).toMatchObject({ allowsJit: true, configured: true });
+    });
+  });
+
+  describe("given a self-hosted deployment whose only connection is a live self-serve one", () => {
+    const PASSWORD = { id: "password", kind: "password", connectionId: null } as const;
+
+    const router = () =>
+      SignInRouterService.create({
+        domains: build({ rows: [row({ id: "ssoc_keycloak" })], registered: ["ssoc_keycloak"] }),
+        policy: {
+          resolvePolicy: async () => ({
+            defaultMethods: [PASSWORD],
+            localMethods: [PASSWORD],
+            federationLicensed: true,
+            selfHosted: true,
+          }),
+        },
+        breakGlass: { allow: async () => true },
+        accounts: { findAccountMethods: async () => null },
+        recorder: { decided: () => undefined },
+      });
+
+    describe("when the sign-in page asks with no address", () => {
+      /** @scenario "A self-serve connection that went live is the sole connection" */
+      it("redirects to the connection's own provider", async () => {
+        const decision = await router().route({ identifier: null });
+
+        expect(decision.outcome).toBe("redirect_to_connection");
+        expect(decision.reasonCode).toBe("sole_active_connection");
+        expect(decision.methodSet[0]?.connectionId).toBe("ssoc_keycloak");
+      });
+    });
+
+    describe("when the break-glass parameter is set", () => {
+      /** @scenario "The break-glass path always reaches a local sign-in" */
+      it("offers the local sign-in instead", async () => {
+        const decision = await router().route({ identifier: null, breakGlass: true });
+
+        expect(decision.outcome).toBe("method_picker");
+        expect(decision.reasonCode).toBe("break_glass");
+      });
     });
   });
 });

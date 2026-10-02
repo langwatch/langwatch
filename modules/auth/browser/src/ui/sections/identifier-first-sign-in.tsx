@@ -25,6 +25,10 @@ import { readHandledError } from "../../model/read-handled-error.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
+import {
+  rememberSoleConnectionAutoDial,
+  soleConnectionAutoDialAllowed,
+} from "../../model/sole-connection-auto-dial.ts";
 import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
@@ -58,6 +62,8 @@ export function IdentifierFirstSignIn() {
   const askedOnMount = useRef(false);
   const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  // Read once per mount, before this page dials anything itself.
+  const [soleAutoDialAllowed] = useState(() => soleConnectionAutoDialAllowed());
   // The address is becoming an account; nothing is created or sent yet.
   const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
   // The account's link is on its way, and nobody is signed in.
@@ -187,7 +193,7 @@ export function IdentifierFirstSignIn() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
-        autoStart={submittedIdentifier !== null}
+        {...routedHandOff({ decision, submittedIdentifier, soleAutoDialAllowed })}
       />
     );
   }
@@ -437,6 +443,26 @@ function NoAccountYet({
 const HANDOFF_QUIET_MS = 400;
 
 /**
+ * Whether a routed hand-off starts on its own. A typed address always dials; with no address
+ * only the self-hosted sole connection does, and only if this tab was not just sent there,
+ * so a failed round trip shows the button rather than looping.
+ */
+function routedHandOff({
+  decision,
+  submittedIdentifier,
+  soleAutoDialAllowed,
+}: {
+  decision: RoutingDecision;
+  submittedIdentifier: string | null;
+  soleAutoDialAllowed: boolean;
+}): { autoStart: boolean; onAutoStart?: () => void } {
+  if (submittedIdentifier !== null) return { autoStart: true };
+  if (decision.reasonCode !== "sole_active_connection") return { autoStart: false };
+
+  return { autoStart: soleAutoDialAllowed, onAutoStart: () => rememberSoleConnectionAutoDial() };
+}
+
+/**
  * The decision routed this address to an identity provider; nothing is drawn
  * while the browser is on its way there. A slow or refused hand-off shows a
  * card saying where it's going, with a button for the refused case.
@@ -449,6 +475,7 @@ export function RoutedToConnection({
   title = "Log in to LangWatch",
   footer,
   autoStart = true,
+  onAutoStart,
 }: {
   decision: RoutingDecision;
   onContinue: (method: SignInMethod) => void;
@@ -459,8 +486,10 @@ export function RoutedToConnection({
   title?: string;
   /** The way out, which differs by the screen that routed here. */
   footer?: ReactNode;
-  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  /** Whether the hand-off starts on its own or waits for the button. */
   autoStart?: boolean;
+  /** Called once, when the hand-off starts on its own. */
+  onAutoStart?: () => void;
 }) {
   const method: SignInMethod | undefined = decision.methodSet[0];
   const dialed = useRef(false);
@@ -471,8 +500,9 @@ export function RoutedToConnection({
     dialed.current = true;
     // Parked here too: the people routed by address are the dial nobody presses.
     rememberPendingMethod(method);
+    onAutoStart?.();
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [autoStart, method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
