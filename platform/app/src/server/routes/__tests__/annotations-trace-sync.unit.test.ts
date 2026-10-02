@@ -149,7 +149,9 @@ describe("Annotations REST API → trace sync", () => {
 
       expect(res.status).toBe(404);
       const body = await res.text();
-      expect(body).toContain("annotation_not_found");
+      // The documented 404 schema, and the clients generated from it, pin
+      // `error` to the code itself rather than a status phrase.
+      expect(JSON.parse(body).error).toBe("annotation_not_found");
       expect(body).not.toContain(PRISMA_PROSE);
     });
 
