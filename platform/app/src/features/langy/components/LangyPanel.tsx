@@ -3041,9 +3041,9 @@ function LangyPanel({
     // The turn stalled on a missing integration; now that it's there, re-drive
     // it so the user doesn't have to retype what they already asked for.
     //
-    // `retryTurn` is `regenerate()`, NOT `sendMessage()` — it re-runs the last
-    // turn without re-posting the user's message, so connecting can't duplicate
-    // it in the transcript (pinned by langy-chat-retry.unit.test.ts).
+    // `retryTurn` goes through `regenerate()`, NOT `sendMessage()`: it re-runs
+    // the last turn without re-posting the user's message, so connecting can't
+    // duplicate it in the transcript (pinned by langy-chat-retry.unit.test.ts).
     retryTurn();
   }, [utils, organizationId, retryTurn]);
 
