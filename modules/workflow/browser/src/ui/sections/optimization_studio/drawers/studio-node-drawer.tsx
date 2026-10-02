@@ -28,13 +28,9 @@ import { EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel } from "
 import { HttpPropertiesPanel as WorkflowHttpPropertiesPanel } from "../../properties/workflow-http-properties-panel.tsx";
 import { IfElsePropertiesPanel as WorkflowIfElsePropertiesPanel } from "../../properties/workflow-if-else-properties-panel.tsx";
 import { PromptingTechniquePropertiesPanel as WorkflowPromptingTechniquePropertiesPanel } from "../../properties/workflow-prompting-technique-properties-panel.tsx";
-import {
-  type WorkflowBasePropertiesPanelProps,
-  type WorkflowCodeEditorProps,
-  type WorkflowHttpConfigProps,
-  type WorkflowHttpTestConfig,
-  type WorkflowOutputsProps,
-  type WorkflowVariablesProps,
+import type {
+  WorkflowHttpTestConfig,
+  WorkflowVariablesProps,
 } from "../../properties/workflow-properties-panel-props.ts";
 import { RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel } from "../../properties/workflow-retrieve-properties-panel.tsx";
 import { DatasetModal } from "../dataset-modal.tsx";
@@ -45,16 +41,23 @@ import { EvaluatorPropertiesPanel } from "../properties/evaluator-properties-pan
 import { SignaturePromptEditorBridge } from "./signature-prompt-editor-bridge.tsx";
 import { StudioDrawerWrapper } from "./studio-drawer-wrapper.tsx";
 
+/**
+ * The panels render these props as component types, so each must keep one
+ * identity: an inline arrow remounts the whole panel (and the open code
+ * editor) on every store change.
+ */
+function StudioVariablesSection(props: WorkflowVariablesProps) {
+  return <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />;
+}
+
 function CodePropertiesPanel({ node }: { node: Node<Component> }) {
   return (
     <WorkflowCodePropertiesPanel
       node={node}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => (
-        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
-      )}
-      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+      renderBase={BasePropertiesPanel}
+      renderCodeEditor={CodeBlockEditor}
+      renderVariables={StudioVariablesSection}
+      renderOutputs={OutputsSection}
     />
   );
 }
@@ -63,10 +66,8 @@ function EndPropertiesPanel({ node }: { node: Node<End> }) {
   return (
     <WorkflowEndPropertiesPanel
       node={node}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => (
-        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
-      )}
+      renderBase={BasePropertiesPanel}
+      renderVariables={StudioVariablesSection}
     />
   );
 }
@@ -78,10 +79,8 @@ function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
     <WorkflowEntryPointPropertiesPanel
       node={node}
       datasetTotal={total}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => (
-        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
-      )}
+      renderBase={BasePropertiesPanel}
+      renderVariables={StudioVariablesSection}
       renderDatasetModal={DatasetModal}
       renderPropertySectionTitle={PropertySectionTitle}
     />
@@ -93,12 +92,10 @@ function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     <WorkflowHttpPropertiesPanel
       node={node}
       useHttpTest={(config: WorkflowHttpTestConfig) => useHttpTest(config)}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderHttpConfig={(props: WorkflowHttpConfigProps) => <HttpConfigEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => (
-        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
-      )}
-      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+      renderBase={BasePropertiesPanel}
+      renderHttpConfig={HttpConfigEditor}
+      renderVariables={StudioVariablesSection}
+      renderOutputs={OutputsSection}
     />
   );
 }
@@ -107,11 +104,9 @@ function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
   return (
     <WorkflowIfElsePropertiesPanel
       node={node}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => (
-        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
-      )}
+      renderBase={BasePropertiesPanel}
+      renderCodeEditor={CodeBlockEditor}
+      renderVariables={StudioVariablesSection}
       renderPropertySectionTitle={PropertySectionTitle}
       renderLiquidConditionEditor={LiquidConditionEditor}
     />
@@ -119,21 +114,11 @@ function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
 }
 
 function PromptingTechniquePropertiesPanel({ node }: { node: Node<PromptingTechnique> }) {
-  return (
-    <WorkflowPromptingTechniquePropertiesPanel
-      node={node}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-    />
-  );
+  return <WorkflowPromptingTechniquePropertiesPanel node={node} renderBase={BasePropertiesPanel} />;
 }
 
 function RetrievePropertiesPanel({ node }: { node: Node<Retriever> }) {
-  return (
-    <WorkflowRetrievePropertiesPanel
-      node={node}
-      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-    />
-  );
+  return <WorkflowRetrievePropertiesPanel node={node} renderBase={BasePropertiesPanel} />;
 }
 
 /**

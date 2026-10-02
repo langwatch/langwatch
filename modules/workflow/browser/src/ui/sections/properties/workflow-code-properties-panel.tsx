@@ -55,17 +55,23 @@ export function CodePropertiesPanel({
   const codeParam = node.data.parameters?.find((p) => p.identifier === "code" && p.type === "code");
   const code = (codeParam?.value as string) ?? "";
 
-  // Convert node inputs to Variable[] format
-  const inputs: WorkflowVariable[] = (node.data.inputs ?? []).map((input) => ({
-    identifier: input.identifier,
-    type: input.type,
-  }));
-
-  // Convert node outputs to Output[] format
-  const outputs: WorkflowOutputsProps["outputs"] = (node.data.outputs ?? []).map((output) => ({
-    identifier: output.identifier,
-    type: output.type,
-  }));
+  // Memoised so the editor contract and the field rows see stable arrays.
+  const inputs: WorkflowVariable[] = useMemo(
+    () =>
+      (node.data.inputs ?? []).map((input) => ({
+        identifier: input.identifier,
+        type: input.type,
+      })),
+    [node.data.inputs],
+  );
+  const outputs: WorkflowOutputsProps["outputs"] = useMemo(
+    () =>
+      (node.data.outputs ?? []).map((output) => ({
+        identifier: output.identifier,
+        type: output.type,
+      })),
+    [node.data.outputs],
+  );
 
   // Build mapping data from workflow graph
   const availableSources = useMemo(
@@ -160,11 +166,8 @@ export function CodePropertiesPanel({
         code={code}
         onChange={handleCodeChange}
         language="python"
-        inputs={inputs.map((i) => ({ identifier: i.identifier, type: i.type }))}
-        outputs={outputs.map((o) => ({
-          identifier: o.identifier,
-          type: o.type,
-        }))}
+        inputs={inputs}
+        outputs={outputs}
         viewStateKey={`code-node:${node.id}`}
       />
 

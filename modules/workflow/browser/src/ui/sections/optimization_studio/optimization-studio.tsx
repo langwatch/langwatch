@@ -263,7 +263,7 @@ export default function OptimizationStudio() {
                 >
                   <HStack width="full">
                     <Link href={`/${project?.slug}/workflows`}>
-                      <LogoIcon width={24} height={24} />
+                      <LogoIcon height={24} forceColorMode="light" />
                     </Link>
                     <StudioWorkflowRunningStatus />
                     {!["waiting", "running"].includes(executionStatus ?? "") && (
