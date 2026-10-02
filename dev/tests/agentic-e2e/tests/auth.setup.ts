@@ -65,13 +65,12 @@ setup("authenticate", async ({ page, request }) => {
 
   // The security offer is product behaviour, but leaving its modal open would
   // obstruct every unrelated authenticated browser test that reuses this state.
-  const dismissNudgeResponse = await page.request.post(
-    "/api/trpc/user.dismissSecureAccountNudge?batch=1",
-    { data: { "0": {} } },
-  );
+  const dismissNudgeResponse = await page.request.post("/api/trpc/user.dismissSecureAccountNudge", {
+    data: {},
+  });
   const dismissNudgeData = await dismissNudgeResponse.json().catch(() => null);
 
-  if (!dismissNudgeResponse.ok() || dismissNudgeData?.["0"]?.error) {
+  if (!dismissNudgeResponse.ok() || dismissNudgeData?.error) {
     throw new Error(
       `dismissSecureAccountNudge failed: ${JSON.stringify(dismissNudgeData).slice(0, 500)}`,
     );
@@ -79,13 +78,12 @@ setup("authenticate", async ({ page, request }) => {
 
   // Same as the nudge: `JoinYourTeamTakeover` always has an offer for `@langwatch.ai` accounts, and
   // its `aria-modal` hides the page from `getByRole` in every later suite.
-  const dismissJoinOfferResponse = await page.request.post(
-    "/api/trpc/joinRequests.dismissOffer?batch=1",
-    { data: { "0": {} } },
-  );
+  const dismissJoinOfferResponse = await page.request.post("/api/trpc/joinRequests.dismissOffer", {
+    data: {},
+  });
   const dismissJoinOfferData = await dismissJoinOfferResponse.json().catch(() => null);
 
-  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.["0"]?.error) {
+  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.error) {
     throw new Error(
       `joinRequests.dismissOffer failed: ${JSON.stringify(dismissJoinOfferData).slice(0, 500)}`,
     );
@@ -98,12 +96,11 @@ setup("authenticate", async ({ page, request }) => {
   console.log("Checking if org/project setup is needed...");
 
   const getAllResponse = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": {} })),
+    "/api/trpc/organization.getAll?input=" + encodeURIComponent(JSON.stringify({})),
   );
   console.log("getAll status:", getAllResponse.status());
   const getAllData = await getAllResponse.json().catch(() => null);
-  const orgs: { teams: { projects: unknown[] }[] }[] = getAllData?.["0"]?.result?.data ?? [];
+  const orgs: { teams: { projects: unknown[] }[] }[] = getAllData?.result?.data ?? [];
   console.log(
     "Orgs found:",
     orgs.length,
@@ -114,22 +111,17 @@ setup("authenticate", async ({ page, request }) => {
 
   if (!hasProject) {
     console.log("No project found — creating org + project via API...");
-    const initResponse = await page.request.post(
-      "/api/trpc/onboarding.initializeOrganization?batch=1",
-      {
-        data: {
-          "0": {
-            orgName: "Browser Test Org",
-            projectName: "Browser Test Project",
-            language: "other",
-            framework: "other",
-          },
-        },
+    const initResponse = await page.request.post("/api/trpc/onboarding.initializeOrganization", {
+      data: {
+        orgName: "Browser Test Org",
+        projectName: "Browser Test Project",
+        language: "other",
+        framework: "other",
       },
-    );
+    });
     console.log("initializeOrganization status:", initResponse.status());
     const initData = await initResponse.json().catch(() => null);
-    if (!initResponse.ok() || initData?.["0"]?.error) {
+    if (!initResponse.ok() || initData?.error) {
       throw new Error(`initializeOrganization failed: ${JSON.stringify(initData).slice(0, 500)}`);
     }
     console.log("Org + project created successfully.");
