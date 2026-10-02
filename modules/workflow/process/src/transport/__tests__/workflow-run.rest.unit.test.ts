@@ -1,7 +1,7 @@
 import {
   bindRestMiddleware,
   createRestRuntime,
-  type RestErrorHandler,
+  canonicalErrorResponse,
   principalOfCredential,
 } from "@langwatch/api/rest";
 /** @vitest-environment node */
@@ -11,9 +11,6 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { workflowRunCallerKey, workflowRunRest } from "../workflow-run.rest.ts";
-
-const renderUnexpected: RestErrorHandler = (error, context) =>
-  context.json({ error: String(error) }, 500);
 
 /** The key row the door binds: only an API key principal has one. */
 function keyRowOf(credential: RestResolvedProjectCredential): string | null {
@@ -58,7 +55,7 @@ function mount(
   return runtime.mount(workflowRunRest.router(), {
     app: () => createApiFixture<WorkflowApi>({ runSynchronous }, "WorkflowApi"),
     credential: "project",
-    onError: renderUnexpected,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(workflowRunCallerKey, () => (caller ? keyRowOf(caller.credential) : null)),
     ],

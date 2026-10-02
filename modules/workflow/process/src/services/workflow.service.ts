@@ -1,5 +1,4 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import { NotFoundError } from "@langwatch/handled-error";
 import { nowInstant, toDate } from "@langwatch/time";
 import {
   archiveWorkflowCommandSchema,
@@ -41,6 +40,7 @@ import type {
 } from "./studio-event-preparer.service.ts";
 import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
 import { WorkflowDslService } from "./workflow-dsl.service.ts";
+import { WorkflowVersionHistoryService } from "./workflow-version-history.service.ts";
 
 /**
  * The app's KSUID resources for a workflow row and a version row
@@ -91,10 +91,12 @@ export class WorkflowService {
 
   private constructor(private readonly options: WorkflowServiceOptions) {
     this.datasetCopies = WorkflowDatasetCopyService.create(options.datasets);
+    this.versionHistory = WorkflowVersionHistoryService.create(options);
   }
 
   private readonly dsl = WorkflowDslService.create();
   private readonly datasetCopies: WorkflowDatasetCopyService;
+  private readonly versionHistory: WorkflowVersionHistoryService;
 
   enrichStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
     return this.options.studioEvents.enrich(input);
@@ -177,77 +179,11 @@ export class WorkflowService {
       id: input.workflowId,
       projectId: input.projectId,
     });
-    const records = await this.options.repository.findVersionHistory({
-      workflowId: input.workflowId,
-      projectId: input.projectId,
-      includeDsl: input.mode === "allDsl",
-    });
-    const current = records.find((record) => record.id === workflow.currentVersionId);
-    const previousVersionId = current?.parent?.id;
-    const previousVersion =
-      input.mode === "previousDsl" && previousVersionId
-        ? await this.options.repository.findVersionById({
-            id: previousVersionId,
-            projectId: input.projectId,
-          })
-        : null;
-
-    return records.map((record) => ({
-      id: record.id,
-      version: record.version,
-      autoSaved: record.autoSaved,
-      commitMessage: record.commitMessage,
-      updatedAt: record.updatedAt,
-      ...(record.dsl ? { dsl: record.dsl } : {}),
-      ...(record.id === workflow.currentVersionId
-        ? { isCurrentVersion: true as const, parent: record.parent }
-        : {}),
-      ...(record.id === workflow.latestVersionId ? { isLatestVersion: true as const } : {}),
-      ...(record.id === workflow.publishedId ? { isPublishedVersion: true as const } : {}),
-      ...(record.id === previousVersionId
-        ? {
-            isPreviousVersion: true as const,
-            ...(previousVersion ? { dsl: previousVersion.dsl } : {}),
-          }
-        : {}),
-      author: record.author,
-    }));
+    return this.versionHistory.getVersionHistory({ ...input, workflow });
   }
 
-  async restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    const version = await this.options.repository.findVersionById({
-      id: input.versionId,
-      projectId: input.projectId,
-    });
-    if (!version) {
-      throw new NotFoundError("workflow_version_not_found", {
-        resource: "Workflow version",
-        id: input.versionId,
-      });
-    }
-
-    const workflow = await this.options.repository.findById({
-      id: version.workflowId,
-      projectId: input.projectId,
-      includeArchived: true,
-    });
-    if (!workflow) {
-      throw new WorkflowNotFoundError(version.workflowId, input.projectId);
-    }
-
-    const dsl = this.options.dslMigration.migrate(version.dsl);
-    await this.options.repository.updateWorkflow({
-      id: workflow.id,
-      projectId: input.projectId,
-      data: {
-        name: dsl.name,
-        icon: dsl.icon,
-        description: dsl.description,
-        currentVersionId: version.id,
-      },
-    });
-
-    return { ...version, dsl };
+  restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
+    return this.versionHistory.restoreVersion(input);
   }
 
   async getPublishedVersion(input: {
