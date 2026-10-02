@@ -1,5 +1,5 @@
-import { Link } from "@langwatch/browser-host/link";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
@@ -53,24 +53,31 @@ const ExperimentLinks = ({
 }: {
   project?: UiHostProject;
   experiment?: ExperimentRow;
-}) => (
-  <>
-    {experiment?.workflowId && (
-      <Link target="_blank" href={`/${project?.slug}/studio/${experiment.workflowId}`} asChild>
-        <PageLayout.HeaderButton textDecoration="none">
+}) => {
+  const router = useRouter();
+  return (
+    <>
+      {experiment?.workflowId && (
+        <PageLayout.HeaderButton
+          onClick={() =>
+            window.open(`/${project?.slug}/studio/${experiment.workflowId}`, "_blank", "noopener")
+          }
+        >
           <ExternalLink size={16} /> Open Workflow
         </PageLayout.HeaderButton>
-      </Link>
-    )}
-    {experiment?.type === "EVALUATIONS_V3" && (
-      <Link href={`/${project?.slug}/experiments/workbench/${experiment.slug}`} asChild>
-        <PageLayout.HeaderButton textDecoration="none">
+      )}
+      {experiment?.type === "EVALUATIONS_V3" && (
+        <PageLayout.HeaderButton
+          onClick={() =>
+            void router.push(`/${project?.slug}/experiments/workbench/${experiment.slug}`)
+          }
+        >
           <ExternalLink size={16} /> Open Experiment
         </PageLayout.HeaderButton>
-      </Link>
-    )}
-  </>
-);
+      )}
+    </>
+  );
+};
 
 /** The results page header: the experiment's name, the run shown, and the page's actions. */
 export const BatchEvaluationResultsHeader = ({
