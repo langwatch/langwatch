@@ -2,7 +2,7 @@
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
@@ -241,6 +241,11 @@ function SectionItemsNav({
       }
       showLabel={showExpanded}
       tourId={item.tourId}
+      rightElement={
+        item.leavesSection ? (
+          <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
+        ) : undefined
+      }
     />
   );
   return (
