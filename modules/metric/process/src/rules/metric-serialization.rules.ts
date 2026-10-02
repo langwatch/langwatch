@@ -3,12 +3,6 @@ import { createHash } from "node:crypto";
 export type UnknownRecord = Record<string, unknown>;
 type NormalizeValue = (current: unknown) => unknown;
 
-/** Ordinal (UTF-16) comparison, matching ClickHouse byte order; localeCompare would not. */
-export function compareOrdinal(left: string, right: string): number {
-  if (left === right) return 0;
-  return left < right ? -1 : 1;
-}
-
 export const isRecord = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === "object";
 
