@@ -246,6 +246,19 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description No annotation with that ID exists in the project */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            error: "annotation_not_found";
+                            message: string;
+                        };
+                    };
+                };
             };
         };
         options?: never;
