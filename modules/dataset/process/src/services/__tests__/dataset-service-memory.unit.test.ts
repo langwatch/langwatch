@@ -1,14 +1,11 @@
 import {
   datasetSchema,
   type Dataset,
-  type DatasetRecord,
-  type DatasetSummary,
   type DatasetWithRecords,
   type CreateDatasetFromStoredObjectInput,
   type DatasetImportStarted,
   type RetryNormalizeInput,
 } from "@langwatch/dataset-contract";
-import { type Instant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,8 +17,9 @@ import type {
   DatasetNormalizeQueue,
   DatasetUpload,
 } from "../../app/dataset.app.ts";
-import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
-import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
+import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
@@ -49,129 +47,20 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
     ...overrides,
   });
 
-class MemoryDatasetRepository implements DatasetRepository {
-  dataset = makeDataset();
-  async findById(input: { id: string; projectId: string }): Promise<Dataset | null> {
-    return this.dataset.id === input.id && this.dataset.projectId === input.projectId
-      ? this.dataset
-      : null;
-  }
-  async findBySlug(input: { slug: string; projectId: string }): Promise<Dataset | null> {
-    return this.dataset.slug === input.slug && this.dataset.projectId === input.projectId
-      ? this.dataset
-      : null;
-  }
-  async findAll(): Promise<DatasetSummary[]> {
-    return [{ ...this.dataset, recordCount: 0 }];
-  }
-  async create(input: {
-    projectId: string;
-    name: string;
-    slug: string;
-    columnTypes: Dataset["columnTypes"];
-  }): Promise<Dataset> {
-    this.dataset = makeDataset({
-      id: "dataset_new",
-      projectId: input.projectId,
-      name: input.name,
-      slug: input.slug,
-      columnTypes: input.columnTypes,
-    });
-    return this.dataset;
-  }
-  async update(input: {
-    id: string;
-    projectId: string;
-    name: string;
-    slug: string;
-    columnTypes: Dataset["columnTypes"];
-  }): Promise<Dataset> {
-    this.dataset = makeDataset({ ...this.dataset, ...input });
-    return this.dataset;
-  }
-  async archive(input: {
-    id: string;
-    projectId: string;
-    slug: string;
-    archivedAt: Instant | null;
-  }): Promise<Dataset> {
-    const { archivedAt, ...rest } = input;
-    this.dataset = makeDataset({
-      ...this.dataset,
-      ...rest,
-      archivedAt: archivedAt ? toDate(archivedAt) : null,
-    });
-    return this.dataset;
-  }
-  async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {
-    this.dataset = makeDataset({ ...this.dataset, ...input, archivedAt: null });
-    return this.dataset;
-  }
-  async updateMapping(input: {
-    id: string;
-    projectId: string;
-    mapping: Record<string, unknown>;
-  }): Promise<Dataset> {
-    this.dataset = makeDataset({ ...this.dataset, mapping: input.mapping });
-    return this.dataset;
-  }
-  async count(): Promise<number> {
-    return 0;
-  }
-}
-
-class MemoryRecordRepository implements DatasetRecordRepository {
-  async count(): Promise<number> {
-    return this.records.length;
-  }
-  async findByIds(): Promise<DatasetRecord[]> {
-    return [];
-  }
-
-  async findPage(): Promise<DatasetRecord[]> {
-    return this.records;
-  }
-  records: DatasetRecord[] = [];
-  async listAll(): Promise<{ records: DatasetRecord[]; total: number }> {
-    return { records: this.records, total: this.records.length };
-  }
-  async createMany(input: {
-    datasetId: string;
-    projectId: string;
-    entries: (Record<string, unknown> & { id: string })[];
-  }): Promise<DatasetRecord[]> {
-    this.records = input.entries.map((entry) => ({
-      id: entry.id,
-      datasetId: input.datasetId,
-      projectId: input.projectId,
-      entry,
-      createdAt: new Date("2026-01-01"),
-      updatedAt: new Date("2026-01-01"),
-    }));
-    return this.records;
-  }
-  async update(input: {
-    id: string;
-    datasetId: string;
-    projectId: string;
-    entry: Record<string, unknown>;
-  }): Promise<DatasetRecord> {
-    const record = this.records.find((candidate) => candidate.id === input.id);
-    if (!record) throw new Error("Dataset record not found");
-    record.entry = input.entry;
-    return record;
-  }
-  async deleteMany(): Promise<number> {
-    const count = this.records.length;
-    this.records = [];
-    return count;
-  }
+function seeded(overrides: Partial<Dataset> = {}) {
+  const database = MemoryDatasetDatabase.create();
+  database.putDataset({ ...makeDataset(overrides), sourceStoredObjectId: null });
+  return {
+    database,
+    dataset: makeDataset(overrides),
+    repository: MemoryDatasetRepository.create({ database }),
+    records: MemoryDatasetRecordRepository.create({ database }),
+  };
 }
 
 describe("DatasetService", () => {
   it("creates records through the Dataset boundary", async () => {
-    const repository = new MemoryDatasetRepository();
-    const records = new MemoryRecordRepository();
+    const { database, repository, records } = seeded();
     const service = DatasetService.create({
       repository,
       records,
@@ -188,15 +77,14 @@ describe("DatasetService", () => {
     });
 
     expect(dataset.slug).toBe("new-set");
-    expect(records.records[0]?.id).toBe("record_1");
+    expect(database.records().map((record) => record.id)).toEqual(["record_1"]);
   });
 
   it("rejects writes to a dataset that is not ready", async () => {
-    const repository = new MemoryDatasetRepository();
-    repository.dataset = makeDataset({ status: "processing" });
+    const { repository, records } = seeded({ status: "processing" });
     const service = DatasetService.create({
       repository,
-      records: new MemoryRecordRepository(),
+      records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
     });
@@ -212,11 +100,10 @@ describe("DatasetService", () => {
 
   /** @scenario "Dataset access is isolated to its own project" */
   it("refuses to read or write a dataset from another project", async () => {
-    const repository = new MemoryDatasetRepository();
-    repository.dataset = makeDataset({ projectId: "project_1" });
+    const { repository, records } = seeded({ projectId: "project_1" });
     const service = DatasetService.create({
       repository,
-      records: new MemoryRecordRepository(),
+      records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
     });
@@ -235,11 +122,10 @@ describe("DatasetService", () => {
 
   /** @scenario "A dataset still being prepared is not used as data" */
   it("refuses to list records from a dataset that is still processing", async () => {
-    const repository = new MemoryDatasetRepository();
-    repository.dataset = makeDataset({ status: "processing" });
+    const { repository, records } = seeded({ status: "processing" });
     const service = DatasetService.create({
       repository,
-      records: new MemoryRecordRepository(),
+      records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
     });
@@ -250,14 +136,12 @@ describe("DatasetService", () => {
   });
 
   it("routes object-backed reads and mutations through the content port", async () => {
-    const repository = new MemoryDatasetRepository();
-    repository.dataset = makeDataset({
+    const { dataset, repository, records } = seeded({
       contentLayout: "s3_jsonl",
       rowCount: 1,
       chunkCount: 1,
       chunkOffsets: [],
     });
-    const records = new MemoryRecordRepository();
     const calls: string[] = [];
     class MemoryContent implements DatasetContent {
       async findEntries(): Promise<Record<string, unknown>[]> {
@@ -312,8 +196,8 @@ describe("DatasetService", () => {
     });
 
     const result = await service.getDatasetWithRecords({
-      slugOrId: repository.dataset.id,
-      projectId: repository.dataset.projectId,
+      slugOrId: dataset.id,
+      projectId: dataset.projectId,
       entrySelection: "all",
       limitMb: 5,
     });
@@ -323,8 +207,7 @@ describe("DatasetService", () => {
   });
 
   it("enqueues normalization after a stored-object import through the queue port", async () => {
-    const repository = new MemoryDatasetRepository();
-    const records = new MemoryRecordRepository();
+    const { repository, records } = seeded();
     const queueCalls: { projectId: string; datasetId: string }[] = [];
     class Uploads implements DatasetUpload {
       async createDatasetFromStoredObject(

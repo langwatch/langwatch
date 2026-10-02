@@ -1,7 +1,7 @@
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { frozenAt } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Cancellation tests: service dispatches cancel_requested event; process manager
  * finishes queued runs CANCELLED; workers kill active runs.
@@ -10,7 +10,6 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
-  ScenarioClock,
   ScenarioTestSuiteId,
   ScenarioId,
   ScenarioSecretCipher,
@@ -37,12 +36,6 @@ class CancellationTestId implements ScenarioId {
 class CancellationTestTestSuiteId implements ScenarioTestSuiteId {
   next(): string {
     return "test_suite_unused";
-  }
-}
-
-class CancellationTestClock implements ScenarioClock {
-  now(): Instant {
-    return Temporal.Instant.fromEpochMilliseconds(0);
   }
 }
 
@@ -91,7 +84,7 @@ function createService(simulations: SimulationService): ScenarioService {
     simulations,
     ids: new CancellationTestId(),
     testSuiteIds: new CancellationTestTestSuiteId(),
-    clock: new CancellationTestClock(),
+    clock: frozenAt("1970-01-01T00:00:00.000Z"),
     secretCipher: new CancellationTestSecretCipher(),
   });
 }

@@ -1,12 +1,11 @@
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
+import { frozenAt } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
 import type {
-  ScenarioClock,
   ScenarioTestSuiteId,
   ScenarioId,
   ScenarioSecretCipher,
@@ -32,13 +31,6 @@ class TestScenarioTestSuiteId implements ScenarioTestSuiteId {
   }
 }
 
-class TestScenarioClock implements ScenarioClock {
-  constructor(private readonly value: Date = new Date(0)) {}
-  now(): Instant {
-    return fromDate(this.value);
-  }
-}
-
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {
     return `encrypted:${value}`;
@@ -52,7 +44,7 @@ class TestScenarioSecretCipher implements ScenarioSecretCipher {
 function serviceOptions(
   repository: ScenarioRepository,
   id: string,
-  clock = new TestScenarioClock(),
+  clock = frozenAt("1970-01-01T00:00:00.000Z"),
 ) {
   return {
     repository,
@@ -197,7 +189,7 @@ describe("ScenarioService", () => {
     const first = new Date("2026-01-01T00:00:00.000Z");
     const later = new Date("2026-01-02T00:00:00.000Z");
     const service = ScenarioService.create(
-      serviceOptions(repository, "scenario_1", new TestScenarioClock(first)),
+      serviceOptions(repository, "scenario_1", frozenAt(first.toISOString())),
     );
     await service.create({
       projectId: "project-a",
@@ -209,7 +201,7 @@ describe("ScenarioService", () => {
 
     const archived = await service.archive({ id: "scenario_1", projectId: "project-a" });
     const retried = await ScenarioService.create(
-      serviceOptions(repository, "unused", new TestScenarioClock(later)),
+      serviceOptions(repository, "unused", frozenAt(later.toISOString())),
     ).archive({ id: "scenario_1", projectId: "project-a" });
 
     expect(archived.archivedAt).toEqual(first);
