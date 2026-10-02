@@ -102,3 +102,10 @@ Feature: Custom role service
     When API Key, Organization, or Invite validates a custom role
     Then it calls the process-owned role application
     And it does not import Role or AuthZ persistence
+
+  @unit
+  Scenario: A custom role is not assigned or removed on a personal workspace
+    Given the team is a member's personal workspace
+    When the caller assigns a custom role on it, or takes one away
+    Then the role application refuses with the personal-workspace error naming the workspace
+    And no grant is written

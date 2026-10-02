@@ -4,7 +4,10 @@ import {
   AuthzGrantNotConfirmedError,
   GrantExceedsCallerPermissionsError,
 } from "@langwatch/authz-contract";
-import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
+import {
+  OrganizationNotFoundForTeamError,
+  PersonalWorkspaceNotManagedHereError,
+} from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,
   RoleInUseError,
@@ -17,7 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
-import { createRoleTestApp, testBinding } from "./role.fixture.ts";
+import { createRoleTestApp, testBinding, testTeam } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 const CALLER = { id: "user-1" };
@@ -351,6 +354,53 @@ describe("given another feature validating a custom role", () => {
           organizationId: ORGANIZATION_ID,
         }),
       ).resolves.toEqual(["role-1"]);
+    });
+  });
+});
+
+describe("given a team that is a member's personal workspace", () => {
+  const personalWorkspace = () => {
+    const attachBindings = vi.fn(async () => ({ attached: [], duplicates: [] }));
+    const store = MemoryRoleStore.create();
+    store.save(role());
+    const { app } = createRoleTestApp({
+      roles: MemoryRoleRepository.create({ store }),
+      organizations: {
+        getOrganizationIdByTeamId: async () => ORGANIZATION_ID,
+        getTeamById: async () => testTeam({ isPersonal: true, name: "Ada's workspace" }),
+      },
+      permissions: {
+        attachBindings,
+        listUserBindings: async () => [testBinding({ scopeId: "team-1" })],
+      },
+    });
+    return { app, attachBindings };
+  };
+
+  describe("when a caller assigns a custom role on it", () => {
+    /** @scenario "A custom role is not assigned or removed on a personal workspace" */
+    it("refuses with the error naming the workspace, before a grant is written", async () => {
+      const { app, attachBindings } = personalWorkspace();
+
+      const assigning = app.assignRoleToUser(
+        { userId: "user-2", teamId: "team-1", customRoleId: "role-1" },
+        CALLER,
+      );
+
+      await expect(assigning).rejects.toBeInstanceOf(PersonalWorkspaceNotManagedHereError);
+      await expect(assigning).rejects.toMatchObject({ meta: { ownerName: "Ada's workspace" } });
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a caller takes a custom role away on it", () => {
+    /** @scenario "A custom role is not assigned or removed on a personal workspace" */
+    it("refuses with the personal-workspace error", async () => {
+      const { app } = personalWorkspace();
+
+      await expect(
+        app.removeRoleFromUser({ userId: "user-2", teamId: "team-1" }, CALLER),
+      ).rejects.toBeInstanceOf(PersonalWorkspaceNotManagedHereError);
     });
   });
 });

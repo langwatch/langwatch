@@ -1,11 +1,9 @@
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { RoleModule } from "../role.app.ts";
@@ -27,13 +25,20 @@ export function testPlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-/** Answers "not personal" for every team and project lookup: the scope fence
- * has its own suite in the owning feature. */
-export function testRolePrisma(): PrismaClient {
-  return prismaDouble({
-    team: { findFirst: async () => null },
-    project: { findFirst: async () => null },
-  });
+/** One team as the organization answers it; not a personal workspace unless a test says so. */
+export function testTeam(overrides: Partial<OrganizationTeam> = {}): OrganizationTeam {
+  return {
+    id: "team-1",
+    name: "Platform",
+    slug: "platform",
+    organizationId: "org-1",
+    isPersonal: false,
+    ownerUserId: null,
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    ...overrides,
+  };
 }
 
 /** One binding as the authorization boundary answers it, with nothing omitted. */
@@ -63,7 +68,6 @@ export function createRoleTestApp(
     permissions?: Partial<AuthzApi>;
     organizations?: Partial<OrganizationApi>;
     entitlement?: Partial<EntitlementApi>;
-    prisma?: PrismaClient;
   }> = {},
 ): { app: RoleModule; roles: MemoryRoleRepository } {
   const roles = input.roles ?? MemoryRoleRepository.create();
@@ -77,16 +81,13 @@ export function createRoleTestApp(
         "AuthzApi",
       ),
       organizations: createApiFixture<OrganizationApi>(
-        input.organizations ?? {},
+        { getTeamById: async ({ teamId }) => testTeam({ id: teamId }), ...input.organizations },
         "OrganizationApi",
       ),
       entitlement: createApiFixture<EntitlementApi>(
         input.entitlement ?? { getActivePlan: async () => testPlan() },
         "EntitlementApi",
       ),
-    },
-    members: {
-      prisma: input.prisma ?? testRolePrisma(),
     },
     config: void 0,
     resources: new ResourceScope(),

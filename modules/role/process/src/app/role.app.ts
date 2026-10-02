@@ -12,7 +12,6 @@ import {
   newAuthzGrantId,
   type AuthzPrincipalRef,
   type BuiltInRoleId,
-  type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
@@ -22,7 +21,6 @@ import {
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,
   RoleApi,
@@ -51,12 +49,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
-type RoleSetup = FeatureSetup<
-  typeof RoleModule.dependencies,
-  MembersRead<typeof RoleModule.reads>,
-  undefined,
-  RoleRepositories
->;
+type RoleSetup = FeatureSetup<typeof RoleModule.dependencies, never, undefined, RoleRepositories>;
 
 const WRITE_ACKNOWLEDGED: RoleWriteAcknowledged = { success: true };
 
@@ -67,29 +60,22 @@ export class RoleModule implements RoleApi {
     organizations: OrganizationApi,
     entitlement: EntitlementApi,
   };
-  static readonly reads = ["prisma"] as const;
 
   #roles: RoleService;
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
-  #prisma: RoleSetup["members"]["prisma"];
 
-  private constructor(
-    repositories: RoleRepositories,
-    dependencies: RoleSetup["dependencies"],
-    members: RoleSetup["members"],
-  ) {
+  private constructor(repositories: RoleRepositories, dependencies: RoleSetup["dependencies"]) {
     this.#roles = RoleService.create({
       repository: repositories.roles,
       entitlement: dependencies.entitlement,
     });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
-    this.#prisma = members.prisma;
   }
 
-  static create({ repositories, dependencies, members }: RoleSetup): RoleModule {
-    return new RoleModule(repositories, dependencies, members);
+  static create({ repositories, dependencies }: RoleSetup): RoleModule {
+    return new RoleModule(repositories, dependencies);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────
@@ -250,7 +236,7 @@ export class RoleModule implements RoleApi {
       throw new RoleUserNotTeamMemberError();
     }
 
-    await this.#assertNoPersonalTeamScope([{ scopeType: "TEAM", scopeId: input.teamId }]);
+    await this.#assertNotPersonalTeam({ teamId: input.teamId });
     await this.#replaceTeamBinding({
       userId: input.userId,
       teamId: input.teamId,
@@ -269,7 +255,7 @@ export class RoleModule implements RoleApi {
     by: RoleCaller,
   ): Promise<RoleWriteAcknowledged> {
     const organizationId = await this.getAssignmentOrganization({ teamId: input.teamId });
-    await this.#assertNoPersonalTeamScope([{ scopeType: "TEAM", scopeId: input.teamId }]);
+    await this.#assertNotPersonalTeam({ teamId: input.teamId });
     await this.#replaceTeamBinding({
       userId: input.userId,
       teamId: input.teamId,
@@ -314,29 +300,10 @@ export class RoleModule implements RoleApi {
 
   // ── the checks and writes the operations above share ───────────────────────
 
-  /** The personal-workspace fence a team or project binding is refused at. */
-  async #assertNoPersonalTeamScope(
-    scopes: { scopeType: GrantScopeTier; scopeId: string }[],
-  ): Promise<void> {
-    const teamIds = scopes
-      .filter((scope) => scope.scopeType === "TEAM")
-      .map((scope) => scope.scopeId);
-    const projectIds = scopes
-      .filter((scope) => scope.scopeType === "PROJECT")
-      .map((scope) => scope.scopeId);
-    const personalTeam = await this.#prisma.team.findFirst({
-      where: { id: { in: teamIds }, isPersonal: true },
-      select: { name: true },
-    });
-    const personalProject = await this.#prisma.project.findFirst({
-      where: {
-        id: { in: projectIds },
-        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
-      },
-      select: { team: { select: { name: true } } },
-    });
-    const personalName = personalTeam?.name ?? personalProject?.team.name;
-    if (personalName) throw new PersonalWorkspaceNotManagedHereError(personalName);
+  /** The personal-workspace fence a team binding is refused at; the team is the organization's. */
+  async #assertNotPersonalTeam(input: { teamId: string }): Promise<void> {
+    const team = await this.#organizations.getTeamById(input);
+    if (team.isPersonal) throw new PersonalWorkspaceNotManagedHereError(team.name);
   }
 
   /**

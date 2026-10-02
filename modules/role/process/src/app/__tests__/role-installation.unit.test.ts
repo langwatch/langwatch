@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { roleProcessModule } from "../../role.module.ts";
-import { testPlan, testRolePrisma } from "./role.fixture.ts";
+import { testPlan } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -32,7 +32,6 @@ function process(role: "api" | "worker") {
 
   return createApp({ role })
     .withModules([withMemoryRepositories(roleProcessModule)])
-    .withRelational(testRolePrisma())
     .provide({ authz, organization, entitlement });
 }
 
