@@ -435,6 +435,16 @@ Feature: Langy renders domain-capability cards for tool calls
       Then the recorded parts are the paragraphs and the calls in the order they happened
       And no paragraph written between two calls is dropped
 
+    # GPT-5 on the Responses API writes a commentary message and a final
+    # message in one reply. They reached the panel as one run of text with no
+    # break, so one sentence ran into the next ("met both criteria.Evals &
+    # LLM Ops is already complete.").
+    @unit
+    Scenario: Two text blocks of one reply are separated by a paragraph break
+      Given Langy wrote two text blocks with no tool call between them
+      When the turn streams to the panel
+      Then the second block starts on a new paragraph
+
     @unit
     Scenario: A card is recorded where the work began
       Given a call whose result arrived after the agent had written more text

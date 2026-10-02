@@ -76,6 +76,48 @@ describe("TurnEventMapper", () => {
     });
   });
 
+  describe("when one turn writes two text blocks with no tool between them", () => {
+    // GPT-5 on the Responses API answers with a commentary message and a
+    // final message; pi reports them as separate text blocks. Joined bare,
+    // the last sentence of one ran into the first of the next
+    // ("met both criteria.Evals & LLM Ops is already complete.").
+    /** @scenario "Two text blocks of one reply are separated by a paragraph break" */
+    it("starts the second block on a new paragraph", () => {
+      const mapper = new TurnEventMapper("t1");
+      const text = (event: Record<string, unknown>) =>
+        mapper.map({ type: "message_update", assistantMessageEvent: event });
+
+      text({ type: "text_start", contentIndex: 0 });
+      expect(text({ type: "text_delta", contentIndex: 0, delta: "met both criteria." })).toEqual([
+        { type: "delta", turnId: "t1", text: "met both criteria." },
+      ]);
+      text({ type: "text_end", contentIndex: 0, content: "met both criteria." });
+      text({ type: "text_start", contentIndex: 1 });
+      expect(
+        text({
+          type: "text_delta",
+          contentIndex: 1,
+          delta: "Evals & LLM Ops is already complete.",
+        }),
+      ).toEqual([
+        { type: "delta", turnId: "t1", text: "\n\nEvals & LLM Ops is already complete." },
+      ]);
+    });
+
+    it("adds no break when a tool call separates the blocks", () => {
+      const mapper = new TurnEventMapper("t1");
+      const text = (event: Record<string, unknown>) =>
+        mapper.map({ type: "message_update", assistantMessageEvent: event });
+
+      text({ type: "text_delta", contentIndex: 0, delta: "Running it now." });
+      text({ type: "text_end", contentIndex: 0, content: "Running it now." });
+      mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: {} });
+      expect(text({ type: "text_delta", contentIndex: 0, delta: "Done." })).toEqual([
+        { type: "delta", turnId: "t1", text: "Done." },
+      ]);
+    });
+  });
+
   describe("when a tool executes", () => {
     it("maps start/update/end, replaying the recorded input on end", () => {
       const mapper = new TurnEventMapper("t1");

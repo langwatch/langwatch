@@ -235,3 +235,23 @@ Feature: Simulation run model resolution per target type
     When the child process parses the job payload
     Then parsing succeeds
     And the simulator and judge fall back to the adapter-role model params
+
+  # Bedrock and Vertex authenticate with their own credential fields
+  # (aws_access_key_id / vertex_credentials) and carry no api_key, so a job
+  # payload that requires api_key fails to parse before the first message.
+
+  @unit
+  Scenario: A job payload whose models run on Bedrock or Vertex parses without an api_key
+    Given the simulator and judge models run on Bedrock with AWS access keys
+    And the adapter model runs on Vertex with service account credentials
+    When the child process parses the job payload
+    Then parsing succeeds
+    And the provider credential fields reach the model params unchanged
+
+  # The run showed "Failed to parse job data: [": a ZodError's message is its
+  # issues as pretty-printed JSON, and the reason shows its first line only.
+  @unit
+  Scenario: A job payload that fails to parse names the rejected fields on one line
+    Given a job payload whose simulator model params carry no model
+    When the child process fails to parse it
+    Then the failure names the rejected field and the reason on one line

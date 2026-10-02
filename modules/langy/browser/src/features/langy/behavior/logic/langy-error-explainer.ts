@@ -1,5 +1,7 @@
 import {
   explainHandledError,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import {
@@ -157,9 +159,14 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`).
+ * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`), plus its own
+ * `llm_upstream_error`. Promotion is by exact code, never by reading a message; the
+ * discriminant beneath only picks the card's sentence.
  */
 const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  // "The provider answered with a failure", whatever discriminant sits beneath
+  // it (Bedrock's "access_denied" is one no list here names).
+  "llm_upstream_error",
   "upstream_stream_error",
   "upstream_bad_request",
   "upstream_unauthorized",
@@ -453,6 +460,23 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
       // upstream. Nothing crashed and nothing was lost. Deterministic, so no auto-retry
       // — the user decides.
       return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "llm_upstream_error": {
+      // The provider was reached and refused. A refused key or a model it
+      // does not serve fails the same way every time, so the card offers the
+      // model settings; anything else (a rate limit, an outage) can pass, so
+      // it offers another try.
+      const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS);
+      return {
+        ...copy,
+        render: "card",
+        action: deterministic ? { label: "Configure model", kind: "configure-model" } : retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
     }
 
     case "langy_worker_spawn_failed":

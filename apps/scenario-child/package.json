@@ -22,6 +22,7 @@
     "@elevenlabs/elevenlabs-js": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -53,7 +54,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/config": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "esbuild": "catalog:",

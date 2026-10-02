@@ -1437,6 +1437,9 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../modules/automation/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../packages/egress
@@ -1525,9 +1528,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness

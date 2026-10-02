@@ -1,3 +1,4 @@
+import { zodErrorMessage } from "@langwatch/config";
 import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";
 /** @vitest-environment node
  * Child-process serialization boundary (issue #6634): model params optional
@@ -188,6 +189,57 @@ describe("ChildProcessJobDataSchema", () => {
       expect(withoutBudget.success).toBe(true);
       if (!withoutBudget.success) return;
       expect(withoutBudget.data.traceWaitTimeoutMs).toBeUndefined();
+    });
+  });
+
+  describe("given model params for providers that carry no api_key", () => {
+    // Shapes prepareLitellmParams emits: Bedrock swaps api_key for AWS access
+    // keys, Vertex sends service account credentials instead.
+    const bedrockParams = {
+      model: "bedrock/global.openai.gpt-5.5",
+      aws_access_key_id: "AKIAEXAMPLE",
+      aws_secret_access_key: "secret-example",
+      aws_region_name: "eu-central-1",
+    };
+    const vertexParams = {
+      model: "vertex_ai/gemini-2.5-pro",
+      vertex_credentials: "{}",
+      vertex_project: "acme-project",
+      vertex_location: "europe-west1",
+    };
+
+    /** @scenario "A job payload whose models run on Bedrock or Vertex parses without an api_key" */
+    it("parses and keeps each provider's credential fields", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        modelParams: vertexParams,
+        simulatorModelParams: bedrockParams,
+        judgeModelParams: bedrockParams,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.simulatorModelParams).toEqual(bedrockParams);
+      expect(result.data.judgeModelParams).toEqual(bedrockParams);
+      expect(result.data.modelParams).toEqual(vertexParams);
+    });
+  });
+
+  describe("given a payload that fails to parse", () => {
+    /** @scenario "A job payload that fails to parse names the rejected fields on one line" */
+    it("names each rejected field on one line, not as a JSON dump", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        simulatorModelParams: { aws_access_key_id: "AKIAEXAMPLE" },
+        judgeModelParams: litellmParams,
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+
+      const described = zodErrorMessage(result.error);
+
+      expect(described).not.toContain("\n");
+      expect(described).toContain("simulatorModelParams.model");
     });
   });
 });

@@ -4,6 +4,7 @@
  * @see specs/scenarios/child-execution-contract.feature
  */
 
+import { zodErrorMessage } from "@langwatch/config";
 import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
 import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import {
@@ -82,7 +83,9 @@ function readJobDataFromStdin(): Promise<ScenarioChildJob> {
       try {
         resolve(ScenarioChildJobSchema.parse(JSON.parse(data)));
       } catch (error) {
-        reject(new Error(`Failed to parse job data: ${formatScenarioChildError(error)}`));
+        // One line: a ZodError's own message is its issues as pretty-printed
+        // JSON, and the run's failure reason shows only its first line, "[".
+        reject(new Error(`Failed to parse job data: ${zodErrorMessage(error)}`));
       }
     });
     process.stdin.on("error", reject);
