@@ -27,6 +27,9 @@ from langwatch.http_client import create_async_client, create_client
 from langwatch.types import Money
 from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
+from langwatch.utils.initialization import ensure_setup
+from langwatch.state import get_instance
+from langwatch.dataset.dataset_api_service import DatasetApiService
 
 
 class EvaluationResult(BaseModel):
@@ -458,16 +461,14 @@ async def run_evaluation(
 def get_dataset(
     slug: str,
 ) -> list[DatasetRecord]:
-    request_params = {
-        "url": langwatch.get_endpoint() + f"/api/v1/dataset/{slug}",
-        "headers": build_request_headers(str(langwatch.get_api_key() or "")),
-    }
-
-    with create_client(timeout=300) as client:
-        response = client.get(**request_params)
-        better_raise_for_status(response)
-
-    result = response.json()
+    ensure_setup()
+    instance = get_instance()
+    if instance is None:
+        raise RuntimeError(
+            "LangWatch client has not been initialized. "
+            "Call langwatch.setup() first or set LANGWATCH_API_KEY."
+        )
+    result = DatasetApiService(instance.rest_api_client).get_dataset(slug)
 
     if "status" in result and result["status"] == "error":
         # If the response contains a status key and its value is "error"
