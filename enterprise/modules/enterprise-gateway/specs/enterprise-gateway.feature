@@ -23,3 +23,9 @@ Feature: Enterprise gateway routing policies and personal virtual keys
   Scenario: Governance serves neither routing policies nor personal virtual keys
     Given the governance module is installed
     Then it declares neither the routingPolicy nor the personalVirtualKeys namespace
+
+  @unit
+  Scenario: No personal virtual key is issued while an operator acts as another member
+    Given an operator acting as a member through impersonation
+    When they issue a personal virtual key in the member's organization
+    Then the issue is refused with permission_denied before membership is read

@@ -52,6 +52,8 @@ export interface EnterpriseGatewayApi {
     label: string;
     routingPolicyId?: string;
     actorUserId: string;
+    /** A session's impersonator: no key is minted while one acts as a member. */
+    impersonatorId?: string | undefined;
   }): Promise<IssuedPersonalVirtualKeyAnswer>;
   revokePersonalVirtualKey(input: {
     organizationId: string;

@@ -29,6 +29,7 @@ export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimT
     .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
 
     .procedure("generate")
+    .mintsCredential("sso:manage")
     .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) =>
@@ -40,7 +41,7 @@ export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimT
           secret: input.secret,
         },
         // Only a full organization admin may mint: the token hands on directory group grants.
-        { id: actor.id },
+        { id: actor.id, impersonatorId: actor.impersonatorId },
       ),
     )
 

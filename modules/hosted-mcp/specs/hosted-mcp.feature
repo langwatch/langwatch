@@ -60,3 +60,9 @@ Feature: Hosted MCP answers main's root paths on the api process
     When it calls any governance ingestion template tool, the OTTL rules included
     Then it is refused as "api_key_scope_violation" and no template is read or written
     And the person's own ingestion-key tools still answer
+
+  @unit
+  Scenario: An MCP authorization code is not issued while an operator acts as another member
+    Given an operator acting as a member through impersonation on the consent page
+    When they approve an MCP client's request
+    Then the approval is refused with access_denied before any authorization code is issued

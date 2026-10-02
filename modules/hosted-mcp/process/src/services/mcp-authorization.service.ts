@@ -91,12 +91,16 @@ export class McpAuthorizationService {
    */
   async authorize({
     approverId,
+    impersonatorId,
     raw,
   }: {
     approverId: string | undefined;
+    impersonatorId?: string | undefined;
     raw: string;
   }): Promise<McpAuthorizeAnswer> {
     if (approverId === undefined) return { status: 401, body: { error: "Not authenticated" } };
+    // An operator acting as a member holds no grant to issue a code as them (F05).
+    if (impersonatorId) return { status: 403, body: { error: "access_denied" } };
 
     const fields = parsePostedApproval(raw);
     if (!fields) return { status: 400, body: { error: "Invalid body" } };

@@ -13,7 +13,11 @@ import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 
 /** The approval this module performs on the consent page's post. */
 export interface McpAuthorizeApi {
-  authorize(input: { approverId: string | undefined; raw: string }): Promise<McpAuthorizeAnswer>;
+  authorize(input: {
+    approverId: string | undefined;
+    impersonatorId?: string | undefined;
+    raw: string;
+  }): Promise<McpAuthorizeAnswer>;
 }
 
 export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>()("hosted-mcp");
@@ -46,6 +50,10 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   )
   .responds({ 200: approved, 400: refused, 401: signedOut, 403: refused, 500: refused })
   .handle(({ app, raw, actor }) =>
-    app.authorize({ approverId: actor?.type === "user" ? actor.id : undefined, raw }),
+    app.authorize({
+      approverId: actor?.type === "user" ? actor.id : undefined,
+      impersonatorId: actor?.type === "user" ? actor.impersonatorId : undefined,
+      raw,
+    }),
   )
   .build();

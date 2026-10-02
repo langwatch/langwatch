@@ -17,10 +17,12 @@ export const ingestionKeyTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("install")
+  .mintsCredential("organization:view")
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>
     app.ingestionKeyInstall({
       userId: actor.id,
+      impersonatorId: actor.impersonatorId,
       organizationId: input.organizationId,
       sourceType: input.sourceType,
       ingestionTemplateId: input.templateId ?? null,
@@ -29,10 +31,12 @@ export const ingestionKeyTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("rotate")
+  .mintsCredential("organization:view")
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>
     app.ingestionKeyRotate({
       userId: actor.id,
+      impersonatorId: actor.impersonatorId,
       organizationId: input.organizationId,
       sourceType: input.sourceType,
       ingestionTemplateId: input.templateId ?? null,

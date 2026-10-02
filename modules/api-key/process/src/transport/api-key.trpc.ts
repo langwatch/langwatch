@@ -43,6 +43,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .handle(({ app, input, actor }) => app.listKeys(input, { id: actor.id }))
 
     .procedure("create")
+    .mintsCredential("organization:view")
     .noPermission({
       reason: OWN_KEYS_REASON,
       allow: { organizationId: "creating API key for user's own org" },

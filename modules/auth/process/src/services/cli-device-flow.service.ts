@@ -16,6 +16,7 @@ import {
   logoutRequestSchema,
   refreshRequestSchema,
 } from "@langwatch/auth-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type {
   FeatureFlagApi,
   FeatureFlagKey,
@@ -62,6 +63,7 @@ export type CliBrowserSession = Readonly<{
   id: string;
   name?: string | null;
   email?: string | null;
+  impersonator?: Readonly<{ id: string }>;
 }>;
 
 /** What the approval page's lookup reads: the query and the browser's own headers. */
@@ -806,6 +808,15 @@ async function approve({
   }
 
   const { user_code, organization_id, project_id } = parsed.data;
+
+  // An operator acting as a member holds no grant to issue credentials as them (F05).
+  if (person.impersonator) {
+    throw new PermissionDeniedError({
+      permission: "apiKeys:create",
+      scope: { type: "organization", id: organization_id },
+      denialReason: "no-binding",
+    });
+  }
 
   // Verify the caller is an ACTIVE member of the organization they are issuing
   // a credential for: a membership an admin disabled to reclaim its seat must

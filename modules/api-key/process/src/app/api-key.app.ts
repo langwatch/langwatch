@@ -532,7 +532,7 @@ export class ApiKeyModule implements ApiKeyApi {
     // An operator acting as a member holds no grant to issue credentials as them.
     if (by.impersonatorId) {
       throw new PermissionDeniedError({
-        permission: "apiKeys:create",
+        permission: "organization:view",
         scope: { type: "organization", id: input.organizationId },
         denialReason: "no-binding",
       });

@@ -27,8 +27,11 @@ export const ingestionSourcesTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) => app.ingestionSourceUpdate(input))
 
   .procedure("rotateSecret")
+  .mintsCredential("ingestionSources:manage")
   .withPermission("ingestionSources:manage")
-  .handle(({ app, input }) => app.ingestionSourceRotateSecret(input))
+  .handle(({ app, input, actor }) =>
+    app.ingestionSourceRotateSecret({ ...input, impersonatorId: actor.impersonatorId }),
+  )
 
   .procedure("archive")
   .withPermission("ingestionSources:manage")

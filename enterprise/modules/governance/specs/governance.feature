@@ -179,6 +179,18 @@ Feature: Enterprise governance package boundary
     Then the key is minted with the device label "unknown-device", as its login key carries
     And its name reads "Ingestion key (copilot_app, unknown-device)"
 
+  @unit
+  Scenario: An ingestion source secret is not rotated while an operator acts as another member
+    Given an operator acting as a member through impersonation
+    When they rotate an ingestion source's secret
+    Then the rotation is refused with permission_denied before the source is read
+
+  @unit
+  Scenario: A personal ingestion key is not minted while an operator acts as another member
+    Given an operator acting as a member through impersonation
+    When they install or rotate a personal ingestion key
+    Then the mint is refused with permission_denied before any key is created
+
   Rule: Governance-origin trace activity feeds the KPI rows and the OCSF export, as on main
 
     @unit

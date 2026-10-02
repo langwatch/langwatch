@@ -27,7 +27,7 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import type { AuthzPermission } from "@langwatch/authorization";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -423,7 +423,11 @@ export interface GovernanceAppDependencies {
 
 /** How a process installs this application: its peers, its members, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["dependencies"];
+  dependencies: FeatureSetup<
+    typeof GovernanceModule.dependencies,
+    never,
+    undefined
+  >["dependencies"];
   config: GovernanceConfig | undefined;
   resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
@@ -1352,8 +1356,18 @@ export class GovernanceModule implements GovernanceRestApi {
   async ingestionSourceRotateSecret(input: {
     id: string;
     organizationId: string;
+    impersonatorId?: string | undefined;
   }): Promise<{ source: IngestionSourceDto; ingestSecret: string }> {
-    const rotated = await this.ingestionSources.rotateSecret(input);
+    const { impersonatorId, ...rotate } = input;
+    // An operator acting as a member holds no grant to issue credentials as them (F05).
+    if (impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "ingestionSources:manage",
+        scope: { type: "organization", id: rotate.organizationId },
+        denialReason: "no-binding",
+      });
+    }
+    const rotated = await this.ingestionSources.rotateSecret(rotate);
     return {
       source: await this.sourceReads.present(rotated.source),
       ingestSecret: rotated.ingestSecret,
@@ -1425,12 +1439,20 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.ingestionKeys.list(input);
   }
 
-  async ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey> {
-    return this.ingestionKeys.install(input);
+  async ingestionKeyInstall(
+    input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
+  ): Promise<IssuedIngestionKey> {
+    const { impersonatorId, ...mint } = input;
+    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    return this.ingestionKeys.install(mint);
   }
 
-  async ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey> {
-    return this.ingestionKeys.rotate(input);
+  async ingestionKeyRotate(
+    input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
+  ): Promise<RotatedIngestionKey> {
+    const { impersonatorId, ...mint } = input;
+    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    return this.ingestionKeys.rotate(mint);
   }
 
   async ingestionKeyRevoke(input: {
@@ -2033,6 +2055,19 @@ export class GovernanceModule implements GovernanceRestApi {
  * there is no user to name; `svc_<projectId>` is what the audit row carries
  * instead, and it has to be one string, decided once.
  */
+/** An operator acting as a member holds no grant to issue a key as them (F05). */
+function refuseImpersonatedKeyMint(input: {
+  impersonatorId: string | undefined;
+  organizationId: string;
+}): void {
+  if (!input.impersonatorId) return;
+  throw new PermissionDeniedError({
+    permission: "organization:view",
+    scope: { type: "organization", id: input.organizationId },
+    denialReason: "no-binding",
+  });
+}
+
 function attributedUserId(by: GovernanceProjectCaller): string {
   return by.userId ?? `svc_${by.projectId}`;
 }

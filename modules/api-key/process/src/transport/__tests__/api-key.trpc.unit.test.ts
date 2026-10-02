@@ -212,7 +212,7 @@ describe("the apiKey tRPC transport", () => {
 
       expect(app.createKey).toHaveBeenCalledWith(
         expect.objectContaining({ permissionMode: "all", keyType: "personal" }),
-        { id: USER_ID },
+        { id: USER_ID, type: "user" },
       );
     });
 
@@ -261,7 +261,7 @@ describe("the apiKey tRPC transport", () => {
           permissionMode: "restricted",
           permissions: ["auditLog:view"],
         }),
-        { id: USER_ID },
+        { id: USER_ID, type: "user" },
       );
     });
 

@@ -304,8 +304,13 @@ export interface GovernanceRestApi {
     organizationId: string;
     userId: string;
   }): Promise<PersonalIngestionKeyListing[]>;
-  ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey>;
-  ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey>;
+  /** No key is minted while an impersonator acts as the member. */
+  ingestionKeyInstall(
+    input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
+  ): Promise<IssuedIngestionKey>;
+  ingestionKeyRotate(
+    input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
+  ): Promise<RotatedIngestionKey>;
   ingestionKeyRevoke(input: {
     organizationId: string;
     userId: string;
@@ -374,6 +379,8 @@ export interface GovernanceRestApi {
   ingestionSourceRotateSecret(input: {
     id: string;
     organizationId: string;
+    /** A session's impersonator: no secret is minted while one acts as a member. */
+    impersonatorId?: string | undefined;
   }): Promise<{ source: IngestionSourceDto; ingestSecret: string }>;
   ingestionSourceArchive(input: {
     id: string;

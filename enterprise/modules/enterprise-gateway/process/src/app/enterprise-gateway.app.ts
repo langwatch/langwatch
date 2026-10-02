@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CreateRoutingPolicyInput,
@@ -160,15 +161,25 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
     return this.#personalKeyDoors.list(input);
   }
 
-  issuePersonalVirtualKey(
+  async issuePersonalVirtualKey(
     input: Readonly<{
       organizationId: string;
       label: string;
       routingPolicyId?: string;
       actorUserId: string;
+      impersonatorId?: string | undefined;
     }>,
   ): Promise<IssuedPersonalVirtualKeyAnswer> {
-    return this.#personalKeyDoors.issue(input);
+    const { impersonatorId, ...issue } = input;
+    // An operator acting as a member holds no grant to issue credentials as them (F05).
+    if (impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "virtualKeys:create",
+        scope: { type: "organization", id: issue.organizationId },
+        denialReason: "no-binding",
+      });
+    }
+    return this.#personalKeyDoors.issue(issue);
   }
 
   revokePersonalVirtualKey(

@@ -61,7 +61,11 @@ export type ScimTokenAuditEntry = Readonly<{
 }>;
 
 /** Who mints a token: the member, and the organization key the call arrived on (which bounds it). */
-export type ScimTokenCaller = Readonly<{ id: string; apiKeyId?: string | null }>;
+export type ScimTokenCaller = Readonly<{
+  id: string;
+  apiKeyId?: string | null;
+  impersonatorId?: string | null;
+}>;
 
 export interface ScimApi {
   // ── The organization's provisioning tokens ───────────────────────────────

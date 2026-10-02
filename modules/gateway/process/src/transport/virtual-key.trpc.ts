@@ -90,6 +90,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     )
 
     .procedure("create")
+    .mintsCredential("virtualKeys:create")
     .withFacts(gatewaySessionFact)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
@@ -101,6 +102,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
       // destination anchored and manageable, guardrail references project-local.
       await app.authorizeVirtualKeyCreate({
         actor: caller,
+        impersonatorId: actor.impersonatorId,
         organizationId: input.organizationId,
         scopes: input.scopes,
         traceProjectId: input.traceProjectId,
@@ -168,6 +170,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("rotate")
+    .mintsCredential("virtualKeys:rotate")
     .withFacts(gatewaySessionFact)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,
@@ -176,6 +179,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     .handle(async ({ app, input, actor }, caller) => {
       await app.authorizeVirtualKeyOperation({
         actor: caller,
+        impersonatorId: actor.impersonatorId,
         organizationId: input.organizationId,
         id: input.id,
         permission: "virtualKeys:rotate",

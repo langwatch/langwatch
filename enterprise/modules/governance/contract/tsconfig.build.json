@@ -31,6 +31,9 @@
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/authorization/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {

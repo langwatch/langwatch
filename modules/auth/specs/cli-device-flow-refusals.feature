@@ -44,3 +44,9 @@ Feature: CLI device flow refusals keep the RFC 8628 wire
     Given the key registry fails unexpectedly while an approval validates its selection
     When the person approves the code
     Then it is answered 500 with error "server_error" and nothing more about the cause
+
+  @unit
+  Scenario: A CLI login is not approved while an operator acts as another member
+    Given an operator signed in as a member through impersonation
+    When they approve a device code for the member's organization
+    Then it is answered 403 with error "permission_denied" before any membership is read
