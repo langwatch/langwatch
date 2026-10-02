@@ -22,34 +22,30 @@ export async function runModelProviderKeysMigration({
   cipher: ModelProviderCredentialCipher;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
-  const projects = await database.project.findMany({ select: { id: true } });
-  logger.info({ projects: projects.length }, "Starting model provider key encryption migration");
+  const rows = await database.modelProvider.findMany({
+    where: { scopes: { some: { scopeType: "PROJECT" } } },
+    select: { id: true, customKeys: true },
+  });
+  logger.info({ providers: rows.length }, "Starting model provider key encryption migration");
 
   let updated = 0;
   let skipped = 0;
 
-  for (const project of projects) {
-    const rows = await database.modelProvider.findMany({
-      where: { scopes: { some: { scopeType: "PROJECT", scopeId: project.id } } },
-      select: { id: true, customKeys: true },
+  for (const row of rows) {
+    const encrypted = migrations.encodeModelProviderKeysRow({
+      row: row as { id: string; customKeys: unknown },
+      cipher,
     });
-
-    for (const row of rows) {
-      const encrypted = migrations.encodeModelProviderKeysRow({
-        row: row as { id: string; customKeys: unknown },
-        cipher,
-      });
-      if (encrypted === null) {
-        skipped += 1;
-        continue;
-      }
-
-      await database.modelProvider.update({
-        where: { id: String(row.id) },
-        data: { customKeys: encrypted },
-      });
-      updated += 1;
+    if (encrypted === null) {
+      skipped += 1;
+      continue;
     }
+
+    await database.modelProvider.update({
+      where: { id: String(row.id) },
+      data: { customKeys: encrypted },
+    });
+    updated += 1;
   }
 
   // The counts, never the values: a log line naming one would publish the

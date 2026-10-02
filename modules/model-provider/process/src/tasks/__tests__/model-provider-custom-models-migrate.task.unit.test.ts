@@ -5,13 +5,12 @@ import { ModelProviderCustomModelsMigrateTask } from "../model-provider-custom-m
 
 function emptyDatabase() {
   return {
-    project: { findMany: vi.fn(async () => []) },
     modelProvider: { findMany: vi.fn(async () => []), update: vi.fn(async () => undefined) },
   } satisfies ModelProviderMigrationDatabase;
 }
 
 describe("ModelProviderCustomModelsMigrateTask", () => {
-  describe("given a database with no projects", () => {
+  describe("given a database with no project-scoped providers", () => {
     /** @scenario "A task runs by name with its arguments" */
     it("is named model-provider-migrate-custom-models and runs to completion", async () => {
       const database = emptyDatabase();
@@ -21,7 +20,10 @@ describe("ModelProviderCustomModelsMigrateTask", () => {
       const controller = new AbortController();
       await task.run({ args: [], signal: controller.signal });
 
-      expect(database.project.findMany).toHaveBeenCalledOnce();
+      expect(database.modelProvider.findMany).toHaveBeenCalledOnce();
+      expect(database.modelProvider.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { scopes: { some: { scopeType: "PROJECT" } } } }),
+      );
     });
   });
 });

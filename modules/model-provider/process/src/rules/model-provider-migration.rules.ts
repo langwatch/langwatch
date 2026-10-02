@@ -6,10 +6,9 @@
 
 /** Exactly the operations these migrations perform, and nothing else. */
 export type ModelProviderMigrationDatabase = {
-  project: { findMany(args: { select: { id: true } }): Promise<{ id: string }[]> };
   modelProvider: {
     findMany(args: {
-      where: { scopes: { some: { scopeType: "PROJECT"; scopeId: string } } };
+      where: { scopes: { some: { scopeType: "PROJECT" } } };
       select: Record<string, true>;
     }): Promise<Record<string, unknown>[]>;
     update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>;

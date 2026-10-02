@@ -17,13 +17,13 @@ class ReversingCipher extends ModelProviderCredentialCipher {
 
 function emptyDatabase() {
   return {
-    project: { findMany: vi.fn(async () => []) },
     modelProvider: { findMany: vi.fn(async () => []), update: vi.fn(async () => undefined) },
   } satisfies ModelProviderMigrationDatabase;
 }
 
 describe("ModelProviderCredentialsMigrateTask", () => {
-  describe("given a database with no projects and a configured key", () => {
+  describe("given a database with no project-scoped providers and a configured key", () => {
+    /** @scenario "The legacy credential and custom-model migrations read only provider rows" */
     it("is named model-provider-migrate-credentials and runs to completion", async () => {
       const database = emptyDatabase();
       const cipher = new ReversingCipher();
@@ -36,7 +36,10 @@ describe("ModelProviderCredentialsMigrateTask", () => {
       const controller = new AbortController();
       await task.run({ args: [], signal: controller.signal });
 
-      expect(database.project.findMany).toHaveBeenCalledOnce();
+      expect(database.modelProvider.findMany).toHaveBeenCalledOnce();
+      expect(database.modelProvider.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { scopes: { some: { scopeType: "PROJECT" } } } }),
+      );
     });
   });
 });

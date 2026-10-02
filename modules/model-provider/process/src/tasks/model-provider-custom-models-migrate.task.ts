@@ -23,42 +23,38 @@ export async function runCustomModelsMigration({
   registryLookup?: typeof getProviderModelOptions;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
-  const projects = await database.project.findMany({ select: { id: true } });
-  logger.info({ projects: projects.length }, "Starting custom models migration");
+  const rows = await database.modelProvider.findMany({
+    where: { scopes: { some: { scopeType: "PROJECT" } } },
+    select: { id: true, provider: true, customModels: true, customEmbeddingsModels: true },
+  });
+  logger.info({ providers: rows.length }, "Starting custom models migration");
 
   let updated = 0;
   let skipped = 0;
 
-  for (const project of projects) {
-    const rows = await database.modelProvider.findMany({
-      where: { scopes: { some: { scopeType: "PROJECT", scopeId: project.id } } },
-      select: { id: true, provider: true, customModels: true, customEmbeddingsModels: true },
+  for (const row of rows) {
+    const result = migrations.convertCustomModelsRow({
+      row: row as {
+        id: string;
+        provider: string;
+        customModels: unknown;
+        customEmbeddingsModels: unknown;
+      },
+      registryLookup,
     });
-
-    for (const row of rows) {
-      const result = migrations.convertCustomModelsRow({
-        row: row as {
-          id: string;
-          provider: string;
-          customModels: unknown;
-          customEmbeddingsModels: unknown;
-        },
-        registryLookup,
-      });
-      if (result === null) {
-        skipped += 1;
-        continue;
-      }
-
-      const data = updateDataFor(result);
-      if (Object.keys(data).length === 0) {
-        skipped += 1;
-        continue;
-      }
-
-      await database.modelProvider.update({ where: { id: String(row.id) }, data });
-      updated += 1;
+    if (result === null) {
+      skipped += 1;
+      continue;
     }
+
+    const data = updateDataFor(result);
+    if (Object.keys(data).length === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    await database.modelProvider.update({ where: { id: String(row.id) }, data });
+    updated += 1;
   }
 
   logger.info({ updated, skipped }, "Custom models migration complete");

@@ -116,3 +116,10 @@ Feature: Model Provider service
     Given a caller without write access to the tenant
     When they ask for a credential probe
     Then it is refused before anything leaves the process
+
+  @unit
+  Scenario: The legacy credential and custom-model migrations read only provider rows
+    Given providers scoped to projects
+    When a legacy model-provider migration runs
+    Then it reads every project-scoped provider in one query of its own table
+    And it never lists projects

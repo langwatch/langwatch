@@ -33,9 +33,6 @@ function databaseOver(rows: { id: string; customKeys: unknown }[]) {
   const stored = rows.map((row) => ({ ...row }));
 
   const database: ModelProviderMigrationDatabase = {
-    project: {
-      findMany: async () => [{ id: "project_1" }],
-    },
     modelProvider: {
       findMany: async () => stored.map((row) => ({ ...row })),
       update: async ({ where, data }) => {
