@@ -21,7 +21,10 @@
   ],
   "exclude": [
     "**/__tests__/**",
-    "**/*.test.*"
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*"
   ],
   "references": [
     {
