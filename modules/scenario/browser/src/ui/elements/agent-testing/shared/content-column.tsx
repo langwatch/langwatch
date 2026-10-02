@@ -59,7 +59,14 @@ export function ContentColumn({
       }
       {...boxProps}
     >
-      <VStack align="stretch" gap={3} width="full" maxWidth={columnMaxWidth} marginX="auto">
+      <VStack
+        align="stretch"
+        gap={3}
+        width="full"
+        minHeight="full"
+        maxWidth={columnMaxWidth}
+        marginX="auto"
+      >
         {children}
       </VStack>
     </Box>

@@ -172,13 +172,12 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
           <PageLayout.HeaderButton
             onClick={() => props.navigation.openTypeSelector()}
             data-testid="agents-first-agent-create"
-            marginTop={4}
           >
             <Plus size={16} /> Create your first agent
           </PageLayout.HeaderButton>
         </NoDataInfoBlock>
       ) : (
-        <PageLayout.Container>
+        <PageLayout.Container paddingTop={6}>
           <VStack gap={6} width="full" align="start">
             <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
               {props.data.isLoading &&

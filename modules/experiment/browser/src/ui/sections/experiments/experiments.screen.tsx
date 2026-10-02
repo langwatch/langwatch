@@ -439,7 +439,7 @@ export function ExperimentsPage() {
             </Text>
           }
         >
-          <HStack marginTop={4} gap={2}>
+          <HStack gap={2}>
             <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
           </HStack>
         </NoDataInfoBlock>

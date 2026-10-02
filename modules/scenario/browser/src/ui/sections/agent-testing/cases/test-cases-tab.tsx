@@ -13,6 +13,10 @@ import { useTestCasesTab } from "./use-test-cases-tab.ts";
 
 export function TestCasesTab() {
   const model = useTestCasesTab();
+  // An empty project has nothing to file, so its setup prompt takes the whole page.
+  const { data } = model;
+  const isEmptyProject =
+    !data.isLoading && !data.hasAgent && data.suites.length === 0 && data.externalSets.length === 0;
 
   return (
     <HStack
@@ -22,7 +26,7 @@ export function TestCasesTab() {
       alignItems="stretch"
       data-testid="agent-testing-cases-tab"
     >
-      <TestCasesRail model={model} />
+      {!isEmptyProject && <TestCasesRail model={model} />}
 
       <VStack align="stretch" flex={1} minWidth={0} gap={0}>
         <TestCasesPanel model={model} />

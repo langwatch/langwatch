@@ -373,7 +373,11 @@ export default function DatasetsScreen() {
                     onUpload={() => bulkUploadModal.onOpen()}
                     onCreate={openCreateDrawer}
                   >
-                    <Button colorPalette="orange" data-testid="empty-state-create-dataset">
+                    <Button
+                      size="sm"
+                      colorPalette="orange"
+                      data-testid="empty-state-create-dataset"
+                    >
                       <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
                     </Button>
                   </UploadOrCreateDatasetMenu>
@@ -392,7 +396,7 @@ export default function DatasetsScreen() {
                 </Text>
               </VStack>
             }
-            icon={<TableIcon />}
+            icon={<TableIcon size={24} />}
           />
         ) : (
           <ListTable>

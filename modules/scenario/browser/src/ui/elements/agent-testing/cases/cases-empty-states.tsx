@@ -4,7 +4,9 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { Box, Button, EmptyState } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box } from "@langwatch/design-system/primitives";
 import { FlaskConical, FolderCode, Plus, FolderPlus, Plug } from "lucide-react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
@@ -26,31 +28,21 @@ export function ConnectAgentEmptyState({
   onConnectAgent: () => void;
 }) {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-connect-agent-empty">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <Plug size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>Setup agent</EmptyState.Title>
-        <EmptyState.Description>
-          Connect the agent you want to test. LangWatch plays your scenarios against it and a judge
-          says whether each criterion was met.
-        </EmptyState.Description>
-        {canManage && (
-          <Box paddingTop={2}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onConnectAgent}
-              data-testid="agent-testing-connect-agent-setup"
-            >
-              <Plug size={14} />
-              Setup agent
-            </Button>
-          </Box>
-        )}
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      testId="agent-testing-connect-agent-empty"
+      title="Setup agent"
+      description="Connect the agent you want to test. LangWatch plays your scenarios against it and a judge says whether each criterion was met."
+      icon={<Plug size={24} />}
+    >
+      {canManage && (
+        <PageLayout.HeaderButton
+          onClick={onConnectAgent}
+          data-testid="agent-testing-connect-agent-setup"
+        >
+          <Plug size={16} /> Setup agent
+        </PageLayout.HeaderButton>
+      )}
+    </NoDataInfoBlock>
   );
 }
 
@@ -66,31 +58,18 @@ export function FirstSuiteEmptyState({
   onNewSuite: () => void;
 }) {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-first-suite-empty">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FolderPlus size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>Name your first test suite</EmptyState.Title>
-        <EmptyState.Description>
-          A test suite groups the scenarios you run together, for example the ones about refunds.
-          Every scenario sits in one.
-        </EmptyState.Description>
-        {canManage && (
-          <Box paddingTop={2}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onNewSuite}
-              data-testid="agent-testing-first-suite-new"
-            >
-              <Plus size={14} />
-              New test suite
-            </Button>
-          </Box>
-        )}
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      testId="agent-testing-first-suite-empty"
+      title="Name your first test suite"
+      description="A test suite groups the scenarios you run together, for example the ones about refunds. Every scenario sits in one."
+      icon={<FolderPlus size={24} />}
+    >
+      {canManage && (
+        <PageLayout.HeaderButton onClick={onNewSuite} data-testid="agent-testing-first-suite-new">
+          <Plus size={16} /> New test suite
+        </PageLayout.HeaderButton>
+      )}
+    </NoDataInfoBlock>
   );
 }
 
@@ -100,32 +79,18 @@ export function FirstSuiteEmptyState({
  */
 export function FirstCaseEmptyState({ canManage, onNewTestCase }: EmptyStateActionProps) {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-first-case-empty">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FlaskConical size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>Write your first scenario</EmptyState.Title>
-        <EmptyState.Description>
-          A scenario is one situation you put your agent in, with the criteria it must meet.
-          LangWatch plays the situation against your agent and a judge says whether each criterion
-          was met.
-        </EmptyState.Description>
-        {canManage && (
-          <Box paddingTop={2}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onNewTestCase}
-              data-testid="agent-testing-first-case-new"
-            >
-              <Plus size={14} />
-              New scenario
-            </Button>
-          </Box>
-        )}
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      testId="agent-testing-first-case-empty"
+      title="Write your first scenario"
+      description="A scenario is one situation you put your agent in, with the criteria it must meet. LangWatch plays the situation against your agent and a judge says whether each criterion was met."
+      icon={<FlaskConical size={24} />}
+    >
+      {canManage && (
+        <PageLayout.HeaderButton onClick={onNewTestCase} data-testid="agent-testing-first-case-new">
+          <Plus size={16} /> New scenario
+        </PageLayout.HeaderButton>
+      )}
+    </NoDataInfoBlock>
   );
 }
 
@@ -154,16 +119,11 @@ export function NoCasesHereEmptyState() {
 /** What a set that runs from code reads before its first run lands. */
 export function ExternalSetEmptyState() {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-empty-external">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FolderCode size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No runs in this period</EmptyState.Title>
-        <EmptyState.Description>
-          This set is written by code. Run it from the SDK or the command line, or widen the period.
-        </EmptyState.Description>
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      testId="agent-testing-empty-external"
+      title="No runs in this period"
+      description="This set is written by code. Run it from the SDK or the command line, or widen the period."
+      icon={<FolderCode size={24} />}
+    />
   );
 }
