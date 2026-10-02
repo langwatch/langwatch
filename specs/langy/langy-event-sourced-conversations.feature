@@ -100,6 +100,16 @@ Feature: Langy conversations are an event-sourced projection
     Then an "agent_responded" event records the failure
     And the conversation status reflects the failure
 
+  # A turn that fails mid-way hands over no answer, but its live stream still
+  # holds what it did. That is recorded as its message, so a reload shows the
+  # plan and the calls instead of only the error.
+  @unit
+  Scenario: A failed turn keeps the plan and the calls it ran as its message
+    Given an agent turn wrote a plan, ran a call and then failed
+    When the failure is recorded
+    Then an "agent_responded" event with a failed outcome carries the plan and the call
+    And a turn that failed before doing anything is recorded without a message
+
   @unit
   Scenario: A stalled response with no answer to carry fails distinctly
     Given an agent response stalled with no answer to carry

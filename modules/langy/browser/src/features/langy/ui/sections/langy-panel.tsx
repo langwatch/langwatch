@@ -488,7 +488,7 @@ function LangyPanel({
     turnActive,
     durableLastError: history.lastError,
     messages: engine.messages,
-    regenerate: engine.regenerate,
+    retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
   });
   const send = useLangyPanelSend({
