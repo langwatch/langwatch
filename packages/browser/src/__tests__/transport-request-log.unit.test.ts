@@ -55,15 +55,40 @@ describe("given the browser transport logs requests in development", () => {
       const spies = spyOnConsole();
       const client = createUiFeatureApiClient({
         isDevelopment: true,
-        fetch: answering({ error: { message: "rejected", code: -32004, data: {} } }),
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                message: "rejected whsec_signing_secret",
+                code: -32004,
+                data: { code: "NOT_FOUND", httpStatus: 404 },
+              },
+            }),
+            { status: 404, headers: { "content-type": "application/json" } },
+          ),
       });
 
       await expect(client.mutation("automation.upsert", SECRET_INPUT)).rejects.toThrow("rejected");
 
       expect(spies.error.mock.calls).toHaveLength(1);
       const everything = logged(spies).join("\n");
-      expect(everything).toMatch(/<< mutation automation\.upsert \d+ms/);
+      expect(everything).toMatch(/<< mutation automation\.upsert \d+ms NOT_FOUND 404$/);
       expect(everything).not.toContain("whsec_signing_secret");
+    });
+
+    it("logs a request its caller cancelled as aborted, not as a failure", async () => {
+      const spies = spyOnConsole();
+      const client = createUiFeatureApiClient({
+        isDevelopment: true,
+        fetch: async () => {
+          throw new DOMException("The operation was aborted.", "AbortError");
+        },
+      });
+
+      await expect(client.mutation("automation.upsert", SECRET_INPUT)).rejects.toThrow("aborted");
+
+      expect(spies.error.mock.calls).toHaveLength(0);
+      expect(logged(spies)[1]).toMatch(/^<< mutation automation\.upsert \d+ms aborted$/);
     });
   });
 
