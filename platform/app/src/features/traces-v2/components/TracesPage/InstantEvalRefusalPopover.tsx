@@ -103,54 +103,59 @@ interface InstantEvalRefusalCopy {
   dismiss: string;
 }
 
+const READ_MORE_SELF_HOSTED = {
+  label: "Read more",
+  href: SELF_HOSTED_INSTANT_EVALS_HREF,
+};
+
 /**
  * A self-hosted install's refusal, worded for the reason it was refused.
- * Null for every other kind.
+ *
+ * A record keyed by the server's offer type rather than a run of ifs, so a
+ * fifth self-hosted offer fails the typecheck here instead of falling through
+ * to the enterprise "Contact us" copy.
  *
  * Only a license that does not include Instant Evals offers a word with us:
  * the other three are fixed on the install, by an admin, its network or its
  * operator, and a "Contact us" there would send the reader to someone who
  * can't change any of them.
  */
-function selfHostedRefusalCopy(
+const SELF_HOSTED_REFUSAL_COPY: Record<
+  SelfHostedInstantEvalOffer,
+  InstantEvalRefusalCopy
+> = {
+  not_in_license: {
+    title: "Your license doesn't include Instant Evals",
+    body: "Instant Evals turn plain language questions into native filters. On a self-hosted install they come with a license that includes them. Contact us to add them.",
+    emphasis: "Instant Evals",
+    action: { label: "Contact us", href: CONTACT_US_HREF },
+    more: READ_MORE_SELF_HOSTED,
+    dismiss: "Not now",
+  },
+  switched_off: {
+    title: "Instant Evals are switched off for your organization",
+    body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
+    action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
+    dismiss: "Not now",
+  },
+  not_connected: {
+    title: "This install can't reach LangWatch",
+    body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
+    more: READ_MORE_SELF_HOSTED,
+    dismiss: "Not now",
+  },
+  ask_operator: {
+    title: "Instant Evals are off on this install",
+    body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
+    more: READ_MORE_SELF_HOSTED,
+    dismiss: "Not now",
+  },
+};
+
+function isSelfHostedRefusal(
   kind: InstantEvalRefusal["kind"],
-): InstantEvalRefusalCopy | null {
-  const readMore = { label: "Read more", href: SELF_HOSTED_INSTANT_EVALS_HREF };
-  if (kind === "not_in_license") {
-    return {
-      title: "Your license doesn't include Instant Evals",
-      body: "Instant Evals turn plain language questions into native filters. On a self-hosted install they come with a license that includes them. Contact us to add them.",
-      emphasis: "Instant Evals",
-      action: { label: "Contact us", href: CONTACT_US_HREF },
-      more: readMore,
-      dismiss: "Not now",
-    };
-  }
-  if (kind === "switched_off") {
-    return {
-      title: "Instant Evals are switched off for your organization",
-      body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
-      action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
-      dismiss: "Not now",
-    };
-  }
-  if (kind === "not_connected") {
-    return {
-      title: "This install can't reach LangWatch",
-      body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
-      more: readMore,
-      dismiss: "Not now",
-    };
-  }
-  if (kind === "ask_operator") {
-    return {
-      title: "Instant Evals are off on this install",
-      body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
-      more: readMore,
-      dismiss: "Not now",
-    };
-  }
-  return null;
+): kind is SelfHostedInstantEvalOffer {
+  return Object.hasOwn(SELF_HOSTED_REFUSAL_COPY, kind);
 }
 
 /**
@@ -198,8 +203,9 @@ export function instantEvalRefusalCopy(
       dismiss: "Skip",
     };
   }
-  const selfHosted = selfHostedRefusalCopy(refusal.kind);
-  if (selfHosted) return selfHosted;
+  if (isSelfHostedRefusal(refusal.kind)) {
+    return SELF_HOSTED_REFUSAL_COPY[refusal.kind];
+  }
   const whereItGoes =
     "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model.";
   if (refusal.kind === "opt_in") {
