@@ -71,7 +71,7 @@ beforeEach(() => {
     core: LocalControlSessionCoreService.create({
       apiKeys,
       readCredential: readSessionKeyCredential,
-      actors: { user: { findUnique: async () => null } },
+      actors: { findById: async () => null },
       baseHost: "https://app.test",
       store,
       presence: runtime.presence,

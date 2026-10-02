@@ -7,19 +7,21 @@ import { describe, expect, it } from "vitest";
 import type { LangyActorUserReader } from "../langy-actor-session.service.ts";
 import { LangyActorSessionService } from "../langy-actor-session.service.ts";
 
-/**
- * A user directory exposing only the `user.findUnique` the resolver uses.
- * Typed as the reader contract rather than cast to it, so a change to the read
- * this resolver makes breaks the double instead of silently passing through.
- */
+/** The user module's `findById`, the one read the resolver makes, typed as the reader. */
 const userReader = (
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-  } | null,
+  user: { id: string; name: string | null; email: string | null } | null,
 ): LangyActorUserReader => ({
-  user: { findUnique: async () => user },
+  findById: async () =>
+    user && {
+      ...user,
+      emailVerified: true,
+      image: null,
+      pendingSsoSetup: false,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      lastLoginAt: null,
+      deactivatedAt: null,
+    },
 });
 
 describe("LangyActorSessionService", () => {

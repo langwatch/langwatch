@@ -53,8 +53,6 @@ export type {
 export type { PendingEnvelope } from "./services/webhook-batch-planner.service.ts";
 export type {
   WebhookEventsService,
-  LegacyWebhookEventsServiceOptions,
-  WebhookProjectReader,
   WebhookEventsServiceOptions,
 } from "./services/webhook-events.service.ts";
 export type {

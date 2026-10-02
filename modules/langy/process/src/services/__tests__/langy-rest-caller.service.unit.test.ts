@@ -24,9 +24,21 @@ const keyCaller: LangyKeyCaller = { actor: { type: "user", id: "user-1" }, proje
 
 function actors(found: boolean): LangyActorUserReader {
   return {
-    user: {
-      findUnique: async () => (found ? { id: "user-1", name: "Ada", email: "ada@x.test" } : null),
-    },
+    findById: async () =>
+      found
+        ? {
+            id: "user-1",
+            name: "Ada",
+            email: "ada@x.test",
+            emailVerified: true,
+            image: null,
+            pendingSsoSetup: false,
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+            lastLoginAt: null,
+            deactivatedAt: null,
+          }
+        : null,
   };
 }
 

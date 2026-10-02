@@ -185,10 +185,21 @@ function testPorts(store: SessionStateStore) {
       return token ? { token, projectId: header("x-project-id") ?? null } : null;
     },
     actors: {
-      async tryFindById() {
-        return { id: userId, name: "Rogerio", email: `owner-${ns}@example.com` };
+      async findById() {
+        return {
+          id: userId,
+          name: "Rogerio",
+          email: `owner-${ns}@example.com`,
+          emailVerified: true,
+          image: null,
+          pendingSsoSetup: false,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          lastLoginAt: null,
+          deactivatedAt: null,
+        };
       },
-    } as never,
+    },
     baseHost: "https://app.langwatch.ai",
     store,
     presence: runtime.presence,

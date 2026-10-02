@@ -350,7 +350,7 @@ export class LangyModule implements LangyApiContract {
     });
     const callers = LangyRestCallerService.create({
       featureFlags: setup.dependencies.featureFlags,
-      actors: setup.members.prisma,
+      actors: setup.dependencies.users,
       projects: setup.dependencies.projects,
     });
     const buffer = setup.repositories.tokenBuffer.open({ redis: setup.members.redis });
@@ -365,7 +365,7 @@ export class LangyModule implements LangyApiContract {
     const core = LocalControlSessionCoreService.create({
       apiKeys: setup.dependencies.apiKeys,
       readCredential: readSessionKeyCredential,
-      actors: setup.members.prisma,
+      actors: setup.dependencies.users,
       baseHost: setup.members.publicBaseUrl,
       store: runtime.store,
       presence: runtime.presence,
@@ -373,7 +373,7 @@ export class LangyModule implements LangyApiContract {
       waits: runtime.waits,
       requests: runtime.requests,
       turns: LocalControlSessionCoreService.turnStarter({
-        actors: setup.members.prisma,
+        actors: setup.dependencies.users,
         turns: langy,
       }),
       conversations: langy,
@@ -410,7 +410,7 @@ export class LangyModule implements LangyApiContract {
       localConnectTurn: {
         presence: () => runtime.presence,
         turns: LocalControlSessionCoreService.turnStarter({
-          actors: setup.members.prisma,
+          actors: setup.dependencies.users,
           turns: langy,
         }),
       },

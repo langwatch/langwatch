@@ -4,19 +4,10 @@
  * them, so a key whose owner no longer exists cannot start one.
  */
 import type { LangyCredentialSession } from "@langwatch/langy-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
-export type LangyActorUserReader = {
-  user: {
-    findUnique(input: {
-      where: { id: string };
-      select: { id: true; name: true; email: true };
-    }): Promise<{
-      id: string;
-      name: string | null;
-      email: string | null;
-    } | null>;
-  };
-};
+/** The one user read a key-authenticated turn needs, from the user module. */
+export type LangyActorUserReader = Pick<UserApi, "findById">;
 
 export type LangyActorResolution =
   | { ok: true; session: LangyCredentialSession }
@@ -35,10 +26,7 @@ export class LangyActorSessionService {
   }
 
   async resolve(input: { userId: string }): Promise<LangyActorResolution> {
-    const user = await this.users.user.findUnique({
-      where: { id: input.userId },
-      select: { id: true, name: true, email: true },
-    });
+    const user = await this.users.findById({ id: input.userId });
     if (!user) {
       return {
         ok: false,
