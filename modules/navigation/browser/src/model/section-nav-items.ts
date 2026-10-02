@@ -43,8 +43,6 @@ export interface SectionNavItemData {
   group?: string;
   /** The `data-tour` target the guided tour spotlights on this entry. */
   tourId?: string;
-  /** The destination sits outside this section; the sidebar marks it with a trailing arrow. */
-  leavesSection?: boolean;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -60,7 +58,6 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
-    leavesSection: true,
   },
   {
     label: "Budgets",

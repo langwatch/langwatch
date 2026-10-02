@@ -215,9 +215,11 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
  */
 function SectionItemsNav({
   items,
+  sectionPath,
   showExpanded,
 }: {
   items: readonly SectionNavItemData[];
+  sectionPath: string;
   showExpanded: boolean;
 }) {
   const pathname = useNavigationHost().pathname();
@@ -242,9 +244,9 @@ function SectionItemsNav({
       showLabel={showExpanded}
       tourId={item.tourId}
       rightElement={
-        item.leavesSection ? (
+        isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : (
           <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
-        ) : undefined
+        )
       }
     />
   );
@@ -282,10 +284,18 @@ function ProductSidebarBody({
     return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
   if (surface === "gateway") {
-    return <SectionItemsNav items={gatewayNavItems} showExpanded={showExpanded} />;
+    return (
+      <SectionItemsNav items={gatewayNavItems} sectionPath="/gateway" showExpanded={showExpanded} />
+    );
   }
   if (surface === "governance") {
-    return <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />;
+    return (
+      <SectionItemsNav
+        items={governanceNavItems}
+        sectionPath="/governance"
+        showExpanded={showExpanded}
+      />
+    );
   }
   return <MainMenuSections showExpanded={showExpanded} />;
 }
