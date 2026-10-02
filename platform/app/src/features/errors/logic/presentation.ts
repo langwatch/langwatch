@@ -506,7 +506,7 @@ const presentations = {
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
     describe: () =>
-      "LangWatch turns on Instant Evals for enterprise organizations. Contact us to get them.",
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",
