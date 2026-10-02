@@ -1,8 +1,8 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /**
  * Tracks whether the column-reorder education dialog has been shown (or explicitly
- * dismissed) so it only fires once per browser.
+ * dismissed) so it only fires once per reader.
  */
 interface ColumnEducationState {
   isOpen: boolean;
@@ -11,47 +11,16 @@ interface ColumnEducationState {
   dismiss: (forever?: boolean) => void;
 }
 
-const STORAGE_KEY = "langwatch:traces-v2:columnEducationDismissed";
-
-function loadDismissed(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function persistDismissed(value: boolean): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    if (value) {
-      localStorage.setItem(STORAGE_KEY, "1");
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // ignore storage write failures
-    return;
-  }
-}
-
-export const useColumnEducationStore = create<ColumnEducationState>((set) => ({
-  isOpen: false,
-  hasDismissed: loadDismissed(),
-  open: () => set({ isOpen: true }),
-  dismiss: (forever) => {
-    set({ isOpen: false });
-    if (forever) {
-      set({ hasDismissed: true });
-      persistDismissed(true);
-    }
-  },
-}));
+export const useColumnEducationStore = defineSlice<ColumnEducationState>({
+  name: "trace:column-education",
+  create: (set) => ({
+    isOpen: false,
+    hasDismissed: false,
+    open: () => set({ isOpen: true }),
+    dismiss: (forever) => set(forever ? { isOpen: false, hasDismissed: true } : { isOpen: false }),
+  }),
+  persist: { partialize: ({ hasDismissed }) => ({ hasDismissed }) },
+});
 
 /**
  * Pixel movement threshold past which we consider a mousedown on a column header to be

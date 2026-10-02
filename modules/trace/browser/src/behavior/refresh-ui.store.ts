@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 interface RefreshUIState {
   isRefreshing: boolean;
@@ -57,34 +57,37 @@ function observeRefreshFetching(s: RefreshUIState, fetching: boolean): Partial<R
   return s;
 }
 
-export const useRefreshUIStore = create<RefreshUIState>((set) => ({
-  isRefreshing: false,
-  pulse: (durationMs = 900) => {
-    if (pulseClearTimer) {
-      clearTimeout(pulseClearTimer);
-    }
-    set({ isRefreshing: true });
-    pulseClearTimer = setTimeout(() => {
-      pulseClearTimer = null;
-      set({ isRefreshing: false });
-    }, durationMs);
-  },
-  isReplacingData: false,
-  setReplacingData: (value) => set({ isReplacingData: value }),
-  refreshRequested: false,
-  refreshSawFetch: false,
-  requestRefresh: () => {
-    if (refreshRequestTimer) {
-      clearTimeout(refreshRequestTimer);
-    }
-    set({ refreshRequested: true, refreshSawFetch: false });
-    refreshRequestTimer = setTimeout(() => {
-      refreshRequestTimer = null;
-      set((s) => (s.refreshRequested ? { refreshRequested: false, refreshSawFetch: false } : s));
-    }, REFRESH_REQUEST_TIMEOUT_MS);
-  },
-  observeFetching: (fetching) =>
-    set((s) => {
-      return observeRefreshFetching(s, fetching);
-    }),
-}));
+export const useRefreshUIStore = defineSlice<RefreshUIState>({
+  name: "trace:refresh-ui",
+  create: (set) => ({
+    isRefreshing: false,
+    pulse: (durationMs = 900) => {
+      if (pulseClearTimer) {
+        clearTimeout(pulseClearTimer);
+      }
+      set({ isRefreshing: true });
+      pulseClearTimer = setTimeout(() => {
+        pulseClearTimer = null;
+        set({ isRefreshing: false });
+      }, durationMs);
+    },
+    isReplacingData: false,
+    setReplacingData: (value) => set({ isReplacingData: value }),
+    refreshRequested: false,
+    refreshSawFetch: false,
+    requestRefresh: () => {
+      if (refreshRequestTimer) {
+        clearTimeout(refreshRequestTimer);
+      }
+      set({ refreshRequested: true, refreshSawFetch: false });
+      refreshRequestTimer = setTimeout(() => {
+        refreshRequestTimer = null;
+        set((s) => (s.refreshRequested ? { refreshRequested: false, refreshSawFetch: false } : s));
+      }, REFRESH_REQUEST_TIMEOUT_MS);
+    },
+    observeFetching: (fetching) =>
+      set((s) => {
+        return observeRefreshFetching(s, fetching);
+      }),
+  }),
+});

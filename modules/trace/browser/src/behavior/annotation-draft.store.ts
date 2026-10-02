@@ -3,7 +3,7 @@ import type {
   AnnotationMode,
   ScoreOptions,
 } from "@langwatch/annotation-contract";
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /** What the reviewer is writing, and which part of the trace it is about. */
 export interface AnnotationDraft extends AnnotationAnchorColumns {
@@ -50,30 +50,33 @@ interface AnnotationDraftState {
 /**
  * The one annotation being written, wherever it is being written from.
  */
-export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
-  draft: null,
-  openDraft: ({ traceId, mode, annotationId, output, anchorKind, anchorId, anchorPath }) =>
-    set({
-      draft: {
-        traceId,
-        mode,
-        annotationId,
-        anchorKind,
-        anchorId,
-        anchorPath,
-        comment: "",
-        // A correction is an edit of what the model actually said, so the
-        // field starts as that output rather than empty. Same starting point
-        // the popover composer uses.
-        expectedOutput: mode === "suggest" ? (output ?? "") : "",
-        scoreOptions: {},
-        seededFromExisting: false,
-      },
-    }),
-  patchDraft: (patch) =>
-    set((state) => (state.draft ? { draft: { ...state.draft, ...patch } } : state)),
-  closeDraft: () => set({ draft: null }),
-}));
+export const useAnnotationDraftStore = defineSlice<AnnotationDraftState>({
+  name: "trace:annotation-draft",
+  create: (set) => ({
+    draft: null,
+    openDraft: ({ traceId, mode, annotationId, output, anchorKind, anchorId, anchorPath }) =>
+      set({
+        draft: {
+          traceId,
+          mode,
+          annotationId,
+          anchorKind,
+          anchorId,
+          anchorPath,
+          comment: "",
+          // A correction is an edit of what the model actually said, so the
+          // field starts as that output rather than empty. Same starting point
+          // the popover composer uses.
+          expectedOutput: mode === "suggest" ? (output ?? "") : "",
+          scoreOptions: {},
+          seededFromExisting: false,
+        },
+      }),
+    patchDraft: (patch) =>
+      set((state) => (state.draft ? { draft: { ...state.draft, ...patch } } : state)),
+    closeDraft: () => set({ draft: null }),
+  }),
+});
 
 /**
  * Whether a draft belongs in the rail beside a conversation turn.

@@ -1,9 +1,8 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 import {
   DEFAULT_PERSPECTIVE_ID,
   type FacetPerspectiveId,
-  isFacetPerspectiveId,
   sectionOrderForPerspective,
 } from "./facet-constants.ts";
 
@@ -40,8 +39,6 @@ interface FacetLensState {
   selectPerspective: (id: FacetPerspectiveId) => void;
 }
 
-const STORAGE_KEY = "langwatch:traces-v2:facet-lens";
-
 const defaultLens: FacetLens = {
   id: "default",
   name: "Default",
@@ -49,104 +46,30 @@ const defaultLens: FacetLens = {
   sectionOpen: {},
 };
 
-interface PersistedState {
-  lens: FacetLens;
-  activePerspectiveId: FacetPerspectiveId;
-}
-
-function loadState(): PersistedState {
-  if (typeof window === "undefined") {
-    return { lens: defaultLens, activePerspectiveId: DEFAULT_PERSPECTIVE_ID };
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { lens: defaultLens, activePerspectiveId: DEFAULT_PERSPECTIVE_ID };
-    }
-    // Backward compatible: the blob is the flat FacetLens shape, with
-    // `activePerspectiveId` added as a sibling field. Pre-perspective blobs
-    // simply lack it. Any stale `groupOrder` from an older build is ignored.
-    const parsed = JSON.parse(raw) as Partial<FacetLens> & {
-      activePerspectiveId?: unknown;
-    };
-    const lens: FacetLens = {
-      id: parsed.id ?? defaultLens.id,
-      name: parsed.name ?? defaultLens.name,
-      sectionOrder: Array.isArray(parsed.sectionOrder)
-        ? parsed.sectionOrder.filter((k): k is string => typeof k === "string")
-        : [],
-      sectionOpen:
-        parsed.sectionOpen && typeof parsed.sectionOpen === "object" ? parsed.sectionOpen : {},
-    };
-    return {
-      lens,
-      activePerspectiveId: isFacetPerspectiveId(parsed.activePerspectiveId)
-        ? parsed.activePerspectiveId
-        : DEFAULT_PERSPECTIVE_ID,
-    };
-  } catch {
-    return { lens: defaultLens, activePerspectiveId: DEFAULT_PERSPECTIVE_ID };
-  }
-}
-
-function persistState(state: PersistedState): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ...state.lens,
-        activePerspectiveId: state.activePerspectiveId,
-      }),
-    );
-  } catch {
-    // storage may be full / disabled
-    return;
-  }
-}
-
-export const useFacetLensStore = create<FacetLensState>((set) => {
-  const initial = loadState();
-  return {
-    lens: initial.lens,
-    activePerspectiveId: initial.activePerspectiveId,
-
-    setSectionOrder: (order) =>
-      set((s) => {
-        const lens: FacetLens = { ...s.lens, sectionOrder: order };
-        persistState({ lens, activePerspectiveId: s.activePerspectiveId });
-        return { lens };
-      }),
-
+/** The reader's sidebar lens, persisted for them and forgotten at sign-out (§10.2). */
+export const useFacetLensStore = defineSlice<FacetLensState>({
+  name: "trace:facet-lens",
+  create: (set) => ({
+    lens: defaultLens,
+    activePerspectiveId: DEFAULT_PERSPECTIVE_ID,
+    setSectionOrder: (order) => set((s) => ({ lens: { ...s.lens, sectionOrder: order } })),
     setSectionOpen: (key, open) =>
-      set((s) => {
-        const lens: FacetLens = {
-          ...s.lens,
-          sectionOpen: { ...s.lens.sectionOpen, [key]: open },
-        };
-        persistState({ lens, activePerspectiveId: s.activePerspectiveId });
-        return { lens };
-      }),
-
+      set((s) => ({ lens: { ...s.lens, sectionOpen: { ...s.lens.sectionOpen, [key]: open } } })),
     setAllSectionsOpen: (keys, open) =>
       set((s) => {
         const sectionOpen = { ...s.lens.sectionOpen };
         for (const k of keys) sectionOpen[k] = open;
-        const lens: FacetLens = { ...s.lens, sectionOpen };
-        persistState({ lens, activePerspectiveId: s.activePerspectiveId });
-        return { lens };
+        return { lens: { ...s.lens, sectionOpen } };
       }),
-
     selectPerspective: (id) =>
-      set((s) => {
-        const lens: FacetLens = {
-          ...s.lens,
-          sectionOrder: sectionOrderForPerspective(id),
-        };
-        persistState({ lens, activePerspectiveId: id });
-        return { lens, activePerspectiveId: id };
-      }),
-  };
+      set((s) => ({
+        lens: { ...s.lens, sectionOrder: sectionOrderForPerspective(id) },
+        activePerspectiveId: id,
+      })),
+  }),
+  persist: {
+    partialize: ({ lens, activePerspectiveId }) => ({ lens, activePerspectiveId }),
+  },
 });
 
 /**

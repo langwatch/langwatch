@@ -1,8 +1,7 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 export type TimeColumnFormat = "relative" | "iso";
 
-const STORAGE_KEY = "langwatch:traces-v2:time-format:v1";
 const DEFAULT_FORMAT: TimeColumnFormat = "relative";
 
 interface TimeColumnSizing {
@@ -23,47 +22,20 @@ export function timeColumnSizing(format: TimeColumnFormat): TimeColumnSizing {
   return { size: 68, minSize: 68, maxSize: 200 };
 }
 
-/**
- * How the Time column renders its value — compact relative ("3m") or full ISO 8601
- * ("2026-06-02T13:14:15.123Z").
- */
-function load(): TimeColumnFormat {
-  if (typeof window === "undefined") {
-    return DEFAULT_FORMAT;
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === "relative" || raw === "iso") {
-      return raw;
-    }
-  } catch {
-    // storage may be disabled
-    return DEFAULT_FORMAT;
-  }
-  return DEFAULT_FORMAT;
-}
-
-function persist(value: TimeColumnFormat): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, value);
-  } catch {
-    // storage may be full / disabled
-    return;
-  }
-}
-
 interface TimeFormatState {
   format: TimeColumnFormat;
   setFormat: (format: TimeColumnFormat) => void;
 }
 
-export const useTimeFormatStore = create<TimeFormatState>((set) => ({
-  format: load(),
-  setFormat: (format) => {
-    persist(format);
-    set({ format });
-  },
-}));
+/**
+ * How the Time column renders its value: compact relative ("3m") or full ISO 8601
+ * ("2026-06-02T13:14:15.123Z"). The reader's pick, persisted for them (§10.2).
+ */
+export const useTimeFormatStore = defineSlice<TimeFormatState>({
+  name: "trace:time-format",
+  create: (set) => ({
+    format: DEFAULT_FORMAT,
+    setFormat: (format) => set({ format }),
+  }),
+  persist: { partialize: ({ format }) => ({ format }) },
+});

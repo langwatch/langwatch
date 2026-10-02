@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /**
  * Tracks which facet the user is currently hovering, so the search bar's chips and the
@@ -21,8 +21,11 @@ interface HoverState {
   clearHover: () => void;
 }
 
-export const useFacetHoverStore = create<HoverState>((set) => ({
-  hoveredFacet: null,
-  setHoveredFacet: (facet) => set({ hoveredFacet: facet }),
-  clearHover: () => set({ hoveredFacet: null }),
-}));
+export const useFacetHoverStore = defineSlice<HoverState>({
+  name: "trace:facet-hover",
+  create: (set) => ({
+    hoveredFacet: null,
+    setHoveredFacet: (facet) => set({ hoveredFacet: facet }),
+    clearHover: () => set({ hoveredFacet: null }),
+  }),
+});

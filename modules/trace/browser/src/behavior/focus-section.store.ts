@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /**
  * Closed set of section ids that header chips and comment anchors can deep-link into.
@@ -43,11 +43,14 @@ interface FocusSectionState {
 /**
  * One-shot signal store for "expand + scroll the trace summary section with id X".
  */
-export const useFocusSectionStore = create<FocusSectionState>((set, get) => ({
-  pending: null,
-  request: ({ traceId, section }) => {
-    const nonce = (get().pending?.nonce ?? 0) + 1;
-    set({ pending: { traceId, section, nonce } });
-  },
-  clear: () => set({ pending: null }),
-}));
+export const useFocusSectionStore = defineSlice<FocusSectionState>({
+  name: "trace:focus-section",
+  create: (set, get) => ({
+    pending: null,
+    request: ({ traceId, section }) => {
+      const nonce = (get().pending?.nonce ?? 0) + 1;
+      set({ pending: { traceId, section, nonce } });
+    },
+    clear: () => set({ pending: null }),
+  }),
+});

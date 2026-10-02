@@ -1,3 +1,4 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import {
   type DisplayRoleVisuals,
   getDisplayRoleVisuals,
@@ -7,7 +8,6 @@ import {
  * Render-only role overrides for traces emitted under the Scenario SDK.
  */
 import { type ReactNode, useEffect } from "react";
-import { create } from "zustand";
 
 interface ScenarioRoleState {
   isScenario: boolean;
@@ -18,11 +18,14 @@ interface ScenarioRoleState {
   setScenarioRole: (value: { isScenario: boolean; isHumanCaller: boolean }) => void;
 }
 
-const useScenarioRoleStore = create<ScenarioRoleState>((set) => ({
-  isScenario: false,
-  isHumanCaller: false,
-  setScenarioRole: (value) => set(value),
-}));
+const useScenarioRoleStore = defineSlice<ScenarioRoleState>({
+  name: "trace:scenario-role",
+  create: (set) => ({
+    isScenario: false,
+    isHumanCaller: false,
+    setScenarioRole: (value) => set(value),
+  }),
+});
 
 /**
  * Sets the scenario flags for the lifetime of the wrapping component.

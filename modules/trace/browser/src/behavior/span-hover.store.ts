@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 interface SpanHoverState {
   /** SpanId currently hovered in the waterfall (either pane), if any. */
@@ -9,7 +9,10 @@ interface SpanHoverState {
 /**
  * Hover highlight for the waterfall's synced tree/timeline panes.
  */
-export const useSpanHoverStore = create<SpanHoverState>((set) => ({
-  hoveredSpanId: null,
-  setHoveredSpanId: (spanId) => set({ hoveredSpanId: spanId }),
-}));
+export const useSpanHoverStore = defineSlice<SpanHoverState>({
+  name: "trace:span-hover",
+  create: (set) => ({
+    hoveredSpanId: null,
+    setHoveredSpanId: (spanId) => set({ hoveredSpanId: spanId }),
+  }),
+});

@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 type FindState = {
   isOpen: boolean;
@@ -6,8 +6,11 @@ type FindState = {
   close: () => void;
 };
 
-export const useFindStore = create<FindState>((set) => ({
-  isOpen: false,
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
-}));
+export const useFindStore = defineSlice<FindState>({
+  name: "trace:find",
+  create: (set) => ({
+    isOpen: false,
+    open: () => set({ isOpen: true }),
+    close: () => set({ isOpen: false }),
+  }),
+});

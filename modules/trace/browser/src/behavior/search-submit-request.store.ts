@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 /** A text another part of the page asked the search bar to submit. */
 export interface SearchSubmitRequest {
@@ -18,9 +18,12 @@ interface SearchSubmitRequestState {
  * and entered: the bar owns routing and the cost rule, so a button elsewhere
  * hands its text over rather than starting anything itself.
  */
-export const useSearchSubmitRequestStore = create<SearchSubmitRequestState>((set, get) => ({
-  request: null,
-  requestSubmit: (request) =>
-    set({ request: { ...request, nonce: (get().request?.nonce ?? 0) + 1 } }),
-  clear: () => set({ request: null }),
-}));
+export const useSearchSubmitRequestStore = defineSlice<SearchSubmitRequestState>({
+  name: "trace:search-submit-request",
+  create: (set, get) => ({
+    request: null,
+    requestSubmit: (request) =>
+      set({ request: { ...request, nonce: (get().request?.nonce ?? 0) + 1 } }),
+    clear: () => set({ request: null }),
+  }),
+});

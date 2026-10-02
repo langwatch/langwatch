@@ -5,12 +5,12 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { nowInstant } from "@langwatch/time";
 import {
   type ExplorerInstantEvalProgress,
   isExplorerInstantEvalRunActive,
 } from "@langwatch/trace-contract";
-import { create } from "zustand";
 
 /**
  * Where a run is, as the page shows it. Counters can still move after the
@@ -107,32 +107,35 @@ function only<T>(record: Record<string, T>, keep: ReadonlySet<string>): Record<s
   return Object.fromEntries(Object.entries(record).filter(([id]) => keep.has(id)));
 }
 
-export const useInstantEvalRunStore = create<InstantEvalRunState>((set) => ({
-  runs: {},
-  stoppedByUser: {},
-  quiet: {},
-  settled: {},
-  setRun: (run, now = nowInstant().epochMilliseconds) =>
-    set((state) => withRead({ state, run, now })),
-  markStopped: (runId) =>
-    set((state) => ({ stoppedByUser: { ...state.stoppedByUser, [runId]: true } })),
-  markSettled: (runId) =>
-    set((state) =>
-      state.settled[runId] ? state : { settled: { ...state.settled, [runId]: true } },
-    ),
-  keepOnly: (runIds) =>
-    set((state) => {
-      const keep = new Set(runIds);
-      const runs = only(state.runs, keep);
-      if (Object.keys(runs).length === Object.keys(state.runs).length) return state;
-      return {
-        runs,
-        stoppedByUser: only(state.stoppedByUser, keep),
-        quiet: only(state.quiet, keep),
-        settled: only(state.settled, keep),
-      };
-    }),
-}));
+export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
+  name: "trace:instant-eval-run",
+  create: (set) => ({
+    runs: {},
+    stoppedByUser: {},
+    quiet: {},
+    settled: {},
+    setRun: (run, now = nowInstant().epochMilliseconds) =>
+      set((state) => withRead({ state, run, now })),
+    markStopped: (runId) =>
+      set((state) => ({ stoppedByUser: { ...state.stoppedByUser, [runId]: true } })),
+    markSettled: (runId) =>
+      set((state) =>
+        state.settled[runId] ? state : { settled: { ...state.settled, [runId]: true } },
+      ),
+    keepOnly: (runIds) =>
+      set((state) => {
+        const keep = new Set(runIds);
+        const runs = only(state.runs, keep);
+        if (Object.keys(runs).length === Object.keys(state.runs).length) return state;
+        return {
+          runs,
+          stoppedByUser: only(state.stoppedByUser, keep),
+          quiet: only(state.quiet, keep),
+          settled: only(state.settled, keep),
+        };
+      }),
+  }),
+});
 
 /** The phase of one run in the store, or null when the store has no such run. */
 export function selectInstantEvalRunPhase(

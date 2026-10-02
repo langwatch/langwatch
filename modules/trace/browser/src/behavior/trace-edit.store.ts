@@ -1,3 +1,4 @@
+import { defineSlice, type SetSlice } from "@langwatch/browser-host/global-store";
 import {
   type SpanInputOutput,
   type SpanTypes,
@@ -7,7 +8,6 @@ import {
   type TraceEditOverlayPatch,
   type TraceEditSpanPatch,
 } from "@langwatch/trace-contract";
-import { create, type StoreApi } from "zustand";
 
 /**
  * Which trace the reader is looking at: the corrected one or the one that was
@@ -348,7 +348,7 @@ function withoutParam(draft: SpanEditDraft, key: string): SpanEditDraft {
   return { ...draft, params: rest };
 }
 
-type SetTraceEditState = StoreApi<TraceEditState>["setState"];
+type SetTraceEditState = SetSlice<TraceEditState>;
 
 /** Starting an editing session, and every way of ending one. */
 const sessionActions = (set: SetTraceEditState) => ({
@@ -515,47 +515,50 @@ const spanRemovalActions = (set: SetTraceEditState) => ({
     }),
 });
 
-export const useTraceEditStore = create<TraceEditState>((set) => ({
-  editingTraceId: null,
-  basePatch: null,
-  ...EMPTY_DRAFTS,
-  overlayView: "edited",
-  pendingExit: null,
-  diffOpen: false,
+export const useTraceEditStore = defineSlice<TraceEditState>({
+  name: "trace:trace-edit",
+  create: (set) => ({
+    editingTraceId: null,
+    basePatch: null,
+    ...EMPTY_DRAFTS,
+    overlayView: "edited",
+    pendingExit: null,
+    diffOpen: false,
 
-  ...sessionActions(set),
-  ...spanFieldActions(set),
-  ...spanParamActions(set),
-  ...spanRemovalActions(set),
+    ...sessionActions(set),
+    ...spanFieldActions(set),
+    ...spanParamActions(set),
+    ...spanRemovalActions(set),
 
-  setTraceInput: ({ text, baselineText }) =>
-    set({
-      traceInputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
-    }),
-  resetTraceInput: () => set({ traceInputDraft: null }),
+    setTraceInput: ({ text, baselineText }) =>
+      set({
+        traceInputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
+      }),
+    resetTraceInput: () => set({ traceInputDraft: null }),
 
-  setTraceOutput: ({ text, baselineText }) =>
-    set({
-      traceOutputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
-    }),
-  resetTraceOutput: () => set({ traceOutputDraft: null }),
+    setTraceOutput: ({ text, baselineText }) =>
+      set({
+        traceOutputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
+      }),
+    resetTraceOutput: () => set({ traceOutputDraft: null }),
 
-  setTraceMetadata: ({ key, value, baselineMetadata }) =>
-    set((s) => {
-      if (metadataIsUnchanged({ baselineMetadata, key, value })) {
-        return { traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key) };
-      }
-      return {
-        traceMetadataDrafts: { ...s.traceMetadataDrafts, [key]: value },
-      };
-    }),
-  resetTraceMetadata: (key) =>
-    set((s) => ({
-      traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key),
-    })),
+    setTraceMetadata: ({ key, value, baselineMetadata }) =>
+      set((s) => {
+        if (metadataIsUnchanged({ baselineMetadata, key, value })) {
+          return { traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key) };
+        }
+        return {
+          traceMetadataDrafts: { ...s.traceMetadataDrafts, [key]: value },
+        };
+      }),
+    resetTraceMetadata: (key) =>
+      set((s) => ({
+        traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key),
+      })),
 
-  setOverlayView: (view) => set({ overlayView: view }),
-}));
+    setOverlayView: (view) => set({ overlayView: view }),
+  }),
+});
 
 function withoutKey(drafts: Record<string, unknown>, key: string): Record<string, unknown> {
   if (!(key in drafts)) return drafts;

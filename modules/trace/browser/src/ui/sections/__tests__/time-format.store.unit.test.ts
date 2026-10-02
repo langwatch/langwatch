@@ -1,28 +1,36 @@
 // @vitest-environment jsdom
+import { clearReaderUiStorage, setUiStorageReader } from "@langwatch/browser-host/storage";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { timeColumnSizing, useTimeFormatStore } from "../../../behavior/time-format.store.ts";
 
-const STORAGE_KEY = "langwatch:traces-v2:time-format:v1";
+const READER = "reader-1";
+const STORAGE_KEY = `langwatch:user:${READER}:trace:time-format`;
 
 describe("timeFormatStore", () => {
   beforeEach(() => {
+    clearReaderUiStorage();
     localStorage.clear();
+    setUiStorageReader(READER);
     useTimeFormatStore.setState({ format: "relative" });
   });
 
   describe("given the Time column format", () => {
     describe("when set to relative", () => {
-      it("persists the choice to localStorage", () => {
+      it("persists the choice for the reader", () => {
         useTimeFormatStore.getState().setFormat("relative");
-        expect(localStorage.getItem(STORAGE_KEY)).toBe("relative");
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+          state: { format: "relative" },
+        });
       });
     });
 
     describe("when set to iso", () => {
-      it("persists the choice to localStorage", () => {
+      it("persists the choice for the reader", () => {
         useTimeFormatStore.getState().setFormat("iso");
-        expect(localStorage.getItem(STORAGE_KEY)).toBe("iso");
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+          state: { format: "iso" },
+        });
       });
     });
   });

@@ -1,5 +1,5 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import type { ChatLayout } from "@langwatch/trace-contract/transcript";
-import { create } from "zustand";
 
 /**
  * Shared chat-layout preference across every IOViewer instance.
@@ -9,7 +9,10 @@ interface ChatLayoutPrefState {
   setChatLayout: (next: ChatLayout) => void;
 }
 
-export const useChatLayoutPref = create<ChatLayoutPrefState>((set) => ({
-  chatLayout: "thread",
-  setChatLayout: (next) => set({ chatLayout: next }),
-}));
+export const useChatLayoutPref = defineSlice<ChatLayoutPrefState>({
+  name: "trace:chat-layout-pref",
+  create: (set) => ({
+    chatLayout: "thread",
+    setChatLayout: (next) => set({ chatLayout: next }),
+  }),
+});

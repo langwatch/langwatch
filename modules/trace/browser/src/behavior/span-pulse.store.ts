@@ -1,5 +1,5 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { nowInstant } from "@langwatch/time";
-import { create } from "zustand";
 
 /**
  * How long a span-row pulse animation lasts. After this the spanId is
@@ -37,61 +37,64 @@ interface SpanPulseState {
   _evict: (spanId: string) => void;
 }
 
-export const useSpanPulseStore = create<SpanPulseState>((set, get) => ({
-  pulsingIds: new Set(),
-  lastPulseAt: new Map(),
-  evictionTimers: new Map(),
+export const useSpanPulseStore = defineSlice<SpanPulseState>({
+  name: "trace:span-pulse",
+  create: (set, get) => ({
+    pulsingIds: new Set(),
+    lastPulseAt: new Map(),
+    evictionTimers: new Map(),
 
-  pulse: (spanId) => {
-    const state = get();
-    const now = nowInstant().epochMilliseconds;
-    const last = state.lastPulseAt.get(spanId) ?? 0;
+    pulse: (spanId) => {
+      const state = get();
+      const now = nowInstant().epochMilliseconds;
+      const last = state.lastPulseAt.get(spanId) ?? 0;
 
-    if (now - last < PULSE_COALESCE_MS) {
-      return;
-    }
+      if (now - last < PULSE_COALESCE_MS) {
+        return;
+      }
 
-    const existingTimer = state.evictionTimers.get(spanId);
-    if (existingTimer !== void 0) {
-      clearTimeout(existingTimer);
-    }
+      const existingTimer = state.evictionTimers.get(spanId);
+      if (existingTimer !== void 0) {
+        clearTimeout(existingTimer);
+      }
 
-    const timer = setTimeout(() => {
-      get()._evict(spanId);
-    }, PULSE_DURATION_MS);
+      const timer = setTimeout(() => {
+        get()._evict(spanId);
+      }, PULSE_DURATION_MS);
 
-    const nextPulsingIds = new Set(state.pulsingIds);
-    nextPulsingIds.add(spanId);
+      const nextPulsingIds = new Set(state.pulsingIds);
+      nextPulsingIds.add(spanId);
 
-    const nextLastPulseAt = new Map(state.lastPulseAt);
-    nextLastPulseAt.set(spanId, now);
+      const nextLastPulseAt = new Map(state.lastPulseAt);
+      nextLastPulseAt.set(spanId, now);
 
-    const nextEvictionTimers = new Map(state.evictionTimers);
-    nextEvictionTimers.set(spanId, timer);
+      const nextEvictionTimers = new Map(state.evictionTimers);
+      nextEvictionTimers.set(spanId, timer);
 
-    set({
-      pulsingIds: nextPulsingIds,
-      lastPulseAt: nextLastPulseAt,
-      evictionTimers: nextEvictionTimers,
-    });
-  },
-
-  _evict: (spanId) => {
-    set((s) => {
-      const nextPulsingIds = new Set(s.pulsingIds);
-      nextPulsingIds.delete(spanId);
-
-      const nextLastPulseAt = new Map(s.lastPulseAt);
-      nextLastPulseAt.delete(spanId);
-
-      const nextEvictionTimers = new Map(s.evictionTimers);
-      nextEvictionTimers.delete(spanId);
-
-      return {
+      set({
         pulsingIds: nextPulsingIds,
         lastPulseAt: nextLastPulseAt,
         evictionTimers: nextEvictionTimers,
-      };
-    });
-  },
-}));
+      });
+    },
+
+    _evict: (spanId) => {
+      set((s) => {
+        const nextPulsingIds = new Set(s.pulsingIds);
+        nextPulsingIds.delete(spanId);
+
+        const nextLastPulseAt = new Map(s.lastPulseAt);
+        nextLastPulseAt.delete(spanId);
+
+        const nextEvictionTimers = new Map(s.evictionTimers);
+        nextEvictionTimers.delete(spanId);
+
+        return {
+          pulsingIds: nextPulsingIds,
+          lastPulseAt: nextLastPulseAt,
+          evictionTimers: nextEvictionTimers,
+        };
+      });
+    },
+  }),
+});

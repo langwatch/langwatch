@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 
 interface AnnotationSessionState {
   /** Comments written since the counter was last started. */
@@ -12,8 +12,11 @@ interface AnnotationSessionState {
 /**
  * How many comments the reviewer has written in the pass they are in.
  */
-export const useAnnotationSessionStore = create<AnnotationSessionState>((set) => ({
-  savedCount: 0,
-  recordSaved: () => set((state) => ({ savedCount: state.savedCount + 1 })),
-  start: () => set({ savedCount: 0 }),
-}));
+export const useAnnotationSessionStore = defineSlice<AnnotationSessionState>({
+  name: "trace:annotation-session",
+  create: (set) => ({
+    savedCount: 0,
+    recordSaved: () => set((state) => ({ savedCount: state.savedCount + 1 })),
+    start: () => set({ savedCount: 0 }),
+  }),
+});

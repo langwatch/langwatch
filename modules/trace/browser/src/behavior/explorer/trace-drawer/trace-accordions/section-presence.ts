@@ -1,5 +1,5 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { useEffect, useRef, useState } from "react";
-import { create } from "zustand";
 
 /**
  * Auto-expand accordion: reset on identity change, open new sections, preserve
@@ -61,12 +61,15 @@ export interface SectionPresenceState {
  * `Section` components can broadcast presence without prop-drilling and without React
  * Context (banned by traces-v2 STANDARDS §2). Only one drawer mounts at a time.
  */
-export const useSectionPresenceStore = create<SectionPresenceState>((set) => ({
-  traceId: null,
-  tab: null,
-  set: ({ traceId, tab }) => set({ traceId, tab }),
-  clear: () => set({ traceId: null, tab: null }),
-}));
+export const useSectionPresenceStore = defineSlice<SectionPresenceState>({
+  name: "trace:section-presence",
+  create: (set) => ({
+    traceId: null,
+    tab: null,
+    set: ({ traceId, tab }) => set({ traceId, tab }),
+    clear: () => set({ traceId: null, tab: null }),
+  }),
+});
 
 export function useSyncSectionPresence(value: { traceId: string; tab: "summary" | "span" }): void {
   const setPresence = useSectionPresenceStore((s) => s.set);

@@ -1,5 +1,5 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { nowInstant } from "@langwatch/time";
-import { create } from "zustand";
 
 /**
  * How long a pulse animation lasts. After this the traceId is evicted
@@ -37,64 +37,67 @@ interface RowPulseState {
   _evict: (traceId: string) => void;
 }
 
-export const useRowPulseStore = create<RowPulseState>((set, get) => ({
-  pulsingIds: new Set(),
-  lastPulseAt: new Map(),
-  evictionTimers: new Map(),
+export const useRowPulseStore = defineSlice<RowPulseState>({
+  name: "trace:row-pulse",
+  create: (set, get) => ({
+    pulsingIds: new Set(),
+    lastPulseAt: new Map(),
+    evictionTimers: new Map(),
 
-  pulse: (traceId) => {
-    const state = get();
-    const now = nowInstant().epochMilliseconds;
-    const last = state.lastPulseAt.get(traceId) ?? 0;
+    pulse: (traceId) => {
+      const state = get();
+      const now = nowInstant().epochMilliseconds;
+      const last = state.lastPulseAt.get(traceId) ?? 0;
 
-    if (now - last < PULSE_COALESCE_MS) {
-      // Within the coalesce window — skip this burst event.
-      return;
-    }
+      if (now - last < PULSE_COALESCE_MS) {
+        // Within the coalesce window — skip this burst event.
+        return;
+      }
 
-    // Cancel any existing eviction timer for this trace so we don't
-    // evict mid-animation when it gets re-triggered.
-    const existingTimer = state.evictionTimers.get(traceId);
-    if (existingTimer !== void 0) {
-      clearTimeout(existingTimer);
-    }
+      // Cancel any existing eviction timer for this trace so we don't
+      // evict mid-animation when it gets re-triggered.
+      const existingTimer = state.evictionTimers.get(traceId);
+      if (existingTimer !== void 0) {
+        clearTimeout(existingTimer);
+      }
 
-    const timer = setTimeout(() => {
-      get()._evict(traceId);
-    }, PULSE_DURATION_MS);
+      const timer = setTimeout(() => {
+        get()._evict(traceId);
+      }, PULSE_DURATION_MS);
 
-    const nextPulsingIds = new Set(state.pulsingIds);
-    nextPulsingIds.add(traceId);
+      const nextPulsingIds = new Set(state.pulsingIds);
+      nextPulsingIds.add(traceId);
 
-    const nextLastPulseAt = new Map(state.lastPulseAt);
-    nextLastPulseAt.set(traceId, now);
+      const nextLastPulseAt = new Map(state.lastPulseAt);
+      nextLastPulseAt.set(traceId, now);
 
-    const nextEvictionTimers = new Map(state.evictionTimers);
-    nextEvictionTimers.set(traceId, timer);
+      const nextEvictionTimers = new Map(state.evictionTimers);
+      nextEvictionTimers.set(traceId, timer);
 
-    set({
-      pulsingIds: nextPulsingIds,
-      lastPulseAt: nextLastPulseAt,
-      evictionTimers: nextEvictionTimers,
-    });
-  },
-
-  _evict: (traceId) => {
-    set((s) => {
-      const nextPulsingIds = new Set(s.pulsingIds);
-      nextPulsingIds.delete(traceId);
-
-      const nextLastPulseAt = new Map(s.lastPulseAt);
-      nextLastPulseAt.delete(traceId);
-
-      const nextEvictionTimers = new Map(s.evictionTimers);
-      nextEvictionTimers.delete(traceId);
-
-      return {
+      set({
         pulsingIds: nextPulsingIds,
         lastPulseAt: nextLastPulseAt,
         evictionTimers: nextEvictionTimers,
-      };
-    });
-  },
-}));
+      });
+    },
+
+    _evict: (traceId) => {
+      set((s) => {
+        const nextPulsingIds = new Set(s.pulsingIds);
+        nextPulsingIds.delete(traceId);
+
+        const nextLastPulseAt = new Map(s.lastPulseAt);
+        nextLastPulseAt.delete(traceId);
+
+        const nextEvictionTimers = new Map(s.evictionTimers);
+        nextEvictionTimers.delete(traceId);
+
+        return {
+          pulsingIds: nextPulsingIds,
+          lastPulseAt: nextLastPulseAt,
+          evictionTimers: nextEvictionTimers,
+        };
+      });
+    },
+  }),
+});
