@@ -39,7 +39,6 @@ import {
 } from "./support/budget-overview.fixture.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
-import { TestOrganizationService } from "./support/test-organization-service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -84,42 +83,48 @@ function createSuiteProjects(): ProjectApi {
 }
 
 /** Membership and the personal workspace: the two reads the overview makes. */
-class SuiteOrganizationService extends TestOrganizationService {
-  override isMember = async ({
-    organizationId,
-    userId,
-  }: {
-    organizationId: string;
-    userId: string;
-  }): Promise<boolean> =>
-    (await prisma.organizationUser.count({ where: { organizationId, userId } })) > 0;
+const suiteOrganizations = (): OrganizationService =>
+  createApiFixture<OrganizationService>(
+    {
+      isMember: async ({
+        organizationId,
+        userId,
+      }: {
+        organizationId: string;
+        userId: string;
+      }): Promise<boolean> =>
+        (await prisma.organizationUser.count({ where: { organizationId, userId } })) > 0,
 
-  override getPersonalWorkspace = async ({
-    userId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): ReturnType<OrganizationService["getPersonalWorkspace"]> => {
-    if (userId !== USER_ID) throw new TeamNotFoundError();
-    const team = await prisma.team.findUniqueOrThrow({ where: { id: PERSONAL_TEAM_ID } });
-    const project = await prisma.project.findUniqueOrThrow({ where: { id: PERSONAL_PROJECT_ID } });
-    return {
-      team: {
-        id: team.id,
-        name: team.name,
-        slug: team.slug,
-        createdAtMs: team.createdAt.getTime(),
+      getPersonalWorkspace: async ({
+        userId,
+      }: {
+        userId: string;
+        organizationId: string;
+      }): ReturnType<OrganizationService["getPersonalWorkspace"]> => {
+        if (userId !== USER_ID) throw new TeamNotFoundError();
+        const team = await prisma.team.findUniqueOrThrow({ where: { id: PERSONAL_TEAM_ID } });
+        const project = await prisma.project.findUniqueOrThrow({
+          where: { id: PERSONAL_PROJECT_ID },
+        });
+        return {
+          team: {
+            id: team.id,
+            name: team.name,
+            slug: team.slug,
+            createdAtMs: team.createdAt.getTime(),
+          },
+          project: {
+            id: project.id,
+            name: project.name,
+            slug: project.slug,
+            apiKey: project.apiKey,
+            createdAtMs: project.createdAt.getTime(),
+          },
+        };
       },
-      project: {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        apiKey: project.apiKey,
-        createdAtMs: project.createdAt.getTime(),
-      },
-    };
-  };
-}
+    },
+    "SuiteOrganizationService",
+  );
 
 let chRepo: GatewayBudgetClickHouseRepository;
 let budgetDecisions: GatewayService;
@@ -128,7 +133,7 @@ const featureFlags = new TestFeatureFlags();
 const overviewService = (): BudgetOverviewService =>
   BudgetOverviewService.create({
     repository: PrismaGatewayBudgetOverviewRepository.create({ database: prisma }),
-    organizations: new SuiteOrganizationService(),
+    organizations: suiteOrganizations(),
     featureFlags: featureFlags.api,
     personalVirtualKeys: {
       listActiveForPrincipal: async ({ userId, organizationId }) =>
