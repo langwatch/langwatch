@@ -55,7 +55,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
-    findDirectoryAssertedRoles: vi.fn(async () => []),
+    findDirectoryGroupIds: vi.fn(async () => []),
     findGroup: vi.fn(async () => null),
     findGroupByExternalId: vi.fn(async () => null),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
@@ -67,7 +67,6 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -267,7 +266,6 @@ describe("SCIM characterization: provisioning invariants", () => {
     const writer = new GrantsFake();
     const repo = repository({
       addMembership: vi.fn(async () => undefined),
-      findGrantRows: vi.fn(async () => []),
     });
     const users = {
       findByEmail: vi.fn(async () => ({

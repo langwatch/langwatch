@@ -8,12 +8,8 @@
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import type {
-  ScimGrantBindingScope,
-  ScimGroupRecord,
-  ScimGrantRecord,
-} from "../../repositories/scim.repository.ts";
+import { GrantsFake, listedGrant } from "../../__tests__/support/grants-fake.ts";
+import type { ScimGroupRecord } from "../../repositories/scim.repository.ts";
 import { ScimDirectoryService, type ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
 
@@ -38,8 +34,9 @@ const administrators: ScimGroupRecord = {
   updatedAt: fromDate(new Date("2024-01-02T00:00:00Z")),
 };
 
-const groupBinding: ScimGrantRecord = {
+const groupBinding = listedGrant({
   id: GROUP_BINDING,
+  organizationId: ORGANIZATION,
   userId: null,
   groupId: GROUP,
   apiKeyId: null,
@@ -47,10 +44,11 @@ const groupBinding: ScimGrantRecord = {
   scopeId: ORGANIZATION,
   role: "ADMIN",
   customRoleId: null,
-};
+});
 
-const manualBinding: ScimGrantRecord = {
+const manualBinding = listedGrant({
   id: MANUAL_BINDING,
+  organizationId: ORGANIZATION,
   userId: MEMBER,
   groupId: null,
   apiKeyId: null,
@@ -58,7 +56,7 @@ const manualBinding: ScimGrantRecord = {
   scopeId: ORGANIZATION,
   role: "VIEWER",
   customRoleId: null,
-};
+});
 
 function directoryOver(provenOffboarding = false) {
   const members = new Set([MEMBER, COLLEAGUE]);
@@ -91,12 +89,11 @@ function directoryOver(provenOffboarding = false) {
       for (const userId of input.userIds) members.delete(userId);
     }),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async (scope: ScimGrantBindingScope) =>
-      scope.kind === "group" ? [groupBinding] : [manualBinding],
-    ),
   };
 
   const grants = new GrantsFake();
+  grants.listGroupBindings.mockResolvedValue([groupBinding]);
+  grants.listUserBindings.mockResolvedValue([manualBinding]);
   grants.revokeBindings.mockImplementation(async () => {
     writes.push("revokeBindings");
   });
@@ -108,7 +105,7 @@ function directoryOver(provenOffboarding = false) {
 
   const service = ScimDirectoryService.create({
     prisma: repository,
-    grants: ScimGrantsService.create({ repository, grants }),
+    grants: ScimGrantsService.create({ grants }),
     identities: { assertWritable: vi.fn(async () => undefined) },
     provenOffboarding,
   });

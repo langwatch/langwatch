@@ -35,7 +35,6 @@ function repository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async () => []),
   };
 }
 
@@ -49,7 +48,7 @@ function harness() {
   const service = ScimDirectoryService.create({
     provenOffboarding: false,
     prisma: repo,
-    grants: ScimGrantsService.create({ repository: repo, grants }),
+    grants: ScimGrantsService.create({ grants }),
     identities: { assertWritable: vi.fn(async () => undefined) },
   });
   const update = (operations: unknown[]) =>

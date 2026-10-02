@@ -32,7 +32,6 @@ function groupsRepository(): ScimDirectoryRepository {
     })),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
-    findGrantRows: vi.fn(async () => []),
     groupSlugExists: vi.fn(async () => false),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),
@@ -104,7 +103,7 @@ describe("SCIM characterization: group PATCH membership and operation casing", (
     const groups = ScimDirectoryService.create({
       provenOffboarding: false,
       prisma: repo,
-      grants: ScimGrantsService.create({ repository: repo, grants }),
+      grants: ScimGrantsService.create({ grants }),
       identities: { assertWritable: vi.fn(async () => undefined) },
     });
     await groups.updateGroup({

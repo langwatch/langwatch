@@ -120,7 +120,6 @@ function repositoryOver(groups: ScimGroupRecord[]) {
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async () => []),
   };
 
   return { repository, created };
@@ -133,7 +132,7 @@ function serviceOver(
   return ScimDirectoryService.create({
     provenOffboarding: false,
     prisma: repository,
-    grants: ScimGrantsService.create({ repository, grants: new GrantsFake() }),
+    grants: ScimGrantsService.create({ grants: new GrantsFake() }),
     identities,
   });
 }

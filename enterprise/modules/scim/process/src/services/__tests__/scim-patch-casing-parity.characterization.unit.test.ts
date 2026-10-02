@@ -59,7 +59,6 @@ function groupRepository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async () => []),
   };
 }
 
@@ -170,7 +169,7 @@ describe("SCIM PATCH operation casing parity", () => {
     const service = ScimDirectoryService.create({
       provenOffboarding: false,
       prisma: repo,
-      grants: ScimGrantsService.create({ repository: repo, grants }),
+      grants: ScimGrantsService.create({ grants }),
       identities: { assertWritable: vi.fn(async () => undefined) },
     });
     await service.updateGroup({

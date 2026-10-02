@@ -40,7 +40,6 @@ export type ScimDirectoryRepository = Pick<
   | "findGroupMemberIds"
   | "findGroupMembers"
   | "listGroups"
-  | "findGrantRows"
   | "renameGroup"
   | "findGroup"
   | "findGroupByExternalId"

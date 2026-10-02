@@ -11,12 +11,10 @@ import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts
 import {
   ScimRepository,
   type ScimDirectoryIdentityRecord,
-  type ScimGrantBindingScope,
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
   type ScimMembershipRecord,
   type ScimOrganizationUserRecord,
-  type ScimGrantRecord,
   type ScimTokenIdentity,
   type ScimTokenRecord,
   type ScimUserRecord,
@@ -28,7 +26,6 @@ type StoredRequest = ScimRequestLogEntry;
 type StoredMembership = { organizationId: string; userId: string; role: string };
 type StoredGroupMember = { groupId: string; userId: string };
 type StoredOrganization = { id: string; ssoDomain: string | null };
-type StoredBinding = ScimGrantRecord & { organizationId: string };
 
 const sameName = (left: string, right: string): boolean =>
   left.trim().toLowerCase() === right.trim().toLowerCase();
@@ -42,7 +39,6 @@ export class MemoryScimRepository extends ScimRepository {
   readonly users = new Map<string, ScimUserRecord>();
   readonly organizations = new Map<string, StoredOrganization>();
   readonly connections: { organizationId: string; connectionId: string }[] = [];
-  readonly bindings: StoredBinding[] = [];
   readonly memberships: StoredMembership[] = [];
   readonly resources: ScimUserResourceRecord[] = [];
   readonly groups: ScimGroupRecord[] = [];
@@ -274,30 +270,13 @@ export class MemoryScimRepository extends ScimRepository {
     this.memberships.splice(index, 1);
   };
 
-  async findDirectoryAssertedRoles(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<string[]> {
-    const directoryGroupIds = new Set(
-      this.groups
-        .filter(
-          (group) => group.organizationId === input.organizationId && group.scimSource !== null,
-        )
-        .map((group) => group.id)
-        .filter((groupId) =>
-          this.groupMembers.some((row) => row.groupId === groupId && row.userId === input.userId),
-        ),
-    );
-    return this.bindings
-      .filter(
-        (binding) =>
-          binding.organizationId === input.organizationId &&
-          binding.groupId !== null &&
-          directoryGroupIds.has(binding.groupId) &&
-          binding.scopeType === "ORGANIZATION" &&
-          binding.scopeId === input.organizationId,
-      )
-      .map((binding) => binding.role);
+  async findDirectoryGroupIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    return this.groups
+      .filter((group) => group.organizationId === input.organizationId && group.scimSource !== null)
+      .map((group) => group.id)
+      .filter((groupId) =>
+        this.groupMembers.some((row) => row.groupId === groupId && row.userId === input.userId),
+      );
   }
 
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
@@ -435,21 +414,6 @@ export class MemoryScimRepository extends ScimRepository {
     return this.groups.some(
       (row) => row.organizationId === input.organizationId && row.slug === input.slug,
     );
-  }
-
-  async findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]> {
-    return this.bindings
-      .filter((binding) => {
-        if (binding.organizationId !== scope.organizationId) return false;
-        if (scope.kind === "group") return binding.groupId === scope.groupId;
-        if (scope.kind === "member-offboarding") return binding.userId === scope.userId;
-        return (
-          binding.userId === scope.userId &&
-          binding.scopeType === "ORGANIZATION" &&
-          binding.scopeId === scope.organizationId
-        );
-      })
-      .map(({ organizationId: _organizationId, ...binding }) => binding);
   }
 
   createToken = async (input: {

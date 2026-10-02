@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
   type ScimDirectoryOwnership,
@@ -38,7 +37,7 @@ import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import { ScimDirectoryService } from "./scim-directory.service.ts";
-import { ScimGrantsService } from "./scim-grants.service.ts";
+import { type ScimGrantAuthority, ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
 import { ScimRequestLogService } from "./scim-request-log.service.ts";
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "./scim-sync-lifecycle.service.ts";
@@ -81,7 +80,7 @@ export class ScimService extends ScimServiceContract {
     tokenPepper,
   }: {
     prisma: ScimRepository;
-    writer: AuthzGrantsService;
+    writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;
@@ -96,7 +95,7 @@ export class ScimService extends ScimServiceContract {
     this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create(prisma);
     this.lifecycle = lifecycle;
-    const grants = ScimGrantsService.create({ repository: prisma, grants: writer });
+    const grants = ScimGrantsService.create({ grants: writer });
     this.userOperations = ScimProvisioningService.create({
       prisma,
       writer,
@@ -118,7 +117,7 @@ export class ScimService extends ScimServiceContract {
 
   static create(options: {
     prisma: ScimRepository;
-    writer: AuthzGrantsService;
+    writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;

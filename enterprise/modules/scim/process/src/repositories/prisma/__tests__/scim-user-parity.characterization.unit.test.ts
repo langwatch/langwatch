@@ -8,7 +8,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GrantsFake } from "../../../__tests__/support/grants-fake.ts";
+import { GrantsFake, listedGrant } from "../../../__tests__/support/grants-fake.ts";
 import { OrganizationAdministrationFake } from "../../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture as repository } from "../../../__tests__/support/scim-repository-fixture.ts";
 import { QuietScimSyncLifecycle } from "../../../services/__tests__/support/quiet-scim-sync-lifecycle.ts";
@@ -202,10 +202,7 @@ describe("SCIM user parity", () => {
     const addMembership = vi.fn(async () => {
       throw Object.assign(new Error("P2002"), { code: "P2002" });
     });
-    const repo = repository({
-      addMembership,
-      findGrantRows: vi.fn(async () => []),
-    });
+    const repo = repository({ addMembership });
     const { writer, service } = harness({
       repository: repo,
       existingUser: user(),
@@ -225,9 +222,14 @@ describe("SCIM user parity", () => {
   });
 
   it("reconciles only the SCIM organization-membership grant slice", async () => {
-    const findGrantRows = vi.fn(async () => [
-      {
+    const { writer, service } = harness({
+      existingUser: user(),
+      membership: null,
+    });
+    writer.listUserBindings.mockResolvedValue([
+      listedGrant({
         id: "org-member",
+        organizationId: "org-1",
         userId: "user-1",
         groupId: null,
         apiKeyId: null,
@@ -235,14 +237,8 @@ describe("SCIM user parity", () => {
         scopeId: "org-1",
         role: "MEMBER",
         customRoleId: null,
-      },
+      }),
     ]);
-    const repo = repository({ findGrantRows });
-    const { writer, service } = harness({
-      repository: repo,
-      existingUser: user(),
-      membership: null,
-    });
 
     await service.createUser({
       organizationId: "org-1",
@@ -252,11 +248,11 @@ describe("SCIM user parity", () => {
       },
     });
 
-    expect(findGrantRows).toHaveBeenCalledWith({
-      kind: "organization-membership",
+    expect(writer.listUserBindings).toHaveBeenCalledWith({
       organizationId: "org-1",
       userId: "user-1",
     });
+    expect(writer.listGroupBindings).not.toHaveBeenCalled();
     expect(writer.revokeBindings).not.toHaveBeenCalled();
   });
 
@@ -309,20 +305,21 @@ describe("SCIM user parity", () => {
         organizationId: "org-1",
         user: user(),
       })),
-      findGrantRows: vi.fn(async () => [
-        {
-          id: "grant-1",
-          userId: "user-1",
-          groupId: null,
-          apiKeyId: null,
-          scopeType: "ORGANIZATION",
-          scopeId: "org-1",
-          role: "MEMBER",
-          customRoleId: null,
-        },
-      ]),
     });
     const { repo: usedRepo, users, writer, service } = harness({ repository: repo });
+    writer.listUserBindings.mockResolvedValue([
+      listedGrant({
+        id: "grant-1",
+        organizationId: "org-1",
+        userId: "user-1",
+        groupId: null,
+        apiKeyId: null,
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "MEMBER",
+        customRoleId: null,
+      }),
+    ]);
 
     await expect(
       service.deleteUser({ id: "user-1", organizationId: "org-1" }),

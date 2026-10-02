@@ -17,16 +17,18 @@
  */
 import type { LedgerActor } from "@langwatch/authorization";
 import {
+  type AuthzApi,
   type AuthzGrantsService,
   type AuthzLedgerBindingAttach,
   authzBindingIdentityKey,
   newAuthzGrantId,
 } from "@langwatch/authz-contract";
 
-import type {
-  ScimGrantBindingScope,
-  ScimGrantRepository,
-} from "../repositories/scim.repository.ts";
+import type { ScimGrantBindingScope, ScimGrantRecord } from "../repositories/scim.repository.ts";
+
+/** The grant writes SCIM issues and the listings it reads its current slice from. */
+export type ScimGrantAuthority = AuthzGrantsService &
+  Pick<AuthzApi, "listUserBindings" | "listGroupBindings" | "listUserAndGroupBindings">;
 
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = {
@@ -101,16 +103,60 @@ function keyOfDesired(grant: DesiredScimGrant): string {
  * push changed nothing.
  */
 export class ScimGrantsService {
-  private constructor(
-    private readonly repository: ScimGrantRepository,
-    private readonly grants: AuthzGrantsService,
-  ) {}
+  private constructor(private readonly grants: ScimGrantAuthority) {}
 
-  static create(options: {
-    repository: ScimGrantRepository;
-    grants: AuthzGrantsService;
-  }): ScimGrantsService {
-    return new ScimGrantsService(options.repository, options.grants);
+  static create(options: { grants: ScimGrantAuthority }): ScimGrantsService {
+    return new ScimGrantsService(options.grants);
+  }
+
+  /** The grants this IdP statement is authoritative for, as authz lists them. */
+  async findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]> {
+    const { organizationId } = scope;
+    const bindings =
+      scope.kind === "group"
+        ? await this.grants.listGroupBindings({ organizationId, groupId: scope.groupId })
+        : await this.grants.listUserBindings({ organizationId, userId: scope.userId });
+    return bindings
+      .filter(
+        (binding) =>
+          binding.organizationId === organizationId &&
+          (scope.kind !== "organization-membership" ||
+            (binding.scopeType === "ORGANIZATION" && binding.scopeId === organizationId)),
+      )
+      .map(({ id, userId, groupId, apiKeyId, scopeType, scopeId, role, customRoleId }) => ({
+        id,
+        userId,
+        groupId,
+        apiKeyId,
+        scopeType,
+        scopeId,
+        role,
+        customRoleId,
+      }));
+  }
+
+  /** The organization-scoped roles these SCIM-pushed groups of this person are mapped to. */
+  async findDirectoryAssertedRoles({
+    organizationId,
+    userId,
+    groupIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    groupIds: readonly string[];
+  }): Promise<string[]> {
+    if (groupIds.length === 0) return [];
+    const bindings = await this.grants.listUserAndGroupBindings({ organizationId, userId, groupIds });
+    return bindings
+      .filter(
+        (binding) =>
+          binding.organizationId === organizationId &&
+          binding.groupId !== null &&
+          groupIds.includes(binding.groupId) &&
+          binding.scopeType === "ORGANIZATION" &&
+          binding.scopeId === organizationId,
+      )
+      .map((binding) => binding.role);
   }
 
   async reconcile(input: {
@@ -118,7 +164,7 @@ export class ScimGrantsService {
     desired: DesiredScimGrant[];
     actor: LedgerActor;
   }): Promise<{ attached: number; revoked: number }> {
-    const current = await this.repository.findGrantRows(input.scope);
+    const current = await this.findGrantRows(input.scope);
 
     const desiredKeys = new Set(input.desired.map(keyOfDesired));
     const currentKeys = new Set(current.map((row) => grantKey(row)));

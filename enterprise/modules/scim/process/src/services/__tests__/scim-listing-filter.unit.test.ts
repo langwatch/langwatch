@@ -84,7 +84,6 @@ function directoryRepository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findGrantRows: vi.fn(async () => []),
   };
 }
 
@@ -154,7 +153,7 @@ describe("ScimDirectoryService.listGroups", () => {
       const service = ScimDirectoryService.create({
         provenOffboarding: false,
         prisma: repository,
-        grants: ScimGrantsService.create({ repository, grants: new GrantsFake() }),
+        grants: ScimGrantsService.create({ grants: new GrantsFake() }),
         identities: { assertWritable: vi.fn(async () => undefined) },
       });
 

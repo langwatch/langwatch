@@ -106,11 +106,7 @@ export interface ScimDirectoryIdentityRecord {
 }
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
-export abstract class ScimGrantRepository {
-  abstract findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]>;
-}
-
-export abstract class ScimRepository extends ScimGrantRepository {
+export abstract class ScimRepository {
   abstract findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null>;
   // Declared as properties of function type, not method shorthand: tests hold
   // a mock repository and reference these members unbound (e.g.
@@ -171,8 +167,8 @@ export abstract class ScimRepository extends ScimGrantRepository {
     role: string;
   }) => Promise<void>;
   abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
-  /** The organization-scoped roles this person's SCIM-pushed groups here are mapped to. */
-  abstract findDirectoryAssertedRoles(input: {
+  /** This organization's SCIM-pushed groups this person belongs to. */
+  abstract findDirectoryGroupIds(input: {
     organizationId: string;
     userId: string;
   }): Promise<string[]>;

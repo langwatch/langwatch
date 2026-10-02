@@ -1,6 +1,7 @@
 // One AuthzGrantsService double for the package, replacing seven incorrect copies.
 // Fakes must honor their contract; old ones lied about return types.
 import {
+  type AuthzAccessBinding,
   type AuthzAttachBindingsOutput,
   AuthzGrantsService,
   type AuthzOffboardOutput,
@@ -8,6 +9,24 @@ import {
 import { vi } from "vitest";
 
 type AttachBindingsInput = Parameters<AuthzGrantsService["attachBindings"]>[0];
+
+type ListedGrantFields = Pick<
+  AuthzAccessBinding,
+  "id" | "organizationId" | "userId" | "groupId" | "apiKeyId" | "scopeType" | "scopeId" | "role" | "customRoleId"
+>;
+
+/** A grant row as the authz listings answer it, undecorated. */
+export function listedGrant(fields: ListedGrantFields): AuthzAccessBinding {
+  return {
+    ...fields,
+    createdAt: new Date(0),
+    expiresAt: null,
+    user: null,
+    group: null,
+    apiKey: null,
+    customRole: null,
+  };
+}
 
 export class GrantsFake extends AuthzGrantsService {
   readonly attach = vi.fn();
@@ -55,4 +74,17 @@ export class GrantsFake extends AuthzGrantsService {
   readonly changeGrantRole = vi.fn();
   readonly revokeGrant = vi.fn();
   readonly invalidateOrganization = vi.fn();
+  readonly listUserBindings = vi.fn(
+    async (_input: { organizationId: string; userId: string }): Promise<AuthzAccessBinding[]> => [],
+  );
+  readonly listGroupBindings = vi.fn(
+    async (_input: { organizationId: string; groupId: string }): Promise<AuthzAccessBinding[]> => [],
+  );
+  readonly listUserAndGroupBindings = vi.fn(
+    async (_input: {
+      organizationId: string;
+      userId: string;
+      groupIds: readonly string[];
+    }): Promise<AuthzAccessBinding[]> => [],
+  );
 }

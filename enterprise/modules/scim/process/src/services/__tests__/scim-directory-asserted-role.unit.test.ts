@@ -3,17 +3,19 @@
  * The membership row a directory push writes carries the role the directory asserts.
  * @see specs/identity/scim-connection-sync.feature
  */
+import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { fromDate } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { GrantsFake, listedGrant } from "../../__tests__/support/grants-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import { ScimGrantsService } from "../scim-grants.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
@@ -50,9 +52,11 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
 
 function serviceOver({
   repository,
+  writer,
   provenOffboarding,
 }: {
   repository: ScimRepository;
+  writer: GrantsFake;
   provenOffboarding: boolean;
 }): ScimService {
   const users = {
@@ -62,7 +66,7 @@ function serviceOver({
   } satisfies ScimUserProvisioning;
   return ScimService.create({
     prisma: repository,
-    writer: new GrantsFake(),
+    writer,
     users,
     governance: {
       departmentResolveByNameOrCreate: vi.fn(async () => ({
@@ -92,16 +96,62 @@ async function push(service: ScimService): Promise<void> {
   });
 }
 
+function groupGrant({
+  id,
+  groupId,
+  role,
+  scopeType = "ORGANIZATION",
+  scopeId = "org-1",
+  organizationId = "org-1",
+  customRoleId = null,
+}: {
+  id: string;
+  groupId: string;
+  role: AuthzAccessBinding["role"];
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
+  organizationId?: string;
+  customRoleId?: string | null;
+}) {
+  return listedGrant({
+    id,
+    organizationId,
+    userId: null,
+    groupId,
+    apiKeyId: null,
+    scopeType,
+    scopeId,
+    role,
+    customRoleId,
+  });
+}
+
+function scimGroupsOf(groupIds: string[]) {
+  return scimRepositoryFixture({ findDirectoryGroupIds: vi.fn(async () => groupIds) });
+}
+
 describe("the membership role a SCIM push writes", () => {
   describe("given SCIM v2 grants and a SCIM group mapped ADMIN at organization scope", () => {
     /** @scenario Membership is no longer a fixed role written beside the grant */
     it("creates an ADMIN member", async () => {
-      const repository = scimRepositoryFixture({
-        findDirectoryAssertedRoles: vi.fn(async () => ["MEMBER", "ADMIN"]),
+      const repository = scimGroupsOf(["scim-group"]);
+      const writer = new GrantsFake();
+      writer.listUserAndGroupBindings.mockResolvedValue([
+        groupGrant({ id: "b1", groupId: "scim-group", role: "MEMBER" }),
+        groupGrant({ id: "b2", groupId: "scim-group", role: "ADMIN" }),
+      ]);
+
+      await push(serviceOver({ repository, writer, provenOffboarding: true }));
+
+      expect(repository.findDirectoryGroupIds).toHaveBeenCalledWith({
+        userId: "user-1",
+        organizationId: "org-1",
       });
-
-      await push(serviceOver({ repository, provenOffboarding: true }));
-
+      expect(writer.listUserAndGroupBindings).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        userId: "user-1",
+        groupIds: ["scim-group"],
+      });
       expect(repository.addMembership).toHaveBeenCalledWith({
         userId: "user-1",
         organizationId: "org-1",
@@ -112,11 +162,14 @@ describe("the membership role a SCIM push writes", () => {
 
   describe("given SCIM v2 grants and only non-admin or custom mappings", () => {
     it("creates a MEMBER", async () => {
-      const repository = scimRepositoryFixture({
-        findDirectoryAssertedRoles: vi.fn(async () => ["VIEWER", "CUSTOM"]),
-      });
+      const repository = scimGroupsOf(["scim-group"]);
+      const writer = new GrantsFake();
+      writer.listUserAndGroupBindings.mockResolvedValue([
+        groupGrant({ id: "b1", groupId: "scim-group", role: "VIEWER" }),
+        groupGrant({ id: "b2", groupId: "scim-group", role: "CUSTOM", customRoleId: "custom-1" }),
+      ]);
 
-      await push(serviceOver({ repository, provenOffboarding: true }));
+      await push(serviceOver({ repository, writer, provenOffboarding: true }));
 
       expect(repository.addMembership).toHaveBeenCalledWith(
         expect.objectContaining({ role: "MEMBER" }),
@@ -126,12 +179,16 @@ describe("the membership role a SCIM push writes", () => {
 
   describe("given the previous write path", () => {
     it("creates a MEMBER without asking what the directory maps", async () => {
-      const findDirectoryAssertedRoles = vi.fn(async () => ["ADMIN"]);
-      const repository = scimRepositoryFixture({ findDirectoryAssertedRoles });
+      const repository = scimGroupsOf(["scim-group"]);
+      const writer = new GrantsFake();
+      writer.listUserAndGroupBindings.mockResolvedValue([
+        groupGrant({ id: "b1", groupId: "scim-group", role: "ADMIN" }),
+      ]);
 
-      await push(serviceOver({ repository, provenOffboarding: false }));
+      await push(serviceOver({ repository, writer, provenOffboarding: false }));
 
-      expect(findDirectoryAssertedRoles).not.toHaveBeenCalled();
+      expect(repository.findDirectoryGroupIds).not.toHaveBeenCalled();
+      expect(writer.listUserAndGroupBindings).not.toHaveBeenCalled();
       expect(repository.addMembership).toHaveBeenCalledWith(
         expect.objectContaining({ role: "MEMBER" }),
       );
@@ -139,90 +196,114 @@ describe("the membership role a SCIM push writes", () => {
   });
 
   describe("given the mapping cannot be read", () => {
-    it("writes no membership and fails the push", async () => {
+    it("writes no membership and fails the push when the grant listing fails", async () => {
+      const repository = scimGroupsOf(["scim-group"]);
+      const writer = new GrantsFake();
+      writer.listUserAndGroupBindings.mockRejectedValue(new Error("role bindings unavailable"));
+
+      await expect(
+        push(serviceOver({ repository, writer, provenOffboarding: true })),
+      ).rejects.toThrow("role bindings unavailable");
+      expect(repository.addMembership).not.toHaveBeenCalled();
+    });
+
+    it("writes no membership and fails the push when the SCIM groups cannot be read", async () => {
       const repository = scimRepositoryFixture({
-        findDirectoryAssertedRoles: vi.fn(async () => {
-          throw new Error("role bindings unavailable");
+        findDirectoryGroupIds: vi.fn(async () => {
+          throw new Error("scim groups unavailable");
         }),
       });
 
-      await expect(push(serviceOver({ repository, provenOffboarding: true }))).rejects.toThrow(
-        "role bindings unavailable",
-      );
+      await expect(
+        push(serviceOver({ repository, writer: new GrantsFake(), provenOffboarding: true })),
+      ).rejects.toThrow("scim groups unavailable");
       expect(repository.addMembership).not.toHaveBeenCalled();
     });
   });
 });
 
-describe("MemoryScimRepository.findDirectoryAssertedRoles", () => {
-  it("answers only organization-scoped roles of this person's SCIM groups", async () => {
+describe("MemoryScimRepository.findDirectoryGroupIds", () => {
+  it("answers only this organization's SCIM groups the person belongs to", async () => {
     const repository = MemoryScimRepository.create();
+    const group = {
+      organizationId: "org-1",
+      connectionId: null,
+      createdAt: epoch,
+      updatedAt: epoch,
+    };
     repository.groups.push(
+      { ...group, id: "scim-group", name: "Admins", slug: "admins", scimSource: "okta", externalId: "ext-1" },
+      { ...group, id: "hand-group", name: "Local", slug: "local", scimSource: null, externalId: null },
       {
-        id: "scim-group",
-        organizationId: "org-1",
-        name: "Admins",
-        slug: "admins",
+        ...group,
+        id: "other-org-group",
+        organizationId: "org-2",
+        name: "Elsewhere",
+        slug: "elsewhere",
         scimSource: "okta",
-        externalId: "ext-1",
-        connectionId: null,
-        createdAt: epoch,
-        updatedAt: epoch,
-      },
-      {
-        id: "hand-group",
-        organizationId: "org-1",
-        name: "Local",
-        slug: "local",
-        scimSource: null,
-        externalId: null,
-        connectionId: null,
-        createdAt: epoch,
-        updatedAt: epoch,
+        externalId: "ext-2",
       },
     );
     repository.groupMembers.push(
       { groupId: "scim-group", userId: "user-1" },
       { groupId: "hand-group", userId: "user-1" },
-    );
-    const binding = {
-      userId: null,
-      apiKeyId: null,
-      customRoleId: null,
-      organizationId: "org-1",
-    };
-    repository.bindings.push(
-      {
-        ...binding,
-        id: "b1",
-        groupId: "scim-group",
-        scopeType: "ORGANIZATION",
-        scopeId: "org-1",
-        role: "ADMIN",
-      },
-      {
-        ...binding,
-        id: "b2",
-        groupId: "scim-group",
-        scopeType: "TEAM",
-        scopeId: "team-1",
-        role: "VIEWER",
-      },
-      {
-        ...binding,
-        id: "b3",
-        groupId: "hand-group",
-        scopeType: "ORGANIZATION",
-        scopeId: "org-1",
-        role: "MEMBER",
-      },
+      { groupId: "other-org-group", userId: "user-1" },
     );
 
     await expect(
-      repository.findDirectoryAssertedRoles({ organizationId: "org-1", userId: "user-1" }),
-    ).resolves.toEqual(["ADMIN"]);
+      repository.findDirectoryGroupIds({ organizationId: "org-1", userId: "user-1" }),
+    ).resolves.toEqual(["scim-group"]);
     await expect(
-      repository.findDirectoryAssertedRoles({ organizationId: "org-1", userId: "user-2" }),
+      repository.findDirectoryGroupIds({ organizationId: "org-1", userId: "user-2" }),
     ).resolves.toEqual([]);
+  });
+});
+
+describe("ScimGrantsService.findDirectoryAssertedRoles", () => {
+  it("answers only organization-scoped roles of this person's SCIM groups", async () => {
+    const grants = new GrantsFake();
+    grants.listUserAndGroupBindings.mockResolvedValue([
+      groupGrant({ id: "b1", groupId: "scim-group", role: "ADMIN" }),
+      groupGrant({ id: "b2", groupId: "scim-group", role: "VIEWER", scopeType: "TEAM", scopeId: "team-1" }),
+      groupGrant({ id: "b3", groupId: "hand-group", role: "MEMBER" }),
+      groupGrant({ id: "b4", groupId: "scim-group", role: "MEMBER", organizationId: "org-2", scopeId: "org-2" }),
+      listedGrant({
+        id: "b5",
+        organizationId: "org-1",
+        userId: "user-1",
+        groupId: null,
+        apiKeyId: null,
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "ADMIN",
+        customRoleId: null,
+      }),
+    ]);
+
+    await expect(
+      ScimGrantsService.create({ grants }).findDirectoryAssertedRoles({
+        organizationId: "org-1",
+        userId: "user-1",
+        groupIds: ["scim-group"],
+      }),
+    ).resolves.toEqual(["ADMIN"]);
+    expect(grants.listUserAndGroupBindings).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      userId: "user-1",
+      groupIds: ["scim-group"],
+    });
+  });
+
+  it("answers nothing without reading grants when the person is in no SCIM group", async () => {
+    const grants = new GrantsFake();
+
+    await expect(
+      ScimGrantsService.create({ grants }).findDirectoryAssertedRoles({
+        organizationId: "org-1",
+        userId: "user-2",
+        groupIds: [],
+      }),
+    ).resolves.toEqual([]);
+    expect(grants.listUserAndGroupBindings).not.toHaveBeenCalled();
   });
 });

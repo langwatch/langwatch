@@ -259,7 +259,7 @@ export class ScimProvisioningService {
     }
 
     await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
-    const visibleGrants = await this.prisma.findGrantRows({
+    const visibleGrants = await this.grants.findGrantRows({
       kind: "member-offboarding",
       organizationId,
       userId,
@@ -358,7 +358,12 @@ export class ScimProvisioningService {
     organizationId: string;
   }): Promise<"ADMIN" | "MEMBER"> {
     if (!this.provenOffboarding) return "MEMBER";
-    const roles = await this.prisma.findDirectoryAssertedRoles({ userId, organizationId });
+    const groupIds = await this.prisma.findDirectoryGroupIds({ userId, organizationId });
+    const roles = await this.grants.findDirectoryAssertedRoles({
+      organizationId,
+      userId,
+      groupIds,
+    });
     return roles.includes("ADMIN") ? "ADMIN" : "MEMBER";
   }
 

@@ -16,12 +16,10 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
-  type ScimGrantBindingScope,
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
   type ScimMembershipRecord,
   type ScimOrganizationUserRecord,
-  type ScimGrantRecord,
   type ScimTokenRecord,
   type ScimTokenIdentity,
   type ScimUserRecord,
@@ -121,24 +119,10 @@ function isScimDatabase(value: object): value is ScimDatabase {
     "organizationUser" in value &&
     "group" in value &&
     "groupMembership" in value &&
-    "roleBinding" in value &&
     "scimToken" in value &&
     "ssoConnection" in value &&
     "scimExternalId" in value
   );
-}
-
-function grantScopeFilter(
-  scope: ScimGrantBindingScope,
-):
-  | { userId: string; scopeType: "ORGANIZATION"; scopeId: string }
-  | { userId: string }
-  | { groupId: string } {
-  if (scope.kind === "organization-membership") {
-    return { userId: scope.userId, scopeType: "ORGANIZATION", scopeId: scope.organizationId };
-  }
-  if (scope.kind === "member-offboarding") return { userId: scope.userId };
-  return { groupId: scope.groupId };
 }
 
 /** Strict generated-Prisma implementation of the SCIM persistence port. */
@@ -389,24 +373,16 @@ export class PrismaScimRepository extends ScimRepository {
       where: { userId_organizationId: input },
     });
   };
-  async findDirectoryAssertedRoles(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<string[]> {
-    const bindings = await this.prisma.roleBinding.findMany({
+  async findDirectoryGroupIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    const groups = await this.prisma.group.findMany({
       where: {
         organizationId: input.organizationId,
-        scopeType: "ORGANIZATION",
-        scopeId: input.organizationId,
-        group: {
-          organizationId: input.organizationId,
-          scimSource: { not: null },
-          members: { some: { userId: input.userId } },
-        },
+        scimSource: { not: null },
+        members: { some: { userId: input.userId } },
       },
-      select: { role: true },
+      select: { id: true },
     });
-    return bindings.map((binding) => binding.role);
+    return groups.map((group) => group.id);
   }
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     const row = await this.prisma.group.findFirst({
@@ -540,24 +516,6 @@ export class PrismaScimRepository extends ScimRepository {
   }
   async groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean> {
     return (await this.prisma.group.findFirst({ where: input, select: { id: true } })) !== null;
-  }
-  findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]> {
-    return this.prisma.roleBinding.findMany({
-      where: {
-        organizationId: scope.organizationId,
-        ...grantScopeFilter(scope),
-      },
-      select: {
-        id: true,
-        userId: true,
-        groupId: true,
-        apiKeyId: true,
-        scopeType: true,
-        scopeId: true,
-        role: true,
-        customRoleId: true,
-      },
-    });
   }
   // Arrow instance property to match the base class's property-typed
   // declaration (see `findMembership` above for why).

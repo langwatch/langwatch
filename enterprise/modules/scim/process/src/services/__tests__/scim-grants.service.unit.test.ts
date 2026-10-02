@@ -2,22 +2,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import {
-  ScimGrantRepository,
-  type ScimGrantBindingScope,
-  type ScimGrantRecord,
-} from "../../repositories/scim.repository.ts";
+import type { AuthzAccessBinding } from "@langwatch/authz-contract";
+
+import { GrantsFake, listedGrant } from "../../__tests__/support/grants-fake.ts";
 import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service.ts";
 
 const organizationId = "org_1";
 const userId = "user_1";
-
-class GrantRepositoryFake extends ScimGrantRepository {
-  readonly findGrantRows = vi.fn<(scope: ScimGrantBindingScope) => Promise<ScimGrantRecord[]>>(
-    async () => [],
-  );
-}
 
 const memberGrant: DesiredScimGrant = {
   principal: { userId },
@@ -29,8 +20,9 @@ const memberGrant: DesiredScimGrant = {
 
 const roleBindingKsuid = /^(?:[a-z\d]+_)?rolebinding_[a-zA-Z\d]{29}$/;
 
-const storedMember: ScimGrantRecord = {
+const storedMember: AuthzAccessBinding = listedGrant({
   id: "binding_1",
+  organizationId,
   userId,
   groupId: null,
   apiKeyId: null,
@@ -38,19 +30,17 @@ const storedMember: ScimGrantRecord = {
   scopeId: organizationId,
   role: "MEMBER",
   customRoleId: null,
-};
+});
 
 describe("SCIM grant reconciliation", () => {
-  let repository: GrantRepositoryFake;
   let grants: GrantsFake;
 
   beforeEach(() => {
-    repository = new GrantRepositoryFake();
     grants = new GrantsFake();
   });
 
   const reconcile = (desired: DesiredScimGrant[]) =>
-    ScimGrantsService.create({ repository, grants }).reconcile({
+    ScimGrantsService.create({ grants }).reconcile({
       scope: {
         kind: "organization-membership",
         organizationId,
@@ -82,7 +72,7 @@ describe("SCIM grant reconciliation", () => {
   });
 
   it("emits nothing when the projection already matches", async () => {
-    repository.findGrantRows.mockResolvedValue([storedMember]);
+    grants.listUserBindings.mockResolvedValue([storedMember]);
 
     expect(await reconcile([memberGrant])).toEqual({ attached: 0, revoked: 0 });
     expect(grants.attachBindings).not.toHaveBeenCalled();
@@ -90,7 +80,7 @@ describe("SCIM grant reconciliation", () => {
   });
 
   it("revokes a grant the directory stopped asserting", async () => {
-    repository.findGrantRows.mockResolvedValue([storedMember]);
+    grants.listUserBindings.mockResolvedValue([storedMember]);
 
     expect(await reconcile([])).toEqual({ attached: 0, revoked: 1 });
     expect(grants.revokeBindings).toHaveBeenCalledWith(
@@ -98,15 +88,25 @@ describe("SCIM grant reconciliation", () => {
     );
   });
 
+  it("revokes by the grant id the listing returned", async () => {
+    grants.listUserBindings.mockResolvedValue([{ ...storedMember, id: "grant_from_listing" }]);
+
+    await reconcile([]);
+
+    expect(grants.revokeBindings).toHaveBeenCalledWith(
+      expect.objectContaining({ bindingIds: ["grant_from_listing"] }),
+    );
+  });
+
   it("revokes the stale role before attaching its replacement", async () => {
-    repository.findGrantRows.mockResolvedValue([{ ...storedMember, role: "VIEWER" }]);
+    grants.listUserBindings.mockResolvedValue([{ ...storedMember, role: "VIEWER" }]);
 
     expect(await reconcile([memberGrant])).toEqual({ attached: 1, revoked: 1 });
     expect(grants.revokeBindings).toHaveBeenCalledBefore(grants.attachBindings);
   });
 
   it("distinguishes a custom role at the same scope", async () => {
-    repository.findGrantRows.mockResolvedValue([
+    grants.listUserBindings.mockResolvedValue([
       { ...storedMember, id: "binding_custom", customRoleId: "custom_1" },
     ]);
 
@@ -117,15 +117,11 @@ describe("SCIM grant reconciliation", () => {
   });
 
   it("uses the same tenant scope for the projection and every command", async () => {
-    repository.findGrantRows.mockResolvedValue([storedMember]);
+    grants.listUserBindings.mockResolvedValue([storedMember]);
 
     await reconcile([]);
 
-    expect(repository.findGrantRows).toHaveBeenCalledWith({
-      kind: "organization-membership",
-      organizationId,
-      userId,
-    });
+    expect(grants.listUserBindings).toHaveBeenCalledWith({ organizationId, userId });
     expect(grants.revokeBindings).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
   });
   describe("when two grants are minted in the same millisecond", () => {
