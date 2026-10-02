@@ -13,7 +13,7 @@ export function SidebarMenuLink({
   menuEnd,
   isSelected,
   children,
-  paddingX = 2.5,
+  paddingX = 3,
 }: {
   href: string;
   icon?: ReactNode;
@@ -33,11 +33,12 @@ export function SidebarMenuLink({
       borderRadius="lg"
       aria-current={isSelected ? "page" : void 0}
       background={isSelected ? "bg.muted" : "transparent"}
-      _hover={{ background: "bg.muted" }}
+      fontWeight={isSelected ? "medium" : void 0}
+      _hover={{ background: "bg.muted", textDecoration: "none" }}
     >
       <HStack width="full" gap={2}>
         {icon}
-        <Text>{children}</Text>
+        <Text truncate>{children}</Text>
         <Spacer />
         {menuEnd}
       </HStack>

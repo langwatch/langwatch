@@ -526,6 +526,7 @@ export function AnnotationList({
             minWidth={0}
             overflow="auto"
             paddingX={6}
+            paddingTop={6}
             paddingBottom={4}
             data-testid="annotations-table-scroll"
           >

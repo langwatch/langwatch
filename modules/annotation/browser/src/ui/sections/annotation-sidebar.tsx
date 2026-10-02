@@ -17,7 +17,7 @@ import { SidebarMenuLink } from "../elements/sidebar-menu-link.tsx";
 /** A badge shows a number or nothing; zero is not news. */
 function PendingCount({ count }: { count: number | undefined }) {
   return (
-    <Text fontSize="10.5px" fontWeight="500">
+    <Text fontSize="xs" color="fg.muted">
       {count && count > 0 ? count : ""}
     </Text>
   );
@@ -59,8 +59,8 @@ function QueueSidebarEntry({
         icon={icon}
         menuEnd={
           <Text
-            fontSize="10.5px"
-            fontWeight="500"
+            fontSize="xs"
+            color="fg.muted"
             opacity={canEdit && menuOpen ? 0 : 1}
             _groupHover={canEdit ? { opacity: 0 } : void 0}
           >
@@ -143,22 +143,22 @@ export function AnnotationSidebar({
         paddingBottom={4}
         borderRightWidth="1px"
         borderColor="border.emphasized"
-        fontSize="12.5px"
+        fontSize="sm"
         minWidth="218px"
         height="full"
-        gap={0.5}
+        gap={0}
       >
         <Text
           fontSize="14px"
           fontWeight="semibold"
-          paddingX={3}
+          paddingX={5}
           height="48px"
           display="flex"
           alignItems="center"
         >
           Annotations
         </Text>
-        <VStack paddingX={2} gap={0.5} width="full">
+        <VStack paddingX={2} paddingTop={2} gap={1} width="full">
           <SidebarMenuLink
             href={`/${projectSlug}/annotations`}
             icon={<Inbox width={15} height={15} />}
@@ -190,16 +190,15 @@ export function AnnotationSidebar({
           >
             All
           </SidebarMenuLink>
-          <Separator />
-          <HStack width="full" justify="space-between" paddingRight={2} paddingTop={1.5}>
+          <Separator marginY={2} />
+          <HStack width="full" justify="space-between" paddingRight={1}>
             <Text
-              fontSize="10px"
+              fontSize="xs"
               fontWeight="semibold"
               textTransform="uppercase"
-              letterSpacing="0.025em"
+              letterSpacing="wider"
               color="fg.muted"
-              paddingX={2.5}
-              paddingY={0.5}
+              paddingX={3}
             >
               My Queues
             </Text>

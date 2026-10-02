@@ -137,8 +137,8 @@ export function AnnotationTable({
             <Table.Row
               key={row.id}
               cursor="pointer"
-              _hover={{ bg: "bg.emphasized" }}
               backgroundColor={row.doneAt ? "bg.subtle" : "bg.panel"}
+              _hover={{ backgroundColor: "bg.muted" }}
               onClick={() => onRowClick(row)}
               data-testid="annotation-row"
             >
@@ -430,7 +430,7 @@ function annotatorNames(annotations: AnnotationWithUser[]): string[] {
 
 export function AnnotationTableSkeleton() {
   return (
-    <Box flex={1} minWidth={0} overflow="auto" paddingX={6}>
+    <Box flex={1} minWidth={0} overflow="auto" paddingX={6} paddingTop={6}>
       <Table.Root variant="line" width="full">
         <Table.Header>
           <Table.Row>
