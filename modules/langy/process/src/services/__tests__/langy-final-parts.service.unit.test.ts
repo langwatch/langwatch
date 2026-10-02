@@ -1,4 +1,4 @@
-import { LangyFinalPartsService } from "@langwatch/langy-process/services/langy-final-parts.service";
+import { LangyFinalPartsService } from "#services/langy-final-parts.service";
 import { describe, expect, it } from "vitest";
 
 const buildFinalAssistantParts = (input: Parameters<LangyFinalPartsService["build"]>[0]) =>

@@ -2062,6 +2062,9 @@ importers:
       '@langwatch/enterprise-managed-provider-browser':
         specifier: workspace:*
         version: link:../../enterprise/modules/managed-provider/browser
+      '@langwatch/enterprise-saas-browser':
+        specifier: workspace:*
+        version: link:../../enterprise/modules/saas/browser
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/saas/contract
@@ -3407,42 +3410,30 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../../packages/browser-host
-      '@langwatch/coding-agent-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/coding-agent/browser
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../../../packages/config
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../../packages/error-views
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/langy-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/langy/browser
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../../../modules/langy/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
-      '@langwatch/navigation-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/navigation/browser
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
-      '@langwatch/user-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/user/browser
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -3461,9 +3452,6 @@ importers:
       recharts:
         specifier: 'catalog:'
         version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
-      zustand:
-        specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -3911,6 +3899,9 @@ importers:
 
   enterprise/modules/managed-provider/browser:
     dependencies:
+      '@langwatch/browser':
+        specifier: workspace:*
+        version: link:../../../../packages/browser
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
@@ -4117,6 +4108,9 @@ importers:
 
   enterprise/modules/saas/browser:
     dependencies:
+      '@langwatch/browser':
+        specifier: workspace:*
+        version: link:../../../../packages/browser
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4971,6 +4965,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -6331,6 +6328,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -7684,9 +7684,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../automation/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -8700,6 +8697,9 @@ importers:
       '@langwatch/enterprise-gateway-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/enterprise-gateway/contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11085,6 +11085,9 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/sso/contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -14139,9 +14142,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/annotation-browser':
-        specifier: workspace:*
-        version: link:../../annotation/browser
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
@@ -14232,9 +14232,6 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
-      '@langwatch/suite-browser':
-        specifier: workspace:*
-        version: link:../../suite/browser
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -14343,9 +14340,6 @@ importers:
       shiki:
         specifier: 'catalog:'
         version: 4.3.0
-      slugify:
-        specifier: 'catalog:'
-        version: 1.6.9
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -14480,9 +14474,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../automation/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -14573,9 +14564,6 @@ importers:
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
         version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(supports-color@10.2.2)(vitest@5.0.1)
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../scenario/contract
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
@@ -14774,6 +14762,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
@@ -15130,9 +15121,6 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@langwatch/agent-browser':
-        specifier: workspace:*
-        version: link:../../agent/browser
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract

@@ -19,10 +19,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./composition/organization-invites": {
-      "types": "./dist/repositories/prisma/prisma.organization-invite.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.organization-invite.repository.ts"
     }
   },
   "scripts": {

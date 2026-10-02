@@ -14,10 +14,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./composition/sso-connection-backoffice": {
-      "types": "./dist/repositories/prisma/prisma.sso-connection-backoffice.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts"
     }
   },
   "scripts": {

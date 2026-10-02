@@ -23,62 +23,6 @@
     "./testing": {
       "types": "./dist/__tests__/testing.d.ts",
       "default": "./src/__tests__/testing.ts"
-    },
-    "./realtime-session-reconciliation": {
-      "types": "./dist/services/gateway-realtime-session-reconciliation.service.d.ts",
-      "default": "./src/services/gateway-realtime-session-reconciliation.service.ts"
-    },
-    "./composition/gateway-change-events": {
-      "types": "./dist/repositories/prisma/prisma.gateway-change-event.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts"
-    },
-    "./composition/gateway-audit": {
-      "types": "./dist/repositories/prisma/prisma.gateway-audit.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-audit.repository.ts"
-    },
-    "./composition/gateway-virtual-keys": {
-      "types": "./dist/repositories/prisma/prisma.virtual-key.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
-    },
-    "./composition/gateway-guardrails": {
-      "types": "./dist/repositories/prisma/prisma.gateway-guardrail.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts"
-    },
-    "./composition/gateway-scope-resolution": {
-      "types": "./dist/repositories/prisma/prisma.gateway-scope-resolution.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts"
-    },
-    "./composition/gateway-key-budgets": {
-      "types": "./dist/repositories/prisma/prisma.gateway-key-budget.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
-    },
-    "./composition/gateway-transactions": {
-      "types": "./dist/repositories/prisma/prisma.gateway-transaction.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-transaction.repository.ts"
-    },
-    "./composition/gateway-virtual-key-direct-budgets": {
-      "types": "./dist/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts"
-    },
-    "./composition/gateway-realtime-sessions": {
-      "types": "./dist/repositories/prisma/prisma.gateway-realtime-session.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts"
-    },
-    "./composition/gateway-virtual-key-authorization": {
-      "types": "./dist/repositories/prisma/prisma.virtual-key-authorization.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts"
-    },
-    "./composition/gateway-provider-labels": {
-      "types": "./dist/repositories/prisma/prisma.gateway-provider-label.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"
-    },
-    "./composition/gateway-spend-fold": {
-      "types": "./dist/projections/gateway-spend.projection.d.ts",
-      "default": "./src/projections/gateway-spend.projection.ts"
-    },
-    "./composition/gateway-agent-cache-store": {
-      "types": "./dist/stores/gateway-agent-cache/gateway-agent-cache.store.d.ts",
-      "default": "./src/stores/gateway-agent-cache/gateway-agent-cache.store.ts"
     }
   },
   "scripts": {

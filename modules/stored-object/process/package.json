@@ -19,10 +19,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./composition/stored-objects": {
-      "types": "./dist/repositories/clickhouse/stored-objects.repository.d.ts",
-      "default": "./src/repositories/clickhouse/stored-objects.repository.ts"
     }
   },
   "scripts": {

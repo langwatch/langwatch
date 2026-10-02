@@ -31,28 +31,20 @@ export type { BillingReportOrganizationDatabase } from "./repositories/prisma/pr
 export type { BillingOrganizationCacheRedis } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 export { BillingReportingPipeline } from "./eventing/billing-reporting.pipeline.ts";
 export { BillingSubscriptionNotifier } from "./channels/billing-subscription-notifier.channel.ts";
-export { MemoryBillingSubscriptionNotifierChannel } from "./channels/memory/memory.billing-subscription-notifier.channel.ts";
 export { billingSubscriptionNotifierChannels } from "./channels/billing-subscription-notifier-channels.registry.ts";
 export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts";
-export { MemoryUsageLimitEmailChannel } from "./channels/memory/memory.usage-limit-email.channel.ts";
 export { usageLimitEmailChannels } from "./channels/usage-limit-email-channels.registry.ts";
 export {
   ConnectedInvoicingChannel,
   type ConnectedInvoiceLine,
   type ProviderInvoice,
 } from "./channels/connected-invoicing.channel.ts";
-export { MemoryConnectedInvoicingChannel } from "./channels/memory/memory.connected-invoicing.channel.ts";
-export {
-  HttpConnectedInvoicingChannel,
-  INVOICE_DAYS_UNTIL_DUE,
-} from "./channels/http/http.connected-invoicing.channel.ts";
 export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
 export type { ConnectedBillingAccountRecord, ConnectedCreditGrantRecord, ConnectedInvoiceRecord, ConnectedSeatChangeRecord, PendingRenewal } from "./repositories/connected-billing.repository.ts";
 export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
 export type { ConnectedBillingTerms } from "./services/connected-billing.service.ts";
 export type { CommitDrawdown, ConnectedCustomer, ConnectedStatement, ConnectedStatementSources, MonthlyStatementRunSummary, StatementSeats, StatementSpendLine } from "./services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
-export { MemoryConnectedStatementMailChannel } from "./channels/memory/memory.connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
@@ -102,7 +94,6 @@ export type { InviteApprover } from "./services/billing-checkout-completion.serv
 export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
 export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
-export { MemoryBillingWebhookHostChannel } from "./channels/memory/memory.billing-webhook-host.channel.ts";
 export { billingWebhookHostChannels } from "./channels/billing-webhook-host-channels.registry.ts";
 export type {
   CancelledSubscription,

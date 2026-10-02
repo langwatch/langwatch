@@ -7,20 +7,17 @@ export {
   createAutomationTraceTriggerCatalogue,
   createAutomationTriggers,
 } from "./automation.module.ts";
-export { SlackWebhookDeliveryChannel } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
   RenderedSlackMessageRequest,
   SlackWebhookRequest,
   SlackWebhookTransport,
 } from "./channels/slack/slack.webhook-delivery.channel.ts";
-export { SlackWebhookClientChannel } from "./channels/slack/slack.webhook-client.channel.ts";
 export type { AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 export type {
   AutomationWebhookSecretCrypto,
   AutomationWebhookStoredParams,
   WebhookStoredActionParams,
 } from "./services/automation-webhook-secrets.service.ts";
-export { HttpWebhookDeliveryChannel } from "./channels/http/http.webhook-delivery.channel.ts";
 export type {
   PersistActionParamsArgs,
   ServerDef,
@@ -35,7 +32,6 @@ export type {
   WebhookDeliveryRequest,
   WebhookDeliveryTransport,
 } from "./channels/http/http.webhook-delivery.channel.ts";
-export { SlackWebApiDeliveryChannel } from "./channels/slack/slack.web-api-delivery.channel.ts";
 export type { SlackApiTransport } from "./channels/slack/slack.web-api-delivery.channel.ts";
 export {
   createAutomationsPipeline,

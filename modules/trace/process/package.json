@@ -23,22 +23,6 @@
     "./testing": {
       "types": "./dist/__tests__/testing.d.ts",
       "default": "./src/__tests__/testing.ts"
-    },
-    "./composition/trace-edit-overlay": {
-      "types": "./dist/repositories/prisma/prisma.trace-edit-overlay.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
-    },
-    "./api-rest/otlp-ingest": {
-      "types": "./dist/transport/otlp-ingest.rest.d.ts",
-      "default": "./src/transport/otlp-ingest.rest.ts"
-    },
-    "./api-rest/traces": {
-      "types": "./dist/transport/traces.rest.d.ts",
-      "default": "./src/transport/traces.rest.ts"
-    },
-    "./api-rest/collector": {
-      "types": "./dist/transport/collector.rest.d.ts",
-      "default": "./src/transport/collector.rest.ts"
     }
   },
   "scripts": {
@@ -53,7 +37,6 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",

@@ -24,37 +24,9 @@
       "types": "./dist/rules/langy-frame-auth.rules.d.ts",
       "default": "./src/rules/langy-frame-auth.rules.ts"
     },
-    "./rules/langy-capability-progress": {
-      "types": "./dist/rules/langy-capability-progress.rules.d.ts",
-      "default": "./src/rules/langy-capability-progress.rules.ts"
-    },
     "./rules/langy-turn-settlement": {
       "types": "./dist/rules/langy-turn-settlement.rules.d.ts",
       "default": "./src/rules/langy-turn-settlement.rules.ts"
-    },
-    "./langy.ids": {
-      "types": "./dist/processes/langy-conversation-process.types.d.ts",
-      "default": "./src/processes/langy-conversation-process.types.ts"
-    },
-    "./services/langy-final-parts.service": {
-      "types": "./dist/services/langy-final-parts.service.d.ts",
-      "default": "./src/services/langy-final-parts.service.ts"
-    },
-    "./services/langy-message.service": {
-      "types": "./dist/services/langy-message.service.d.ts",
-      "default": "./src/services/langy-message.service.ts"
-    },
-    "./services/langy-turn.service": {
-      "types": "./dist/services/langy-turn.service.d.ts",
-      "default": "./src/services/langy-turn.service.ts"
-    },
-    "./ports/langy-turn-runtime": {
-      "types": "./dist/app/langy.members.d.ts",
-      "default": "./src/app/langy.members.ts"
-    },
-    "./subscribers/langy-conversation": {
-      "types": "./dist/subscribers/langy-conversation.subscriber.d.ts",
-      "default": "./src/subscribers/langy-conversation.subscriber.ts"
     }
   },
   "scripts": {

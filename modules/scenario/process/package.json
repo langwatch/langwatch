@@ -23,22 +23,6 @@
     "./scenario-child": {
       "types": "./dist/scenario-child.server.d.ts",
       "default": "./src/scenario-child.module.ts"
-    },
-    "./composition/scenario-failure-handler": {
-      "types": "./dist/services/scenario-failure-handler.service.d.ts",
-      "default": "./src/services/scenario-failure-handler.service.ts"
-    },
-    "./composition/simulation-clickhouse": {
-      "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
-      "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
-    },
-    "./composition/simulation-execution": {
-      "types": "./dist/repositories/simulation-execution.repository.d.ts",
-      "default": "./src/repositories/simulation-execution.repository.ts"
-    },
-    "./composition/stalled-runs-backfill": {
-      "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",
-      "default": "./src/tasks/stalled-runs-backfill.task.ts"
     }
   },
   "scripts": {

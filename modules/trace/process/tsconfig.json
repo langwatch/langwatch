@@ -29,9 +29,6 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../automation/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
