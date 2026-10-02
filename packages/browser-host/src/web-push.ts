@@ -113,7 +113,24 @@ export async function ensureWebPushSubscription(
   return subscription;
 }
 
-async function subscribeBrowser(
+/**
+ * One subscribe at a time per key. Enabling from a click and the page's own effect both ask
+ * at once; two concurrent `pushManager.subscribe` calls can each register a new endpoint, and
+ * the server would keep pushing to the one the browser dropped.
+ */
+const subscribing = new Map<string, Promise<WebPushSubscriptionJson | null>>();
+
+function subscribeBrowser(applicationServerKey: string): Promise<WebPushSubscriptionJson | null> {
+  const pending = subscribing.get(applicationServerKey);
+  if (pending) return pending;
+  const started = subscribeBrowserOnce(applicationServerKey).finally(() => {
+    subscribing.delete(applicationServerKey);
+  });
+  subscribing.set(applicationServerKey, started);
+  return started;
+}
+
+async function subscribeBrowserOnce(
   applicationServerKey: string,
 ): Promise<WebPushSubscriptionJson | null> {
   if (!isWebPushSupported()) return null;
