@@ -149,9 +149,8 @@ export class IdentityLedgerStore implements IdentityLedger {
 
   /**
    * Leg one on its own: the command handed to the queue, which is where the append happens.
-   * Public because ADR-116 §3's born-finalized entrance has to put its
    */
-  async stage({ command }: { command: IdentityCommand }): Promise<void> {
+  private async stage({ command }: { command: IdentityCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = await this.stagedSender(senderName);
     if (!sender) {
@@ -167,7 +166,7 @@ export class IdentityLedgerStore implements IdentityLedger {
   /**
    * Leg two: wait for the projection's cursor to reach the last event the guard decided.
    */
-  async awaitFold({
+  private async awaitFold({
     userId,
     tenantId,
     events,

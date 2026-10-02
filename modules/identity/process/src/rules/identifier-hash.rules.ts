@@ -1,17 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
-
-/**
- * The pinned user id a flagged sign-up is borne under (ADR-116 §3).
- */
-export function deriveNewbornUserId({ normalizedValue }: { normalizedValue: string }): string {
-  const digest = createHash("sha256").update(`newborn${normalizedValue}`).digest();
-  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  let id = "";
-  for (let index = 0; index < 21; index += 1) {
-    id += alphabet[(digest[index] as number) % alphabet.length];
-  }
-  return id;
-}
+import { createHmac } from "node:crypto";
 
 /**
  * HMAC-SHA256(userHashKey, normalized value), `hmac:`-prefixed hex

@@ -5,7 +5,7 @@ import {
   IdentityUnsupportedStorageQueryError,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { fromDate, nowInstant, toDate } from "@langwatch/time";
+import { fromDate, toDate } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import type {
   AdapterFactory,
@@ -18,7 +18,6 @@ import type {
 import { createAdapterFactory } from "better-auth/adapters";
 import { APIError } from "better-auth/api";
 
-import type { IdentityBirth } from "../app/identity.members.ts";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -34,7 +33,6 @@ import type {
   IdentityResolver,
 } from "../rules/identity-storage.rules.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
-import type { BetterAuthIdentityBirthService } from "./better-auth-identity-birth.service.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
@@ -111,14 +109,6 @@ export interface IdentityStorageAdapterDeps {
    * gate already reads.
    */
   isAnyoneOnIdentityWrites: () => Promise<boolean>;
-  /**
-   * ADR-116 §3's entrance, reached only inside a request the auth route
-   * boundary marked. Outside one this is never called, which is what keeps a
-   * deploy of the entrance from changing anything on its own.
-   */
-  birth: IdentityBirth;
-  /** The request's born-finalized marker the write fork reads (ADR-116 §3). */
-  newborns: BetterAuthIdentityBirthService;
   passkeyRemoval: PasskeyRemoval;
 }
 
@@ -203,15 +193,13 @@ class IdentityStorageRouting {
 
   private readonly modelOf = (model: string): string => this.naming.getDefaultModelName(model);
 
-  /**
-   * The write fork, as every routed write asks it (ADR-116 §2, §3).
-   */
+  /** The write fork, as every routed write asks it (ADR-116 §2). */
   private readonly routesToIdentity: IdentityUserGate = (input) =>
-    this.deps.newborns.birthAwareGate(this.deps.isUserOnIdentityWrites)(input);
+    this.deps.isUserOnIdentityWrites(input);
 
   /** The same fork asked of the fleet, for a query that names nobody. */
-  private readonly anyoneRoutesToIdentity = async (): Promise<boolean> =>
-    this.deps.newborns.anyBornInThisRequest() || (await this.deps.isAnyoneOnIdentityWrites());
+  private readonly anyoneRoutesToIdentity = (): Promise<boolean> =>
+    this.deps.isAnyoneOnIdentityWrites();
 
   private readonly toCanonicalKeys = (model: string, data: Row): Row =>
     Object.fromEntries(
@@ -566,33 +554,6 @@ class IdentityStorageRouting {
   };
 
   /**
-   * A `user` create inside a marked request: the born-finalized entrance
-   * (ADR-116 §3), or nothing at all.
-   */
-  private readonly bearOnIdentityBranch = async (canonical: Row): Promise<Row | null> => {
-    if (!this.deps.newborns.isInsideIdentityBirth()) return null;
-    const { email, createdAt } = canonical;
-    if (typeof email !== "string" || email.length === 0) {
-      logger.warn(
-        { model: "user" },
-        "a flagged request created a user with no email; the born-finalized entrance has no identifier to state, so the create takes the this.deps.legacy branch",
-      );
-      return null;
-    }
-    const born = await this.deps.birth.bear({
-      row: canonical,
-      email,
-      createdAtMs: createdAt instanceof Date ? createdAt.getTime() : nowInstant().epochMilliseconds,
-    });
-    // From here the request's remaining routed writes are this user's, and
-    // the gate — which cannot see a state row written moments ago on
-    // another connection — is answered by the marker instead.
-    const bornId = born.id;
-    if (typeof bornId === "string") this.deps.newborns.recordIdentityBirth({ userId: bornId });
-    return born;
-  };
-
-  /**
    * A `user` update on the identity branch, with `email` taken out of it
    * (ADR-116 §6) — or the update exactly as it arrived.
    */
@@ -672,10 +633,6 @@ class IdentityStorageRouting {
 
   create: CustomAdapter["create"] = async ({ model, data, select }) => {
     const canonical = this.toCanonicalKeys(model, data);
-    if (this.modelOf(model) === "user") {
-      const born = await this.bearOnIdentityBranch(canonical);
-      if (born) return this.toStorageKeys(model, { ...born }) as never;
-    }
     if (this.modelOf(model) === "account") {
       const userId = canonical.userId;
       if (typeof userId === "string" && (await this.routesToIdentity({ userId }))) {

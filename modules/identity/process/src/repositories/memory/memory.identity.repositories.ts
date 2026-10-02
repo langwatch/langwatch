@@ -12,7 +12,6 @@ import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin
 import {
   MemoryIdentityBackfillRepository,
   MemoryIdentityHeadsRepository,
-  MemoryIdentityNewbornRepository,
   MemoryIdentityReservationRepository,
   MemoryIdentityUsersRepository,
   MemoryIdentityVerificationRepository,
@@ -64,7 +63,6 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     users: MemoryIdentityUsersRepository.create(store),
     signInAccounts: MemoryIdentitySignInAccountsRepository.create(store),
     accountRekey: MemoryIdentityAccountRekeyRepository.create(store),
-    newborn: MemoryIdentityNewbornRepository.create(store),
     reservations: MemoryIdentityReservationRepository.create(store),
     verification: MemoryIdentityVerificationRepository.create(store),
     backfill: MemoryIdentityBackfillRepository.create(store),

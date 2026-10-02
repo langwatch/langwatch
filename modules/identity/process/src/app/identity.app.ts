@@ -485,11 +485,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       isLatched,
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
-    const newbornSweep = IdentityNewbornReconciliationService.create({
-      newborns: setup.repositories.newborn,
-      identity,
-      reservations,
-    });
+    const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
     const secrets = IdentitySecretCarryService.create(infrastructure.secrets);
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,

@@ -1,15 +1,10 @@
+/**
+ * The address-lock reaper the migration pass runs (ADR-116 §6).
+ * @vitest-environment node
+ */
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  AbandonedNewborn,
-  IdentityNewbornRepository,
-} from "../../repositories/identity-newborn.repository.ts";
-/**
- * entrance (specs/identity/identity-storage-adapter.feature).
- * @vitest-environment node
- * The sweep ADR-116 §3 calls a required companion to the born-finalized
- */
 import type { IdentityReservationRepository } from "../../repositories/identity-reservations.repository.ts";
 import {
   IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
@@ -18,67 +13,28 @@ import {
 
 const NOW = 1_690_000_000_000;
 
-function harness(options?: {
-  abandoned?: AbandonedNewborn[];
-  eraseFails?: (userId: string) => boolean;
-  locksReaped?: number;
-}) {
-  const findAbandoned = vi.fn<IdentityNewbornRepository["findAbandoned"]>(
-    async () => options?.abandoned ?? [],
-  );
-  const releaseClaim = vi.fn<IdentityNewbornRepository["releaseClaim"]>(async () => undefined);
-  const eraseUser = vi.fn(async ({ userId }: { userId: string }) => {
-    if (options?.eraseFails?.(userId)) throw new Error("clickhouse unavailable");
-    return [];
-  });
-
-  const reapOrphans = vi.fn<IdentityReservationRepository["reapOrphans"]>(
-    async () => options?.locksReaped ?? 0,
-  );
+function harness({ reap }: { reap: IdentityReservationRepository["reapOrphans"] }) {
+  const reapOrphans = vi.fn<IdentityReservationRepository["reapOrphans"]>(reap);
   const reservations: IdentityReservationRepository = {
     claim: async () => {
-      throw new Error("the sweep never claims");
+      throw new Error("the reaper never claims");
     },
     release: async () => 0,
     reapOrphans,
   };
-  const newborns: IdentityNewbornRepository = {
-    findAbandoned,
-    releaseClaim,
-    claim: async () => {
-      throw new Error("the sweep never claims");
-    },
-    hasUserAtPinnedId: async () => {
-      throw new Error("the sweep never reads a pinned id");
-    },
-    commitNewborn: async () => {
-      throw new Error("the sweep never commits a newborn");
-    },
-  };
+  const service = IdentityNewbornReconciliationService.create({ reservations, now: () => NOW });
 
-  const service = IdentityNewbornReconciliationService.create({
-    newborns,
-    identity: { eraseUser: eraseUser as never },
-    reservations,
-    now: () => NOW,
-  });
-
-  return { service, findAbandoned, releaseClaim, eraseUser, reapOrphans };
+  return { service, reapOrphans };
 }
 
-const abandoned = (userId: string): AbandonedNewborn => ({
-  userId,
-  claimedAt: Temporal.Instant.fromEpochMilliseconds(NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS - 1),
-});
-
-describe("the newborn reconciliation sweep", () => {
+describe("the address-lock reaper", () => {
   describe("given an address lock whose fact never landed", () => {
-    describe("when the sweep runs", () => {
+    describe("when the reaper runs", () => {
       /** @scenario "An address lock whose fact never landed is reaped" */
       /** @scenario An orphaned address lock is released so the address can be taken again */
       /** @scenario A lock whose ceremony is still in flight is left alone */
-      it("reaps it behind the same horizon the streams use", async () => {
-        const { service, reapOrphans } = harness({ locksReaped: 2 });
+      it("reaps it behind the abandonment horizon", async () => {
+        const { service, reapOrphans } = harness({ reap: async () => 2 });
 
         const summary = await service.runPass();
 
@@ -89,73 +45,19 @@ describe("the newborn reconciliation sweep", () => {
             ),
           }),
         );
-        expect(summary.locksReaped).toBe(2);
-      });
-    });
-  });
-
-  describe("given a flagged sign-up whose facts landed and whose rows never did", () => {
-    describe("when the sweep runs", () => {
-      it("erases the orphaned stream and releases its claim", async () => {
-        const { service, eraseUser, releaseClaim } = harness({
-          abandoned: [abandoned("user_orphan")],
-        });
-
-        const summary = await service.runPass();
-
-        expect(eraseUser).toHaveBeenCalledWith(
-          expect.objectContaining({
-            tenantId: "user_orphan",
-            userId: "user_orphan",
-            actor: {
-              type: "system",
-              id: "system:identity-newborn-reconciliation",
-            },
-          }),
-        );
-        expect(releaseClaim).toHaveBeenCalledWith({ userId: "user_orphan" });
-        expect(summary).toEqual({
-          examined: 1,
-          erased: 1,
-          failed: 0,
-          locksReaped: 0,
-        });
-      });
-
-      it("only looks at claims older than the abandonment threshold", async () => {
-        const { service, findAbandoned } = harness();
-
-        await service.runPass();
-
-        expect(findAbandoned).toHaveBeenCalledWith(
-          expect.objectContaining({
-            olderThan: Temporal.Instant.fromEpochMilliseconds(
-              NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
-            ),
-          }),
-        );
+        expect(summary).toEqual({ locksReaped: 2 });
       });
     });
 
-    describe("when one stream cannot be erased", () => {
-      it("keeps its claim, counts it, and finishes the rest of the pass", async () => {
-        const { service, releaseClaim } = harness({
-          abandoned: [abandoned("user_broken"), abandoned("user_fine")],
-          eraseFails: (userId) => userId === "user_broken",
+    describe("when the reservation store is unreachable", () => {
+      it("reports nothing reaped so the next pass retries", async () => {
+        const { service } = harness({
+          reap: async () => {
+            throw new Error("postgres unavailable");
+          },
         });
 
-        const summary = await service.runPass();
-
-        expect(summary).toEqual({
-          examined: 2,
-          erased: 1,
-          failed: 1,
-          locksReaped: 0,
-        });
-        // The claim is the sweep's only handle on the stream, so a failed
-        // erase must not drop it — the next pass retries.
-        expect(releaseClaim).toHaveBeenCalledTimes(1);
-        expect(releaseClaim).toHaveBeenCalledWith({ userId: "user_fine" });
+        await expect(service.runPass()).resolves.toEqual({ locksReaped: 0 });
       });
     });
   });

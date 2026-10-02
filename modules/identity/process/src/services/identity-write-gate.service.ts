@@ -50,18 +50,6 @@ export class IdentityWriteGateService {
     return new IdentityWriteGateService(state);
   }
 
-  /**
-   * Drop this user's cached answer, and the fleet-wide "has anyone finalized" The born-finalized
-   * entrance is what needs this, and needs it explicitly.
-   * one with it (ADR-116 §3).
-   */
-  static forget({ userId }: { userId: string }): void {
-    gate.invalidate({ subject: userId });
-    anyoneGate.invalidate({
-      subject: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-    });
-  }
-
   /** The caches, dropped — for tests that latch a user mid-suite. */
   static resetForTests(): void {
     gate.resetForTesting();

@@ -6,8 +6,6 @@ import {
   IdentityIdentifierNotFoundError,
   IdentityVerificationInvalidError,
 } from "@langwatch/identity-contract";
-import { Temporal } from "@langwatch/time";
-import type { Instant } from "@langwatch/time";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type {
@@ -16,10 +14,6 @@ import type {
   IdentityBackfillRepository,
 } from "../identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
-import type {
-  AbandonedNewborn,
-  IdentityNewbornRepository,
-} from "../identity-newborn.repository.ts";
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
@@ -151,45 +145,6 @@ export class MemoryIdentityUsersRepository implements IdentityUsersRepository {
     return [...this.store.users.values()]
       .filter((candidate) => (candidate.email ?? "").toLowerCase() === wanted)
       .map((row) => row.id);
-  }
-}
-
-/** The newborn twin: the claim latch and the abandoned sweep. */
-export class MemoryIdentityNewbornRepository implements IdentityNewbornRepository {
-  static create(store: MemoryIdentityStore): MemoryIdentityNewbornRepository {
-    return new MemoryIdentityNewbornRepository(store);
-  }
-
-  private constructor(private readonly store: MemoryIdentityStore) {}
-
-  async claim(args: { userId: string }): Promise<void> {
-    this.store.newbornClaims.set(args.userId, Temporal.Now.instant());
-  }
-
-  async hasUserAtPinnedId(args: { userId: string }): Promise<boolean> {
-    return this.store.findUserRow(args) !== null;
-  }
-
-  async commitNewborn(args: {
-    userId: string;
-    user: Record<string, unknown>;
-  }): Promise<Record<string, unknown>> {
-    const row = this.store.findUserRow(args);
-    if (row) row.payload = args.user;
-    this.store.newbornClaims.delete(args.userId);
-
-    return args.user;
-  }
-
-  async findAbandoned(args: { olderThan: Instant; limit: number }): Promise<AbandonedNewborn[]> {
-    return [...this.store.newbornClaims.entries()]
-      .filter(([, claimedAt]) => Temporal.Instant.compare(claimedAt, args.olderThan) <= 0)
-      .slice(0, args.limit)
-      .map(([userId, claimedAt]) => ({ userId, claimedAt }));
-  }
-
-  async releaseClaim(args: { userId: string }): Promise<void> {
-    this.store.newbornClaims.delete(args.userId);
   }
 }
 

@@ -11,7 +11,6 @@ import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
 import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
-import type { IdentityNewbornRepository } from "./identity-newborn.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
@@ -53,7 +52,6 @@ export interface IdentityRepositories {
   readonly signInAccounts: IdentitySignInAccountsRepository;
   /** The pre-3.17 Microsoft account key move a sign-in makes before better-auth's lookup. */
   readonly accountRekey: IdentityAccountRekeyRepository;
-  readonly newborn: IdentityNewbornRepository;
   readonly reservations: IdentityReservationRepository;
   readonly verification: IdentityVerificationRepository;
   readonly backfill: IdentityBackfillRepository;
@@ -123,6 +121,5 @@ export type IdentityMigrationRepositories = Pick<
   | "identityProjection"
   | "backfill"
   | "secretCarry"
-  | "newborn"
   | "ssoDomainOwnership"
 >;

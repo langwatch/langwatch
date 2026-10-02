@@ -47,7 +47,6 @@ export class MemoryIdentityStore {
   readonly backfillIdentifiers = new Map<string, BackfillIdentifierRow[]>();
   readonly reservations = new Map<string, IdentifierReservationHolder>();
   readonly verifications = new Map<string, IdentityVerificationRecord>();
-  readonly newbornClaims = new Map<string, Instant>();
   readonly mfaEnrollments = new Map<string, MfaEnrollmentState>();
   readonly mfaRequiringSlugs = new Map<string, readonly string[]>();
   readonly joinRequests = new Map<string, JoinRequestAggregateState>();

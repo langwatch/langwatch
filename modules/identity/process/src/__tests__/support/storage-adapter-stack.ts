@@ -1,8 +1,4 @@
-import {
-  type IdentityCommand,
-  IdentityEngineUnavailableError,
-  normalizeIdentifierValue,
-} from "@langwatch/identity-contract";
+import type { IdentityCommand } from "@langwatch/identity-contract";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -10,16 +6,10 @@ import { createAuthEndpoint } from "better-auth/api";
 import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { z } from "zod";
 
-import { type IdentityBirth } from "../../app/identity.members.ts";
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
-import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
-import {
-  adoptUserEmailCommandId,
-  newIdentityCommandId,
-} from "../../rules/identity-command-id.rules.ts";
+import { newIdentityCommandId } from "../../rules/identity-command-id.rules.ts";
 import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
 import { BetterAuthCeremonyBridgeService } from "../../services/better-auth-ceremony-bridge.service.ts";
-import { BetterAuthIdentityBirthService } from "../../services/better-auth-identity-birth.service.ts";
 import { IdentityCeremoniesService } from "../../services/better-auth-identity-ceremonies.service.ts";
 import {
   BetterAuthIdentityStorageService,
@@ -151,9 +141,7 @@ export interface IdentityStack {
    * gate's cache cannot make stale (ADR-116 §2). It follows the gate by
    */
   finalized: { is: (userId: string) => boolean };
-  /** The migration-state rows the born-finalized entrance writes, by user
-   *  (ADR-116 §3). A newborn's says `finalized`; an entrance that failed
-   *  before its rows committed leaves the claim it wrote before the append. */
+  /** The migration-state rows, by user (ADR-116 §2). */
   migrationState: Map<string, "migrated" | "finalized">;
   /** The event-sourcing stack, as the entrance finds it. Turned off, the
    *  append throws and the sign-up must fail rather than fall back. */
@@ -203,9 +191,6 @@ export function identityStack({
     heads,
     events,
     commands,
-    // The shape the app's ledger fails in when the event stack is down: a
-    // plain Error, which the entrance is what turns into a handled
-    // `identity_engine_unavailable`.
     refuse: () =>
       engine.available
         ? null
@@ -266,57 +251,17 @@ export function identityStack({
     heads,
     users,
     identity,
-    // The ceremonies fork on the SAME question the adapter does, and a
-    // newborn whose adapter routed to identity while their ceremony declined
-    // would get a legacy `Account` row anyway (ADR-116 §3).
-    isLatched: BetterAuthIdentityBirthService.create().birthAwareGate(isUserOnIdentityWrites),
+    // The ceremonies fork on the SAME question the adapter does (ADR-116 §2).
+    isLatched: isUserOnIdentityWrites,
     clock: { now: () => T0, newCommandId: newIdentityCommandId },
   });
-
-  /**
-   * the waited append first, then the row writes, then the projection.
-   * The born-finalized entrance, in memory, in the legs ADR-116 §3 pins:
-   */
-  const birth: IdentityBirth = {
-    async bear({ row, email, createdAtMs }) {
-      const normalizedValue = normalizeIdentifierValue(email);
-      const userId = deriveNewbornUserId({ normalizedValue });
-      migrationState.set(userId, "migrated");
-      try {
-        await identity.attachIdentifier({
-          tenantId: userId,
-          userId,
-          commandId: adoptUserEmailCommandId({ userId }),
-          accountId: null,
-          provider: "email",
-          providerId: null,
-          issuer: null,
-          providerAccountId: null,
-          value: email,
-          occurredAtMs: createdAtMs,
-          ceremony: { flow: "better-auth" },
-          actor: { type: "user", id: userId },
-        });
-      } catch (error) {
-        throw new IdentityEngineUnavailableError(
-          "the born-finalized entrance could not append the newborn's identity facts",
-          error,
-        );
-      }
-      const written = { ...row, id: userId };
-      db.user?.push(written);
-      migrationState.set(userId, "finalized");
-      return written;
-    },
-  };
 
   const accounts: IdentityAccounts = inert ? inertIdentityPorts.accounts : storage;
   const resolution: IdentityResolver = inert ? inertIdentityPorts.resolution : storage;
 
   const bridge = BetterAuthCeremonyBridgeService.create({
     ceremonies,
-    routesToIdentity:
-      BetterAuthIdentityBirthService.create().birthAwareGate(isUserOnIdentityWrites),
+    routesToIdentity: isUserOnIdentityWrites,
   });
   const auth = authOver(
     BetterAuthIdentityStorageService.create({
@@ -326,10 +271,8 @@ export function identityStack({
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
-      birth,
       // A stack that names no removal port is testing something else; the
       // refusal keeps a passkey delete from quietly taking the legacy path.
-      newborns: BetterAuthIdentityBirthService.create(),
       passkeyRemoval: passkeyRemoval ?? {
         deleteIfAnotherWayInRemains: async () => "not_found",
       },
@@ -371,26 +314,4 @@ export async function signUp(auth: AuthUnderTest, email: string): Promise<string
     asResponse: true,
   });
   return response.headers.get("set-cookie") ?? "";
-}
-
-/**
- * A sign-up whose request carries the identity-branch opt-in — what the auth
- * route boundary does once the backend feature-flag check passes (ADR-116
- * §3). Nothing below the marker re-decides the flag.
- */
-export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<string> {
-  return BetterAuthIdentityBirthService.create().runWithIdentityBirth(() => signUp(auth, email));
-}
-
-/**
- * The same sign-up, driven so that a failure THROWS rather than becoming a response. `asResponse`
- * turns better-auth's own error handling into a status code, which is the wrong lens for asserting
- * that a refusal kept its handled code all the way out.
- */
-export function flaggedSignUpOrThrow(auth: AuthUnderTest, email: string): Promise<unknown> {
-  return BetterAuthIdentityBirthService.create().runWithIdentityBirth(() =>
-    auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: "Sam" },
-    }),
-  );
 }

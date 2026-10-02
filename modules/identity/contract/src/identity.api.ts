@@ -92,11 +92,8 @@ import type {
 } from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
 
-/** One abandoned-newborn sweep pass (ADR-116 §3). */
+/** One address-lock reaper pass (ADR-116 §6). */
 export interface IdentityNewbornSweepSummary {
-  examined: number;
-  erased: number;
-  failed: number;
   locksReaped: number;
 }
 
@@ -198,7 +195,7 @@ export interface IdentityCeremoniesApi {
   beforeAccountDelete(account: IdentityCeremonyAccountRow): Promise<void>;
 }
 
-/** The abandoned-newborn sweep (ADR-116 §3). */
+/** The address-lock reaper (ADR-116 §6). */
 export interface IdentityNewbornSweepApi {
   runPass(): Promise<IdentityNewbornSweepSummary>;
 }

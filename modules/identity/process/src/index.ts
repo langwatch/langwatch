@@ -17,16 +17,6 @@ export type {
   IdentityBackfillOutcome,
   IdentityBackfillServiceDeps,
 } from "./services/identity-backfill.service.ts";
-/**
- * The synthetic issuer better-auth 1.7 expects on an account row. Exported
- * from the root, not just `./better-auth`, because it is a PERSISTED format
- * every writer of a credential account row must reach and reuse.
- */
-/**
- * The row mappings the fold writes through and every guard reads back through.
- * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
- * ADR-117), folded into this package in the core-application exit: the
- */
 export type { IdentityPipeline } from "./eventing/user-identity.pipeline.ts";
 export type { JoinRequestPipeline } from "./eventing/join-request.pipeline.ts";
 /** The day-7-reminder/day-14-expiry process manager's registered name, named
@@ -131,12 +121,11 @@ export type {
 } from "./rules/join-requests-contract.rules.ts";
 export type { PrismaIdentityHeadsDatabase } from "./repositories/prisma/prisma.identity-heads.repository.ts";
 
-// The identity graph's remaining application half: the birth entrance, the
-// newborn sweep, the write-gate latch, the SCIM sync ledger and projection,
+// The identity graph's remaining application half: the address-lock
+// reaper, the write-gate latch, the SCIM sync ledger and projection,
 // the operator back office, the teardown dispatcher, the three system
 // migrations and the Prisma repositories behind them. All were
 // `platform/app/src/server/app-layer/identity/`.
-export type { IdentityBirthServiceDeps } from "./services/identity-birth.service.ts";
 export type {
   IdentityNewbornReconciliationDeps,
   IdentityNewbornSweepSummary,
@@ -157,10 +146,6 @@ export type {
 export type { PerSubjectCachedFlag } from "./services/per-subject-cached-gate.service.ts";
 export type { ConnectionDirectoryRevocation } from "./services/sso-connection-teardown.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
-export {
-  BetterAuthIdentityBirthService,
-  type IdentityBirthScope,
-} from "./services/better-auth-identity-birth.service.ts";
 export { IdentityProducerPipelines } from "./app/identity-producer-composition.build.ts";
 export {
   IdentityNewbornSweep,

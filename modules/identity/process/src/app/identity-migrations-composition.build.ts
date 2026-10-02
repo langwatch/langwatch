@@ -1,6 +1,6 @@
 /**
  * Identity's system-migration legs as the one-shot migration pass composes them (ADR-101 §6,
- * ADR-116 §3): the user- and organization-rooted registries and the abandoned-newborn sweep.
+ * ADR-116 §3): the user- and organization-rooted registries and the address-lock reaper.
  */
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -68,7 +68,7 @@ export class IdentityUserMigrations {
   }
 }
 
-/** The abandoned-newborn sweep, composed wherever the migration pass runs, as a leg of it. */
+/** The address-lock reaper, composed wherever the migration pass runs, as a leg of it. */
 export class IdentityNewbornSweep {
   static create(options: IdentityMigrationsOptions): IdentityNewbornSweep {
     return new IdentityNewbornSweep(options);
@@ -79,8 +79,6 @@ export class IdentityNewbornSweep {
   build(): IdentityNewbornReconciliationService {
     const repositories = identityMigrationRepositories(this.options.database);
     return IdentityNewbornReconciliationService.create({
-      newborns: repositories.newborn,
-      identity: identityOver({ repositories, eventing: this.options.eventing }),
       reservations: repositories.reservations,
     });
   }

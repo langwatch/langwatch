@@ -14,7 +14,6 @@ import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.rep
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 import { PrismaIdentityLookupRepository } from "./prisma.identity-lookup.repository.ts";
-import { PrismaIdentityNewbornRepository } from "./prisma.identity-newborn.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
@@ -70,7 +69,6 @@ export class PostgresIdentityRepositories {
       signInAccounts: PrismaIdentitySignInAccountsRepository.create(database),
       accountRekey: PrismaIdentityAccountRekeyRepository.create(database),
       ssoBreakGlass: PrismaSsoBreakGlassRepository.create(database),
-      newborn: PrismaIdentityNewbornRepository.create(database),
       reservations,
       verification: PrismaIdentityVerificationRepository.create(database),
       backfill: PrismaIdentityBackfillRepository.create(database),
@@ -126,7 +124,6 @@ export function identityMigrationRepositoriesOverPrisma(
     }),
     backfill: PrismaIdentityBackfillRepository.create(database),
     secretCarry: PrismaIdentitySecretCarryRepository.create(database),
-    newborn: PrismaIdentityNewbornRepository.create(database),
     ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
   };
 }

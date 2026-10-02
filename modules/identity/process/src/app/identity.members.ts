@@ -1,38 +1,11 @@
-import type { IdentifierProvider, IdentityCommand } from "@langwatch/identity-contract";
+import type { IdentifierProvider } from "@langwatch/identity-contract";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 
-import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
-
-/**
- * The newborn as the entrance takes them: better-auth's own canonical user row, plus the two
- * values the identity sequence needs pulled out of it. The row rides through as it arrived
- * rather than as a narrowed shape, so a better-auth version that adds a user field writes it.
- */
-export interface IdentityNewborn {
-  /** better-auth's canonical `user` row, keys and all. */
-  row: Record<string, unknown>;
-  /** The address the identifier is derived from, unnormalized. */
-  email: string;
-  /** Business time for the attach fact — the row's own `createdAt`. */
-  createdAtMs: number;
-}
-
-/**
- * The entrance itself, as the adapter reaches it. The sequence lives in the
- * application, where the event store, Postgres and the migration-state table
- * are; the adapter only decides that this write is a birth.
- */
-export abstract class IdentityBirth {
-  /**
-   * Run ADR-116 §3's sequence and answer the `User` row better-auth must be
-   */
-  abstract bear(newborn: IdentityNewborn): Promise<Record<string, unknown>>;
-}
 
 /** The fact an identifier id is derived from. */
 export type DeriveIdentifierIdInput = {
@@ -49,19 +22,6 @@ export type DeriveIdentifierIdInput = {
 export interface IdentifierIdentity {
   /** The deterministic id this fact always derives, on any pass. */
   deriveIdentifierId(fact: DeriveIdentifierIdInput): string;
-}
-
-/**
- * The two ledger legs the born-finalized entrance sequences its own Deliberately not
- * `IdentityLedger`: that interface's `commit` is stage-then- wait in one call,
- * transaction between (ADR-116 §3).
- */
-export interface IdentityBirthLedger {
-  /** Hand the command to the engine. Refusing here fails the sign-up. */
-  stage(input: { command: IdentityCommand }): Promise<void>;
-
-  /** Wait, bounded, for the fold to carry these events. An observation. */
-  awaitFold(input: { userId: string; tenantId: string; events: IdentityEvent[] }): Promise<void>;
 }
 
 /** One pipeline command's sender, or that this process registered none for it. */
