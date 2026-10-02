@@ -42,16 +42,7 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../navigation/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../onboarding/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../onboarding/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../organization/browser/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

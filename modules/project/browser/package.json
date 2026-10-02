@@ -20,7 +20,6 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
-    "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
@@ -28,12 +27,8 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
-    "@langwatch/langy-browser": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
-    "@langwatch/navigation-browser": "workspace:*",
-    "@langwatch/onboarding-browser": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
-    "@langwatch/organization-browser": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
