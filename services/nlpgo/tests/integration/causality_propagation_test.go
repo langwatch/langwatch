@@ -137,7 +137,7 @@ func setupCausalityStack(t *testing.T) (url string, captured *[]capturedRequest)
 			path:              r.URL.Path,
 			traceparent:       r.Header.Get("traceparent"),
 			baggage:           r.Header.Get("baggage"),
-			depthHeader:       r.Header.Get(httpapi.CausalityDepthHeader),
+			depthHeader:       r.Header.Get(otelsetup.CausalityDepthHeader),
 			xLangwatchTraceID: r.Header.Get("X-LangWatch-Trace-Id"),
 		})
 		w.Header().Set("Content-Type", "application/json")
@@ -219,7 +219,7 @@ func postWithTraceContext(
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-LangWatch-Origin", "evaluation")
 	req.Header.Set("traceparent", "00-"+inboundTraceID+"-"+inboundSpanID+"-01")
-	req.Header.Set(httpapi.CausalityDepthHeader, itoaTest(inboundDepth))
+	req.Header.Set(otelsetup.CausalityDepthHeader, itoaTest(inboundDepth))
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)

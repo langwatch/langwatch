@@ -29,11 +29,9 @@ import (
 	"time"
 
 	otelapi "go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
@@ -229,10 +227,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// re-dispatching evaluations on spans we emit. See
 	// specs/monitors/online-evaluator-loop-prevention.feature.
 	otelapi.GetTextMapPropagator().Inject(reqCtx, propagation.HeaderCarrier(httpReq.Header))
-	if depth := currentCausalityDepthFromBaggage(reqCtx); depth > 0 {
+	if depth := otelsetup.CausalityDepth(reqCtx); depth > 0 {
 		// Also surface as a plain header for non-OTel consumers (eg.
 		// langwatch app's collector reads this directly).
-		httpReq.Header.Set(httpapi.CausalityDepthHeader, strconv.Itoa(depth))
+		httpReq.Header.Set(otelsetup.CausalityDepthHeader, strconv.Itoa(depth))
 	}
 
 	start := time.Now()
@@ -330,22 +328,6 @@ func parseResult(body []byte) (*Result, error) {
 		Label:   u.Label,
 		Cost:    u.Cost,
 	}, nil
-}
-
-// currentCausalityDepthFromBaggage reads the depth set by the httpapi
-// inbound handler (applyInboundCausality). Returns 0 when absent so
-// callers outside an evaluator request (eg. direct invocations) don't
-// emit a spurious header.
-func currentCausalityDepthFromBaggage(ctx context.Context) int {
-	m := baggage.FromContext(ctx).Member(otelsetup.BaggageKeyCausalityDepth)
-	if m.Key() == "" {
-		return 0
-	}
-	v, err := strconv.Atoi(m.Value())
-	if err != nil || v < 0 {
-		return 0
-	}
-	return v
 }
 
 func truncate(b []byte, n int) string {
