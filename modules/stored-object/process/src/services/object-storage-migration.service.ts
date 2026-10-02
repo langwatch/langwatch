@@ -1,9 +1,6 @@
 /**
  * Controlled S3 <-> Azure object-storage migration.
  */
-import { createHash } from "node:crypto";
-import type { Readable } from "node:stream";
-
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal, fromDate, nowInstant, toDate } from "@langwatch/time";
 
@@ -18,6 +15,7 @@ import {
   hasMigratableChunkCount,
   paginate,
 } from "../rules/object-storage-migration-transfer.rules.ts";
+import { ObjectStorageMigrationCopyService } from "./object-storage-migration-copy.service.ts";
 
 /** Kept out of rules because minting a timestamp is impure. */
 function newerVersionTimestamp(previous: Instant, candidate: Instant): Instant {
@@ -115,6 +113,8 @@ export class ObjectStorageMigrationService {
 
   private readonly now: () => Instant;
 
+  private readonly verifiedCopy = ObjectStorageMigrationCopyService.create();
+
   private constructor(private readonly deps: ObjectStorageMigrationDeps) {
     if (deps.source.provider === deps.destination.provider) {
       throw new Error("Migration source and destination providers must differ");
@@ -163,12 +163,16 @@ export class ObjectStorageMigrationService {
           );
         }
 
-        await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
+        await this.verifiedCopy.assertUriDigest(
+          this.deps.destination.driver,
+          destinationUri,
+          row.sha256,
+        );
         report.skippedVerified += 1;
         continue;
       }
 
-      const result = await copyVerified({
+      const result = await this.verifiedCopy.copyVerified({
         source: this.deps.source,
         sourceUri: row.storage_uri,
         destination: this.deps.destination,
@@ -214,7 +218,7 @@ export class ObjectStorageMigrationService {
       return this.acceptDestinationOnlyChunk({ sourceUri, destinationUri });
     }
 
-    return copyVerified({
+    return this.verifiedCopy.copyVerified({
       source: this.deps.source,
       sourceUri,
       destination: this.deps.destination,
@@ -300,7 +304,11 @@ export class ObjectStorageMigrationService {
   private async verifyEligible(scope: EligibleScope): Promise<void> {
     for await (const row of this.eligibleStoredObjects(scope)) {
       const destinationUri = this.deps.destination.storedObjectUri(row.project_id, row.sha256);
-      await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
+      await this.verifiedCopy.assertUriDigest(
+        this.deps.destination.driver,
+        destinationUri,
+        row.sha256,
+      );
     }
 
     for await (const chunk of this.eligibleDatasetChunks(scope)) {
@@ -314,8 +322,14 @@ export class ObjectStorageMigrationService {
       }
 
       // Verification never needs the bytes resident — hash both streams.
-      const sourceSha256 = await sha256OfStream(await this.deps.source.driver.get(chunk.sourceUri));
-      await assertUriDigest(this.deps.destination.driver, chunk.destinationUri, sourceSha256);
+      const sourceSha256 = await this.verifiedCopy.sha256OfStream(
+        await this.deps.source.driver.get(chunk.sourceUri),
+      );
+      await this.verifiedCopy.assertUriDigest(
+        this.deps.destination.driver,
+        chunk.destinationUri,
+        sourceSha256,
+      );
     }
   }
 
@@ -436,89 +450,4 @@ export class ObjectStorageMigrationService {
       yield dataset;
     }
   }
-}
-
-async function copyVerified({
-  source,
-  sourceUri,
-  destination,
-  destinationUri,
-  expectedSha256,
-  mediaType,
-}: {
-  source: MigrationStorageEndpoint;
-  sourceUri: string;
-  destination: MigrationStorageEndpoint;
-  destinationUri: string;
-  expectedSha256?: string;
-  mediaType: string;
-}): Promise<"copied" | "repaired" | "skippedVerified"> {
-  // The ONLY full copy held in memory: `StoredObjectBlobRepository.put` takes a Buffer,
-  // so the source bytes must be resident to write them. Every digest below
-  // hashes its stream chunk-by-chunk instead of buffering a second (or
-  // third) copy alongside — peak residency is one object, not two or three.
-  const sourceBytes = await readAll(await source.driver.get(sourceUri));
-  const sourceSha256 = sha256(sourceBytes);
-  if (expectedSha256 && sourceSha256 !== expectedSha256) {
-    throw new Error(
-      `Source object verification failed for ${redactStoredObjectStorageUri(sourceUri)}: expected ${expectedSha256}, got ${sourceSha256}`,
-    );
-  }
-
-  if (await destination.driver.exists(destinationUri)) {
-    const destinationSha256 = await sha256OfStream(await destination.driver.get(destinationUri));
-    if (destinationSha256 === sourceSha256) {
-      return "skippedVerified";
-    }
-
-    await destination.driver.put(destinationUri, sourceBytes, mediaType);
-    await assertUriDigest(destination.driver, destinationUri, sourceSha256);
-
-    return "repaired";
-  }
-
-  await destination.driver.put(destinationUri, sourceBytes, mediaType);
-  await assertUriDigest(destination.driver, destinationUri, sourceSha256);
-
-  return "copied";
-}
-
-async function assertUriDigest(
-  driver: StoredObjectBlobRepository,
-  uri: string,
-  expectedSha256: string,
-): Promise<void> {
-  if (!(await driver.exists(uri))) {
-    throw new Error(`Destination object is missing: ${redactStoredObjectStorageUri(uri)}`);
-  }
-
-  const actual = await sha256OfStream(await driver.get(uri));
-  if (actual !== expectedSha256) {
-    throw new Error(
-      `Destination object verification failed for ${redactStoredObjectStorageUri(uri)}: expected ${expectedSha256}, got ${actual}`,
-    );
-  }
-}
-
-async function readAll(stream: Readable): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  return Buffer.concat(chunks);
-}
-
-function sha256(bytes: Buffer): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
-/** Digest a stream chunk-by-chunk — nothing is retained beyond the hash state. */
-async function sha256OfStream(stream: Readable): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of stream) {
-    hash.update(chunk);
-  }
-
-  return hash.digest("hex");
 }
