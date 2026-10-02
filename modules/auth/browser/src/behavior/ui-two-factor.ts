@@ -4,13 +4,12 @@
  * endpoint answered them: the server speaks our own codes, the registry the words.
  */
 
+import type { UiTwoStepAnswer } from "@langwatch/auth-contract";
+
 import { signInRefusalOf } from "../model/sso-sign-in-answer.ts";
 
 /** Better Auth's two-factor endpoints, mounted under the auth base path. */
 const TWO_FACTOR_PATH = "/api/auth/two-factor";
-
-/** The value, or the refusal as the endpoint answered it, for the registry to read by code. */
-export type UiTwoStepAnswer<Value> = { ok: true; value: Value } | { ok: false; error: unknown };
 
 /** A started setup: the link the scannable code and the typed key both come from. */
 export type UiTwoStepSetup = { setupUri: string; backupCodes: readonly string[] };

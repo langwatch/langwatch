@@ -5,8 +5,11 @@
  */
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import type { UiLinkSignInMethodOutcome } from "@langwatch/auth-contract";
 import type { TimeInput } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
+
+export type { UiLinkSignInMethodOutcome };
 
 /** One passkey, as the plugin stores it and the screen reads it. */
 export type UiPasskey = {
@@ -115,9 +118,6 @@ export async function renameUiPasskey(
     return { ok: false, cancelled: false };
   }
 }
-
-/** How an attempt to link an additional sign-in method ended. */
-export type UiLinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
 
 /**
  * `azure-ad` (`NEXTAUTH_PROVIDER`) maps to `microsoft` (the social
