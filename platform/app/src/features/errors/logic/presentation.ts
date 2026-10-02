@@ -239,9 +239,33 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
  * is: one remediation, one sentence.
  */
-const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_unauthorized",
   "upstream_forbidden",
+  // The providers' own codes for the same two statuses, which the proxy files
+  // instead of the status when the body carries one: Bedrock through the
+  // gateway ("access_denied" / "permission_denied_error"), Anthropic
+  // ("authentication_error" / "permission_error"), OpenAI ("invalid_api_key"),
+  // and the AWS SDK exception name.
+  "access_denied",
+  "permission_denied_error",
+  "authentication_error",
+  "permission_error",
+  "invalid_api_key",
+  "AccessDeniedException",
+]);
+
+/**
+ * The provider does not serve the model to this key: a 404 status, or the
+ * provider's own code for it (OpenAI "model_not_found", Anthropic
+ * "not_found_error", the AWS SDK exception name). Deterministic, like a
+ * refused credential: the fix is the model, not a retry.
+ */
+export const PROVIDER_MODEL_MISSING_REASONS: ReadonlySet<string> = new Set([
+  "upstream_not_found",
+  "model_not_found",
+  "not_found_error",
+  "ResourceNotFoundException",
 ]);
 
 /**
@@ -4646,7 +4670,10 @@ const presentations = {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
-        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+        return "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)) {
+        return "The model provider does not serve this model to this key. Check the model name, or pick a different model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
         return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";

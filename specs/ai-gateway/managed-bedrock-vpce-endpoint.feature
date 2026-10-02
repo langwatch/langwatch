@@ -27,3 +27,29 @@ Feature: Managed-Bedrock dispatch through a customer VPC endpoint
       Given a Bedrock credential with no runtime endpoint configured
       When the gateway resolves the runtime endpoint for that credential
       Then no endpoint is resolved so dispatch stays on the default Bedrock path
+
+  Rule: OpenAI models on Bedrock are served with plain model invocation access
+
+    # OpenAI models on Bedrock (gpt-5.x through the global.openai.* inference
+    # profiles, gpt-oss) are also served by a second endpoint, bedrock-mantle,
+    # which needs its own IAM permission. A Bedrock credential is normally
+    # granted bedrock:InvokeModel only, so the gateway serves these models
+    # through the Converse API on the regional runtime endpoint.
+
+    @integration
+    Scenario: OpenAI models on Bedrock are served through Converse with InvokeModel access
+      Given a Bedrock credential with no runtime endpoint and InvokeModel access only
+      When a chat request for "global.openai.gpt-5.5" is dispatched for that credential
+      Then the request is sent to the regional Bedrock runtime endpoint through Converse
+      And it is not sent to the bedrock-mantle endpoint
+      And other Bedrock models stay on the default path
+
+    # OpenAI models on Converse take the Responses API shape for structured
+    # output: gpt-5.5 ignores a chat-completions response_format and gpt-6
+    # refuses it as an unknown parameter.
+    @unit
+    Scenario: Structured output on an OpenAI model on Bedrock is enforced through Converse
+      Given a chat request for "global.openai.gpt-5.5" with a json_schema response format
+      When the Converse request is built
+      Then the schema is sent as text.format
+      And a json_schema for gpt-oss, which does not enforce it, is refused

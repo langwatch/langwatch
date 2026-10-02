@@ -338,10 +338,14 @@ export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 // LiteLLM Types
 // ============================================================================
 
-/** LiteLLM proxy parameters for model access */
+/**
+ * Params from `prepareLitellmParams`. `api_key` is optional because Bedrock
+ * (AWS access keys) and Vertex (service account credentials) authenticate
+ * through their own fields, which ride the catchall.
+ */
 export const LiteLLMParamsSchema = z
   .object({
-    api_key: z.string(),
+    api_key: z.string().optional(),
     model: z.string(),
   })
   .catchall(z.string());

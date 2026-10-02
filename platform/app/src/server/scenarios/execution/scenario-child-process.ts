@@ -26,6 +26,7 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { createCallLimitTimer } from "../voice/call-limit-timer";
 import {
   type CallerVoiceConfig,
@@ -101,7 +102,11 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
         // three layers into model construction (issue #6634).
         resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
       } catch (error) {
-        reject(new Error(`Failed to parse job data: ${error}`));
+        // One line: a ZodError's own message is its issues as pretty-printed
+        // JSON, and the run's failure reason shows only its first line, "[".
+        reject(
+          new Error(`Failed to parse job data: ${zodErrorMessage(error)}`),
+        );
       }
     });
     process.stdin.on("error", reject);
