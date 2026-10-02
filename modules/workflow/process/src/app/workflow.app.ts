@@ -321,7 +321,7 @@ export interface WorkflowInfrastructure {
   ids: WorkflowId;
   /** Upgrades a persisted graph before it becomes the workflow's current version. */
   dslMigration: WorkflowDslMigration;
-  /** The project's decrypted secrets. */
+  /** The listed project secrets a Studio run receives. */
   projectEnvironment: WorkflowProjectEnvironment;
   /** Resolves process-specific LiteLLM credentials without exposing provider rows. */
   llmParameters: WorkflowLlmParameters;
@@ -619,17 +619,13 @@ export class WorkflowModule implements WorkflowApi {
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
-    /** Where the token typed into an HTTP node is stored, as a project secret. */
+    /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
     secrets: SecretApi,
     /** Every organisation, for the task that moves old inline tokens into secrets. */
     organizations: OrganizationApi,
   };
   static readonly config = workflowConfig;
-  /**
-   * `prisma` for `workflowRows`/`workflows`/`projectEnvironment`, via this
-   * module's own `workflowRepositories` registry; `encryption` for decrypting
-   * the project secrets `projectEnvironment` reads.
-   */
+  /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */
   static readonly reads = [
     "prisma",
     "encryption",
@@ -647,8 +643,7 @@ export class WorkflowModule implements WorkflowApi {
       modelProviders: setup.dependencies.modelProviders,
     });
     const projectEnvironment = WorkflowProjectEnvironmentService.create({
-      repository: setup.repositories.projectEnvironment,
-      encryption: setup.members.encryption,
+      secrets: setup.dependencies.secrets,
     });
     const studioEvents = StudioEventPreparerService.create({
       datasets,
@@ -1536,9 +1531,9 @@ export type WorkflowRunEnvironment = {
   secrets: Record<string, string>;
 };
 
-/** Project credentials and decrypted secrets are application members. */
+/** A Studio run's secrets; `workflow` is the graph whose secret references must be readable. */
 export interface WorkflowProjectEnvironment {
-  get(input: { projectId: string }): Promise<WorkflowRunEnvironment>;
+  get(input: { projectId: string; workflow: StudioWorkflow }): Promise<WorkflowRunEnvironment>;
 }
 
 export type WorkflowLlmParameterResolution = {

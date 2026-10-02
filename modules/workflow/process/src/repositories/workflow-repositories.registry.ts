@@ -14,19 +14,17 @@ import {
   type NlpLambdaArnRedis,
 } from "./redis/redis.nlp-lambda-arn.repository.ts";
 import type { WorkflowLineageRepository } from "./workflow-lineage.repository.ts";
-import type { WorkflowProjectEnvironmentRepository } from "./workflow-project-environment.repository.ts";
 import type { WorkflowRowRepository } from "./workflow-row.repository.ts";
 import type { WorkflowRepository } from "./workflow.repository.ts";
 
 /**
  * The rows the workflow module owns, chosen once at boot: the graph and its versions, the
- * bare row a Studio copy lands in, its lineage and publication flags, and the run
- * environment. Postgres holds them when composed; the memory tier holds them otherwise.
+ * bare row a Studio copy lands in, and its lineage and publication flags. Postgres holds
+ * them when composed; the memory tier holds them otherwise.
  */
 export interface WorkflowRepositories {
   readonly workflows: WorkflowRepository;
   readonly workflowRows: WorkflowRowRepository;
-  readonly projectEnvironment: WorkflowProjectEnvironmentRepository;
   readonly lineage: WorkflowLineageRepository;
   /** Each project's resolved studio function, shared cluster-wide. */
   readonly nlpLambdaArns: NlpLambdaArnCache;

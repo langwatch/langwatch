@@ -92,7 +92,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
 
     const llmConfigs = this.llmConfigs(event, studioWorkflow.nodes);
     const [environment, resolutions] = await Promise.all([
-      this.options.projectEnvironment.get({ projectId: input.projectId }),
+      this.options.projectEnvironment.get({ projectId: input.projectId, workflow: studioWorkflow }),
       this.options.llmParameters.resolve({
         projectId: input.projectId,
         models: llmConfigs.map((config) => config.llm.model),

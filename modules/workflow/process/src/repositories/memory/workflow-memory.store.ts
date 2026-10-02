@@ -5,11 +5,6 @@
  */
 import type { Workflow, WorkflowProjectPath, WorkflowVersion } from "@langwatch/workflow-contract";
 
-/** A project's stored run environment, as the memory tier holds it. */
-export type StoredEnvironmentRow = {
-  secrets: { name: string; encryptedValue: string }[];
-};
-
 export class WorkflowMemoryStore {
   static create(): WorkflowMemoryStore {
     return new WorkflowMemoryStore();
@@ -17,7 +12,6 @@ export class WorkflowMemoryStore {
 
   readonly workflows = new Map<string, Workflow>();
   readonly versions = new Map<string, WorkflowVersion>();
-  readonly environments = new Map<string, StoredEnvironmentRow>();
   /** Author display rows a version history joins, keyed by author id. */
   readonly authors = new Map<string, { name: string | null; image: string | null }>();
   /** The organization, team and project a copy's path names, keyed by project id. */

@@ -1,56 +1,71 @@
-/** Execution environment: decrypted project secrets with an injected cipher. */
+/** A Studio run's project secrets, read through the secret module's contract. */
 import {
-  type WorkflowProjectEnvironment,
-  type WorkflowRunEnvironment,
-} from "../app/workflow.app.ts";
-import type { WorkflowProjectEnvironmentRepository } from "../repositories/workflow-project-environment.repository.ts";
+  SecretUnreadableError,
+  referencedSecretNames,
+  type SecretApi,
+} from "@langwatch/secret-contract";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 
-/** The stored-secret cipher, as this service asks it. */
-export type WorkflowEnvironmentDecryptor = {
-  decrypt(value: string): string;
-};
+import type { WorkflowProjectEnvironment, WorkflowRunEnvironment } from "../app/workflow.app.ts";
 
-export class WorkflowProjectEnvironmentService implements WorkflowProjectEnvironment {
-  static create(options: {
-    repository: WorkflowProjectEnvironmentRepository;
-    encryption: WorkflowEnvironmentDecryptor;
-  }): WorkflowProjectEnvironmentService {
-    return new WorkflowProjectEnvironmentService(options);
-  }
-
-  private constructor(
-    private readonly options: {
-      repository: WorkflowProjectEnvironmentRepository;
-      encryption: WorkflowEnvironmentDecryptor;
-    },
-  ) {}
-
-  async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
-    const stored = await this.options.repository.findEnvironment(input);
-    const environment: WorkflowRunEnvironment = { secrets: {} };
-    for (const { name, encryptedValue } of stored.secrets) {
-      environment.secrets[name] = this.options.encryption.decrypt(encryptedValue);
-    }
-
-    return environment;
-  }
-}
+type RunSecretReader = Pick<SecretApi, "list" | "getValuesByName">;
 
 /**
- * A deployment with no stored-secret cipher. Refuses rather than passing the
- * ciphertext through: a graph sending an encrypted provider key verbatim
- * fails as a mystery at the provider, not a missing key here.
+ * Code nodes may build a secret's name at runtime, so every listed secret travels;
+ * the listing never holds a reserved one. A secret the graph names must be readable;
+ * one it does not name and that cannot be read is left out instead of failing the run.
  */
-export class UnavailableWorkflowEnvironmentDecryptor implements WorkflowEnvironmentDecryptor {
-  static create(): UnavailableWorkflowEnvironmentDecryptor {
-    return new UnavailableWorkflowEnvironmentDecryptor();
+export class WorkflowProjectEnvironmentService implements WorkflowProjectEnvironment {
+  static create(options: { secrets: RunSecretReader }): WorkflowProjectEnvironmentService {
+    return new WorkflowProjectEnvironmentService(options.secrets);
   }
 
-  private constructor() {}
+  private constructor(private readonly secrets: RunSecretReader) {}
 
-  decrypt(_value: string): string {
-    throw new Error(
-      "This process was composed without a stored-secret cipher, so it cannot decrypt a project secret for a workflow run.",
-    );
+  async get({
+    projectId,
+    workflow,
+  }: {
+    projectId: string;
+    workflow: StudioWorkflow;
+  }): Promise<WorkflowRunEnvironment> {
+    const listed = await this.secrets.list({ projectId });
+
+    return {
+      secrets: await this.readable({
+        projectId,
+        names: listed.map(({ name }) => name),
+        referenced: new Set(referencedSecretNames(workflow)),
+      }),
+    };
+  }
+
+  private async readable({
+    projectId,
+    names,
+    referenced,
+  }: {
+    projectId: string;
+    names: string[];
+    referenced: ReadonlySet<string>;
+  }): Promise<Record<string, string>> {
+    try {
+      return await this.secrets.getValuesByName({ projectId, names });
+    } catch (error) {
+      const unreadable = error instanceof SecretUnreadableError ? error.meta.name : undefined;
+      if (
+        typeof unreadable !== "string" ||
+        referenced.has(unreadable) ||
+        !names.includes(unreadable)
+      ) {
+        throw error;
+      }
+
+      return this.readable({
+        projectId,
+        names: names.filter((name) => name !== unreadable),
+        referenced,
+      });
+    }
   }
 }

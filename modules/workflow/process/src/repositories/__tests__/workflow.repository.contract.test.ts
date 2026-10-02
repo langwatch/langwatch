@@ -167,14 +167,4 @@ describe.each(backends)("given the $name workflow backend", (backend) => {
       expect(copies.map((copy) => copy.id)).toEqual(["workflow_2"]);
     });
   });
-
-  describe("when a project environment is read", () => {
-    it("answers with the stored api key and its encrypted secrets", async () => {
-      const repositories = backend.create();
-
-      const environment = await repositories.projectEnvironment.findEnvironment({ projectId });
-
-      expect(environment.secrets).toEqual([]);
-    });
-  });
 });

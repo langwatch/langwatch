@@ -4,13 +4,6 @@ export type {
   WorkflowVersionHistoryRecord,
 } from "./repositories/workflow.repository.ts";
 export type { WorkflowRowDraft } from "./repositories/workflow-row.repository.ts";
-export type { WorkflowRowDatabase } from "./repositories/prisma/prisma.workflow-row.repository.ts";
-export type { WorkflowProjectEnvironmentDatabase } from "./repositories/prisma/prisma.workflow-project-environment.repository.ts";
-export type {
-  StoredProjectEnvironment,
-  StoredProjectSecret,
-} from "./repositories/workflow-project-environment.repository.ts";
-export type { WorkflowPrismaDatabase } from "./repositories/prisma/prisma.workflow.repositories.ts";
 
 export {
   HttpWorkflowNlpRuntimeAdapter,

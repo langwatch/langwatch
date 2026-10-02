@@ -67,7 +67,10 @@ async function appAt({
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
-      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      secrets: createApiFixture<SecretApi>(
+        { list: async () => [], getValuesByName: async () => ({}) },
+        "SecretApi",
+      ),
       organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {

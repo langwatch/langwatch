@@ -4,7 +4,6 @@ import { ObjectStorageNlpPayloadStagingRepository } from "../object-storage/obje
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
 import { MemoryNlpLambdaArnRepository } from "./memory.nlp-lambda-arn.repository.ts";
 import { WorkflowLineageMemoryRepository } from "./memory.workflow-lineage.repository.ts";
-import { WorkflowProjectEnvironmentMemoryRepository } from "./memory.workflow-project-environment.repository.ts";
 import { WorkflowRowMemoryRepository } from "./memory.workflow-row.repository.ts";
 import { WorkflowMemoryRepository } from "./memory.workflow.repository.ts";
 import { WorkflowMemoryStore } from "./workflow-memory.store.ts";
@@ -22,7 +21,6 @@ export class MemoryWorkflowRepositories {
     return {
       workflows: WorkflowMemoryRepository.create(store),
       workflowRows: WorkflowRowMemoryRepository.create(store),
-      projectEnvironment: WorkflowProjectEnvironmentMemoryRepository.create(store),
       lineage: WorkflowLineageMemoryRepository.create(store),
       nlpLambdaArns: MemoryNlpLambdaArnRepository.create(),
       payloadStaging: ObjectStorageNlpPayloadStagingRepository.create({

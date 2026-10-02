@@ -16,7 +16,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
-import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import {
   WorkflowModule,
@@ -72,10 +71,6 @@ async function appWith(
     repositories: {
       workflowRows: members.workflowRows,
       workflows: createApiFixture<WorkflowRepository>({}, "WorkflowRepository"),
-      projectEnvironment: createApiFixture<WorkflowProjectEnvironmentRepository>(
-        {},
-        "WorkflowProjectEnvironmentRepository",
-      ),
       lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
       nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
       payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),

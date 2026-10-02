@@ -431,3 +431,24 @@ Feature: Workflow service boundary
     Given the credentials backfill has read a workflow version
     When a user saves that version before the backfill writes it
     Then the backfill skips the version and logs its id only
+
+  @unit
+  Scenario: A studio workflow run receives only listed, non-reserved secrets
+    Given a project holding its own secrets beside a product-reserved one
+    When Workflow prepares a Studio run for the project
+    Then the run receives every secret the project lists
+    And the reserved secret is never read, even when the graph names it
+
+  @unit
+  Scenario: An unreadable secret the studio workflow does not name leaves the run unaffected
+    Given a project secret whose stored value cannot be read
+    And a graph that does not name that secret
+    When Workflow prepares a Studio run for the project
+    Then the run receives the other secrets without it
+
+  @unit
+  Scenario: An unreadable secret the studio workflow names refuses the run
+    Given a project secret whose stored value cannot be read
+    And a graph that names that secret
+    When Workflow prepares a Studio run for the project
+    Then the run is refused with the handled code secret_unreadable
