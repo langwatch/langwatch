@@ -150,19 +150,13 @@ export class NurturingDeliveryService {
       case "evaluation_completed":
         return this.evaluationCompleted(signal);
       case "experiment_ran":
-        if (!signal.fullRun || !signal.experimentId) return;
-        return this.sendCustomerIoCalls(
-          fireExperimentRan({ ...signal, experimentId: signal.experimentId }),
-        );
+        return this.experimentRan(signal);
       case "prompt_created":
         return this.sendCustomerIoCalls(firePromptCreated(signal));
       case "signed_up":
         return this.sendSignup(signal);
       case "team_member_invited":
-        for (const role of signal.roles) {
-          this.sendCustomerIoCalls(fireTeamMemberInvited({ ...signal, role }));
-        }
-        return;
+        return this.teamMemberInvited(signal);
       case "invite_accepted":
         return this.sendCustomerIoCalls(fireInviteAccepted({ signal }));
       case "sso_auto_added":
@@ -267,6 +261,17 @@ export class NurturingDeliveryService {
         });
       default:
         return;
+    }
+  }
+
+  private experimentRan(signal: NurturingSignalOf<"experiment_ran">): void {
+    if (!signal.fullRun || !signal.experimentId) return;
+    this.sendCustomerIoCalls(fireExperimentRan({ ...signal, experimentId: signal.experimentId }));
+  }
+
+  private teamMemberInvited(signal: NurturingSignalOf<"team_member_invited">): void {
+    for (const role of signal.roles) {
+      this.sendCustomerIoCalls(fireTeamMemberInvited({ ...signal, role }));
     }
   }
 
