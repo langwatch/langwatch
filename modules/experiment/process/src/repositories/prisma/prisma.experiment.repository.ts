@@ -16,6 +16,7 @@ import {
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 
+import { isEvaluationsWorkbench } from "../../rules/experiment-workbench-type.rules.ts";
 import {
   ArchivedExperimentWriteError,
   ExperimentRepository,
@@ -307,7 +308,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
       },
     });
     if (!row) throw new ExperimentNotFoundError(input.id ?? input.slug ?? "");
-    if (row.type !== "EVALUATIONS_V3") throw new ExperimentTypeMismatchError();
+    if (!isEvaluationsWorkbench(row)) throw new ExperimentTypeMismatchError();
     const author = await this.database.experimentVersion.findFirst({
       where: {
         projectId: input.projectId,
@@ -380,7 +381,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
         select: { id: true, slug: true, type: true, workbenchVersion: true },
       });
       if (!row) throw new ExperimentNotFoundError(input.id);
-      if (row.type !== "EVALUATIONS_V3") throw new ExperimentTypeMismatchError();
+      if (!isEvaluationsWorkbench(row)) throw new ExperimentTypeMismatchError();
       if (input.expectedVersion !== undefined && input.expectedVersion !== row.workbenchVersion) {
         return this.staleWorkbenchWrite(transaction, input.projectId, row.id);
       }

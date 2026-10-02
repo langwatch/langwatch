@@ -8,6 +8,7 @@ import type {
   LlmConfigWithLatestVersion,
 } from "../repositories/prompt.repository.ts";
 import { withLatestTag } from "../rules/prompt-shape.rules.ts";
+import { assertOneVersionSelector } from "../rules/prompt-version-selector.rules.ts";
 import type { PromptTagLookupService } from "./prompt-tag-lookup.service.ts";
 import type { VersionedPrompt } from "./prompt.service.ts";
 
@@ -126,6 +127,7 @@ export class PromptReadService {
       });
     }
 
+    assertOneVersionSelector({ version: params.version, versionId: resolvedVersionId });
     const config = await this.repository.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,

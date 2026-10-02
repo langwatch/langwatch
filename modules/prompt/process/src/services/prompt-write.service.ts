@@ -384,6 +384,17 @@ export class PromptWriteService {
       organizationId,
     });
 
+    const config = await this.repository.findConfigByIdOrHandleWithLatestVersion({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+    if (config.projectId !== params.projectId) {
+      throw new Error(
+        `Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${params.projectId}`,
+      );
+    }
+
     const result = await this.repository.deleteConfig({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,

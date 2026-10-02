@@ -92,7 +92,7 @@ export abstract class LlmConfigRepository {
 
   abstract findCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]>;
 
-  abstract findCopySource(input: { promptId: string }): Promise<PromptCopySource>;
+  abstract findCopySource(input: { promptId: string }): Promise<PromptCopySource[]>;
 
   abstract findAllWithLatestVersion(params: {
     projectId: string;

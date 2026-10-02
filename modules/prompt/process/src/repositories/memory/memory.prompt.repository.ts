@@ -3,7 +3,6 @@ import {
   LATEST_SCHEMA_VERSION,
   NotFoundError,
   PromptHandleTakenError,
-  PromptNotACopyError,
   type LatestConfigVersionSchema,
   type PromptCopySource,
   type PromptCopySummary,
@@ -130,15 +129,13 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       }));
   }
 
-  async findCopySource(input: { promptId: string }): Promise<PromptCopySource> {
+  async findCopySource(input: { promptId: string }): Promise<PromptCopySource[]> {
     const copy = this.#state.configs.get(input.promptId);
     const source = copy?.copiedFromPromptId
       ? this.#state.configs.get(copy.copiedFromPromptId)
       : undefined;
-    if (!source || source.deletedAt !== null) {
-      throw new PromptNotACopyError();
-    }
-    return { sourcePromptId: source.id, sourceProjectId: source.projectId };
+    if (!source || source.deletedAt !== null) return [];
+    return [{ sourcePromptId: source.id, sourceProjectId: source.projectId }];
   }
 
   async findAllWithLatestVersion(params: {
@@ -174,8 +171,6 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     version?: number;
     versionId?: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    if (params.version && params.versionId)
-      throw new Error("Cannot specify both version and versionId");
     const config = this.#find(params, true);
     if (!config) {
       throw new NotFoundError(`Prompt config not found. ID: ${params.idOrHandle}`);
@@ -286,9 +281,6 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     const config = this.#find(params, true);
     if (!config) {
       throw new NotFoundError(`Prompt config not found. ID: ${params.idOrHandle}`);
-    }
-    if (config.projectId !== params.projectId) {
-      throw new Error("Project ID mismatch");
     }
     this.#state.configs.set(config.id, {
       ...config,

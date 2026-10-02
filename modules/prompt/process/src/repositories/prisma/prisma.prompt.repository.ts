@@ -11,7 +11,6 @@ import {
   SchemaVersion,
   NotFoundError,
   PromptHandleTakenError,
-  PromptNotACopyError,
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
@@ -180,27 +179,23 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     }));
   }
 
-  /**
-   * Where this prompt was copied from. Refuses when it was never copied, and
-   * when the prompt it was copied from has since been deleted: both leave the
-   * caller with no source to sync against.
-   */
-  async findCopySource(input: { promptId: string }): Promise<PromptCopySource> {
+  /** Where this prompt was copied from; empty when it was never copied or its source is deleted. */
+  async findCopySource(input: { promptId: string }): Promise<PromptCopySource[]> {
     const prompt = await this.prisma.llmPromptConfig.findUnique({
       where: { id: input.promptId },
       select: { copiedFromPromptId: true },
     });
 
-    if (!prompt?.copiedFromPromptId) throw new PromptNotACopyError();
+    if (!prompt?.copiedFromPromptId) return [];
 
     const source = await this.prisma.llmPromptConfig.findUnique({
       where: { id: prompt.copiedFromPromptId },
       select: { id: true, projectId: true, deletedAt: true },
     });
 
-    if (!source || source.deletedAt) throw new PromptNotACopyError();
+    if (!source || source.deletedAt) return [];
 
-    return { sourcePromptId: source.id, sourceProjectId: source.projectId };
+    return [{ sourcePromptId: source.id, sourceProjectId: source.projectId }];
   }
 
   /**
@@ -360,10 +355,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
 
     if (params.versionId) {
       where.id = params.versionId;
-    }
-
-    if (params.version && params.versionId) {
-      throw new Error("Cannot specify both version and versionId");
     }
 
     const config = await this.prisma.llmPromptConfig.findFirst({
@@ -658,13 +649,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       projectId,
       organizationId,
     });
-
-    const isProjectMatch = config.projectId === projectId;
-    if (!isProjectMatch) {
-      throw new Error(
-        `Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${projectId}`,
-      );
-    }
 
     // Soft-delete: set deletedAt instead of hard-deleting, so existing suite references can
     // still identify the prompt as deleted.

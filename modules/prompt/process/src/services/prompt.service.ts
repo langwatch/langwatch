@@ -1,6 +1,7 @@
 import {
   deriveResponseFormatFromOutputs,
   type LatestConfigVersionSchema,
+  PromptNotACopyError,
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
@@ -257,7 +258,9 @@ export class PromptService {
   }
 
   async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
-    return this.repository.findCopySource(input);
+    const [source] = await this.repository.findCopySource(input);
+    if (!source) throw new PromptNotACopyError();
+    return source;
   }
 
   getNamesByIds(input: {
