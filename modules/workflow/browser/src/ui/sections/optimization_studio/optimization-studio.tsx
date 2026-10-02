@@ -1,6 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   useColorMode,
   useColorModeValue,
@@ -52,14 +52,23 @@ import { useShallow } from "zustand/react/shallow";
 
 import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
-import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
-import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow.ts";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
-import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-prompt-picker-flow.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
+import {
+  useWorkflowAgentPickerFlow,
+  type AgentPicker,
+} from "../../../behavior/use-workflow-agent-picker-flow.ts";
+import {
+  useWorkflowEvaluatorPickerFlow,
+  type EvaluatorPicker,
+} from "../../../behavior/use-workflow-evaluator-picker-flow.ts";
+import {
+  useWorkflowPromptPickerFlow,
+  type PromptPickerController,
+} from "../../../behavior/use-workflow-prompt-picker-flow.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
@@ -519,9 +528,43 @@ function StudioWorkflowNodeSelectionPanel({
 }) {
   const { project } = useOrganizationTeamProject();
   const workflowId = useWorkflowStore((state) => state.workflow_id);
-  const { handlePromptDragEnd } = usePromptPickerFlow();
-  const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
-  const { handleAgentDragEnd } = useAgentPickerFlow();
+  const { openDrawer, closeDrawer } = useDrawer();
+  const pickers = useMemo(() => {
+    const openList = (list: "agentList" | "evaluatorList" | "promptList") => () => {
+      setTimeout(() => openDrawer(list, void 0, { resetStack: true }), 0);
+    };
+    return {
+      prompt: {
+        register: (callbacks) => setFlowCallbacks("promptList", callbacks),
+        open: openList("promptList"),
+        close: closeDrawer,
+      } satisfies PromptPickerController,
+      evaluator: {
+        register: (callbacks) => setFlowCallbacks("evaluatorList", callbacks),
+        registerCreation: (onSave) => {
+          setFlowCallbacks("evaluatorEditor", { onSave });
+          setFlowCallbacks("workflowSelectorForEvaluator", { onSave });
+        },
+        openList: openList("evaluatorList"),
+        openCategory: () => openDrawer("evaluatorCategorySelector"),
+        close: closeDrawer,
+      } satisfies EvaluatorPicker,
+      agent: {
+        register: (callbacks) => setFlowCallbacks("agentList", callbacks),
+        registerCreation: (onSave) => {
+          setFlowCallbacks("agentHttpEditor", { onSave });
+          setFlowCallbacks("agentCodeEditor", { onSave });
+          setFlowCallbacks("workflowSelector", { onSave });
+        },
+        openList: openList("agentList"),
+        openTypeSelector: () => openDrawer("agentTypeSelector"),
+        close: closeDrawer,
+      } satisfies AgentPicker,
+    };
+  }, [closeDrawer, openDrawer]);
+  const { handlePromptDragEnd } = useWorkflowPromptPickerFlow(pickers.prompt);
+  const { handleEvaluatorDragEnd } = useWorkflowEvaluatorPickerFlow(pickers.evaluator);
+  const { handleAgentDragEnd } = useWorkflowAgentPickerFlow(pickers.agent);
   const resolvedDefault = workflowApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
     { enabled: !!project?.id },

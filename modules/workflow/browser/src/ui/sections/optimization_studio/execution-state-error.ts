@@ -5,16 +5,7 @@ import {
 } from "@langwatch/handled-error/presentation";
 import { nodeErrorToDomainError } from "@langwatch/workflow-contract";
 
-/**
- * An errored execution state, as the studio reads it.
- */
-export interface CodedExecutionFailure {
-  error_type?: string;
-  upstream_status?: number;
-  trace_id?: string;
-  span_id?: string;
-  error?: string;
-}
+import type { CodedExecutionFailure } from "../../../behavior/workflow-store.ts";
 
 /** What a customer reads when a run, a step, or the stream itself fails. */
 /**

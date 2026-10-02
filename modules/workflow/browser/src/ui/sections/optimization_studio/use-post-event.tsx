@@ -17,12 +17,8 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
-import {
-  type CodedExecutionFailure,
-  explainExecutionStateError,
-  reportableExecutionFailure,
-} from "./execution-state-error.ts";
+import { type CodedExecutionFailure, type WorkflowStore } from "../../../behavior/workflow-store.ts";
+import { explainExecutionStateError, reportableExecutionFailure } from "./execution-state-error.ts";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;

@@ -30,14 +30,14 @@ vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
     ),
 }));
 vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({ LLMModelDisplay: () => null }));
-vi.mock("../../../../behavior/optimization_studio/use-agent-picker-flow.ts", () => ({
-  useAgentPickerFlow: () => ({ handleAgentDragEnd: vi.fn() }),
+vi.mock("../../../../behavior/use-workflow-agent-picker-flow.ts", () => ({
+  useWorkflowAgentPickerFlow: () => ({ handleAgentDragEnd: vi.fn() }),
 }));
-vi.mock("../../../../behavior/optimization_studio/use-evaluator-picker-flow.ts", () => ({
-  useEvaluatorPickerFlow: () => ({ handleEvaluatorDragEnd: vi.fn() }),
+vi.mock("../../../../behavior/use-workflow-evaluator-picker-flow.ts", () => ({
+  useWorkflowEvaluatorPickerFlow: () => ({ handleEvaluatorDragEnd: vi.fn() }),
 }));
-vi.mock("../../../../behavior/optimization_studio/use-prompt-picker-flow.ts", () => ({
-  usePromptPickerFlow: () => ({ handlePromptDragEnd: vi.fn() }),
+vi.mock("../../../../behavior/use-workflow-prompt-picker-flow.ts", () => ({
+  useWorkflowPromptPickerFlow: () => ({ handlePromptDragEnd: vi.fn() }),
 }));
 vi.mock("../../../../behavior/optimization_studio/use-component-version.tsx", () => ({
   useComponentVersion: () => ({ currentVersion: null }),
