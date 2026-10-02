@@ -1,12 +1,13 @@
-import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
 
 import { integerDecimal } from "./metric-numbers.rules.ts";
-import {
-  isRecord,
-  stableStringify,
-  type UnknownRecord,
-} from "./metric-serialization.rules.ts";
+import { isRecord, stableStringify, type UnknownRecord } from "./metric-serialization.rules.ts";
+
+/** Ordinal (UTF-16) order, matching ClickHouse byte order; never localeCompare. */
+function compareOrdinal(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
 
