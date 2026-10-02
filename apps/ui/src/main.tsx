@@ -11,9 +11,14 @@ import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
-import { createUiApplication, type UiApplication } from "@langwatch/browser/application";
+import {
+  createUiApplication,
+  installedModuleFailures,
+  type UiApplication,
+} from "@langwatch/browser/application";
 import { UiApplicationShell } from "@langwatch/browser/application-shell";
 import { UiErrorToaster } from "@langwatch/browser/error-toaster";
+import type { UiFailureInterceptor } from "@langwatch/browser/feature-install";
 import { GraphicsQualityProvider } from "@langwatch/browser/graphics-quality-provider";
 import { installedModuleApis } from "@langwatch/browser/module-apis";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
@@ -136,6 +141,7 @@ class BrowserUiShell extends UiShell {
     transport,
     sessionVersions,
     hosts,
+    failures,
     rootCapabilities,
   }: {
     config: UiFeatureConfig;
@@ -147,6 +153,7 @@ class BrowserUiShell extends UiShell {
     transport: UiFeatureApiTransport;
     sessionVersions: SessionVersionWatch;
     hosts: readonly UiModuleHostMount[];
+    failures: readonly UiFailureInterceptor[];
     rootCapabilities: UiRootCapabilities;
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
@@ -159,6 +166,7 @@ class BrowserUiShell extends UiShell {
           routes: screens.routes,
           apis,
           hosts,
+          failures,
           transport,
           sessionVersions,
           // Without these the shell resolves the REFUSING defaults, so the first
@@ -256,6 +264,7 @@ export async function startUi(): Promise<void> {
       transport,
       sessionVersions,
       hosts: installedModuleHostMounts(installed.modules),
+      failures: installedModuleFailures(installed.modules),
       rootCapabilities,
     }),
   }).start();

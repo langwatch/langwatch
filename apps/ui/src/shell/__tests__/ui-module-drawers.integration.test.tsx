@@ -1,14 +1,10 @@
+import { defineBrowserModule } from "@langwatch/browser";
 /**
  * @vitest-environment jsdom
  * The drawer law, end to end: a module declares a drawer, the shell composes
  * one registry, and the address bar is what opens and stacks it.
  */
-import {
-  CurrentDrawer,
-  type UiEvaluatorEditorDrawerProps,
-  useDrawer,
-} from "@langwatch/browser-host/drawer";
-import { defineBrowserModule } from "@langwatch/browser";
+import { CurrentDrawer, useDrawer } from "@langwatch/browser-host/drawer";
 import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -52,7 +48,7 @@ function TraceDetailsDrawer({ traceId }: { traceId?: string }) {
   );
 }
 
-function EvaluatorEditorDrawer(_props: UiEvaluatorEditorDrawerProps) {
+function EvaluatorEditorDrawer() {
   const { goBack } = useDrawer();
   return (
     <div>
