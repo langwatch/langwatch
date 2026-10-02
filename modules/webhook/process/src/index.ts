@@ -19,7 +19,6 @@ export {
   type WebhookEventType,
   type WebhookEventTypeName,
 } from "@langwatch/webhook-contract";
-export type { WebhookEndpointDeps } from "./repositories/prisma/prisma.webhook-endpoint.repository.ts";
 export type {
   WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
@@ -30,7 +29,6 @@ export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
 // port. Its cursor codec is private to the feature: nothing outside it
 // names that any more.
 export type { WebhookClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
-export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export type { WebhookEndpointConfigurationInput } from "./rules/webhook-endpoint-policy.rules.ts";
 export type {
   WebhookDestinationConfig,
