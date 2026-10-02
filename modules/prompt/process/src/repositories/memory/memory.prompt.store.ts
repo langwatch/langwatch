@@ -1,6 +1,7 @@
+import { generate } from "@langwatch/ksuid";
 import type { PromptScope, PromptTag, SchemaVersion } from "@langwatch/prompt-contract";
-import { SchemaVersion as SchemaVersions } from "@langwatch/prompt-contract";
-import type { TimeInput } from "@langwatch/time";
+import { SchemaVersion as SchemaVersions, getVersionValidator } from "@langwatch/prompt-contract";
+import { nowInstant, toDate, type TimeInput } from "@langwatch/time";
 
 import type { PromptTagAssignmentRow } from "../prompt-tag-assignment.repository.ts";
 import type { PromptVersionAuthor, PromptVersionRow } from "../prompt-version.repository.ts";
@@ -73,4 +74,29 @@ export function deriveDisplayHandle(
     return config.handle.slice(organizationId.length + 1);
   }
   return config.handle;
+}
+
+/** Writes one version row and touches its config, as Prisma's insert does. */
+export function appendVersion({
+  state,
+  input,
+}: {
+  state: MemoryPromptState;
+  input: Omit<StoredVersion, "id" | "createdAt" | "author" | "schemaVersion"> & {
+    schemaVersion: SchemaVersion;
+  };
+}): StoredVersion {
+  getVersionValidator(input.schemaVersion)
+    .omit({ id: true, createdAt: true, version: true })
+    .parse(input);
+  const row: StoredVersion = {
+    ...clone(input),
+    id: generate("promptversion").toString(),
+    createdAt: toDate(nowInstant()),
+    author: null,
+  };
+  state.versions.set(row.id, row);
+  const config = state.configs.get(row.configId);
+  if (config) state.configs.set(config.id, { ...config, updatedAt: toDate(nowInstant()) });
+  return row;
 }

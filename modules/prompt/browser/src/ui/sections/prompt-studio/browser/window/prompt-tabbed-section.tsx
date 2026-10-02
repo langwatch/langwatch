@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
@@ -17,9 +17,21 @@ import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/prompt-playground-chat.tsx";
+import { DemonstrationsField } from "../../fields/demonstrations-field.tsx";
 import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
 import { ResizableDivider, useTabId } from "../../studio-internals.ts";
-import { DemonstrationsTabContent } from "./demonstrations-tab-content.tsx";
+
+/**
+ * DemonstrationsTabContent
+ * Single Responsibility: Renders the Demonstrations tab content with few-shot examples.
+ */
+function DemonstrationsTabContent() {
+  return (
+    <VStack width="full" gap={6} p={3} align="start">
+      <DemonstrationsField />
+    </VStack>
+  );
+}
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

@@ -13,8 +13,13 @@ import {
   type PromptVersionRow,
 } from "../prompt-version.repository.ts";
 import type { MemoryLlmConfigRepository } from "./memory.prompt.repository.ts";
-import type { MemoryPromptState } from "./memory.prompt.store.ts";
-import { clone, findVersions, schemaVersionOf } from "./memory.prompt.store.ts";
+import {
+  appendVersion,
+  clone,
+  findVersions,
+  type MemoryPromptState,
+  schemaVersionOf,
+} from "./memory.prompt.store.ts";
 
 export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
   readonly #state: MemoryPromptState;
@@ -83,11 +88,14 @@ export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsReposito
         -1,
         ...findVersions(this.#state, config.id, config.projectId).map((row) => row.version),
       ) + 1;
-    const created = this.#configs.appendVersion({
-      ...params.versionData,
-      version: next,
-      authorId: params.versionData.authorId ?? null,
-      runtimeParameters: params.versionData.runtimeParameters ?? {},
+    const created = appendVersion({
+      state: this.#state,
+      input: {
+        ...params.versionData,
+        version: next,
+        authorId: params.versionData.authorId ?? null,
+        runtimeParameters: params.versionData.runtimeParameters ?? {},
+      },
     });
     return { ...clone(created), schemaVersion: created.schemaVersion as SchemaVersion };
   }

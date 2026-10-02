@@ -271,15 +271,7 @@ export class PromptSyncService {
       remoteParameters: Record<string, unknown>;
     };
   }> {
-    const {
-      idOrHandle,
-      localConfigData,
-      localVersion,
-      projectId,
-      organizationId,
-      authorId,
-      commitMessage,
-    } = params;
+    const { idOrHandle, localConfigData, projectId, organizationId } = params;
 
     // Must run before comparison/creation so both code paths use the merged inputs.
     const resolvedConfigData = mergeInputsIntoConfigData(localConfigData);
@@ -310,6 +302,20 @@ export class PromptSyncService {
       organizationId: organizationId,
     });
 
+    return this.syncExistingPrompt({ params, existingPrompt, resolvedConfigData });
+  }
+
+  /** Compares an existing prompt with the local one: same version, local behind, or local ahead. */
+  private async syncExistingPrompt({
+    params,
+    existingPrompt,
+    resolvedConfigData,
+  }: {
+    params: Parameters<PromptSyncService["syncPrompt"]>[0];
+    existingPrompt: VersionedPrompt;
+    resolvedConfigData: ConfigData;
+  }): ReturnType<PromptSyncService["syncPrompt"]> {
+    const { idOrHandle, localVersion, projectId, organizationId, authorId, commitMessage } = params;
     const remoteVersion = existingPrompt.version;
 
     const remoteConfigData = remoteConfigDataOf(existingPrompt);

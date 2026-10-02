@@ -8,7 +8,6 @@ import {
   type PromptCopySummary,
   type PromptScope,
   type SchemaVersion,
-  getVersionValidator,
   parseLlmConfigVersion,
   parseRuntimeParameters,
   type PromptUsageCount,
@@ -27,6 +26,7 @@ import {
 } from "../prompt.repository.ts";
 import { MemoryLlmConfigVersionsRepository } from "./memory.prompt-version.repository.ts";
 import {
+  appendVersion,
   type MemoryPromptState,
   clone,
   deriveDisplayHandle,
@@ -252,16 +252,19 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       data: params.data,
     });
     const prior = await this.versions.findLatestVersion(updated.id, params.projectId);
-    const created = this.appendVersion({
-      configId: updated.id,
-      projectId: params.projectId,
-      version: prior.version + 1,
-      commitMessage: params.commitMessage,
-      configData: { ...parseLlmConfigVersion(prior).configData, ...params.configDataUpdates },
-      schemaVersion: params.schemaVersion,
-      authorId: params.authorId ?? null,
-      runtimeParameters:
-        params.runtimeParameters ?? parseRuntimeParameters(prior.runtimeParameters),
+    const created = appendVersion({
+      state: this.#state,
+      input: {
+        configId: updated.id,
+        projectId: params.projectId,
+        version: prior.version + 1,
+        commitMessage: params.commitMessage,
+        configData: { ...parseLlmConfigVersion(prior).configData, ...params.configDataUpdates },
+        schemaVersion: params.schemaVersion,
+        authorId: params.authorId ?? null,
+        runtimeParameters:
+          params.runtimeParameters ?? parseRuntimeParameters(prior.runtimeParameters),
+      },
     });
     const config = this.#state.configs.get(updated.id);
     if (!config) {
@@ -343,15 +346,18 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       ? input.configData
       : { ...input.configData, model: defaultModel };
     this.#state.configs.set(config.id, config);
-    const version = this.appendVersion({
-      configId: config.id,
-      projectId: config.projectId,
-      version: 1,
-      commitMessage: input.commitMessage ?? null,
-      configData: configDataForVersion,
-      schemaVersion: schemaVersionOf(input.schemaVersion ?? LATEST_SCHEMA_VERSION),
-      authorId: configData.authorId ?? null,
-      runtimeParameters: "runtimeParameters" in input ? (input.runtimeParameters ?? {}) : {},
+    const version = appendVersion({
+      state: this.#state,
+      input: {
+        configId: config.id,
+        projectId: config.projectId,
+        version: 1,
+        commitMessage: input.commitMessage ?? null,
+        configData: configDataForVersion,
+        schemaVersion: schemaVersionOf(input.schemaVersion ?? LATEST_SCHEMA_VERSION),
+        authorId: configData.authorId ?? null,
+        runtimeParameters: "runtimeParameters" in input ? (input.runtimeParameters ?? {}) : {},
+      },
     });
     return this.#withLatest(config, version, {
       projectId: config.projectId,
@@ -533,23 +539,13 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     }
   }
 
-  appendVersion(
-    input: Omit<StoredVersion, "id" | "createdAt" | "author" | "schemaVersion"> & {
-      schemaVersion: SchemaVersion;
-    },
-  ): StoredVersion {
-    getVersionValidator(input.schemaVersion)
-      .omit({ id: true, createdAt: true, version: true })
-      .parse(input);
-    const row: StoredVersion = {
-      ...clone(input),
-      id: generate("promptversion").toString(),
-      createdAt: toDate(nowInstant()),
-      author: null,
-    };
-    this.#state.versions.set(row.id, row);
-    const config = this.#state.configs.get(row.configId);
-    if (config) this.#state.configs.set(config.id, { ...config, updatedAt: toDate(nowInstant()) });
-    return row;
+  /** The stored handle, `<projectId or organizationId>/<handle>`, as Prisma writes it. */
+  createHandle(
+    args:
+      | { handle: string; scope: "PROJECT"; projectId: string }
+      | { handle: string; scope: "ORGANIZATION"; organizationId: string },
+  ): string {
+    if (args.scope === "ORGANIZATION") return `${args.organizationId}/${args.handle}`;
+    return `${args.projectId}/${args.handle}`;
   }
 }
