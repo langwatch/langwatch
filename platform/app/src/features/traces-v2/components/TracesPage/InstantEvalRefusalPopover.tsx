@@ -145,7 +145,7 @@ function selfHostedRefusalCopy(
   if (kind === "ask_operator") {
     return {
       title: "Instant Evals are off on this install",
-      body: "This install judges with its own key, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
+      body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
       more: readMore,
       dismiss: "Not now",
     };

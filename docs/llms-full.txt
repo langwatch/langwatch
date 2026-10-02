@@ -61418,7 +61418,7 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | Your license doesn't include Instant Evals | Contact us to add them to your license. |
 | Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
 | This install can't reach LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
-| Instant Evals are off on this install | The install judges with its own key. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`. |
+| Instant Evals are off on this install | The install judges with its own key, or has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
 
 If judging stops partway on a connected install, the popover also names both addresses, so check that they are still reachable.
 
