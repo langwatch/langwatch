@@ -252,7 +252,9 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
     return {};
   }
 
-  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
+  // Deployment mapping depends on the selected model. Evaluator execution
+  // translates prepareLitellmParams().deployment into the completion- or
+  // embeddings-specific Azure environment variable after model resolution.
 
   return Object.fromEntries(
     Object.keys(getSchemaShape(providerDefinition.keysSchema))
