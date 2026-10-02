@@ -16942,6 +16942,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../api
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client

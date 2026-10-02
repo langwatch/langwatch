@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./trpc-members": {
+      "types": "./dist/trpc-members/index.d.ts",
+      "default": "./src/trpc-members/index.ts"
+    },
     "./client-doubles/clickhouse": {
       "types": "./dist/client-doubles/clickhouse.double.d.ts",
       "default": "./src/client-doubles/clickhouse.double.ts"
@@ -50,6 +54,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",

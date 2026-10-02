@@ -32,6 +32,9 @@
     },
     {
       "path": "../design-system-internal/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

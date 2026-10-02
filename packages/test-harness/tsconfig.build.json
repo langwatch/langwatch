@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
       "path": "../clickhouse-client/tsconfig.build.json"
     },
     {
