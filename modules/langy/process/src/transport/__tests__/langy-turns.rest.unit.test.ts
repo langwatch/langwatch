@@ -41,17 +41,19 @@ function buildApi(options: {
     app: () => app,
     onError: (error, context) => canonicalErrorResponse(error, context),
   });
-  const post = (body: unknown, headers: Record<string, string> = {}) =>
+  const postRaw = (raw: string, headers: Record<string, string> = {}) =>
     hono.request("http://api.test/api/langy/conversations", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: raw,
       headers: { "content-type": "application/json", ...headers },
     });
+  const post = (body: unknown, headers: Record<string, string> = {}) =>
+    postRaw(JSON.stringify(body), headers);
 
   const postUnmounted = () =>
     hono.request("http://api.test/api/langy/not-a-real-route", { method: "POST" });
 
-  return { post, postUnmounted, started };
+  return { post, postRaw, postUnmounted, started };
 }
 
 const TURN = {
@@ -137,6 +139,46 @@ describe("given a project key starting a Langy turn", () => {
         [{ role: "user", parts: [{ type: "text", text: "plain" }] }],
         [{ role: "user", parts: [{ type: "text", text: "kept" }] }],
       ]);
+    });
+  });
+});
+
+describe("given a project key sending a turn the framework refuses", () => {
+  describe("when the body is not JSON", () => {
+    it("answers 400 malformed_request before any turn starts", async () => {
+      const api = buildApi({});
+
+      const response = await api.postRaw("{not json");
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "malformed_request" });
+      expect(api.started).toEqual([]);
+    });
+  });
+
+  describe("when the body misses the schema", () => {
+    it("answers 422 validation_error before any turn starts", async () => {
+      const api = buildApi({});
+
+      const response = await api.post({ messages: [] });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(api.started).toEqual([]);
+    });
+  });
+
+  describe("when a fresh turn asks to adopt a conversation id it has no path for", () => {
+    it("answers 422 validation_error naming adoptConversationId", async () => {
+      const api = buildApi({});
+
+      const response = await api.post({ ...TURN, adoptConversationId: true });
+
+      expect(response.status).toBe(422);
+      const body = await response.text();
+      expect(body).toContain("validation_error");
+      expect(body).toContain("adoptConversationId");
+      expect(api.started).toEqual([]);
     });
   });
 });

@@ -1,3 +1,4 @@
+import type { RestCaller } from "@langwatch/api/hosting";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -15,7 +16,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalRest } from "../langy-local.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
 
 const PROJECT_ID = "project-123";
 const USER_ID = "user-1";
@@ -77,13 +77,13 @@ function buildApi(options: { granted: boolean; own?: boolean; actor?: RestCaller
     app: () => createApiFixture<LangyApi>(ops),
     onError: (error, context) => canonicalErrorResponse(error, context),
   });
-  const send = (path: string, init?: { method: "POST"; body?: unknown }) =>
-    hono.request(`http://api.test${path}`, {
+  const send = (path: string, init?: { method: "POST"; body?: unknown; raw?: string }) => {
+    const raw = init?.raw ?? (init?.body === undefined ? undefined : JSON.stringify(init.body));
+    return hono.request(`http://api.test${path}`, {
       method: init?.method ?? "GET",
-      ...(init?.body === undefined
-        ? {}
-        : { body: JSON.stringify(init.body), headers: { "content-type": "application/json" } }),
+      ...(raw === undefined ? {} : { body: raw, headers: { "content-type": "application/json" } }),
     });
+  };
 
   return { authenticate, ops, send };
 }
@@ -202,6 +202,26 @@ describe("each local route answers its operation's result as JSON with status 20
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ waitId: "wait-1" });
     expect(api.ops.startLocalWait).toHaveBeenCalledWith({ ...KEY, wait });
+  });
+
+  it("refuses a wait whose body is not JSON with 400 malformed_request", async () => {
+    const api = buildApi({ granted: true });
+
+    const response = await api.send("/api/langy/waits", { method: "POST", raw: "{not json" });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "malformed_request" });
+    expect(api.ops.startLocalWait).not.toHaveBeenCalled();
+  });
+
+  it("refuses a wait that misses the schema with 422 validation_error", async () => {
+    const api = buildApi({ granted: true });
+
+    const response = await api.send("/api/langy/waits", { method: "POST", body: { kind: 1 } });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "validation_error" });
+    expect(api.ops.startLocalWait).not.toHaveBeenCalled();
   });
 
   it("reads a wait's answer", async () => {

@@ -10,7 +10,6 @@ import {
 } from "@langwatch/api/rest";
 import {
   LangyApi,
-  LangyApiRequestInvalidError,
   langyRestConversationParamsSchema,
   langyRestTurnBodySchema,
   type LangyKeyCaller,
@@ -49,34 +48,12 @@ function parseRequestedWaitSeconds(request: Request): number | null {
   return Math.min(Number(match[1]), MAX_WAIT_SECONDS);
 }
 
-/** Parse and validate a turn request body. */
-function parseTurnBody(
-  raw: string,
-  conversationId: string | null,
-): z.infer<typeof langyRestTurnBodySchema> {
-  let body: unknown;
-
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    body = null;
-  }
-
-  const parsed = langyRestTurnBodySchema.safeParse(body);
-  if (!parsed.success) throw new LangyApiRequestInvalidError(parsed.error.issues);
-
-  if (parsed.data.adoptConversationId && !conversationId) {
-    throw new LangyApiRequestInvalidError([
-      {
-        path: ["adoptConversationId"],
-        message:
-          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
-      },
-    ]);
-  }
-
-  return parsed.data;
-}
+/** A fresh turn has no path id to adopt, so it refuses the flag in its own schema. */
+const startTurnBodySchema = langyRestTurnBodySchema.refine((body) => !body.adoptConversationId, {
+  path: ["adoptConversationId"],
+  message:
+    "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
+});
 
 /**
  * Start or continue a turn. Nothing is caught: every refusal is a
@@ -88,18 +65,16 @@ async function startTurn(input: {
   key: LangyKeyCaller;
   request: Request;
   response: RestProtocolProducer<typeof TURN_PRODUCES>;
-  raw: string;
+  body: z.output<typeof langyRestTurnBodySchema>;
   conversationId: string | null;
 }): Promise<RestAnswer<"protocol">> {
-  const { app, request, response, conversationId } = input;
+  const { app, request, response, body, conversationId } = input;
   // The door already resolved this key and enforced `langy:create` as its
   // ceiling; reading its answer back here asks the key store nothing twice.
   const caller = await app.getRestCaller({ ...input.key, surface: "turns" });
   if (caller.dark) return response.write(HONO_NOT_FOUND);
 
   const session = await app.getRestActor({ userId: caller.userId });
-
-  const body = parseTurnBody(input.raw, conversationId);
 
   const result = await app.startConversationTurn({
     projectId: caller.projectId,
@@ -177,17 +152,17 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
 
   .post("/api/langy/conversations", "startLangyConversationTurn")
   .withPermission("langy:create")
-  .withRawBody("text")
+  .withInput(startTurnBodySchema)
   .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Start a Langy conversation with one turn. ${TURN_ANSWER}` })
-  .handle(async ({ app, raw, request, response, actor, scope }) =>
+  .handle(async ({ app, input, request, response, actor, scope }) =>
     startTurn({
       app,
       key: { actor, projectId: scope.id },
       request,
       response,
-      raw,
+      body: input,
       conversationId: null,
     }),
   )
@@ -195,17 +170,17 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .post("/api/langy/conversations/:conversationId/messages", "continueLangyConversationTurn")
   .withPermission("langy:create")
   .withParams(langyRestConversationParamsSchema)
-  .withRawBody("text")
+  .withInput(langyRestTurnBodySchema)
   .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Continue one Langy conversation with a turn. ${TURN_ANSWER}` })
-  .handle(async ({ app, input, raw, request, response, actor, scope }) =>
+  .handle(async ({ app, input, request, response, actor, scope }) =>
     startTurn({
       app,
       key: { actor, projectId: scope.id },
       request,
       response,
-      raw,
+      body: input,
       conversationId: input.conversationId,
     }),
   )

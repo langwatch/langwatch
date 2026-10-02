@@ -139,17 +139,12 @@ export const langyLocalRest = defineRestRouter(LangyApi)
 
   .post("/api/langy/waits", "langyLocalStartWait")
   .withPermission(LOCAL_PERMISSION)
-  // Same composed-schema reason as `/local/calls` above.
-  .withRawBody("text")
+  .withInput(langyLocalStartWaitRequestSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withOutput(startWaitResponseSchema)
   .withDocs({ description: "The started wait's own id." })
-  .handle(({ app, raw, actor, scope }) =>
-    app.startLocalWait({
-      actor,
-      projectId: scope.id,
-      wait: parseJsonBody(raw, langyLocalStartWaitRequestSchema),
-    }),
+  .handle(({ app, input, actor, scope }) =>
+    app.startLocalWait({ actor, projectId: scope.id, wait: input }),
   )
 
   .get("/api/langy/waits/:waitId", "langyLocalReadWait")
