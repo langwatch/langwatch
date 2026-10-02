@@ -1,6 +1,7 @@
 export * from "./annotation.api.ts";
 export * from "./annotation.schemas.ts";
 export * from "./annotation-anchor.schemas.ts";
+export * from "./annotation-scores.ts";
 export * from "./annotation-score.schemas.ts";
 export * from "./annotation-response.schemas.ts";
 export * from "./annotation-rest.schemas.ts";
