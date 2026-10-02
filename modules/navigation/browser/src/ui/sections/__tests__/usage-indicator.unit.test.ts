@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getUsageDisplay } from "../usage-indicator.tsx";
 
 /**
- * Spec: specs/usage-indicator-display.feature
+ * Spec: specs/sidebar/usage-indicator-display.feature
  */
 describe("getUsageDisplay()", () => {
   describe("given the deployment is self-hosted", () => {

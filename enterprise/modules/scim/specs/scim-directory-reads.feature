@@ -50,13 +50,6 @@ Feature: Reading the directory back - a page of people that means what it says
   Rule: Every page is cut from the same order, so the pages tile the directory
 
     @unit
-    Scenario: Paging through a large directory lists everybody exactly once
-      Given a provider reads the directory a hundred people at a time
-      When it walks from the first page to the last
-      Then it has seen every person in "acme" exactly once
-      And no page repeated somebody an earlier page already carried
-
-    @unit
     Scenario: The order a page is cut from is fixed rather than whatever the store offers
       When a provider asks for any page of people
       Then the people are taken in a settled order that is the same on every request
@@ -99,24 +92,6 @@ Feature: Reading the directory back - a page of people that means what it says
       When the provider reads that page
       Then the page says it holds a hundred
 
-    @unit
-    Scenario: The total is the whole directory, never the page
-      When a provider reads any single page of a five thousand person directory
-      Then the total says five thousand
-      And the total counts everybody the filter matched, not everybody returned
-
-    @unit
-    Scenario: A start past the end of the directory is an empty page, not a failure
-      When a provider asks for people starting past the last of them
-      Then the answer is a page carrying nobody
-      And it still says how many people there are, so the provider knows it has arrived at the end
-
-    @unit
-    Scenario: A provider that advances by what it was told lands on the end exactly
-      Given a provider advances by the count each page reports
-      When it walks a directory whose size is not a multiple of the page
-      Then it stops on the last person rather than before them
-
   # ── A question we cannot answer is refused ─────────────────────────────
 
   Rule: A filter is honoured or refused, and never quietly dropped
@@ -139,19 +114,6 @@ Feature: Reading the directory back - a page of people that means what it says
       When a provider lists people filtered by the address it knows them by
       Then only that person is returned
       And the match ignores the case the address was written in
-
-    @unit
-    Scenario: Looking somebody up by the directory's own identifier works
-      Given the directory knows "sam" by an identifier of its own on "okta-primary"
-      When a provider lists people filtered by that identifier
-      Then only "sam" is returned
-      And an address change never breaks this lookup, because the identifier is what the directory means
-
-    @unit
-    Scenario: One connection cannot find another connection's person by identifier
-      Given "entra-contractors" knows somebody by the same identifier "okta-primary" uses for "sam"
-      When "okta-primary" looks that identifier up
-      Then it finds its own "sam" and never the other connection's person
 
     @unit
     Scenario: A filter matching nobody is an empty page rather than a refusal

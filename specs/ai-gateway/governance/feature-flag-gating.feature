@@ -47,9 +47,9 @@ Feature: Governance visibility rides a single feature flag
       | My Workspace dashboard             | /me                               |
       | My Workspace settings              | /me/settings                      |
       | Admin Routing Policies             | /gateway/routing-policies         |
-      | Admin Activity Monitor             | /settings/activity-monitor        |
-      | Admin Provider Catalog             | /settings/providers               |
-      | Admin IngestionSource setup        | /settings/ingestion-sources       |
+      | Governance overview                | /governance                       |
+      | Governance inventory (sources)     | /governance/inventory             |
+      | Governance people                  | /governance/people                |
       | "My Workspace" avatar dropdown link| (DashboardLayout user menu)        |
       | WorkspaceSwitcher (personal scope) | (top-bar context dropdown)         |
     And no governance API calls fire from the client

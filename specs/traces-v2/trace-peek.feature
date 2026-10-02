@@ -23,17 +23,11 @@ Rule: Eye-icon trigger
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the "release_ui_traces_v2_enabled" feature flag is enabled
 
   Scenario: Eye icon renders next to a trace ID
     When a TraceIdPeek is rendered with a traceId
     Then a 16px Eye icon button is visible
     And the icon is muted by default and brightens on hover
-
-  Scenario: Component is hidden when the feature flag is off
-    Given the "release_ui_traces_v2_enabled" feature flag is disabled
-    When TraceIdPeek would render
-    Then nothing is rendered
 
   Scenario: Sustained hover opens the popover
     When the user hovers the Eye icon for ~400ms

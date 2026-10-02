@@ -256,7 +256,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
       | option                         | route                                           |
       | A — dedicated team detail page | /governance/teams/<teamId>            |
       | B — filtered traces view       | /traces?filter[teamId]=<teamId>                |
-      | C — filtered activity-monitor  | /settings/activity-monitor?filter[teamId]=...  |
+      | C — filtered activity-monitor  | /governance?filter[teamId]=...  |
     And whichever option ships, the destination page renders that team's
       spend totals + recent activity + per-user breakdown for that team
     And the destination is consistent with the View-all link
