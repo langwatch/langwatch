@@ -24,7 +24,7 @@ export function OutputPathInput({ value, onChange, disabled = false }: HttpOutpu
       <Text fontSize="xs" color="fg.muted">
         Path to extract the agent response from the API response.
       </Text>
-      <Text fontSize="xs" color="yellow.500">
+      <Text fontSize="xs" color="yellow.fg">
         Note: HTTP Agents must return text.
       </Text>
     </VStack>

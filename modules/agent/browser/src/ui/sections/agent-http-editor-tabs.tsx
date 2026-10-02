@@ -154,7 +154,7 @@ export function AgentHttpEditorTabs({
               lockedVariableIds: fixedVariableIds,
             })}
             {!hasAtLeastOneMapping && (
-              <Text data-testid="at-least-one-mapping-error" color="red.500" fontSize="sm">
+              <Text data-testid="at-least-one-mapping-error" color="fg.error" fontSize="sm">
                 At least one variable must be mapped
               </Text>
             )}

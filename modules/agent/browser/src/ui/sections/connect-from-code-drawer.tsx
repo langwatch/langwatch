@@ -167,9 +167,11 @@ function CodeBlock({
             meta={{ colorScheme: colorMode }}
             borderRadius="md"
             overflow="hidden"
+            minWidth={0}
             data-testid={`connect-code-${language}`}
           >
-            <ChakraCodeBlock.Content overflowX="auto">
+            {/* The recipe caps content at 320px, hiding the horizontal scrollbar. */}
+            <ChakraCodeBlock.Content maxHeight="none" overflowX="auto">
               <ChakraCodeBlock.Code>
                 <ChakraCodeBlock.CodeText />
               </ChakraCodeBlock.Code>

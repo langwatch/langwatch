@@ -15,9 +15,13 @@ export function HttpMethodSelector({ value, onChange, disabled = false }: HttpMe
     <NativeSelect.Root size="sm" width="100px" disabled={disabled}>
       <NativeSelect.Field
         value={value}
-        onChange={(e) => onChange(e.target.value as HttpMethod)}
+        onChange={(e) => {
+          const method = HTTP_METHODS.find((candidate) => candidate === e.target.value);
+          if (method) onChange(method);
+        }}
+        fontFamily="mono"
+        fontSize="13px"
         fontWeight="medium"
-        color="blue.600"
       >
         {HTTP_METHODS.map((method) => (
           <option key={method} value={method}>
