@@ -20,6 +20,8 @@ import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
 import type { Authorize, Entitlements } from "../access/access.ts";
+import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
+import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
 import type {
   FeatureTrpcHost,
   FeatureTrpcMountOptions,
@@ -46,10 +48,11 @@ import {
   type TrpcRouterDeclaration,
   type TrpcRuntimeMembers,
 } from "./runtime.ts";
-import { SESSION_VERSION_HEADER } from "./session-version.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
-import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
-import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
+
+/** The session version every tRPC answer carries (dev/docs/adr/170-browser-query-cache-tiers.md).
+ */
+const SESSION_VERSION_HEADER = "x-lw-session-version";
 
 /** The signed-in person, as the procedures that render one read it. */
 export type TrpcSessionUser = Readonly<{
