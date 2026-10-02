@@ -74,20 +74,18 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
 
 /** The refusal envelope as the caller reads it: code plus the meta the scenarios inspect. */
 const refusalSchema = z.object({
-  error: z.object({
-    code: z.string(),
-    meta: z
-      .object({
-        parameters: z.array(z.string()).optional(),
-        violations: z
-          .array(z.object({ code: z.string(), allowedFunctions: z.array(z.string()).optional() }))
-          .optional(),
-      })
-      .optional(),
-  }),
+  code: z.string(),
+  meta: z
+    .object({
+      parameters: z.array(z.string()).optional(),
+      violations: z
+        .array(z.object({ code: z.string(), allowedFunctions: z.array(z.string()).optional() }))
+        .optional(),
+    })
+    .optional(),
 });
 
-const refusalOf = (body: unknown) => refusalSchema.parse(body).error;
+const refusalOf = (body: unknown) => refusalSchema.parse(body);
 
 const violationCodes = (body: unknown) =>
   (refusalOf(body).meta?.violations ?? []).map((violation) => violation.code);
@@ -217,7 +215,10 @@ describe("given the query door over the real service", () => {
       const allowed = violation?.allowedFunctions ?? [];
       expect(status).toBe(400);
       expect(allowed.length).toBeGreaterThan(0);
-      expect(allowed).toEqual(allowed.toSorted());
+      expect(allowed).toEqual(
+        allowed.toSorted((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
+      );
+      expect(new Set(allowed).size).toBe(allowed.length);
       expect(executor.requests).toEqual([]);
     });
   });

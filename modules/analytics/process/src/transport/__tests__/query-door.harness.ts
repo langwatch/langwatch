@@ -8,7 +8,7 @@ import {
   MAX_LWQL_LENGTH,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
@@ -97,7 +97,7 @@ export function mountQueryDoor({
     "/",
     runtime.mount(queryRest.router(), {
       app: () => apis.reference(AnalyticsQueryApi),
-      onError: renderHandled,
+      onError: canonicalErrorResponse,
       facts: [
         bindRestMiddleware(langWatchQLKeyReach, () => ({
           kind: "project" as const,
@@ -112,26 +112,3 @@ export function mountQueryDoor({
       app.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-/** A handled refusal must reach the caller at its own status with its own code and meta. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  const handled = error as {
-    httpStatus?: number;
-    code?: string;
-    message?: string;
-    meta?: Record<string, unknown>;
-  };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      {
-        error: {
-          code: handled.code ?? "error",
-          message: handled.message ?? "",
-          ...(handled.meta ? { meta: handled.meta } : {}),
-        },
-      },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};
