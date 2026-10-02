@@ -59,7 +59,7 @@ describe("ScenarioRunKeyService", () => {
         userId: "user-1",
         callerApiKeyId: "pat-1",
         projectId,
-        permissions: ["traces:create"],
+        permissions: ["traces:create", "traces:view", "scenarios:create"],
         minRemainingMs: CHILD_PROCESS.TIMEOUT_MS,
       },
     ]);
@@ -75,7 +75,7 @@ describe("ScenarioRunKeyService", () => {
       {
         userId: "user-1",
         projectId,
-        permissions: ["traces:create"],
+        permissions: ["traces:create", "traces:view", "scenarios:create"],
         minRemainingMs: CHILD_PROCESS.TIMEOUT_MS,
       },
     ]);
@@ -89,7 +89,7 @@ describe("ScenarioRunKeyService", () => {
 
     expect(calls[0]).toMatchObject({
       userId: null,
-      permissions: ["traces:create", "evaluations:manage"],
+      permissions: ["traces:create", "traces:view", "scenarios:create", "evaluations:manage"],
     });
   });
 
