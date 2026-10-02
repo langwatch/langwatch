@@ -2,9 +2,8 @@
 // context only, no UI/router/toast imports); supports tri-state feature flag for webhook channel.
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-contract";
 import { createContext, useContext } from "react";
-
-import type { SlackConnectionSaved } from "./slack/slack-connection-types.ts";
 
 /** The organization, team and project the current page is about. */
 export type AutomationScope = {

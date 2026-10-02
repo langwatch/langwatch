@@ -20,17 +20,17 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-import { FaSlack } from "react-icons/fa";
-import { LuChevronRight, LuPlus } from "react-icons/lu";
-
-import { slackApi } from "../../behavior/slack-api.ts";
 import {
   maskedSecret,
   slackConnectionKindLabel,
   slackConnectionScopeLabel,
+  type SlackConnection,
   usedByLabel,
-} from "../../model/slack/slack-connection-copy.ts";
-import { type SlackConnection } from "../../model/slack/slack-connection-types.ts";
+} from "@langwatch/slack-contract";
+import { FaSlack } from "react-icons/fa";
+import { LuChevronRight, LuPlus } from "react-icons/lu";
+
+import { slackApi } from "../../behavior/slack-api.ts";
 
 export function SlackCard() {
   const { project } = useOrganizationTeamProject();

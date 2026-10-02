@@ -9,7 +9,13 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import type { SlackConnectionKind } from "@langwatch/slack-contract";
+import {
+  findSlackConnection,
+  type SlackConnection,
+  type SlackConnectionKind,
+  type SlackConnectionList as SlackConnectionListOutput,
+  type SlackConnectionSaved,
+} from "@langwatch/slack-contract";
 import { Plus } from "lucide-react";
 
 import {
@@ -17,14 +23,13 @@ import {
   useSlackConnectionCollection,
 } from "../../../../behavior/slack/use-slack-connection-collection.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
-import { findSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
-import {
-  type SlackConnection,
-  type SlackConnectionList,
-  type SlackConnectionSaved,
-} from "../../../../model/slack/slack-connection-types.ts";
 import { announceSubFlowDeparture, keepDraftOnSubFlowReturn } from "../../behavior/sub-flow.ts";
 import type { SlackSlice } from "../../model/slack-slice.ts";
+
+/** The list query's answer as the picker reads it: its instants reach it as strings. */
+type SlackConnectionList = Omit<SlackConnectionListOutput, "connections"> & {
+  connections: SlackConnection[];
+};
 
 interface ConnectionOption {
   value: string;

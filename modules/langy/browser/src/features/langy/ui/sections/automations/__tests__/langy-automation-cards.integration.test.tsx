@@ -5,6 +5,7 @@
  * @see specs/langy/langy-automations.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SlackConnection } from "@langwatch/slack-contract";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +18,6 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
-import type { SlackConnection } from "../../../../../../model/slack/slack-connection-types.ts";
 import type { useLangySlackConnections } from "../../../../behavior/use-langy-automation-data.ts";
 import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { LangyFailedStepCard } from "../../langy-failed-step-card.tsx";

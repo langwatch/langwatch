@@ -1,11 +1,10 @@
 import { createListCollection } from "@langwatch/design-system/primitives";
-import { useMemo } from "react";
-
 import {
+  type SlackConnection,
   slackConnectionKindLabel,
   slackConnectionScopeLabel,
-} from "../../model/slack/slack-connection-copy.ts";
-import type { SlackConnection } from "../../model/slack/slack-connection-types.ts";
+} from "@langwatch/slack-contract";
+import { useMemo } from "react";
 
 /** The select value that opens connection creation instead of picking one. */
 export const NEW_CONNECTION = "__new_slack_connection__";

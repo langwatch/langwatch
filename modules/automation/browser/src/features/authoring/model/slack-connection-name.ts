@@ -1,9 +1,6 @@
 import { TriggerAction } from "@langwatch/automation-contract";
+import { findSlackConnection, type NamedSlackConnection } from "@langwatch/slack-contract";
 
-import {
-  findSlackConnection,
-  type NamedSlackConnection,
-} from "../../../model/slack/slack-connection-name.ts";
 import type { SlackSlice } from "./slack-slice.ts";
 
 /** The part of a draft the Slack connection name is read from and written to. */

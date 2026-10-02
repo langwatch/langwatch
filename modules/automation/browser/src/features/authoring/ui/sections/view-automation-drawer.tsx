@@ -16,6 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { Calendar, TrendingUp } from "react-feather";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
@@ -31,7 +32,6 @@ import {
 } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
-import { type NamedSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import { EmailList, type TriggerActionParams } from "../../../overview/index.ts";
 import {

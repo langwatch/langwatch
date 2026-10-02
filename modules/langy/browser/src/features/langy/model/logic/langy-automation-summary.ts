@@ -14,13 +14,9 @@ import {
   slackProvider,
   webhookProvider,
 } from "@langwatch/automation-contract";
+import { findSlackConnection, type NamedSlackConnection } from "@langwatch/slack-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
-
-import {
-  findSlackConnection,
-  type NamedSlackConnection,
-} from "../../../../model/slack/slack-connection-name.ts";
 
 export type LangyAutomationKind = "alert" | "report" | "automation";
 

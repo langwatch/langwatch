@@ -1,8 +1,8 @@
 import { TriggerAction } from "@langwatch/automation-contract";
+import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { useEffect } from "react";
 
 import { useSlackConnections } from "../../../behavior/use-automation-reads.ts";
-import { type NamedSlackConnection } from "../../../model/slack/slack-connection-name.ts";
 import { type SlackNamedDraft, withSlackConnectionName } from "../model/slack-connection-name.ts";
 import type { SlackSlice } from "../model/slack-slice.ts";
 

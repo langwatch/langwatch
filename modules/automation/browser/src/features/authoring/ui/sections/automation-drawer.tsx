@@ -21,7 +21,6 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automation-contract";
-import type { UiAutomationDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
@@ -34,6 +33,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { NamedSlackConnection } from "@langwatch/slack-contract";
 import { nowInstant } from "@langwatch/time";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -53,7 +53,6 @@ import { useAutomation } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";
 import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
-import type { NamedSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
 import {
   ALERT_TEMPLATE_VARIABLES,
   REPORT_TEMPLATE_VARIABLES,
@@ -199,6 +198,24 @@ function cadenceTodo(draft: AutomationDraft): string {
       return "";
   }
 }
+
+/** What a caller hands automation's editor drawer: an automation, or prefills for a new one. */
+export type UiAutomationDrawerProps = {
+  automationId?: string;
+  /** Set by the email "Edit automation" link, so the drawer shows its landing banner. */
+  source?: string;
+  /** Opens in graph-alert mode with this graph locked in. */
+  prefilledGraphId?: string;
+  prefilledSeriesName?: string;
+  /** Fresh-create prefills; `initialFilters` is the persisted filter JSON. */
+  initialSource?: string;
+  initialName?: string;
+  initialAction?: string;
+  initialFilters?: string;
+  /** A traces query to seed a fresh trace automation's subject with. */
+  initialFilterQuery?: string;
+  onClose?: () => void;
+};
 
 /** The editor as the registry opens it by address, where nothing else supplies `onClose`. */
 export function RegisteredAutomationDrawer({ onClose, ...props }: UiAutomationDrawerProps) {

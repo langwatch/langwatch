@@ -4,9 +4,9 @@
  * automation (a test fire) keeps the declarative card. Spec: specs/langy/langy-automations.feature.
  */
 import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import type { NamedSlackConnection } from "@langwatch/slack-contract";
 
 import type { CapabilityTone } from "../../../../../model/langy-capability-registry.ts";
-import type { NamedSlackConnection } from "../../../../../model/slack/slack-connection-name.ts";
 import {
   useLangyAutomationNow,
   useLangySlackConnections,

@@ -20,6 +20,7 @@ import {
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
+import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { toEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
 import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "react-feather";
@@ -64,7 +65,6 @@ import {
 import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
 import { useAutomationHost } from "../../model/automation-host.ts";
 import { formatTimeAgo } from "../../model/relative-time.ts";
-import { type NamedSlackConnection } from "../../model/slack/slack-connection-name.ts";
 import { ClampedText } from "../elements/clamped-text.tsx";
 import { AutomationsLayout, type AutomationSection } from "./automations-layout.tsx";
 

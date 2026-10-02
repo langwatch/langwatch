@@ -1,8 +1,37 @@
 /**
- * The words the settings list, the connection drawer and the automation's Slack step share.
- * Spec: specs/automations/slack-connections.feature.
+ * The words, shapes and lookups the settings list, the connection drawer and the automation's
+ * Slack step share. Spec: specs/automations/slack-connections.feature.
  */
-import type { SlackConnectionKind, SlackConnectionScopeType } from "@langwatch/slack-contract";
+import type {
+  SlackConnectionKind,
+  SlackConnectionScopeType,
+  SlackManagedConnection,
+} from "./slack.schemas.ts";
+
+/** A listed connection as a browser reads it: its instants reach it as strings, so are unread. */
+export type SlackConnection = Omit<SlackManagedConnection, "createdAt" | "updatedAt">;
+
+/** What the connection drawer hands back to whoever opened it. */
+export interface SlackConnectionSaved {
+  connectionId: string;
+  name: string;
+  kind: SlackConnectionKind;
+}
+
+/** A connection as a caller names it: only its id and name are read. */
+export type NamedSlackConnection = Pick<SlackConnection, "id" | "name">;
+
+/** The listed connection with this id, or none: the id may be gone or out of reach. */
+export function findSlackConnection<T extends NamedSlackConnection>({
+  connectionId,
+  connections,
+}: {
+  connectionId: string | undefined;
+  connections: readonly T[] | undefined;
+}): T[] {
+  if (!connectionId) return [];
+  return (connections ?? []).filter((connection) => connection.id === connectionId);
+}
 
 export const SLACK_CONNECTION_KINDS: readonly {
   value: SlackConnectionKind;
