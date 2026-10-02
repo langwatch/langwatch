@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { isIP } from "node:net";
+
 import { senderAddressHeadersSchema } from "@langwatch/enterprise-saas-contract";
 
 /**
@@ -23,15 +25,18 @@ export function usageReportInstanceKey(instanceId: string): string {
 /** The proxy headers that name a sender's address, most specific first. */
 const ADDRESS_HEADERS = Object.keys(senderAddressHeadersSchema.shape);
 
-const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-
-/** The first well-formed address the headers name; empty where none does. */
+/** The first well-formed IPv4 or IPv6 address the headers name; empty where none does. */
 export function senderAddressesOf(headers: Readonly<Record<string, string | undefined>>): string[] {
   for (const name of ADDRESS_HEADERS) {
-    const candidate = (headers[name]?.split(",")[0] ?? "").replace(/^::ffff:/, "").trim();
-    if (IPV4.test(candidate) || IPV6.test(candidate)) return [candidate];
+    const candidate = unmapped((headers[name]?.split(",")[0] ?? "").trim());
+    if (isIP(candidate) !== 0) return [candidate.toLowerCase()];
   }
 
   return [];
+}
+
+/** An IPv4 address carried as IPv6 (`::ffff:a.b.c.d`) is that IPv4 address. */
+function unmapped(address: string): string {
+  const inner = address.replace(/^::ffff:/i, "");
+  return isIP(inner) === 4 ? inner : address;
 }

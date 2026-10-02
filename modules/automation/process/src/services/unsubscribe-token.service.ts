@@ -1,10 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+
 export type UnsubscribeTokenPayload = {
   projectId: string;
   triggerId: string | null;
   email: string;
 };
+
+/** How long a footer link keeps working after it is minted. */
+const LINK_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
+
+/** Links minted before links carried an expiry stop working at this instant. */
+const UNDATED_LINKS_EXPIRE_AT = Temporal.Instant.from("2027-04-01T00:00:00Z");
+
+type Clock = Readonly<{ now(): Instant }>;
 
 export abstract class UnsubscribeTokenVerifier {
   abstract findVerifiedPayload(token: string): UnsubscribeTokenPayload | null;
@@ -18,21 +28,29 @@ export class UnsubscribeTokenService {
   static create(input: {
     /** Injected signing key; empty or absent fails closed on both sides. */
     secret: string | undefined;
+    clock?: Clock;
   }): UnsubscribeTokenService {
-    return new UnsubscribeTokenService(input.secret);
+    return new UnsubscribeTokenService(input.secret, input.clock ?? { now: nowInstant });
   }
 
-  private constructor(private readonly secret: string | undefined) {}
+  private constructor(
+    private readonly secret: string | undefined,
+    private readonly clock: Clock,
+  ) {}
 
-  /** Wire format: `base64url(JSON payload) + "." + hex(HMAC of the payload)`. */
+  /**
+   * Wire format: `base64url(JSON payload) + "." + hex(HMAC of the payload)`;
+   * `exp` is epoch seconds.
+   */
   sign(payload: UnsubscribeTokenPayload): string {
-    const serialized = JSON.stringify(normalize(payload));
+    const exp = Math.floor(this.clock.now().epochMilliseconds / 1000) + LINK_LIFETIME_SECONDS;
+    const serialized = JSON.stringify({ ...normalize(payload), exp });
     const encoded = Buffer.from(serialized).toString("base64url");
 
     return `${encoded}.${this.signature(serialized)}`;
   }
 
-  /** The payload a well-formed, correctly signed token carries, or nothing. */
+  /** The payload a well-formed, correctly signed, unexpired token carries, or nothing. */
   findVerifiedPayload(token: string): UnsubscribeTokenPayload | null {
     const dot = token.lastIndexOf(".");
     if (dot <= 0) {
@@ -72,8 +90,12 @@ export class UnsubscribeTokenService {
       return null;
     }
 
-    const { projectId, triggerId, email } = parsed as Record<string, unknown>;
+    const { projectId, triggerId, email, exp } = parsed as Record<string, unknown>;
     if (typeof projectId !== "string" || typeof email !== "string") {
+      return null;
+    }
+
+    if (!this.isLive(exp)) {
       return null;
     }
 
@@ -84,6 +106,16 @@ export class UnsubscribeTokenService {
     // Normalized on the way out too, so a caller reads the same address the
     // signer bound regardless of how the token was cased.
     return normalize({ projectId, triggerId, email });
+  }
+
+  /** A dated link lives until its `exp`; an undated one until the fixed cut-off. */
+  private isLive(exp: unknown): boolean {
+    const now = this.clock.now().epochMilliseconds;
+    if (exp === undefined) {
+      return now < UNDATED_LINKS_EXPIRE_AT.epochMilliseconds;
+    }
+
+    return typeof exp === "number" && now < exp * 1000;
   }
 
   private signature(serialized: string): string {
@@ -101,9 +133,9 @@ export class UnsubscribeTokenService {
 }
 
 /**
- * The signed shape, field order included: the HMAC covers
- * `JSON.stringify` of this object, so reordering these three keys
- * changes every signature and invalidates every link already in an inbox.
+ * The signed shape, field order included: the HMAC covers `JSON.stringify`
+ * of this object (then `exp`), so reordering these keys changes every
+ * signature and invalidates every link already in an inbox.
  */
 function normalize(payload: UnsubscribeTokenPayload): UnsubscribeTokenPayload {
   return {
@@ -119,7 +151,7 @@ function normalize(payload: UnsubscribeTokenPayload): UnsubscribeTokenPayload {
  * feature's (`UnsubscribeTokenService`), never re-implemented per root.
  */
 export class HmacUnsubscribeTokenAdapter extends UnsubscribeTokenVerifier {
-  static create(input: { secret: string | undefined }): HmacUnsubscribeTokenAdapter {
+  static create(input: { secret: string | undefined; clock?: Clock }): HmacUnsubscribeTokenAdapter {
     return new HmacUnsubscribeTokenAdapter(UnsubscribeTokenService.create(input));
   }
 

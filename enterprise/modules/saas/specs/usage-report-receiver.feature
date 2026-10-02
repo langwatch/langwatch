@@ -46,3 +46,9 @@ Feature: LangWatch Cloud receives the daily usage report
     Given the receiver is past one of its limits
     When a report arrives
     Then it is refused with the code "rate_limited" and nothing is recorded or sent
+
+  @unit
+  Scenario: A sender's IPv6 address is limited like any other
+    Given a report whose proxy header names the sender by an IPv6 address, written short or in full
+    When the receiver reads the sender's address
+    Then the report is counted against that address's limit

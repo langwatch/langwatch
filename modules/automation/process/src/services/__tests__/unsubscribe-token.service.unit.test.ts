@@ -1,3 +1,4 @@
+import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "../trigger-no-reply.service.ts";
@@ -6,6 +7,8 @@ import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 // Spec: modules/automation/specs/unsubscribe-token-twin.feature
 // Tokens recorded from platform mailer; hardcoded to verify cross-module compatibility.
 const SHARED_KEY = "0f".repeat(32);
+const BEFORE_CUT_OFF = "2026-10-02T00:00:00.000Z";
+const LIFETIME_MS = 180 * 24 * 60 * 60 * 1000;
 
 const APPLICATION_TRIGGER_TOKEN =
   "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOiJ0cmlnZ2VyLTEiLCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSJ9.aba1dbbe8d7ba211a0d91c962a5993e4d61fcc0b56c55c06c37e24cbbd5af6b1";
@@ -22,7 +25,10 @@ class RecordingWarnings extends TriggerNoReplyWarning {
 
 describe("UnsubscribeTokenService", () => {
   describe("given the signing key both processes share", () => {
-    const tokens = UnsubscribeTokenService.create({ secret: SHARED_KEY });
+    const tokens = UnsubscribeTokenService.create({
+      secret: SHARED_KEY,
+      clock: frozenAt(BEFORE_CUT_OFF),
+    });
 
     /** @scenario "A token the application signed verifies here" */
     it("reads back the project, the automation and the recipient", () => {
@@ -38,25 +44,70 @@ describe("UnsubscribeTokenService", () => {
       });
     });
 
-    /** @scenario "A token this feature signs is the application's bytes" */
-    it("signs the bytes the application produces", () => {
-      expect(
-        tokens.sign({
+    /** @scenario "A token this feature signs keeps the shared format and carries its expiry" */
+    it("signs the shared fields in order, then the expiry, and reads them back", () => {
+      const token = tokens.sign({
+        projectId: "project-1",
+        triggerId: "trigger-1",
+        // Cased and padded, as an author may have typed it: the format
+        // normalizes before it signs, so the link works either way.
+        email: "  Ada@Example.COM ",
+      });
+      const [encoded] = token.split(".");
+
+      expect(Buffer.from(encoded!, "base64url").toString("utf8")).toBe(
+        JSON.stringify({
           projectId: "project-1",
           triggerId: "trigger-1",
-          // Cased and padded, as an author may have typed it: the format
-          // normalizes before it signs, so the link works either way.
-          email: "  Ada@Example.COM ",
+          email: "ada@example.com",
+          exp: (Date.parse(BEFORE_CUT_OFF) + LIFETIME_MS) / 1000,
         }),
-      ).toBe(APPLICATION_TRIGGER_TOKEN);
-      expect(
-        tokens.sign({ projectId: "project-1", triggerId: null, email: "ada@example.com" }),
-      ).toBe(APPLICATION_PROJECT_TOKEN);
+      );
+      expect(tokens.findVerifiedPayload(token)).toEqual({
+        projectId: "project-1",
+        triggerId: "trigger-1",
+        email: "ada@example.com",
+      });
+    });
+  });
+
+  describe("given a link signed today", () => {
+    /** @scenario "A link stops working once its lifetime has passed" */
+    it("verifies until its lifetime has passed, then refuses", () => {
+      const clock = frozenAt(BEFORE_CUT_OFF);
+      const tokens = UnsubscribeTokenService.create({ secret: SHARED_KEY, clock });
+      const token = tokens.sign({
+        projectId: "project-1",
+        triggerId: null,
+        email: "ada@example.com",
+      });
+
+      clock.advance(LIFETIME_MS - 1_000);
+      expect(tokens.findVerifiedPayload(token)).not.toBeNull();
+
+      clock.advance(1_000);
+      expect(tokens.findVerifiedPayload(token)).toBeNull();
+    });
+  });
+
+  describe("given a link minted before links carried an expiry", () => {
+    /** @scenario "A link minted without an expiry works until a fixed date" */
+    it("verifies before the cut-off and refuses from it on", () => {
+      const clock = frozenAt("2027-03-31T23:59:59.000Z");
+      const tokens = UnsubscribeTokenService.create({ secret: SHARED_KEY, clock });
+      expect(tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).not.toBeNull();
+
+      clock.set("2027-04-01T00:00:00.000Z");
+      expect(tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).toBeNull();
+      expect(tokens.findVerifiedPayload(APPLICATION_PROJECT_TOKEN)).toBeNull();
     });
   });
 
   describe("given a token signed for one recipient", () => {
-    const tokens = UnsubscribeTokenService.create({ secret: SHARED_KEY });
+    const tokens = UnsubscribeTokenService.create({
+      secret: SHARED_KEY,
+      clock: frozenAt(BEFORE_CUT_OFF),
+    });
 
     /** @scenario "The address is bound to the recipient it was minted for" */
     it("refuses a token whose payload was altered", () => {
@@ -76,9 +127,10 @@ describe("UnsubscribeTokenService", () => {
     /** @scenario "The address is bound to the recipient it was minted for" */
     it("refuses a token minted under a different key", () => {
       expect(
-        UnsubscribeTokenService.create({ secret: "ab".repeat(32) }).findVerifiedPayload(
-          APPLICATION_TRIGGER_TOKEN,
-        ),
+        UnsubscribeTokenService.create({
+          secret: "ab".repeat(32),
+          clock: frozenAt(BEFORE_CUT_OFF),
+        }).findVerifiedPayload(APPLICATION_TRIGGER_TOKEN),
       ).toBeNull();
     });
   });

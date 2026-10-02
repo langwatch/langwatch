@@ -5,7 +5,7 @@ import { toDispatchError } from "@langwatch/eventing";
 import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { WebhookSendRequestResult } from "@langwatch/webhook-contract";
 
@@ -77,6 +77,8 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     baseHost: string;
     /** `NEXTAUTH_SECRET`, as the application spells it. */
     unsubscribeSigningSecret?: string;
+    /** The wall clock unsubscribe links are dated by; the system clock when absent. */
+    clock?: Readonly<{ now(): Instant }>;
     /** The webhook module's `sendRequest`; absent where no webhook action can be delivered. */
     webhookTransport?: WebhookDeliveryTransport;
     slackWebhookClient?: SlackWebhookClientChannel;
@@ -93,6 +95,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
       baseHost: options.baseHost,
       unsubscribeTokens: UnsubscribeTokenService.create({
         secret: options.unsubscribeSigningSecret,
+        ...(options.clock ? { clock: options.clock } : {}),
       }),
       noReply: TriggerNoReplyService.create({
         secret: options.unsubscribeSigningSecret,

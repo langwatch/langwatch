@@ -1,5 +1,6 @@
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { SendEmailCommand } from "@langwatch/notification-contract";
+import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookDeliveryTransport } from "../../channels/http/http.webhook-delivery.channel.ts";
@@ -16,9 +17,9 @@ const BASE_HOST = "https://app.langwatch.test";
 /** Notification turns it into `LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>`. */
 const APPLICATION_NO_REPLY_TAG = "81d9d46cce00";
 const APPLICATION_TRIGGER_TOKEN =
-  "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOiJ0cmlnZ2VyLTEiLCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSJ9.aba1dbbe8d7ba211a0d91c962a5993e4d61fcc0b56c55c06c37e24cbbd5af6b1";
+  "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOiJ0cmlnZ2VyLTEiLCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSIsImV4cCI6MTgwNjQ1MTIwMH0.e2233db171a160427f21771d17605f17be9aa80736de6eae596defe361314299";
 const APPLICATION_PROJECT_TOKEN =
-  "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOm51bGwsImVtYWlsIjoiYWRhQGV4YW1wbGUuY29tIn0.ec785b87b9ec6dfda75a6bf6099fae99780222f09cba44b352eedac673ff18d0";
+  "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOm51bGwsImVtYWlsIjoiYWRhQGV4YW1wbGUuY29tIiwiZXhwIjoxODA2NDUxMjAwfQ.f62e16bf15fd03dffb32f87d6f18000d07e988bace68599ba04626d71613d08c";
 const APPLICATION_HTML = `<html><body><p>hi</p>
     <div style="margin-top:24px;padding-top:12px;border-top:1px solid #F2F4F8;color:#8B96A5;font-size:12px;line-height:18px;">
       <a href="${BASE_HOST}/unsubscribe?token=${APPLICATION_TRIGGER_TOKEN}" style="color:#8B96A5;text-decoration:underline;">Stop receiving this notification</a>
@@ -48,6 +49,7 @@ function composeDelivery(
     renderer: ReactEmailMailRenderer.create(),
     baseHost: BASE_HOST,
     unsubscribeSigningSecret: SIGNING_KEY,
+    clock: frozenAt("2026-10-02T00:00:00.000Z"),
     ...(over.webhookTransport ? { webhookTransport: over.webhookTransport } : {}),
     logger: logger as never,
   });

@@ -8,8 +8,12 @@ Feature: The unsubscribe token and no-reply address as one shared format
 
   Once mail can leave a background process as well as the application, the two
   sides of each format are in different codebases. So both live in the feature
-  that owns their meaning, and the application's copies stay frozen beside
-  them: a recorded token signed by one is verified by the other, byte for byte.
+  that owns their meaning: a recorded token the application signed verifies
+  here, and a token signed here keeps the shared fields in the shared order.
+
+  A footer link is the authorization to suppress someone's mail, so it does
+  not live forever: a link carries its expiry, and a link minted before links
+  carried one stops working on a fixed date.
 
   The two behave differently on an absent key, deliberately. The token IS the
   authorization — a forgeable one lets anyone suppress anyone's mail — so it
@@ -23,10 +27,25 @@ Feature: The unsubscribe token and no-reply address as one shared format
     Then it reads back the project, the automation and the recipient
 
   @unit
-  Scenario: A token this feature signs is the application's bytes
+  Scenario: A token this feature signs keeps the shared format and carries its expiry
     Given the signing key both processes share
     When this feature signs a footer link for one recipient
-    Then the token is byte for byte the one the application produces
+    Then the token carries the project, the automation and the recipient in the shared order
+    And it carries the instant it stops working
+
+  @unit
+  Scenario: A link stops working once its lifetime has passed
+    Given a link signed today
+    When its lifetime has passed
+    Then verification refuses
+
+  @unit
+  Scenario: A link minted without an expiry works until a fixed date
+    Given a link minted before links carried an expiry
+    When it is opened before the cut-off date
+    Then it verifies
+    When it is opened on or after the cut-off date
+    Then verification refuses
 
   @unit
   Scenario: The address is bound to the recipient it was minted for
