@@ -160,7 +160,7 @@ describe("SignInAccountLookupService", () => {
       ).resolves.toBeNull();
     });
 
-    /** @scenario "An account still waiting for identifier backfill keeps its way in" */
+    /** @scenario "An unlatched account's sign-in methods come from its legacy rows" */
     it("falls back to the legacy rows of an account that has not latched", async () => {
       const lookup = lookupOver({
         latched: new Set(),
@@ -202,7 +202,7 @@ describe("SignInAccountLookupService", () => {
   });
 
   describe("when the projection holds the address but its owner has not latched", () => {
-    /** @scenario "An account still waiting for identifier backfill keeps its way in" */
+    /** @scenario "An unlatched account's legacy rows win over its partial identifier heads" */
     it("prefers the legacy rows over partial heads", async () => {
       const lookup = lookupOver({
         heads: [head({ provider: "email" })],

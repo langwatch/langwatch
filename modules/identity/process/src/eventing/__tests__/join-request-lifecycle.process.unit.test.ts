@@ -246,7 +246,7 @@ describe("given a request that reached an ending", () => {
       );
     });
 
-    /** @scenario "An expired join request tells its requester" */
+    /** @scenario Fourteen days of silence expires the request */
     it("queues the requester's notice from the recorded expiry", () => {
       const wake = joinRequestLifecycleWake(armed(), ctx(EXPIRES_AT));
       const terminal = ctx(EXPIRES_AT);
