@@ -279,6 +279,15 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And no answer ever starts streaming
     And the user is never left watching a turn that produces nothing
 
+  @regression @unit
+  Scenario: An unexpected turn-acceptance failure stays unknown
+    Given Langy is ready to run a turn
+    And accepting the turn fails for an unexpected internal reason
+    When the user sends a message
+    Then the turn fails with the generic unknown error and a trace id
+    And the user is not told the agent is unavailable or advised to retry
+    And no answer ever starts streaming
+
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.
   @unit
