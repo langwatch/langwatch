@@ -143,7 +143,9 @@ one component and one exemplar; a screen that disagrees is the defect.
 
 Every page inside the app chrome, workspace, settings, governance and `/me` alike, opens with
 `PageLayout.Header` (the 48px bar) holding `PageLayout.Heading`. Actions sit after a `<Spacer />`
-and are `PageLayout.HeaderButton` only: no raw `Button`, no solid primary. Full-screen tools
+and are `PageLayout.HeaderButton` only, no raw `Button`. At most one is `primary` (solid,
+the page's main action); the rest are outline, and a page with no main action has none
+(ruled 2026-10-02, Alex). Full-screen tools
 (studio, traces explorer, workbench) and card screens (auth, onboarding, authorize) carry no bar.
 Exemplar: `modules/workflow/browser/src/ui/sections/workflows/workflows-screen.tsx:46`.
 Pages never size their title. Account pages (every `/me` page, Settings > Profile and
@@ -155,7 +157,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 <PageLayout.Header>
   <PageLayout.Heading>Page Title</PageLayout.Heading>
   <Spacer />
-  <PageLayout.HeaderButton onClick={handleAction}>
+  <PageLayout.HeaderButton primary onClick={handleAction}>
     <Plus /> Add Item
   </PageLayout.HeaderButton>
 </PageLayout.Header>;

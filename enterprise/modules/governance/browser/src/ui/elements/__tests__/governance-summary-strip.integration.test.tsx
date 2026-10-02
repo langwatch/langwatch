@@ -150,7 +150,7 @@ describe("the action of an empty pane", () => {
           <GovernanceEmptyStateAction emphasis={emphasis}>The action</GovernanceEmptyStateAction>
         }
       />
-      <PageLayout.HeaderButton>House</PageLayout.HeaderButton>
+      <PageLayout.HeaderButton primary>House</PageLayout.HeaderButton>
       <Button size="sm" variant="ghost">
         Ghost
       </Button>

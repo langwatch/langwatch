@@ -36,6 +36,7 @@ export function ConnectAgentEmptyState({
     >
       {canManage && (
         <PageLayout.HeaderButton
+          primary
           onClick={onConnectAgent}
           data-testid="agent-testing-connect-agent-setup"
         >
@@ -65,7 +66,11 @@ export function FirstSuiteEmptyState({
       icon={<FolderPlus size={24} />}
     >
       {canManage && (
-        <PageLayout.HeaderButton onClick={onNewSuite} data-testid="agent-testing-first-suite-new">
+        <PageLayout.HeaderButton
+          primary
+          onClick={onNewSuite}
+          data-testid="agent-testing-first-suite-new"
+        >
           <Plus size={16} /> New test suite
         </PageLayout.HeaderButton>
       )}
@@ -86,7 +91,11 @@ export function FirstCaseEmptyState({ canManage, onNewTestCase }: EmptyStateActi
       icon={<FlaskConical size={24} />}
     >
       {canManage && (
-        <PageLayout.HeaderButton onClick={onNewTestCase} data-testid="agent-testing-first-case-new">
+        <PageLayout.HeaderButton
+          primary
+          onClick={onNewTestCase}
+          data-testid="agent-testing-first-case-new"
+        >
           <Plus size={16} /> New scenario
         </PageLayout.HeaderButton>
       )}

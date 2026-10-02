@@ -163,7 +163,7 @@ function ScenarioLibraryPage() {
             onToggle={handleLabelToggle}
             triggerSize="header"
           />
-          <PageLayout.HeaderButton onClick={handleNewScenario}>
+          <PageLayout.HeaderButton primary onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario
           </PageLayout.HeaderButton>
         </HStack>

@@ -96,11 +96,17 @@ function Content({ children, ...props }: PropsWithChildren<CardRootProps>) {
   );
 }
 
-type HeaderButtonProps = ChakraButtonProps;
+type HeaderButtonProps = ChakraButtonProps & { primary?: boolean };
 
-function HeaderButton({ children, ...props }: PropsWithChildren<HeaderButtonProps>) {
+const PRIMARY_PROPS = { variant: "solid", colorPalette: "orange" } as const;
+
+function HeaderButton({
+  children,
+  primary = false,
+  ...props
+}: PropsWithChildren<HeaderButtonProps>) {
   return (
-    <Button variant="solid" colorPalette="orange" size="sm" {...props}>
+    <Button variant="outline" size="sm" {...(primary ? PRIMARY_PROPS : {})} {...props}>
       {children}
     </Button>
   );

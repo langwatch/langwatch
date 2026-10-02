@@ -110,7 +110,7 @@ function CacheRulesPage() {
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
           {canCreate && !showRulesEmpty && (
-            <PageLayout.HeaderButton onClick={() => setCreateOpen(true)}>
+            <PageLayout.HeaderButton primary onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New rule
             </PageLayout.HeaderButton>
           )}
@@ -192,7 +192,7 @@ function CacheRulesEmptyState({
       icon={<Zap size={32} />}
     >
       {canCreate && (
-        <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
+        <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
           <Plus size={14} /> New rule
         </PageLayout.HeaderButton>
       )}

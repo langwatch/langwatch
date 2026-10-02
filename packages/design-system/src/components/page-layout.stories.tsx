@@ -19,7 +19,7 @@ export const Default: Story = {
       <PageLayout.Header>
         <PageLayout.Heading>Prompts</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton>New prompt</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton primary>New prompt</PageLayout.HeaderButton>
       </PageLayout.Header>
       <PageLayout.Container {...args} sidebarWidth={0}>
         <PageLayout.Content>
@@ -55,7 +55,7 @@ export const HeaderActions: Story = {
         <HStack gap="2">
           <PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>
           <PageLayout.HeaderButton loading>Importing</PageLayout.HeaderButton>
-          <PageLayout.HeaderButton>New dataset</PageLayout.HeaderButton>
+          <PageLayout.HeaderButton primary>New dataset</PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>
     </Box>

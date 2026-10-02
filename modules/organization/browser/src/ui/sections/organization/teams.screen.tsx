@@ -1062,6 +1062,7 @@ export default function TeamsScreen() {
         )}
         {canManage && (
           <PageLayout.HeaderButton
+            primary
             onClick={() => openDrawer("createTeam")}
             data-testid="teams-team-new"
           >

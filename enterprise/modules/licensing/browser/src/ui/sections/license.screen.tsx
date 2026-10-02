@@ -18,7 +18,7 @@ export default function LicenseScreen() {
     <>
       <PageLayout.Header>
         <PageLayout.Heading>License</PageLayout.Heading>
-        <PageLayout.HeaderButton asChild>
+        <PageLayout.HeaderButton primary asChild>
           <Link href={CONTACT_SALES_URL} target="_blank" rel="noreferrer">
             Contact sales
             <ArrowUpRight size={14} />

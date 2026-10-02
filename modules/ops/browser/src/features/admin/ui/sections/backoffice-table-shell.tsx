@@ -62,7 +62,7 @@ export function BackofficeTable({
       }
       createAction={
         onCreate ? (
-          <PageLayout.HeaderButton onClick={onCreate}>
+          <PageLayout.HeaderButton primary onClick={onCreate}>
             <Plus size={20} />
             {createLabel}
           </PageLayout.HeaderButton>

@@ -153,6 +153,7 @@ function GuardrailsPage() {
         <Spacer />
         {canManage && (
           <PageLayout.HeaderButton
+            primary
             data-testid="gateway-guardrail-new"
             onClick={() => openGuardrail()}
             disabled={guardrailEvaluators.length === 0}

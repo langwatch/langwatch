@@ -124,7 +124,9 @@ function InboxEmptyBrief({
           {/* Two ways out: Set up data (house button, local state, no mutation yet); Open
               Langy (ghost, changes screen only). */}
           <HStack gap={2} marginTop={6}>
-            <PageLayout.HeaderButton onClick={onSetup}>Set up data</PageLayout.HeaderButton>
+            <PageLayout.HeaderButton primary onClick={onSetup}>
+              Set up data
+            </PageLayout.HeaderButton>
             <Button size="sm" variant="ghost" onClick={onOpenLangy}>
               Open Langy
             </Button>

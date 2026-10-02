@@ -108,7 +108,7 @@ export default function DatasetEditorScreen() {
           headerActions={
             host.hasPermission(EXPERIMENT_PERMISSION) ? (
               <PageLayout.HeaderButton
-                variant="solid"
+                primary
                 data-testid="run-experiment-from-dataset"
                 onClick={runExperiment}
               >

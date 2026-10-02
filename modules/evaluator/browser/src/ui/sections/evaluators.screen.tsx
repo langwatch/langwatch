@@ -148,7 +148,7 @@ export default function EvaluatorsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Evaluators</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
+        <PageLayout.HeaderButton primary data-testid="evaluator-new-open" onClick={openCreate}>
           <Plus size={16} /> New Evaluator
         </PageLayout.HeaderButton>
       </PageLayout.Header>
@@ -160,7 +160,7 @@ export default function EvaluatorsScreen() {
           icon={<CheckSquare size={24} />}
         >
           <HStack gap={2}>
-            <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
+            <PageLayout.HeaderButton primary data-testid="evaluator-new-open" onClick={openCreate}>
               <Plus size={16} /> Create your first evaluator
             </PageLayout.HeaderButton>
             <SetupWithAgentButton surface="evaluators" />

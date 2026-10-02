@@ -118,7 +118,7 @@ function VirtualKeysHeader({
         <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
         <Spacer />
         {canCreate && (
-          <PageLayout.HeaderButton data-testid="gateway-virtual-key-new" onClick={onCreate}>
+          <PageLayout.HeaderButton primary data-testid="gateway-virtual-key-new" onClick={onCreate}>
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}
@@ -697,7 +697,7 @@ function VirtualKeysEmptyState({
         icon={<KeyRound size={32} />}
       >
         {canCreate && (
-          <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
+          <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}

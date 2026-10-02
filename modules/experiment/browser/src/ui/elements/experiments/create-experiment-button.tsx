@@ -19,7 +19,7 @@ export const CreateExperimentButton = ({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <PageLayout.HeaderButton background="bg" data-testid="experiment-new-open">
+        <PageLayout.HeaderButton primary data-testid="experiment-new-open">
           <Plus size={16} />
           New Experiment
           <ChevronDown size={14} />

@@ -11,7 +11,7 @@ export function NoPrivacyRules({ canWrite, onAdd }: { canWrite: boolean; onAdd: 
       icon={<Shield size={24} />}
     >
       {canWrite && (
-        <PageLayout.HeaderButton onClick={onAdd}>
+        <PageLayout.HeaderButton primary onClick={onAdd}>
           <Plus /> Add privacy rule
         </PageLayout.HeaderButton>
       )}

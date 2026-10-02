@@ -26,7 +26,11 @@ export function GovernanceEmptyStateAction({
   }
 >) {
   if (emphasis === "primary") {
-    return <PageLayout.HeaderButton {...props}>{children}</PageLayout.HeaderButton>;
+    return (
+      <PageLayout.HeaderButton primary {...props}>
+        {children}
+      </PageLayout.HeaderButton>
+    );
   }
 
   return (

@@ -170,6 +170,7 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
           icon={<Bot size={24} />}
         >
           <PageLayout.HeaderButton
+            primary
             onClick={() => props.navigation.openTypeSelector()}
             data-testid="agents-first-agent-create"
           >

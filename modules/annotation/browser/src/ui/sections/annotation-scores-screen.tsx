@@ -283,6 +283,7 @@ export default function AnnotationScoresScreen() {
         <Spacer />
         {canManage && getAllAnnotationScores.data?.length !== 0 && (
           <PageLayout.HeaderButton
+            primary
             onClick={() => host.openEditor()}
             data-testid="annotation-score-add"
           >
@@ -316,6 +317,7 @@ export default function AnnotationScoresScreen() {
             >
               {canManage && (
                 <PageLayout.HeaderButton
+                  primary
                   onClick={() => host.openEditor()}
                   data-testid="annotation-score-empty-add"
                 >

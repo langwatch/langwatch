@@ -462,7 +462,7 @@ function AgentsPage() {
                 Model Provider". The brand accent marks only the sample
                 affordances, the one thing on this screen it must distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
-          <PageLayout.HeaderButton onClick={openRegister}>
+          <PageLayout.HeaderButton primary onClick={openRegister}>
             <Plus size={14} />
             Register agent
           </PageLayout.HeaderButton>

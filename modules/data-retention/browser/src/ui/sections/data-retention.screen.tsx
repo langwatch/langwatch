@@ -296,7 +296,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           currentProjectId={projectId}
         />
         {canWrite && (
-          <PageLayout.HeaderButton onClick={() => setDrawerOpen(true)}>
+          <PageLayout.HeaderButton primary onClick={() => setDrawerOpen(true)}>
             Add retention policy
           </PageLayout.HeaderButton>
         )}
@@ -460,7 +460,7 @@ function RetentionPolicyList({
         icon={<DatabaseBackup size={24} />}
       >
         {canWrite && (
-          <PageLayout.HeaderButton onClick={onAdd}>
+          <PageLayout.HeaderButton primary onClick={onAdd}>
             <Plus /> Add retention policy
           </PageLayout.HeaderButton>
         )}

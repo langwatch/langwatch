@@ -714,7 +714,7 @@ function PeoplePageHeader({
               Run match pass
             </PageLayout.HeaderButton>
           )}
-          <PageLayout.HeaderButton onClick={onAddDepartment}>
+          <PageLayout.HeaderButton primary onClick={onAddDepartment}>
             <Plus size={14} /> Add department
           </PageLayout.HeaderButton>
         </>

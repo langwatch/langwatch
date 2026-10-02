@@ -57,7 +57,7 @@ export default function ModelCostsScreen() {
         <PageLayout.Heading>Model Costs</PageLayout.Heading>
         <Spacer />
         <PageLayout.HeaderButton
-          variant="solid"
+          primary
           data-testid="add-model-cost"
           onClick={() => host.openPlatformDrawer({ drawer: "llmModelCost" })}
           disabled={!host.hasPermission(MODEL_COST_MANAGE_PERMISSION)}

@@ -143,7 +143,9 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           />
         )}
         {canWrite && snapshot?.rules.length !== 0 && (
-          <PageLayout.HeaderButton onClick={openAdd}>Add privacy rule</PageLayout.HeaderButton>
+          <PageLayout.HeaderButton primary onClick={openAdd}>
+            Add privacy rule
+          </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>

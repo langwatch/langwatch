@@ -281,7 +281,7 @@ export default function SimulationsPage() {
                 setPeriod={setPeriod}
                 setRelativePeriod={setRelativePeriod}
               />
-              <PageLayout.HeaderButton onClick={handleNewSuite}>
+              <PageLayout.HeaderButton primary onClick={handleNewSuite}>
                 <Plus size={16} /> New Run Plan
               </PageLayout.HeaderButton>
             </HStack>

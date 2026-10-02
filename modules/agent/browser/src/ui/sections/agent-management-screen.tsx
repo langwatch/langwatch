@@ -47,7 +47,7 @@ class ScreenComposition implements AgentPageComposition {
       <PageLayout.Header>
         <PageLayout.Heading>Agents</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton onClick={onCreate} data-testid="agents-new-agent">
+        <PageLayout.HeaderButton primary onClick={onCreate} data-testid="agents-new-agent">
           <Plus size={16} /> New Agent
         </PageLayout.HeaderButton>
       </PageLayout.Header>

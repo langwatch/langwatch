@@ -169,7 +169,7 @@ export function renderScreen({
 function ButtonReferences() {
   return (
     <>
-      <Button size="sm" variant="outline" colorPalette="orange">
+      <Button size="sm" variant="outline">
         reference outline small
       </Button>
       <Button size="sm" variant="ghost">
@@ -188,7 +188,7 @@ function ButtonReferences() {
           trigger composition adds a class and its own emitted style, so the
           references wear the same wrapper and the comparison stays about the button. */}
       <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
-        <Button size="sm" variant="outline" colorPalette="orange">
+        <Button size="sm" variant="outline">
           reference outline small trigger
         </Button>
       </AddIngestionSourceMenu>
