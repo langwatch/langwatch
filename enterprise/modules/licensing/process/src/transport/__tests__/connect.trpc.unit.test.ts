@@ -44,7 +44,9 @@ describe("the connect tRPC namespace", () => {
     await expect(caller.status({ organizationId: "org-acme" })).resolves.toBeDefined();
     await expect(
       caller.setService({ organizationId: "org-acme", service: "instant_evals", enabled: true }),
-    ).rejects.toBeDefined();
-    await expect(caller.setCap({ organizationId: "org-acme", capUsd: 10 })).rejects.toBeDefined();
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.setCap({ organizationId: "org-acme", capUsd: 10 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 });
