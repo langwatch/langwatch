@@ -108,8 +108,8 @@ describe("given a self-hosted install", () => {
 });
 
 describe("given a self-hosted install that is not released", () => {
-  const licensed = { entitled: true, switchedOn: true };
-  const unlicensed = { entitled: false, switchedOn: false };
+  const licensed = { isEntitled: true, isSwitchedOn: true };
+  const unlicensed = { isEntitled: false, isSwitchedOn: false };
 
   /** @scenario "A self-hosted install is told why from its judge and its license, and the plan is not read" */
   it.each([
@@ -123,7 +123,7 @@ describe("given a self-hosted install that is not released", () => {
     {
       reason: "holds a license naming them that an admin switched off",
       route: "connect",
-      license: { entitled: true, switchedOn: false },
+      license: { isEntitled: true, isSwitchedOn: false },
       offer: "switched_off",
     },
     {

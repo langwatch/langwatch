@@ -21,7 +21,10 @@
  */
 
 import { CONNECT_INSTANT_EVALS_SERVICE } from "@ee/licensing/connect/install/connectClassifier";
-import { connectServiceState } from "@ee/licensing/connect/install/connectEntitlement";
+import {
+  type ConnectServiceState,
+  connectServiceState,
+} from "@ee/licensing/connect/install/connectEntitlement";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
@@ -75,12 +78,7 @@ export type SelfHostedInstantEvalOffer =
   | "ask_operator";
 
 /** What one organization's license says about hosted judging. */
-export interface InstantEvalLicenseState {
-  /** The license names Instant Evals. */
-  readonly entitled: boolean;
-  /** Named, and no organization admin switched them off. */
-  readonly switchedOn: boolean;
-}
+export type InstantEvalLicenseState = ConnectServiceState;
 
 const isHostedService = () => env.IS_SAAS === true;
 
@@ -156,8 +154,8 @@ export async function selfHostedInstantEvalOffer({
   if (route === "off" || route === "own_key") return "ask_operator";
   if (route === "disconnected") return "not_connected";
   const license = await licenseOf();
-  if (!license.entitled) return "not_in_license";
-  if (!license.switchedOn) return "switched_off";
+  if (!license.isEntitled) return "not_in_license";
+  if (!license.isSwitchedOn) return "switched_off";
   return "not_connected";
 }
 

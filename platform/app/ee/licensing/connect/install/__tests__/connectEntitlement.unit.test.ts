@@ -246,19 +246,19 @@ describe("given a refused Instant Eval asking which half of the answer said no",
       when: "the license names it and nobody switched it off",
       connectServices: ["instant_evals"],
       disabled: [],
-      state: { entitled: true, switchedOn: true },
+      state: { isEntitled: true, isSwitchedOn: true },
     },
     {
       when: "the license names it and an admin switched it off",
       connectServices: ["instant_evals"],
       disabled: ["instant_evals"],
-      state: { entitled: true, switchedOn: false },
+      state: { isEntitled: true, isSwitchedOn: false },
     },
     {
       when: "the license does not name it",
       connectServices: ["managed_models"],
       disabled: [],
-      state: { entitled: false, switchedOn: false },
+      state: { isEntitled: false, isSwitchedOn: false },
     },
   ])("reads the state when $when", async ({
     connectServices,
@@ -289,7 +289,7 @@ describe("given a refused Instant Eval asking which half of the answer said no",
         publicKey: PUBLIC_KEY,
         now: NOW,
       }),
-    ).resolves.toEqual({ entitled: false, switchedOn: false });
+    ).resolves.toEqual({ isEntitled: false, isSwitchedOn: false });
   });
 });
 
