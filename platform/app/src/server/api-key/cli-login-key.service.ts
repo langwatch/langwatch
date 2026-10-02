@@ -7,7 +7,6 @@ import {
   batchTeamsPermissions,
   type Permission,
 } from "~/server/app-layer/authz/permission-adapters";
-import { holdsSharedAccess } from "~/utils/memberRoleConstraints";
 import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";
@@ -294,27 +293,16 @@ export class CliLoginKeyService {
     userId: string;
     organizationId: string;
   }): Promise<string[]> {
-    // ADR-143: a Developer seat holds its own personal team and nothing
-    // shared, so that team is the only candidate. The grants engine would
-    // drop every other team anyway; narrowing here keeps the key's scope
-    // list from ever naming a shared team for a Developer.
-    const membership = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId, disabledAt: null },
-      select: { role: true },
-    });
-    const personalOnly =
-      membership != null && !holdsSharedAccess(membership.role);
+    // A Developer seat (ADR-143) is capped to its own personal team by the
+    // grants engine at resolution, so a shared team listed here never
+    // becomes one of its key scopes.
     const teams = await this.prisma.team.findMany({
       where: {
         organizationId,
         archivedAt: null,
-        ...(personalOnly
-          ? { isPersonal: true, ownerUserId: userId }
-          : {
-              // Another member's personal workspace is never a scope for
-              // this user's key, whatever membership rows exist.
-              NOT: { isPersonal: true, ownerUserId: { not: userId } },
-            }),
+        // Another member's personal workspace is never a scope for this
+        // user's key, whatever membership rows exist.
+        NOT: { isPersonal: true, ownerUserId: { not: userId } },
       },
       select: { id: true },
     });
