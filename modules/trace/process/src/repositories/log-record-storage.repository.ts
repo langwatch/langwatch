@@ -1,19 +1,7 @@
-/**
- * Stored log record read by trace. Generic across emitters; correlates at
- * TRACE level. Body and attributes carry emitter data; resource/scope provide provenance.
- */
-export interface StoredLogRecordRow {
-  traceId: string;
-  spanId: string;
-  timeUnixMs: number;
-  /** The OTLP LogRecord body (a summary/marker for many emitters; content-of-record for some). */
-  body: string;
-  /** Attribute map carrying event payload, event.name, request_id, cost_usd, etc. */
-  attributes: Record<string, string>;
-  resourceAttributes: Record<string, string>;
-  scopeName: string;
-  scopeVersion: string | null;
-}
+import type { CanonicalTraceLogRecord } from "@langwatch/log-contract";
+
+/** Stored log record read by trace: log's trace-correlated read shape. */
+export type StoredLogRecordRow = CanonicalTraceLogRecord;
 
 // Ceiling on log rows one trace read materialises to avoid OOM in marathon sessions.
 export const TRACE_LOG_READ_CAP = 2000;

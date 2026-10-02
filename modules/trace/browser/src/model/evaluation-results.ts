@@ -1,19 +1,8 @@
+import type { ParsedEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   serializedHandledErrorSchema,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
-
-/**
- * Parsed evaluation result with status information. Used for rendering evaluation
- * results in UI components.
- */
-export type ParsedEvaluationResult = {
-  status: "pending" | "running" | "passed" | "failed" | "processed" | "error" | "skipped";
-  score?: number;
-  label?: string;
-  details?: string;
-  domainError?: SerializedHandledError;
-};
 
 function readSerializedDomainError(candidate: unknown): SerializedHandledError | undefined {
   const result = serializedHandledErrorSchema.safeParse(candidate);

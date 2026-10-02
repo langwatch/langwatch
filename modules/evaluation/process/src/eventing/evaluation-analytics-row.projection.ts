@@ -1,3 +1,4 @@
+import type { AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { trimAttributesForAnalytics } from "@langwatch/trace-contract";
 
@@ -6,33 +7,7 @@ const logger = createLogger(
 );
 
 /** Persisted shape for one evaluation in the slim evaluation_analytics table. */
-export interface EvaluationAnalyticsRow {
-  tenantId: string;
-  evaluationId: string;
-  version: string;
-  occurredAtMs: number;
-  createdAtMs: number;
-  updatedAtMs: number;
-  evaluatorType: string;
-  evaluatorName: string | null;
-  status: string;
-  isGuardrail: boolean;
-  passed: boolean | null;
-  score: number | null;
-  label: string | null;
-  model: string | null;
-  traceId: string | null;
-  userId: string | null;
-  conversationId: string | null;
-  customerId: string | null;
-  origin: string | null;
-  durationMs: number;
-  totalCost: number | null;
-  nonBilledCost: number | null;
-  attributes: Record<string, string>;
-  startedAtMs: number | null;
-  completedAtMs: number | null;
-}
+export type EvaluationAnalyticsRow = AnalyticsEvaluationRow;
 
 /** Fold state needed to derive the slim row. Heavy evaluator artifacts stay in evaluation_runs. */
 export interface EvaluationAnalyticsData {
