@@ -1,4 +1,5 @@
 import { Skeleton } from "@langwatch/design-system/primitives";
+import { inferProvider, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
 
@@ -6,7 +7,6 @@ import { useAllPromptsForProject } from "../../../../behavior/use-all-prompts-fo
 import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { Sidebar, SidebarEmptyState } from "../studio-internals.ts";
 import { PublishedPromptContent } from "./published-prompt-content.tsx";
 
@@ -73,9 +73,7 @@ export function PublishedPromptsList() {
             // agents, datasets and model-config families took.
             <Sidebar.Item
               key={prompt.id}
-              icon={
-                modelProviderIcons[prompt.model?.split("/")[0] as keyof typeof modelProviderIcons]
-              }
+              icon={providerIconFor({ model: prompt.model ?? "" })}
               onClick={() => {
                 const defaultValues = computeInitialFormValuesForPrompt({
                   prompt,
@@ -112,4 +110,10 @@ export function PublishedPromptsList() {
       ))}
     </>
   );
+}
+
+/** Theme-aware provider mark (black logos invert in dark mode); none for an unknown provider. */
+function providerIconFor({ model }: { model: string }) {
+  const provider = inferProvider(model);
+  return provider ? <ProviderIconGlyph provider={provider} size="12px" /> : undefined;
 }

@@ -53,10 +53,18 @@ export function PromptEditorHeader({
   const deployDialog = useDisclosure();
 
   return (
-    <Box width="full" display="flex" gap={8} justifyContent="space-between">
+    <Box
+      width="full"
+      display="flex"
+      flexWrap="wrap"
+      columnGap={4}
+      rowGap={2}
+      justifyContent="space-between"
+    >
       <ModelSelectFieldMini />
+      {/* When squeezed the buttons wrap (as a group, then one by one), never the model name. */}
       {variant === "full" && (
-        <HStack gap={2} flexShrink={0}>
+        <HStack gap={2} flexWrap="wrap" justifyContent="flex-end" marginLeft="auto">
           {configId && onVersionRestore && (
             <VersionHistoryButton
               configId={configId}

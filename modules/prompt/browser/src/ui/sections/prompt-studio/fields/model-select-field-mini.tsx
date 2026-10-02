@@ -115,6 +115,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
           >
             <Popover.Anchor asChild>
               <HStack
+                minWidth="180px"
                 paddingY={2}
                 paddingX={3}
                 borderRadius="md"
