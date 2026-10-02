@@ -7,7 +7,7 @@ import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
+  canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
@@ -26,15 +26,6 @@ class ScenarioParameterUnknownTestError extends HandledError {
     );
   }
 }
-
-const boundaryErrorHandler: RestErrorHandler = (error, c) => {
-  const handled = error as Error & { code?: string; httpStatus?: number };
-  if (typeof handled.code === "string" && typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code, message: handled.message }, handled.httpStatus as 400);
-  }
-
-  return c.json({ error: "internal_server_error", message: String(error) }, 500);
-};
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
 
@@ -73,7 +64,7 @@ function buildApi(run: (...args: never[]) => unknown) {
   const app = runtime.mount(createSuitesAliasRest().router(), {
     app: () => suites,
     credential: "project",
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -134,7 +125,7 @@ describe("POST /api/suites/:id/run", () => {
       });
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ error: "scenario_parameter_unknown" });
+      expect(await response.json()).toMatchObject({ code: "scenario_parameter_unknown" });
     });
   });
 
@@ -149,7 +140,7 @@ describe("POST /api/suites/:id/run", () => {
       });
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ error: "validation_error" });
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(run).not.toHaveBeenCalled();
     });
   });
