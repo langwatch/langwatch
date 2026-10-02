@@ -116,3 +116,18 @@ Feature: Managed-Bedrock dispatch through a customer VPC endpoint
       Given Bedrock answers a Converse call with a 400 ValidationException
       When the gateway returns the error
       Then it carries status 400 and the error type "ValidationException"
+
+    @unit
+    Scenario: A request the SDK refuses to send is a bad request
+      Given the Bedrock SDK refuses a Converse request for a missing required field
+      When the gateway returns the error
+      Then it is a "bad_request", which is neither retried nor failed over
+
+    # A stream already answered 200 has no status to forward, so the status
+    # Bedrock gives the exception on a plain call is what the trace records.
+    @unit
+    Scenario: A mid-stream Bedrock exception names its type and status
+      Given a ConverseStream ends with a ThrottlingException
+      When the gateway reports the stream error
+      Then the error type is "ThrottlingException" and the status is 429
+      And an Anthropic client reads it as a rate_limit_error with the exception name in its message

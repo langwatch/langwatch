@@ -1206,7 +1206,7 @@ describe("LangyConversationService", () => {
         commands: makeCommands({ recordAgentResponse }),
         repository: makeRepo(),
         events: null,
-        turnOrder: { readTurnOrder: vi.fn(async () => account) },
+        turnOrder: { readTurnOrder: vi.fn(async () => account), readTurnAccount: vi.fn() },
       });
 
       await svc.ingestAgentTurnResult({
@@ -1238,6 +1238,7 @@ describe("LangyConversationService", () => {
           readTurnOrder: vi.fn(async () => {
             throw new Error("redis is down");
           }),
+          readTurnAccount: vi.fn(),
         },
       });
 

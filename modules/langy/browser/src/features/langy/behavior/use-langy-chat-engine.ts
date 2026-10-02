@@ -150,7 +150,7 @@ function useRetryKeepingFailedReply({
  * The failed turn's reply, when it has something to show. `regenerate` would drop it, and with it
  * the plan card and the tool calls the turn already ran.
  */
-export function replyToKeepOnRetry(messages: readonly UIMessage[]): UIMessage | null {
+function replyToKeepOnRetry(messages: readonly UIMessage[]): UIMessage | null {
   const last = messages.at(-1);
   if (last?.role !== "assistant" || last.parts.length === 0) {
     return null;

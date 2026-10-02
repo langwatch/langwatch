@@ -74,7 +74,7 @@ export class LangyConversationTurnService {
     conversationId: string;
     turnId: string;
   }): Promise<LangyMessagePart[]> {
-    if (!this.deps.turnOrder?.readTurnAccount) {
+    if (!this.deps.turnOrder) {
       return [];
     }
 

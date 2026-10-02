@@ -20,7 +20,7 @@ export type LangyTurnAccount = {
 };
 
 type ToolStreamEntry = Extract<LangyStreamEntry, { type: "tool" }>;
-type ToolCallInProgress = LangyFinalToolCall & { returned: boolean };
+type ToolCallInProgress = LangyFinalToolCall & { hasReturned: boolean };
 
 /**
  * Fold a turn's stream entries into its ordered account. A call is recorded once, at its first
@@ -63,8 +63,8 @@ export class LangyTurnOrderService implements LangyTurnOrderReader {
     }
 
     const toolCalls = [...calls.values()]
-      .filter((call) => call.returned)
-      .map(({ returned: _returned, ...call }) => call);
+      .filter((call) => call.hasReturned)
+      .map(({ hasReturned: _hasReturned, ...call }) => call);
     const last = order.at(-1);
 
     return { order, toolCalls, closingText: last?.kind === "text" ? last.text : "" };
@@ -77,7 +77,7 @@ export class LangyTurnOrderService implements LangyTurnOrderReader {
   ): ToolCallInProgress {
     const next: ToolCallInProgress = call
       ? { ...call }
-      : { id: entry.id, name: entry.name, returned: false };
+      : { id: entry.id, name: entry.name, hasReturned: false };
     if (entry.name) {
       next.name = entry.name;
     }
@@ -96,7 +96,7 @@ export class LangyTurnOrderService implements LangyTurnOrderReader {
 
     return {
       ...next,
-      returned: true,
+      hasReturned: true,
       ...(entry.output !== undefined ? { output: entry.output } : {}),
       ...(entry.isError !== undefined ? { isError: entry.isError } : {}),
       ...(entry.digest !== undefined ? { digest: entry.digest } : {}),
@@ -151,5 +151,5 @@ export interface LangyTurnStreamTail {
 export interface LangyTurnOrderReader {
   readTurnOrder(a: { conversationId: string; turnId: string }): Promise<LangyTurnSegment[]>;
   /** The whole account, for a turn that failed before handing one over. */
-  readTurnAccount?(a: { conversationId: string; turnId: string }): Promise<LangyTurnAccount>;
+  readTurnAccount(a: { conversationId: string; turnId: string }): Promise<LangyTurnAccount>;
 }
