@@ -15,7 +15,6 @@ const {
   registerMock,
   signInMock,
   replaceMock,
-  hardNavigateMock,
   sessionRef,
   searchParamsRef,
   publicEnvRef,
@@ -27,7 +26,6 @@ const {
   registerMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
-  hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: {
@@ -80,7 +78,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 
 vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replaceMock,
-  hardNavigate: hardNavigateMock,
+  hardNavigate: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
@@ -851,29 +849,6 @@ describe("given the identifier-first sign-in screen", () => {
 
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
       expect(screen.queryByTestId("unknown-identifier")).toBeNull();
-    });
-
-    /** @scenario An address with no account on an installation that cannot send email goes to the password step */
-    it("hands the unconfirmed proof to the sign-up door instead of saying to check email", async () => {
-      publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };
-      routeMock.mockResolvedValue(unknownIdentifier);
-      requestSignUpVerificationMock.mockResolvedValue({ sent: false, addressProof: "proof-1" });
-
-      renderScreen();
-      await enterEmail("nobody@example.com");
-      await screen.findByTestId("unknown-identifier");
-
-      expect(screen.queryByRole("button", { name: /send confirmation link/i })).toBeNull();
-      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-
-      await waitFor(() => expect(hardNavigateMock).toHaveBeenCalledTimes(1));
-      const target = new URL(hardNavigateMock.mock.calls[0]?.[0] as string, "http://x");
-      expect(target.pathname).toBe("/auth/signup");
-      const fragment = new URLSearchParams(target.hash.replace(/^#/, ""));
-      expect(fragment.get("email")).toBe("nobody@example.com");
-      expect(fragment.get("proof")).toBe("proof-1");
-      expect(target.search).not.toContain("proof");
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
     });
 
     /**

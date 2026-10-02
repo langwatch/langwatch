@@ -9,11 +9,7 @@ import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts"
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
-import {
-  forgetCarriedEmail,
-  readCarriedAddressProof,
-  readCarriedEmail,
-} from "../../model/carried-email.ts";
+import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
@@ -51,7 +47,6 @@ export function VerificationFirstSignUp() {
   // prefills is drawn then, and forgotten immediately after — see
   // `carriedEmail`.
   const [carriedEmail] = useState(readCarriedEmail);
-  const [carriedProof] = useState(readCarriedAddressProof);
   useEffect(forgetCarriedEmail, []);
 
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
@@ -91,13 +86,6 @@ export function VerificationFirstSignUp() {
     },
   });
   const { enrollment, failedLink, resolveEnrollment } = proofEnrollment;
-  useCarriedUnconfirmedProof({
-    email: carriedEmail,
-    proof: carriedProof,
-    verifyToken,
-    onUnconfirmed: setAddressConfirmed,
-    resolveEnrollment,
-  });
 
   // The emailed link is spent once, on arrival. Guarded by a ref rather than
   // by request state because the token is single-use: a second attempt would
@@ -636,33 +624,6 @@ function useInstanceMethods({
   }, [decide, verifyToken]);
 
   return instanceMethods;
-}
-
-/**
- * The log-in door asked for this address where no email can be sent and handed over the
- * unconfirmed proof, so this door opens on the password step instead of asking again.
- */
-function useCarriedUnconfirmedProof({
-  email,
-  proof,
-  verifyToken,
-  onUnconfirmed,
-  resolveEnrollment,
-}: {
-  email: string | undefined;
-  proof: string | undefined;
-  /** An emailed link being spent is the journey; a carried proof then counts for nothing. */
-  verifyToken: string | null | undefined;
-  onUnconfirmed: (confirmed: false) => void;
-  resolveEnrollment: (email: string, proof: string) => Promise<void>;
-}) {
-  const spent = useRef(false);
-  useEffect(() => {
-    if (!email || !proof || verifyToken || spent.current) return;
-    spent.current = true;
-    onUnconfirmed(false);
-    void resolveEnrollment(email, proof);
-  }, [email, proof, verifyToken, onUnconfirmed, resolveEnrollment]);
 }
 
 /** The proven address's enrollment, and the failed link a retry re-asks with. */

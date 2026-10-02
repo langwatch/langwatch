@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
-import { hardNavigate, replaceLocation } from "../../behavior/browser-navigation.ts";
+import { replaceLocation } from "../../behavior/browser-navigation.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
@@ -330,17 +330,17 @@ function signInDepth({
 }
 
 /** What the log-in door says about an unknown address where no confirmation
- *  link can be sent: what is missing, and that the address stays unconfirmed. */
+ *  link can be sent: what is missing, and who can fix it. */
 const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
   title: "There is no account for that email address yet",
   describe:
-    "This installation cannot send email, so it cannot confirm a new address. Continue to create an account with a password, and the address stays unconfirmed until an administrator has set up an email provider. Or sign in with single sign-on once your organization has it.",
+    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
 } as const;
 
 /**
  * The address routed to no account (ADR-117, revision 2026-08-25). Offers the
- * sign-up and keeps a mistyped address one click away. It sends the sign-up
- * door's link, or, without an email provider, says no link can be sent.
+ * sign-up and keeps a mistyped address one click away. Without an email
+ * provider it sends no link and says what is missing instead.
  */
 function NoAccountYet({
   email,
@@ -362,15 +362,28 @@ function NoAccountYet({
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
   const sendsEmail = usePublicEnv().data.HAS_EMAIL_PROVIDER_KEY;
 
+  if (!sendsEmail) {
+    return (
+      <AuthCard
+        title={NO_ACCOUNT_WITHOUT_EMAIL_COPY.title}
+        intro={NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe}
+        finePrint={<FrontDoorFinePrint />}
+      >
+        <VStack width="full" align="stretch" gap="14px">
+          <div data-testid="unknown-identifier" hidden>
+            {email}
+          </div>
+          <Button variant="outline" onClick={onUseDifferentEmail}>
+            Use a different email
+          </Button>
+        </VStack>
+      </AuthCard>
+    );
+  }
+
   const beginSignUp = async () => {
     try {
-      const result = await requestVerification.mutateAsync({ email });
-      if (!result.sent) {
-        // Nothing was mailed: the sign-up door takes the unconfirmed proof straight to the
-        // password step, the same step its own address form leads to on this installation.
-        hardNavigate(signUpHref({ callbackUrl, email, addressProof: result.addressProof }));
-        return;
-      }
+      await requestVerification.mutateAsync({ email });
       onAwaitingConfirmation(email);
     } catch (failure) {
       if (readHandledError(failure)?.code === "email_already_registered") {
@@ -381,16 +394,10 @@ function NoAccountYet({
 
   return (
     <AuthCard
-      title={
-        sendsEmail
-          ? (guidance?.title ?? "Let's create your account")
-          : NO_ACCOUNT_WITHOUT_EMAIL_COPY.title
-      }
+      title={guidance?.title ?? "Let's create your account"}
       intro={
-        sendsEmail
-          ? (guidance?.describe ??
-            "There is no account for that email address yet, so this is a sign-up.")
-          : NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe
+        guidance?.describe ??
+        "There is no account for that email address yet, so this is a sign-up."
       }
       finePrint={<FrontDoorFinePrint />}
     >
@@ -408,7 +415,7 @@ function NoAccountYet({
           loading={requestVerification.isPending}
           onClick={() => void beginSignUp()}
         >
-          {sendsEmail ? "Send confirmation link" : "Continue"}
+          Send confirmation link
         </Button>
         <Button variant="outline" onClick={onUseDifferentEmail}>
           Use a different email
