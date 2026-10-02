@@ -1,49 +1,27 @@
-import { ROLE_KIND, roleSchema, type Role } from "@langwatch/role-contract";
+import { ROLE_KIND, type Role } from "@langwatch/role-contract";
 
 import type { RoleRepository } from "../role.repository.ts";
+import { MemoryRoleStore } from "./memory.role.store.ts";
 
-/**
- * The same reads over a map. A definition is written through the grants
- * ledger, so `save` and `assign` are how a test states the rows a ledger would
- * have produced.
- */
+/** The same reads over the {@link MemoryRoleStore} a test states rows in. */
 export class MemoryRoleRepository implements RoleRepository {
-  #roles = new Map<string, Role>();
-  #assignments: { userId: string; teamId: string; customRoleId: string }[] = [];
+  private constructor(private readonly store: MemoryRoleStore) {}
 
-  private constructor() {}
-
-  static create(): MemoryRoleRepository {
-    return new MemoryRoleRepository();
-  }
-
-  /** States one stored role, parsed by the same schema Prisma rows return through. */
-  save(role: Role): Role {
-    const stored = roleSchema.parse(role);
-    this.#roles.set(stored.id, stored);
-
-    return stored;
-  }
-
-  /** States one legacy team assignment of a custom role. */
-  assign(assignment: { userId: string; teamId: string; customRoleId: string }): void {
-    this.#assignments.push(assignment);
-  }
-
-  /** Forgets one stored role, as the ledger's delete would. */
-  forget(input: { roleId: string }): void {
-    this.#roles.delete(input.roleId);
+  static create({
+    store = MemoryRoleStore.create(),
+  }: { store?: MemoryRoleStore } = {}): MemoryRoleRepository {
+    return new MemoryRoleRepository(store);
   }
 
   async findById(input: { roleId: string }): Promise<Role | undefined> {
-    return this.#roles.get(input.roleId);
+    return this.store.roles.get(input.roleId);
   }
 
   async findCustomInOrganization(input: {
     roleId: string;
     organizationId: string;
   }): Promise<Role | undefined> {
-    const role = this.#roles.get(input.roleId);
+    const role = this.store.roles.get(input.roleId);
 
     return role?.organizationId === input.organizationId && role.kind === ROLE_KIND.CUSTOM
       ? role
@@ -54,7 +32,7 @@ export class MemoryRoleRepository implements RoleRepository {
     organizationId: string;
     name: string;
   }): Promise<{ id: string } | undefined> {
-    const role = [...this.#roles.values()].find(
+    const role = [...this.store.roles.values()].find(
       (candidate) =>
         candidate.organizationId === input.organizationId && candidate.name === input.name,
     );
@@ -67,7 +45,7 @@ export class MemoryRoleRepository implements RoleRepository {
     organizationId: string;
   }): Promise<{ id: string }[]> {
     return input.roleIds.flatMap((roleId) => {
-      const role = this.#roles.get(roleId);
+      const role = this.store.roles.get(roleId);
 
       return role?.organizationId === input.organizationId && role.kind === ROLE_KIND.CUSTOM
         ? [{ id: roleId }]
@@ -76,7 +54,7 @@ export class MemoryRoleRepository implements RoleRepository {
   }
 
   async countAssignedUsers(input: { roleId: string }): Promise<number> {
-    return this.#assignments.filter((assignment) => assignment.customRoleId === input.roleId)
+    return this.store.assignments.filter((assignment) => assignment.customRoleId === input.roleId)
       .length;
   }
 }

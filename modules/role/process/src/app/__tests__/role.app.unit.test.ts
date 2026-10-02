@@ -16,6 +16,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
+import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
 import { createRoleTestApp, testBinding } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -71,8 +72,9 @@ describe("given a caller defining a custom role", () => {
     /** @scenario "A role name is already taken in the organization" */
     it("refuses before anything is written", async () => {
       const defineRole = vi.fn(async () => {});
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
       const { app } = createRoleTestApp({ roles, permissions: { defineRole } });
 
       await expect(
@@ -93,9 +95,9 @@ describe("given a caller defining a custom role", () => {
 });
 
 /** A ledger whose projection lands each definition before the write answers. */
-const projectingInto = (roles: MemoryRoleRepository) =>
+const projectingInto = (store: MemoryRoleStore) =>
   vi.fn(async (input: AuthzDefineRoleInput) => {
-    roles.save(
+    store.save(
       role({
         id: input.roleId,
         organizationId: input.organizationId,
@@ -113,8 +115,9 @@ describe("given a caller creating a role and reading it straight back", () => {
   describe("when the creation answers", () => {
     /** @scenario "A created role is readable as soon as its creation answers" */
     it("has waited for the projection, so the read finds the role", async () => {
-      const roles = MemoryRoleRepository.create();
-      const defineRole = projectingInto(roles);
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      const defineRole = projectingInto(store);
       const { app } = createRoleTestApp({ roles, permissions: { defineRole } });
 
       const created = await app.createRole(reviewerCreate, CALLER);
@@ -146,8 +149,9 @@ describe("given a caller creating a role and reading it straight back", () => {
   describe("when a second role asks for the name the first one took", () => {
     /** @scenario "A second role with a name already taken is refused with a conflict" */
     it("refuses the second with the name-taken conflict", async () => {
-      const roles = MemoryRoleRepository.create();
-      const defineRole = projectingInto(roles);
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      const defineRole = projectingInto(store);
       const { app } = createRoleTestApp({ roles, permissions: { defineRole } });
 
       await app.createRole(reviewerCreate, CALLER);
@@ -165,8 +169,9 @@ describe("given a role that belongs to another organization", () => {
   describe("when an organization-scoped operation names it", () => {
     /** @scenario "A role is requested from another organization" */
     it("answers the same not-found as for a role that never existed", async () => {
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
       const { app } = createRoleTestApp({ roles });
 
       await expect(
@@ -183,8 +188,9 @@ describe("given a caller reading one role by its id", () => {
   describe("when the organization decision refuses them", () => {
     /** @scenario "A caller the organization decision refuses reaches no role data" */
     it("refuses with the permission-denied code", async () => {
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
       const { app } = createRoleTestApp({
         roles,
         permissions: { hasPermission: async () => false },
@@ -202,8 +208,9 @@ describe("given a role that carries an organization-exclusive permission", () =>
     /** @scenario "A caller assigns a role below organization scope" */
     it("refuses before a grant is written", async () => {
       const attachBindings = vi.fn(async () => ({ attached: [], duplicates: [] }));
-      const roles = MemoryRoleRepository.create();
-      roles.save(role({ permissions: ["organization:manage"] }));
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role({ permissions: ["organization:manage"] }));
       const { app } = createRoleTestApp({
         roles,
         organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
@@ -227,8 +234,9 @@ describe("given a caller assigning a custom role above what it holds", () => {
     const changeBindingRole = vi.fn(async () => {
       throw new GrantExceedsCallerPermissionsError(["traces:view"]);
     });
-    const roles = MemoryRoleRepository.create();
-    roles.save(role());
+    const store = MemoryRoleStore.create();
+    const roles = MemoryRoleRepository.create({ store });
+    store.save(role());
     const { app } = createRoleTestApp({
       roles,
       organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
@@ -283,9 +291,10 @@ describe("given a role something still holds", () => {
     /** @scenario "A role still has holders" */
     it("refuses with the role-in-use error", async () => {
       const deleteRole = vi.fn(async () => {});
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
-      roles.assign({ userId: "user-2", teamId: "team-1", customRoleId: "role-1" });
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
+      store.assign({ userId: "user-2", teamId: "team-1", customRoleId: "role-1" });
       const { app } = createRoleTestApp({
         roles,
         permissions: { ...noBindings, deleteRole },
@@ -304,8 +313,9 @@ describe("given a deletion that races a new holder", () => {
     /** @scenario "A role deletion races with a new holder" */
     it("reports that the role is in use rather than deleting it", async () => {
       const deleteRole = vi.fn(async () => {});
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
       let seen = 0;
       const listOrganizationBindings = vi.fn(async () => {
         seen += 1;
@@ -329,9 +339,10 @@ describe("given another feature validating a custom role", () => {
   describe("when it asks which of a set this organization may assign", () => {
     /** @scenario "Another feature needs custom-role behaviour" */
     it("answers through the role application rather than a shared query", async () => {
-      const roles = MemoryRoleRepository.create();
-      roles.save(role());
-      roles.save(role({ id: "role-2", organizationId: "org-2", name: "Other" }));
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
+      store.save(role());
+      store.save(role({ id: "role-2", organizationId: "org-2", name: "Other" }));
       const { app } = createRoleTestApp({ roles });
 
       await expect(

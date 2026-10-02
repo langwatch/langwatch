@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { testPlan } from "../../app/__tests__/role.fixture.ts";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
+import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
 import { RoleService } from "../role.service.ts";
 
 const role = (overrides: Partial<Role> = {}): Role => ({
@@ -22,8 +23,9 @@ function serviceWith(...roles: Role[]) {
 }
 
 function serviceOnPlan(planType: string, ...roles: Role[]) {
-  const repository = MemoryRoleRepository.create();
-  for (const stored of roles) repository.save(stored);
+  const store = MemoryRoleStore.create();
+  const repository = MemoryRoleRepository.create({ store });
+  for (const stored of roles) store.save(stored);
   const entitlement = { getActivePlan: async () => testPlan({ type: planType }) };
 
   return { service: RoleService.create({ repository, entitlement }), repository };

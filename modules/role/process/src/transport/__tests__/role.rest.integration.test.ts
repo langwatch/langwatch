@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import { createRoleTestApp, testBinding } from "../../app/__tests__/role.fixture.ts";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
+import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
 import { roleRest, roleRestFacts } from "../role.rest.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -51,10 +52,11 @@ function world({
   callerLacks = [] as string[],
   enterprise = true,
 } = {}) {
-  const roles = MemoryRoleRepository.create();
+  const store = MemoryRoleStore.create();
+  const roles = MemoryRoleRepository.create({ store });
   const ledger = new Map<string, StoredRole>();
   const state = (role: StoredRole) => {
-    roles.save(role);
+    store.save(role);
     ledger.set(role.id, role);
   };
   const { app } = createRoleTestApp({
@@ -73,7 +75,7 @@ function world({
       },
       deleteRole: async (input) => {
         ledger.delete(input.roleId);
-        roles.forget({ roleId: input.roleId });
+        store.forget({ roleId: input.roleId });
       },
       listUserCreatedRoles: async ({ organizationId }) =>
         [...ledger.values()].filter((role) => role.organizationId === organizationId),

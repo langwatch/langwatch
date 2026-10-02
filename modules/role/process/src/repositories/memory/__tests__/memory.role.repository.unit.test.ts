@@ -7,6 +7,7 @@ import { ROLE_KIND } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryRoleRepository } from "../memory.role.repository.ts";
+import { MemoryRoleStore } from "../memory.role.store.ts";
 
 const ORGANIZATION_ID = "org-1";
 const ROLE_ID = "role-1";
@@ -14,7 +15,8 @@ const ROLE_ID = "role-1";
 describe("given the memory-backed role repositories", () => {
   describe("when saving a role", () => {
     it("reads back the role it just saved", async () => {
-      const roles = MemoryRoleRepository.create();
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
 
       const now = new Date();
       const role = {
@@ -28,7 +30,7 @@ describe("given the memory-backed role repositories", () => {
         updatedAt: now,
       };
 
-      roles.save(role);
+      store.save(role);
 
       const found = await roles.findById({ roleId: ROLE_ID });
 
@@ -41,10 +43,11 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("finds a role by name within an organization", async () => {
-      const roles = MemoryRoleRepository.create();
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
 
       const now = new Date();
-      roles.save({
+      store.save({
         id: ROLE_ID,
         organizationId: ORGANIZATION_ID,
         name: "Unique Role",
@@ -64,11 +67,12 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("finds custom roles assigned to an organization", async () => {
-      const roles = MemoryRoleRepository.create();
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
 
       const now = new Date();
       const customRoleId = "custom-1";
-      roles.save({
+      store.save({
         id: customRoleId,
         organizationId: ORGANIZATION_ID,
         name: "Custom Role",
@@ -89,10 +93,11 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("counts assigned users for a role", async () => {
-      const roles = MemoryRoleRepository.create();
+      const store = MemoryRoleStore.create();
+      const roles = MemoryRoleRepository.create({ store });
 
-      roles.assign({ userId: "user-1", teamId: "team-1", customRoleId: ROLE_ID });
-      roles.assign({ userId: "user-2", teamId: "team-1", customRoleId: ROLE_ID });
+      store.assign({ userId: "user-1", teamId: "team-1", customRoleId: ROLE_ID });
+      store.assign({ userId: "user-2", teamId: "team-1", customRoleId: ROLE_ID });
 
       const count = await roles.countAssignedUsers({ roleId: ROLE_ID });
 

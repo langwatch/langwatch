@@ -7,6 +7,7 @@ import { ROLE_KIND, type Role } from "@langwatch/role-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
+import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
 import { createRoleTestApp, testBinding, testPlan } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -25,8 +26,9 @@ const role: Role = {
 };
 
 function harness(planType: "FREE" | "ENTERPRISE") {
-  const roles = MemoryRoleRepository.create();
-  roles.save(role);
+  const store = MemoryRoleStore.create();
+  const roles = MemoryRoleRepository.create({ store });
+  store.save(role);
   const permissions = {
     defineRole: vi.fn(async () => {}),
     deleteRole: vi.fn(async () => {}),
