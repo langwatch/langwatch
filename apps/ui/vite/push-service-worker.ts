@@ -9,9 +9,12 @@ import { build, type Plugin } from "vite";
 
 export const PUSH_SERVICE_WORKER_FILE = "push-sw.js";
 
-const ENTRY = fileURLToPath(
-  new URL("../../../packages/browser-host/src/push-service-worker.entry.ts", import.meta.url),
-);
+/** Resolved on use: a test environment that loads this module may give it a non-file URL. */
+function pushWorkerEntry(): string {
+  return fileURLToPath(
+    new URL("../../../packages/browser-host/src/push-service-worker.entry.ts", import.meta.url),
+  );
+}
 
 /** The worker as one IIFE script. */
 export async function bundlePushServiceWorker({ minify }: { minify: boolean }): Promise<string> {
@@ -25,7 +28,7 @@ export async function bundlePushServiceWorker({ minify }: { minify: boolean }): 
       sourcemap: false,
       emptyOutDir: false,
       lib: {
-        entry: ENTRY,
+        entry: pushWorkerEntry(),
         formats: ["iife"],
         name: "langwatchPushWorker",
         fileName: () => PUSH_SERVICE_WORKER_FILE,
@@ -46,7 +49,7 @@ export function pushServiceWorker(): Plugin {
   return {
     name: "langwatch-push-service-worker",
     configureServer(server) {
-      server.watcher.add(ENTRY);
+      server.watcher.add(pushWorkerEntry());
       server.watcher.on("change", (file) => {
         if (file.includes("push-service-worker")) devScript = null;
       });
