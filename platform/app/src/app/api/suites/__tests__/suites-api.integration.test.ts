@@ -764,6 +764,33 @@ describe("Feature: Suites REST API", () => {
 
       expect(res.status).toBe(400);
     });
+
+    describe("when the body carries fields the endpoint does not have", () => {
+      it("refuses the create and names the fields", async () => {
+        const scenario = await createScenario("Scheduled Scenario");
+
+        const res = await helpers.api.post("/api/suites", {
+          name: "Nightly Plan",
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+          schedule: "0 2 * * *",
+          cron: "0 2 * * *",
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("validation_error");
+        const reasons = JSON.stringify(body.reasons);
+        expect(reasons).toContain("schedule");
+        expect(reasons).toContain("cron");
+        const listed = await (await helpers.api.get("/api/suites")).json();
+        expect(
+          (listed as Array<{ name: string }>).some(
+            (suite) => suite.name === "Nightly Plan",
+          ),
+        ).toBe(false);
+      });
+    });
   });
 
   describe("PATCH /api/suites/:id", () => {

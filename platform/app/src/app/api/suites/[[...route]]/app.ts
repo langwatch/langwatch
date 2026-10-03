@@ -204,6 +204,10 @@ function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
  * One create schema for both kinds, with the guards conditional on kind: a
  * body naming no kind is a custom run plan and keeps the historical
  * at-least-one guards.
+ *
+ * Strict, so a field this endpoint does not have (`schedule`, `cron`) is
+ * refused by name instead of dropped behind a 201: a caller that believes it
+ * set up a schedule must learn that run plans have none.
  */
 const createSuiteInputSchema = z
   .object({
@@ -221,6 +225,7 @@ const createSuiteInputSchema = z
     repeatCount: z.number().int().min(1).max(100).default(1),
     labels: z.array(z.string()).default([]),
   })
+  .strict()
   .superRefine((body, ctx) => {
     if (body.kind === "folder") {
       refuseTestSuiteExtras(body, ctx);
