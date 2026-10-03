@@ -923,6 +923,21 @@ describe("Feature: automations over the public API express what the dashboard ex
       });
     });
 
+    it("refuses clearing the graph of an alert", async () => {
+      const watched = await graph("Cleared");
+      const alert = await alertOn(watched.id);
+
+      const response = await patch(`/api/triggers/${alert.id}`, {
+        customGraphId: null,
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("trigger_kind_immutable");
+      expect(await storedRow(alert.id)).toMatchObject({
+        customGraphId: watched.id,
+      });
+    });
+
     it("accepts the null a trace automation reads back with", async () => {
       const automation = await emailAutomation(`Null graph ${ns}`);
 
