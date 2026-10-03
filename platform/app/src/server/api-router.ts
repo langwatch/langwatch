@@ -93,6 +93,7 @@ import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
+import { app as scenarioExecuteSyncApp } from "./routes/scenario-execute-sync";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -218,6 +219,7 @@ export function createApiRouter() {
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
+  api.route("/", scenarioExecuteSyncApp); // /api/scenario/execute-sync (internal: scenario child -> this project's engine)
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 

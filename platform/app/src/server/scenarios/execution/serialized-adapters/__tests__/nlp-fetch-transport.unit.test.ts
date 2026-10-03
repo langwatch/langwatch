@@ -71,6 +71,7 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 import { SerializedCodeAgentAdapter } from "../code-agent.adapter";
+import { directExecuteSyncTransport } from "../execute-sync-transport";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 
 /** Bodies the fake nlpgo received, so the request itself can be asserted on. */
@@ -136,7 +137,7 @@ describe("given a dispatcher built by the undici package", () => {
     it("reaches the service and returns its output", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: "test-api-key",
       });
 
@@ -147,7 +148,7 @@ describe("given a dispatcher built by the undici package", () => {
     it("sends the execute_flow event the service expects", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: "test-api-key",
       });
 
@@ -163,7 +164,7 @@ describe("given a dispatcher built by the undici package", () => {
     it("still reaches the service with a deadline past undici's 300s default", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...config, timeoutMs: 615_000 },
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: "test-api-key",
       });
 
@@ -191,7 +192,7 @@ describe("given a dispatcher built by the undici package", () => {
     it("reaches the service and returns its output", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: "test-api-key",
       });
 

@@ -3,7 +3,8 @@ import {
   concatBytes,
   findLWAPreludeSeparator,
   LWA_PRELUDE_SEPARATOR_LEN,
-} from "../index";
+  readLWAResponsePayload,
+} from "../lwaPrelude";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -192,5 +193,71 @@ describe("LWA prelude-strip end-to-end behavior", () => {
     const tail = enc.encode('data: {"b":2}\n\n');
     const body = stripPrelude([full, tail]);
     expect(dec.decode(body)).toBe('data: {"a":1}\n\ndata: {"b":2}\n\n');
+  });
+});
+
+describe("readLWAResponsePayload", () => {
+  function framed({ prelude, body }: { prelude: string; body: string }) {
+    return concatBytes(
+      concatBytes(
+        enc.encode(prelude),
+        new Uint8Array(LWA_PRELUDE_SEPARATOR_LEN),
+      ),
+      enc.encode(body),
+    );
+  }
+
+  it("reads the engine's status out of the prelude and the body after it", () => {
+    const payload = framed({
+      prelude: '{"statusCode":422,"headers":{},"cookies":[]}',
+      body: '{"error":"unprocessable"}',
+    });
+
+    expect(readLWAResponsePayload(payload)).toEqual({
+      status: 422,
+      body: '{"error":"unprocessable"}',
+    });
+  });
+
+  it("keeps an empty body empty instead of returning the prelude as one", () => {
+    const payload = framed({ prelude: '{"statusCode":204}', body: "" });
+
+    expect(readLWAResponsePayload(payload)).toEqual({ status: 204, body: "" });
+  });
+
+  it("reads a payload with no prelude as a body of unknown status", () => {
+    expect(readLWAResponsePayload(enc.encode('{"buffered":true}'))).toEqual({
+      status: null,
+      body: '{"buffered":true}',
+    });
+  });
+
+  it("leaves the status unknown rather than wrong when the prelude will not parse", () => {
+    const payload = framed({ prelude: "not json", body: "hello" });
+
+    expect(readLWAResponsePayload(payload)).toEqual({
+      status: null,
+      body: "hello",
+    });
+  });
+
+  it("leaves the status unknown when the prelude names an impossible status", () => {
+    const payload = framed({ prelude: '{"statusCode":"nope"}', body: "hi" });
+
+    expect(readLWAResponsePayload(payload)).toEqual({
+      status: null,
+      body: "hi",
+    });
+  });
+
+  it("reads an absent payload as an empty body", () => {
+    expect(readLWAResponsePayload(undefined)).toEqual({
+      status: null,
+      body: "",
+    });
+    expect(readLWAResponsePayload(new Uint8Array(0))).toEqual({
+      status: null,
+      body: "",
+    });
   });
 });

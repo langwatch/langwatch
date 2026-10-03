@@ -248,6 +248,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     nlpServiceUrl,
     projectApiKey: langwatchApiKey,
     parameters,
+    // Where a code or workflow target sends execute_sync, chosen by the
+    // parent. Absent on a job queued before the route existed, which falls
+    // back to posting to nlpServiceUrl as it always did.
+    executeSyncRoute: jobData.executeSyncRoute,
   });
   const cast = buildRunCast({ jobData, adapter });
 
