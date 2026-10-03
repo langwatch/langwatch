@@ -4,7 +4,9 @@
  * It predates the split between a RUN PLAN, which is what you run and is
  * identified by its name, and a TEST SUITE, which is a group of scenarios.
  * Both now have a family of their own, `/api/v1/run-plans` and
- * `/api/v1/test-suites`, and this one keeps answering exactly as it did.
+ * `/api/v1/test-suites`, and this one keeps answering as it did, with one
+ * exception: a create body carrying a field the family does not have is
+ * refused rather than dropped behind a 201.
  *
  * Every response carries the deprecation headers and every operation is marked
  * deprecated in the published document, so an integrator reading either finds

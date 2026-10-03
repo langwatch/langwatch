@@ -766,16 +766,19 @@ describe("Feature: Suites REST API", () => {
     });
 
     describe("when the body carries fields the endpoint does not have", () => {
-      it("refuses the create and names the fields", async () => {
+      const createScheduled = async () => {
         const scenario = await createScenario("Scheduled Scenario");
-
-        const res = await helpers.api.post("/api/suites", {
+        return helpers.api.post("/api/suites", {
           name: "Nightly Plan",
           scenarioIds: [scenario.id],
           targets: [{ type: "http", referenceId: "agent_abc" }],
           schedule: "0 2 * * *",
           cron: "0 2 * * *",
         });
+      };
+
+      it("answers 422 naming the fields", async () => {
+        const res = await createScheduled();
 
         expect(res.status).toBe(422);
         const body = await res.json();
@@ -783,6 +786,11 @@ describe("Feature: Suites REST API", () => {
         const reasons = JSON.stringify(body.reasons);
         expect(reasons).toContain("schedule");
         expect(reasons).toContain("cron");
+      });
+
+      it("stores no run plan", async () => {
+        await createScheduled();
+
         const listed = await (await helpers.api.get("/api/suites")).json();
         expect(
           (listed as Array<{ name: string }>).some(
