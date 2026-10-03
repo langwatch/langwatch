@@ -1,5 +1,6 @@
 /**
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
+ * @see specs/evaluations/category-evaluator-performance.feature
  *
  * The Online Evaluations table and the analytics page must publish the same
  * numbers. The analytics page reads evaluations through the trace-anchored
@@ -25,6 +26,7 @@ import { MonitorPerformanceClickHouseRepository } from "../repositories/monitor-
 import {
   buildSeedMatrix,
   readAnalyticsPageNumbers,
+  type SeededEvaluation,
   seedMonitorPerformance,
 } from "./monitor-performance.fixtures";
 
@@ -32,6 +34,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-monitor-performance-${nanoid()}`;
 const scoreEvaluatorId = `${tenantId}-score`;
 const guardrailEvaluatorId = `${tenantId}-guardrail`;
+const categoryEvaluatorId = `${tenantId}-category`;
 const endMs = Date.now();
 const currentStartMs = endMs - 7 * DAY_MS;
 // Derived through the same helper the router and the analytics page use, so
@@ -98,6 +101,36 @@ const expectSameNumbers = ({
   });
 };
 
+/**
+ * A classifier: every result carries a label and neither a score nor a pass
+ * flag, which is exactly the shape that used to read as no data at all.
+ */
+const categorySeeds = (): SeededEvaluation[] => {
+  const half = DAY_MS / 2;
+  const at = (startMs: number, dayOffset: number) =>
+    startMs + dayOffset * DAY_MS + half;
+  const run = (occurredAtMs: number, label: string): SeededEvaluation => ({
+    traceId: `${categoryEvaluatorId}-trace-${nanoid()}`,
+    traceOccurredAtMs: occurredAtMs,
+    scheduledAtMs: occurredAtMs,
+    evaluatorId: categoryEvaluatorId,
+    score: null,
+    passed: null,
+    label,
+  });
+
+  return [
+    run(at(currentStartMs, 1), "resolved"),
+    run(at(currentStartMs, 1), "resolved"),
+    run(at(currentStartMs, 2), "resolved"),
+    run(at(currentStartMs, 2), "escalated"),
+    run(at(previousStartMs, 1), "resolved"),
+    run(at(previousStartMs, 1), "escalated"),
+    run(at(previousStartMs, 2), "escalated"),
+    run(at(previousStartMs, 2), "escalated"),
+  ];
+};
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   clickHouse = containers.clickHouseClient;
@@ -105,13 +138,16 @@ beforeAll(async () => {
   await seedMonitorPerformance({
     client: clickHouse,
     tenantId,
-    seeded: buildSeedMatrix({
-      tenantId,
-      scoreEvaluatorId,
-      guardrailEvaluatorId,
-      currentStartMs,
-      previousStartMs,
-    }),
+    seeded: [
+      ...buildSeedMatrix({
+        tenantId,
+        scoreEvaluatorId,
+        guardrailEvaluatorId,
+        currentStartMs,
+        previousStartMs,
+      }),
+      ...categorySeeds(),
+    ],
   });
 }, 180_000);
 
@@ -189,10 +225,64 @@ describe("online evaluation monitor performance", () => {
     ]);
   });
 
+  describe("when a monitor classifies its results instead of scoring them", () => {
+    /** @scenario "Label counts are read per day and period" */
+    it("carries the count of each label produced on each day", async () => {
+      const repository = new MonitorPerformanceClickHouseRepository(
+        async () => clickHouse,
+      );
+      const buckets = await repository.findBuckets({
+        tenantId,
+        evaluatorIds: [categoryEvaluatorId],
+        previousStartMs,
+        currentStartMs,
+        endMs,
+        timeZone: "UTC",
+      });
+
+      const current = buckets.filter((bucket) => bucket.period === "current");
+      expect(current.map((bucket) => bucket.labelCounts)).toEqual([
+        { resolved: 2 },
+        { resolved: 1, escalated: 1 },
+      ]);
+      // Nothing to average: this is the shape that used to read as no data.
+      expect(current.every((bucket) => bucket.scoreCount === 0)).toBe(true);
+      expect(current.every((bucket) => bucket.passCount === 0)).toBe(true);
+    });
+
+    it("summarizes the period as a label distribution with a real comparison", async () => {
+      const service = new MonitorPerformanceService(
+        new MonitorPerformanceClickHouseRepository(async () => clickHouse),
+      );
+      const [performance] = await service.getPerformance({
+        tenantId,
+        monitors: [{ id: categoryEvaluatorId, isGuardrail: false }],
+        previousStartMs,
+        currentStartMs,
+        endMs,
+        timeZone: "UTC",
+      });
+
+      expect(performance).toEqual({
+        monitorId: categoryEvaluatorId,
+        metric: "label",
+        labels: [
+          { label: "resolved", count: 3, share: 0.75 },
+          { label: "escalated", count: 1, share: 0.25 },
+        ],
+        current: 0.75,
+        previous: 0.25,
+      });
+    });
+  });
+
   describe("when the analytics page reads the same period", () => {
     /** @scenario The configuration table matches the analytics page numbers */
     it("reports the same score values as the analytics page", async () => {
       const [scorePerformance] = await readTablePerformance();
+      if (scorePerformance?.metric !== "score") {
+        throw new Error("expected a score metric");
+      }
       const analyticsPage = await readAnalyticsPageNumbers({
         client: clickHouse,
         tenantId,
@@ -202,12 +292,15 @@ describe("online evaluation monitor performance", () => {
         endMs,
       });
 
-      expectSameNumbers({ table: scorePerformance!, analyticsPage });
+      expectSameNumbers({ table: scorePerformance, analyticsPage });
     });
 
     /** @scenario The configuration table matches the analytics page numbers */
     it("reports the same pass rate as the analytics page", async () => {
       const [, guardrailPerformance] = await readTablePerformance();
+      if (guardrailPerformance?.metric !== "pass_rate") {
+        throw new Error("expected a pass rate metric");
+      }
       const analyticsPage = await readAnalyticsPageNumbers({
         client: clickHouse,
         tenantId,
@@ -217,7 +310,7 @@ describe("online evaluation monitor performance", () => {
         endMs,
       });
 
-      expectSameNumbers({ table: guardrailPerformance!, analyticsPage });
+      expectSameNumbers({ table: guardrailPerformance, analyticsPage });
     });
   });
 });
