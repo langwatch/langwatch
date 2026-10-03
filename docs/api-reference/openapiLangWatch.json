@@ -59069,7 +59069,8 @@
                     },
                     "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value."
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -59530,7 +59531,8 @@
                     },
                     "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value."
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
