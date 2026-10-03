@@ -145,15 +145,16 @@ export function formatAbsoluteTime(timestamp: number): string {
 /**
  * Four decimals cover a tenth of a cent and up. A single call to a cheap model
  * costs less than that, and four decimals would print it as "$0.0000", which
- * reads as a model with no price. Below a tenth of a cent the cost keeps its
- * two leading digits instead, however many decimals that takes.
+ * reads as a model with no price. Below a tenth of a cent the cost is rounded
+ * to its two leading digits instead, with no padding after them.
  */
 export function formatCost(cost: number, estimated?: boolean): string {
   if (cost === 0) return "—";
   const prefix = estimated ? "~" : "";
   if (cost > 0 && cost < 0.001) {
-    const decimals = Math.min(1 - Math.floor(Math.log10(cost)), 12);
-    return `${prefix}$${cost.toFixed(decimals)}`;
+    // 100 is the most decimals toFixed accepts.
+    const decimals = Math.min(1 - Math.floor(Math.log10(cost)), 100);
+    return `${prefix}$${cost.toFixed(decimals).replace(/0+$/, "")}`;
   }
   if (cost < 0.01) return `${prefix}$${cost.toFixed(4)}`;
   return `${prefix}$${cost.toFixed(2)}`;

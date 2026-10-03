@@ -203,29 +203,34 @@ Rule: Duration formatting
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Cost formatting
-  formatCost: returns "—" for $0 (or null), 4 decimal places below $0.01, otherwise 2 decimal places. Below a tenth of a cent it keeps the two leading digits, so a priced call never reads as zero. An estimated cost is prefixed with "~".
+  formatCost: returns "—" for $0 (or null), 4 decimal places below $0.01, otherwise 2 decimal places. Below a tenth of a cent it rounds to the two leading digits with no padding, so a priced call never reads as zero. An estimated cost is prefixed with "~".
 
   @unit
   Scenario: A cost below a tenth of a cent keeps its leading digits
     Given a trace has a cost of 0.0000358 dollars
     Then the cost displays as "$0.000036"
 
+  @unit
   Scenario: Sub-cent cost shows four decimal places
     Given a trace has a cost of 0.003 dollars
     Then the cost displays as "$0.0030"
 
+  @unit
   Scenario: Cent-range cost shows two decimal places
     Given a trace has a cost of 0.04 dollars
     Then the cost displays as "$0.04"
 
+  @unit
   Scenario: Dollar-range cost shows two decimal places
     Given a trace has a cost of 1.24 dollars
     Then the cost displays as "$1.24"
 
+  @unit
   Scenario: High cost still uses two decimal places
     Given a trace has a cost of 142 dollars
     Then the cost displays as "$142.00"
 
+  @unit
   Scenario: Estimated cost shows tilde prefix
     Given a trace has an estimated cost of 0.003 dollars
     Then the cost displays as "~$0.0030"
