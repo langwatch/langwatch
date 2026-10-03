@@ -591,7 +591,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/light-mode-contrast.feature",
   "specs/traces-v2/live-tail.feature",
   "specs/traces-v2/metadata-facet.feature",
-  "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
   "specs/traces-v2/prompt-facets.feature",
@@ -656,6 +655,10 @@ const LEGACY_INERT: string[] = [
  *   - Every entry must still be partially tagged.
  */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
+  // the "Cost formatting" rule is enforced. The pills, duration, token and
+  // span tab rules are described here and stay untagged.
+  "specs/traces-v2/metrics.feature",
   // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
   // and the unknown-metric refusal, which its three new scenarios enforce.
   // The six older scenarios describe the query presets and stay untagged.
