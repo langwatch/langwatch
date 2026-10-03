@@ -130,3 +130,14 @@ Feature: LangWatchQL access model — one typed definition, two emitters, two de
     Given sql mode with LWQL_ACCESS_MODEL_SQL_SINGLE_NODE set to "true"
     When the sql-mode cluster guard runs
     Then it passes regardless of the cluster topology
+
+  # ---------------------------------------------------------------------------
+  # AC10 — reconciliation is fail-closed and never leaks the password
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A failed access-model reconciliation aborts the deploy without leaking the password
+    Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
+    When reconciling it fails and the error echoes that DDL
+    Then the deploy is aborted rather than continuing with the executor available
+    And the password and the admin connection string are redacted from anything logged or re-thrown

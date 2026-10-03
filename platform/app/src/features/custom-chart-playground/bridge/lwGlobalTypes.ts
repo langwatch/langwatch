@@ -68,6 +68,7 @@ interface LwQueryResult {
   readonly columns: readonly LwQueryColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: Record<string, unknown>;
+  readonly truncated: boolean;
   readonly diagnostics: readonly Record<string, unknown>[];
   readonly followsTimeWindow: boolean;
   readonly followsGranularity: boolean;

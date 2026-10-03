@@ -1,18 +1,19 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { parseGridFlag } from "../../utils/parseGridFlag";
 
 /**
- * Returns the placed chart rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). With no grid
- * row given, the platform allocates the next free row on that dashboard,
- * counting charts of every kind.
+ * Returns the placed widget rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts). The twin of
+ * `placeChartCommand`, on the widget's own 8-column grid. With no grid row
+ * given, the platform allocates the next free row on that dashboard,
+ * counting cards of every kind.
  */
-export const placeChartCommand = async (
+export const placeDashboardWidgetCommand = async (
   id: string,
   options: {
     dashboardId?: string;
@@ -35,13 +36,13 @@ export const placeChartCommand = async (
   const colSpan = parseGridFlag("--col-span", options.colSpan);
   const rowSpan = parseGridFlag("--row-span", options.rowSpan);
 
-  const service = new ChartsApiService();
+  const widgets = new DashboardWidgetsApiService();
   const spinner = createSpinner(
-    `Placing chart "${id}" on dashboard "${options.dashboardId}"...`,
+    `Placing widget "${id}" on dashboard "${options.dashboardId}"...`,
   ).start();
 
   try {
-    const chart = await service.place(id, {
+    const widget = await widgets.place(id, {
       dashboardId: options.dashboardId,
       ...(gridColumn === undefined ? {} : { gridColumn }),
       ...(gridRow === undefined ? {} : { gridRow }),
@@ -50,26 +51,26 @@ export const placeChartCommand = async (
     });
 
     spinner.succeed(
-      `Placed chart "${chalk.cyan(chart.name)}" on dashboard ${chalk.green(chart.dashboardId ?? options.dashboardId)}`,
+      `Placed "${chalk.cyan(widget.name)}" on dashboard ${chalk.green(widget.dashboardId ?? options.dashboardId)}`,
     );
 
     return {
-      data: chart,
+      data: widget,
       table: () => {
         console.log();
         console.log(
-          `  ${chalk.gray("Grid:")} column ${chart.gridColumn}, row ${chart.gridRow}, spans ${chart.colSpan}x${chart.rowSpan}`,
+          `  ${chalk.gray("Grid:")} column ${widget.gridColumn}, row ${widget.gridRow}, spans ${widget.colSpan}x${widget.rowSpan}`,
         );
-        if (chart.platformUrl) {
+        if (widget.platformUrl) {
           console.log(
-            `  ${chalk.bold("View:")} ${chalk.underline(chart.platformUrl)}`,
+            `  ${chalk.bold("View:")} ${chalk.underline(widget.platformUrl)}`,
           );
         }
         console.log();
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "place chart" });
+    failSpinner({ spinner, error, action: "place dashboard widget" });
     process.exit(1);
   }
 };

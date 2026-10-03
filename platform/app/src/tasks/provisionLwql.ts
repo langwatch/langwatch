@@ -53,3 +53,56 @@ export default async function execute() {
   // instead of throwing out of this task.
   await selfProvisionAll(inputs);
 }
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Replaces every occurrence of each secret with a fixed marker.
+ *
+ * A ClickHouse error can echo the DDL that failed, and the access-model DDL
+ * embeds `LWQL_CLICKHOUSE_PASSWORD`; the admin `CLICKHOUSE_URL` can likewise
+ * surface in a connection error. Both are stripped before the message is
+ * logged or re-thrown. Literal `split`/`join` so no secret has to be escaped
+ * into a regexp. Empty/undefined secrets are skipped, never matched.
+ */
+export function redactSecrets(
+  text: string,
+  secrets: readonly (string | undefined)[],
+): string {
+  let redacted = text;
+  for (const secret of secrets) {
+    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
+  }
+  return redacted;
+}
+
+/**
+ * Aborts with a redacted error when access-model reconciliation fails — the
+ * fail-closed-by-throwing path.
+ *
+ * NOTE: the boot task above delegates the converge to
+ * `../server/analytics/lwql/provisioning`, which is deliberately non-fatal (a
+ * default-on feature must not crashloop a boot) and never embeds the plaintext
+ * password in its DDL (it renders `passwordSha256Hex`), so `execute()` does not
+ * call this. It is retained as a standalone, tested redaction helper
+ * (provisionLwql.redaction.unit.test.ts) for callers that reconcile with the
+ * plaintext-bearing DDL and want to abort rather than log-and-continue.
+ */
+export function failClosedOnAccessModelReconciliation({
+  error,
+  secrets,
+}: {
+  error: unknown;
+  secrets: readonly (string | undefined)[];
+}): never {
+  const redacted = redactSecrets(errorMessage(error), secrets);
+  logger.error(
+    { error: redacted },
+    "lwql self-provisioning: failed to reconcile ClickHouse access model — aborting",
+  );
+  throw new Error(
+    `lwql self-provisioning: failed to reconcile ClickHouse access model: ${redacted}`,
+  );
+}
