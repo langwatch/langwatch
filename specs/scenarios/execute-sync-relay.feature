@@ -44,6 +44,16 @@ Feature: A scenario turn runs on the project's own engine without the credential
       Then the run is routed straight to the engine
       And the route names the engine the deployment already configured
 
+    @regression @unit
+    Scenario: A relayed turn does not leave the deployment
+      Given the deployment is configured with per-project engines
+      When the parent prepares a scenario run
+      Then the route names the address the platform hands out as itself
+      And it does not name the deployment's public hostname
+      # The public hostname is served through a CDN, which ends a request the
+      # origin has not answered within 100 seconds. A turn may run for ten
+      # minutes, so routing it past the edge lets the edge set the ceiling.
+
     @unit
     Scenario: A job queued before the route existed still runs
       Given a job carrying no route
