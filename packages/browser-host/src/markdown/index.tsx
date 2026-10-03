@@ -8,6 +8,7 @@ import { useRouter } from "../use-router.ts";
 import { RenderCode } from "./render-code.tsx";
 import { stringifyIfObject } from "./stringify-if-object.ts";
 export { RenderCode } from "./render-code.tsx";
+export { stringifyIfObject } from "./stringify-if-object.ts";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 

@@ -1,4 +1,5 @@
 import { Link as UiLink } from "@langwatch/browser-host/link";
+import { stringifyIfObject } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
@@ -8,7 +9,6 @@ import { Children, isValidElement, memo, type ReactNode, useState } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { stringifyIfObject } from "../../model/stringify-if-object.ts";
 import { RenderCode } from "../blocks/code/render-code.tsx";
 import { Prose } from "../elements/prose.tsx";
 
