@@ -237,14 +237,6 @@ describe("a trace filter pairing an evaluator with its result", () => {
       );
     });
 
-    it("leaves it out when two verdicts are picked and only one is X's", async () => {
-      expect(
-        await matching(
-          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
-        ),
-      ).toEqual([]);
-    });
-
     it("leaves it out for a label only the other evaluator emitted", async () => {
       expect(await matching("evaluator:X AND evaluatorLabel:toxic")).toEqual(
         [],
@@ -287,13 +279,28 @@ describe("a trace filter pairing an evaluator with its result", () => {
       ).toEqual([X_RAN_TWICE]);
     });
 
-    it("matches two picked verdicts held by different runs", async () => {
+    it("matches a run holding either of two picked verdicts", async () => {
       expect(
         await matching(
           "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
           versionsTenantId,
         ),
-      ).toEqual([X_RAN_TWICE]);
+      ).toEqual([X_RAN_TWICE, X_SCHEDULED_THEN_FAILED].sort());
+    });
+
+    it("needs one run to hold a verdict and a score together", async () => {
+      expect(
+        await matching(
+          "(evaluator:X AND evaluatorVerdict:fail AND evaluatorScore:[0.5 TO 1])",
+          versionsTenantId,
+        ),
+      ).toEqual([]);
+      expect(
+        await matching(
+          "(evaluator:X AND evaluatorVerdict:fail AND evaluatorScore:[0 TO 0.5])",
+          versionsTenantId,
+        ),
+      ).toEqual([X_RAN_TWICE, X_SCHEDULED_THEN_FAILED].sort());
     });
 
     it("drops the trace when any run holds an excluded result", async () => {

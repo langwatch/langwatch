@@ -37,14 +37,15 @@ import {
  * exactly one evaluator, the result conditions next to it are judged against
  * X's own evaluations only:
  *
- * - each condition kept must hold on some evaluation of X;
+ * - the conditions kept must hold together on one evaluation of X, so
+ *   `evaluatorVerdict:fail AND evaluatorScore:[0 TO 0.5]` is one failed run
+ *   with a low score, not a failed run plus another low-scoring one;
+ * - several kept values of one categorical field are alternatives: the
+ *   drilldown puts two picked verdicts or labels in the same group
+ *   (`evaluatorVerdict:pass AND evaluatorVerdict:fail`), and one run holds only
+ *   one of them. Score conditions stay joined, so a typed range keeps working;
  * - each condition excluded with NOT must hold on no evaluation of X, so
  *   excluding `fail` hides a trace where any run of X failed.
- *
- * Conditions are judged one by one rather than all on one evaluation row,
- * because the drilldown puts two picked values of one field in the same group
- * (`evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail`), which no
- * single row can satisfy.
  *
  * The chain is read once, from its top, so word order never changes the
  * result. It stops at parentheses: `(evaluator:X AND …) AND (evaluator:Y AND …)`
@@ -139,12 +140,15 @@ export function translateEvaluationScope(
       innerWhere: predicates.length > 0 ? predicates.join(" AND ") : "1 = 1",
     });
 
-  const kept = scope.conditions.filter((c) => !c.negated);
+  const keptSql = keptGroups(scope).map(({ conditions, anyOf }) => {
+    const joined = conditions
+      .map((c) => conditionSql(c, ctx))
+      .join(anyOf ? " OR " : " AND ");
+    return conditions.length > 1 ? `(${joined})` : joined;
+  });
   const excluded = scope.conditions.filter((c) => c.negated);
   return [
-    ...(kept.length > 0
-      ? kept.map((c) => runsOfX([conditionSql(c, ctx)]))
-      : [runsOfX([])]),
+    runsOfX(keptSql),
     ...excluded.map((c) => `NOT ${runsOfX([conditionSql(c, ctx)])}`),
   ].join(" AND ");
 }
@@ -169,11 +173,42 @@ export function evaluateEvaluationScope(
       evaluations: [evaluation],
     }) === true;
 
-  const kept = scope.conditions.filter((c) => !c.negated);
+  const groups = keptGroups(scope);
   const excluded = scope.conditions.filter((c) => c.negated);
-  const heldByX = (c: ScopedCondition) =>
-    runsOfX.some((evaluation) => holds(evaluation, c));
-  return runsOfX.length > 0 && kept.every(heldByX) && !excluded.some(heldByX);
+  return (
+    runsOfX.some((evaluation) =>
+      groups.every(({ conditions, anyOf }) =>
+        anyOf
+          ? conditions.some((c) => holds(evaluation, c))
+          : conditions.every((c) => holds(evaluation, c)),
+      ),
+    ) &&
+    !excluded.some((c) => runsOfX.some((evaluation) => holds(evaluation, c)))
+  );
+}
+
+/**
+ * The kept conditions grouped by facet, in first-seen order. A categorical
+ * group is a set of alternatives (`anyOf`); a range group is joined.
+ */
+function keptGroups(
+  scope: EvaluationScope,
+): { conditions: ScopedCondition[]; anyOf: boolean }[] {
+  const groups = new Map<
+    string,
+    { conditions: ScopedCondition[]; anyOf: boolean }
+  >();
+  for (const condition of scope.conditions) {
+    if (condition.negated) continue;
+    const facet = scopedFacet(condition.field);
+    const group = groups.get(facet.key) ?? {
+      conditions: [],
+      anyOf: facet.kind !== "range",
+    };
+    group.conditions.push(condition);
+    groups.set(facet.key, group);
+  }
+  return [...groups.values()];
 }
 
 /**

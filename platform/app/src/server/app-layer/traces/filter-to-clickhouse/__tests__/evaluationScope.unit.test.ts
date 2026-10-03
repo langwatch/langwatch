@@ -111,14 +111,14 @@ describe("an evaluator paired with its own result", () => {
     });
   });
 
-  describe("when two verdicts are picked and only another evaluator holds one", () => {
-    it("does not match", () => {
+  describe("when two verdicts are picked for the evaluator", () => {
+    it("matches a run holding either of them", () => {
       expect(
         evaluateQueryInMemory(
           "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
-          xPassedYFailed,
+          xFailed,
         ),
-      ).toBe(false);
+      ).toBe(true);
     });
   });
 
@@ -173,13 +173,42 @@ describe("an evaluator paired with its own result", () => {
       ).toBe(true);
     });
 
-    it("matches two picked verdicts when its runs hold both", () => {
+    it("needs one run to hold a verdict and a score together", () => {
+      const failedHighPassedLow = traceWith([
+        makeEval({
+          evaluationId: "e-x1",
+          evaluatorId: "X",
+          passed: false,
+          score: 0.9,
+        }),
+        makeEval({
+          evaluationId: "e-x2",
+          evaluatorId: "X",
+          passed: true,
+          score: 0.1,
+        }),
+      ]);
       expect(
         evaluateQueryInMemory(
-          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
-          xPassedThenFailed,
+          "(evaluator:X AND evaluatorVerdict:fail AND evaluatorScore:[0 TO 0.5])",
+          failedHighPassedLow,
+        ),
+      ).toBe(false);
+    });
+
+    it("keeps two score bounds joined on one run", () => {
+      expect(
+        evaluateQueryInMemory(
+          "evaluator:Y AND evaluatorScore:>0.05 AND evaluatorScore:<0.2",
+          xPassedYFailed,
         ),
       ).toBe(true);
+      expect(
+        evaluateQueryInMemory(
+          "evaluator:Y AND evaluatorScore:>0.05 AND evaluatorScore:<0.08",
+          xPassedYFailed,
+        ),
+      ).toBe(false);
     });
 
     it("drops the trace when any of its runs holds an excluded result", () => {
