@@ -22,9 +22,10 @@ Feature: The nlpgo invoke lane answers what nlpgo answered
     #           platform/app/src/utils/__tests__/lambdaFetchDeadline.unit.test.ts
     #           platform/app/src/utils/__tests__/lambdaFetchDispatcher.unit.test.ts
     #           platform/app/src/server/evaluators/__tests__/runCodeEvaluator.lambdaStatus.unit.test.ts
+    #           platform/app/src/server/workflows/__tests__/runWorkflow.lambdaStatus.unit.test.ts
     # Sender: platform/app/src/utils/lambdaFetch.ts
     # Response framing: platform/app/src/utils/lwaPrelude.ts
-    #   (platform/app/src/optimization_studio/server/lambda/__tests__/lwa-prelude.test.ts)
+    #   (platform/app/src/utils/__tests__/lwaPrelude.unit.test.ts)
 
   Rule: The status a caller reads is nlpgo's, not the invocation's
 
