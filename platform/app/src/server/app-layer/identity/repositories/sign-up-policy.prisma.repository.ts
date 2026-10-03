@@ -7,15 +7,23 @@ export class PrismaSignUpPolicyRepository implements SignUpPolicyRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async hasPendingInvite({ email }: { email: string }): Promise<boolean> {
+    return (await this.findPendingInviteCode({ email })) !== null;
+  }
+
+  async findPendingInviteCode({
+    email,
+  }: {
+    email: string;
+  }): Promise<string | null> {
     const invite = await this.prisma.organizationInvite.findFirst({
       where: {
         email: { equals: email, mode: "insensitive" },
         status: "PENDING",
         OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
       },
-      select: { id: true },
+      select: { inviteCode: true },
     });
-    return invite !== null;
+    return invite?.inviteCode ?? null;
   }
 
   async anyUserExists(): Promise<boolean> {

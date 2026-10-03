@@ -71,11 +71,11 @@ By default anybody who can reach the install can create an account and then crea
 - `SIGN_UP_MODE=invite_only` allows an account only for an address with a pending invitation. Members join the organizations that invited them. Only the operators in `ADMIN_EMAILS` can create a new organization, apart from the first organization on an install that has none.
 - `SIGN_UP_ALLOWED_DOMAINS` allows an account only for the listed email domains. It works with either mode.
 
-An invited address can always sign up, whatever its domain. An address in `ADMIN_EMAILS` can always sign up.
+An invited address can always sign up, whatever its domain, from the invitation link or from the sign-in screen. Either way it lands on its invitation. An address in `ADMIN_EMAILS` can always sign up.
 
 The first administrator on an invite-only install:
 
-1. Set `ADMIN_EMAILS` to your address, then sign up with it. Nobody else can sign up without an invitation.
+1. Set `ADMIN_EMAILS` to your address, then sign up with it. No other address can sign up without an invitation.
 2. Create the first organization and invite the rest of your team from **Settings > Members**.
 
 With `ADMIN_EMAILS` empty, the first account on an install with no users is still allowed, so the install can be set up. When `SIGN_UP_ALLOWED_DOMAINS` is set, that first account also has to be on a listed domain. Anybody who reaches the install before you can take that account, so set `ADMIN_EMAILS` on an install that is reachable from outside your network.

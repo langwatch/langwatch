@@ -67,6 +67,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
       config: () => policyState.config,
       repository: {
         hasPendingInvite: async () => false,
+        findPendingInviteCode: async () => null,
         anyUserExists: async () => true,
         anyOrganizationExists: async () => policyState.organizationExists,
       },

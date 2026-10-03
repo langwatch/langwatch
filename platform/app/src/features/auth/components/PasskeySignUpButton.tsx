@@ -32,6 +32,12 @@ const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 const ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
 
 /**
+ * The server's code for an address the installation's sign-up policy refuses.
+ * Kept in step with `server/better-auth/passkey-signup.ts`.
+ */
+const SIGN_UP_RESTRICTED = "auth_sign_up_restricted";
+
+/**
  * The `code` off a client error, where it carried one. The client types the
  * error as "a code, or not" depending on which leg failed — the ceremony's own
  * failures always name one, a server refusal names one only if the endpoint
@@ -102,8 +108,8 @@ function readRefusal(error: { status: number } & object): Refusal {
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
   // The installation's sign-up policy refused the address; the registry has
   // the words for it.
-  if (code === "auth_sign_up_restricted") {
-    return { kind: "report", error: { error: "auth_sign_up_restricted" } };
+  if (code === SIGN_UP_RESTRICTED) {
+    return { kind: "report", error: { error: SIGN_UP_RESTRICTED } };
   }
   // A session was already open. Named rather than folded into the generic
   // refusal, because its remedy — sign out, or add from settings — is the one

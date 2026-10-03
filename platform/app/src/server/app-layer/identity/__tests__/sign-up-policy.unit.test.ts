@@ -16,6 +16,10 @@ class FakeRepository implements SignUpPolicyRepository {
     this.reads++;
     return this.invited.has(email);
   }
+  async findPendingInviteCode({ email }: { email: string }) {
+    this.reads++;
+    return this.invited.has(email) ? `code-for-${email}` : null;
+  }
   async anyUserExists() {
     this.reads++;
     return this.users > 0;
@@ -49,6 +53,22 @@ describe("SignUpPolicy", () => {
       await expect(
         policy().checkOrganizationCreation({ email: "sam@acme.com" }),
       ).resolves.toEqual({ allowed: true, via: "open" });
+      expect(repository.reads).toBe(0);
+    });
+
+    it("names no waiting invitation and reads nothing", async () => {
+      repository.invited.add("sam@acme.com");
+      let asked = 0;
+      await expect(
+        policy().pendingInvitationFor({
+          addresses: async () => {
+            asked++;
+            return ["sam@acme.com"];
+          },
+        }),
+      ).resolves.toBeNull();
+      expect(asked).toBe(0);
+      expect(repository.reads).toBe(0);
     });
   });
 
@@ -76,6 +96,26 @@ describe("SignUpPolicy", () => {
       await expect(
         policy().checkSignUp({ email: "Sam@Acme.com" }),
       ).resolves.toEqual({ allowed: true, via: "invitation" });
+    });
+
+    describe("when a signed-in person belongs to no organization", () => {
+      /** @scenario "An invited member who signed up from the sign-in screen is sent to their invitation" */
+      it("names the invitation waiting for one of their addresses", async () => {
+        repository.invited.add("sam@acme.com");
+        await expect(
+          policy().pendingInvitationFor({
+            addresses: async () => ["other@acme.com", "Sam@Acme.com"],
+          }),
+        ).resolves.toEqual({ inviteCode: "code-for-sam@acme.com" });
+      });
+
+      it("names none when no address of theirs was invited", async () => {
+        await expect(
+          policy().pendingInvitationFor({
+            addresses: async () => ["stranger@example.com"],
+          }),
+        ).resolves.toBeNull();
+      });
     });
 
     /** @scenario "An address in ADMIN_EMAILS can always sign up" */

@@ -147,3 +147,12 @@ Feature: Restricting who can sign up on a self-hosted installation
     When the chart is rendered
     Then the app receives SIGN_UP_MODE "invite_only"
     And the app receives SIGN_UP_ALLOWED_DOMAINS "acme.com,acme.io"
+
+  @unit
+  Scenario: An invited member who signed up from the sign-in screen is sent to their invitation
+    Given SIGN_UP_MODE is "invite_only"
+    And an organization already exists
+    And "sam@acme.com" holds a pending invitation to it
+    When "sam@acme.com" signs up from the sign-in screen and signs in
+    Then they are sent to their invitation
+    And they are not shown the screen that creates an organization

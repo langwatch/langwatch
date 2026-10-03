@@ -86,11 +86,34 @@ describe("PrismaSignUpPolicyRepository.hasPendingInvite()", () => {
     });
   });
 
-  describe("when nobody invited the address", () => {
+  describe("when the address was never invited", () => {
     it("answers no", async () => {
       await expect(
         repository.hasPendingInvite({ email: address("stranger") }),
       ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("PrismaSignUpPolicyRepository.findPendingInviteCode()", () => {
+  const repository = new PrismaSignUpPolicyRepository(prisma);
+
+  describe("when the address holds a pending, unexpired invitation", () => {
+    it("returns its code", async () => {
+      await expect(
+        repository.findPendingInviteCode({ email: address("pending") }),
+      ).resolves.toMatch(/^code-/);
+    });
+  });
+
+  describe("when the invitation expired or the address was never invited", () => {
+    it("returns none", async () => {
+      await expect(
+        repository.findPendingInviteCode({ email: address("expired") }),
+      ).resolves.toBeNull();
+      await expect(
+        repository.findPendingInviteCode({ email: address("stranger") }),
+      ).resolves.toBeNull();
     });
   });
 });

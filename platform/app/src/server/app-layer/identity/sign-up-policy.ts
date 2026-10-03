@@ -43,6 +43,8 @@ export interface SignUpPolicyRepository {
   /** Whether a PENDING, unexpired invitation exists for this address in any
    *  organization. */
   hasPendingInvite(args: { email: string }): Promise<boolean>;
+  /** The code of a PENDING, unexpired invitation for this address, if any. */
+  findPendingInviteCode(args: { email: string }): Promise<string | null>;
   /** Whether the installation holds at least one user. */
   anyUserExists(): Promise<boolean>;
   /** Whether the installation holds at least one organization. */
@@ -148,5 +150,28 @@ export class SignUpPolicy {
       return { allowed: true, via: "first_organization" };
     }
     return { allowed: false, reason: "invite_only" };
+  }
+
+  /**
+   * The invitation a signed-in person who belongs to no organization should
+   * be sent to, instead of the screen that creates one.
+   *
+   * Asked only in `invite_only` mode, where that screen refuses them. The
+   * addresses are read lazily so the default configuration does no work.
+   */
+  async pendingInvitationFor({
+    addresses,
+  }: {
+    addresses: () => Promise<readonly string[]>;
+  }): Promise<{ inviteCode: string } | null> {
+    if (this.deps.config().mode !== "invite_only") return null;
+
+    for (const address of await addresses()) {
+      const inviteCode = await this.deps.repository.findPendingInviteCode({
+        email: address.trim().toLowerCase(),
+      });
+      if (inviteCode) return { inviteCode };
+    }
+    return null;
   }
 }

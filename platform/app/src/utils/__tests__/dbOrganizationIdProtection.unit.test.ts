@@ -168,7 +168,7 @@ describe("guardOrganizationId — original three models preserved", () => {
   });
 
   describe("when asking whether one address holds a pending invitation", () => {
-    it("does NOT throw — the read is bounded to one address", async () => {
+    it("does NOT throw, because the read is bounded to one address", async () => {
       await expect(
         runGuard({
           model: "OrganizationInvite",
