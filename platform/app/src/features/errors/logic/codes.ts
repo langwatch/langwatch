@@ -406,6 +406,7 @@ export const APP_ERROR_CODES = [
   "model_provider_test_rate_limited",
   "model_restricted_for_feature",
   "monitor_evaluator_required",
+  "monitor_parameters_unused",
   "no_admin_configured",
   // Also a Go code, with copy already written under the shared/transport
   // heading — `ee/admin/routes/admin.ts` raises it to hide the admin surface
