@@ -16,6 +16,10 @@
  * are semantically equivalent to EXISTS.
  */
 
+import {
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
+} from "../../filters/clickhouse/filter-conditions";
 import type { FilterField } from "../../filters/types";
 import { type CHTable, tableAliases } from "./field-mappings";
 
@@ -86,8 +90,10 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "metadata.customer_id": (values) =>
     translateMetadataFilter("langwatch.customer_id", values),
   "metadata.labels": (values) => translateLabelsFilter(values),
-  "metadata.key": (values) => translateMetadataKeyFilter(values),
-  "metadata.value": (values, key) => translateMetadataValueFilter(values, key),
+  "metadata.key": (values) =>
+    translateCustomMetadataFilter("metadata.key", values),
+  "metadata.value": (values, key) =>
+    translateCustomMetadataFilter("metadata.value", values, key),
   "metadata.prompt_ids": (values) => translatePromptIdsFilter(values),
 
   // Trace Filters
@@ -228,40 +234,24 @@ function translateLabelsFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate metadata key exists filter
+ * Translate a custom metadata key or value filter with the trace search's own
+ * builders, so a graph and the trace list read the same three storage formats
+ * and match the same traces.
+ *
+ * @see https://github.com/langwatch/tasks/issues/919
  */
-function translateMetadataKeyFilter(values: string[]): FilterTranslation {
-  const ts = tableAliases.trace_summaries;
-  const paramName = genParamName("metaKeys");
-  // Use arrayExists to check if any key exists
-  return {
-    whereClause: `arrayExists(k -> mapContains(${ts}.Attributes, k), {${paramName}:Array(String)})`,
-    requiredJoins: [],
-    params: { [paramName]: values },
-  };
-}
-
-/**
- * Translate metadata value filter (requires key)
- */
-function translateMetadataValueFilter(
+function translateCustomMetadataFilter(
+  field: "metadata.key" | "metadata.value",
   values: string[],
   key?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  if (!key) {
-    return { whereClause: "1=1", requiredJoins: [], params: {} };
-  }
-
-  // Key may have dots replaced with special char, restore them
-  const attributeKey = key.replace(/·/g, ".");
-  const paramName = genParamName("metaValue");
-
-  return {
-    whereClause: `${ts}.Attributes[{${paramName}_key:String}] IN ({${paramName}:Array(String)})`,
-    requiredJoins: [],
-    params: { [`${paramName}_key`]: attributeKey, [paramName]: values },
-  };
+  const paramId = genParamName("customMeta");
+  const { sql, params } =
+    field === "metadata.key"
+      ? customMetadataKeyCondition({ values, paramId, alias: ts })
+      : customMetadataValueCondition({ values, paramId, key, alias: ts });
+  return { whereClause: sql, requiredJoins: [], params };
 }
 
 /**

@@ -3,6 +3,7 @@ import type { FilterField } from "../types";
 import type {
   FilterConditionBuilder,
   FilterConditionOptions,
+  FilterConditionResult,
   GenerateFilterConditionsResult,
 } from "./types";
 
@@ -32,6 +33,72 @@ function buildEvaluatorExistsCondition(
     )`,
     params: { [`${paramId}_values`]: values },
   });
+}
+
+/**
+ * Custom metadata is stored under one of three keys, depending on how it was
+ * sent:
+ * - `metadata.{key}` (canonical, from Python SDK canonicalization)
+ * - `langwatch.metadata.{key}` (legacy REST collector)
+ * - `{key}` (legacy bare OTEL resource attribute)
+ *
+ * Every reader of a custom metadata filter (trace search, analytics on
+ * `trace_summaries` and on the slim analytics tables) goes through these two
+ * builders, so they all match the same traces. `alias` is the table alias the
+ * caller's query gives the row carrying `Attributes`.
+ *
+ * @see https://github.com/langwatch/tasks/issues/919
+ */
+interface CustomMetadataConditionInput {
+  values: string[];
+  paramId: string;
+  /** Alias of the row carrying `Attributes` in the caller's query. */
+  alias?: string;
+}
+
+export function customMetadataKeyCondition({
+  values,
+  paramId,
+  alias = "ts",
+}: CustomMetadataConditionInput): FilterConditionResult {
+  if (values.length === 0) return { sql: "1=0", params: {} };
+  const conditions = values.map((_v, i) => {
+    return `(${alias}.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ${alias}.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ${alias}.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
+  });
+  const params: Record<string, unknown> = {};
+  values.forEach((v, i) => {
+    const rawKey = v.replaceAll("·", ".");
+    params[`${paramId}_k${i}_canonical`] = `metadata.${rawKey}`;
+    params[`${paramId}_k${i}_lw`] = `langwatch.metadata.${rawKey}`;
+    params[`${paramId}_k${i}_bare`] = rawKey;
+  });
+  return {
+    sql:
+      conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
+    params,
+  };
+}
+
+/** {@link customMetadataKeyCondition}, matching the key's value instead. */
+export function customMetadataValueCondition({
+  values,
+  paramId,
+  key,
+  alias = "ts",
+}: CustomMetadataConditionInput & {
+  key: string | undefined;
+}): FilterConditionResult {
+  if (!key) return { sql: "1=0", params: {} };
+  const rawKey = key.replaceAll("·", ".");
+  return {
+    sql: `(${alias}.Attributes[{${paramId}_canonical:String}] IN ({${paramId}_values:Array(String)}) OR ${alias}.Attributes[{${paramId}_lw:String}] IN ({${paramId}_values:Array(String)}) OR ${alias}.Attributes[{${paramId}_bare:String}] IN ({${paramId}_values:Array(String)}))`,
+    params: {
+      [`${paramId}_canonical`]: `metadata.${rawKey}`,
+      [`${paramId}_lw`]: `langwatch.metadata.${rawKey}`,
+      [`${paramId}_bare`]: rawKey,
+      [`${paramId}_values`]: values,
+    },
+  };
 }
 
 /**
@@ -70,47 +137,10 @@ export const clickHouseFilterConditions: Record<
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.key": (values, paramId) => {
-    if (values.length === 0) return { sql: "1=0", params: {} };
-    // Check all three legacy key formats for each metadata key:
-    // - metadata.{key} (canonical, from Python SDK canonicalization)
-    // - langwatch.metadata.{key} (legacy REST collector)
-    // - {key} (legacy bare OTEL resource attribute)
-    const conditions = values.map((_v, i) => {
-      return `(ts.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ts.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ts.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
-    });
-    const params: Record<string, unknown> = {};
-    values.forEach((v, i) => {
-      const rawKey = v.replaceAll("·", ".");
-      params[`${paramId}_k${i}_canonical`] = `metadata.${rawKey}`;
-      params[`${paramId}_k${i}_lw`] = `langwatch.metadata.${rawKey}`;
-      params[`${paramId}_k${i}_bare`] = rawKey;
-    });
-    return {
-      sql:
-        conditions.length === 1
-          ? conditions[0]!
-          : `(${conditions.join(" OR ")})`,
-      params,
-    };
-  },
-  "metadata.value": (values, paramId, key) => {
-    if (!key) return { sql: "1=0", params: {} };
-    const rawKey = key.replaceAll("·", ".");
-    // Match all three legacy key formats for existing data:
-    // - metadata.{key} (canonical, from Python SDK canonicalization)
-    // - langwatch.metadata.{key} (legacy REST collector)
-    // - {key} (legacy bare OTEL resource attribute)
-    return {
-      sql: `(ts.Attributes[{${paramId}_canonical:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_lw:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_bare:String}] IN ({${paramId}_values:Array(String)}))`,
-      params: {
-        [`${paramId}_canonical`]: `metadata.${rawKey}`,
-        [`${paramId}_lw`]: `langwatch.metadata.${rawKey}`,
-        [`${paramId}_bare`]: rawKey,
-        [`${paramId}_values`]: values,
-      },
-    };
-  },
+  "metadata.key": (values, paramId) =>
+    customMetadataKeyCondition({ values, paramId }),
+  "metadata.value": (values, paramId, key) =>
+    customMetadataValueCondition({ values, paramId, key }),
   "metadata.prompt_ids": (values, paramId) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },

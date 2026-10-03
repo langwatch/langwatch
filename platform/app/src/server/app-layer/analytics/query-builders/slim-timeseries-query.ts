@@ -25,6 +25,10 @@
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import {
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
+} from "~/server/filters/clickhouse/filter-conditions";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -333,14 +337,13 @@ function buildSlimFilterClauses(
       case "metadata.key": {
         const keys = collectStringValues(rawValue);
         if (keys.length === 0) break;
-        // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
-        // Attributes map. mapContains() works on Map(String, String).
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ta}.Attributes, {${p}:String})`;
+        const condition = customMetadataKeyCondition({
+          values: keys,
+          paramId: next("metaKey"),
+          alias: ta,
         });
-        clauses.push(`(${exprs.join(" OR ")})`);
+        clauses.push(condition.sql);
+        Object.assign(params, condition.params);
         break;
       }
       case "metadata.value": {
@@ -348,13 +351,14 @@ function buildSlimFilterClauses(
         if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
         for (const [metaKey, vals] of Object.entries(rawValue)) {
           if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
+          const condition = customMetadataValueCondition({
+            values: vals,
+            paramId: next("metaValue"),
+            key: metaKey,
+            alias: ta,
+          });
+          clauses.push(condition.sql);
+          Object.assign(params, condition.params);
         }
         break;
       }

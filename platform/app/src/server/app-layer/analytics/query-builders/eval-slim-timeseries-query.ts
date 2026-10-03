@@ -25,6 +25,10 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
+import {
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
+} from "~/server/filters/clickhouse/filter-conditions";
 import type { FilterField } from "~/server/filters/types";
 import type {
   AnalyticsTimeseriesBuilderInput,
@@ -200,25 +204,28 @@ function buildEvalSlimFilterClauses(
       case "metadata.key": {
         const keys = collectStringValues(rawValue);
         if (keys.length === 0) break;
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ea}.Attributes, {${p}:String})`;
+        const condition = customMetadataKeyCondition({
+          values: keys,
+          paramId: next("metaKey"),
+          alias: ea,
         });
-        clauses.push(`(${exprs.join(" OR ")})`);
+        clauses.push(condition.sql);
+        Object.assign(params, condition.params);
         break;
       }
       case "metadata.value": {
+        // Shape: Record<metaKey, string[]>
         if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
         for (const [metaKey, vals] of Object.entries(rawValue)) {
           if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
+          const condition = customMetadataValueCondition({
+            values: vals,
+            paramId: next("metaValue"),
+            key: metaKey,
+            alias: ea,
+          });
+          clauses.push(condition.sql);
+          Object.assign(params, condition.params);
         }
         break;
       }
