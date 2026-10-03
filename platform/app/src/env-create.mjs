@@ -353,6 +353,11 @@ export function createEnvConfig() {
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
       LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
+      // Shared secret for the app -> nlpgo hop, sent as X-LangWatch-NLP-Secret
+      // (see server/nlpgo/internalSecret.ts). Optional on purpose: an install
+      // whose .env predates it keeps working, with nlpgo accepting
+      // unauthenticated calls and warning once at startup.
+      LANGWATCH_NLP_INTERNAL_SECRET: z.string().optional(),
       LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
 
@@ -862,6 +867,7 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_NLP_INTERNAL_SECRET: process.env.LANGWATCH_NLP_INTERNAL_SECRET,
       LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
       LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB:
         process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,

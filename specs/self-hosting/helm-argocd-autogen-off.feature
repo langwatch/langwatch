@@ -35,9 +35,10 @@ Feature: Helm installs with operator-owned Secrets under Argo CD
     @unit
     Scenario: remapped Secret key names reach every consumer
       Given the app Secret uses dashed key names
-      And gateway.secrets.internalSecretKey, gateway.secrets.jwtSecretKey and secrets.secretKeys name them
+      And gateway.secrets.internalSecretKey, gateway.secrets.jwtSecretKey, langwatch_nlp.secrets.internalSecretKey and secrets.secretKeys name them
       When the chart renders
       Then the app and the gateway pod read the gateway keys under those names
+      And the app and the NLP service read the NLP credential under that name
       And the app reads the LangWatchQL passwords under the names in secrets.secretKeys
       And with autogen the chart writes the gateway keys under the configured names
 

@@ -19,7 +19,9 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
 **SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
 
-**API tokens** are signed with JWT (`API_TOKEN_JWT_SECRET`) for SDK authentication.
+**API keys** authenticate the SDKs, the CLI and the REST API. They are random tokens, not JWTs. A key in the current format (`sk-lw-`, `ik-lw-` or `pat-lw-` followed by a lookup id and a secret) is stored as a lookup id plus an HMAC-SHA256 of the secret, keyed with [`CREDENTIALS_SECRET`](#credentials-secret), so a database dump alone cannot be used to recover or verify a key.
+
+Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-256 hash until their next use, when it is rewritten as HMAC; older project keys are stored as-is on the project and compared directly.
 
 ## Encryption
 
@@ -32,7 +34,32 @@ See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 | S3 | Server-side encryption (SSE-S3 or SSE-KMS) |
 | Stored credentials | Application-level encryption via `CREDENTIALS_SECRET` |
 
-The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+### Credentials secret
+
+`CREDENTIALS_SECRET` is the application-level encryption key, applied on top of database-level encryption. The app and workers read it. The Helm chart always sets it, from `app.credentialsEncryptionKey` or from the `credentialsEncryptionKey` key of the app Secret, and fails to render when no value, Secret or autogen provides one.
+
+**Format.** 64 hex characters (32 bytes). Generate one with `openssl rand -hex 32`. Any other value makes every encrypt and decrypt call fail. When `CREDENTIALS_SECRET` is unset the app falls back to `NEXTAUTH_SECRET`, which then has to meet the same format. Set `CREDENTIALS_SECRET` explicitly.
+
+**What it encrypts.** Values are stored as AES-256-GCM ciphertext in PostgreSQL:
+
+- Model provider API keys and custom provider settings
+- Project secrets and scenario run secret values
+- Project and organization S3 storage credentials
+- SSO connection credentials
+- Webhook signing secrets and Slack integration credentials
+- Stored MCP and agent API keys, Langy virtual keys, and API idempotency receipts
+
+**What else it keys.** The same value is the HMAC pepper for API keys (see Authentication & Authorization above) and signs short-lived tokens (voice session tokens, GitHub App install state).
+
+**Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
+
+- Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
+- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
+- In-flight signed tokens are rejected and the user starts that flow again.
+
+The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.
+
+Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable.
 
 ### In Transit
 
@@ -42,7 +69,7 @@ The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and cr
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
-| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS). App and workers authenticate to NLP with `LANGWATCH_NLP_INTERNAL_SECRET` |
 
 <Tip>
 For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
@@ -52,7 +79,9 @@ For inter-service encryption, deploy a service mesh like Istio or Linkerd. This 
 
 ### Development (Auto-Generated)
 
-For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production, secrets change on reinstall.
+`autogen.enabled: true` (off by default) generates random values for the app Secret on first install. `helm upgrade` keeps the values already in the Secret and only generates keys that are missing. The Secret is deleted with `helm uninstall`, so a reinstall generates a new `credentialsEncryptionKey` and the stored credentials become unreadable (see [Changing it](#credentials-secret)).
+
+GitOps tools that render without cluster access, such as Argo CD, cannot see the existing Secret; use a pre-created Secret there (see [Argo CD](/self-hosting/deployment/argocd)). Use autogen for evaluation installs, not production.
 
 ### Production (Kubernetes Secrets)
 
@@ -63,14 +92,27 @@ kubectl create secret generic langwatch-secrets \
   --namespace langwatch \
   --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
   --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32)
+  --from-literal=cronApiKey=$(openssl rand -hex 32) \
+  --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32) \
+  --from-literal=LANGWATCH_NLP_INTERNAL_SECRET=$(openssl rand -hex 32)
 ```
 
-Reference in `values.yaml`:
+The two `LW_GATEWAY_*` keys are needed while `gateway.chartManaged` is `true` (the default), and `LANGY_INTERNAL_SECRET` while `langyagent.chartManaged` is `true`. `LANGWATCH_NLP_INTERNAL_SECRET` is optional: without it the NLP service accepts unauthenticated requests from inside the cluster. `helm install` prints the exact list for your values (section "Required Secrets").
+
+Reference in `values.yaml`. The gateway and the Langy agent mount the same Secret, so point them at it too:
 
 ```yaml
 secrets:
   existingSecret: langwatch-secrets
+gateway:
+  secrets:
+    existingSecretName: langwatch-secrets
+langyagent:
+  secrets:
+    existingSecretName: langwatch-secrets
 ```
 
 ### Production (External Secret Managers)
@@ -187,10 +229,10 @@ spec:
 | App | PostgreSQL | 5432 | TCP |
 | App, Workers | ClickHouse | 8123 | HTTP |
 | App, Workers | Redis | 6379 | TCP |
-| Workers | NLP | 5561 | HTTP |
-| Workers | LangEvals | 5562 | HTTP |
+| App, Workers | NLP | 5561 | HTTP |
+| App, Workers | LangEvals | 5562 | HTTP |
 | NLP, LangEvals | External LLMs | 443 | HTTPS |
-| CronJobs | App | 5560 | HTTP |
+| CronJobs you add under `cronjobs.jobs` | App | 5560 | HTTP |
 
 ## Pod Security
 
@@ -249,8 +291,9 @@ In-cluster datastores satisfy read-only-root policies, but managed databases (th
 
 LangWatch includes a built-in PII redaction pipeline step that automatically detects and masks personally identifiable information in traces before storage.
 
-- **Enabled by default** in the Helm chart
-- `app.features.disableStrictPiiRedaction: true` skips only the strict pass (the Presidio analysis service). Secrets and essential PII redaction still run (not recommended)
+- **On by default** at the essential level (secrets and common identifiers), configurable per project
+- The strict level adds a pass through the Presidio analysis service in LangEvals
+- `app.features.disableStrictPiiRedaction: true` skips only that strict pass. Secrets and essential PII redaction still run (not recommended)
 - Runs as part of the event sourcing pipeline in workers
 
 ## Multitenancy
@@ -259,7 +302,7 @@ LangWatch enforces tenant isolation at the application level:
 
 - Every ClickHouse query includes `WHERE TenantId = ...` as the first predicate
 - PostgreSQL queries include `projectId` in WHERE clauses
-- API tokens are scoped to a specific project
+- Project keys are scoped to one project; API keys are limited to the organization, team and project role bindings they were created with
 - Cross-tenant data access is prevented at the query layer
 
 ## Supply Chain
