@@ -84,6 +84,13 @@ const CUSTOMER_FAULT_CODES = new Set([
   "agent_missing_workflow_id",
   "custom_missing_workflow_id",
   "evaluator_missing_slug",
+  // A missing or unreachable End node is a field the author filled in wrong —
+  // the same category as every code above it, and what their presentation copy
+  // already tells the customer to go and fix. Without them here the `default`
+  // below classifies both as `platform`, which is backwards: it tells the
+  // customer we broke, and pages us for their wiring (#3198).
+  "missing_end_node",
+  "unreached_end_node",
 ]);
 
 /**

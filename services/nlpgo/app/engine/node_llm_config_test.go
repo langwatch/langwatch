@@ -96,9 +96,17 @@ func modellessSignatureWorkflow() *dsl.Workflow {
 				Inputs:  []dsl.Field{{Identifier: "q", Type: "str"}},
 				Outputs: []dsl.Field{{Identifier: "answer", Type: "str"}},
 			}},
+			// A wired End node keeps this a realistic full-run shape. Without
+			// it the planner rejects the workflow outright (#3198) and the
+			// test would assert against that error instead of the modelless
+			// signature failure it is actually about.
+			{ID: "end", Type: dsl.ComponentEnd, Data: dsl.Component{
+				Inputs: []dsl.Field{{Identifier: "answer", Type: "str"}},
+			}},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.q", Target: "sig", TargetHandle: "inputs.q"},
+			{Source: "sig", SourceHandle: "outputs.answer", Target: "end", TargetHandle: "inputs.answer"},
 		},
 	}
 }
