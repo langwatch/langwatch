@@ -34,7 +34,10 @@ vi.mock("~/server/nlpgo/nlpgoFetch", () => ({ nlpgoFetch: nlpgoFetchMock }));
 
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { LambdaFetchTimeoutError } from "~/utils/lambdaFetch";
+import {
+  LambdaFetchAbortedError,
+  LambdaFetchTimeoutError,
+} from "~/utils/lambdaFetch";
 
 wireDefaultTestApp();
 
@@ -215,7 +218,7 @@ describe("POST /api/scenario/execute-sync", () => {
     });
   });
 
-  describe("what the caller reads back", () => {
+  describe("given the engine has answered", () => {
     /** @scenario "A successful run passes through" */
     it("reads the engine's status and body on a successful run", async () => {
       const body = '{"status":"success","result":{"output":"hi"}}';
@@ -299,6 +302,21 @@ describe("POST /api/scenario/execute-sync", () => {
 
       expect(response.status).toBe(200);
       expect(sentToEngine().body).toEqual(big);
+    });
+  });
+
+  describe("given a caller that went away mid-turn", () => {
+    /** @scenario "A caller that goes away cancels the invoke" */
+    it("answers rather than raising, so a stopped run is no unhandled failure", async () => {
+      nlpgoFetchMock.mockRejectedValue(
+        new LambdaFetchAbortedError({ path: "/go/studio/execute_sync" }),
+      );
+
+      const response = await relay({ headers: { "X-Auth-Token": apiKey } });
+
+      // 408 and not a 500: the child is gone, so there is nothing to answer,
+      // and raising here would log a stopped simulation as an incident.
+      expect(response.status).toBe(408);
     });
   });
 

@@ -15,6 +15,12 @@
 import { env } from "~/env.mjs";
 import type { ExecuteSyncRoute } from "./types";
 
+/**
+ * Decide how this deployment's scenario children reach nlpgo for one turn.
+ *
+ * @returns `relay` with the control plane's base URL when the deployment gives
+ * each project its own engine, otherwise `direct` with the single engine's URL.
+ */
 export function resolveExecuteSyncRoute(): ExecuteSyncRoute {
   if (env.LANGWATCH_NLP_LAMBDA_CONFIG) {
     return { mode: "relay", relayBaseUrl: env.BASE_HOST };
