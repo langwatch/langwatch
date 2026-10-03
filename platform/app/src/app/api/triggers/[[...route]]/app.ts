@@ -406,6 +406,15 @@ const updateTriggerSchema = z.object({
    * same channel. Create a new automation to deliver somewhere else.
    */
   action: triggerActionEnum.optional(),
+  customGraphId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The graph this alert watches, which an update cannot change. Accepted " +
+        "so that writing the read response back works; a different graph is " +
+        "refused. Create an alert on the other graph and delete this one.",
+    ),
   actionParams: anyActionParamsSchema
     .optional()
     .describe(
@@ -778,7 +787,8 @@ secured.access(requires("triggers:update")).patch(
     description:
       "Update an automation. Every field is optional and what is left out is " +
       "left alone, except `actionParams`, which replaces the delivery " +
-      "configuration as a whole. The delivery channel cannot be changed.",
+      "configuration as a whole. The delivery channel and an alert's graph " +
+      "cannot be changed.",
     responses: {
       ...baseResponses,
       200: {
@@ -810,6 +820,7 @@ secured.access(requires("triggers:update")).patch(
       triggerId: id,
       input: {
         action: body.action as TriggerAction | undefined,
+        customGraphId: body.customGraphId,
         name: body.name,
         active: body.active,
         message: body.message,
