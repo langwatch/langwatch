@@ -12,9 +12,12 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
 
-const recoveryFlag = vi.hoisted(() => ({ disabled: false }));
+const recoveryFlag = vi.hoisted(() => ({ disabled: false, unreadable: false }));
 vi.mock("~/server/app-layer/evaluations/settings-recovery-flag", () => ({
-  isEvaluatorSettingsRecoveryDisabled: async () => recoveryFlag.disabled,
+  isEvaluatorSettingsRecoveryDisabled: async () => {
+    if (recoveryFlag.unreadable) throw new Error("flag store unreachable");
+    return recoveryFlag.disabled;
+  },
 }));
 
 wireDefaultTestApp();
@@ -389,6 +392,22 @@ describe("Monitors API", () => {
           where: { id, projectId: testProjectId },
         });
         expect(persisted?.parameters).toEqual({ prompt: "Is the reply rude?" });
+      });
+    });
+
+    describe("when the rollback flag cannot be read", () => {
+      beforeEach(() => {
+        recoveryFlag.unreadable = true;
+      });
+      afterEach(() => {
+        recoveryFlag.unreadable = false;
+      });
+
+      it("still refuses the parameters, as the runner keeps recovery active", async () => {
+        const res = await createOverTopLevelPrompt();
+
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toBe("monitor_parameters_unused");
       });
     });
   });
