@@ -289,5 +289,98 @@ describe("Monitors API", () => {
       expect(res.status).toBe(422);
       expect((await res.json()).evaluatorId).toBe(other.id);
     });
+
+    it("refuses a move that would leave the stored parameters unused", async () => {
+      const monitor = await (
+        await post(
+          "/api/monitors",
+          blocklistBody({ parameters: { competitors: ["Acme"] } }),
+        )
+      ).json();
+      const other = await evaluatorWith(["Initech"]);
+
+      const res = await patch(`/api/monitors/${monitor.id}`, {
+        evaluatorId: other.id,
+      });
+
+      expect(res.status).toBe(422);
+      const persisted = await prisma.monitor.findFirst({
+        where: { id: monitor.id, projectId: testProjectId },
+      });
+      expect(persisted?.evaluatorId).toBe(blocklist.id);
+    });
+
+    it("accepts a move that clears the parameters", async () => {
+      const monitor = await (
+        await post(
+          "/api/monitors",
+          blocklistBody({ parameters: { competitors: ["Acme"] } }),
+        )
+      ).json();
+      const other = await evaluatorWith(["Initech"]);
+
+      const res = await patch(`/api/monitors/${monitor.id}`, {
+        evaluatorId: other.id,
+        parameters: {},
+      });
+
+      expect(res.status).toBe(200);
+      expect((await res.json()).evaluatorId).toBe(other.id);
+    });
+
+    it("refuses parameters over a prompt recovered from the top of the config", async () => {
+      const topLevel = await prisma.evaluator.create({
+        data: {
+          id: `evaluator_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Top-level Judge",
+          slug: `top-level-judge-${nanoid()}`,
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/llm_boolean",
+            prompt: "Is the reply polite?",
+          },
+        },
+      });
+
+      const res = await post(
+        "/api/monitors",
+        createBody({
+          evaluatorId: topLevel.id,
+          parameters: { prompt: "Is the reply rude?" },
+        }),
+      );
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toBe("monitor_parameters_unused");
+    });
+  });
+
+  describe("when a monitor without an evaluator is given parameters", () => {
+    it("stores them, since they are what runs", async () => {
+      const legacy = await prisma.monitor.create({
+        data: {
+          id: `check_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Legacy Blocklist",
+          slug: `legacy-blocklist-${nanoid()}`,
+          checkType: "langevals/competitor_blocklist",
+          preconditions: [],
+          parameters: { competitors: ["Acme"] },
+          sample: 1,
+          enabled: true,
+          executionMode: "ON_MESSAGE",
+        },
+      });
+
+      const res = await patch(`/api/monitors/${legacy.id}`, {
+        parameters: { competitors: ["Globex"] },
+      });
+
+      expect(res.status).toBe(200);
+      expect((await res.json()).parameters).toEqual({
+        competitors: ["Globex"],
+      });
+    });
   });
 });

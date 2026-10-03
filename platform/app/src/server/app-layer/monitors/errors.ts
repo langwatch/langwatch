@@ -30,7 +30,8 @@ export class MonitorEvaluatorRequiredError extends HandledError {
 
 /**
  * A monitor's `parameters` are only read when its evaluator has no settings of
- * its own: the evaluator's settings win at run time (langwatch#6397). Storing
+ * its own: the evaluator's settings win at run time (langwatch#6397), whether
+ * they sit under `config.settings` or are recovered from the top level. Storing
  * parameters that disagree with them saved cleanly and read back like the live
  * configuration while never running, so they are refused instead.
  */
@@ -41,7 +42,7 @@ export class MonitorParametersUnusedError extends HandledError {
     super(
       "monitor_parameters_unused",
       "This monitor runs with its evaluator's settings, so these parameters would never be used. " +
-        "Change the evaluator's settings instead, or leave parameters out.",
+        "Change the evaluator's settings instead, or send parameters as an empty object.",
       {
         meta: { field: "parameters", evaluatorId },
         httpStatus: 422,

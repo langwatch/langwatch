@@ -115,8 +115,9 @@ function toMonitorResponse(monitor: {
  * Refuses `parameters` the run would never read. The runner hands the judge the
  * evaluator's own settings whenever it has some, so parameters that disagree
  * with them would be stored and read back as the monitor's configuration while
- * never running. Recovery is held off so the refusal covers only settings that
- * win whichever way the operator rollback flag is set.
+ * never running. Resolved as the runner does by default: the operator rollback
+ * flag only ever narrows when the evaluator wins, so anything the rollback
+ * would ignore is ignored here too.
  */
 function assertParametersWillRun({
   evaluator,
@@ -131,7 +132,6 @@ function assertParametersWillRun({
     config: evaluator.config as Record<string, unknown> | null,
     parameters,
     evaluatorRecordType: evaluator.type,
-    recoveryDisabled: true,
   });
   if (source === "monitor-parameters" || isEqual(settings, parameters)) return;
 
@@ -353,7 +353,9 @@ secured.access(requires("evaluations:update")).patch(
     }
 
     // Parameters are checked against the evaluator the monitor will run with
-    // after this update: the one it moves to, or the one it already has.
+    // after this update: the one it moves to, or the one it already has. A move
+    // re-checks the stored parameters too, since the new evaluator's settings
+    // may override them.
     let evaluator: Evaluator | null = null;
     if (body.evaluatorId) {
       evaluator = await prisma.evaluator.findFirst({
@@ -372,7 +374,13 @@ secured.access(requires("evaluations:update")).patch(
       });
     }
     if (evaluator) {
-      assertParametersWillRun({ evaluator, parameters: body.parameters });
+      assertParametersWillRun({
+        evaluator,
+        parameters:
+          body.parameters ??
+          (existing.parameters as Record<string, unknown> | null) ??
+          undefined,
+      });
     }
 
     const data: Record<string, unknown> = {};
