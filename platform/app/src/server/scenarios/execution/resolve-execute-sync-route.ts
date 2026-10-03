@@ -27,6 +27,11 @@ import type { ExecuteSyncRoute } from "./types";
  * run for ten minutes, so that edge decides the ceiling instead of the
  * platform.
  *
+ * A deployment that configures no endpoint falls back to `BASE_HOST`, which is
+ * the address this used to send every turn to. It keeps such a deployment
+ * working for the turns that already worked rather than refusing all of them,
+ * and leaves the long ones on whatever ceiling sits in front of that host.
+ *
  * @returns `relay` with the control plane's base URL when the deployment gives
  * each project its own engine, otherwise `direct` with the single engine's URL.
  */

@@ -44,7 +44,7 @@ Feature: A scenario turn runs on the project's own engine without the credential
       Then the run is routed straight to the engine
       And the route names the engine the deployment already configured
 
-    @unit
+    @regression @unit
     Scenario: A relayed turn does not leave the deployment
       Given the deployment is configured with per-project engines
       When the parent prepares a scenario run
