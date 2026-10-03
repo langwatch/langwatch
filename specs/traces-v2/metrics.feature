@@ -234,7 +234,10 @@ Rule: Cost formatting
   Scenario: Estimated cost shows tilde prefix
     Given a trace has an estimated cost of 0.003 dollars
     Then the cost displays as "~$0.0030"
-    And hovering the Cost pill shows a tooltip noting "Cost is estimated from token counts" (only when authoritative tokens are absent)
+
+  Scenario: Estimated cost explains itself on hover
+    Given a trace has an estimated cost of 0.003 dollars
+    Then hovering the Cost pill shows a tooltip noting "Cost is estimated from token counts" (only when authoritative tokens are absent)
 
   Scenario: Zero cost is rendered as an em-dash
     Given a trace has a cost of 0 dollars
