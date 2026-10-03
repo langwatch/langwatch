@@ -362,7 +362,7 @@ async function buildChart({
     endDate: to,
     filters: (graph.filters ?? {}) as TimeseriesInputType["filters"],
     series: seriesInputs,
-    groupBy: graphData.groupBy,
+    groupBy: groupByToQuery(type, graphData.groupBy),
     timeScale,
     // A report renders in the project's own frame; the scheduler already fires
     // in the report's timezone, so the buckets only need to be stable.
@@ -403,14 +403,12 @@ async function buildChart({
   );
   const series = seriesInputs.map((input, index) => ({
     name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
-    data: extractSeriesPoints(
-      buckets,
-      bucketKeys[index]!,
-      graphData.groupBy,
-    ).map((point, pointIndex) => ({
-      label: categories[pointIndex] ?? point.timestamp,
-      value: point.value,
-    })),
+    data: extractSeriesPoints(buckets, bucketKeys[index]!).map(
+      (point, pointIndex) => ({
+        label: categories[pointIndex] ?? point.timestamp,
+        value: point.value,
+      }),
+    ),
   }));
 
   const primary = series[0];
@@ -429,6 +427,18 @@ async function buildChart({
       one.data.every((point) => point.value === 0),
     ),
   };
+}
+
+/**
+ * Only a pie draws the groups, one slice each. Every other chart draws one line
+ * per series, and only the database can compute that line across every group:
+ * adding per-group values back together summed averages.
+ */
+function groupByToQuery(
+  type: ReportChart["type"],
+  groupBy: CustomGraphInput["groupBy"],
+): CustomGraphInput["groupBy"] {
+  return type === "pie" ? groupBy : undefined;
 }
 
 /**

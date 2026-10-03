@@ -276,6 +276,76 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
+  describe("given a grouped graph whose series is an average", () => {
+    const AVG_KEY = "0/performance.completion_time/avg";
+
+    function groupedAverageHarness() {
+      const h = makeHarness({
+        trigger: makeTrigger({
+          actionParams: {
+            threshold: 250,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/performance.completion_time/avg",
+            members: ["a@example.com"],
+          },
+        } as Partial<Trigger>),
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Average completion time",
+                metric: "performance.completion_time",
+                aggregation: "avg",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: "traces.trace_name",
+            timeScale: 60,
+          },
+        } as unknown as Partial<CustomGraph>),
+        series: timeseries(null),
+      });
+      // Two groups averaging 100 ms and 200 ms; across every trace the series
+      // averages 150 ms. Only an ungrouped read can give the latter.
+      h.getTimeseries.mockImplementation(async (input: { groupBy?: string }) =>
+        input.groupBy
+          ? ({
+              currentPeriod: [
+                {
+                  date: "2026-06-20T11:00:00Z",
+                  "traces.trace_name": {
+                    checkout: { [AVG_KEY]: 100 },
+                    search: { [AVG_KEY]: 200 },
+                  },
+                },
+              ],
+              previousPeriod: [],
+            } as unknown as TimeseriesResult)
+          : ({
+              currentPeriod: [{ date: "2026-06-20T11:00:00Z", [AVG_KEY]: 150 }],
+              previousPeriod: [],
+            } as unknown as TimeseriesResult),
+      );
+      return h;
+    }
+
+    it("compares the series' own value with the threshold, not the groups added together", async () => {
+      const grouped = groupedAverageHarness();
+
+      const result = await evaluateGraphTrigger({
+        deps: grouped.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.value).toBe(150);
+      expect(result.status).toBe("not_breached");
+      expect(grouped.getTimeseries.mock.calls[0]![0].groupBy).toBeUndefined();
+    });
+  });
+
   describe("given a graph whose grouped result exceeds the row ceiling", () => {
     // The failure this replaces was not an error at all: the result was
     // materialised until the process died, so the job neither completed nor

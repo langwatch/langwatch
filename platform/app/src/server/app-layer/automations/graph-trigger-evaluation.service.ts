@@ -82,24 +82,20 @@ export type GraphTriggerEvaluationReason =
  *
  * A threshold evaluation collapses the whole result to ONE number
  * (`aggregateSeriesValues`), and the alert template's sparkline needs only the
- * time axis. But the query it issues carries the graph's `groupBy`, so
- * ClickHouse returns `buckets x distinct group values` and
- * `extractSeriesPoints` sums the group axis away in the worker — after every
- * row has been materialised as a JS object.
+ * time axis. The query used to carry the graph's `groupBy`, so ClickHouse
+ * returned `buckets x distinct group values`; a `groupBy` on something like a
+ * user id made the result grow without limit while the answer stayed one
+ * scalar. That killed the worker outright — the process died mid-read, so the
+ * job never completed and never failed; three of those in a row and the poison
+ * guard parked the tenant's whole graph-trigger lane, which is how one
+ * project's misconfigured graph silently stopped ALL of its alerts for 19 hours
+ * on 2026-08-09.
  *
- * The time axis is already capped at 1,000 buckets
- * (`adjustTimeScaleForBucketCap`). Cardinality is not capped and cannot be:
- * it comes from the data, so a `groupBy` on something like a user id makes the
- * result grow without limit while the answer stays one scalar. That is what
- * killed the worker outright — the process dies mid-read, so the job never
- * completes and never fails; three of those in a row and the poison guard
- * parks the tenant's whole graph-trigger lane, which is how one project's
- * misconfigured graph silently stopped ALL of its alerts for 19 hours on
- * 2026-08-09.
- *
- * 10,000 rows is 10x the bucket cap, so any single-group-per-bucket read
- * passes with room to spare, while a genuinely unbounded cardinality fails
- * fast and cheap — server-side, before anything is materialised here.
+ * The read no longer groups, and the time axis is capped at 1,000 buckets
+ * (`adjustTimeScaleForBucketCap`). The ceiling stays as the backstop: 10,000
+ * rows is 10x the bucket cap, so a normal read passes with room to spare, while
+ * anything that still fans out fails fast and cheap — server-side, before
+ * anything is materialised here.
  */
 export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 
@@ -454,7 +450,10 @@ async function runGraphTriggerEvaluation({
       unknown
     > as TimeseriesInputType["filters"],
     series: [seriesInput],
-    groupBy: graphData.groupBy as TimeseriesInputType["groupBy"],
+    // Not the graph's `groupBy`: the threshold is checked against one number,
+    // and only the database can compute that number across every group. Adding
+    // per-group values back together gave a sum of averages for an `avg`
+    // series, and counted a trace once per label for an array grouping.
     timeScale: graphData.timeScale ?? 60,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
@@ -466,8 +465,8 @@ async function runGraphTriggerEvaluation({
     });
   } catch (error) {
     if (isResultTooLarge(error)) {
-      // A configuration fault, not an outage: this graph's `groupBy` has more
-      // distinct values than a threshold read can carry. Retrying re-asks the
+      // A configuration fault, not an outage: the read fans out to more rows
+      // than a threshold read can carry. Retrying re-asks the
       // identical question, so this must NOT reach the caller's failure count —
       // an evaluation that throws is redelivered, and a permanently oversized
       // trigger would then re-fail on every delivery until it quarantined its
@@ -478,7 +477,6 @@ async function runGraphTriggerEvaluation({
           projectId,
           triggerId,
           reason,
-          groupBy: graphData.groupBy,
           timePeriodMinutes: timePeriod,
           maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
         },
@@ -533,12 +531,10 @@ async function runGraphTriggerEvaluation({
   const currentPoints = extractSeriesPoints(
     timeseriesResult.currentPeriod,
     bucketKey,
-    graphData.groupBy,
   );
   const previousPoints = extractSeriesPoints(
     timeseriesResult.previousPeriod,
     bucketKey,
-    graphData.groupBy,
   );
   const currentValue = aggregateSeriesValues(
     currentPoints.map((point) => point.value),

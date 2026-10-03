@@ -159,6 +159,62 @@ describe("loadReportCharts", () => {
     });
   });
 
+  describe("given a grouped line graph whose series is an average", () => {
+    it("plots the series' own value rather than the groups added together", async () => {
+      const avgSeries = {
+        metric: "performance.completion_time",
+        aggregation: "avg",
+        name: "Average completion time",
+      };
+      const avgKey = buildSeriesName(avgSeries as never, 0);
+      const getTimeseries = vi.fn(async (input: { groupBy?: string }) =>
+        input.groupBy
+          ? ({
+              previousPeriod: [],
+              currentPeriod: [
+                {
+                  date: "2026-07-11T09:00:00Z",
+                  "traces.trace_name": {
+                    checkout: { [avgKey]: 100 },
+                    search: { [avgKey]: 200 },
+                  },
+                },
+              ],
+            } as unknown as TimeseriesResult)
+          : ({
+              previousPeriod: [],
+              currentPeriod: [{ date: "2026-07-11T09:00:00Z", [avgKey]: 150 }],
+            } as unknown as TimeseriesResult),
+      );
+      const deps: ReportChartDeps = {
+        ...makeDeps({
+          graphs: [
+            makeGraph({
+              graph: {
+                graphId: "graph-1",
+                graphType: "line",
+                series: [avgSeries],
+                groupBy: "traces.trace_name",
+                includePrevious: false,
+                timeScale: 60,
+              },
+            } as unknown as Partial<CustomGraph>),
+          ],
+          timeseries: { previousPeriod: [], currentPeriod: [] },
+        }),
+        getTimeseries,
+      };
+
+      const [chart] = await run({
+        deps,
+        source: { kind: "customGraph", customGraphId: "graph-1" },
+      });
+
+      expect(chart!.series[0]!.data.map((p) => p.value)).toEqual([150]);
+      expect(chart!.total).toBe(150);
+    });
+  });
+
   describe("given a grouped pie graph", () => {
     it("makes one slice per group, largest first", async () => {
       const deps = makeDeps({
