@@ -56,6 +56,13 @@ interface UseFeatureFlagResult {
   enabled: boolean;
   /** Whether the flag check is in progress. */
   isLoading: boolean;
+  /**
+   * Whether the flag check failed. Always `false` on the override path, where
+   * no query runs.
+   */
+  isError: boolean;
+  /** Re-runs the flag query. A no-op on the override path. */
+  refetch: () => void;
 }
 
 /**
@@ -92,7 +99,8 @@ interface UseFeatureFlagResult {
  *
  * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
  * @param options - Optional targeting and query configuration
- * @returns Object with `enabled` (boolean) and `isLoading` (boolean)
+ * @returns Object with `enabled` (boolean), `isLoading` (boolean), `isError`
+ *   (boolean — the flag query failed) and `refetch` (re-runs the query)
  *
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FRONTEND_FEATURE_FLAGS for available flags
@@ -106,33 +114,43 @@ export function useFeatureFlag(
   const overrides = useFeatureFlagOverrides();
   const override = overrides[flag];
 
-  const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
-    {
-      flag,
-      projectId: toWireTargetId(options.projectId),
-      organizationId: toWireTargetId(options.organizationId),
-    },
-    {
-      staleTime: CLIENT_FLAG_STALE_TIME_MS,
-      refetchOnWindowFocus: false,
-      // Skip the network call when an override is set — the override wins
-      // anyway, and we don't want a refetch storm while toggling in dev.
-      enabled: queryEnabled && override === undefined,
-      // Flag checks are mounted at app shell (MainMenu, command bar) and fire
-      // alongside the page's data queries. Without splitting, an in-flight
-      // tracesV2.list (~1s) would block the menu from rendering its links —
-      // and the list's perceived latency would absorb the flag round-trip.
-      // Run on its own connection.
-      trpc: { context: { skipBatch: true } },
-    },
-  );
+  const { data, isLoading, isError, refetch } =
+    api.featureFlag.isEnabled.useQuery(
+      {
+        flag,
+        projectId: toWireTargetId(options.projectId),
+        organizationId: toWireTargetId(options.organizationId),
+      },
+      {
+        staleTime: CLIENT_FLAG_STALE_TIME_MS,
+        refetchOnWindowFocus: false,
+        // Skip the network call when an override is set — the override wins
+        // anyway, and we don't want a refetch storm while toggling in dev.
+        enabled: queryEnabled && override === undefined,
+        // Flag checks are mounted at app shell (MainMenu, command bar) and fire
+        // alongside the page's data queries. Without splitting, an in-flight
+        // tracesV2.list (~1s) would block the menu from rendering its links —
+        // and the list's perceived latency would absorb the flag round-trip.
+        // Run on its own connection.
+        trpc: { context: { skipBatch: true } },
+      },
+    );
 
   if (override !== undefined) {
-    return { enabled: override, isLoading: false };
+    return {
+      enabled: override,
+      isLoading: false,
+      isError: false,
+      refetch() {
+        // No query runs on the override path, so there is nothing to refetch.
+      },
+    };
   }
 
   return {
     enabled: data?.enabled ?? false,
     isLoading: queryEnabled ? isLoading : false,
+    isError: queryEnabled ? isError : false,
+    refetch,
   };
 }

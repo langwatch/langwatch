@@ -1,8 +1,9 @@
 # Starter dashboard seed
 
 One-shot script that populates an **"Analytics starter"** dashboard with 8
-widgets pulled from the `north-star-widgets` and `legacy-parity-widgets`
-packs, so a new project gets a useful dashboard without opening the UI.
+widgets pulled from the `north-star-widgets` pack and this folder's own
+legacy-parity JSON files, so a new project gets a useful dashboard without
+opening the UI.
 
 ## Env vars
 
@@ -29,11 +30,11 @@ order below is literally the widget's top-to-bottom order on the dashboard.
 | 1 | north-star-widgets | north-star-metric-stat.json |
 | 2 | north-star-widgets | north-star-area-timeseries.json |
 | 3 | north-star-widgets | north-star-stacked-bars.json |
-| 4 | legacy-parity-widgets | legacy-trace-count-over-time.json |
+| 4 | starter-dashboard | legacy-trace-count-over-time.json |
 | 5 | north-star-widgets | north-star-donut.json |
 | 6 | north-star-widgets | north-star-leaderboard.json |
 | 7 | north-star-widgets | north-star-heatmap.json |
-| 8 | legacy-parity-widgets | legacy-latency-percentiles.json |
+| 8 | starter-dashboard | legacy-latency-percentiles.json |
 
 **Prototype note:** this is single-column only. Every widget gets
 `gridColumn = 0`, so widgets share the gridRow numbering line and just

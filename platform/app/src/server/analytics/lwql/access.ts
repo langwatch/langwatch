@@ -1,5 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag";
+import { LWQL_WORKBENCH_FRONTEND_FLAG } from "~/server/featureFlag/frontendFeatureFlags";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 /**
@@ -10,8 +11,13 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
  * what hides the navigation entry and the page — and the REST route refuses
  * outright, so a caller who skips the availability question gets the same
  * answer.
+ *
+ * The flag key's source of truth is `LWQL_WORKBENCH_FRONTEND_FLAG` in
+ * `~/server/featureFlag/frontendFeatureFlags.ts` (client-safe, listed in
+ * `FRONTEND_FEATURE_FLAGS`); this reuses it so both boundaries and the
+ * Analytics v2 page gate on one constant.
  */
-export const LWQL_FLAG = "release_lwql_workbench";
+export const LWQL_FLAG = LWQL_WORKBENCH_FRONTEND_FLAG;
 
 /**
  * Whether the LangWatchQL surface is open to this project.
