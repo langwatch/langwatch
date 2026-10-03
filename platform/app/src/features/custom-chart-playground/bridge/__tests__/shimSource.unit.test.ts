@@ -36,6 +36,9 @@ function evaluateShim() {
   const listeners: Record<string, Array<(event: unknown) => void>> = {};
   const parent = { name: "parent-window" };
   const activateAuthor = vi.fn();
+  // Everything the shim posts over the transferred port, in order — so a test
+  // can assert a render receipt was sent.
+  const posts: Array<Record<string, unknown>> = [];
 
   const win: FrameWindow = {
     parent,
@@ -61,7 +64,10 @@ function evaluateShim() {
   run(win, fakeConsole, () => 0);
 
   const dispatchInit = (source: unknown, widgetSource: string) => {
-    const port = { onmessage: null as unknown, postMessage: () => {} };
+    const port = {
+      onmessage: null as unknown,
+      postMessage: (message: Record<string, unknown>) => posts.push(message),
+    };
     const event = {
       data: {
         type: "lw:init",
@@ -75,7 +81,7 @@ function evaluateShim() {
     for (const handler of listeners.message ?? []) handler(event);
   };
 
-  return { win, parent, activateAuthor, dispatchInit };
+  return { win, parent, activateAuthor, dispatchInit, posts };
 }
 
 describe("given the frame's shim is listening for lw:init", () => {
@@ -100,6 +106,121 @@ describe("given the frame's shim is listening for lw:init", () => {
 
       expect(win.__LW_AUTHOR_SOURCE__).toBe("export default () => null;");
       expect(activateAuthor).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the shim has been initialised by its parent", () => {
+  describe("when the author runtime reports a successful mount", () => {
+    /** @scenario "A mounted widget reports a render receipt with its markup" */
+    it("posts a debounced render receipt carrying the widget root's markup", () => {
+      vi.useFakeTimers();
+      try {
+        // The real shim runs with #lw-root already in the frame document; the
+        // shim reads `document` (the real jsdom document here) directly.
+        const root = document.createElement("div");
+        root.id = "lw-root";
+        root.innerHTML = "<svg data-chart='1'></svg>";
+        document.body.appendChild(root);
+
+        const { win, parent, dispatchInit, posts } = evaluateShim();
+        dispatchInit(parent, "export default () => null;");
+
+        const report = win.__lwReportRender as (
+          status: string,
+          errorText?: string,
+        ) => void;
+        expect(typeof report).toBe("function");
+        report("ok");
+        // Debounced by 250ms — nothing posted until the timer fires.
+        expect(
+          posts.find((m) => m.type === "lw:render-receipt"),
+        ).toBeUndefined();
+        vi.advanceTimersByTime(300);
+
+        const receipt = posts.find((m) => m.type === "lw:render-receipt");
+        expect(receipt).toBeDefined();
+        expect(receipt?.status).toBe("ok");
+        expect(String(receipt?.markup)).toContain('id="lw-root"');
+        expect(String(receipt?.markup)).toContain("data-chart");
+        expect(receipt?.isMarkupTruncated).toBe(false);
+      } finally {
+        document.getElementById("lw-root")?.remove();
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("when the author runtime reports an error", () => {
+    /** @scenario "A widget that fails to compile or throws reports an error receipt" */
+    it("posts a receipt whose status is error and carries the error text", () => {
+      vi.useFakeTimers();
+      try {
+        const root = document.createElement("div");
+        root.id = "lw-root";
+        document.body.appendChild(root);
+
+        const { win, parent, dispatchInit, posts } = evaluateShim();
+        dispatchInit(parent, "export default () => null;");
+
+        (win.__lwReportRender as (status: string, errorText?: string) => void)(
+          "error",
+          "Compile error: unexpected token",
+        );
+        vi.advanceTimersByTime(300);
+
+        const receipt = posts.find((m) => m.type === "lw:render-receipt");
+        expect(receipt?.status).toBe("error");
+        expect(receipt?.errorText).toBe("Compile error: unexpected token");
+      } finally {
+        document.getElementById("lw-root")?.remove();
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("when a query result arrives and the chart re-renders", () => {
+    /** @scenario "A receipt follows the widget's data" */
+    it("posts an updated receipt for the new markup after the debounce", async () => {
+      vi.useFakeTimers();
+      try {
+        const root = document.createElement("div");
+        root.id = "lw-root";
+        root.innerHTML = "<svg data-chart='1'></svg>";
+        document.body.appendChild(root);
+
+        const { win, parent, dispatchInit, posts } = evaluateShim();
+        dispatchInit(parent, "export default () => null;");
+
+        const report = win.__lwReportRender as (
+          status: string,
+          errorText?: string,
+        ) => void;
+        report("ok");
+        vi.advanceTimersByTime(300);
+        expect(
+          posts.filter((m) => m.type === "lw:render-receipt"),
+        ).toHaveLength(1);
+
+        // Data lands after mount: the chart library appends a label under
+        // #lw-root, the same shape a query result driving a re-render takes.
+        const label = document.createElement("span");
+        label.textContent = "42";
+        root.appendChild(label);
+
+        // MutationObserver callbacks fire as microtasks, independent of the
+        // faked setTimeout — flush them before advancing the debounce timer.
+        await Promise.resolve();
+        await Promise.resolve();
+        vi.advanceTimersByTime(300);
+
+        const receipts = posts.filter((m) => m.type === "lw:render-receipt");
+        expect(receipts).toHaveLength(2);
+        expect(String(receipts[1]?.markup)).toContain(">42<");
+      } finally {
+        document.getElementById("lw-root")?.remove();
+        vi.useRealTimers();
+      }
     });
   });
 });

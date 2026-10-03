@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKBENCH_ACTIONS } from "~/experiments-v3/actions/manifest";
+import { DASHBOARD_ACTIONS } from "~/server/analytics/dashboardWidgetRenderActions";
 import { StaleWorkbenchStateError } from "~/server/experiments/errors";
 import type { ExperimentService } from "~/server/experiments/experiment.service";
 import { executeBackendAction } from "../uiActionBackendExecutor";
@@ -150,6 +151,25 @@ beforeEach(() => {
 });
 
 describe("executeBackendAction", () => {
+  describe("when a non-workbench action falls back with no browser attached", () => {
+    /** @scenario "With no browser attached the action answers that no page is open" */
+    it("refuses a dashboard action with langy_ui_no_browser before touching state", async () => {
+      const experiments = makeExperiments();
+      await expect(
+        executeBackendAction({
+          experiments,
+          // The experiment IS named here: the refusal is about the KIND, not a
+          // missing slug — a render receipt exists only in an open tab.
+          context: CONTEXT,
+          kind: "dashboard.getWidgetRender",
+          definition: DASHBOARD_ACTIONS["dashboard.getWidgetRender"],
+          payload: {},
+        }),
+      ).rejects.toMatchObject({ code: "langy_ui_no_browser" });
+      expect(experiments.getWorkbenchState).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the dispatch names no experiment", () => {
     /** @scenario A backend fallback without the experiment named is refused */
     it("refuses with langy_ui_experiment_required", async () => {

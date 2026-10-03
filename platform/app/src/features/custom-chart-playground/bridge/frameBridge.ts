@@ -30,14 +30,28 @@ import type {
   ChartQueryResult,
   FrameToParentMessage,
   LwLogMessage,
+  LwRenderReceiptMessage,
 } from "./bridgeProtocol";
 import {
   CHART_FRAME_HEARTBEAT_TIMEOUT_MS,
   CHART_FRAME_PATH,
+  CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS,
 } from "./bridgeProtocol";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
+
+/** Upper bound on the receipt's `errorText`, mirroring the markup cap. */
+const RENDER_RECEIPT_MAX_ERROR_TEXT_CHARS = 4_000;
+
+/**
+ * How often the parent delivers a render receipt to `onRenderReceipt`, at
+ * most. The shim itself debounces before posting, but `lw:render-receipt`
+ * arrives over a port the sandboxed frame's author code can also post on
+ * directly, bypassing the shim entirely — this throttle is the parent's own
+ * backstop, independent of whatever the frame side does or doesn't enforce.
+ */
+const RENDER_RECEIPT_THROTTLE_MS = 100;
 
 /**
  * Runs one of the widget's declared queries for the frame, by name, with the
@@ -57,6 +71,12 @@ export interface ChartFrameLogEntry {
   readonly source: ChartFrameLogSource | "bridge";
   readonly text: string;
 }
+
+/**
+ * A render receipt as the parent receives it — the wire message without its
+ * `type` discriminator, which the transport has already used.
+ */
+export type ChartFrameRenderReceipt = Omit<LwRenderReceiptMessage, "type">;
 
 export interface CreateFrameBridgeOptions {
   readonly iframe: HTMLIFrameElement;
@@ -89,6 +109,13 @@ export interface CreateFrameBridgeOptions {
     target: string;
     params: Readonly<Record<string, unknown>>;
   }) => void;
+  /**
+   * The frame's render receipt (`lw:render-receipt`) — status, error text and
+   * the rendered `#lw-root` markup — arriving on mount and on every subsequent
+   * DOM change. The host keeps the latest per widget so an off-screen agent
+   * can read what the widget painted. Omitted, receipts are dropped.
+   */
+  readonly onRenderReceipt?: (receipt: ChartFrameRenderReceipt) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
 }
@@ -112,6 +139,7 @@ export function createFrameBridge(
     onLog,
     onHeightChange,
     onNavigate,
+    onRenderReceipt,
     onTeardown,
     src = CHART_FRAME_PATH,
   } = options;
@@ -131,6 +159,27 @@ export function createFrameBridge(
     activeAborts.clear();
   };
 
+  // Receive-side throttle for render receipts, independent of the shim's own
+  // debounce (see RENDER_RECEIPT_THROTTLE_MS). Trailing: every receipt in a
+  // window overwrites `pendingReceipt`, and only the last one seen when the
+  // window elapses is delivered — a burst of synchronous posts collapses to
+  // one `onRenderReceipt` call.
+  let pendingReceipt: ChartFrameRenderReceipt | null = null;
+  let receiptTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const scheduleReceipt = (receipt: ChartFrameRenderReceipt) => {
+    pendingReceipt = receipt;
+    if (receiptTimer !== null) return;
+    receiptTimer = setTimeout(() => {
+      receiptTimer = null;
+      if (pendingReceipt) {
+        const next = pendingReceipt;
+        pendingReceipt = null;
+        onRenderReceipt?.(next);
+      }
+    }, RENDER_RECEIPT_THROTTLE_MS);
+  };
+
   const onVisibilityChange = () => {
     if (document.visibilityState === "visible") {
       // Fresh grace period: a backlog of misses accrued while hidden/
@@ -143,6 +192,9 @@ export function createFrameBridge(
     if (disposed) return;
     disposed = true;
     if (watchdog !== null) clearInterval(watchdog);
+    if (receiptTimer !== null) clearTimeout(receiptTimer);
+    receiptTimer = null;
+    pendingReceipt = null;
     iframe.removeEventListener("load", onFrameLoad);
     document.removeEventListener("visibilitychange", onVisibilityChange);
     abortAll();
@@ -234,6 +286,15 @@ export function createFrameBridge(
           text: message.message,
         });
         return;
+      case "lw:render-receipt": {
+        // event.data is untrusted: author code can post on the transferred
+        // port directly, bypassing the shim that normally enforces the
+        // markup cap. sanitizeRenderReceipt re-validates and re-clamps
+        // every field; a malformed message is dropped outright.
+        const receipt = sanitizeRenderReceipt(message);
+        if (receipt) scheduleReceipt(receipt);
+        return;
+      }
       default:
         return;
     }
@@ -291,6 +352,50 @@ export function createFrameBridge(
       });
     },
     dispose: stop,
+  };
+}
+
+/** A finite, non-negative height; anything else is not a real measurement. */
+function sanitizeReceiptHeight(raw: unknown): number {
+  return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : 0;
+}
+
+/**
+ * Validates and clamps an `lw:render-receipt` payload from the wire. The
+ * frame is sandboxed but author code can post on the transferred port
+ * directly, skipping the shim that normally enforces the markup cap — so the
+ * parent re-checks every field itself rather than trusting the shape.
+ * Returns `null` for non-object values, unsupported statuses, or non-string
+ * `markup`. Normalizes invalid heights to `0` and omits non-string `errorText`.
+ */
+export function sanitizeRenderReceipt(
+  raw: unknown,
+): ChartFrameRenderReceipt | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const candidate = raw as Record<string, unknown>;
+
+  if (candidate.status !== "ok" && candidate.status !== "error") return null;
+  if (typeof candidate.markup !== "string") return null;
+
+  const isMarkupOverCap =
+    candidate.markup.length > CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS;
+  const markup = isMarkupOverCap
+    ? candidate.markup.slice(0, CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS)
+    : candidate.markup;
+  const isMarkupTruncated =
+    isMarkupOverCap || candidate.isMarkupTruncated === true;
+
+  const errorText =
+    typeof candidate.errorText === "string"
+      ? candidate.errorText.slice(0, RENDER_RECEIPT_MAX_ERROR_TEXT_CHARS)
+      : undefined;
+
+  return {
+    status: candidate.status,
+    markup,
+    isMarkupTruncated,
+    height: sanitizeReceiptHeight(candidate.height),
+    ...(errorText !== undefined ? { errorText } : {}),
   };
 }
 
