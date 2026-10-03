@@ -19,7 +19,7 @@
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
-} from "../../filters/clickhouse/filter-conditions";
+} from "../../filters/clickhouse";
 import type { FilterField } from "../../filters/types";
 import { type CHTable, tableAliases } from "./field-mappings";
 

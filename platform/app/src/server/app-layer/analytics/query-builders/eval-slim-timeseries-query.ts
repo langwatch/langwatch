@@ -25,17 +25,11 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
-import {
-  customMetadataKeyCondition,
-  customMetadataValueCondition,
-} from "~/server/filters/clickhouse/filter-conditions";
-import type { FilterField } from "~/server/filters/types";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
 import {
-  collectStringValues,
   dateTrunc,
   hasFilterValues,
   isPercentile,
@@ -182,62 +176,21 @@ function dedupedSlim(alias: string, dateClause: string): string {
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
 /**
- * Translate the small slice of filter fields the eval slim natively
- * serves into a WHERE fragment + params. Anything else MUST have been
- * rejected by `pickAnalyticsTable` already.
+ * The eval slim serves no filter fields: its Attributes carry only the
+ * evaluation events' own metadata, never the trace's, so `pickAnalyticsTable`
+ * routes every filtered query to `evaluation_runs`. A filter reaching here is
+ * a routing bug.
  */
 function buildEvalSlimFilterClauses(
   filters: AnalyticsTimeseriesBuilderInput["filters"],
 ): { whereClause: string; params: Record<string, unknown> } {
-  if (!filters) return { whereClause: "", params: {} };
-
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-  let paramIdx = 0;
-  const next = (prefix: string) => `evalslim_${prefix}_${paramIdx++}`;
-
-  for (const [rawField, rawValue] of Object.entries(filters)) {
-    if (!hasFilterValues(rawValue)) continue;
-    const field = rawField as FilterField;
-
-    switch (field) {
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        const condition = customMetadataKeyCondition({
-          values: keys,
-          paramId: next("metaKey"),
-          alias: ea,
-        });
-        clauses.push(condition.sql);
-        Object.assign(params, condition.params);
-        break;
-      }
-      case "metadata.value": {
-        // Shape: Record<metaKey, string[]>
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const condition = customMetadataValueCondition({
-            values: vals,
-            paramId: next("metaValue"),
-            key: metaKey,
-            alias: ea,
-          });
-          clauses.push(condition.sql);
-          Object.assign(params, condition.params);
-        }
-        break;
-      }
-      default:
-        throw new Error(
-          `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
-        );
-    }
+  for (const [field, value] of Object.entries(filters ?? {})) {
+    if (!hasFilterValues(value)) continue;
+    throw new Error(
+      `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
+    );
   }
-
-  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
-  return { whereClause, params };
+  return { whereClause: "", params: {} };
 }
 
 /**

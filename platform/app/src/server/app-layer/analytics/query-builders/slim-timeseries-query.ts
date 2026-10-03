@@ -28,7 +28,7 @@ import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipeline
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
-} from "~/server/filters/clickhouse/filter-conditions";
+} from "~/server/filters/clickhouse";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -347,8 +347,13 @@ function buildSlimFilterClauses(
         break;
       }
       case "metadata.value": {
-        // Shape: Record<metaKey, string[]>
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
+        // Shape: Record<metaKey, string[]>. Values with no key match
+        // nothing, as on trace_summaries.
+        if (Array.isArray(rawValue)) {
+          clauses.push("1=0");
+          break;
+        }
+        if (typeof rawValue !== "object") break;
         for (const [metaKey, vals] of Object.entries(rawValue)) {
           if (!Array.isArray(vals) || vals.length === 0) continue;
           const condition = customMetadataValueCondition({

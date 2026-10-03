@@ -43,6 +43,7 @@ const TRACES = [
   { id: "rest", attributes: { "langwatch.metadata.outcome": "fail" } },
   { id: "otel", attributes: { outcome: "ok" } },
   { id: "none", attributes: { "metadata.other": "x" } },
+  { id: "empty", attributes: { "metadata.outcome": "" } },
 ] as const;
 
 const SERIES = {
@@ -180,6 +181,7 @@ describe("analytics metadata filters", () => {
       expect(await countWith({})).toBe(TRACES.length);
     });
 
+    // The trace whose outcome is empty is not counted.
     it("counts a metadata key in any of the three storage formats", async () => {
       expect(await countWith({ "metadata.key": ["outcome"] })).toBe(3);
     });
@@ -194,6 +196,10 @@ describe("analytics metadata filters", () => {
       expect(await countWith({ "metadata.value": { outcome: ["fail"] } })).toBe(
         1,
       );
+    });
+
+    it("counts nothing for values sent without a key", async () => {
+      expect(await countWith({ "metadata.value": ["ok"] })).toBe(0);
     });
   });
 });

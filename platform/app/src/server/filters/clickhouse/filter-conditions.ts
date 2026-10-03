@@ -1,6 +1,7 @@
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "../types";
 import type {
+  CustomMetadataConditionInput,
   FilterConditionBuilder,
   FilterConditionOptions,
   FilterConditionResult,
@@ -43,27 +44,24 @@ function buildEvaluatorExistsCondition(
  * - `{key}` (legacy bare OTEL resource attribute)
  *
  * Every reader of a custom metadata filter (trace search, analytics on
- * `trace_summaries` and on the slim analytics tables) goes through these two
- * builders, so they all match the same traces. `alias` is the table alias the
- * caller's query gives the row carrying `Attributes`.
+ * `trace_summaries` and on the slim trace analytics table) goes through these
+ * two builders, so they all match the same traces. A key holding an empty
+ * value does not count as present.
  *
  * @see https://github.com/langwatch/tasks/issues/919
  */
-interface CustomMetadataConditionInput {
-  values: string[];
-  paramId: string;
-  /** Alias of the row carrying `Attributes` in the caller's query. */
-  alias?: string;
-}
-
 export function customMetadataKeyCondition({
   values,
   paramId,
-  alias = "ts",
+  alias,
 }: CustomMetadataConditionInput): FilterConditionResult {
   if (values.length === 0) return { sql: "1=0", params: {} };
+  // mapContains lets ClickHouse skip granules through the bloom filter on
+  // mapKeys(Attributes); the != '' keeps empty values out.
+  const present = (param: string) =>
+    `(mapContains(${alias}.Attributes, {${param}:String}) AND ${alias}.Attributes[{${param}:String}] != '')`;
   const conditions = values.map((_v, i) => {
-    return `(${alias}.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ${alias}.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ${alias}.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
+    return `(${present(`${paramId}_k${i}_canonical`)} OR ${present(`${paramId}_k${i}_lw`)} OR ${present(`${paramId}_k${i}_bare`)})`;
   });
   const params: Record<string, unknown> = {};
   values.forEach((v, i) => {
@@ -84,7 +82,7 @@ export function customMetadataValueCondition({
   values,
   paramId,
   key,
-  alias = "ts",
+  alias,
 }: CustomMetadataConditionInput & {
   key: string | undefined;
 }): FilterConditionResult {
@@ -138,9 +136,9 @@ export const clickHouseFilterConditions: Record<
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.key": (values, paramId) =>
-    customMetadataKeyCondition({ values, paramId }),
+    customMetadataKeyCondition({ values, paramId, alias: "ts" }),
   "metadata.value": (values, paramId, key) =>
-    customMetadataValueCondition({ values, paramId, key }),
+    customMetadataValueCondition({ values, paramId, key, alias: "ts" }),
   "metadata.prompt_ids": (values, paramId) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
