@@ -541,6 +541,11 @@ function SignUpLink({
   email?: string | null;
   label: string;
 }) {
+  // No way to the sign-up screen where accounts are created by invitation: an
+  // invited person arrives through the link in their invitation.
+  const isInviteOnly = usePublicEnv().data.SIGN_UP_MODE === "invite_only";
+  if (isInviteOnly) return null;
+
   // The address rides in the FRAGMENT, which is the half of a URL the browser
   // does not send: it reaches no access log and no `Referer` on the way to the
   // other door. See `signUpHref`.

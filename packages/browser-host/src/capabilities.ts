@@ -302,6 +302,8 @@ export type UiDeployment = {
   passkeysEnabled?: boolean;
   /** Whether this deployment mounted email/password sign-in; absent reads as no. */
   emailPasswordEnabled?: boolean;
+  /** `invite_only` when accounts here are created by invitation; absent reads as open. */
+  signUpMode?: "open" | "invite_only";
   /** Whether ops offers the Cloud admin capability; off unless this is LangWatch's own cloud. */
   hasCloudOps: boolean;
   /** Where a customer's SDK reaches the gateway, without `/v1`; absent when unconfigured. */

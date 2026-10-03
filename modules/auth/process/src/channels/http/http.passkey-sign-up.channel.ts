@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
@@ -11,6 +12,9 @@ import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
+
+/** Whether the installation admits a new account for an address. */
+export type PasskeySignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
 
 /** The mailbox proof a spent confirmation link minted: checked before the ceremony,
  *  spent after it. */
@@ -36,6 +40,9 @@ export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
 
 /** A signed-in browser ran the sign-up ceremony for some other address. */
 export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/** The installation restricts who may create an account, and this address is not admitted. */
+export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
 
 /** Who the ceremony's request is signed in as, if anyone. */
 export type PasskeyCeremonyCaller =
@@ -133,6 +140,22 @@ async function refuseIfRegistered({
   });
 }
 
+async function refuseIfPolicyRefuses({
+  policy,
+  email,
+}: {
+  policy: PasskeySignUpPolicy;
+  email: string;
+}): Promise<void> {
+  const verdict = await policy.checkSignUp({ email });
+  if (verdict.allowed) return;
+
+  throw new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_RESTRICTED,
+    message: "Accounts on this installation are created by invitation.",
+  });
+}
+
 /**
  * Resolves ceremony user (unauthenticated signup): address without account
  * and its handle. Name/displayName are credential manager display text.
@@ -141,12 +164,14 @@ async function resolveUser({
   handleSecret,
   users,
   verification,
+  policy,
   context,
 }: {
   ctx: GenericEndpointContext;
   handleSecret: string;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
   const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
@@ -154,6 +179,9 @@ async function resolveUser({
     throw verificationRequired();
   }
   await refuseIfRegistered({ users, email: resolvedEmail });
+  // Before the system prompt opens, so a refused address is never asked to
+  // create a passkey for an account it cannot have.
+  await refuseIfPolicyRefuses({ policy, email: resolvedEmail });
 
   return {
     id: provisionalHandle({ email: resolvedEmail, handleSecret }),
@@ -170,11 +198,13 @@ function createAfterVerification({
   announcements,
   users,
   verification,
+  policy,
   sessionOf,
 }: {
   announcements: BetterAuthAnnouncements;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
   sessionOf: PasskeyCeremonySession;
 }): (params: {
   ctx: GenericEndpointContext;
@@ -200,6 +230,8 @@ function createAfterVerification({
     // and an account can be created in that window. The unique index on the
     // address is the real backstop; this is the one that answers in words.
     await refuseIfRegistered({ users, email: resolvedEmail });
+    // Before the proof is spent: a refused address keeps its link.
+    await refuseIfPolicyRefuses({ policy, email: resolvedEmail });
 
     // Spent before anything is written: the proof is the authority to enrol.
     if (!(await verification.claimAddressProof({ token: addressProof, email: resolvedEmail }))) {
@@ -228,6 +260,7 @@ export function passkeySignUpRegistration(options: {
   handleSecret: string;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
   sessionOf?: PasskeyCeremonySession;
 }): {
   requireSession: boolean;
@@ -248,6 +281,7 @@ export function passkeySignUpRegistration(options: {
         context,
         users: options.users,
         verification: options.verification,
+        policy: options.policy,
         handleSecret: options.handleSecret,
       }),
     afterVerification: createAfterVerification({

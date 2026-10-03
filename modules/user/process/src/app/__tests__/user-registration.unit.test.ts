@@ -17,6 +17,7 @@ import {
   createUserTestApp,
   createUserTestAuth,
   createUserTestInfrastructure,
+  createUserTestOrganizations,
 } from "./user.fixture.ts";
 
 function register(
@@ -86,6 +87,24 @@ describe("registering a credential account", () => {
       expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
       expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
       await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
+    });
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    /** @scenario "A refused registration spends no address proof and writes no account" */
+    it("refuses with the restricted code before the proof is spent or the account written", async () => {
+      const auth = createUserTestAuth();
+      const organizations = createUserTestOrganizations();
+      organizations.checkSignUp.mockResolvedValueOnce({ allowed: false, reason: "invite_only" });
+      const app = createUserTestApp({ dependencies: { auth, organizations } });
+
+      await expect(register(app, "Stranger@Example.com")).rejects.toMatchObject({
+        code: "auth_sign_up_restricted",
+      });
+      expect(organizations.checkSignUp).toHaveBeenCalledWith({ email: "stranger@example.com" });
+      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
+      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
+      await expect(app.findByEmail({ email: "stranger@example.com" })).resolves.toBeNull();
     });
   });
 

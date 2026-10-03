@@ -15,6 +15,7 @@ const served: PublicAppConfig = {
     identityFrontDoor: false,
     authProvider: "auth0",
     emailPasswordEnabled: true,
+    signUpMode: "invite_only",
   },
   authz: {},
   billing: {},
@@ -47,6 +48,7 @@ describe("browser feature configuration", () => {
         authProvider: "auth0",
         passkeysEnabled: true,
         emailPasswordEnabled: true,
+        signUpMode: "invite_only",
         gatewayBaseUrl: "https://gateway.langwatch.test",
       });
     });

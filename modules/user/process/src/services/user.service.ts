@@ -143,6 +143,10 @@ export class UserService {
     return this.repository.hasAccountOnDomain(normalised);
   }
 
+  hasAnyAccount(): Promise<boolean> {
+    return this.repository.hasAnyAccount();
+  }
+
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     const parsed = userProfilesInputSchema.parse(input);
 

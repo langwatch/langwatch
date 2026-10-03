@@ -2126,6 +2126,16 @@ const presentations = {
         : "It only takes effect at organization scope. Bind it there instead.";
     },
   },
+  auth_sign_up_restricted: {
+    title: "Sign-up on this installation is by invitation",
+    describe: () =>
+      "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
+  },
+  organization_creation_restricted: {
+    title: "Organizations here are created by an administrator",
+    describe: () =>
+      "Ask an administrator to invite you to an existing organization, or to create a new one for you.",
+  },
   organization_slug_taken: {
     title: "That organization slug is already in use",
     describe: () => "Pick a different slug, or leave it out to generate one from the name.",

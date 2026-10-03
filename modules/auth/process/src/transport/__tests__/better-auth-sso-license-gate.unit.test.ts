@@ -109,6 +109,7 @@ function buildOptions(
     /** No organization has set a threshold, so nothing is ever locked out. */
     signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
     findGoverningConnections,
+    signUpPolicy: { checkSignUp: async () => ({ allowed: true, via: "open" }) },
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,

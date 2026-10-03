@@ -23,6 +23,8 @@ export type AuthPublicEnvironment = Readonly<{
   HAS_LANGEVALS_ENDPOINT: boolean;
   STRIPE_LICENSE_PAYMENT_LINK_URL: string | undefined;
   NEXTAUTH_PROVIDER: string | undefined;
+  /** `invite_only` when accounts on this installation are created by invitation. */
+  SIGN_UP_MODE: "open" | "invite_only";
 }>;
 
 /** The address a front-door screen is rendering, as data. */

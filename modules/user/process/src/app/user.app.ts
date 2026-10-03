@@ -17,7 +17,7 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
 import type {
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,
@@ -458,6 +458,11 @@ export class UserModule implements UserApi {
       budget: SIGNUP_BUDGET,
       refuse: () => new UserSignupThrottledError(),
     });
+
+    // Before the proof is spent: a refused address keeps its link for the day
+    // an administrator invites it.
+    const verdict = await this.#peers.organizations.checkSignUp({ email });
+    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
 
     // The mailbox proof is the authority to enrol a credential, spent before
     // anything is hashed or written and bound to this exact address.
@@ -1065,6 +1070,10 @@ export class UserModule implements UserApi {
 
   hasAccountOnDomain(input: { domain: string }): Promise<boolean> {
     return this.#users.hasAccountOnDomain(input);
+  }
+
+  hasAnyAccount(): Promise<boolean> {
+    return this.#users.hasAnyAccount();
   }
 
   /**

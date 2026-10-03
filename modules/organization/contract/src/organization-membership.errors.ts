@@ -163,6 +163,42 @@ export class OrganizationSlugTakenError extends HandledError {
   }
 }
 
+/**
+ * The installation restricts who may create an account and this address is
+ * not admitted. One code for both restrictions: the remedy is an invitation
+ * either way. The rule that refused travels as the reason.
+ */
+export class SignUpRestrictedError extends HandledError {
+  declare readonly code: "auth_sign_up_restricted";
+
+  constructor(detail: string) {
+    super("auth_sign_up_restricted", "Accounts on this installation are created by invitation.", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SignUpRestrictedError";
+  }
+}
+
+/**
+ * The installation runs invite-only sign-up (`SIGN_UP_MODE=invite_only`), so a
+ * member joins the organizations that invited them and only an instance
+ * administrator founds a new one.
+ */
+export class OrganizationCreationRestrictedError extends HandledError {
+  declare readonly code: "organization_creation_restricted";
+
+  constructor() {
+    super(
+      "organization_creation_restricted",
+      "Only an instance administrator can create an organization on this installation.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "OrganizationCreationRestrictedError";
+  }
+}
+
 /** Custom role is not assignable: belongs to another org or is built-in. */
 export class CustomRoleNotAssignableError extends HandledError {
   declare readonly code: "custom_role_not_assignable";

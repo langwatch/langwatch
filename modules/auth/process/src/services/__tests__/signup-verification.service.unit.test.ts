@@ -51,12 +51,14 @@ function makeService({
   decision = SIGN_UP_DECISION,
   budgetAllowed = true,
   emailUnconfigured = false,
+  signUpRefused = false,
   mailer,
 }: {
   holder?: UserProfile | null;
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
   emailUnconfigured?: boolean;
+  signUpRefused?: boolean;
   mailer?: SignUpVerificationMailChannel;
 } = {}) {
   const memory = MemoryAuthDatabase.create();
@@ -72,6 +74,8 @@ function makeService({
     mailer: mailer ?? mail,
     users: createApiFixture<UserApi>({ findByEmail: async () => current }),
     route: async () => decision,
+    checkSignUp: async () =>
+      signUpRefused ? { allowed: false, reason: "invite_only" } : { allowed: true, via: "open" },
     isWithinBudget: async ({ key }) => {
       budgets.push(key);
       return budgetAllowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
@@ -350,6 +354,30 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
   describe("when the address holds an account still awaiting confirmation", () => {
     it("mails the link again", async () => {
       const harness = makeService({ holder: account({ emailVerified: false }) });
+
+      await harness.service.requestNewAccountVerification({ email: "sam@acme.com" });
+
+      expect(harness.mail.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    /** @scenario "A refused sign-up is told before a confirmation link is sent" */
+    it("refuses a new address by code and mails nothing", async () => {
+      const harness = makeService({ signUpRefused: true });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "stranger@example.com" }),
+      ).rejects.toMatchObject({ code: "auth_sign_up_restricted" });
+      expect(harness.mail.sent).toEqual([]);
+      expect(harness.budgets).toEqual([]);
+    });
+
+    it("still mails the link again to an account awaiting confirmation", async () => {
+      const harness = makeService({
+        signUpRefused: true,
+        holder: account({ emailVerified: false }),
+      });
 
       await harness.service.requestNewAccountVerification({ email: "sam@acme.com" });
 

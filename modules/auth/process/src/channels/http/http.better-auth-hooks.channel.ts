@@ -42,24 +42,66 @@ export type BetterAuthHookCollaborators = Readonly<{
   ssoMigration: SsoMigrationCallbackApi;
 }>;
 
+/** Whether the installation admits a new account for an address. */
+export type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
+
 const logger = createLogger("langwatch:better-auth:hooks");
 
 /**
  * Called before a new user is created (via OAuth signup or email+password signup).
  */
-export const beforeUserCreate: NonNullable<
+export function createBeforeUserCreateHook({
+  policy,
+  findGoverningConnections,
+}: {
+  policy: SignUpPolicy;
+  findGoverningConnections: FindGoverningConnections;
+}): NonNullable<
   NonNullable<
     NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["user"]>["create"]
   >["before"]
-> = async (user) => {
-  if (user.deactivatedAt) {
-    logger.warn("Blocked signup: user is deactivated");
-    return false;
-  }
-  // No-op: org auto-assignment happens in the after-create hook so that we
-  // have a real user id to link with.
-  return undefined;
-};
+> {
+  return async (user) => {
+    if (user.deactivatedAt) {
+      logger.warn("Blocked signup: user is deactivated");
+      return false;
+    }
+    await refuseRestrictedSignUp({ email: user.email, policy, findGoverningConnections });
+    // Org auto-assignment happens in the after-create hook so that we have a
+    // real user id to link with.
+    return undefined;
+  };
+}
+
+/**
+ * The one place every way of creating an account passes through, federated
+ * sign-in included. An address an organization's own connection governs is
+ * admitted: the organization that configured the connection vouches for it.
+ */
+async function refuseRestrictedSignUp({
+  email,
+  policy,
+  findGoverningConnections,
+}: {
+  email: string;
+  policy: SignUpPolicy;
+  findGoverningConnections: FindGoverningConnections;
+}): Promise<void> {
+  const verdict = await policy.checkSignUp({ email });
+  if (verdict.allowed) return;
+  if ((await findGoverningConnections({ email })).length > 0) return;
+
+  logger.warn({ reason: verdict.reason }, "Refused sign-up: the installation restricts it");
+  // Thrown rather than returned false, so Better Auth carries the code to the
+  // sign-in screen as `?error=`.
+  throw APIError.from("FORBIDDEN", {
+    code: SIGN_UP_RESTRICTED_CODE,
+    message: SIGN_UP_RESTRICTED_CODE,
+  });
+}
+
+/** The code the sign-in screen and the passkey ceremony read a restricted sign-up by. */
+export const SIGN_UP_RESTRICTED_CODE = "auth_sign_up_restricted";
 
 /**
  * The organization-scoped grant that comes with a default membership. Idempotent by

@@ -11,6 +11,7 @@ import {
   normalizeIdentifierValue,
   type RoutingDecision,
 } from "@langwatch/identity-contract";
+import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { EmailAlreadyRegisteredError, type UserApi } from "@langwatch/user-contract";
 
@@ -34,6 +35,8 @@ export interface SignUpVerificationDeps {
   isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>>;
+  /** Whether the installation admits a new account for this address. */
+  checkSignUp: OrganizationApi["checkSignUp"];
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
   /** No email configured at all; a named but unusable provider is a misconfiguration, not this. */
@@ -128,6 +131,12 @@ export class SignUpVerificationService {
     const state = await this.addressState({ email });
     if (state === "confirmed" || (withoutEmail && state !== "unknown")) {
       throw new EmailAlreadyRegisteredError();
+    }
+    // An address with an account is only finishing its confirmation, so the
+    // sign-up policy is asked of a new address alone.
+    if (state === "unknown") {
+      const verdict = await this.deps.checkSignUp({ email });
+      if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
     }
 
     const budget = await this.deps.isWithinBudget({

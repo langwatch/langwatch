@@ -145,6 +145,11 @@ export class PrismaUserRepository
     return row !== null;
   }
 
+  async hasAnyAccount(): Promise<boolean> {
+    const row = await this.prisma.user.findFirst({ select: { id: true } });
+    return row !== null;
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 

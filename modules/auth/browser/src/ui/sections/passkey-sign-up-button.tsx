@@ -22,6 +22,9 @@ const PASSKEY: SignInMethod = {
  */
 const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 
+/** The server's code for an address the installation's sign-up policy refuses. */
+const SIGN_UP_RESTRICTED = "auth_sign_up_restricted";
+
 /**
  * The `code` off a client error, where it carried one — the ceremony's own
  * failures always name one, a server refusal only if the endpoint set it,
@@ -76,6 +79,11 @@ async function createAccountWithPasskey({
 function readRefusal(error: { status: number } & object): Refusal {
   const code = readCode(error);
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
+  // The installation's sign-up policy refused the address; the registry has
+  // the words for it.
+  if (code === SIGN_UP_RESTRICTED) {
+    return { kind: "report", error: { error: SIGN_UP_RESTRICTED } };
+  }
   // Saying "went wrong" about a cancelled prompt would scold somebody for
   // deciding. But only the explicit abort is that: a status-less client
   // failure isn't, and treating every status-less error as a cancel left a

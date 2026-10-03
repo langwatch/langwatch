@@ -11557,6 +11557,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

@@ -50,4 +50,13 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
     .handle(({ app, input, actor }, person) =>
       app.acceptInvitation({ inviteCode: input.inviteCode }, callerOf(actor, person)),
     )
+
+    /**
+     * Answers for the session person's own proven addresses. The caller belongs
+     * to no organization yet, which is the condition being reported.
+     */
+    .procedure("myPendingInvitation")
+    .withFacts(organizationSessionPersonFact)
+    .noPermission(BEFORE_MEMBERSHIP)
+    .handle(({ app, actor }, person) => app.getPendingInvitation(callerOf(actor, person)))
     .build();

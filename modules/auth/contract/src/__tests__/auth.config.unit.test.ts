@@ -79,6 +79,22 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the installation's sign-up mode", () => {
+    const signUpMode = async (environment: Record<string, string>) =>
+      (await authBrowserConfig.project(read(environment), void 0)).signUpMode;
+
+    /** @scenario "The sign-in screen learns the installation is invite-only" */
+    it("hands the page invite_only when it is set, and open otherwise", async () => {
+      await expect(signUpMode({ SIGN_UP_MODE: "invite_only" })).resolves.toBe("invite_only");
+      await expect(signUpMode({})).resolves.toBe("open");
+      await expect(signUpMode({ SIGN_UP_MODE: "" })).resolves.toBe("open");
+    });
+
+    it("refuses a mode nothing reads rather than leaving sign-up open", () => {
+      expect(() => read({ SIGN_UP_MODE: "closed" })).toThrow(ConfigParseError);
+    });
+  });
+
   describe("given only one half of the browser session identity is named", () => {
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
     it("refuses the configuration and names both variables", () => {
@@ -94,6 +110,7 @@ describe("auth server configuration", () => {
             localPasswords: false,
             auth0ManagementClientId: undefined,
             isSaas: false,
+            signUpMode: "open",
             signInProviders: {
               authProvider: undefined,
               legacyProvider: undefined,

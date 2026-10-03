@@ -6,6 +6,7 @@ import {
   type SignInMethod,
   type SignInRoutingReasonCode,
 } from "@langwatch/identity-contract";
+import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
 
 export interface SignUpEnrollmentServiceDeps {
   validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
@@ -17,6 +18,8 @@ export interface SignUpEnrollmentServiceDeps {
   addressIsTaken(input: { email: string }): Promise<boolean>;
   resolveDefaultMethods(): Promise<readonly SignInMethod[]>;
   passwordIsAllowed(): Promise<boolean>;
+  /** Whether the installation admits a new account for this address. */
+  checkSignUp: OrganizationApi["checkSignUp"];
 }
 
 /**
@@ -74,6 +77,9 @@ export class SignUpEnrollmentService {
       ? offered
       : offered.filter((method) => method.kind !== "password");
     if (methodSet.length === 0) return unavailable(decision.reasonCode);
+
+    const verdict = await this.deps.checkSignUp({ email });
+    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
 
     return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
   }

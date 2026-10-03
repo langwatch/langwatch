@@ -116,6 +116,17 @@ describe("public application configuration projection", () => {
     });
   });
 
+  describe("given the sign-up mode the dev server projects for auth", () => {
+    const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
+    const signUpMode = (source: Record<string, string>) =>
+      resolvePublicAppConfig({ ...base, ...source }).auth?.signUpMode;
+
+    it("names invite_only when it is set, and open otherwise", () => {
+      expect(signUpMode({ SIGN_UP_MODE: "invite_only" })).toBe("invite_only");
+      expect(signUpMode({})).toBe("open");
+    });
+  });
+
   it("retains the gateway public-url, legacy-url, and deployment-default precedence", () => {
     expect(
       resolveGatewayBaseUrl({

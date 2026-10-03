@@ -97,6 +97,8 @@ export function betterAuthTransportFor(
     /** No organization has set a threshold, so nothing is ever locked out. */
     signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
     findGoverningConnections: async () => [],
+    /** Sign-up is open, as on an installation that sets neither variable. */
+    signUpPolicy: { checkSignUp: async () => ({ allowed: true, via: "open" }) },
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,

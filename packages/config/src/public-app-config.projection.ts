@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { Config, parseProcessConfig, type ConfigOf, type ConfigSlice } from "./config.ts";
-import { gatewayAddressOf } from "./deployment-facts.ts";
+import { gatewayAddressOf, signUpMode } from "./deployment-facts.ts";
 import { environmentOneOrTrueSchema } from "./env-schemas.ts";
 import {
   processWebConfigSchema,
@@ -70,6 +70,8 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional()),
     /** Passwords beside a federated provider, as auth's own switch reads it. */
     localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", z.enum(["off", "on"]).optional()),
+    /** Who may create an account, as auth projects it for the create-account links. */
+    signUpMode,
     /** The address readers sign in on, as auth projects it for copy-paste snippets. */
     publicUrl: c.env(
       "NEXTAUTH_URL",
@@ -249,6 +251,7 @@ function projectPublicAppConfig(
         (config.authProviderName ?? config.authProvider ?? "email") === "email" ||
         !config.isSaas ||
         config.identity.localPasswords === "on",
+      signUpMode: config.identity.signUpMode,
       ...(config.identity.publicUrl ? { publicUrl: config.identity.publicUrl } : {}),
     },
     authz: { demoProjectSlug: config.demoProjectSlug },

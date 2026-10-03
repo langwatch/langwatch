@@ -12,6 +12,7 @@ import type {
   OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
 import type {
+  inviteTrpc,
   joinRequestTrpc,
   OrganizationIntent,
   ScopeGraphOrganization,
@@ -22,10 +23,12 @@ import type { TimeInput } from "@langwatch/time";
 type SignUpData = Readonly<Record<string, unknown>>;
 
 /**
- * `joinRequests.lookup` feeds the create screen's join-instead notice; `modelProvider.*` lets the
+ * `joinRequests.lookup` feeds the create screen's join-instead notice; `invite.myPendingInvitation`
+ * sends an invited reader to their invitation before that screen; `modelProvider.*` lets the
  * guided takeover read the saved providers and point Langy's own role at the connected model.
  */
 export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
+  ContractApiMap<typeof inviteTrpc> &
   ContractApiMap<typeof modelProviderTrpc> & {
     onboarding: {
       /**

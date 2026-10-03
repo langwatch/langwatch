@@ -176,6 +176,12 @@ const hasInlineScope = (clause: unknown): boolean => {
   );
 };
 
+// An invitation lookup for exactly one email address, compared whole.
+const namesOneAddress = (clause: unknown): boolean => {
+  const email = clauseField(clause, "email");
+  return typeof email === "string" || typeof clauseField(email, "equals") === "string";
+};
+
 const boundsToSingleOrg = (clause: unknown): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
 
@@ -195,8 +201,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   Team: {},
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
-    // names belongs to exactly one organization.
-    extraBound: ({ clause }) => typeof clauseField(clause, "inviteCode") === "string",
+    // names belongs to exactly one organization. "Is this address invited
+    // anywhere" is a READ bounded by the one address it names.
+    extraBound: ({ clause, action }) =>
+      typeof clauseField(clause, "inviteCode") === "string" ||
+      (action === "findFirst" && namesOneAddress(clause)),
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or

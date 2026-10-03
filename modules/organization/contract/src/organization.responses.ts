@@ -84,6 +84,17 @@ export const organizationInviteAcceptedSchema = z.object({
 });
 export type OrganizationInviteAccepted = z.infer<typeof organizationInviteAcceptedSchema>;
 
+/**
+ * The invitation a signed-in person who belongs to no organization is sent to,
+ * instead of the screen that creates one. `inviteCode` is null when none waits.
+ */
+export const organizationPendingInvitationForCallerSchema = z.object({
+  inviteCode: z.string().min(1).nullable(),
+});
+export type PendingInvitationForCaller = z.infer<
+  typeof organizationPendingInvitationForCallerSchema
+>;
+
 /** The user row, flat. Mirrors `User` in `organization.rows.ts`. */
 export const organizationUserRowSchema = z
   .object({
