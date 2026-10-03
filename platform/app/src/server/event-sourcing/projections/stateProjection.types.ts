@@ -37,7 +37,14 @@ export interface StateProjectionStore<State> {
   ): Promise<void>;
 }
 
-export interface StateProjectionOptions {
+export interface StateProjectionOptions<E extends Event = Event> {
+  /** Independent reporting of actual refused events, awaited before acknowledging
+   * the projection job. Failure retries this job without running paid intents.
+   */
+  onKillSwitchSkip?: (input: {
+    events: readonly E[];
+    componentName: string;
+  }) => Promise<void>;
   killSwitch?: KillSwitchOptions;
   /** One load and one store may fold this many queued events. Defaults to 1. */
   coalesceMaxBatch?: number;
@@ -58,5 +65,5 @@ export interface StateProjectionDefinition<State, E extends Event = Event> {
   apply(state: State, event: E): State;
   store: StateProjectionStore<State>;
   key?: (event: E) => string;
-  options?: StateProjectionOptions;
+  options?: StateProjectionOptions<E>;
 }

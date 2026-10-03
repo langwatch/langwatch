@@ -540,6 +540,11 @@ const presentations = {
     describe: () =>
       "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
+  instant_eval_processing_disabled: {
+    title: "Instant Eval processing is disabled",
+    describe: () =>
+      "A processing step was disabled. Contact your administrator or support before starting a new run.",
+  },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () =>

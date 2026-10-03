@@ -257,6 +257,7 @@ export const APP_ERROR_CODES = [
   "instant_eval_not_enabled",
   "instant_eval_not_found",
   "instant_eval_opt_in_not_offered",
+  "instant_eval_processing_disabled",
   "instant_eval_query_budget_exceeded",
   "instant_eval_query_invalid",
   "instant_eval_query_missing_columns",

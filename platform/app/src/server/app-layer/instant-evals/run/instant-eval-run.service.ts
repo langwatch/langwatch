@@ -36,6 +36,7 @@ import { instantEvalRowLimitOrRefuse } from "./caps";
 import {
   InstantEvalAlreadyFinishedError,
   InstantEvalNotEnabledError,
+  InstantEvalProcessingDisabledError,
   InstantEvalRunNotFoundError,
 } from "./errors";
 import {
@@ -60,7 +61,9 @@ import {
   readInstantEvalSample,
 } from "./instant-eval-reads";
 import type { InstantEvalRunRepository } from "./instant-eval-run.repository";
+import type { InstantEvalRunInterruptionsRepository } from "./instant-eval-run-interruptions.repository";
 import type { InstantEvalJudgmentStatus } from "./judgments";
+import type { InstantEvalRunView } from "./processing-block";
 import type { InstantEvalRowSource, InstantEvalRunCaller } from "./row-source";
 import {
   type AcceptedInstantEvalStatement,
@@ -116,6 +119,11 @@ export interface InstantEvalRunCommands {
 
 export interface InstantEvalRunServiceDependencies {
   readonly runs: InstantEvalRunRepository;
+  readonly interruptions: InstantEvalRunInterruptionsRepository;
+  /** Admission checks only requestRun, using the same targeted switch as workers. */
+  readonly isRequestRunDisabled: (input: {
+    projectId: string;
+  }) => Promise<boolean>;
   readonly judgments: InstantEvalJudgmentsRepository;
   readonly rowSource: InstantEvalRowSource;
   readonly query: LangWatchQLService;
@@ -237,6 +245,9 @@ export class InstantEvalRunService {
     input: InstantEvalRunInput;
   }) {
     const caller = await this.callerOrRefuse(projectId);
+    if (await this.deps.isRequestRunDisabled({ projectId })) {
+      throw new InstantEvalProcessingDisabledError();
+    }
     const rowLimit = await this.rowLimitOrRefuse({
       projectId,
       ...(input.limit === undefined ? {} : { requested: input.limit }),
@@ -376,19 +387,39 @@ export class InstantEvalRunService {
     beforeId?: string;
   }) {
     await this.callerOrRefuse(projectId);
-    return await this.deps.runs.list({
+    const rows = await this.deps.runs.list({
       projectId,
       limit,
       ...(before ? { before } : {}),
       ...(beforeId ? { beforeId } : {}),
     });
+    return await this.withProcessingBlocks({ projectId, rows });
   }
 
   async get({ projectId, runId }: { projectId: string; runId: string }) {
     await this.callerOrRefuse(projectId);
     const row = await this.deps.runs.findById({ projectId, runId });
     if (!row) throw new InstantEvalRunNotFoundError({ runId });
-    return row;
+    return (await this.withProcessingBlocks({ projectId, rows: [row] }))[0]!;
+  }
+
+  /** Receipts are read independently, once per list; read errors propagate so
+   * missing evidence cannot accidentally present a healthy run.
+   */
+  private async withProcessingBlocks({
+    projectId,
+    rows,
+  }: {
+    projectId: string;
+    rows: readonly InstantEvalRunView[];
+  }): Promise<InstantEvalRunView[]> {
+    const blocks = await this.deps.interruptions.blocksForRuns({
+      projectId,
+      runIds: rows.map((row) => row.id),
+    });
+    return rows.map((row) =>
+      blocks[row.id] ? { ...row, processingBlock: blocks[row.id] } : row,
+    );
   }
 
   /**

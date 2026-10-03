@@ -18,6 +18,12 @@ import type {
 } from "../commandDispatcher";
 import { processCommand, processCommandBatch } from "../commandDispatcher";
 
+// Reused module graphs may already contain the real dispatcher from a domain
+// flow suite. Re-import it against this suite's own mocked boundary.
+vi.hoisted(() => {
+  vi.resetModules();
+});
+
 // Mock the kill switch module
 vi.mock("../../../utils/killSwitch", () => ({
   isComponentDisabled: vi.fn().mockResolvedValue(false),
@@ -99,6 +105,38 @@ describe("processCommand", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  describe("when disabled skips have an observer", () => {
+    /** @scenario Every disabled run command records its actual refusal */
+    it("awaits a receipt with validated scope before acknowledging the skip", async () => {
+      mockedIsComponentDisabled.mockResolvedValue(true);
+      const onKillSwitchSkip = vi.fn().mockResolvedValue(undefined);
+      const params = createDefaultParams({ onKillSwitchSkip });
+      await processCommand(params);
+      expect(onKillSwitchSkip).toHaveBeenCalledWith({
+        payload: validPayload,
+        tenantId: String(tenantId),
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        componentName: commandName,
+      });
+      expect(params.handler.handle).not.toHaveBeenCalled();
+      expect(params.storeEventsFn).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Receipt write failure retries only the refused job */
+    it("propagates receipt failure without calling the command handler", async () => {
+      mockedIsComponentDisabled.mockResolvedValue(true);
+      const params = createDefaultParams({
+        onKillSwitchSkip: async () => {
+          throw new Error("receipt unavailable");
+        },
+      });
+      await expect(processCommand(params)).rejects.toThrow(
+        "receipt unavailable",
+      );
+      expect(params.handler.handle).not.toHaveBeenCalled();
+    });
   });
 
   // ─── 1. Valid flow ──────────────────────────────────────────────

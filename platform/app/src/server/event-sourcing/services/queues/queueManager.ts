@@ -713,6 +713,7 @@ export class QueueManager<EventType extends Event = Event> {
         pipelineName: this.pipelineName,
         featureFlagService: this.featureFlagService,
         killSwitchOptions: cmdEntry.killSwitchOptions,
+        onKillSwitchSkip: cmdEntry.options.onKillSwitchSkip,
         logger,
       };
 
