@@ -13,7 +13,10 @@ import type { ModelTrouble } from "~/server/app-layer/traces/search-router/contr
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalConfirmation } from "./InstantEvalConfirmDialog";
-import type { InstantEvalRefusal } from "./InstantEvalRefusalPopover";
+import {
+  type InstantEvalRefusal,
+  isSelfHostedRefusal,
+} from "./InstantEvalRefusalPopover";
 
 /**
  * What the search router hands over when Enter on a sentence is a judgement
@@ -333,7 +336,8 @@ function useInstantEvalStarter({
  * rather than applying a fallback query.
  *
  * A member who may manage a self-serve organization gets the switch; one who
- * may not is told to ask an admin; anyone else gets a word with us. The
+ * may not is told to ask an admin; a self-hosted install is told why in its
+ * own terms; anyone else gets a word with us. The
  * payload is held aside for the switch only, so a thrown switch can go on to
  * the estimate the reader asked for.
  */
@@ -361,6 +365,10 @@ function bailUnreleased({
   heldRef.current = null;
   if (optInOffer === "ask_admin") {
     outcome.setRefusal({ kind: "ask_admin" });
+    return;
+  }
+  if (isSelfHostedRefusal(optInOffer)) {
+    outcome.setRefusal({ kind: optInOffer });
     return;
   }
   outcome.setRefusal({ kind: "unreleased" });

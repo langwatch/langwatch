@@ -869,6 +869,40 @@ describe("agent_payload_too_large", () => {
   });
 });
 
+describe("instant_eval_opt_in_not_offered", () => {
+  describe("when a self-hosted install is refused the switch", () => {
+    it("says the license, or the operator of an install with its own judge key, is what adds Instant Evals", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "self_hosted" },
+        }),
+      );
+
+      expect(description).toBe(
+        "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+      );
+    });
+  });
+
+  describe("when an enterprise organization is refused the switch", () => {
+    it("says LangWatch switches them on for the plan", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "enterprise" },
+        }),
+      );
+
+      expect(description).toBe(
+        "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      );
+    });
+  });
+});
+
 describe("agent_test_refused", () => {
   describe("when the reason is longer than a sentence", () => {
     /** @scenario "Technical detail stops at the trace id" */

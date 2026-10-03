@@ -503,6 +503,32 @@ describe("given Instant Evals are off for an enterprise organization", () => {
   });
 });
 
+describe("given an eval chip refused on a self-hosted install", () => {
+  describe("when the Explorer receives the payload", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it.each([
+      "not_in_license",
+      "switched_off",
+      "not_connected",
+      "ask_operator",
+    ] as const)("opens the %s popover, with no estimate and no switch", (offer) => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: offer,
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: offer });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given Instant Evals are off for a self-serve organization", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */

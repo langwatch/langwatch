@@ -13,9 +13,13 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     organization admin, and is never offered a button the server would refuse;
   - an enterprise organization is offered a word with us instead, and is never switched on by a
     click;
-  - a self-hosted install is offered a word with us too, because its judging is a matter of its
-    Connect license and not of this switch;
-  - the operator's release flag stays as it was, and either the flag or the switch makes a
+  - a self-hosted install that judges through LangWatch is released by its license: the customer
+    signed a license that names Instant Evals, which is the same agreement, and an organization
+    admin can still switch hosted judging off in Settings, Connect;
+  - a self-hosted install that is not released is told why in its own terms: its license does
+    not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
+    judges with its own key and its operator decides;
+  - the operator's release flag stays as it was, and the flag, the license or the switch makes a
     project judgeable.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
@@ -42,11 +46,52 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the popover asks what to offer
       Then it is offered a word with us, whatever the member may do
 
+  Rule: A self-hosted install is released by its license, and told why when it is not
+
     @unit
-    Scenario: A self-hosted install is offered a word with us
+    Scenario: A license that names Instant Evals releases them without the flag
+      Given a self-hosted install that judges through LangWatch, with the release flag off
+      And the organization's license names Instant Evals and no admin switched them off
+      When the project asks whether it may judge
+      Then it may, from the license, and the organization's own switch is not read
+
+    @unit
+    Scenario: An admin who switched hosted judging off keeps it off
+      Given a self-hosted install that judges through LangWatch, with the release flag off
+      And the organization's license names Instant Evals but an admin switched them off
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: An install with its own judge key still waits for the release flag
+      Given a self-hosted install that judges with its own key, with the release flag off
+      When the project asks whether it may judge
+      Then the license is not what releases it
+
+    @unit
+    Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
       Given a self-hosted install
       When the popover asks what to offer
-      Then it is offered a word with us, and the plan is not read
+      Then an install whose license does not include Instant Evals, or that holds no license, is told its license does not include them
+      And an install whose admin switched hosted judging off is told where to switch it back on
+      And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
+      And an install that judges with its own key, or with judging turned off, is told to ask whoever runs it
+
+    @integration
+    Scenario: Each self-hosted refusal says what to do about it
+      Given an eval chip refused on a self-hosted install
+      When the popover opens
+      Then a license without Instant Evals offers to contact us to add them
+      And a switched-off organization names Settings, Connect, and offers no "Contact us"
+      And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
+      And an install that judges with its own key offers no "Contact us"
+
+    @integration
+    Scenario: A judgement that fails on an install judging through LangWatch names the addresses it needs
+      Given a project on an install that judges through LangWatch
+      When the judge can't be reached for an eval chip
+      Then the "can't run right now" popover names connect.langwatch.ai and gateway.langwatch.ai
+      And it still offers to contact us
 
   Rule: The switch is the organization's, and the first click is the one that counts
 
@@ -110,3 +155,4 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       When a request tries to throw the switch anyway
       Then it is refused as not offered, and nothing is recorded
+      And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has its own judge key

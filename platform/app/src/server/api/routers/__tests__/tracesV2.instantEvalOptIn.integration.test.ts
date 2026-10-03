@@ -4,7 +4,8 @@
  * `tracesV2.instantEval.access` and `.enable` through the real tRPC router:
  * the server half of the opt-in authorization. Session, RBAC and the
  * organization lookup run against the real test database. Only the
- * deployment and the plan are stated, so the organization is one the switch
+ * deployment and the plan are stated, in both modules that read the
+ * deployment, so the organization is one the switch
  * is offered to and the member's own authority is what decides.
  *
  * Spec: specs/instant-evals/instant-eval-opt-in.feature
@@ -47,6 +48,19 @@ vi.mock("~/server/app-layer/instant-evals/opt-in", async (importOriginal) => {
     ) => original.switchInstantEvalsOn({ ...args, ...hostedSelfServe }),
   };
 });
+// The same deployment, stated where the router and the access read ask it:
+// the hosted service never judges through Connect and has no license, so
+// neither answer may hang on the runner's own environment.
+vi.mock(
+  "~/server/app-layer/instant-evals/classifier",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/app-layer/instant-evals/classifier")
+    >()),
+    isSelfHostedJudgingThroughConnect: () => false,
+    isInstantEvalLicensedForOrganization: async () => false,
+  }),
+);
 
 const ns = `ieoi-${nanoid(8)}`;
 const ORG_ID = `org-${ns}`;
@@ -164,7 +178,11 @@ describe("tracesV2.instantEval opt-in procedures", () => {
       const result = await callerFor(MEMBER_ID).tracesV2.instantEval.access({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: false, offer: "ask_admin" });
+      expect(result).toEqual({
+        released: false,
+        offer: "ask_admin",
+        viaConnect: false,
+      });
     });
 
     it("is refused the switch, and nothing is recorded", async () => {
@@ -185,14 +203,24 @@ describe("tracesV2.instantEval opt-in procedures", () => {
       const result = await callerFor(ADMIN_ID).tracesV2.instantEval.access({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: false, offer: "enable" });
+      expect(result).toEqual({
+        released: false,
+        offer: "enable",
+        viaConnect: false,
+      });
     });
 
     it("switches on the project's own organization and no other", async () => {
       const result = await callerFor(ADMIN_ID).tracesV2.instantEval.enable({
         projectId: PROJECT_ID,
       });
-      expect(result).toEqual({ released: true, offer: "enable" });
+      // The access read's own shape, since the popover writes it into that
+      // cache; the hosted switch never judges through Connect.
+      expect(result).toEqual({
+        released: true,
+        offer: "enable",
+        viaConnect: false,
+      });
 
       const own = await optInOf(ORG_ID);
       expect(own.instantEvalsEnabledAt).toBeInstanceOf(Date);

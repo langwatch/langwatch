@@ -23,6 +23,7 @@ import {
   instantEvalsReleased,
   organizationOfProject,
 } from "~/server/app-layer/instant-evals/access";
+import { isSelfHostedJudgingThroughConnect } from "~/server/app-layer/instant-evals/classifier";
 import {
   instantEvalOptInOffer,
   switchInstantEvalsOn,
@@ -164,6 +165,7 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
           organizationId,
         }),
         instantEvalOptInOffer({
+          prisma: ctx.prisma,
           organizationId,
           user: ctx.session.user,
           // The same authority `enable` declares below, so a member the
@@ -177,7 +179,10 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
             ),
         }),
       ]);
-      return { released, offer };
+      // A self-hosted install that judges through LangWatch: what the
+      // "can't run right now" popover adds the two addresses it needs for.
+      const viaConnect = isSelfHostedJudgingThroughConnect();
+      return { released, offer, viaConnect };
     }),
 
   /**
@@ -233,7 +238,10 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
       // Outside the try, so a failed write of this row is never recorded
       // as a failed switch: the switch is already on by then.
       await record();
-      return result;
+      // The same shape the access read answers, since the popover writes it
+      // straight into that cache. The switch is thrown on the hosted service
+      // only, which never judges through Connect.
+      return { ...result, viaConnect: false };
     }),
 
   estimate: protectedProcedure

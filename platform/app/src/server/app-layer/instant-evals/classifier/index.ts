@@ -61,14 +61,62 @@ const BUCKET_BURST_SECONDS = 2;
 
 let cached: InstantEvalClassifier | undefined;
 
+/**
+ * Where this deployment's judge runs, in the order the classifier is chosen.
+ *
+ * - `off`: the operator turned judging off with `INSTANT_EVAL_CLASSIFIER=null`.
+ * - `own_key`: the install judges with its own `JEV_API_KEY`.
+ * - `connect`: the install judges through LangWatch, as its license allows.
+ * - `disconnected`: no key of its own and Connect switched off, so nothing
+ *   can judge until one of the two changes.
+ */
+export type InstantEvalJudgeRoute =
+  | "off"
+  | "own_key"
+  | "connect"
+  | "disconnected";
+
+export function instantEvalJudgeRoute(): InstantEvalJudgeRoute {
+  if (env.INSTANT_EVAL_CLASSIFIER === "null") return "off";
+  if (env.JEV_API_KEY) return "own_key";
+  return readConnectConfig().permitted ? "connect" : "disconnected";
+}
+
 /** Whether this deployment can judge anything at all. */
 export function isInstantEvalClassifierConfigured(): boolean {
-  if (env.INSTANT_EVAL_CLASSIFIER === "null") return false;
-  if (env.JEV_API_KEY) return true;
   // The Connect classifier answers per organization, and an organization
   // whose license names no hosted judging skips every question. Whether it can
   // judge for anyone is decided there, not here.
-  return readConnectConfig().permitted;
+  const route = instantEvalJudgeRoute();
+  return route === "own_key" || route === "connect";
+}
+
+/**
+ * Whether this is a self-hosted install that judges through LangWatch. The
+ * hosted service is never one, whatever its environment holds, so the license
+ * check and the popover's host sentence rest on the deployment and not on the
+ * hosted service happening to set a judge key.
+ */
+export function isSelfHostedJudgingThroughConnect(): boolean {
+  return env.IS_SAAS !== true && instantEvalJudgeRoute() === "connect";
+}
+
+/**
+ * Whether the organization's license is what releases Instant Evals to it:
+ * a self-hosted install that judges through LangWatch, and the organization's
+ * license names hosted judging that no admin switched off.
+ *
+ * The license is signed by the customer, which makes it the organization's
+ * agreement to the data flow in the same way the hosted service's own switch
+ * is, so no release flag is asked on top of it. An install that judges with
+ * its own key is never released here: the operator's flag still decides for
+ * it, because nothing the customer signed names that judge.
+ */
+export async function isInstantEvalLicensedForOrganization(
+  organizationId: string,
+): Promise<boolean> {
+  if (!isSelfHostedJudgingThroughConnect()) return false;
+  return await isInstantEvalClassifierAvailableForOrganization(organizationId);
 }
 
 /**
@@ -99,34 +147,41 @@ export function getInstantEvalClassifier(): InstantEvalClassifier {
   return (cached ??= createInstantEvalClassifier());
 }
 
+/**
+ * Built from `instantEvalJudgeRoute()`, so the classifier this process judges
+ * with and the route the popover reports are the same answer.
+ */
 function createInstantEvalClassifier(): InstantEvalClassifier {
-  if (env.INSTANT_EVAL_CLASSIFIER === "null") {
-    return new NullInstantEvalClassifier();
-  }
-
+  const route = instantEvalJudgeRoute();
   const apiKey = env.JEV_API_KEY;
-  if (!apiKey) {
-    const config = readConnectConfig();
-    if (config.permitted) {
-      return new ConnectInstantEvalClassifier({ prisma, config });
-    }
+
+  if (route === "connect") {
+    return new ConnectInstantEvalClassifier({
+      prisma,
+      config: readConnectConfig(),
+    });
+  }
+  // The key is read again only so the type narrows: the route is `own_key`
+  // exactly when it is set.
+  if (route === "own_key" && apiKey) {
+    return new JevInstantEvalClassifier({
+      apiKey,
+      ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),
+      // `jev-latest` is the name the API accepts and is what it resolves to a
+      // concrete version (`jev-1.13.0` as of September 2026); a version
+      // spelled out, such as `jev-1.13`, is refused as an unknown model. This
+      // is here so a deployment can pin whatever concrete name the provider
+      // later publishes without a release.
+      ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
+      limiter: createInstantEvalRateLimiter(),
+    });
+  }
+  if (route === "disconnected") {
     logger.info(
       "No Instant Evals classifier is configured; judged columns will be skipped",
     );
-    return new NullInstantEvalClassifier();
   }
-
-  return new JevInstantEvalClassifier({
-    apiKey,
-    ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),
-    // `jev-latest` is the name the API accepts and is what it resolves to a
-    // concrete version (`jev-1.13.0` as of September 2026); a version spelled
-    // out, such as `jev-1.13`, is refused as an unknown model. This is here so
-    // a deployment can pin whatever concrete name the provider later publishes
-    // without a release.
-    ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
-    limiter: createInstantEvalRateLimiter(),
-  });
+  return new NullInstantEvalClassifier();
 }
 
 /** The shared limiter, sized from the environment. */
