@@ -1,0 +1,112 @@
+# Dispatch-only: this cell drives real TTS + STT through the deployed LangWatch
+# AI Gateway and so spends real provider money on every run. It must never fire
+# on push or PR. The per-push sdk-python-ci job skips this test automatically
+# because SCENARIO_VOICE_GATEWAY_VK is absent in that job's environment; here we
+# provision it from a secret so the cell actually runs. Tracked in issue #6180.
+name: Scenario voice gateway cell
+
+on:
+  workflow_dispatch:
+    inputs:
+      gateway_url:
+        description: Gateway base URL the audio calls route through. Must be an https URL whose host is gateway.langwatch.ai or ends with .langwatch.ai; anything else fails the run before a request is made.
+        required: false
+        default: https://gateway.langwatch.ai/v1
+
+permissions:
+  contents: read
+
+# Each run spends real provider money, so accidental double dispatches queue
+# instead of running twice.
+concurrency:
+  group: scenario-voice-gateway-cell
+  cancel-in-progress: false
+
+jobs:
+  voice-cell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "sdks/python/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: sdks/python
+        run: uv sync --all-groups --all-extras
+
+      - name: Refuse a gateway URL outside langwatch.ai
+        # The virtual key rides in the Authorization header of every request,
+        # so an arbitrary gateway_url would hand the secret to whoever runs
+        # that host. Only LangWatch-controlled https origins are accepted.
+        env:
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
+        run: |
+          url="$SCENARIO_VOICE_GATEWAY_URL"
+
+          if [ -z "$url" ]; then
+            echo "::error::gateway_url is empty"
+            exit 1
+          fi
+
+          case "$url" in
+            https://*)
+              ;;
+            *)
+              echo "::error::gateway_url '$url' must use https://"
+              exit 1
+              ;;
+          esac
+
+          authority="${url#https://}"
+          authority="${authority%%/*}"
+
+          if [ -z "$authority" ]; then
+            echo "::error::gateway_url '$url' has an empty host"
+            exit 1
+          fi
+
+          # Reject userinfo in authority (e.g., attacker@host would let attacker sit before @ while httpx connects elsewhere)
+          case "$authority" in
+            *@*)
+              echo "::error::gateway_url '$url' contains @ in the authority, which could be used to redirect to another host"
+              exit 1
+              ;;
+          esac
+
+          host="${authority%%:*}"
+
+          case "$host" in
+            gateway.langwatch.ai|*.langwatch.ai)
+              ;;
+            *)
+              echo "::error::gateway_url '$url' is not an https origin under langwatch.ai; refusing to send the virtual key there"
+              exit 1
+              ;;
+          esac
+
+      # The test file skips when SCENARIO_VOICE_GATEWAY_VK is absent so the
+      # per-push lane stays free, but this dedicated cell must never go green by
+      # skipping — fail loudly when the secret is not configured.
+      - name: Fail loudly if the virtual key secret is not configured
+        env:
+          SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+        run: |
+          if [ -z "$SCENARIO_VOICE_GATEWAY_VK" ]; then
+            echo "::error::PYTHON_SDK_GATEWAY_VIRTUAL_KEY is not set for this repository; the voice cell would skip instead of run"
+            exit 1
+          fi
+
+      - name: Run the Scenario voice gateway cell
+        working-directory: sdks/python
+        env:
+          LANGWATCH_DEBUG: "true"
+          PYTHONPATH: .
+          SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
+        run: uv run pytest -s -vv -m e2e tests/e2e/test_scenario_voice_gateway_e2e.py
