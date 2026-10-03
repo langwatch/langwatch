@@ -11,6 +11,11 @@ import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { normalizeQuery, translateFilterToClickHouse } from "./ast";
 import { FIELD_DEF_BY_NAME } from "./build-handlers";
 import {
+  type EvaluationScope,
+  evaluateEvaluationScope,
+  evaluationScopeOf,
+} from "./evaluation-scope";
+import {
   type FieldNeeds,
   type InMemoryTrace,
   UNSUPPORTED,
@@ -119,6 +124,10 @@ function evaluateNode(
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
+      // An evaluator and its result conditions are one evaluation, exactly
+      // as `translateNode` binds them.
+      const scope = negated ? null : evaluationScopeOf(logExpr);
+      if (scope) return evaluateBoundChain(scope, trace, state);
       // Negation threads down unchanged and the operator stays as-is — the
       // exact shape `translateNode` compiles, so both sides always agree.
       const left = evaluateNode(logExpr.left, negated, trace, state);
@@ -142,6 +151,28 @@ function evaluateNode(
     default:
       return UNSUPPORTED;
   }
+}
+
+/** Mirrors `translateBoundChain`: the bound group, ANDed with the rest. */
+function evaluateBoundChain(
+  scope: EvaluationScope,
+  trace: InMemoryTrace,
+  state: WalkState,
+): boolean | Unsupported {
+  state.nodeCount += scope.nodeCount - 1;
+  if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
+  const bound = evaluateEvaluationScope(scope, trace);
+  if (bound === UNSUPPORTED) {
+    state.unsupportedFields.push("evaluator");
+    return UNSUPPORTED;
+  }
+  let matched = bound;
+  for (const operand of scope.rest) {
+    const result = evaluateNode(operand, false, trace, state);
+    if (result === UNSUPPORTED) return UNSUPPORTED;
+    matched = matched && result;
+  }
+  return matched;
 }
 
 function evaluateTag(
