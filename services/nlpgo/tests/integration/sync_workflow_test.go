@@ -7,7 +7,6 @@ package integration_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -20,12 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // stack assembles a fully-wired httpapi.Router around the engine,
@@ -63,7 +62,7 @@ func setupStack(t *testing.T) *stack {
 
 	eng := engine.New(engine.Options{HTTP: httpExec, Code: codeExec})
 
-	executor := executorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 
 	probes := health.New("test")
@@ -81,101 +80,6 @@ func setupStack(t *testing.T) *stack {
 	t.Cleanup(srv.Close)
 
 	return &stack{url: srv.URL, upstream: upstream, upstreamURL: upstream.URL}
-}
-
-// executorAdapter is a copy of cmd.engineAdapter — kept inline so the
-// integration test doesn't depend on the cmd package (avoids forcing
-// the test binary to also pull in os.Args parsing).
-type executorAdapter struct {
-	eng *engine.Engine
-}
-
-func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
-	}
-	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
-		Workflow:          wf,
-		Inputs:            req.Inputs,
-		Origin:            req.Origin,
-		TraceID:           req.TraceID,
-		ProjectID:         req.ProjectID,
-		ThreadID:          req.ThreadID,
-		NodeID:            req.NodeID,
-		Type:              req.Type,
-		RunID:             req.RunID,
-		WorkflowVersionID: req.WorkflowVersionID,
-		EvaluateOn:        req.EvaluateOn,
-		DatasetEntry:      req.DatasetEntry,
-	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
-	}
-	out := make(chan app.WorkflowStreamEvent, 16)
-	go func() {
-		defer close(out)
-		for ev := range in {
-			out <- app.WorkflowStreamEvent{Type: ev.Type, TraceID: ev.TraceID, Payload: ev.Payload}
-		}
-	}()
-	return out, nil
-}
-
-func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
-			Status: "error",
-			Error:  &app.WorkflowError{Type: "invalid_workflow", Message: err.Error()},
-		}, nil
-	}
-	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{
-		Workflow:          wf,
-		Inputs:            req.Inputs,
-		Origin:            req.Origin,
-		TraceID:           req.TraceID,
-		ProjectID:         req.ProjectID,
-		ThreadID:          req.ThreadID,
-		NodeID:            req.NodeID,
-		Type:              req.Type,
-		RunID:             req.RunID,
-		WorkflowVersionID: req.WorkflowVersionID,
-		EvaluateOn:        req.EvaluateOn,
-		DatasetEntry:      req.DatasetEntry,
-	})
-	if err != nil {
-		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
-			Status: "error",
-			Error:  &app.WorkflowError{Type: "engine_error", Message: err.Error()},
-		}, nil
-	}
-	out := &app.WorkflowResult{
-		TraceID: res.TraceID,
-		Status:  res.Status,
-		Result:  res.Result,
-	}
-	if res.Error != nil {
-		out.Error = &app.WorkflowError{
-			NodeID:    res.Error.NodeID,
-			Type:      res.Error.Type,
-			Message:   res.Error.Message,
-			Traceback: res.Error.Traceback,
-		}
-	}
-	if len(res.Nodes) > 0 {
-		out.Nodes = make(map[string]any, len(res.Nodes))
-		for k, v := range res.Nodes {
-			out.Nodes[k] = v
-		}
-	}
-	return out, nil
 }
 
 func postSync(t *testing.T, stack *stack, body string) *app.WorkflowResult {
