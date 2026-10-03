@@ -13,6 +13,11 @@ import {
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
+import {
+  concatBytes,
+  findLWAPreludeSeparator,
+  LWA_PRELUDE_SEPARATOR_LEN,
+} from "~/utils/lwaPrelude";
 import { env } from "../../../env.mjs";
 import { nlpgoInternalHeaders } from "../../../server/nlpgo/internalSecret";
 import {
@@ -100,48 +105,9 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
 // to ride out a ~30-60s burst without surfacing the error to Studio.
 const LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
 
-// Lambda Web Adapter RESPONSE_STREAM mode delimits the JSON prelude
-// from the response body with 8 zero bytes. Exposed for testing.
-export const LWA_PRELUDE_SEPARATOR_LEN = 8;
-
-/** Returns the index of the first 8-zero-byte run in `buf`, or -1 if
- *  not present. Used to locate the LWA RESPONSE_STREAM prelude/body
- *  boundary; see invokeLambda's prelude-strip block. SSE response
- *  bodies are text and never contain runs of 8 NULs, so a false-
- *  positive on the body side is not a practical concern. The buffer
- *  parameter is typed as Uint8Array<ArrayBufferLike> so AWS SDK
- *  PayloadChunk.Payload values flow through without an extra copy. */
-export function findLWAPreludeSeparator(
-  buf: Uint8Array<ArrayBufferLike>,
-): number {
-  for (let i = 0; i + LWA_PRELUDE_SEPARATOR_LEN <= buf.length; i++) {
-    let allZero = true;
-    for (let j = 0; j < LWA_PRELUDE_SEPARATOR_LEN; j++) {
-      if (buf[i + j] !== 0) {
-        allZero = false;
-        break;
-      }
-    }
-    if (allZero) return i;
-  }
-  return -1;
-}
-
-/** Allocates a new Uint8Array containing `a` followed by `b`. The
- *  output owns a fresh ArrayBuffer (Uint8Array<ArrayBuffer>) so
- *  ReadableStreamDefaultController.enqueue and other strict consumers
- *  accept it without a buffer-type mismatch. */
-export function concatBytes(
-  a: Uint8Array<ArrayBufferLike>,
-  b: Uint8Array<ArrayBufferLike>,
-): Uint8Array<ArrayBuffer> {
-  const out = new Uint8Array(a.length + b.length);
-  out.set(a, 0);
-  out.set(b, a.length);
-  return out;
-}
-
-export const createLambdaClient = (): LambdaClient => {
+export const createLambdaClient = (
+  opts: { maxAttempts?: number } = {},
+): LambdaClient => {
   const config = parseLambdaConfig();
   return new LambdaClient({
     region: config.AWS_REGION,
@@ -149,7 +115,7 @@ export const createLambdaClient = (): LambdaClient => {
       accessKeyId: config.AWS_ACCESS_KEY_ID,
       secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
     },
-    maxAttempts: LAMBDA_CLIENT_MAX_ATTEMPTS,
+    maxAttempts: opts.maxAttempts ?? LAMBDA_CLIENT_MAX_ATTEMPTS,
   });
 };
 
