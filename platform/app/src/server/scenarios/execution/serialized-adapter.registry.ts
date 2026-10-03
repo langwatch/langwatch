@@ -70,11 +70,14 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       parameters,
     }),
   code: ({ data, projectApiKey, parameters, executeSyncTransport }) => {
-    if (!projectApiKey) {
-      throw new Error("Code adapter requires projectApiKey");
-    }
-    if (!executeSyncTransport) {
-      throw new Error("Code adapter requires executeSyncTransport");
+    // One guard, because a code turn needs both or it cannot run: the
+    // project's platform key, which reaches the engine inside the DSL, and a
+    // way to reach the engine at all. `createAdapter` derives the second from
+    // the first, so neither arrives without the other.
+    if (!projectApiKey || !executeSyncTransport) {
+      throw new Error(
+        "Code adapter requires projectApiKey and a transport to the engine",
+      );
     }
     return new SerializedCodeAgentAdapter({
       config: data as CodeAgentData,
@@ -84,11 +87,11 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
     });
   },
   workflow: ({ data, projectApiKey, parameters, executeSyncTransport }) => {
-    if (!projectApiKey) {
-      throw new Error("Workflow adapter requires projectApiKey");
-    }
-    if (!executeSyncTransport) {
-      throw new Error("Workflow adapter requires executeSyncTransport");
+    // See the code factory above: both or neither.
+    if (!projectApiKey || !executeSyncTransport) {
+      throw new Error(
+        "Workflow adapter requires projectApiKey and a transport to the engine",
+      );
     }
     return new SerializedWorkflowAgentAdapter({
       config: data as WorkflowAgentData,

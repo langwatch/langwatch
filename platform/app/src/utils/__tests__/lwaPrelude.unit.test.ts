@@ -4,7 +4,7 @@ import {
   findLWAPreludeSeparator,
   LWA_PRELUDE_SEPARATOR_LEN,
   readLWAResponsePayload,
-} from "~/utils/lwaPrelude";
+} from "../lwaPrelude";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
