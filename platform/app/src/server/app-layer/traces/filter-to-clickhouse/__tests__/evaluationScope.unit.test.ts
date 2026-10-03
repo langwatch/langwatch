@@ -137,13 +137,38 @@ describe("an evaluator paired with its own result", () => {
   });
 
   describe("when two evaluators are named in one conjunction", () => {
-    it("does not tie the result to either of them", () => {
+    it.each([
+      "evaluator:X AND evaluator:Y AND evaluatorVerdict:fail",
+      "evaluator:Y AND evaluator:X AND evaluatorVerdict:fail",
+      "evaluator:X AND evaluatorVerdict:fail AND evaluator:Y",
+      "evaluatorVerdict:fail AND evaluator:X AND evaluator:Y",
+    ])("ties the result to neither of them in %s", (query) => {
+      expect(evaluateQueryInMemory(query, xPassedYFailed)).toBe(true);
+    });
+  });
+
+  describe("when the evaluator ran more than once", () => {
+    const xPassedThenFailed = traceWith([
+      makeEval({ evaluationId: "e-x1", evaluatorId: "X", passed: true }),
+      makeEval({ evaluationId: "e-x2", evaluatorId: "X", passed: false }),
+    ]);
+
+    it("matches a kept result held by any of its runs", () => {
       expect(
         evaluateQueryInMemory(
-          "evaluator:X AND evaluator:Y AND evaluatorVerdict:fail",
-          xPassedYFailed,
+          "evaluator:X AND evaluatorVerdict:pass",
+          xPassedThenFailed,
         ),
       ).toBe(true);
+    });
+
+    it("drops the trace when any of its runs holds an excluded result", () => {
+      expect(
+        evaluateQueryInMemory(
+          "evaluator:X AND NOT evaluatorVerdict:fail",
+          xPassedThenFailed,
+        ),
+      ).toBe(false);
     });
   });
 });

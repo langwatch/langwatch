@@ -4,6 +4,7 @@ import type {
   TagToken,
   UnaryOperatorToken,
 } from "liqe";
+import type { EvaluationRunData } from "../../evaluations/types";
 import {
   type ExpressionCategoricalDef,
   FACET_REGISTRY,
@@ -16,7 +17,7 @@ import {
   translateNumericField,
   translateStringField,
 } from "./generic-translators";
-import { boundedSubquery } from "./subqueries";
+import { latestEvaluationRunsSubquery } from "./subqueries";
 import {
   extractStringValue,
   nextParam,
@@ -32,10 +33,15 @@ import {
  * that way. Compiled tag by tag, though, each half is its own trace-level
  * subquery and the pair means "X ran, and some evaluation failed" — a trace
  * where X passed and Y failed matches. So within one AND chain that names
- * exactly one evaluator, the result conditions next to it are compiled into
- * the same `evaluation_runs` row as the evaluator.
+ * exactly one evaluator, the result conditions next to it are judged against
+ * X's own evaluations:
  *
- * The chain stops at parentheses: `(evaluator:X AND …) AND (evaluator:Y AND …)`
+ * - the conditions kept must all hold on one evaluation of X;
+ * - a condition excluded with NOT must hold on no evaluation of X, so
+ *   excluding `fail` hides a trace where any run of X failed.
+ *
+ * The chain is read once, from its top, so word order never changes the
+ * result. It stops at parentheses: `(evaluator:X AND …) AND (evaluator:Y AND …)`
  * is two chains, one per group, which is the shape the drilldown emits for two
  * evaluators. Two evaluators in one flat chain are ambiguous and stay unbound,
  * as does a result condition with no evaluator next to it.
@@ -59,10 +65,10 @@ const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
   ["evaluatorPassed", "evaluatorVerdict"],
 ]);
 
-const SCOPED_TABLE = "evaluation_runs";
-
-/** A result condition bound to the evaluator, with the polarity it holds under. */
+/** A result condition bound to the evaluator, kept or excluded. */
 interface ScopedCondition {
+  /** The chain operand: the tag, or the NOT around it. */
+  node: LiqeQuery;
   tag: TagToken;
   /** The tag's field, one of {@link SCOPED_FACET_KEY_BY_FIELD}'s keys. */
   field: string;
@@ -71,47 +77,48 @@ interface ScopedCondition {
   nodeCount: number;
 }
 
-/** One AND chain, split into the bound evaluator group and everything else. */
+/** The evaluator and the result conditions bound to it. */
 export interface EvaluationScope {
   anchor: TagToken;
   conditions: ScopedCondition[];
-  /** The chain's other operands, compiled as they always were. */
+}
+
+/** One AND chain, flattened, with its evaluator group when it has one. */
+export interface AndChain {
+  /** Null when the chain names no evaluator, more than one, or no result. */
+  scope: EvaluationScope | null;
+  /** The operands outside the group, compiled as they always were. */
   rest: LiqeQuery[];
   /**
-   * AST nodes the bound group and the chain's own AND nodes span, so the
+   * AST nodes the chain's AND nodes and the bound group span, so the
    * complexity ceiling counts exactly what the tag-by-tag walk counted.
    */
   nodeCount: number;
 }
 
 /**
- * The evaluator group of an AND chain, or null when the chain names no
- * evaluator, more than one, or no result condition to bind to it.
+ * The AND chain rooted at `node`, or null when `node` is an OR. Callers walk
+ * `rest` without re-reading its nested AND nodes as chains of their own: a
+ * chain's binding is decided once, here.
  */
-export function evaluationScopeOf(
-  node: LogicalExpressionToken,
-): EvaluationScope | null {
+export function andChainOf(node: LogicalExpressionToken): AndChain | null {
+  if (node.operator.operator === "OR") return null;
   const operands = andOperands(node);
-  const anchors = operands.filter(isAnchor);
-  if (anchors.length !== 1) return null;
-  const anchor = anchors[0] as TagToken;
-
-  const conditions: ScopedCondition[] = [];
-  const rest: LiqeQuery[] = [];
-  for (const operand of operands) {
-    if (operand === anchor) continue;
-    const condition = scopedCondition(operand);
-    if (condition) conditions.push(condition);
-    else rest.push(operand);
-  }
-  if (conditions.length === 0) return null;
-
   const andNodes = operands.length - 1;
-  const boundNodes = conditions.reduce((sum, c) => sum + c.nodeCount, 1);
-  return { anchor, conditions, rest, nodeCount: andNodes + boundNodes };
+  const scope = scopeOf(operands);
+  if (!scope) return { scope: null, rest: operands, nodeCount: andNodes };
+
+  const bound = new Set<LiqeQuery>([scope.anchor]);
+  for (const condition of scope.conditions) bound.add(condition.node);
+  const boundNodes = scope.conditions.reduce((sum, c) => sum + c.nodeCount, 1);
+  return {
+    scope,
+    rest: operands.filter((operand) => !bound.has(operand)),
+    nodeCount: andNodes + boundNodes,
+  };
 }
 
-/** The bound group as one `evaluation_runs` subquery. */
+/** The bound group as `evaluation_runs` subqueries over X's latest rows. */
 export function translateEvaluationScope(
   scope: EvaluationScope,
   ctx: TranslationContext,
@@ -121,21 +128,25 @@ export function translateEvaluationScope(
   const p = nextParam(ctx, "evaluatorId");
   ctx.params[p] = evaluatorId;
 
-  const predicates = [
-    `EvaluatorId = {${p}:String}`,
-    ...scope.conditions.map((condition) => conditionSql(condition, ctx)),
-  ];
-  return boundedSubquery(
-    SCOPED_TABLE,
-    TABLE_TIME_COLUMNS[SCOPED_TABLE],
-    predicates.join(" AND "),
-  );
+  const runsOfX = (predicates: string[]): string =>
+    latestEvaluationRunsSubquery({
+      timeCol: TABLE_TIME_COLUMNS.evaluation_runs,
+      scopeWhere: `EvaluatorId = {${p}:String}`,
+      innerWhere: predicates.length > 0 ? predicates.join(" AND ") : "1 = 1",
+    });
+
+  const kept = scope.conditions.filter((c) => !c.negated);
+  const excluded = scope.conditions.filter((c) => c.negated);
+  return [
+    runsOfX(kept.map((c) => conditionSql(c, ctx))),
+    ...excluded.map((c) => `NOT ${runsOfX([conditionSql(c, ctx)])}`),
+  ].join(" AND ");
 }
 
 /**
- * The bound group in memory: some evaluation of the named evaluator meets
- * every condition. Each condition reuses its field's own in-memory predicate
- * over that one evaluation, so the two sides keep reading values the same way.
+ * The bound group in memory, mirroring {@link translateEvaluationScope}. Each
+ * condition reuses its field's own in-memory predicate over one evaluation, so
+ * the two sides keep reading values the same way.
  */
 export function evaluateEvaluationScope(
   scope: EvaluationScope,
@@ -143,37 +154,36 @@ export function evaluateEvaluationScope(
 ): boolean | Unsupported {
   if (trace.evaluations == null) return UNSUPPORTED;
   const evaluatorId = extractStringValue(scope.anchor);
-  return trace.evaluations.some(
-    (evaluation) =>
-      evaluation.evaluatorId === evaluatorId &&
-      scope.conditions.every(({ tag, field, negated }) => {
-        const def = FIELD_DEF_BY_NAME.get(field);
-        return (
-          def?.evaluateInMemory(tag, negated, {
-            ...trace,
-            evaluations: [evaluation],
-          }) === true
-        );
-      }),
+  const runsOfX = trace.evaluations.filter(
+    (evaluation) => evaluation.evaluatorId === evaluatorId,
+  );
+  const holds = (evaluation: EvaluationRunData, c: ScopedCondition) =>
+    FIELD_DEF_BY_NAME.get(c.field)?.evaluateInMemory(c.tag, false, {
+      ...trace,
+      evaluations: [evaluation],
+    }) === true;
+
+  const kept = scope.conditions.filter((c) => !c.negated);
+  const excluded = scope.conditions.filter((c) => c.negated);
+  return (
+    runsOfX.some((evaluation) => kept.every((c) => holds(evaluation, c))) &&
+    excluded.every((c) => !runsOfX.some((evaluation) => holds(evaluation, c)))
   );
 }
 
 /**
- * A condition's predicate on one `evaluation_runs` row. A NULL column (no
- * score, no label) fails a positive condition and passes a negated one, which
- * is how the tag-by-tag form and the in-memory reads already treat a missing
- * value.
+ * A condition's predicate on one `evaluation_runs` row, always in its kept
+ * form: an excluded condition is applied by excluding the rows it matches. A
+ * NULL column (no score, no label) matches no row either way.
  */
 function conditionSql(
-  { tag, field, negated }: ScopedCondition,
+  { tag, field }: ScopedCondition,
   ctx: TranslationContext,
 ): string {
   const facet = scopedFacet(field);
-  const positive =
-    facet.kind === "range"
-      ? translateNumericField(facet.expression, tag, false, ctx, facet.key)
-      : translateStringField(facet.expression, tag, false, ctx, facet.key);
-  return negated ? `NOT ifNull(${positive}, 0)` : positive;
+  return facet.kind === "range"
+    ? translateNumericField(facet.expression, tag, false, ctx, facet.key)
+    : translateStringField(facet.expression, tag, false, ctx, facet.key);
 }
 
 function scopedFacet(field: string): ExpressionCategoricalDef | RangeFacetDef {
@@ -193,19 +203,36 @@ function andOperands(node: LiqeQuery): LiqeQuery[] {
   return [...andOperands(logExpr.left), ...andOperands(logExpr.right)];
 }
 
+/** The chain's single evaluator and the result conditions beside it. */
+function scopeOf(operands: LiqeQuery[]): EvaluationScope | null {
+  const anchors = operands.filter(isAnchor);
+  if (anchors.length !== 1) return null;
+  const conditions = operands.flatMap((operand) => {
+    const condition = scopedCondition(operand);
+    return condition ? [condition] : [];
+  });
+  if (conditions.length === 0) return null;
+  return { anchor: anchors[0] as TagToken, conditions };
+}
+
 function isAnchor(node: LiqeQuery): boolean {
   return node.type === "Tag" && fieldOf(node as TagToken) === EVALUATOR_FIELD;
 }
 
 function scopedCondition(node: LiqeQuery): ScopedCondition | null {
   if (node.type === "Tag") {
-    return conditionOn(node as TagToken, { negated: false, nodeCount: 1 });
+    return conditionOn(node as TagToken, {
+      node,
+      negated: false,
+      nodeCount: 1,
+    });
   }
   if (node.type !== "UnaryOperator") return null;
   const unary = node as UnaryOperatorToken;
   const isNeg = unary.operator === "NOT" || unary.operator === "-";
   if (!isNeg || unary.operand.type !== "Tag") return null;
   return conditionOn(unary.operand as TagToken, {
+    node,
     negated: true,
     nodeCount: 2,
   });
@@ -213,7 +240,7 @@ function scopedCondition(node: LiqeQuery): ScopedCondition | null {
 
 function conditionOn(
   tag: TagToken,
-  shape: Pick<ScopedCondition, "negated" | "nodeCount">,
+  shape: Pick<ScopedCondition, "node" | "negated" | "nodeCount">,
 ): ScopedCondition | null {
   const field = fieldOf(tag);
   return field !== null && SCOPED_FACET_KEY_BY_FIELD.has(field)

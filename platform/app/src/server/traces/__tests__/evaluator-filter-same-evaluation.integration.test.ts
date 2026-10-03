@@ -19,6 +19,8 @@ import {
 } from "../../event-sourcing/__tests__/integration/testContainers";
 
 const tenantId = `test-eval-scope-${nanoid()}`;
+/** Holds evaluations stored in more than one version, kept apart from the rest. */
+const versionsTenantId = `test-eval-scope-versions-${nanoid()}`;
 const now = Date.now();
 const WINDOW = { from: now - 60_000, to: now + 60_000 };
 
@@ -28,11 +30,15 @@ const X_PASSED_Y_FAILED = `trace-x-passed-y-failed-${nanoid()}`;
 const X_FAILED = `trace-x-failed-${nanoid()}`;
 /** X failed, Y passed. */
 const X_FAILED_Y_PASSED = `trace-x-failed-y-passed-${nanoid()}`;
+/** X was scheduled, then failed; the scheduled version is not merged away. */
+const X_SCHEDULED_THEN_FAILED = `trace-x-scheduled-then-failed-${nanoid()}`;
+/** X ran twice: one run passed, the other failed. */
+const X_RAN_TWICE = `trace-x-ran-twice-${nanoid()}`;
 
-function traceRow(traceId: string) {
+function traceRow(traceId: string, tenant = tenantId) {
   return {
     ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
+    TenantId: tenant,
     TraceId: traceId,
     Version: "v1",
     Attributes: {},
@@ -58,24 +64,32 @@ function evaluationRow({
   passed,
   score,
   label = null,
+  tenant = tenantId,
+  evaluationId = `eval-${nanoid()}`,
+  status = "processed",
+  updatedAt = new Date(now),
 }: {
   traceId: string;
   evaluatorId: string;
-  passed: 0 | 1;
-  score: number;
+  passed: 0 | 1 | null;
+  score: number | null;
   label?: string | null;
+  tenant?: string;
+  evaluationId?: string;
+  status?: string;
+  updatedAt?: Date;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    EvaluationId: `eval-${nanoid()}`,
+    TenantId: tenant,
+    EvaluationId: evaluationId,
     Version: "v1",
     EvaluatorId: evaluatorId,
     EvaluatorType: "custom/test",
     EvaluatorName: evaluatorId,
     TraceId: traceId,
     IsGuardrail: 0,
-    Status: "processed",
+    Status: status,
     Score: score,
     Passed: passed,
     Label: label,
@@ -85,7 +99,7 @@ function evaluationRow({
     LastProcessedEventId: `evt-${nanoid()}`,
     ScheduledAt: new Date(now),
     CreatedAt: new Date(now),
-    UpdatedAt: new Date(now),
+    UpdatedAt: updatedAt,
     LastEventOccurredAt: new Date(now),
   };
 }
@@ -93,8 +107,8 @@ function evaluationRow({
 let ch: ClickHouseClient;
 
 /** The trace ids a compiled filter selects, sorted. */
-async function matching(filter: string): Promise<string[]> {
-  const compiled = translateFilterToClickHouse(filter, tenantId, WINDOW);
+async function matching(filter: string, tenant = tenantId): Promise<string[]> {
+  const compiled = translateFilterToClickHouse(filter, tenant, WINDOW);
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
   const result = await ch.query({
     query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled.sql}`,
@@ -112,7 +126,9 @@ beforeAll(async () => {
 
   await ch.insert({
     table: "trace_summaries",
-    values: [X_PASSED_Y_FAILED, X_FAILED, X_FAILED_Y_PASSED].map(traceRow),
+    values: [X_PASSED_Y_FAILED, X_FAILED, X_FAILED_Y_PASSED].map((traceId) =>
+      traceRow(traceId),
+    ),
     format: "JSONEachRow",
     clickhouse_settings: settings,
   });
@@ -154,6 +170,55 @@ beforeAll(async () => {
     format: "JSONEachRow",
     clickhouse_settings: settings,
   });
+
+  const xScheduled = `eval-${nanoid()}`;
+  await ch.insert({
+    table: "trace_summaries",
+    values: [X_SCHEDULED_THEN_FAILED, X_RAN_TWICE].map((traceId) =>
+      traceRow(traceId, versionsTenantId),
+    ),
+    format: "JSONEachRow",
+    clickhouse_settings: settings,
+  });
+  await ch.insert({
+    table: "evaluation_runs",
+    values: [
+      evaluationRow({
+        tenant: versionsTenantId,
+        traceId: X_SCHEDULED_THEN_FAILED,
+        evaluatorId: "X",
+        evaluationId: xScheduled,
+        status: "scheduled",
+        passed: null,
+        score: null,
+        updatedAt: new Date(now - 1_000),
+      }),
+      evaluationRow({
+        tenant: versionsTenantId,
+        traceId: X_SCHEDULED_THEN_FAILED,
+        evaluatorId: "X",
+        evaluationId: xScheduled,
+        passed: 0,
+        score: 0.1,
+      }),
+      evaluationRow({
+        tenant: versionsTenantId,
+        traceId: X_RAN_TWICE,
+        evaluatorId: "X",
+        passed: 1,
+        score: 0.9,
+      }),
+      evaluationRow({
+        tenant: versionsTenantId,
+        traceId: X_RAN_TWICE,
+        evaluatorId: "X",
+        passed: 0,
+        score: 0.1,
+      }),
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: settings,
+  });
 }, 120_000);
 
 afterAll(async () => {
@@ -184,6 +249,43 @@ describe("a trace filter pairing an evaluator with its result", () => {
       expect(
         await matching("evaluator:X AND NOT evaluatorVerdict:pass"),
       ).toEqual([X_FAILED, X_FAILED_Y_PASSED].sort());
+    });
+  });
+
+  describe("when an evaluation is stored in an older version too", () => {
+    it("judges it by its latest version only", async () => {
+      expect(
+        await matching(
+          "evaluator:X AND evaluatorStatus:scheduled",
+          versionsTenantId,
+        ),
+      ).toEqual([]);
+      expect(
+        await matching(
+          "evaluator:X AND NOT evaluatorVerdict:fail",
+          versionsTenantId,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the evaluator ran more than once", () => {
+    it("matches a kept result held by any run", async () => {
+      expect(
+        await matching(
+          "evaluator:X AND evaluatorVerdict:pass",
+          versionsTenantId,
+        ),
+      ).toEqual([X_RAN_TWICE]);
+    });
+
+    it("drops the trace when any run holds an excluded result", async () => {
+      expect(
+        await matching(
+          "evaluator:X AND NOT evaluatorVerdict:fail",
+          versionsTenantId,
+        ),
+      ).not.toContain(X_RAN_TWICE);
     });
   });
 

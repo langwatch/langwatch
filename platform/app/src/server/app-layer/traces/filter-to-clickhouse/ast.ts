@@ -14,8 +14,8 @@ import {
 import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
 import {
-  type EvaluationScope,
-  evaluationScopeOf,
+  type AndChain,
+  andChainOf,
   translateEvaluationScope,
 } from "./evaluation-scope";
 import type { ResolvedInstantEvalRun } from "./instant-eval-field";
@@ -381,9 +381,8 @@ function translateNode({
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
-      const scope =
-        bindEvaluations && !negated ? evaluationScopeOf(logExpr) : null;
-      if (scope) return translateBoundChain({ scope, ctx, walk });
+      const chain = bindEvaluations && !negated ? andChainOf(logExpr) : null;
+      if (chain) return translateAndChain({ chain, ctx, walk });
       const branch = (side: LiqeQuery): string => walk(side, negated);
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
       return `(${branch(logExpr.left)} ${op} ${branch(logExpr.right)})`;
@@ -408,29 +407,33 @@ function translateNode({
 }
 
 /**
- * An AND chain whose evaluator binds its result conditions: the bound group
- * as one subquery, ANDed with the chain's other operands walked as usual.
+ * An AND chain read once from its top: the bound evaluator group, if any, as
+ * one condition, ANDed with the chain's other operands walked as usual. The
+ * operands are folded left, the shape the parser gave the chain.
  */
-function translateBoundChain({
-  scope,
+function translateAndChain({
+  chain,
   ctx,
   walk,
 }: {
-  scope: EvaluationScope;
+  chain: AndChain;
   ctx: TranslationContext;
   walk: (next: LiqeQuery, negated: boolean) => string;
 }): string {
-  // The chain's own node is already counted; the bound group is not walked,
-  // so it is counted here to keep the ceiling where the tag-by-tag walk had it.
-  ctx.nodeCount += scope.nodeCount - 1;
+  // The chain's own node is already counted; its nested AND nodes and the
+  // bound group are not walked, so they are counted here to keep the ceiling
+  // where the tag-by-tag walk had it.
+  ctx.nodeCount += chain.nodeCount - 1;
   if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
     throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
   const parts = [
-    translateEvaluationScope(scope, ctx),
-    ...scope.rest.map((operand) => walk(operand, false)),
+    ...(chain.scope ? [translateEvaluationScope(chain.scope, ctx)] : []),
+    ...chain.rest.map((operand) => walk(operand, false)),
   ];
-  return `(${parts.join(" AND ")})`;
+  const [first = "1 = 1", ...others] = parts;
+  if (others.length === 0) return `(${first})`;
+  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
 }
 
 function translateTag(
