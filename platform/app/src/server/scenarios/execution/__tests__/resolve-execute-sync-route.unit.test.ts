@@ -25,10 +25,10 @@ beforeEach(() => {
 
 describe("the route a scenario run is prepared with", () => {
   describe("given the deployment is configured with per-project engines", () => {
-    /**
-     * @scenario "A deployment with per-project engines relays"
-     * @scenario "A relayed turn does not leave the deployment"
-     */
+    // Two scenarios, one assertion: the checker binds an annotation only when
+    // it closes its own comment, so they stack rather than share a block.
+    /** @scenario "A deployment with per-project engines relays" */
+    /** @scenario "A relayed turn does not leave the deployment" */
     it("routes the run through the control plane, at the address the app hands out", () => {
       mockEnv.LANGWATCH_NLP_LAMBDA_CONFIG = '{"AWS_REGION":"eu-central-1"}';
 
