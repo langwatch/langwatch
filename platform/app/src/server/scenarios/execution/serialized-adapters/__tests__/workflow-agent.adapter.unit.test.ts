@@ -18,6 +18,7 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import { directExecuteSyncTransport } from "../execute-sync-transport";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
@@ -109,16 +110,24 @@ describe("SerializedWorkflowAgentAdapter", () => {
   const nlpServiceUrl = "http://localhost:8080";
   const apiKey = "test-api-key";
 
-  /** NLP service /studio/execute_sync response format. */
-  const nlpResponse = (result: Record<string, unknown> | null) => ({
-    ok: true,
-    json: vi.fn().mockResolvedValue({
-      trace_id: "trace_abc123",
-      status: "success",
-      result,
-    }),
-    text: vi.fn().mockResolvedValue(""),
-  });
+  /**
+   * NLP service /studio/execute_sync response format.
+   *
+   * `text` serves the same body `json` would, because the adapter reads the
+   * body once as text: `json()` consumes the stream, so a json-then-text
+   * fallback cannot recover a non-JSON payload (lw#3439). A helper that left
+   * `text` empty would make this suite pass over a body the adapter never
+   * managed to read.
+   */
+  const nlpResponse = (result: Record<string, unknown> | null) => {
+    const body = { trace_id: "trace_abc123", status: "success", result };
+    return {
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(body),
+      text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+    };
+  };
 
   const defaultInput: AgentInput = {
     threadId: "thread_123",
@@ -162,7 +171,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("has AGENT role", () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       expect(adapter.role).toBe(AgentRole.AGENT);
@@ -171,7 +180,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("has correct name", () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       expect(adapter.name).toBe("SerializedWorkflowAgentAdapter");
@@ -184,7 +193,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", "s3cr3t");
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -200,7 +209,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       vi.stubEnv("LANGWATCH_NLP_INTERNAL_SECRET", undefined);
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -216,7 +225,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("sends an execute_flow event to /go/studio/execute_sync", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -245,7 +254,9 @@ describe("SerializedWorkflowAgentAdapter", () => {
               OTHER_SECRET: "value-2",
             },
           },
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -273,7 +284,9 @@ describe("SerializedWorkflowAgentAdapter", () => {
               WORKFLOW_LANGWATCH_API_KEY: "sk-lw-fresh",
             },
           },
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -291,7 +304,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("passes the pre-fetched workflow DSL through unchanged", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -308,7 +321,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("returns the end node output as a response string", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -320,7 +333,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("sets run_evaluations to false and do_not_trace to true", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -333,7 +346,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("generates a valid 32-char hex trace_id", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -354,7 +367,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       };
       const adapter = new SerializedWorkflowAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -378,7 +391,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(multiMessageInput);
@@ -404,7 +417,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("uses resolved mappings for input record values", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -430,7 +443,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       };
       const adapter = new SerializedWorkflowAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -452,7 +465,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       };
       const adapter = new SerializedWorkflowAgentAdapter({
         config: singleInputConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -481,7 +494,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -501,7 +514,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -518,7 +531,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -539,7 +552,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -558,7 +571,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -574,7 +587,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -587,7 +600,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("passes an abort signal for timeout protection", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -627,7 +640,9 @@ describe("SerializedWorkflowAgentAdapter", () => {
       try {
         const adapter = new SerializedWorkflowAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         // Attach the rejection handler before advancing timers so the abort
@@ -677,7 +692,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("passes a dispatcher whose headers timeout matches the 630s default deadline", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -695,7 +710,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     ) {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters,
       });
@@ -770,7 +785,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       injectTraceContext();
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { region: "eu-central" },
       });
@@ -789,7 +804,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       injectTraceContext();
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { trace_id: "supplied", traceparent: "supplied" },
       });
@@ -807,7 +822,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       injectTraceContext();
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { region: "eu-central" },
       });

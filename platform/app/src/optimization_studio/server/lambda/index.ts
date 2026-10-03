@@ -13,6 +13,7 @@ import {
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
+import { LAMBDA_CLIENT_MAX_ATTEMPTS } from "~/utils/lambdaInvokeAttempts";
 import {
   concatBytes,
   findLWAPreludeSeparator,
@@ -97,13 +98,6 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
     );
   }
 };
-
-// SDK default is 3 retries for retryable errors (incl. TooManyRequestsException
-// which surfaces as "Rate Exceeded."). When the per-project Lambda fleet is
-// cold-starting under a fresh image, a transient ConcurrentExecutions burst
-// can cause 3-retry windows to all land inside the saturation. Bumped to 6
-// to ride out a ~30-60s burst without surfacing the error to Studio.
-const LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
 
 export const createLambdaClient = (
   opts: { maxAttempts?: number } = {},

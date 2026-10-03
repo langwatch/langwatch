@@ -98,6 +98,14 @@ function named(name: string) {
   return Object.assign(new Error(name), { name });
 }
 
+/**
+ * A socket error the way the SDK's node handler rejects with it: the real
+ * Node error, carrying `code` and the generic name `Error`.
+ */
+function connectFailed(code: string) {
+  return Object.assign(new Error(`connect ${code} 10.0.0.5:443`), { code });
+}
+
 beforeEach(() => {
   sendCalls.length = 0;
   stageCalls.length = 0;
@@ -320,6 +328,71 @@ describe("how many times a turn may run the customer's code", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("given the connection to the Lambda service was never established", () => {
+    /** @scenario "An invoke that never reached the service is retried" */
+    it("retries, because no request bytes reached the function", async () => {
+      let attempts = 0;
+      lambdaState.handler = async () => {
+        attempts += 1;
+        if (attempts < 2) throw connectFailed("ECONNREFUSED");
+        return {
+          StatusCode: 200,
+          Payload: lwaPayload({ status: 200, body: '{"ran":1}' }),
+        };
+      };
+
+      vi.useFakeTimers();
+      try {
+        const pending = lambdaFetch(ARN, PATH, { method: "POST", body: "{}" });
+        await vi.advanceTimersByTimeAsync(30_000);
+        const response = await pending;
+
+        expect(sendCalls).toHaveLength(2);
+        expect(await response.json()).toEqual({ ran: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("reads the socket error off `cause` as well, since a wrapping handler puts it there", async () => {
+      let attempts = 0;
+      lambdaState.handler = async () => {
+        attempts += 1;
+        if (attempts < 2) {
+          throw new Error("send failed", {
+            cause: connectFailed("EAI_AGAIN"),
+          });
+        }
+        return {
+          StatusCode: 200,
+          Payload: lwaPayload({ status: 200, body: "{}" }),
+        };
+      };
+
+      vi.useFakeTimers();
+      try {
+        const pending = lambdaFetch(ARN, PATH, { method: "POST", body: "{}" });
+        await vi.advanceTimersByTimeAsync(30_000);
+        await pending;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(sendCalls).toHaveLength(2);
+    });
+
+    it("does not retry a reset, which says nothing about whether the function ran", async () => {
+      lambdaState.handler = async () => {
+        throw connectFailed("ECONNRESET");
+      };
+
+      await expect(
+        lambdaFetch(ARN, PATH, { method: "POST", body: "{}" }),
+      ).rejects.toThrow("ECONNRESET");
+      expect(sendCalls).toHaveLength(1);
     });
   });
 

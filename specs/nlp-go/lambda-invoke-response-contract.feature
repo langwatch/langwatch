@@ -102,6 +102,16 @@ Feature: The nlpgo invoke lane answers what nlpgo answered
       # image bursts concurrency, so this retry is what keeps those turns alive.
 
     @unit
+    Scenario: An invoke that never reached the service is retried
+      Given the connection to the Lambda service is refused
+      When the control plane invokes the per-project nlpgo Lambda
+      Then the invoke is retried
+      And the function runs the user's code only once in total
+      # No request bytes left this process, so the function cannot have run.
+      # A reset or a read timeout is different: either may have delivered the
+      # request, so neither is retried.
+
+    @unit
     Scenario: A staged payload survives a retry and is reaped once
       Given an oversized body was staged to S3 and the first invoke is throttled
       When the invoke is retried and succeeds

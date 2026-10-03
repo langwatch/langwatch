@@ -1,3 +1,4 @@
+import type { Dispatcher } from "undici";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import { nlpgoInternalHeaders } from "./internalSecret";
@@ -97,6 +98,25 @@ export interface NLPGOFetchOptions<TBody = unknown> {
     traceId: string;
     parentSpanId: string;
   };
+  /**
+   * Deadline for this call, honoured on the Lambda lane and the HTTP lane
+   * alike. Omit it and no deadline is imposed, which is what every caller
+   * that predates it gets.
+   */
+  timeoutMs?: number;
+  /**
+   * The caller's own cancellation. A caller that already bounds the call with
+   * its own timer passes the signal alone and keeps that timer as the single
+   * deadline, so a failure is classified by the caller rather than twice.
+   */
+  signal?: AbortSignal;
+  /**
+   * HTTP lane only: an undici dispatcher, for a caller that must hold the
+   * socket past undici's 300s `headersTimeout`/`bodyTimeout` defaults. Build
+   * it with `createNlpFetchDispatcher` in `./timeouts`. Without one a self
+   * hosted call is cut off at 300s however far out the deadline is armed.
+   */
+  dispatcher?: Dispatcher;
 }
 
 export interface NLPGOFetchResult<T> {
@@ -164,6 +184,9 @@ export async function nlpgoFetch<T = unknown>(
     // sync-invoke Payload cap (per-project ARN path only; no-op for the
     // self-hosted HTTP URL path).
     projectId: opts.projectId,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    dispatcher: opts.dispatcher,
   });
 
   return {

@@ -10,7 +10,7 @@
  * tests drive the real nlpgoFetch and the real lambdaFetch, mocking only the
  * AWS client, so they cover the whole chain rather than the guard alone.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { lambdaState, findFirstMock } = vi.hoisted(() => ({
   lambdaState: { handler: null as null | (() => Promise<unknown>) },
@@ -91,6 +91,13 @@ beforeEach(() => {
   });
   // Selects the per-project Lambda lane in nlpgoFetch.
   vi.stubEnv("LANGWATCH_NLP_LAMBDA_CONFIG", "{}");
+});
+
+// The variable above is what selects the Lambda lane, and the unit config runs
+// with `isolate: false`, so leaving it stubbed would put every later file in
+// this worker on the Lambda lane too.
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 function run() {

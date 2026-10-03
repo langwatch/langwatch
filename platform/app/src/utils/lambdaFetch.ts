@@ -1,3 +1,4 @@
+import { STATUS_CODES } from "node:http";
 import {
   InvokeCommand,
   type InvokeCommandOutput,
@@ -13,6 +14,7 @@ import {
   type StagedObject,
   stagePayloadToS3,
 } from "../server/s3/stagePayload";
+import { LAMBDA_CLIENT_MAX_ATTEMPTS } from "./lambdaInvokeAttempts";
 import { readLWAResponsePayload } from "./lwaPrelude";
 
 const logger = createLogger("langwatch:lambdaFetch");
@@ -34,13 +36,12 @@ const FUNCTION_ERROR_STATUS = 502;
 
 /**
  * Total attempts for an invoke the Lambda control plane refused BEFORE the
- * function started. Matches the studio client's own allowance
- * (LAMBDA_CLIENT_MAX_ATTEMPTS), which exists to ride out the concurrency burst
- * a cold per-project image causes. Only the errors in
- * {@link invokeNeverStarted} consume these attempts; see
- * {@link sendInvokeAtMostOnce}.
+ * function started. The studio client's own allowance, which exists to ride
+ * out the concurrency burst a cold per-project image causes, so the two stay
+ * one number. Only the errors in {@link invokeNeverStarted} consume these
+ * attempts; see {@link sendInvokeAtMostOnce}.
  */
-const INVOKE_MAX_ATTEMPTS = 6;
+const INVOKE_MAX_ATTEMPTS = LAMBDA_CLIENT_MAX_ATTEMPTS;
 
 /** First backoff step between refused invokes; doubles per attempt. */
 const INVOKE_RETRY_BASE_DELAY_MS = 500;
@@ -146,30 +147,13 @@ type LambdaFetchResponse<T> = {
 
 /**
  * The reason phrase for a status, so the Lambda lane's `statusText` reads the
- * way the HTTP lane's does. Only the statuses nlpgo and the invoke path
- * actually produce are named; anything else degrades to the number rather than
- * claiming a phrase it does not have.
+ * way the HTTP lane's does. `STATUS_CODES` is the same table `fetch` answers
+ * from, which is what keeps the two lanes describing one engine answer with
+ * one string. A status outside it degrades to the number rather than claiming
+ * a phrase it does not have.
  */
-const REASON_PHRASES: Record<number, string> = {
-  200: "OK",
-  201: "Created",
-  204: "No Content",
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  408: "Request Timeout",
-  413: "Payload Too Large",
-  422: "Unprocessable Entity",
-  429: "Too Many Requests",
-  500: "Internal Server Error",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
-  504: "Gateway Timeout",
-};
-
 function reasonPhrase(status: number): string {
-  return REASON_PHRASES[status] ?? `HTTP ${status}`;
+  return STATUS_CODES[status] ?? `HTTP ${status}`;
 }
 
 /**
@@ -182,19 +166,39 @@ function reasonPhrase(status: number): string {
  * read timeout) is ambiguous about whether the function got the request, and
  * an ambiguous retry is a second execution of someone's Python.
  */
+const INVOKE_REFUSED_ERROR_NAMES = new Set([
+  "TooManyRequestsException",
+  "ThrottlingException",
+  "EC2ThrottledException",
+]);
+
+/**
+ * Socket errors raised while the connection was still being established, so
+ * no request bytes reached the service.
+ */
+const CONNECT_FAILED_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+]);
+
 function invokeNeverStarted(error: unknown): boolean {
   const name = (error as { name?: string } | null)?.name;
-  if (
-    name === "TooManyRequestsException" ||
-    name === "ThrottlingException" ||
-    name === "EC2ThrottledException"
-  ) {
+  if (name !== undefined && INVOKE_REFUSED_ERROR_NAMES.has(name)) {
     return true;
   }
+  // The SDK's node handler rejects with the socket error itself, so `code` is
+  // on the error. A handler that wraps it instead leaves the socket error on
+  // `cause`, which is where undici and Node's own fetch put it, so both
+  // shapes are read.
   const code = (error as { code?: string } | null)?.code;
-  return (
-    code === "ECONNREFUSED" || code === "ENOTFOUND" || code === "EAI_AGAIN"
-  );
+  if (code !== undefined && CONNECT_FAILED_ERROR_CODES.has(code)) {
+    return true;
+  }
+  const causeCode = (
+    (error as { cause?: { code?: string } } | null)?.cause ?? null
+  )?.code;
+  return causeCode !== undefined && CONNECT_FAILED_ERROR_CODES.has(causeCode);
 }
 
 function backoffDelayMs(attempt: number): number {
@@ -236,8 +240,8 @@ function sleep({
  */
 function armDeadline(init: LambdaFetchInit | undefined): {
   signal: AbortSignal | undefined;
-  timedOut: () => boolean;
-  cancelled: () => boolean;
+  hasTimedOut: () => boolean;
+  isCancelled: () => boolean;
 } {
   const timeoutSignal =
     init?.timeoutMs === undefined
@@ -253,8 +257,8 @@ function armDeadline(init: LambdaFetchInit | undefined): {
         : signals.length === 1
           ? signals[0]
           : AbortSignal.any(signals),
-    timedOut: () => timeoutSignal?.aborted ?? false,
-    cancelled: () => init?.signal?.aborted ?? false,
+    hasTimedOut: () => timeoutSignal?.aborted ?? false,
+    isCancelled: () => init?.signal?.aborted ?? false,
   };
 }
 
@@ -269,14 +273,14 @@ function classifyCallFailure({
   timeoutMs,
 }: {
   error: unknown;
-  deadline: { timedOut: () => boolean; cancelled: () => boolean };
+  deadline: { hasTimedOut: () => boolean; isCancelled: () => boolean };
   path: string;
   timeoutMs: number | undefined;
 }): never {
-  if (deadline.cancelled()) {
+  if (deadline.isCancelled()) {
     throw new LambdaFetchAbortedError({ path });
   }
-  if (deadline.timedOut() && timeoutMs !== undefined) {
+  if (deadline.hasTimedOut() && timeoutMs !== undefined) {
     throw new LambdaFetchTimeoutError({ path, timeoutMs });
   }
   throw error;
@@ -294,7 +298,7 @@ async function classifyingCallFailures<R>({
   timeoutMs,
 }: {
   run: () => Promise<R>;
-  deadline: { timedOut: () => boolean; cancelled: () => boolean };
+  deadline: { hasTimedOut: () => boolean; isCancelled: () => boolean };
   path: string;
   timeoutMs: number | undefined;
 }): Promise<R> {
