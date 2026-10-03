@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.4.0...clickhouse-serverless@v0.5.0) (2026-10-03)
+
+
+### Features
+
+* **lwql:** the app always owns the LangWatchQL access model — remove LWQL_SELF_PROVISION, delete the chart's rendered LWQL path, supersede ADR-101 ([#8258](https://github.com/langwatch/langwatch/issues/8258)) ([#8261](https://github.com/langwatch/langwatch/issues/8261)) ([a0e8401](https://github.com/langwatch/langwatch/commit/a0e8401f6aa2983178febc024f59af84cee4958d))
+
+
+### Bug Fixes
+
+* **self-hosting:** autogen-off and Argo CD installs, gateway ingress, PDBs, activation codes in the license variable, SSO without restart ([#8399](https://github.com/langwatch/langwatch/issues/8399)) ([0a300c1](https://github.com/langwatch/langwatch/commit/0a300c1dab1cbd2f3c1ba909542a136751ec1e3c))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.3.0...clickhouse-serverless@v0.4.0) (2026-09-12)
 
 
