@@ -1645,7 +1645,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       "Update a trigger (automation). Anything left out is left alone.",
       "",
       "`actionParams` replaces the delivery configuration as a whole, so send every field it should have from now on. A credential the read hid comes back as [redacted]; send that back to keep the stored value. Changing a webhook's `url` means sending its header values in the same call.",
-      "The delivery channel and the kind of automation cannot be changed.",
+      "The delivery channel, the kind of automation and an alert's graph cannot be changed.",
     ].join("\n"),
     {
       id: z.string().describe("The trigger ID"),
