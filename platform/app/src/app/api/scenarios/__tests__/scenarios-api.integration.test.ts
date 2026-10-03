@@ -488,6 +488,24 @@ describe("Scenarios API", () => {
         });
       });
 
+      describe("when the body carries a field the endpoint does not have", () => {
+        it("refuses the update, names the field and leaves the scenario as it was", async () => {
+          const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+            labels: ["relabelled"],
+            status: "active",
+          });
+
+          expect(res.status).toBe(422);
+          const body = await res.json();
+          expect(body.error).toBe("validation_error");
+          expect(JSON.stringify(body.reasons)).toContain("status");
+          const stored = await prisma.scenario.findFirst({
+            where: { id: scenario.id, projectId: testProjectId },
+          });
+          expect(stored?.labels).toEqual(["original"]);
+        });
+      });
+
       describe("when name is empty", () => {
         it("returns a validation error", async () => {
           const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
