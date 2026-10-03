@@ -149,10 +149,7 @@ export interface EvaluateGraphTriggerResult {
   missingVariables?: string[];
 }
 
-export type StoredGraphConfig = Pick<
-  CustomGraphInput,
-  "series" | "groupBy" | "groupByKey" | "timeScale"
->;
+export type StoredGraphConfig = Pick<CustomGraphInput, "series" | "timeScale">;
 
 /**
  * Notification dispatcher hook (ADR-034 Phase 8.1). Implemented in the

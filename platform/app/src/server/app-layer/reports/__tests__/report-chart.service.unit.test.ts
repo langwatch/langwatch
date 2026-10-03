@@ -212,6 +212,7 @@ describe("loadReportCharts", () => {
 
       expect(chart!.series[0]!.data.map((p) => p.value)).toEqual([150]);
       expect(chart!.total).toBe(150);
+      expect(getTimeseries.mock.calls[0]![0].groupBy).toBeUndefined();
     });
   });
 
@@ -261,6 +262,11 @@ describe("loadReportCharts", () => {
       ]);
       expect(chart!.series).toEqual([]);
       expect(chart!.total).toBe(7);
+      // Slices come from the groups, so a pie is the one chart that still
+      // asks the timeseries for them.
+      expect(deps.getTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({ groupBy: "metadata.model" }),
+      );
     });
   });
 
