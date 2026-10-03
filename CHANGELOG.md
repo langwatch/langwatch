@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.21.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.1...langwatch@v3.21.0) (2026-10-03)
+
+
+### Features
+
+* **auth:** setting to restrict self sign-up on self-hosted installs ([#8425](https://github.com/langwatch/langwatch/issues/8425)) ([dd31854](https://github.com/langwatch/langwatch/commit/dd3185478284c7897ad112efa28366238decc0e5))
+* **instant-evals:** opt-in switch for self-serve organizations, clearer refusal popovers ([#8348](https://github.com/langwatch/langwatch/issues/8348)) ([0a2baa6](https://github.com/langwatch/langwatch/commit/0a2baa67ecbf6e8973cdec617ccb66ce414295b2))
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+
+
+### Bug Fixes
+
+* **aigateway:** merge parallel tool results on the Bedrock Converse lane and keep Bedrock refusal statuses ([#8422](https://github.com/langwatch/langwatch/issues/8422)) ([0182e6b](https://github.com/langwatch/langwatch/commit/0182e6ba578a772a362b27ec6a5c94b5d2ed9240))
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* **deps:** bump OpenTelemetry Go modules to clear govulncheck ([#8417](https://github.com/langwatch/langwatch/issues/8417)) ([e477614](https://github.com/langwatch/langwatch/commit/e4776147883d496995fbf4f34dbdd8ba218d8db2))
+* **langy:** route Bedrock OpenAI models through Converse, name provider refusals, apply provider changes to cached keys ([#8388](https://github.com/langwatch/langwatch/issues/8388)) ([d75ae80](https://github.com/langwatch/langwatch/commit/d75ae801b38966a25b0d512109cdeab73826e7ce))
+* **nlpgo:** harden code-block isolation and internal endpoint auth ([#8424](https://github.com/langwatch/langwatch/issues/8424)) ([ff9f1ed](https://github.com/langwatch/langwatch/commit/ff9f1ed1e6a96cc33daa1dfc49f11aed34c45f7c))
+* **scenarios:** run a project's turns on its own engine, and read that engine's status ([#8429](https://github.com/langwatch/langwatch/issues/8429)) ([66c9815](https://github.com/langwatch/langwatch/commit/66c98151dfbd5b49c353c246a1462b090599a7ad))
+* **scenarios:** send a relayed turn to the address the app hands out, not the public one ([#8431](https://github.com/langwatch/langwatch/issues/8431)) ([4c193ed](https://github.com/langwatch/langwatch/commit/4c193ed46a4f8f823e0f47c9461b460413595bd9))
+
+
+### Miscellaneous
+
+* drop unused SENTRY_DSN env key ([#8381](https://github.com/langwatch/langwatch/issues/8381)) ([47135b2](https://github.com/langwatch/langwatch/commit/47135b2627af2c5f00188cf0b854adf01b27c47f))
+
+
+### Documentation
+
+* **self-hosting:** correct security, env var and Helm values docs against the code ([#8426](https://github.com/langwatch/langwatch/issues/8426)) ([92d3399](https://github.com/langwatch/langwatch/commit/92d3399871bbd920a022ec46b983fc7db9f48f72))
+
 ## [3.20.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.0...langwatch@v3.20.1) (2026-10-02)
 
 
