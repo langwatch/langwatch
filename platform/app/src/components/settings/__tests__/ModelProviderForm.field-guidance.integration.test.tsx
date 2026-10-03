@@ -11,100 +11,23 @@
  * specs/model-providers/credential-validation.feature.
  */
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const {
-  mockMutateAsync,
-  mockGetAllForProjectForFrontendQuery,
-  mockListAllForOrganizationForFrontendQuery,
-  mockListAllForProjectForFrontendQuery,
-} = vi.hoisted(() => ({
-  mockMutateAsync: vi.fn().mockResolvedValue({}),
-  mockGetAllForProjectForFrontendQuery: vi.fn(),
-  mockListAllForOrganizationForFrontendQuery: vi.fn(),
-  mockListAllForProjectForFrontendQuery: vi.fn(),
-}));
-
-vi.mock("../../../utils/api", () => ({
-  api: {
-    modelProvider: {
-      getAllForProjectForFrontend: {
-        useQuery: mockGetAllForProjectForFrontendQuery,
-      },
-      listAllForOrganizationForFrontend: {
-        useQuery: mockListAllForOrganizationForFrontendQuery,
-      },
-      listAllForProjectForFrontend: {
-        useQuery: mockListAllForProjectForFrontendQuery,
-      },
-      update: { useMutation: () => ({ mutateAsync: mockMutateAsync }) },
-      setRoleAssignmentForScope: {
-        useMutation: () => ({
-          mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
-        }),
-      },
-      isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
-    },
-    useUtils: () => ({
-      organization: { getAll: { invalidate: vi.fn() } },
-      modelProvider: {
-        getAllForProject: { invalidate: vi.fn() },
-        getAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForOrganizationForFrontend: { invalidate: vi.fn() },
-        getResolvedDefault: { invalidate: vi.fn() },
-        getDefaultModelsForProject: { invalidate: vi.fn() },
-      },
-    }),
-  },
-}));
-
-vi.mock("../../../hooks/useDrawer", () => ({
-  useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
-}));
-
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", name: "Web App", slug: "web-app" },
-    team: { id: "team-1", name: "Platform" },
-    organization: {
-      id: "org-1",
-      name: "Acme",
-      teams: [
-        {
-          id: "team-1",
-          name: "Platform",
-          projects: [{ id: "proj-1", name: "Web App" }],
-        },
-      ],
-    },
-    hasPermission: () => true,
-  }),
-}));
-
-vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
-  useModelProviderApiKeyValidation: () => ({
-    validate: vi.fn().mockResolvedValue(true),
-    validateWithCustomUrl: vi.fn().mockResolvedValue(true),
-    isValidating: false,
-    validationError: undefined,
-    clearError: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
-}));
-
-vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { modelProviderRegistry } from "../../../features/onboarding/regions/model-providers/registry";
-import { EditModelProviderForm } from "../ModelProviderForm";
 import {
   keyedRow,
   makePrimeQueries,
+  modelProviderDrawerMocks,
+  resetModelProviderDrawerMocks,
   Wrapper,
 } from "./modelProviderDrawerHarness";
+import { EditModelProviderForm } from "../ModelProviderForm";
+
+const {
+  mockGetAllForProjectForFrontendQuery,
+  mockListAllForOrganizationForFrontendQuery,
+  mockListAllForProjectForFrontendQuery,
+} = modelProviderDrawerMocks;
 
 const primeQueries = makePrimeQueries({
   collapsedQuery: mockGetAllForProjectForFrontendQuery,
@@ -130,7 +53,7 @@ const geminiEntry = modelProviderRegistry.find(
 
 describe("Feature: the drawer says where each credential comes from", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetModelProviderDrawerMocks();
   });
 
   afterEach(() => {
